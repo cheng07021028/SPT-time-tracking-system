@@ -40,7 +40,9 @@ if not df.empty:
         if h <= 7.5:
             return "正常"
         return "超時"
+
     df["status"] = df.apply(lambda r: status(r["total_hours"], r["record_count"], r["active_count"]), axis=1)
+    df["累積工時 / Total Time"] = df["total_hours"].map(hours_to_hms)
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("出勤在廠人數 / Attendance", f"{len(df):,}")
@@ -48,19 +50,36 @@ if not df.empty:
     c3.metric("未紀錄 / No Record", f"{(df['status']=='未紀錄').sum():,}")
     c4.metric("偏低 / Low", f"{(df['status']=='偏低').sum():,}")
 
-    st.subheader("BI 工時分布 / BI Time Distribution")
+    st.subheader("工時分布 / Time Distribution")
     chart_df = df.copy()
-    chart_df["total_seconds"] = chart_df["total_hours"].astype(float) * 3600
     fig = px.bar(
         chart_df.sort_values("total_hours", ascending=False),
         x="employee_name",
-        y="total_seconds",
+        y="total_hours",
         color="status",
-        hover_data=["employee_id", "department", "title", "record_count", "active_count"],
-        labels={"employee_name": "人員", "total_seconds": "累積秒數", "status": "狀態"},
-        title="人員每日累積工時 BI 圖 / Daily Employee Time BI",
+        hover_data={
+            "employee_id": True,
+            "department": True,
+            "title": True,
+            "record_count": True,
+            "active_count": True,
+            "total_hours": ":.2f",
+            "累積工時 / Total Time": True,
+        },
+        labels={"employee_name": "人員", "total_hours": "累積時數", "status": "狀態"},
+        title="人員每日累積工時 / Daily Employee Time",
     )
-    fig.update_layout(template="plotly_dark", height=420, margin=dict(l=20, r=20, t=60, b=80))
+    fig.update_layout(
+        template="plotly_dark",
+        height=420,
+        margin=dict(l=20, r=20, t=60, b=80),
+        yaxis_title="累積時數",
+        xaxis_title="人員",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info("目前沒有符合條件的人員資料 / No employee data")
 
 render_table(df, "daily_employee_hours", editable=False, height=620)
