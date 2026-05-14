@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
+
 from datetime import datetime, date
 import uuid
 import pandas as pd
+
 from .db_service import execute, query_df, query_one
 from .calculation_service import calculate_work_hours, split_timestamp
 from .log_service import write_log
@@ -16,6 +18,22 @@ def make_record_key(employee_id: str, work_order: str, process_name: str, start_
     return f"{employee_id}|{work_order}|{process_name}|{start_ts}|{uuid.uuid4().hex[:8]}"
 
 
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None) -> pd.DataFrame:
+    sql = "SELECT * FROM time_records WHERE end_timestamp IS NULL"
+    params: list[str] = []
+    if employee_id:
+        sql += " AND employee_id=?"
+        params.append(employee_id)
+    if process_name:
+        sql += " AND process_name=?"
+        params.append(process_name)
+    if start_date:
+        sql += " AND start_date=?"
+        params.append(start_date)
+    sql += " ORDER BY employee_id, process_name, start_timestamp, id"
+    return query_df(sql, params)
+
+
 def get_active_record(employee_id: str) -> dict | None:
     return query_one(
         """
@@ -27,14 +45,44 @@ def get_active_record(employee_id: str) -> dict | None:
     )
 
 
+def get_active_group(record_id: int) -> pd.DataFrame:
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (record_id,))
+    if not rec:
+        return pd.DataFrame()
+    return get_active_records(
+        employee_id=rec.get("employee_id"),
+        process_name=rec.get("process_name"),
+        start_date=rec.get("start_date"),
+    )
+
+
+def _pause_conflicting_active_records(employee_id: str, process_name: str, start_date: str) -> int:
+    """Same employee may run parallel records only within same day + same process.
+
+    When starting a different process/day, close all other active records as paused.
+    """
+    active = get_active_records(employee_id=employee_id)
+    if active.empty:
+        return 0
+    conflict = active[(active["process_name"].astype(str) != str(process_name)) | (active["start_date"].astype(str) != str(start_date))]
+    closed = 0
+    for _, row in conflict.iterrows():
+        finish_work(int(row["id"]), "暫停", "系統自動暫停：同一人員切換不同工段或不同日期作業", finish_parallel_group=True)
+        closed += 1
+    return closed
+
+
 def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:
     now = _now()
-    active = get_active_record(employee["employee_id"])
-    if active and auto_pause_old:
-        finish_work(active["id"], "暫停", "系統自動暫停：同一人員開始新的作業")
-
     start_date, start_time = split_timestamp(now)
-    record_key = make_record_key(employee["employee_id"], work_order["work_order"], process_name, now)
+    employee_id = employee.get("employee_id")
+
+    # V1.3 規則：同一人、同一天、同一工段可以同時多筆製令計時；不同工段才自動暫停舊作業。
+    if auto_pause_old:
+        _pause_conflicting_active_records(employee_id, process_name, start_date)
+
+    record_key = make_record_key(employee_id, work_order.get("work_order"), process_name, now)
+    group_key = f"{employee_id}|{process_name}|{start_date}"
     rid = execute(
         """
         INSERT INTO time_records(
@@ -51,7 +99,7 @@ def start_work(employee: dict, work_order: dict, process_name: str, remark: str 
             work_order.get("part_no", ""),
             work_order.get("type_name", ""),
             process_name,
-            employee.get("employee_id"),
+            employee_id,
             employee.get("employee_name"),
             "開始",
             now,
@@ -59,39 +107,83 @@ def start_work(employee: dict, work_order: dict, process_name: str, remark: str 
             start_date,
             start_time,
             work_order.get("assembly_location", ""),
-            f"{work_order.get('work_order')}|{process_name}|{start_date}|{start_time[:5]}",
+            group_key,
             0,
             "streamlit",
             now,
             now,
         ),
     )
+
+    parallel = get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date)
+    if len(parallel) > 1:
+        execute(
+            "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND process_name=? AND start_date=? AND end_timestamp IS NULL",
+            (group_key, now, employee_id, process_name, start_date),
+        )
     write_log("START_WORK", f"{employee.get('employee_name')} 開始 {work_order.get('work_order')} / {process_name}", "time_records", rid)
     return rid
 
 
-def finish_work(record_id: int, end_action: str, remark: str = "") -> None:
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:
+    """Finish work record.
+
+    V1.3 core rule:
+    - Same employee + same day + same process = parallel active group.
+    - Ending any one record ends all records in that active group.
+    - The elapsed group hours from earliest start to end now, after rest deduction, are averaged back to each record.
+    """
     rec = query_one("SELECT * FROM time_records WHERE id=?", (record_id,))
     if not rec:
         raise ValueError("找不到工時紀錄")
     if rec.get("end_timestamp"):
-        return
+        return 0
+
     now = _now()
     end_date, end_time = split_timestamp(now)
-    hours = calculate_work_hours(rec["start_timestamp"], now)
     status = end_action if end_action in ("下班", "暫停", "完工") else "已結束"
-    new_remark = rec.get("remark") or ""
-    if remark:
-        new_remark = (new_remark + "；" if new_remark else "") + remark
-    execute(
-        """
-        UPDATE time_records
-        SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?, work_hours=?, remark=?, updated_at=?
-        WHERE id=?
-        """,
-        (status, end_action, now, end_date, end_time, hours, new_remark, now, record_id),
+
+    if finish_parallel_group:
+        group = get_active_group(record_id)
+    else:
+        group = pd.DataFrame([rec])
+
+    if group.empty:
+        group = pd.DataFrame([rec])
+
+    group_ids = [int(x) for x in group["id"].tolist()]
+    earliest_start = min(str(x) for x in group["start_timestamp"].dropna().tolist())
+    total_hours = calculate_work_hours(earliest_start, now)
+    avg_hours = round(total_hours / max(len(group_ids), 1), 2)
+    is_group = 1 if len(group_ids) > 1 else int(rec.get("is_group_work") or 0)
+    group_key = rec.get("group_key") or f"{rec.get('employee_id')}|{rec.get('process_name')}|{rec.get('start_date')}"
+
+    for rid in group_ids:
+        old = query_one("SELECT remark FROM time_records WHERE id=?", (rid,)) or {}
+        new_remark = old.get("remark") or ""
+        append = remark or ""
+        if len(group_ids) > 1:
+            append = (append + "；" if append else "") + f"同步作業平均分配：{len(group_ids)}筆，群組總工時={total_hours:.2f}，平均={avg_hours:.2f}"
+        if append:
+            new_remark = (new_remark + "；" if new_remark else "") + append
+        execute(
+            """
+            UPDATE time_records
+            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
+            WHERE id=? AND end_timestamp IS NULL
+            """,
+            (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, is_group, now, rid),
+        )
+
+    write_log(
+        "END_WORK_GROUP" if len(group_ids) > 1 else "END_WORK",
+        f"結束工時紀錄 #{record_id}，同步結束={len(group_ids)}筆，狀態={status}，群組總工時={total_hours:.2f}，平均工時={avg_hours:.2f}",
+        "time_records",
+        record_id,
+        detail=",".join(str(x) for x in group_ids),
     )
-    write_log("END_WORK", f"結束工時紀錄 #{record_id}，狀態={status}，工時={hours}", "time_records", record_id)
+    return len(group_ids)
 
 
 def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:
@@ -115,3 +207,38 @@ def load_records(start_date: str | None = None, end_date: str | None = None, emp
 
 def today_records() -> pd.DataFrame:
     return load_records(date.today().strftime("%Y-%m-%d"), date.today().strftime("%Y-%m-%d"))
+
+
+def save_time_records(df: pd.DataFrame) -> int:
+    if df is None or df.empty:
+        return 0
+    update_cols = [
+        "status", "work_order", "part_no", "type_name", "process_name", "employee_id", "employee_name",
+        "start_action", "start_timestamp", "end_action", "end_timestamp", "remark", "start_date", "start_time",
+        "end_date", "end_time", "work_hours", "assembly_location", "group_key", "is_group_work", "source",
+    ]
+    count = 0
+    now = _now()
+    for _, r in df.iterrows():
+        if pd.isna(r.get("id")):
+            continue
+        vals = []
+        for c in update_cols:
+            v = r.get(c, "")
+            if pd.isna(v):
+                v = None
+            if c == "is_group_work" and v is not None:
+                v = int(bool(v))
+            vals.append(v)
+        vals += [now, int(r["id"])]
+        execute(
+            f"""
+            UPDATE time_records
+            SET {', '.join([c+'=?' for c in update_cols])}, updated_at=?
+            WHERE id=?
+            """,
+            vals,
+        )
+        count += 1
+    write_log("SAVE_TIME_RECORDS", f"人工編輯並儲存工時紀錄 {count} 筆", "time_records")
+    return count

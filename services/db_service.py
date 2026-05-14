@@ -132,6 +132,14 @@ def _init_schema(conn: sqlite3.Connection) -> None:
     )
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS table_ui_settings (
+        table_key TEXT PRIMARY KEY,
+        widths_json TEXT,
+        updated_at TEXT DEFAULT (datetime('now','localtime'))
+    )
+    """)
+
     default_rests = [
         (1, "上午休息", "10:30", "10:45", 1),
         (2, "午休", "12:00", "13:00", 2),

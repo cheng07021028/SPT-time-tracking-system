@@ -140,3 +140,66 @@ def import_employees_df(df: pd.DataFrame) -> int:
             count += 1
     write_log("IMPORT_EMPLOYEES", f"匯入人員資料 {count} 筆", "employees")
     return count
+
+
+def save_work_orders_df(df: pd.DataFrame) -> int:
+    if df is None or df.empty:
+        return 0
+    count = 0
+    now = _now()
+    for _, r in df.iterrows():
+        if pd.isna(r.get("id")):
+            continue
+        execute(
+            """
+            UPDATE work_orders
+            SET work_order=?, part_no=?, type_name=?, assembly_location=?, customer=?, note=?, is_active=?, updated_at=?
+            WHERE id=?
+            """,
+            (
+                _clean_value(r.get("work_order")),
+                _clean_value(r.get("part_no")),
+                _clean_value(r.get("type_name")),
+                _clean_value(r.get("assembly_location")),
+                _clean_value(r.get("customer")),
+                _clean_value(r.get("note")),
+                int(bool(r.get("is_active"))),
+                now,
+                int(r.get("id")),
+            ),
+        )
+        count += 1
+    write_log("SAVE_WORK_ORDERS", f"人工編輯並儲存製令資料 {count} 筆", "work_orders")
+    return count
+
+
+def save_employees_df(df: pd.DataFrame) -> int:
+    if df is None or df.empty:
+        return 0
+    count = 0
+    now = _now()
+    for _, r in df.iterrows():
+        if pd.isna(r.get("id")):
+            continue
+        execute(
+            """
+            UPDATE employees
+            SET employee_id=?, employee_name=?, department=?, title=?, is_active=?, is_in_factory=?, is_today_attendance=?, note=?, updated_at=?
+            WHERE id=?
+            """,
+            (
+                _clean_value(r.get("employee_id")),
+                _clean_value(r.get("employee_name")),
+                _clean_value(r.get("department")),
+                _clean_value(r.get("title")),
+                int(bool(r.get("is_active"))),
+                int(bool(r.get("is_in_factory"))),
+                int(bool(r.get("is_today_attendance"))),
+                _clean_value(r.get("note")),
+                now,
+                int(r.get("id")),
+            ),
+        )
+        count += 1
+    write_log("SAVE_EMPLOYEES", f"人工編輯並儲存人員資料 {count} 筆", "employees")
+    return count
