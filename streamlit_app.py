@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from services.theme_service import apply_theme, render_home_header, render_kpi_cards
+from services.theme_service import apply_theme, render_home_header, render_kpi_cards, render_module_cards
 
 st.set_page_config(
     page_title="超慧科技製造部｜智慧工時紀錄系統",
@@ -24,7 +24,7 @@ render_kpi_cards([
     ("系統狀態 / Status", "Online"),
 ])
 
-st.markdown('<div class="spt-section-title">系統模組</div>', unsafe_allow_html=True)
+st.header("系統模組 / System Modules")
 
 modules = [
     ("01", "工時紀錄", "快速開始、同步作業、暫停、下班、完工與工時計算"),
@@ -37,14 +37,4 @@ modules = [
     ("08", "人員每日工時", "每日累積工時、合理區間與異常提醒"),
 ]
 
-html = '<div class="spt-module-grid">'
-for no, name, desc in modules:
-    html += f'''
-    <div class="spt-module-card">
-      <div class="spt-module-no">{no}</div>
-      <div class="spt-module-name">{name}</div>
-      <div class="spt-module-desc">{desc}</div>
-    </div>
-    '''
-html += '</div>'
-st.markdown(html, unsafe_allow_html=True)
+render_module_cards(modules)
