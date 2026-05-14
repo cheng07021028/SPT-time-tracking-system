@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-SPT Time Tracking V1.23 - DB Service with Data Guard
+SPT Time Tracking V1.30 - DB Service with Cloud Auto Restore Guard
 
 重點：
-1. 自動建立 SQLite schema。
-2. 查詢前若 DB 空白，會嘗試從 data/persistent_state 或 data/persistent_backups 自動還原。
-3. 寫入後自動刷新永久 JSON；不會用空 DB 覆蓋既有永久資料。
+1. 自動建立 SQLite schema，包含工時主資料、UI設定、權限管理資料表。
+2. Streamlit Cloud 更新/重啟後，如果 SQLite 不存在或主資料為 0，會自動從 GitHub data/persistent_state 還原。
+3. 寫入資料後自動刷新永久 JSON；若已設定 GitHub Token，會嘗試同步 latest JSON 到 GitHub。
+4. 嚴格避免「空資料庫」覆蓋 GitHub 上既有永久資料。
 """
 from __future__ import annotations
 
 import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
@@ -22,6 +24,8 @@ DB_PATH = DB_DIR / "spt_time_tracking.db"
 
 _SCHEMA_READY = False
 _RESTORE_CHECKED = False
+_LAST_CLOUD_SYNC_TS = 0.0
+_CLOUD_SYNC_INTERVAL_SEC = 20.0
 
 
 def _now() -> str:
@@ -37,6 +41,8 @@ def _open_connection() -> sqlite3.Connection:
 
 def _init_schema(conn: sqlite3.Connection) -> None:
     cur = conn.cursor()
+
+    # 製令主檔
     cur.execute("""
     CREATE TABLE IF NOT EXISTS work_orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,6 +57,8 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         updated_at TEXT
     )
     """)
+
+    # 人員名單
     cur.execute("""
     CREATE TABLE IF NOT EXISTS employees (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,6 +74,8 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         updated_at TEXT
     )
     """)
+
+    # 工時紀錄
     cur.execute("""
     CREATE TABLE IF NOT EXISTS time_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,6 +105,8 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         updated_at TEXT
     )
     """)
+
+    # LOG
     cur.execute("""
     CREATE TABLE IF NOT EXISTS system_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,6 +120,8 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         level TEXT DEFAULT 'INFO'
     )
     """)
+
+    # 休息時間設定
     cur.execute("""
     CREATE TABLE IF NOT EXISTS rest_periods (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -118,6 +132,8 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         sort_order INTEGER DEFAULT 0
     )
     """)
+
+    # 系統設定
     cur.execute("""
     CREATE TABLE IF NOT EXISTS system_settings (
         setting_key TEXT PRIMARY KEY,
@@ -126,7 +142,8 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         updated_at TEXT
     )
     """)
-    # Common settings tables used by table UI modules. Keep flexible schema.
+
+    # 表格欄寬/排序設定
     cur.execute("""
     CREATE TABLE IF NOT EXISTS table_column_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,6 +167,70 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         UNIQUE(page_key, table_key)
     )
     """)
+
+    # 權限管理資料表：放在 db_service 內建立，確保 GitHub JSON 還原時表已存在。
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS auth_users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        password_hint TEXT,
+        employee_id TEXT,
+        display_name TEXT,
+        email TEXT,
+        role_code TEXT DEFAULT 'operator',
+        is_active INTEGER DEFAULT 1,
+        force_password_change INTEGER DEFAULT 0,
+        last_login_at TEXT,
+        note TEXT,
+        created_at TEXT,
+        updated_at TEXT
+    )
+    """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS auth_account_permissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        module_code TEXT NOT NULL,
+        module_name_zh TEXT,
+        module_name_en TEXT,
+        can_view INTEGER DEFAULT 0,
+        can_create INTEGER DEFAULT 0,
+        can_edit INTEGER DEFAULT 0,
+        can_delete INTEGER DEFAULT 0,
+        can_import INTEGER DEFAULT 0,
+        can_export INTEGER DEFAULT 0,
+        can_backup INTEGER DEFAULT 0,
+        can_restore INTEGER DEFAULT 0,
+        can_manage INTEGER DEFAULT 0,
+        updated_at TEXT,
+        UNIQUE(username, module_code)
+    )
+    """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS auth_login_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        display_name TEXT,
+        event_time TEXT,
+        event_type TEXT,
+        result TEXT,
+        module_code TEXT,
+        module_name TEXT,
+        message TEXT,
+        ip_address TEXT,
+        user_agent TEXT
+    )
+    """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS auth_security_settings (
+        setting_key TEXT PRIMARY KEY,
+        setting_value TEXT,
+        note TEXT,
+        updated_at TEXT
+    )
+    """)
+
     default_rests = [
         (1, "上午休息", "10:30", "10:45", 1),
         (2, "午休", "12:00", "13:00", 2),
@@ -161,6 +242,7 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         INSERT OR IGNORE INTO rest_periods (id, name, start_time, end_time, is_active, sort_order)
         VALUES (?, ?, ?, ?, 1, ?)
     """, default_rests)
+
     now = _now()
     settings = [
         ("company_name", "超慧科技", "公司名稱"),
@@ -174,6 +256,12 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         INSERT OR IGNORE INTO system_settings (setting_key, setting_value, note, updated_at)
         VALUES (?, ?, ?, ?)
     """, [(k, v, n, now) for k, v, n in settings])
+
+    cur.execute("""
+    INSERT OR IGNORE INTO auth_security_settings(setting_key, setting_value, note, updated_at)
+    VALUES ('idle_timeout_minutes','15','閒置自動登出分鐘數 / Idle logout minutes',?)
+    """, (now,))
+
     cur.execute("""
         INSERT INTO system_logs (log_time, user_name, action_type, target_table, target_id, message, detail, level)
         SELECT ?, 'SYSTEM', 'AUTO_INIT_DATABASE', 'ALL', '', '自動初始化資料庫完成', ?, 'INFO'
@@ -191,17 +279,54 @@ def ensure_database() -> None:
     _SCHEMA_READY = True
 
 
-def ensure_data_guard_restore() -> None:
-    global _RESTORE_CHECKED
-    if _RESTORE_CHECKED:
-        return
+def database_business_row_count() -> int:
     ensure_database()
+    tables = ["work_orders", "employees", "time_records"]
+    total = 0
+    with _open_connection() as conn:
+        for table in tables:
+            try:
+                total += int(conn.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0])
+            except Exception:
+                pass
+    return total
+
+
+def ensure_data_guard_restore(force: bool = False) -> dict[str, Any]:
+    """啟動/查詢前資料防消失還原。
+
+    force=False 時每個 process 僅檢查一次；force=True 可由第 09 頁手動再次執行。
+    """
+    global _RESTORE_CHECKED
+    if _RESTORE_CHECKED and not force:
+        return {"ok": True, "skipped": True, "message": "已檢查過自動還原。"}
+
+    ensure_database()
+    results: list[dict[str, Any]] = []
+
+    # 1) 先從 GitHub 下載 latest JSON，這對 Streamlit Cloud 最重要。
+    try:
+        from services.github_cloud_storage_service import restore_from_github_if_database_empty
+        res = restore_from_github_if_database_empty(force=force)
+        results.append({"step": "github_cloud_restore", **(res if isinstance(res, dict) else {"result": str(res)})})
+        if isinstance(res, dict) and res.get("ok") and not res.get("skipped"):
+            _RESTORE_CHECKED = True
+            return {"ok": True, "message": "已從 GitHub 永久檔自動還原。", "results": results}
+    except Exception as exc:
+        results.append({"step": "github_cloud_restore", "ok": False, "message": str(exc)})
+
+    # 2) 再從本機 persistent_state / persistent_backups 還原。
     try:
         from services.persistence_service import auto_restore_if_database_empty
-        auto_restore_if_database_empty()
-    except Exception:
-        pass
+        res = auto_restore_if_database_empty(force=force)
+        results.append({"step": "local_persistent_restore", **(res if isinstance(res, dict) else {"result": str(res)})})
+        _RESTORE_CHECKED = True
+        return {"ok": bool(isinstance(res, dict) and res.get("ok")), "message": "自動還原檢查完成。", "results": results}
+    except Exception as exc:
+        results.append({"step": "local_persistent_restore", "ok": False, "message": str(exc)})
+
     _RESTORE_CHECKED = True
+    return {"ok": False, "message": "自動還原未完成。", "results": results}
 
 
 def get_connection() -> sqlite3.Connection:
@@ -211,9 +336,23 @@ def get_connection() -> sqlite3.Connection:
 
 
 def _after_write() -> None:
+    """寫入後刷新永久檔；若已設定 Token，節流上傳 latest 到 GitHub。"""
+    global _LAST_CLOUD_SYNC_TS
     try:
         from services.persistence_service import safe_export_after_write
         safe_export_after_write()
+    except Exception:
+        pass
+
+    # GitHub API 上傳可能較慢，採簡易節流，避免同一秒大量寫入造成 API 過多請求。
+    now_ts = time.time()
+    if now_ts - _LAST_CLOUD_SYNC_TS < _CLOUD_SYNC_INTERVAL_SEC:
+        return
+    try:
+        from services.github_cloud_storage_service import github_config, upload_existing_permanent_files
+        if github_config().get("token"):
+            upload_existing_permanent_files(archive=False)
+            _LAST_CLOUD_SYNC_TS = now_ts
     except Exception:
         pass
 
@@ -228,7 +367,7 @@ def execute(sql: str, params: Iterable[Any] | None = None) -> int:
         conn.commit()
         last_id = cur.lastrowid
     _after_write()
-    return last_id
+    return int(last_id or 0)
 
 
 def executemany(sql: str, rows: list[Iterable[Any]]) -> None:

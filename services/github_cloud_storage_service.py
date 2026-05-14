@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-"""GitHub cloud persistence service for SPT Time Tracking.
+"""GitHub cloud persistence service for SPT Time Tracking V1.30.
 
-This module stores permanent JSON snapshots in the GitHub repository by using
-GitHub Contents API. It does NOT use `git push`, so Streamlit Cloud does not
-need SSH keys or local git identity.
+重點：
+1. 永久檔一律使用 data/persistent_state/，避免誤存到 date/persistent_state/。
+2. 使用 GitHub Contents API，不用 git push。
+3. 支援 Streamlit Cloud 啟動時自動下載 latest JSON 並還原 SQLite。
+4. 防止空資料覆蓋 GitHub 上有資料的 JSON。
 """
 from __future__ import annotations
 
@@ -12,6 +14,7 @@ import json
 import os
 import sqlite3
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -24,7 +27,11 @@ HISTORY_DIR = STATE_DIR / "history"
 LATEST_STATE = STATE_DIR / "spt_permanent_state.json"
 LATEST_SETTINGS = STATE_DIR / "spt_module_settings.json"
 
+REMOTE_STATE_ROOT = "data/persistent_state"
+REMOTE_HISTORY_ROOT = "data/persistent_state/history"
+LEGACY_REMOTE_ROOTS = ["date/persistent_state", "data/persisten_state"]
 TABLE_EXCLUDE = {"sqlite_sequence"}
+BUSINESS_TABLES = ["work_orders", "employees", "time_records"]
 
 
 def _now() -> str:
@@ -38,18 +45,19 @@ def _stamp() -> str:
 def ensure_dirs() -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+    (STATE_DIR / ".gitkeep").touch(exist_ok=True)
+    (HISTORY_DIR / ".gitkeep").touch(exist_ok=True)
 
 
 def _read_secret(name: str, default: str = "") -> str:
-    # Works both locally and on Streamlit Cloud.
     try:
         import streamlit as st  # type: ignore
         val = st.secrets.get(name, "")
         if val:
-            return str(val)
+            return str(val).strip()
     except Exception:
         pass
-    return os.environ.get(name, default)
+    return os.environ.get(name, default).strip()
 
 
 def github_config() -> Dict[str, str]:
@@ -70,87 +78,111 @@ def db_exists() -> bool:
     return DB_PATH.exists()
 
 
+def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+    row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,)).fetchone()
+    return row is not None
+
+
+def _count_table(conn: sqlite3.Connection, table_name: str) -> int:
+    if not _table_exists(conn, table_name):
+        return 0
+    try:
+        return int(conn.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()[0])
+    except Exception:
+        return 0
+
+
+def database_business_row_count() -> int:
+    if not DB_PATH.exists():
+        return 0
+    conn = _connect()
+    try:
+        return sum(_count_table(conn, t) for t in BUSINESS_TABLES)
+    finally:
+        conn.close()
+
+
 def list_tables() -> List[str]:
     if not DB_PATH.exists():
         return []
     conn = _connect()
     try:
         rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
-        return [str(r[0]) for r in rows if str(r[0]) not in TABLE_EXCLUDE]
+        return [str(r[0]) for r in rows if str(r[0]) not in TABLE_EXCLUDE and not str(r[0]).startswith("sqlite_")]
     finally:
         conn.close()
 
 
-def export_database_state() -> Dict[str, Any]:
-    """Export every SQLite table to a JSON-serializable dictionary."""
+def export_database_state(force: bool = False) -> Dict[str, Any]:
     ensure_dirs()
     state: Dict[str, Any] = {
-        "schema_version": "v1.26",
+        "schema_version": "v1.30",
         "export_time": _now(),
         "database_path": str(DB_PATH),
         "tables": {},
         "table_counts": {},
     }
-
     if not DB_PATH.exists():
-        state["warning"] = "SQLite database not found. Only metadata exported."
+        state["skipped"] = True
+        state["warning"] = "SQLite database not found. Export skipped to protect cloud data."
         return state
-
     conn = _connect()
     try:
+        business_count = sum(_count_table(conn, t) for t in BUSINESS_TABLES)
+        state["business_row_count"] = business_count
+        if business_count == 0 and not force:
+            state["skipped"] = True
+            state["warning"] = "Current DB has zero business rows. Export skipped to protect cloud data."
+            return state
         for table in list_tables():
-            try:
-                rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
-                data = [dict(r) for r in rows]
-                state["tables"][table] = data
-                state["table_counts"][table] = len(data)
-            except Exception as exc:
-                state["tables"][table] = []
-                state["table_counts"][table] = 0
-                state.setdefault("errors", {})[table] = str(exc)
+            rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
+            records = [dict(r) for r in rows]
+            state["tables"][table] = records
+            state["table_counts"][table] = len(records)
+        return state
     finally:
         conn.close()
-    return state
 
 
-def export_module_settings() -> Dict[str, Any]:
-    """Export common UI settings if present."""
+def export_module_settings_state() -> Dict[str, Any]:
     ensure_dirs()
-    settings: Dict[str, Any] = {
-        "schema_version": "v1.26",
-        "export_time": _now(),
-        "settings": {},
-    }
+    settings_tables = [
+        "system_settings",
+        "table_column_settings",
+        "table_sort_settings",
+        "auth_users",
+        "auth_account_permissions",
+        "auth_security_settings",
+    ]
+    payload: Dict[str, Any] = {"schema_version": "v1.30", "export_time": _now(), "tables": {}, "table_counts": {}}
     if not DB_PATH.exists():
-        return settings
-
+        payload["warning"] = "SQLite database not found."
+        return payload
     conn = _connect()
     try:
-        tables = set(list_tables())
-        for table in ["system_settings", "ui_settings", "column_width_settings", "module_settings"]:
-            if table in tables:
-                rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
-                settings["settings"][table] = [dict(r) for r in rows]
+        for table in settings_tables:
+            if _table_exists(conn, table):
+                rows = [dict(r) for r in conn.execute(f'SELECT * FROM "{table}"').fetchall()]
+                payload["tables"][table] = rows
+                payload["table_counts"][table] = len(rows)
+        return payload
     finally:
         conn.close()
-    return settings
 
 
-def create_permanent_files() -> Dict[str, Any]:
-    """Create latest + timestamp history permanent JSON files locally."""
+def create_permanent_files(force: bool = False) -> Dict[str, Any]:
     ensure_dirs()
     stamp = _stamp()
-    state = export_database_state()
-    module_settings = export_module_settings()
-
+    state = export_database_state(force=force)
+    if state.get("skipped") and not force:
+        return {"ok": False, "message": state.get("warning", "主資料為 0，為避免覆蓋 GitHub 永久檔，已停止建立 latest。"), "state": state}
+    module_settings = export_module_settings_state()
     state_history = HISTORY_DIR / f"spt_permanent_state_{stamp}.json"
     settings_history = HISTORY_DIR / f"spt_module_settings_{stamp}.json"
-
     LATEST_STATE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
     LATEST_SETTINGS.write_text(json.dumps(module_settings, ensure_ascii=False, indent=2), encoding="utf-8")
     state_history.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
     settings_history.write_text(json.dumps(module_settings, ensure_ascii=False, indent=2), encoding="utf-8")
-
     return {
         "ok": True,
         "message": "永久檔案已建立",
@@ -159,6 +191,7 @@ def create_permanent_files() -> Dict[str, Any]:
         "history_state": str(state_history),
         "history_settings": str(settings_history),
         "table_counts": state.get("table_counts", {}),
+        "business_row_count": state.get("business_row_count", 0),
         "warning": state.get("warning", ""),
     }
 
@@ -187,30 +220,52 @@ def _github_api_request(method: str, url: str, token: str, payload: Optional[Dic
         except Exception:
             parsed = {"message": body}
         return exc.code, parsed
+    except Exception as exc:
+        return 0, {"message": str(exc)}
+
+
+def _contents_url(repo: str, path: str, branch: str) -> str:
+    encoded_path = urllib.parse.quote(path.strip("/"), safe="/")
+    return f"https://api.github.com/repos/{repo}/contents/{encoded_path}?ref={urllib.parse.quote(branch)}"
+
+
+def _get_remote_file(repo: str, branch: str, token: str, path: str) -> Dict[str, Any]:
+    status, body = _github_api_request("GET", _contents_url(repo, path, branch), token)
+    return {"ok": status == 200 and isinstance(body, dict), "status": status, "path": path, "body": body}
 
 
 def _get_remote_sha(repo: str, branch: str, token: str, path: str) -> Optional[str]:
-    encoded_path = path.replace(" ", "%20")
-    url = f"https://api.github.com/repos/{repo}/contents/{encoded_path}?ref={branch}"
-    status, body = _github_api_request("GET", url, token)
-    if status == 200:
-        return body.get("sha")
+    res = _get_remote_file(repo, branch, token, path)
+    if res.get("ok"):
+        return res.get("body", {}).get("sha")
     return None
+
+
+def _decode_github_content(body: Dict[str, Any]) -> str:
+    content = str(body.get("content", ""))
+    if body.get("encoding") == "base64":
+        return base64.b64decode(content.encode("ascii")).decode("utf-8")
+    download_url = body.get("download_url")
+    if download_url:
+        with urllib.request.urlopen(download_url, timeout=30) as resp:
+            return resp.read().decode("utf-8")
+    return content
+
+
+def _normalise_remote_path(path_in_repo: str) -> str:
+    return path_in_repo.replace("date/persistent_state", REMOTE_STATE_ROOT).replace("data/persisten_state", REMOTE_STATE_ROOT)
 
 
 def upload_text_to_github(path_in_repo: str, content: str, message: str) -> Dict[str, Any]:
     cfg = github_config()
     token, repo, branch = cfg["token"], cfg["repo"], cfg["branch"]
     if not token:
-        return {
-            "ok": False,
-            "message": "缺少 GITHUB_TOKEN。請到 Streamlit Cloud → App settings → Secrets 設定。",
-        }
+        return {"ok": False, "message": "缺少 GITHUB_TOKEN。請到 Streamlit Cloud → App settings → Secrets 設定。"}
     if not repo or "/" not in repo:
         return {"ok": False, "message": "GITHUB_REPOSITORY 格式錯誤，應為 owner/repo。"}
-
+    path_in_repo = _normalise_remote_path(path_in_repo)
     sha = _get_remote_sha(repo, branch, token, path_in_repo)
-    encoded_path = path_in_repo.replace(" ", "%20")
+    encoded_path = urllib.parse.quote(path_in_repo.strip("/"), safe="/")
     url = f"https://api.github.com/repos/{repo}/contents/{encoded_path}"
     payload: Dict[str, Any] = {
         "message": message,
@@ -222,7 +277,7 @@ def upload_text_to_github(path_in_repo: str, content: str, message: str) -> Dict
     status, body = _github_api_request("PUT", url, token, payload)
     if status in (200, 201):
         return {"ok": True, "message": f"已上傳：{path_in_repo}", "path": path_in_repo, "status": status}
-    return {"ok": False, "message": body.get("message", str(body)), "status": status, "detail": body}
+    return {"ok": False, "message": body.get("message", str(body)), "status": status, "detail": body, "path": path_in_repo}
 
 
 def upload_file_to_github(local_path: Path, path_in_repo: str, message: Optional[str] = None) -> Dict[str, Any]:
@@ -232,39 +287,141 @@ def upload_file_to_github(local_path: Path, path_in_repo: str, message: Optional
     return upload_text_to_github(path_in_repo, content, message or f"Update {path_in_repo}")
 
 
-def create_and_upload_permanent_files() -> Dict[str, Any]:
-    """Create local permanent files and upload latest + timestamped history to GitHub."""
-    created = create_permanent_files()
+def create_and_upload_permanent_files(force: bool = False) -> Dict[str, Any]:
+    created = create_permanent_files(force=force)
+    if not created.get("ok"):
+        return {**created, "uploads": [], "remote_root": REMOTE_STATE_ROOT}
     stamp = _stamp()
     uploads = []
     files = [
-        (LATEST_STATE, "data/persistent_state/spt_permanent_state.json"),
-        (LATEST_SETTINGS, "data/persistent_state/spt_module_settings.json"),
-        (Path(created["history_state"]), f"data/persistent_state/history/spt_permanent_state_{stamp}.json"),
-        (Path(created["history_settings"]), f"data/persistent_state/history/spt_module_settings_{stamp}.json"),
+        (LATEST_STATE, f"{REMOTE_STATE_ROOT}/spt_permanent_state.json"),
+        (LATEST_SETTINGS, f"{REMOTE_STATE_ROOT}/spt_module_settings.json"),
+        (Path(created["history_state"]), f"{REMOTE_HISTORY_ROOT}/spt_permanent_state_{stamp}.json"),
+        (Path(created["history_settings"]), f"{REMOTE_HISTORY_ROOT}/spt_module_settings_{stamp}.json"),
     ]
     ok_all = True
     for local, remote in files:
         res = upload_file_to_github(local, remote, f"Backup permanent state {stamp}")
         uploads.append(res)
         ok_all = ok_all and bool(res.get("ok"))
-    return {**created, "ok": ok_all, "uploads": uploads}
+    return {**created, "ok": ok_all, "uploads": uploads, "remote_root": REMOTE_STATE_ROOT}
 
 
-def upload_existing_permanent_files() -> Dict[str, Any]:
-    """Upload existing latest permanent files to GitHub without using git push."""
+def upload_existing_permanent_files(archive: bool = True) -> Dict[str, Any]:
     ensure_dirs()
     stamp = _stamp()
     uploads = []
     if not LATEST_STATE.exists() and not LATEST_SETTINGS.exists():
         return {"ok": False, "message": "找不到永久保存檔，請先建立永久檔案。"}
     if LATEST_STATE.exists():
-        uploads.append(upload_file_to_github(LATEST_STATE, "data/persistent_state/spt_permanent_state.json", f"Upload permanent state {stamp}"))
-        uploads.append(upload_file_to_github(LATEST_STATE, f"data/persistent_state/history/spt_permanent_state_{stamp}.json", f"Archive permanent state {stamp}"))
+        uploads.append(upload_file_to_github(LATEST_STATE, f"{REMOTE_STATE_ROOT}/spt_permanent_state.json", f"Upload permanent state {stamp}"))
+        if archive:
+            uploads.append(upload_file_to_github(LATEST_STATE, f"{REMOTE_HISTORY_ROOT}/spt_permanent_state_{stamp}.json", f"Archive permanent state {stamp}"))
     if LATEST_SETTINGS.exists():
-        uploads.append(upload_file_to_github(LATEST_SETTINGS, "data/persistent_state/spt_module_settings.json", f"Upload module settings {stamp}"))
-        uploads.append(upload_file_to_github(LATEST_SETTINGS, f"data/persistent_state/history/spt_module_settings_{stamp}.json", f"Archive module settings {stamp}"))
-    return {"ok": all(bool(x.get("ok")) for x in uploads), "uploads": uploads}
+        uploads.append(upload_file_to_github(LATEST_SETTINGS, f"{REMOTE_STATE_ROOT}/spt_module_settings.json", f"Upload module settings {stamp}"))
+        if archive:
+            uploads.append(upload_file_to_github(LATEST_SETTINGS, f"{REMOTE_HISTORY_ROOT}/spt_module_settings_{stamp}.json", f"Archive module settings {stamp}"))
+    return {"ok": all(bool(x.get("ok")) for x in uploads), "uploads": uploads, "remote_root": REMOTE_STATE_ROOT}
+
+
+def download_text_from_github(path_in_repo: str) -> Dict[str, Any]:
+    cfg = github_config()
+    token, repo, branch = cfg["token"], cfg["repo"], cfg["branch"]
+    if not token:
+        return {"ok": False, "message": "缺少 GITHUB_TOKEN", "path": path_in_repo}
+    res = _get_remote_file(repo, branch, token, path_in_repo)
+    if not res.get("ok"):
+        body = res.get("body", {})
+        return {"ok": False, "message": body.get("message", "找不到 GitHub 雲端檔案"), "status": res.get("status"), "path": path_in_repo, "detail": body}
+    try:
+        return {"ok": True, "text": _decode_github_content(res["body"]), "path": path_in_repo, "sha": res["body"].get("sha")}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc), "path": path_in_repo}
+
+
+def download_latest_permanent_files_from_github(allow_legacy: bool = True) -> Dict[str, Any]:
+    ensure_dirs()
+    roots = [REMOTE_STATE_ROOT]
+    if allow_legacy:
+        roots.extend(LEGACY_REMOTE_ROOTS)
+    downloaded: List[Dict[str, Any]] = []
+    for root in roots:
+        found_any = False
+        state_res = download_text_from_github(f"{root}/spt_permanent_state.json")
+        settings_res = download_text_from_github(f"{root}/spt_module_settings.json")
+        if state_res.get("ok"):
+            LATEST_STATE.write_text(str(state_res["text"]), encoding="utf-8")
+            downloaded.append({"local": str(LATEST_STATE), "remote": state_res["path"], "ok": True})
+            found_any = True
+        if settings_res.get("ok"):
+            LATEST_SETTINGS.write_text(str(settings_res["text"]), encoding="utf-8")
+            downloaded.append({"local": str(LATEST_SETTINGS), "remote": settings_res["path"], "ok": True})
+            found_any = True
+        if found_any:
+            return {"ok": True, "message": f"已從 GitHub 雲端下載永久檔：{root}", "source_root": root, "downloaded": downloaded}
+    return {"ok": False, "message": "GitHub 雲端找不到 data/persistent_state 或舊路徑 date/persistent_state 的永久檔。", "downloaded": downloaded}
+
+
+def restore_from_github_if_database_empty(force: bool = False) -> Dict[str, Any]:
+    """Cloud startup helper: if DB is empty/missing, pull latest JSON from GitHub and restore."""
+    try:
+        from services.persistence_service import database_business_row_count, restore_latest_available_state
+        if DB_PATH.exists() and not force:
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                current_count = database_business_row_count(conn)  # type: ignore[arg-type]
+                conn.close()
+                if current_count > 0:
+                    return {"ok": True, "skipped": True, "message": f"SQLite 已有主資料 {current_count} 筆，不需 GitHub 還原。"}
+            except Exception:
+                pass
+        dl = download_latest_permanent_files_from_github(allow_legacy=True)
+        if not dl.get("ok"):
+            return dl
+        restored = restore_latest_available_state(mode="replace")
+        return {"ok": bool(restored.get("ok")), "download": dl, "restore": restored, "message": "已嘗試從 GitHub latest JSON 還原 SQLite。"}
+    except Exception as exc:
+        return {"ok": False, "message": f"GitHub 自動還原失敗：{exc}"}
+
+
+def github_cloud_file_status() -> Dict[str, Any]:
+    cfg = github_config()
+    rows: List[Dict[str, Any]] = []
+    for path in [
+        f"{REMOTE_STATE_ROOT}/spt_permanent_state.json",
+        f"{REMOTE_STATE_ROOT}/spt_module_settings.json",
+        *[f"{root}/spt_permanent_state.json" for root in LEGACY_REMOTE_ROOTS],
+        *[f"{root}/spt_module_settings.json" for root in LEGACY_REMOTE_ROOTS],
+    ]:
+        res = download_text_from_github(path)
+        item = {"path": path, "exists": bool(res.get("ok")), "message": res.get("message", "OK" if res.get("ok") else "")}
+        if res.get("ok") and "spt_permanent_state" in path:
+            try:
+                payload = json.loads(str(res.get("text", "{}")))
+                item["business_row_count"] = payload.get("business_row_count") or sum(len(payload.get("tables", {}).get(t, [])) for t in BUSINESS_TABLES)
+                item["table_counts"] = payload.get("table_counts", {})
+            except Exception:
+                pass
+        rows.append(item)
+    return {"repo": cfg.get("repo"), "branch": cfg.get("branch"), "token_set": bool(cfg.get("token")), "files": rows}
+
+
+def migrate_legacy_date_path_to_data_path() -> Dict[str, Any]:
+    stamp = _stamp()
+    results: List[Dict[str, Any]] = []
+    migrated = False
+    for legacy_root in LEGACY_REMOTE_ROOTS:
+        for filename in ["spt_permanent_state.json", "spt_module_settings.json"]:
+            old_path = f"{legacy_root}/{filename}"
+            dl = download_text_from_github(old_path)
+            if dl.get("ok"):
+                new_path = f"{REMOTE_STATE_ROOT}/{filename}"
+                up = upload_text_to_github(new_path, str(dl["text"]), f"Migrate SPT persistent state path {stamp}")
+                results.append({"from": old_path, "to": new_path, "upload": up})
+                migrated = migrated or bool(up.get("ok"))
+            else:
+                results.append({"from": old_path, "to": f"{REMOTE_STATE_ROOT}/{filename}", "skipped": True, "reason": dl.get("message")})
+    return {"ok": migrated, "message": "已嘗試將舊路徑 date/persistent_state 搬到 data/persistent_state", "results": results}
 
 
 # Backward-compatible function names used by older page versions.
@@ -273,10 +430,8 @@ def backup_all_to_files() -> Dict[str, Any]:
 
 
 def backup_all_and_push_to_github() -> Dict[str, Any]:
-    # Critical: this uses GitHub API, not git push.
     return create_and_upload_permanent_files()
 
 
 def push_existing_backups_to_github() -> Dict[str, Any]:
-    # Critical: this uses GitHub API, not git push.
     return upload_existing_permanent_files()

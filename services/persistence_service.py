@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-SPT Time Tracking V1.24 - Persistent Data Guard Service
+SPT Time Tracking V1.30 - Persistent Data Guard Service
 
 目的：
-1. 資料與模組設定永久保存到 JSON，避免更新 patch 後資料消失。
-2. 啟動/查詢時若 SQLite 是空的，會自動從永久保存檔還原。
-3. 防止空資料庫覆蓋掉有資料的永久保存檔。
-4. 相容 V1.10 的「09. 資料永久保存與備份」頁面函式。
+1. 將所有資料表與模組設定永久保存到 JSON，避免更新 patch 後資料消失。
+2. DB 空白時可從 GitHub latest JSON 或本機永久檔還原。
+3. 嚴格防止空 DB 覆蓋有資料的永久檔。
+4. 相容舊版 09 備份頁函式。
 """
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import sqlite3
 import subprocess
@@ -30,6 +29,7 @@ LATEST_MANIFEST = BACKUP_DIR / "latest_backup_manifest.json"
 
 STATE_DIR = PROJECT_ROOT / "data" / "persistent_state"
 ARCHIVE_DIR = STATE_DIR / "archive"
+HISTORY_DIR = STATE_DIR / "history"
 STATE_JSON = STATE_DIR / "spt_permanent_state.json"
 SETTINGS_JSON = STATE_DIR / "spt_module_settings.json"
 DB_COPY_DIR = STATE_DIR / "db_copy"
@@ -45,6 +45,9 @@ SETTING_TABLE_CANDIDATES = [
     "page_settings",
     "ui_settings",
     "system_settings",
+    "auth_users",
+    "auth_account_permissions",
+    "auth_security_settings",
 ]
 
 
@@ -69,9 +72,11 @@ def _ensure_dirs() -> None:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+    HISTORY_DIR.mkdir(parents=True, exist_ok=True)
     DB_COPY_DIR.mkdir(parents=True, exist_ok=True)
     (BACKUP_DIR / ".gitkeep").write_text("keep this folder for persistent GitHub backups\n", encoding="utf-8")
     (STATE_DIR / ".gitkeep").write_text("", encoding="utf-8")
+    (HISTORY_DIR / ".gitkeep").write_text("", encoding="utf-8")
 
 
 def connect_db() -> sqlite3.Connection:
@@ -138,7 +143,7 @@ def _load_json(path: Path) -> dict[str, Any] | None:
 
 
 def _normalise_backup_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """支援 V1.20 state 格式，也支援 V1.10 full_backup.json 格式。"""
+    """支援 latest state 格式，也支援 full_backup.json 格式。"""
     if "tables" not in payload or not isinstance(payload["tables"], dict):
         return {"tables": {}}
     tables: dict[str, list[dict[str, Any]]] = {}
@@ -161,12 +166,13 @@ def _latest_backup_json_candidates() -> list[Path]:
             p = PROJECT_ROOT / folder / "full_backup.json"
             if p.exists():
                 candidates.append(p)
+    for folder in [HISTORY_DIR, ARCHIVE_DIR]:
+        if folder.exists():
+            for p in sorted(folder.glob("spt_permanent_state_*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+                if p not in candidates:
+                    candidates.append(p)
     if BACKUP_DIR.exists():
         for p in sorted(BACKUP_DIR.glob("backup_*/full_backup.json"), key=lambda x: x.stat().st_mtime, reverse=True):
-            if p not in candidates:
-                candidates.append(p)
-    if ARCHIVE_DIR.exists():
-        for p in sorted(ARCHIVE_DIR.glob("spt_permanent_state_*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
             if p not in candidates:
                 candidates.append(p)
     return candidates
@@ -184,49 +190,74 @@ def export_table(conn: sqlite3.Connection, table_name: str) -> list[dict[str, An
 
 
 def export_permanent_state(include_logs: bool = True, force: bool = False) -> dict[str, Any]:
-    """匯出所有資料表與設定。若目前 DB 是空的，不會覆蓋掉既有有資料的 JSON。"""
+    """匯出所有資料表與設定。
+
+    安全規則：
+    - force=False 時，若目前 DB 主資料為 0，不會覆蓋既有永久檔。
+    - 若本機無永久檔且 DB 主資料為 0，也不建立空 latest，避免上傳空檔覆蓋 GitHub。
+    """
     _ensure_dirs()
     old_state = _load_json(STATE_JSON) or {}
     old_count = _state_business_row_count(_normalise_backup_payload(old_state))
 
     if not DB_PATH.exists():
-        if old_count > 0 and not force:
-            return {"version": "V1.24", "exported_at": _now(), "skipped": True, "reason": "DB not found; keep previous permanent state", "tables": old_state.get("tables", {})}
-        state = {"version": "V1.24", "exported_at": _now(), "db_exists": False, "tables": {}}
-        STATE_JSON.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
-        return state
+        return {
+            "version": "V1.30",
+            "exported_at": _now(),
+            "skipped": True,
+            "reason": "DB not found; export skipped to protect cloud data",
+            "previous_business_row_count": old_count,
+        }
 
     conn = connect_db()
     try:
         current_count = database_business_row_count(conn)
-        if current_count == 0 and old_count > 0 and not force:
-            return {"version": "V1.24", "exported_at": _now(), "skipped": True, "reason": "Current DB has zero business rows; keep previous permanent state", "tables": old_state.get("tables", {})}
+        if current_count == 0 and not force:
+            return {
+                "version": "V1.30",
+                "exported_at": _now(),
+                "skipped": True,
+                "reason": "Current DB has zero business rows; export skipped to protect permanent state",
+                "previous_business_row_count": old_count,
+                "business_row_count": current_count,
+            }
 
         existing = get_existing_tables(conn)
         tables: dict[str, list[dict[str, Any]]] = {}
         for table in existing:
-            if not include_logs and table == "system_logs":
+            if not include_logs and table in {"system_logs", "auth_login_logs"}:
                 continue
             tables[table] = export_table(conn, table)
 
         state = {
-            "version": "V1.24",
+            "version": "V1.30",
             "exported_at": _now(),
             "db_path": str(DB_PATH),
             "db_exists": True,
             "business_row_count": current_count,
+            "table_counts": {t: len(rows) for t, rows in tables.items()},
             "tables": tables,
         }
+
         if STATE_JSON.exists() and old_state:
             ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(STATE_JSON, ARCHIVE_DIR / f"spt_permanent_state_{_stamp()}.json")
+            HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+            archive_name = f"spt_permanent_state_{_stamp()}.json"
+            shutil.copy2(STATE_JSON, ARCHIVE_DIR / archive_name)
+            shutil.copy2(STATE_JSON, HISTORY_DIR / archive_name)
         STATE_JSON.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
         settings_tables: dict[str, list[dict[str, Any]]] = {}
         for table in SETTING_TABLE_CANDIDATES:
             if table_exists(conn, table):
                 settings_tables[table] = export_table(conn, table)
-        SETTINGS_JSON.write_text(json.dumps({"version": "V1.24", "exported_at": _now(), "tables": settings_tables}, ensure_ascii=False, indent=2), encoding="utf-8")
+        settings_state = {
+            "version": "V1.30",
+            "exported_at": _now(),
+            "tables": settings_tables,
+            "table_counts": {t: len(rows) for t, rows in settings_tables.items()},
+        }
+        SETTINGS_JSON.write_text(json.dumps(settings_state, ensure_ascii=False, indent=2), encoding="utf-8")
 
         if DB_PATH.exists():
             shutil.copy2(DB_PATH, DB_COPY_DIR / "spt_time_tracking_latest.db")
@@ -274,14 +305,25 @@ def restore_permanent_state(json_path: str | Path | None = None, mode: str = "re
     if not isinstance(tables, dict) or not tables:
         return {"ok": False, "message": f"永久保存檔無資料：{target}"}
 
+    # 確保 schema 先存在。
+    try:
+        from services.db_service import ensure_database
+        ensure_database()
+    except Exception:
+        pass
+
     conn = connect_db()
     restored: dict[str, int] = {}
     try:
-        for table_name, rows in tables.items():
+        # 先還原主資料，再還原設定/權限/LOG，避免 FK 或關聯順序問題。
+        ordered = [*BUSINESS_TABLES]
+        ordered += [t for t in tables.keys() if t not in ordered]
+        for table_name in ordered:
+            rows = tables.get(table_name, [])
             if isinstance(rows, list) and table_exists(conn, table_name):
                 restored[table_name] = _insert_rows(conn, table_name, rows, mode=mode)
         conn.commit()
-        return {"ok": True, "restored": restored, "source": str(target)}
+        return {"ok": True, "restored": restored, "source": str(target), "business_row_count": sum(restored.get(t, 0) for t in BUSINESS_TABLES)}
     finally:
         conn.close()
 
@@ -299,13 +341,13 @@ def restore_latest_available_state(mode: str = "replace") -> dict[str, Any]:
         if result.get("ok"):
             return result
         last_error = str(result)
-    return {"ok": False, "message": f"找到備份檔，但沒有可還原資料。{last_error}"}
+    return {"ok": False, "message": f"找到備份檔，但沒有可還原主資料。{last_error}"}
 
 
-def auto_restore_if_database_empty() -> dict[str, Any]:
+def auto_restore_if_database_empty(force: bool = False) -> dict[str, Any]:
     """資料表存在但主資料為 0 時，自動從 JSON 備份還原。"""
     _ensure_dirs()
-    if LOCK_FILE.exists():
+    if LOCK_FILE.exists() and not force:
         return {"ok": False, "skipped": True, "message": "restore lock exists"}
     try:
         LOCK_FILE.write_text(_now(), encoding="utf-8")
@@ -313,8 +355,8 @@ def auto_restore_if_database_empty() -> dict[str, Any]:
             return restore_latest_available_state(mode="replace")
         with connect_db() as conn:
             current_count = database_business_row_count(conn)
-        if current_count > 0:
-            return {"ok": True, "skipped": True, "message": f"資料庫已有資料：{current_count} 筆，不需還原。"}
+        if current_count > 0 and not force:
+            return {"ok": True, "skipped": True, "message": f"資料庫已有主資料：{current_count} 筆，不需還原。"}
         return restore_latest_available_state(mode="replace")
     finally:
         try:
@@ -323,12 +365,12 @@ def auto_restore_if_database_empty() -> dict[str, Any]:
             pass
 
 
-def safe_export_after_write() -> None:
+def safe_export_after_write() -> dict[str, Any]:
     """寫入 DB 後自動刷新永久 JSON；若 DB 是空的則不覆蓋舊 JSON。"""
     try:
-        export_permanent_state(include_logs=True, force=False)
-    except Exception:
-        pass
+        return export_permanent_state(include_logs=True, force=False)
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}
 
 
 # -----------------------------------------------------------------------------
@@ -408,52 +450,7 @@ def create_persistent_backup(include_excel: bool = True, include_csv: bool = Tru
     return BackupResult(True, f"永久備份完成，共 {len(tables)} 個資料表。", str(batch_dir), created_files)
 
 
-def _git_identity() -> tuple[str, str]:
-    """
-    Streamlit Cloud / Linux container often has no git user.name or user.email.
-    Use environment variables when available; otherwise use a safe project bot identity.
-    You can override these in Streamlit Cloud Secrets or environment variables:
-      GIT_USER_NAME / GIT_AUTHOR_NAME
-      GIT_USER_EMAIL / GIT_AUTHOR_EMAIL
-    """
-    name = (
-        os.getenv("GIT_USER_NAME")
-        or os.getenv("GIT_AUTHOR_NAME")
-        or os.getenv("GITHUB_USER_NAME")
-        or "SPT Time Tracking Bot"
-    )
-    email = (
-        os.getenv("GIT_USER_EMAIL")
-        or os.getenv("GIT_AUTHOR_EMAIL")
-        or os.getenv("GITHUB_USER_EMAIL")
-        or "spt-time-tracking-bot@users.noreply.github.com"
-    )
-    return name.strip(), email.strip()
-
-
-def ensure_git_identity() -> str:
-    """Set git identity for both local CMD and Streamlit Cloud runtime before commit."""
-    name, email = _git_identity()
-    outputs: list[str] = []
-    for key, value in [("user.name", name), ("user.email", email)]:
-        proc = subprocess.run(
-            ["git", "config", "--global", key, value],
-            cwd=str(PROJECT_ROOT),
-            text=True,
-            capture_output=True,
-            shell=False,
-        )
-        out = (proc.stdout or "") + (proc.stderr or "")
-        if proc.returncode != 0:
-            raise RuntimeError(out.strip() or f"git config --global {key} failed")
-        outputs.append(f"{key}={value}")
-    return "Git identity ready: " + ", ".join(outputs)
-
-
 def _run_git(args: list[str]) -> str:
-    # Always ensure identity immediately before git commands so Streamlit Cloud can commit.
-    if args and args[0] in {"add", "commit", "push", "status"}:
-        ensure_git_identity()
     proc = subprocess.run(["git", *args], cwd=str(PROJECT_ROOT), text=True, capture_output=True, shell=False)
     out = (proc.stdout or "") + (proc.stderr or "")
     if proc.returncode != 0:
@@ -467,6 +464,8 @@ def git_backup_push(commit_message: str | None = None) -> BackupResult:
         commit_message = f"Backup SPT time tracking data {_stamp()}"
     outputs: list[str] = []
     try:
+        outputs.append(_run_git(["config", "user.name", "SPT Time Tracking Bot"]))
+        outputs.append(_run_git(["config", "user.email", "spt-time-tracking-bot@users.noreply.github.com"]))
         outputs.append(_run_git(["add", "data/persistent_backups", "data/persistent_state", ".gitignore"]))
         status_after_add = _run_git(["status", "--short"])
         outputs.append(status_after_add)
