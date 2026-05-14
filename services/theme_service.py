@@ -83,6 +83,34 @@ div[data-testid="stMetric"] label { color:#cbd5e1 !important; }
 .stButton>button:hover { border-color:rgba(56,189,248,.85); box-shadow:0 0 16px rgba(56,189,248,.28); }
 [data-testid="stDataFrame"] { border-radius:16px; overflow:hidden; }
 hr { border-color: rgba(148,163,184,.2); }
+
+/* ===== Sidebar readability fix V1.1 ===== */
+[data-testid="stSidebar"] * {
+  color: #e5e7eb !important;
+}
+[data-testid="stSidebarNav"] a,
+[data-testid="stSidebarNav"] span,
+[data-testid="stSidebarNavLinkText"],
+[data-testid="stSidebarUserContent"] p,
+[data-testid="stSidebarUserContent"] label {
+  color: #e5e7eb !important;
+  opacity: 1 !important;
+}
+[data-testid="stSidebarNav"] a:hover,
+[data-testid="stSidebarNav"] a[aria-current="page"] {
+  background: linear-gradient(90deg, rgba(56,189,248,.22), rgba(227,27,47,.18)) !important;
+  border-radius: 12px !important;
+}
+[data-testid="stSidebarNav"] a[aria-current="page"] span,
+[data-testid="stSidebarNav"] a:hover span {
+  color: #ffffff !important;
+  font-weight: 800 !important;
+}
+[data-testid="stSidebar"] input {
+  color: #f8fafc !important;
+  background: rgba(15,23,42,.85) !important;
+}
+
 </style>
 """,
         unsafe_allow_html=True,
