@@ -1,50 +1,111 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
 import streamlit as st
-from services.theme_service import apply_theme, render_header
-from services.db_service import DB_PATH, query_df
-
-st.set_page_config(page_title="超慧科技製造部｜工時紀錄系統", page_icon="🕒", layout="wide")
-apply_theme()
-render_header("超慧科技製造部｜智慧工時紀錄系統")
-
-st.markdown("""
-<div class="spt-card">
-本系統以 <b>快速記錄、準確計算、即時統計、完整追溯</b> 為核心，
-將原 Excel 工時模型逐步轉換成 Streamlit + SQLite 架構。
-</div>
-""", unsafe_allow_html=True)
 
 try:
-    k1 = query_df("SELECT COUNT(*) AS c FROM work_orders").iloc[0]["c"]
-    k2 = query_df("SELECT COUNT(*) AS c FROM employees").iloc[0]["c"]
-    k3 = query_df("SELECT COUNT(*) AS c FROM time_records").iloc[0]["c"]
-    k4 = query_df("SELECT COUNT(*) AS c FROM time_records WHERE end_timestamp IS NULL").iloc[0]["c"]
+    from services.theme_service import apply_spt_theme, render_page_header, metric_card
 except Exception:
-    st.warning("尚未初始化資料庫。請先執行：python tools\\init_database.py")
-    k1 = k2 = k3 = k4 = 0
+    apply_spt_theme = None
+    render_page_header = None
+    metric_card = None
+
+st.set_page_config(
+    page_title="超慧科技製造部｜智慧工時紀錄系統",
+    page_icon="🕒",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+if apply_spt_theme:
+    apply_spt_theme()
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+DB_PATH = PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
+
+
+def _safe_count(table: str) -> int:
+    if not DB_PATH.exists():
+        return 0
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cur = conn.cursor()
+            cur.execute(f"SELECT COUNT(*) FROM {table}")
+            return int(cur.fetchone()[0] or 0)
+    except Exception:
+        return 0
+
+
+def _safe_sum_hours() -> float:
+    if not DB_PATH.exists():
+        return 0.0
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT COALESCE(SUM(work_hours), 0) FROM time_records")
+            return float(cur.fetchone()[0] or 0)
+    except Exception:
+        return 0.0
+
+if render_page_header:
+    render_page_header(
+        "超慧科技製造部｜智慧工時紀錄系統",
+        "Super Plus Tech Manufacturing Time Tracking System｜Streamlit + SQLite + Excel Import / Export",
+    )
+else:
+    st.title("超慧科技製造部｜智慧工時紀錄系統")
+    st.caption("Super Plus Tech Manufacturing Time Tracking System")
+
+st.success("系統初始化成功。請從左側選單進入各功能頁。")
 
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("製令主檔", f"{k1:,}")
-c2.metric("人員名單", f"{k2:,}")
-c3.metric("累積工時紀錄", f"{k3:,}")
-c4.metric("目前作業中", f"{k4:,}")
+with c1:
+    if metric_card:
+        metric_card("製令主檔 / Work Orders", _safe_count("work_orders"), "目前已建立製令數")
+    else:
+        st.metric("製令主檔", _safe_count("work_orders"))
+with c2:
+    if metric_card:
+        metric_card("人員主檔 / Employees", _safe_count("employees"), "目前已建立人員數")
+    else:
+        st.metric("人員主檔", _safe_count("employees"))
+with c3:
+    if metric_card:
+        metric_card("工時紀錄 / Records", _safe_count("time_records"), "目前累積紀錄筆數")
+    else:
+        st.metric("工時紀錄", _safe_count("time_records"))
+with c4:
+    if metric_card:
+        metric_card("累積工時 / Total Hours", f"{_safe_sum_hours():.2f}", "已結束並計算工時")
+    else:
+        st.metric("累積工時", f"{_safe_sum_hours():.2f}")
 
-st.divider()
-st.subheader("系統模組")
-cols = st.columns(4)
+st.markdown("### 系統模組 / System Modules")
+
 modules = [
-    ("01 工時紀錄", "工程師快速開始 / 暫停 / 下班 / 完工"),
-    ("02 歷史紀錄", "查詢、篩選、匯出 Excel"),
-    ("03 製令管理", "Excel 匯入 / 貼上 / 手動維護"),
-    ("04 人員名單", "出勤與在廠狀態管理"),
-    ("05 製令工時分析", "製令、工段、人員工時統計"),
-    ("06 LOG 查詢", "動作與異常追溯"),
-    ("07 今日未紀錄名單", "即時找出出勤未記錄人員"),
-    ("08 人員每日工時", "每日累積工時與異常燈號"),
+    ("01", "工時紀錄", "Time Record", "工程師快速開始、暫停、下班、完工，並自動扣除休息時間。"),
+    ("02", "歷史紀錄", "History Records", "完整工時明細查詢、編輯、儲存與 Excel 匯出。"),
+    ("03", "製令管理", "Work Order Management", "製令主檔匯入、貼上、新增、編輯與維護。"),
+    ("04", "人員名單", "Employee Master", "人員主檔、在廠狀態、今日出勤與名單維護。"),
+    ("05", "製令工時分析", "Work Order Analysis", "製令累積工時、工段工時與人員工時分析。"),
+    ("06", "LOG查詢", "System Logs", "追蹤人員操作、系統異常與資料異動紀錄。"),
+    ("07", "今日未紀錄名單", "Missing Records Today", "顯示今日出勤但尚未建立工時紀錄的人員。"),
+    ("08", "人員每日工時", "Daily Employee Hours", "追蹤每日每人累積工時與合理工時差異。"),
 ]
-for idx, (name, desc) in enumerate(modules):
-    with cols[idx % 4]:
-        st.markdown(f"<div class='spt-card'><h3>{name}</h3><p>{desc}</p></div>", unsafe_allow_html=True)
 
-st.caption(f"資料庫位置：{DB_PATH}")
+for i in range(0, len(modules), 2):
+    cols = st.columns(2)
+    for col, item in zip(cols, modules[i:i+2]):
+        no, zh, en, desc = item
+        with col:
+            st.markdown(
+                f"""
+                <div class="spt-card">
+                  <div class="spt-card-title">{no}. {zh} / {en}</div>
+                  <div class="spt-card-desc">{desc}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
