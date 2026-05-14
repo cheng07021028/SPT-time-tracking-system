@@ -33,6 +33,78 @@ def ensure_cols(df: pd.DataFrame) -> pd.DataFrame:
             df[c] = False if c in ["_delete", "is_active", "is_in_factory", "is_today_attendance"] else ""
     return df[COLS]
 
+
+def _normalize_text(v):
+    if pd.isna(v):
+        return ""
+    return str(v).strip()
+
+def parse_pasted_employees(raw: str) -> pd.DataFrame:
+    """Parse tab/comma pasted employee data into editable DB columns.
+
+    支援兩種格式：
+    1. 有標題列：工號 / employee_id / 姓名 / department / title...
+    2. 無標題列：依序視為 工號、姓名、單位、職稱、備註
+    """
+    lines = [line for line in raw.splitlines() if line.strip()]
+    rows = []
+    for line in lines:
+        if "\t" in line:
+            parts = [x.strip() for x in line.split("\t")]
+        else:
+            parts = [x.strip() for x in line.split(",")]
+        rows.append(parts)
+    if not rows:
+        return ensure_cols(pd.DataFrame())
+
+    header_tokens = {"工號", "employee_id", "employee id", "姓名", "name", "員工姓名", "單位", "department", "職稱", "title"}
+    first = [x.strip().lower() for x in rows[0]]
+    has_header = any(x in header_tokens for x in first)
+
+    if has_header:
+        source = pd.DataFrame(rows[1:], columns=rows[0])
+        lower_map = {str(c).strip().lower(): c for c in source.columns}
+        def pick(*names):
+            for name in names:
+                key = name.strip().lower()
+                if key in lower_map:
+                    return source[lower_map[key]]
+            return ""
+        df = pd.DataFrame({
+            "_delete": False,
+            "id": "",
+            "employee_id": pick("工號", "員工編號", "人員編號", "employee_id", "employee id", "id"),
+            "employee_name": pick("姓名", "員工姓名", "人員姓名", "employee_name", "employee name", "name"),
+            "department": pick("單位", "部門", "課別", "department", "dept"),
+            "title": pick("職稱", "工段", "title", "job title"),
+            "is_active": True,
+            "is_in_factory": True,
+            "is_today_attendance": True,
+            "note": pick("備註", "note", "remark", "說明"),
+            "created_at": "",
+            "updated_at": "",
+        })
+    else:
+        padded = [r + [""] * (5 - len(r)) for r in rows]
+        df = pd.DataFrame({
+            "_delete": False,
+            "id": "",
+            "employee_id": [r[0] for r in padded],
+            "employee_name": [r[1] for r in padded],
+            "department": [r[2] for r in padded],
+            "title": [r[3] for r in padded],
+            "is_active": True,
+            "is_in_factory": True,
+            "is_today_attendance": True,
+            "note": [r[4] for r in padded],
+            "created_at": "",
+            "updated_at": "",
+        })
+    for c in ["employee_id", "employee_name", "department", "title", "note"]:
+        df[c] = df[c].map(_normalize_text)
+    df = df[(df["employee_id"] != "") & (df["employee_name"] != "")].copy()
+    return ensure_cols(df)
+
 def reload_data():
     df = load_employees()
     df.insert(0, "_delete", False)

@@ -33,6 +33,76 @@ def ensure_cols(df: pd.DataFrame) -> pd.DataFrame:
             df[c] = False if c in ["_delete", "is_active"] else ""
     return df[COLS]
 
+
+def _normalize_text(v):
+    if pd.isna(v):
+        return ""
+    return str(v).strip()
+
+def parse_pasted_work_orders(raw: str) -> pd.DataFrame:
+    """Parse tab/comma pasted work order data into editable DB columns.
+
+    支援兩種格式：
+    1. 有標題列：製令 / work_order / P/N / part_no / Type / 客戶...
+    2. 無標題列：依序視為 製令、P/N、機型、組立地點、客戶、備註
+    """
+    lines = [line for line in raw.splitlines() if line.strip()]
+    rows = []
+    for line in lines:
+        if "\t" in line:
+            parts = [x.strip() for x in line.split("\t")]
+        else:
+            parts = [x.strip() for x in line.split(",")]
+        rows.append(parts)
+    if not rows:
+        return ensure_cols(pd.DataFrame())
+
+    header_tokens = {"製令", "工單", "工令", "work_order", "work order", "wo", "mo", "p/n", "part", "type", "機型", "客戶", "customer"}
+    first = [x.strip().lower() for x in rows[0]]
+    has_header = any(x in header_tokens for x in first)
+
+    if has_header:
+        source = pd.DataFrame(rows[1:], columns=rows[0])
+        lower_map = {str(c).strip().lower(): c for c in source.columns}
+        def pick(*names):
+            for name in names:
+                key = name.strip().lower()
+                if key in lower_map:
+                    return source[lower_map[key]]
+            return ""
+        df = pd.DataFrame({
+            "_delete": False,
+            "id": "",
+            "work_order": pick("製令", "工單", "工令", "製令號碼", "work_order", "work order", "wo", "mo"),
+            "part_no": pick("p/n", "pn", "part_no", "part no", "料號"),
+            "type_name": pick("type", "type_name", "機型", "型號"),
+            "assembly_location": pick("組立地點", "assembly_location", "assembly location", "地點"),
+            "customer": pick("客戶", "customer", "client"),
+            "note": pick("備註", "note", "remark", "說明"),
+            "is_active": True,
+            "created_at": "",
+            "updated_at": "",
+        })
+    else:
+        padded = [r + [""] * (6 - len(r)) for r in rows]
+        df = pd.DataFrame({
+            "_delete": False,
+            "id": "",
+            "work_order": [r[0] for r in padded],
+            "part_no": [r[1] for r in padded],
+            "type_name": [r[2] for r in padded],
+            "assembly_location": [r[3] for r in padded],
+            "customer": [r[4] for r in padded],
+            "note": [r[5] for r in padded],
+            "is_active": True,
+            "created_at": "",
+            "updated_at": "",
+        })
+    for c in ["work_order", "part_no", "type_name", "assembly_location", "customer", "note"]:
+        df[c] = df[c].map(_normalize_text)
+    df = df[df["work_order"] != ""].copy()
+    return ensure_cols(df)
+
 def reload_data():
     df = load_work_orders()
     df.insert(0, "_delete", False)
