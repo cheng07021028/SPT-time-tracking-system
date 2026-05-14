@@ -1,19 +1,22 @@
 # -*- coding: utf-8 -*-
 """SPT Time Tracking System - Visual theme helpers.
 
-V1.11
-- All module/page headers use native Streamlit rendering to avoid visible HTML text.
-- Headers include Super Plus Tech logo.
-- Add high-tech breathing glow effect to page title panels and cards.
-- Backward compatible with apply_theme / app_theme / render_header / render_home_header.
+V1.12
+- Force-render Super Plus Tech logo in every module header.
+- Add visible high-tech breathing glow to headers/cards/sidebar.
+- Keep backward compatibility: apply_theme / app_theme / render_header / render_home_header.
+- Avoid raw <div> text by always using unsafe_allow_html=True inside this service.
 """
 from __future__ import annotations
 
+import base64
 from pathlib import Path
+from typing import Iterable
+
 import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-LOGO_PATHS = [
+LOGO_CANDIDATES = [
     PROJECT_ROOT / "data" / "logo" / "super_plus_logo.png",
     PROJECT_ROOT / "data" / "logo" / "logococo(黑字).png",
     PROJECT_ROOT / "logococo(黑字).png",
@@ -21,125 +24,217 @@ LOGO_PATHS = [
 
 
 def _find_logo() -> Path | None:
-    for p in LOGO_PATHS:
-        if p.exists():
+    for p in LOGO_CANDIDATES:
+        if p.exists() and p.is_file():
             return p
     return None
 
 
-def apply_theme() -> None:
-    """Apply global dark high-tech Streamlit styling.
+def _logo_data_uri() -> str | None:
+    p = _find_logo()
+    if not p:
+        return None
+    suffix = p.suffix.lower().replace(".", "") or "png"
+    mime = "jpeg" if suffix in {"jpg", "jpeg"} else "png"
+    try:
+        raw = p.read_bytes()
+        b64 = base64.b64encode(raw).decode("ascii")
+        return f"data:image/{mime};base64,{b64}"
+    except Exception:
+        return None
 
-    Only CSS is injected here. Visible headers/cards are rendered with native
-    Streamlit elements to prevent <div> HTML from appearing as plain text.
-    """
+
+def apply_theme() -> None:
+    """Apply global SPT dark-tech style."""
     st.markdown(
         """
 <style>
 :root {
-    --spt-bg0: #050b16;
-    --spt-bg1: #071426;
-    --spt-panel: rgba(10, 25, 44, .92);
-    --spt-text: #f4fbff;
-    --spt-muted: #a9bacb;
-    --spt-cyan: #35e7ff;
-    --spt-purple: #b44dff;
-    --spt-blue: #1e86ff;
+  --spt-bg0:#050b16;
+  --spt-bg1:#071426;
+  --spt-panel:rgba(8,20,38,.92);
+  --spt-panel2:rgba(11,43,68,.82);
+  --spt-text:#f4fbff;
+  --spt-muted:#9fb2c7;
+  --spt-cyan:#34e8ff;
+  --spt-blue:#1e86ff;
+  --spt-purple:#ba5cff;
+  --spt-green:#2df7b5;
 }
 
-@keyframes sptBreathingGlow {
-    0%, 100% {
-        box-shadow:
-            0 0 18px rgba(53, 231, 255, .12),
-            inset 0 0 18px rgba(53, 231, 255, .04);
-        border-color: rgba(53, 231, 255, .22);
-    }
-    50% {
-        box-shadow:
-            0 0 34px rgba(53, 231, 255, .34),
-            0 0 54px rgba(180, 77, 255, .14),
-            inset 0 0 26px rgba(53, 231, 255, .08);
-        border-color: rgba(53, 231, 255, .52);
-    }
+@keyframes sptBreath {
+  0%,100% {
+    box-shadow:
+      0 0 16px rgba(52,232,255,.16),
+      0 0 36px rgba(52,232,255,.07),
+      inset 0 0 18px rgba(52,232,255,.045);
+    border-color: rgba(52,232,255,.26);
+    filter: saturate(1.00);
+  }
+  50% {
+    box-shadow:
+      0 0 26px rgba(52,232,255,.42),
+      0 0 64px rgba(186,92,255,.20),
+      inset 0 0 26px rgba(52,232,255,.12);
+    border-color: rgba(52,232,255,.72);
+    filter: saturate(1.18);
+  }
+}
+
+@keyframes sptScan {
+  0% { transform: translateX(-120%); opacity: .05; }
+  45% { opacity: .55; }
+  100% { transform: translateX(120%); opacity: .02; }
 }
 
 html, body, [data-testid="stAppViewContainer"] {
-    background:
-        radial-gradient(circle at 8% 8%, rgba(103, 58, 183, .23), transparent 34%),
-        radial-gradient(circle at 78% 10%, rgba(21, 134, 177, .24), transparent 35%),
-        linear-gradient(135deg, #050914 0%, #071321 48%, #061729 100%) !important;
-    color: var(--spt-text) !important;
+  background:
+    radial-gradient(circle at 7% 6%, rgba(103,58,183,.24), transparent 34%),
+    radial-gradient(circle at 82% 9%, rgba(33,150,243,.22), transparent 37%),
+    linear-gradient(135deg, #050914 0%, #071321 48%, #061729 100%) !important;
+  color: var(--spt-text) !important;
 }
-[data-testid="stHeader"] { background: rgba(5, 11, 22, .70) !important; }
-.block-container { padding-top: 1.6rem; }
+[data-testid="stHeader"] { background: rgba(5,11,22,.72) !important; }
+.block-container { padding-top: 1.45rem; max-width: 1660px; }
 
 /* Sidebar */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #071426 0%, #05101d 100%) !important;
-    border-right: 1px solid rgba(53, 231, 255, .22);
+  background: linear-gradient(180deg, #071426 0%, #05101d 100%) !important;
+  border-right: 1px solid rgba(52,232,255,.26);
 }
-[data-testid="stSidebar"] * {
-    color: #eaf8ff !important;
-    font-weight: 760;
-}
+[data-testid="stSidebar"] * { color:#eefaff !important; font-weight:780; }
 [data-testid="stSidebarNav"] a {
-    color: #eaf8ff !important;
-    border-radius: 10px;
-    margin: 4px 6px;
+  color:#eefaff !important;
+  border-radius:10px;
+  margin:4px 6px;
 }
 [data-testid="stSidebarNav"] a:hover,
 [data-testid="stSidebarNav"] a[aria-current="page"] {
-    background: linear-gradient(90deg, rgba(53,231,255,.28), rgba(180,77,255,.20)) !important;
-    box-shadow: inset 3px 0 0 var(--spt-cyan), 0 0 16px rgba(53,231,255,.22);
+  background: linear-gradient(90deg, rgba(52,232,255,.30), rgba(186,92,255,.22)) !important;
+  box-shadow: inset 3px 0 0 var(--spt-cyan), 0 0 18px rgba(52,232,255,.24);
 }
 
-h1, h2, h3, h4, h5, h6, p, span, div, label { color: var(--spt-text); }
+h1,h2,h3,h4,h5,h6,p,span,div,label { color: var(--spt-text); }
 [data-testid="stCaptionContainer"] { color: var(--spt-muted) !important; }
 
-/* Bordered native Streamlit containers: used by page title/header and module cards */
+.spt-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 112px;
+  border: 1px solid rgba(52,232,255,.34);
+  border-radius: 22px;
+  padding: 20px 24px;
+  margin: 4px 0 24px 0;
+  background:
+    radial-gradient(circle at 98% 8%, rgba(52,232,255,.20), transparent 34%),
+    linear-gradient(105deg, rgba(8,18,35,.96), rgba(11,48,75,.82));
+  animation: sptBreath 3.4s ease-in-out infinite;
+}
+.spt-hero::after {
+  content:"";
+  position:absolute;
+  top:0;
+  left:0;
+  width:44%;
+  height:100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.09), transparent);
+  animation: sptScan 4.8s ease-in-out infinite;
+  pointer-events:none;
+}
+.spt-hero-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+.spt-logo-wrap {
+  width: 205px;
+  min-width: 205px;
+  height: 72px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius: 14px;
+  background: rgba(255,255,255,.96);
+  padding: 8px 12px;
+  box-shadow: 0 0 18px rgba(52,232,255,.20);
+}
+.spt-logo-wrap img { max-width:100%; max-height:100%; object-fit:contain; }
+.spt-logo-fallback {
+  font-size: 28px;
+  font-weight: 950;
+  letter-spacing: 2px;
+  color: #f4fbff;
+  text-shadow: 0 0 16px rgba(52,232,255,.45);
+}
+.spt-title-main {
+  font-size: 34px;
+  line-height: 1.18;
+  font-weight: 950;
+  letter-spacing: .5px;
+  color: #f9fdff;
+  text-shadow: 0 0 16px rgba(52,232,255,.34), 0 0 26px rgba(186,92,255,.18);
+}
+.spt-title-sub {
+  margin-top: 10px;
+  font-size: 14px;
+  letter-spacing: .25px;
+  color: #abc0d5;
+}
+.spt-divider {
+  height:1px;
+  background: linear-gradient(90deg, rgba(52,232,255,.03), rgba(52,232,255,.58), rgba(186,92,255,.42), rgba(52,232,255,.03));
+  margin: 6px 0 22px 0;
+}
+.spt-module-card {
+  min-height: 118px;
+  border:1px solid rgba(52,232,255,.24);
+  border-radius:18px;
+  padding:18px 18px;
+  background: linear-gradient(145deg, rgba(9,22,42,.88), rgba(10,37,61,.72));
+  animation: sptBreath 4.2s ease-in-out infinite;
+}
+.spt-module-no { color:#71f2ff; font-size:18px; font-weight:950; }
+.spt-module-name { font-size:22px; font-weight:920; margin-top:4px; }
+.spt-module-desc { color:#9fb2c7; font-size:13px; margin-top:10px; }
+
+/* Native containers / metrics also glow */
 div[data-testid="stVerticalBlockBorderWrapper"] {
-    border-radius: 22px !important;
-    border: 1px solid rgba(53, 231, 255, .24) !important;
-    background:
-        linear-gradient(105deg, rgba(8, 18, 35, .96), rgba(15, 68, 96, .70)),
-        radial-gradient(circle at 100% 0%, rgba(53, 231, 255, .16), transparent 42%) !important;
-    animation: sptBreathingGlow 3.8s ease-in-out infinite;
+  border-radius: 20px !important;
+  border: 1px solid rgba(52,232,255,.26) !important;
+  background: linear-gradient(145deg, rgba(9,22,42,.88), rgba(10,37,61,.68)) !important;
+  animation: sptBreath 4.0s ease-in-out infinite;
 }
-
-/* Metrics */
 [data-testid="stMetric"] {
-    background: linear-gradient(145deg, rgba(9,22,42,.90), rgba(10,37,61,.72));
-    border: 1px solid rgba(53,231,255,.18);
-    border-radius: 18px;
-    padding: 16px 18px;
-    box-shadow: 0 0 20px rgba(53,231,255,.08);
+  background: linear-gradient(145deg, rgba(9,22,42,.90), rgba(10,37,61,.72));
+  border: 1px solid rgba(52,232,255,.18);
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow: 0 0 20px rgba(52,232,255,.10);
 }
-
-/* Tables */
 [data-testid="stDataFrame"], [data-testid="stDataEditor"] {
-    border: 1px solid rgba(53, 231, 255, .18);
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 0 22px rgba(53, 231, 255, .09);
+  border: 1px solid rgba(52,232,255,.18);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 0 22px rgba(52,232,255,.10);
 }
-
-/* Buttons */
 .stButton>button, .stDownloadButton>button {
-    border-radius: 12px !important;
-    border: 1px solid rgba(53,231,255,.35) !important;
-    background: linear-gradient(90deg, rgba(10,35,60,.96), rgba(20,68,98,.94)) !important;
-    color: #f4fbff !important;
-    box-shadow: 0 0 14px rgba(53,231,255,.14);
+  border-radius: 12px !important;
+  border: 1px solid rgba(52,232,255,.35) !important;
+  background: linear-gradient(90deg, rgba(10,35,60,.96), rgba(20,68,98,.94)) !important;
+  color: #f4fbff !important;
+  box-shadow: 0 0 14px rgba(52,232,255,.16);
 }
 .stButton>button:hover, .stDownloadButton>button:hover {
-    border-color: var(--spt-cyan) !important;
-    box-shadow: 0 0 22px rgba(53,231,255,.30);
+  border-color: var(--spt-cyan) !important;
+  box-shadow: 0 0 24px rgba(52,232,255,.34);
 }
 
-.spt-divider {
-    height: 1px;
-    background: linear-gradient(90deg, rgba(53,231,255,.05), rgba(53,231,255,.55), rgba(180,77,255,.40), rgba(53,231,255,.05));
-    margin: 14px 0 24px 0;
+@media (max-width: 900px) {
+  .spt-hero-inner { flex-direction: column; align-items: flex-start; }
+  .spt-logo-wrap { width: 190px; min-width: 190px; }
+  .spt-title-main { font-size: 26px; }
 }
 </style>
         """,
@@ -147,37 +242,33 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     )
 
 
-# Backward-compatible alias used by older generated pages.
+# Backward-compatible alias used by older pages.
 def app_theme() -> None:
     apply_theme()
 
 
 def render_header(title: str, subtitle: str = "", logo: bool = True) -> None:
-    """Render common page header with logo and breathing glow.
-
-    Native Streamlit widgets are used for visible content to avoid raw HTML
-    appearing on the page.
-    """
-    logo_path = _find_logo() if logo else None
-
-    with st.container(border=True):
-        if logo:
-            cols = st.columns([1.10, 5.20], vertical_alignment="center")
-            with cols[0]:
-                if logo_path:
-                    st.image(str(logo_path), use_container_width=True)
-                else:
-                    st.markdown("### SPT")
-            with cols[1]:
-                st.title(title)
-                if subtitle:
-                    st.caption(subtitle)
-        else:
-            st.title(title)
-            if subtitle:
-                st.caption(subtitle)
-
-    st.markdown('<div class="spt-divider"></div>', unsafe_allow_html=True)
+    """Render SPT page header with embedded logo and breathing glow."""
+    logo_uri = _logo_data_uri() if logo else None
+    if logo_uri:
+        logo_html = f'<div class="spt-logo-wrap"><img src="{logo_uri}" alt="Super Plus Tech Logo"></div>'
+    else:
+        logo_html = '<div class="spt-logo-fallback">SPT</div>'
+    st.markdown(
+        f"""
+<div class="spt-hero">
+  <div class="spt-hero-inner">
+    {logo_html}
+    <div>
+      <div class="spt-title-main">{title}</div>
+      <div class="spt-title-sub">{subtitle}</div>
+    </div>
+  </div>
+</div>
+<div class="spt-divider"></div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_home_header() -> None:
@@ -189,19 +280,28 @@ def render_home_header() -> None:
 
 
 def render_kpi_cards(items: list[tuple[str, str]]) -> None:
-    cols = st.columns(len(items) if items else 1)
+    if not items:
+        return
+    cols = st.columns(len(items))
     for col, (label, value) in zip(cols, items):
         with col:
             st.metric(label, value)
 
 
-def render_module_cards(modules: list[tuple[str, str, str]]) -> None:
-    """Render module cards using native containers."""
+def render_module_cards(modules: Iterable[tuple[str, str, str]]) -> None:
+    modules = list(modules)
     for i in range(0, len(modules), 4):
         cols = st.columns(4)
         for col, item in zip(cols, modules[i:i + 4]):
             no, name, desc = item
             with col:
-                with st.container(border=True):
-                    st.subheader(f"{no}. {name}")
-                    st.caption(desc)
+                st.markdown(
+                    f"""
+<div class="spt-module-card">
+  <div class="spt-module-no">{no}</div>
+  <div class="spt-module-name">{name}</div>
+  <div class="spt-module-desc">{desc}</div>
+</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
