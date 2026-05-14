@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-SPT Time Tracking V1.23 - Persistent Data Guard Service
+SPT Time Tracking V1.24 - Persistent Data Guard Service
 
 目的：
 1. 資料與模組設定永久保存到 JSON，避免更新 patch 後資料消失。
@@ -11,6 +11,7 @@ SPT Time Tracking V1.23 - Persistent Data Guard Service
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -190,8 +191,8 @@ def export_permanent_state(include_logs: bool = True, force: bool = False) -> di
 
     if not DB_PATH.exists():
         if old_count > 0 and not force:
-            return {"version": "V1.23", "exported_at": _now(), "skipped": True, "reason": "DB not found; keep previous permanent state", "tables": old_state.get("tables", {})}
-        state = {"version": "V1.23", "exported_at": _now(), "db_exists": False, "tables": {}}
+            return {"version": "V1.24", "exported_at": _now(), "skipped": True, "reason": "DB not found; keep previous permanent state", "tables": old_state.get("tables", {})}
+        state = {"version": "V1.24", "exported_at": _now(), "db_exists": False, "tables": {}}
         STATE_JSON.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
         return state
 
@@ -199,7 +200,7 @@ def export_permanent_state(include_logs: bool = True, force: bool = False) -> di
     try:
         current_count = database_business_row_count(conn)
         if current_count == 0 and old_count > 0 and not force:
-            return {"version": "V1.23", "exported_at": _now(), "skipped": True, "reason": "Current DB has zero business rows; keep previous permanent state", "tables": old_state.get("tables", {})}
+            return {"version": "V1.24", "exported_at": _now(), "skipped": True, "reason": "Current DB has zero business rows; keep previous permanent state", "tables": old_state.get("tables", {})}
 
         existing = get_existing_tables(conn)
         tables: dict[str, list[dict[str, Any]]] = {}
@@ -209,7 +210,7 @@ def export_permanent_state(include_logs: bool = True, force: bool = False) -> di
             tables[table] = export_table(conn, table)
 
         state = {
-            "version": "V1.23",
+            "version": "V1.24",
             "exported_at": _now(),
             "db_path": str(DB_PATH),
             "db_exists": True,
@@ -225,7 +226,7 @@ def export_permanent_state(include_logs: bool = True, force: bool = False) -> di
         for table in SETTING_TABLE_CANDIDATES:
             if table_exists(conn, table):
                 settings_tables[table] = export_table(conn, table)
-        SETTINGS_JSON.write_text(json.dumps({"version": "V1.23", "exported_at": _now(), "tables": settings_tables}, ensure_ascii=False, indent=2), encoding="utf-8")
+        SETTINGS_JSON.write_text(json.dumps({"version": "V1.24", "exported_at": _now(), "tables": settings_tables}, ensure_ascii=False, indent=2), encoding="utf-8")
 
         if DB_PATH.exists():
             shutil.copy2(DB_PATH, DB_COPY_DIR / "spt_time_tracking_latest.db")
@@ -407,7 +408,52 @@ def create_persistent_backup(include_excel: bool = True, include_csv: bool = Tru
     return BackupResult(True, f"永久備份完成，共 {len(tables)} 個資料表。", str(batch_dir), created_files)
 
 
+def _git_identity() -> tuple[str, str]:
+    """
+    Streamlit Cloud / Linux container often has no git user.name or user.email.
+    Use environment variables when available; otherwise use a safe project bot identity.
+    You can override these in Streamlit Cloud Secrets or environment variables:
+      GIT_USER_NAME / GIT_AUTHOR_NAME
+      GIT_USER_EMAIL / GIT_AUTHOR_EMAIL
+    """
+    name = (
+        os.getenv("GIT_USER_NAME")
+        or os.getenv("GIT_AUTHOR_NAME")
+        or os.getenv("GITHUB_USER_NAME")
+        or "SPT Time Tracking Bot"
+    )
+    email = (
+        os.getenv("GIT_USER_EMAIL")
+        or os.getenv("GIT_AUTHOR_EMAIL")
+        or os.getenv("GITHUB_USER_EMAIL")
+        or "spt-time-tracking-bot@users.noreply.github.com"
+    )
+    return name.strip(), email.strip()
+
+
+def ensure_git_identity() -> str:
+    """Set git identity for both local CMD and Streamlit Cloud runtime before commit."""
+    name, email = _git_identity()
+    outputs: list[str] = []
+    for key, value in [("user.name", name), ("user.email", email)]:
+        proc = subprocess.run(
+            ["git", "config", "--global", key, value],
+            cwd=str(PROJECT_ROOT),
+            text=True,
+            capture_output=True,
+            shell=False,
+        )
+        out = (proc.stdout or "") + (proc.stderr or "")
+        if proc.returncode != 0:
+            raise RuntimeError(out.strip() or f"git config --global {key} failed")
+        outputs.append(f"{key}={value}")
+    return "Git identity ready: " + ", ".join(outputs)
+
+
 def _run_git(args: list[str]) -> str:
+    # Always ensure identity immediately before git commands so Streamlit Cloud can commit.
+    if args and args[0] in {"add", "commit", "push", "status"}:
+        ensure_git_identity()
     proc = subprocess.run(["git", *args], cwd=str(PROJECT_ROOT), text=True, capture_output=True, shell=False)
     out = (proc.stdout or "") + (proc.stderr or "")
     if proc.returncode != 0:
