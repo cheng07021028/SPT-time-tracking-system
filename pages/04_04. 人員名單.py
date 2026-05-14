@@ -194,6 +194,23 @@ def parse_pasted_employees(raw: str) -> tuple[pd.DataFrame, bool, list[str]]:
         warnings.append(f"已略過 {dropped} 筆缺少工號或姓名的資料列。")
     return ensure_cols(df), has_header, warnings
 
+
+def sort_editor_state(state_key: str, label_prefix: str) -> None:
+    """Explicit sort controls for editable master tables."""
+    df = st.session_state.get(state_key)
+    if df is None or df.empty:
+        return
+    with st.expander("排序設定 / Sort Settings", expanded=False):
+        c1, c2, c3 = st.columns([2, 1, 1])
+        sort_col = c1.selectbox("排序欄位 / Sort Column", list(df.columns), key=f"{label_prefix}_sort_col")
+        ascending = c2.radio("排序方向 / Direction", ["升冪 / ASC", "降冪 / DESC"], horizontal=True, key=f"{label_prefix}_sort_dir") == "升冪 / ASC"
+        if c3.button("套用排序 / Apply Sort", use_container_width=True, key=f"{label_prefix}_apply_sort"):
+            try:
+                st.session_state[state_key] = df.sort_values(sort_col, ascending=ascending, kind="mergesort", na_position="last").reset_index(drop=True)
+                rerun()
+            except Exception as exc:
+                st.warning(f"此欄位無法排序：{exc}")
+
 def reload_data():
     df = load_employees()
     df.insert(0, "_delete", False)
@@ -249,6 +266,9 @@ with tab1:
         rerun()
 
     st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。工號 / Employee ID、姓名 / Name 為必填。")
+
+    sort_editor_state(STATE_KEY, "employees")
+
 
     edited = st.data_editor(
         st.session_state[STATE_KEY],

@@ -2,10 +2,12 @@
 from __future__ import annotations
 from datetime import date
 import streamlit as st
+import plotly.express as px
 
 from services.theme_service import apply_theme, render_header
 from services.db_service import query_df
 from services.table_ui_service import render_table
+from services.duration_service import hours_to_hms
 
 st.set_page_config(page_title="08. 人員每日工時", page_icon="⏱️", layout="wide")
 apply_theme()
@@ -42,8 +44,23 @@ if not df.empty:
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("出勤在廠人數 / Attendance", f"{len(df):,}")
-    c2.metric("未紀錄 / No Record", f"{(df['status']=='未紀錄').sum():,}")
-    c3.metric("偏低 / Low", f"{(df['status']=='偏低').sum():,}")
-    c4.metric("正常/超時 / OK/Over", f"{((df['status']=='正常') | (df['status']=='超時')).sum():,}")
+    c2.metric("累積工時 / Total Time", hours_to_hms(df["total_hours"].sum()))
+    c3.metric("未紀錄 / No Record", f"{(df['status']=='未紀錄').sum():,}")
+    c4.metric("偏低 / Low", f"{(df['status']=='偏低').sum():,}")
+
+    st.subheader("BI 工時分布 / BI Time Distribution")
+    chart_df = df.copy()
+    chart_df["total_seconds"] = chart_df["total_hours"].astype(float) * 3600
+    fig = px.bar(
+        chart_df.sort_values("total_hours", ascending=False),
+        x="employee_name",
+        y="total_seconds",
+        color="status",
+        hover_data=["employee_id", "department", "title", "record_count", "active_count"],
+        labels={"employee_name": "人員", "total_seconds": "累積秒數", "status": "狀態"},
+        title="人員每日累積工時 BI 圖 / Daily Employee Time BI",
+    )
+    fig.update_layout(template="plotly_dark", height=420, margin=dict(l=20, r=20, t=60, b=80))
+    st.plotly_chart(fig, use_container_width=True)
 
 render_table(df, "daily_employee_hours", editable=False, height=620)

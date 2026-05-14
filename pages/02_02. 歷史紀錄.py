@@ -9,6 +9,7 @@ from services.theme_service import apply_theme, render_header
 from services.time_record_service import load_records, save_time_records
 from services.master_data_service import load_employees, load_work_orders
 from services.table_ui_service import render_table
+from services.duration_service import hours_to_hms
 
 st.set_page_config(page_title="02. 歷史紀錄", page_icon="📚", layout="wide")
 apply_theme()
@@ -29,7 +30,7 @@ df = load_records(str(start), str(end), emp or None, wo or None)
 
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("筆數 / Records", f"{len(df):,}")
-m2.metric("總工時 / Total Hours", f"{df['work_hours'].sum():.2f}" if not df.empty else "0.00")
+m2.metric("總工時 / Total Time", hours_to_hms(df['work_hours'].sum()) if not df.empty else "00:00:00")
 m3.metric("作業中 / Active", f"{(df['end_timestamp'].isna()).sum():,}" if not df.empty else "0")
 m4.metric("人員數 / Employees", f"{df['employee_id'].nunique():,}" if not df.empty else "0")
 
