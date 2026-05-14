@@ -1,166 +1,140 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import sys
+import json
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-try:
-    from services.theme_service import apply_theme, render_header
-except Exception:
-    def apply_theme():
-        pass
-
-    def render_header(title: str, subtitle: str = ""):
-        st.title(title)
-        if subtitle:
-            st.caption(subtitle)
-
-from services.security_service import require_module_access
-from services.persistence_service import (
-    BACKUP_DIR,
-    create_persistent_backup,
-    create_backup_and_push_to_github,
-    git_backup_push,
-    list_database_tables,
-    load_latest_manifest,
-    read_table,
-)
-
-st.set_page_config(
-    page_title="09. 資料永久保存與備份",
-    page_icon="💾",
-    layout="wide",
+from services.theme_service import apply_theme, render_header
+from services.db_service import DB_PATH, database_business_row_count, ensure_data_guard_restore
+from services.github_cloud_storage_service import (
+    LATEST_SETTINGS,
+    LATEST_STATE,
+    REMOTE_STATE_ROOT,
+    STATE_DIR,
+    create_and_upload_permanent_files,
+    create_permanent_files,
+    download_latest_permanent_files_from_github,
+    github_cloud_file_status,
+    github_config,
+    migrate_legacy_date_path_to_data_path,
+    restore_from_github_if_database_empty,
+    upload_existing_permanent_files,
 )
 
 apply_theme()
-require_module_access("09_persistence")
-render_header(
-    "09｜資料永久保存與備份",
-    "Permanent Data Backup｜SQLite → JSON / Excel / CSV → GitHub",
-)
+render_header("09", "資料永久保存與備份", "GitHub 雲端永久保存｜啟動自動還原｜防止空資料覆蓋")
 
+st.subheader("資料防消失中心 / Data Guard Center")
 st.info(
-    "此頁會將目前資料庫內的工時紀錄、歷史紀錄、製令、人員名單、LOG 等資料，"
-    "輸出到 data/persistent_backups/，並可上傳到 GitHub 做永久保存。"
+    "V1.30 已加入啟動自動還原：Streamlit Cloud 更新模組或重新部署後，如果 SQLite 不存在或主資料為 0，"
+    "系統會先從 GitHub 的 data/persistent_state/spt_permanent_state.json 下載並還原。"
 )
 
-tables = list_database_tables()
+cfg = github_config()
+with st.expander("GitHub 雲端設定檢查 / Cloud Settings", expanded=True):
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Repository", cfg.get("repo") or "未設定")
+    c2.metric("Branch", cfg.get("branch") or "main")
+    c3.metric("Token", "已設定" if cfg.get("token") else "未設定")
+    c4.metric("正確路徑", REMOTE_STATE_ROOT)
+    if not cfg.get("token"):
+        st.warning(
+            "請到 Streamlit Cloud → App settings → Secrets 加入：\n\n"
+            'GITHUB_TOKEN = "你的 GitHub Token"\n'
+            'GITHUB_REPOSITORY = "cheng07021028/SPT-time-tracking-system"\n'
+            'GITHUB_BRANCH = "main"'
+        )
 
+st.divider()
+
+st.subheader("一鍵操作 / Actions")
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    st.metric("資料表 / Tables", len(tables))
+    if st.button("建立本機永久檔", use_container_width=True):
+        res = create_permanent_files()
+        if res.get("ok"):
+            st.success("永久檔案已建立。")
+        else:
+            st.warning(res.get("message", "建立失敗或被安全機制阻擋。"))
+        st.json(res)
 with c2:
-    st.metric("備份資料夾 / Backup Folder", "persistent_backups")
+    if st.button("上傳既有永久檔到 GitHub", use_container_width=True):
+        res = upload_existing_permanent_files(archive=True)
+        if res.get("ok"):
+            st.success("已上傳既有永久檔到 GitHub。")
+        else:
+            st.error(res.get("message", "上傳失敗"))
+        st.json(res)
 with c3:
-    st.metric("備份格式 / Formats", "JSON / XLSX / CSV")
+    if st.button("建立永久檔並上傳 GitHub", use_container_width=True):
+        res = create_and_upload_permanent_files()
+        if res.get("ok"):
+            st.success("永久備份完成，已存到 GitHub。")
+        else:
+            st.error(res.get("message", "永久備份未完成；請看 JSON。"))
+        st.json(res)
 with c4:
-    manifest = load_latest_manifest()
-    st.metric("最近備份 / Latest", manifest.get("backup_time", "尚未備份") if manifest else "尚未備份")
+    if st.button("立即從 GitHub 還原資料", use_container_width=True):
+        res = ensure_data_guard_restore(force=True)
+        if res.get("ok"):
+            st.success("已執行 GitHub / 本機永久檔還原檢查。")
+        else:
+            st.error("還原未完成，請看下方 JSON。")
+        st.json(res)
+
+st.divider()
+st.subheader("雲端檢查與修正 / Cloud Check & Fix")
+c5, c6, c7 = st.columns(3)
+with c5:
+    if st.button("檢查 GitHub 雲端檔案", use_container_width=True):
+        st.json(github_cloud_file_status())
+with c6:
+    if st.button("修正舊路徑 date → data", use_container_width=True):
+        res = migrate_legacy_date_path_to_data_path()
+        if res.get("ok"):
+            st.success("已將舊路徑資料搬到正確 data/persistent_state。")
+        else:
+            st.warning("沒有搬移成功；可能舊路徑不存在，或 Token 權限不足。")
+        st.json(res)
+with c7:
+    if st.button("只下載 GitHub latest 檔案", use_container_width=True):
+        res = download_latest_permanent_files_from_github(allow_legacy=True)
+        if res.get("ok"):
+            st.success("已下載 GitHub latest 永久檔到本機暫存。")
+        else:
+            st.error(res.get("message", "下載失敗"))
+        st.json(res)
 
 st.divider()
 
-st.subheader("目前資料表 / Current Database Tables")
+st.subheader("目前永久檔狀態 / Permanent File Status")
+try:
+    main_count = database_business_row_count()
+except Exception:
+    main_count = 0
+status_rows = [
+    {"項目 / Item": "SQLite DB", "路徑 / Path": str(DB_PATH), "存在 / Exists": DB_PATH.exists(), "大小 / Size": DB_PATH.stat().st_size if DB_PATH.exists() else 0, "主資料筆數 / Business Rows": main_count},
+    {"項目 / Item": "永久資料 latest", "路徑 / Path": str(LATEST_STATE), "存在 / Exists": LATEST_STATE.exists(), "大小 / Size": LATEST_STATE.stat().st_size if LATEST_STATE.exists() else 0, "主資料筆數 / Business Rows": ""},
+    {"項目 / Item": "模組設定 latest", "路徑 / Path": str(LATEST_SETTINGS), "存在 / Exists": LATEST_SETTINGS.exists(), "大小 / Size": LATEST_SETTINGS.stat().st_size if LATEST_SETTINGS.exists() else 0, "主資料筆數 / Business Rows": ""},
+]
+st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
 
-if not tables:
-    st.warning("目前找不到資料表。請先確認資料庫已初始化。")
-else:
-    summary_rows = []
-    for table in tables:
+if LATEST_STATE.exists():
+    with st.expander("預覽永久資料 latest / Preview Permanent State", expanded=True):
         try:
-            df = read_table(table)
-            summary_rows.append({
-                "資料表 / Table": table,
-                "筆數 / Records": len(df),
-                "欄位數 / Columns": len(df.columns),
+            data = json.loads(LATEST_STATE.read_text(encoding="utf-8"))
+            st.json({
+                "export_time": data.get("export_time") or data.get("exported_at"),
+                "version": data.get("version") or data.get("schema_version"),
+                "business_row_count": data.get("business_row_count"),
+                "table_counts": data.get("table_counts", {}),
+                "skipped": data.get("skipped"),
+                "warning": data.get("warning"),
             })
         except Exception as exc:
-            summary_rows.append({
-                "資料表 / Table": table,
-                "筆數 / Records": 0,
-                "欄位數 / Columns": 0,
-                "錯誤 / Error": str(exc),
-            })
-    st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+            st.error(str(exc))
 
-st.divider()
-
-st.subheader("建立永久備份 / Create Permanent Backup")
-
-col_a, col_b, col_c = st.columns([1, 1, 2])
-
-with col_a:
-    include_excel = st.checkbox("產生 Excel / XLSX", value=True)
-with col_b:
-    include_csv = st.checkbox("產生 CSV", value=True)
-
-with col_c:
-    st.caption("JSON 一定會產生，適合 GitHub 長期保存與資料還原。Excel 適合主管查閱。CSV 適合稽核與程式分析。")
-
-b1, b2, b3 = st.columns(3)
-
-with b1:
-    if st.button("建立永久備份", type="primary", use_container_width=True):
-        with st.spinner("正在建立永久備份..."):
-            result = create_persistent_backup(include_excel=include_excel, include_csv=include_csv)
-        if result.ok:
-            st.success(result.message)
-            st.write("備份位置：", result.backup_dir)
-            st.write(result.files)
-        else:
-            st.error(result.message)
-
-with b2:
-    if st.button("只上傳既有備份到 GitHub", use_container_width=True):
-        with st.spinner("正在執行 git add / commit / push..."):
-            result = git_backup_push()
-        if result.ok:
-            st.success(result.message)
-        else:
-            st.error(result.message)
-        if result.git_output:
-            st.code(result.git_output)
-
-with b3:
-    if st.button("建立備份並上傳 GitHub", use_container_width=True):
-        with st.spinner("正在建立備份並上傳 GitHub..."):
-            result = create_backup_and_push_to_github(include_excel=include_excel, include_csv=include_csv)
-        if result.ok:
-            st.success(result.message)
-            st.write("備份位置：", result.backup_dir)
-            st.write(result.files)
-        else:
-            st.error(result.message)
-        if result.git_output:
-            st.code(result.git_output)
-
-st.divider()
-
-st.subheader("最近備份資訊 / Latest Backup Manifest")
-
-manifest = load_latest_manifest()
-if manifest:
-    st.json(manifest)
-else:
-    st.caption("尚未建立備份。")
-
-st.divider()
-
-st.subheader("操作建議 / Recommended Workflow")
-
-st.markdown(
-    """
-1. 每天下班前按 **建立備份並上傳 GitHub**。  
-2. 若公司電腦有排程需求，可執行根目錄的 `backup_to_github.bat`。  
-3. SQLite 主資料庫 `data/database/spt_time_tracking.db` 不建議直接上傳 GitHub；GitHub 上保存的是可稽核、可還原的備份檔。  
-4. 若未來要多人同時使用，建議升級 PostgreSQL / Supabase，避免多人同時寫入 SQLite 造成鎖定。
-"""
-)
-
-st.caption(f"永久備份資料夾：{BACKUP_DIR}")
+st.caption("GitHub 正確保存路徑：data/persistent_state/ 與 data/persistent_state/history/。history 檔案使用時間戳，不會覆蓋舊檔。")
