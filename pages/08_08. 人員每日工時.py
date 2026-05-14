@@ -5,12 +5,14 @@ import streamlit as st
 import plotly.express as px
 
 from services.theme_service import apply_theme, render_header
+from services.security_service import require_module_access
 from services.db_service import query_df
 from services.table_ui_service import render_table
 from services.duration_service import hours_to_hms
 
 st.set_page_config(page_title="08. 人員每日工時", page_icon="⏱️", layout="wide")
 apply_theme()
+require_module_access("08_daily_hours")
 render_header("08｜人員每日工時", "每日應紀錄 7~7.5 小時，快速辨識偏低、超時、未紀錄")
 
 selected = st.date_input("日期 / Date", value=date.today())

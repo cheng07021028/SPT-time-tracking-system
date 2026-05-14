@@ -8,12 +8,14 @@ import plotly.express as px
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
+from services.security_service import require_module_access
 from services.time_record_service import load_records, save_time_records
 from services.table_ui_service import render_table
 from services.duration_service import hours_to_hms
 
 st.set_page_config(page_title="05. 製令工時分析", page_icon="📊", layout="wide")
 apply_theme()
+require_module_access("05_analysis")
 render_header("05｜製令工時分析", "製令、工段、人員累積工時分析與明細編輯")
 
 c1, c2 = st.columns(2)

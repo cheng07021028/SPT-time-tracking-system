@@ -3,11 +3,13 @@ from __future__ import annotations
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
+from services.security_service import require_module_access
 from services.log_service import load_logs
 from services.table_ui_service import render_table
 
 st.set_page_config(page_title="06. LOG 查詢", page_icon="🧾", layout="wide")
 apply_theme()
+require_module_access("06_logs")
 render_header("06｜LOG 查詢", "人員動作、系統事件、異常紀錄追溯")
 
 limit = st.slider("讀取筆數 / Limit", 100, 3000, 500, step=100)

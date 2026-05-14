@@ -4,6 +4,12 @@ from __future__ import annotations
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
+from services.security_service import (
+    check_permission,
+    require_module_access,
+    render_post_record_continue_prompt,
+    trigger_post_record_continue_prompt,
+)
 from services.master_data_service import load_employees, load_work_orders
 from services.time_record_service import get_active_record, get_active_group, start_work, finish_work, today_records
 from services.db_service import query_one
@@ -11,7 +17,9 @@ from services.table_ui_service import render_table
 
 st.set_page_config(page_title="01. 工時紀錄", page_icon="▶️", layout="wide")
 apply_theme()
+require_module_access("01_time_record")
 render_header("01｜工時紀錄", "快速開始、同步作業、暫停、下班、完工｜自動記錄時間與扣除休息")
+render_post_record_continue_prompt()
 
 PROCESS_OPTIONS = ["前置鈑金", "LP改造", "骨架組立", "配電", "模組", "水平", "S.T.", "清潔", "收機", "包機", "Packing", "異常", "設變", "重工", "教育訓練", "IPQC", "其他"]
 
@@ -43,9 +51,12 @@ with left:
         st.info(f"目前作業中：{active['process_name']}，同步計時 {len(group)} 筆。開始其中任一不同工段時，舊工段會自動暫停。")
 
     if st.button("▶ 開始作業 / Start", use_container_width=True):
-        rid = start_work(employee, work_order, process, remark, auto_pause_old=auto_pause)
-        st.success(f"已開始作業，紀錄編號：{rid}")
-        st.rerun()
+        if not check_permission("01_time_record", "can_create"):
+            st.error("權限不足：你沒有新增工時紀錄權限。")
+        else:
+            rid = start_work(employee, work_order, process, remark, auto_pause_old=auto_pause)
+            st.success(f"已開始作業，紀錄編號：{rid}")
+            st.rerun()
 
 with right:
     st.subheader("結束目前作業 / Finish Work")
@@ -71,17 +82,26 @@ with right:
         end_remark = st.text_input("結束備註｜Finish Remark", key="end_remark")
         c1, c2, c3 = st.columns(3)
         if c1.button("⏸ 暫停 / Pause", use_container_width=True):
-            n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=True)
-            st.success(f"已同步暫停 {n} 筆並平均計算工時。")
-            st.rerun()
+            if not check_permission("01_time_record", "can_edit"):
+                st.error("權限不足：你沒有結束 / 編輯工時權限。")
+            else:
+                n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=True)
+                trigger_post_record_continue_prompt(f"已同步暫停 {n} 筆並平均計算工時。")
+                st.rerun()
         if c2.button("🏁 完工 / Complete", use_container_width=True):
-            n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=True)
-            st.success(f"已同步完工 {n} 筆並平均計算工時。")
-            st.rerun()
+            if not check_permission("01_time_record", "can_edit"):
+                st.error("權限不足：你沒有結束 / 編輯工時權限。")
+            else:
+                n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=True)
+                trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。")
+                st.rerun()
         if c3.button("🌙 下班 / Off Duty", use_container_width=True):
-            n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=True)
-            st.success(f"已同步下班 {n} 筆並平均計算工時。")
-            st.rerun()
+            if not check_permission("01_time_record", "can_edit"):
+                st.error("權限不足：你沒有結束 / 編輯工時權限。")
+            else:
+                n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=True)
+                trigger_post_record_continue_prompt(f"已同步下班 {n} 筆並平均計算工時。")
+                st.rerun()
 
 st.divider()
 st.subheader("今日工時紀錄 / Today Records")

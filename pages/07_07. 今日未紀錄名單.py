@@ -4,11 +4,13 @@ from datetime import date
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
+from services.security_service import require_module_access
 from services.db_service import query_df
 from services.table_ui_service import render_table
 
 st.set_page_config(page_title="07. 今日未紀錄名單", page_icon="⚠️", layout="wide")
 apply_theme()
+require_module_access("07_missing")
 render_header("07｜今日未紀錄名單", "出勤 / 在廠但尚未有任何工時紀錄的人員")
 
 today = date.today().strftime("%Y-%m-%d")

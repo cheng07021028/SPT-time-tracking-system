@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
+from services.security_service import require_module_access
 from services.time_record_service import load_records, save_time_records
 from services.master_data_service import load_employees, load_work_orders
 from services.table_ui_service import render_table
@@ -13,6 +14,7 @@ from services.duration_service import hours_to_hms
 
 st.set_page_config(page_title="02. 歷史紀錄", page_icon="📚", layout="wide")
 apply_theme()
+require_module_access("02_history")
 render_header("02｜歷史紀錄", "完整工時明細查詢、資料編輯、儲存與 Excel 匯出")
 
 employees = load_employees(active_only=False)
