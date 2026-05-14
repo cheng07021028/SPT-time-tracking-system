@@ -8,6 +8,7 @@ import pandas as pd
 from .db_service import execute, query_df, query_one
 from .calculation_service import calculate_work_hours, split_timestamp
 from .log_service import write_log
+from .duration_service import hms_to_hours
 
 
 def _now() -> str:
@@ -227,6 +228,9 @@ def save_time_records(df: pd.DataFrame) -> int:
             v = r.get(c, "")
             if pd.isna(v):
                 v = None
+            if c == "work_hours" and v is not None:
+                # UI displays 00:00:00, database keeps decimal hours for calculation.
+                v = hms_to_hours(v)
             if c == "is_group_work" and v is not None:
                 v = int(bool(v))
             vals.append(v)
