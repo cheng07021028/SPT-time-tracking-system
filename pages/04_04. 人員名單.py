@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import re
 import pandas as pd
 import streamlit as st
 
 try:
     from services.theme_service import apply_theme, render_header
 except Exception:
-    def apply_theme(): pass
+    def apply_theme():
+        pass
     def render_header(title: str, subtitle: str = ""):
         st.title(title)
-        if subtitle: st.caption(subtitle)
+        if subtitle:
+            st.caption(subtitle)
 
 from services.crud_table_service import load_employees, save_employees
 
@@ -19,13 +22,18 @@ apply_theme()
 render_header("04｜人員名單", "人員主檔、在廠狀態、今日出勤勾選、清單編輯、刪除與儲存")
 
 STATE_KEY = "v114_employees_editor"
-COLS = ["_delete", "id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at"]
+COLS = [
+    "_delete", "id", "employee_id", "employee_name", "department", "title",
+    "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at",
+]
+
 
 def rerun():
     try:
         st.rerun()
     except Exception:
         st.experimental_rerun()
+
 
 def ensure_cols(df: pd.DataFrame) -> pd.DataFrame:
     for c in COLS:
@@ -39,37 +47,50 @@ def _normalize_text(v):
         return ""
     return str(v).strip()
 
-def parse_pasted_employees(raw: str) -> pd.DataFrame:
-    """Parse tab/comma pasted employee data into editable DB columns.
 
-    支援兩種格式：
-    1. 有標題列：工號 / employee_id / 姓名 / department / title...
-    2. 無標題列：依序視為 工號、姓名、單位、職稱、備註
+def _split_paste_line(line: str) -> list[str]:
+    line = line.strip()
+    if "\t" in line:
+        return [x.strip() for x in line.split("\t")]
+    if "," in line:
+        return [x.strip() for x in line.split(",")]
+    # Excel / chat copy sometimes becomes multiple spaces instead of tabs.
+    parts = [x.strip() for x in re.split(r"\s{2,}", line) if x.strip()]
+    if len(parts) <= 1:
+        parts = [x.strip() for x in line.split()]
+    return parts
+
+
+def parse_pasted_employees(raw: str) -> pd.DataFrame:
+    """Parse pasted employee data.
+
+    支援：
+    - 有標題列：工號、姓名、單位、職稱、備註
+    - 無標題列：工號、姓名、單位、職稱、備註
+    - 分隔符：Excel Tab、逗號、多個空白
     """
     lines = [line for line in raw.splitlines() if line.strip()]
-    rows = []
-    for line in lines:
-        if "\t" in line:
-            parts = [x.strip() for x in line.split("\t")]
-        else:
-            parts = [x.strip() for x in line.split(",")]
-        rows.append(parts)
+    rows = [_split_paste_line(line) for line in lines]
     if not rows:
         return ensure_cols(pd.DataFrame())
 
     header_tokens = {"工號", "employee_id", "employee id", "姓名", "name", "員工姓名", "單位", "department", "職稱", "title"}
-    first = [x.strip().lower() for x in rows[0]]
+    first = [str(x).strip().lower() for x in rows[0]]
     has_header = any(x in header_tokens for x in first)
 
     if has_header:
-        source = pd.DataFrame(rows[1:], columns=rows[0])
+        width = max(len(r) for r in rows)
+        padded_rows = [r + [""] * (width - len(r)) for r in rows]
+        source = pd.DataFrame(padded_rows[1:], columns=padded_rows[0])
         lower_map = {str(c).strip().lower(): c for c in source.columns}
+
         def pick(*names):
             for name in names:
                 key = name.strip().lower()
                 if key in lower_map:
                     return source[lower_map[key]]
             return ""
+
         df = pd.DataFrame({
             "_delete": False,
             "id": "",
@@ -100,18 +121,22 @@ def parse_pasted_employees(raw: str) -> pd.DataFrame:
             "created_at": "",
             "updated_at": "",
         })
+
     for c in ["employee_id", "employee_name", "department", "title", "note"]:
         df[c] = df[c].map(_normalize_text)
     df = df[(df["employee_id"] != "") & (df["employee_name"] != "")].copy()
     return ensure_cols(df)
+
 
 def reload_data():
     df = load_employees()
     df.insert(0, "_delete", False)
     st.session_state[STATE_KEY] = ensure_cols(df)
 
+
 if STATE_KEY not in st.session_state:
     reload_data()
+
 
 tab1, tab2, tab3 = st.tabs(["人員清單編輯", "Excel 匯入", "貼上資料"])
 
@@ -180,7 +205,7 @@ with tab1:
             "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
             "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
         },
-        key="employees_data_editor_v114",
+        key="employees_data_editor_v117",
     )
     st.session_state[STATE_KEY] = ensure_cols(edited)
 
@@ -194,14 +219,39 @@ with tab2:
     st.subheader("Excel 匯入 / Excel Import")
     uploaded = st.file_uploader("上傳人員 Excel", type=["xlsx", "xlsm", "xls"])
     if uploaded is not None:
-        df = pd.read_excel(uploaded)
-        st.dataframe(df, use_container_width=True)
-        st.info("先確認欄位後，可複製到清單編輯頁新增/修正。下一版可接續做欄位對應直接匯入。")
+        source_df = pd.read_excel(uploaded)
+        st.dataframe(source_df, use_container_width=True)
+        st.info("可先確認欄位，再複製到『貼上資料』或『人員清單編輯』處理。")
 
 with tab3:
     st.subheader("貼上資料 / Paste Data")
-    raw = st.text_area("貼上 Excel 複製資料", height=220)
+    st.caption("V1.17 loaded｜貼上後會在預覽表格上方顯示兩個存檔按鈕")
+    st.caption("支援格式：工號、姓名、單位、職稱、備註。可從 Excel 直接複製貼上。")
+    raw = st.text_area("貼上 Excel 複製資料", height=260, key="employees_paste_raw_v117")
+
     if raw.strip():
-        rows = [r.split("\t") for r in raw.splitlines() if r.strip()]
-        max_len = max(len(r) for r in rows)
-        st.dataframe(pd.DataFrame([r + [""] * (max_len-len(r)) for r in rows]), use_container_width=True)
+        parsed = parse_pasted_employees(raw)
+        if parsed.empty:
+            st.error("解析後沒有可儲存資料。請確認至少包含：工號、姓名。")
+        else:
+            st.success(f"已解析 {len(parsed)} 筆人員資料。請確認下方預覽後，可直接存檔或加入清單編輯。")
+
+            a1, a2 = st.columns(2)
+            if a1.button("➕ 加入清單編輯 / Add to Editor", type="secondary", use_container_width=True, key="add_pasted_employees_to_editor_v117"):
+                st.session_state[STATE_KEY] = pd.concat([parsed, st.session_state[STATE_KEY]], ignore_index=True)
+                st.success("已加入『人員清單編輯』頁，請切回第一個頁籤確認後按儲存。")
+
+            if a2.button("💾 直接儲存貼上資料 / Save Pasted Employees", type="primary", use_container_width=True, key="save_pasted_employees_v117"):
+                result = save_employees(parsed)
+                reload_data()
+                st.success(f"貼上資料已儲存：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
+                rerun()
+
+            st.markdown("### 解析後資料預覽 / Parsed Preview")
+            st.dataframe(
+                parsed[["employee_id", "employee_name", "department", "title", "note", "is_active", "is_in_factory", "is_today_attendance"]],
+                use_container_width=True,
+                height=360,
+            )
+    else:
+        st.info("請先貼上 Excel 資料；貼上後會出現『加入清單編輯』與『直接儲存貼上資料』按鈕。")
