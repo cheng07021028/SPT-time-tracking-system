@@ -18,7 +18,7 @@ render_home_header()
 st.success("系統初始化成功。請從左側選單進入各功能頁。")
 
 render_kpi_cards([
-    ("核心模組 / Modules", "08"),
+    ("核心模組 / Modules", "09"),
     ("資料庫 / Database", "SQLite"),
     ("匯入匯出 / Excel", "Ready"),
     ("系統狀態 / Status", "Online"),
@@ -35,6 +35,7 @@ modules = [
     ("06", "LOG查詢", "系統操作、異常與資料異動紀錄查詢"),
     ("07", "今日未紀錄名單", "出勤但尚未登錄工時的人員即時提示"),
     ("08", "人員每日工時", "每日累積工時、合理區間與異常提醒"),
+    ("09", "資料永久保存與備份", "JSON / Excel / CSV 備份並上傳 GitHub 永久保存"),
 ]
 
 render_module_cards(modules)
