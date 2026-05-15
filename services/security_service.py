@@ -15,7 +15,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import html
 import os
 import time
 from datetime import datetime
@@ -49,6 +48,7 @@ MODULES = [
     {"module_code": "09_persistence", "module_no": "09", "module_name": "資料永久保存與備份", "module_name_en": "Persistence"},
     {"module_code": "10_permissions", "module_no": "10", "module_name": "權限管理", "module_name_en": "Permissions"},
     {"module_code": "11_login_logs", "module_no": "11", "module_name": "登入紀錄", "module_name_en": "Login Logs"},
+    {"module_code": "12_module_persistence", "module_no": "12", "module_name": "模組永久紀錄中心", "module_name_en": "Module Permanent Records"},
 ]
 
 MODULE_CODE_TO_NO = {m["module_code"]: m["module_no"] for m in MODULES}
@@ -289,12 +289,6 @@ def seed_security_defaults() -> None:
 
 def get_idle_timeout_minutes() -> int:
     """讀取閒置登出設定；同一個 session 內做快取，避免每頁反覆查 DB。"""
-    try:
-        runtime_minutes = st.session_state.get("_spt_idle_timeout_minutes_runtime")
-        if runtime_minutes is not None:
-            return max(1, int(runtime_minutes))
-    except Exception:
-        pass
     cache = st.session_state.get("_spt_idle_timeout_cache")
     now_ts = time.time()
     if cache and now_ts - float(cache.get("ts", 0)) < _PERMISSION_CACHE_TTL_SECONDS:
@@ -322,41 +316,6 @@ def set_idle_timeout_minutes(minutes: int) -> None:
             updated_at=excluded.updated_at
     """, (str(minutes), _now()))
     st.session_state.pop("_spt_idle_timeout_cache", None)
-
-
-def get_security_setting(setting_key: str, default: str = "") -> str:
-    ensure_security_schema()
-    try:
-        row = query_one("SELECT setting_value FROM security_settings WHERE setting_key=?", (setting_key,))
-        if row and row.get("setting_value") is not None:
-            return str(row.get("setting_value"))
-    except Exception:
-        pass
-    return str(default)
-
-
-def set_security_setting(setting_key: str, setting_value: str, note: str = "") -> None:
-    ensure_security_schema()
-    execute("""
-        INSERT INTO security_settings (setting_key, setting_value, note, updated_at)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(setting_key) DO UPDATE SET
-            setting_value=excluded.setting_value,
-            note=excluded.note,
-            updated_at=excluded.updated_at
-    """, (setting_key, str(setting_value), note, _now()))
-    if setting_key == "idle_timeout_minutes":
-        st.session_state.pop("_spt_idle_timeout_cache", None)
-
-
-def should_ask_continue_after_record() -> bool:
-    try:
-        runtime_value = st.session_state.get("_spt_ask_continue_after_record_runtime")
-        if runtime_value is not None:
-            return str(runtime_value) != "0"
-    except Exception:
-        pass
-    return get_security_setting("ask_continue_after_record", "1") != "0"
 
 
 def log_security_event(username: str | None, event_type: str, result: str, message: str = "", module_code: str = "", idle_seconds: int | None = None) -> None:
@@ -551,32 +510,21 @@ def render_login_form() -> None:
 
 def render_idle_watchdog() -> None:
     seconds = get_idle_timeout_minutes() * 60
-    # V1.61: 前端逾時後帶 spt_idle_logout=1 重新整理，後端會立即登出。
-    # 這比單純 reload 後比對 session timestamp 更可靠。
+    # 前端偵測無滑鼠/鍵盤活動後重新整理，後端在下一次 rerun 時判斷並登出。
     components.html(
         f"""
 <script>
 (function() {{
   const idleMs = {seconds * 1000};
   let timer = null;
-  const events = ['mousemove','mousedown','keydown','scroll','touchstart','click'];
-  function goIdleLogout() {{
-    try {{
-      const loc = window.parent.location;
-      const url = new URL(loc.href);
-      url.searchParams.set('spt_idle_logout', '1');
-      url.searchParams.set('spt_idle_ts', String(Date.now()));
-      loc.href = url.toString();
-    }} catch(e) {{
-      try {{ window.parent.location.reload(); }} catch(err) {{ window.location.reload(); }}
-    }}
-  }}
   function resetTimer() {{
     if (timer) clearTimeout(timer);
-    timer = setTimeout(goIdleLogout, idleMs);
+    timer = setTimeout(function() {{
+      try {{ window.parent.location.reload(); }} catch(e) {{ window.location.reload(); }}
+    }}, idleMs + 3000);
   }}
-  events.forEach(function(evt) {{
-    try {{ window.parent.document.addEventListener(evt, resetTimer, true); }} catch(e) {{}}
+  ['mousemove','mousedown','keydown','scroll','touchstart','click'].forEach(function(evt) {{
+    window.parent.document.addEventListener(evt, resetTimer, true);
   }});
   resetTimer();
 }})();
@@ -585,27 +533,6 @@ def render_idle_watchdog() -> None:
         height=0,
         width=0,
     )
-
-
-def _consume_idle_logout_query() -> bool:
-    try:
-        qp = st.query_params
-        flag = qp.get("spt_idle_logout")
-        if isinstance(flag, list):
-            flag = flag[0] if flag else ""
-        if str(flag) == "1":
-            try:
-                qp.pop("spt_idle_logout", None)
-                qp.pop("spt_idle_ts", None)
-            except Exception:
-                try:
-                    st.query_params.clear()
-                except Exception:
-                    pass
-            return True
-    except Exception:
-        return False
-    return False
 
 
 def _check_idle_timeout() -> None:
@@ -630,31 +557,16 @@ def render_user_bar(module_code: str = "") -> None:
         return
     render_idle_watchdog()
     roles = ", ".join(user.get("roles", [])) or "未設定角色"
-    idle_minutes = get_idle_timeout_minutes()
-    name = html.escape(str(user.get("display_name", "")))
-    username = html.escape(str(user.get("username", "")))
-    roles_html = html.escape(str(roles))
-    c1, c2 = st.columns([4.5, 1])
-    with c1:
-        st.markdown(
-            f'<div class="spt-user-bar"><div class="spt-user-meta">登入帳號：<b>{name}</b>（{username}）</div><div class="spt-user-meta">角色：<b>{roles_html}</b>｜閒置自動登出：<b>{idle_minutes}</b> 分鐘</div></div>',
-            unsafe_allow_html=True,
-        )
-    with c2:
-        st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
-        if st.button("登出 / Logout", use_container_width=True, key=f"logout_{module_code}"):
-            logout("使用者手動登出")
-            st.rerun()
+    c1, c2, c3 = st.columns([2, 2, 1])
+    c1.caption(f"登入帳號：{user['display_name']}（{user['username']}）")
+    c2.caption(f"角色：{roles}｜閒置自動登出：{get_idle_timeout_minutes()} 分鐘")
+    if c3.button("登出 / Logout", use_container_width=True, key=f"logout_{module_code}"):
+        logout("使用者手動登出")
+        st.rerun()
 
 
 def require_login(module_code: str = "") -> None:
     ensure_security_schema()
-    if st.session_state.get("auth_logged_in") and _consume_idle_logout_query():
-        timeout_min = get_idle_timeout_minutes()
-        logout(f"閒置超過 {timeout_min} 分鐘，自動登出")
-        st.warning("帳號已因閒置逾時自動登出，請重新登入。")
-        render_login_form()
-        st.stop()
     if not st.session_state.get("auth_logged_in"):
         render_login_form()
         st.stop()
@@ -670,14 +582,21 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:
         st.stop()
 
 
+def require_permission(module_code: str, action: str = "can_view") -> None:
+    """Backward-compatible alias for older pages.
+
+    Some pages imported require_permission while newer pages use
+    require_module_access.  Keep both names so permission guarding never
+    silently falls back to unprotected access.
+    """
+    return require_module_access(module_code, action)
+
+
 def mark_activity() -> None:
     st.session_state["auth_last_activity_ts"] = time.time()
 
 
 def trigger_post_record_continue_prompt(message: str = "工時紀錄已完成") -> None:
-    # V1.60: respect 10｜權限管理 → 安全設定.
-    if not should_ask_continue_after_record():
-        return
     st.session_state["post_record_prompt"] = True
     st.session_state["post_record_message"] = message
 
