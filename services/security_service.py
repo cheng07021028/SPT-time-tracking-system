@@ -28,6 +28,11 @@ import streamlit.components.v1 as components
 
 from services.db_service import execute, query_df, query_one
 
+# Project root must be defined before persistent security file paths are built.
+# Streamlit Cloud imports this module during app startup, so missing PROJECT_ROOT
+# causes the whole app to fail before login.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
 PBKDF2_ITERATIONS = 180_000
 DEFAULT_IDLE_MINUTES = 15
 _PERMISSION_CACHE_TTL_SECONDS = 300
