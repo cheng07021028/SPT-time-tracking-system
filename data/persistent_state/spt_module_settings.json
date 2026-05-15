@@ -1,7 +1,9 @@
 {
-  "schema_version": "v1.30",
-  "export_time": "2026-05-15 06:14:43",
+  "version": "V1.30",
+  "exported_at": "2026-05-15 07:33:02",
   "tables": {
+    "table_column_settings": [],
+    "table_sort_settings": [],
     "system_settings": [
       {
         "setting_key": "company_name",
@@ -40,8 +42,6 @@
         "updated_at": "2026-05-15 03:42:53"
       }
     ],
-    "table_column_settings": [],
-    "table_sort_settings": [],
     "auth_users": [
       {
         "id": 1,
@@ -1267,18 +1267,24 @@
     "auth_security_settings": [
       {
         "setting_key": "idle_timeout_minutes",
-        "setting_value": "15",
+        "setting_value": "1",
         "note": "閒置自動登出分鐘數 / Idle logout minutes",
-        "updated_at": "2026-05-15 03:42:53"
+        "updated_at": "2026-05-15 07:28:46"
+      },
+      {
+        "setting_key": "ask_continue_after_record",
+        "setting_value": "1",
+        "note": null,
+        "updated_at": "2026-05-15 07:28:54"
       }
     ]
   },
   "table_counts": {
-    "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
+    "system_settings": 6,
     "auth_users": 6,
     "auth_account_permissions": 66,
-    "auth_security_settings": 1
+    "auth_security_settings": 2
   }
 }
