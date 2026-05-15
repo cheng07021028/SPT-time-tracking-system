@@ -22,13 +22,12 @@ except Exception:
     require_permission = None
 
 apply_theme()
-
 if require_login:
     require_login()
 if require_permission:
     require_permission("09_persistence", "can_view")
 
-render_header("12", "模組永久紀錄中心", "Independent permanent files and settings for every module")
+render_header("12", "模組永久紀錄中心", "每個模組獨立 records、settings、audit 與 history 時間戳備份")
 
 st.markdown("### 模組獨立永久紀錄 / Independent Permanent Module Records")
 st.info("每個模組都有獨立 records.json、settings.json、audit.jsonl 與 history 時間戳備份。這些檔案位於 data/persistent_modules/，更新程式模組時不應覆蓋。")
@@ -37,12 +36,12 @@ c1, c2, c3 = st.columns(3)
 with c1:
     if st.button("建立永久資料夾 / Bootstrap", use_container_width=True):
         protect_gitignore_rules()
-        result = bootstrap_module_persistence(username=st.session_state.get("username", "SYSTEM"))
+        result = bootstrap_module_persistence(username=st.session_state.get("auth_username", st.session_state.get("username", "SYSTEM")))
         st.success("已建立模組永久資料夾與設定索引")
         st.json(result)
 with c2:
     if st.button("匯出全部模組紀錄 / Export All", use_container_width=True):
-        result = export_all_modules(username=st.session_state.get("username", "SYSTEM"))
+        result = export_all_modules(username=st.session_state.get("auth_username", st.session_state.get("username", "SYSTEM")))
         st.success("全部模組紀錄已匯出到 data/persistent_modules")
         st.json({k: v.get("counts", {}) for k, v in result.items()})
 with c3:
@@ -52,29 +51,19 @@ with c3:
         st.json(result)
 
 st.divider()
-
 st.markdown("### 模組狀態 / Module Status")
 status_df = pd.DataFrame(get_module_status())
-st.dataframe(status_df, use_container_width=True, hide_index=True)
+st.dataframe(status_df, use_container_width=True, hide_index=True, height=420)
 
 st.divider()
 st.markdown("### 單一模組匯出 / Export Single Module")
 module_options = {f'{v["name_zh"]} / {v["name_en"]} ({k})': k for k, v in MODULE_TABLE_MAP.items()}
-label = st.selectbox("選擇模組 / Select Module", list(module_options.keys()))
-if st.button("匯出選取模組 / Export Selected Module", use_container_width=True):
-    code = module_options[label]
-    payload = export_module_records(code, username=st.session_state.get("username", "SYSTEM"), write_history=True)
-    st.success(f"已匯出：{label}")
-    st.json(payload.get("counts", {}))
-
-with st.expander("永久檔案規則說明 / Permanent File Rule", expanded=False):
-    st.markdown("""
-- `data/persistent_modules/<module_code>/<module_code>_records.json`：該模組 latest 紀錄檔。
-- `data/persistent_modules/<module_code>/<module_code>_settings.json`：該模組 latest 設定檔。
-- `data/persistent_modules/<module_code>/<module_code>_audit.jsonl`：該模組操作留痕。
-- `data/persistent_modules/<module_code>/history/`：每次匯出的時間戳版本，不覆蓋舊檔。
-- `data/persistent_state/spt_module_independent_state.json`：全模組索引。
-- `data/persistent_state/spt_module_independent_settings.json`：全模組設定索引。
-
-專案更新 patch 時，只覆蓋程式檔，不應刪除 `data/persistent_modules/` 與 `data/persistent_state/`。
-""")
+selected_label = st.selectbox("選擇模組 / Select Module", list(module_options.keys()))
+if st.button("匯出選定模組 / Export Selected Module", use_container_width=True):
+    module_code = module_options[selected_label]
+    result = export_module_records(module_code, username=st.session_state.get("auth_username", st.session_state.get("username", "SYSTEM")))
+    if result.get("ok"):
+        st.success("已匯出模組永久紀錄")
+    else:
+        st.error(result.get("message", "匯出失敗"))
+    st.json(result)
