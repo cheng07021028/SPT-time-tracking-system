@@ -36,12 +36,14 @@ MODULE_TITLES = {
     "10": ("權限管理", "帳號、角色、模組權限與閒置自動登出設定"),
     "11": ("登入紀錄", "登入、登出、閒置自動登出、權限不足與安全事件查詢"),
     "12": ("模組永久紀錄中心", "每個模組獨立 records、settings、audit 與 history 時間戳備份"),
+    "13": ("系統設定", "工段名稱、休息時間與跨模組共用設定"),
 }
 
 MODULE_DESC_TO_NO = {
     "工時紀錄": "01", "歷史紀錄": "02", "製令管理": "03", "人員名單": "04",
     "製令工時分析": "05", "LOG查詢": "06", "今日未紀錄名單": "07", "人員每日工時": "08",
     "資料永久保存與備份": "09", "權限管理": "10", "登入紀錄": "11", "模組永久紀錄中心": "12",
+    "系統設定": "13",
 }
 
 
@@ -529,6 +531,44 @@ div[data-testid="stExpander"] summary * {
     color: #f4fbff !important;
     -webkit-text-fill-color: #f4fbff !important;
     font-weight: 900 !important;
+}
+
+
+/* ===== V2.02 login user bar: larger, clear, tech breathing glow ===== */
+.spt-login-pill {
+    min-height: 58px;
+    padding: 10px 18px;
+    margin: 4px 0 10px 0;
+    border: 1px solid rgba(98, 244, 255, .65);
+    border-radius: 16px;
+    background: linear-gradient(105deg, rgba(4, 32, 54, .92), rgba(5, 74, 105, .70), rgba(39, 24, 90, .58));
+    box-shadow: 0 0 0 1px rgba(35,230,255,.18) inset, 0 0 18px rgba(35,230,255,.28), 0 0 34px rgba(112,61,255,.14);
+    animation: sptLoginBreath 2.6s ease-in-out infinite;
+}
+.spt-login-label {
+    color: rgba(207, 246, 255, .88);
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: .7px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+.spt-login-value {
+    color: #ffffff;
+    font-size: 22px;
+    line-height: 1.25;
+    font-weight: 1000;
+    letter-spacing: .4px;
+    text-shadow: 0 0 10px rgba(255,255,255,.28), 0 0 22px rgba(35,230,255,.38);
+}
+.spt-login-value span {
+    color: #aef7ff;
+    font-size: 18px;
+    font-weight: 950;
+}
+@keyframes sptLoginBreath {
+    0%,100% { box-shadow: 0 0 0 1px rgba(35,230,255,.18) inset, 0 0 14px rgba(35,230,255,.22), 0 0 28px rgba(112,61,255,.12); }
+    50% { box-shadow: 0 0 0 1px rgba(35,230,255,.42) inset, 0 0 30px rgba(35,230,255,.55), 0 0 58px rgba(112,61,255,.30); }
 }
 
 </style>

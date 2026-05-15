@@ -68,6 +68,13 @@ MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
         "tables": ["employees", "time_records"],
         "settings_keys": ["table_columns", "sort", "filters", "ui"],
     },
+    # 舊版相容代碼：部分權限或永久檔仍可能使用 07_missing。
+    "07_missing": {
+        "name_zh": "今日未紀錄名單",
+        "name_en": "Missing Today Legacy",
+        "tables": ["employees", "time_records"],
+        "settings_keys": ["table_columns", "sort", "filters", "ui"],
+    },
     "08_daily_hours": {
         "name_zh": "人員每日工時",
         "name_en": "Daily Hours",
@@ -83,8 +90,20 @@ MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
     "10_permissions": {
         "name_zh": "權限管理",
         "name_en": "Permissions",
-        "tables": ["users", "roles", "user_roles", "role_permissions", "user_module_permissions"],
+        "tables": ["auth_users", "auth_account_permissions", "auth_security_settings", "security_users", "security_module_permissions", "security_settings"],
         "settings_keys": ["table_columns", "sort", "filters", "security", "ui"],
+    },
+    "11_login_logs": {
+        "name_zh": "登入紀錄",
+        "name_en": "Login Logs",
+        "tables": ["auth_login_logs", "security_login_logs"],
+        "settings_keys": ["table_columns", "sort", "filters", "retention", "ui"],
+    },
+    "12_module_persistence": {
+        "name_zh": "模組永久紀錄中心",
+        "name_en": "Module Permanent Records",
+        "tables": ["system_settings"],
+        "settings_keys": ["module_persistence", "records", "settings", "audit", "history", "ui"],
     },
     "13_system_settings": {
         "name_zh": "系統設定",
@@ -92,14 +111,7 @@ MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
         "tables": ["process_options", "rest_periods", "system_settings"],
         "settings_keys": ["process", "rest_periods", "ui"],
     },
-    "11_login_logs": {
-        "name_zh": "登入紀錄",
-        "name_en": "Login Logs",
-        "tables": ["login_logs"],
-        "settings_keys": ["table_columns", "sort", "filters", "retention", "ui"],
-    },
 }
-
 
 def _now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")

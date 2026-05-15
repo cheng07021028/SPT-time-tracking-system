@@ -20,6 +20,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 import json
+from html import escape
 from typing import Any
 
 import pandas as pd
@@ -765,12 +766,36 @@ def render_user_bar(module_code: str = "") -> None:
         return
     render_idle_watchdog()
     roles = ", ".join(user.get("roles", [])) or "未設定角色"
-    c1, c2, c3 = st.columns([2, 2, 1])
-    c1.caption(f"登入帳號：{user['display_name']}（{user['username']}）")
-    c2.caption(f"角色：{roles}｜閒置自動登出：{get_idle_timeout_minutes()} 分鐘")
-    if c3.button("登出 / Logout", use_container_width=True, key=f"logout_{module_code}"):
-        logout("使用者手動登出")
-        st.rerun()
+    display_name = escape(str(user.get("display_name") or user.get("username") or ""))
+    username = escape(str(user.get("username") or ""))
+    role_text = escape(str(roles))
+    idle = int(get_idle_timeout_minutes())
+
+    c1, c2, c3 = st.columns([2.2, 2.2, 1.0])
+    with c1:
+        st.markdown(
+            f"""
+<div class="spt-login-pill spt-login-pill-user">
+  <div class="spt-login-label">登入帳號 / Login</div>
+  <div class="spt-login-value">{display_name} <span>({username})</span></div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+    with c2:
+        st.markdown(
+            f"""
+<div class="spt-login-pill spt-login-pill-role">
+  <div class="spt-login-label">角色 / Idle</div>
+  <div class="spt-login-value">{role_text} <span>｜閒置自動登出：{idle} 分鐘</span></div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+    with c3:
+        if st.button("登出 / Logout", use_container_width=True, key=f"logout_{module_code}"):
+            logout("使用者手動登出")
+            st.rerun()
 
 
 def require_login(module_code: str = "") -> None:
