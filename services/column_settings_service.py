@@ -248,11 +248,25 @@ def _visible_order(df: pd.DataFrame, table_setting: Dict[str, Any], editable: bo
 
 
 def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[Dict[str, Any], bool]:
+    """Render column setting UI without normal st.button controls.
+
+    V1.73 修正：
+    - 前版在全域 data_editor wrapper 內加入「啟動/停止編輯」按鈕，遇到頁面本身已經有
+      啟動/停止編輯時會重複顯示。
+    - 若頁面把 data_editor 放在 st.form 內，欄位設定區的 st.button 會觸發
+      StreamlitAPIException: st.button() can't be used in an st.form。
+
+    因此本函式改成「自動保存欄位設定」：欄位設定表與欄位順序文字框修改後，會在該次 rerun
+    或表單提交後自動寫入設定檔，不再在這個共用 wrapper 內產生 st.button。
+    """
     table_setting = _get_table_setting(table_id, [str(c) for c in df.columns])
     col_settings = table_setting.get("columns", {})
 
     with st.expander("欄位設定 / Column Settings（永久保存）", expanded=False):
-        st.caption("可設定每個表格欄位的顯示、順序、欄寬與標題。按『套用欄位設定』後會永久保存到 data/persistent_state/spt_table_column_settings.json。")
+        st.caption(
+            "可設定每個表格欄位的顯示、順序、欄寬與標題。修改後會自動保存到 "
+            "data/persistent_state/spt_table_column_settings.json。"
+        )
         rows = []
         for idx, col in enumerate(df.columns):
             key = str(col)
@@ -287,55 +301,50 @@ def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[D
             key=lambda x: int(col_settings.get(x, _default_column_setting(x)).get("order", 999)),
         )
         order_text = st.text_area(
-            "欄位順序 / Column order（每行一個欄位；可剪下貼上調整順序，按套用後永久保存）",
+            "欄位順序 / Column order（每行一個欄位；可剪下貼上調整順序，會自動永久保存）",
             value="\n".join(current_order),
             key=f"column_order_text::{_safe_widget_suffix(table_id)}",
             height=420,
-            help="每行一個欄位名稱。可直接在這個大型文字框內剪下/貼上調整欄位順序，按套用後會永久保存。Streamlit 原生表格目前無法穩定讀取滑鼠拖拉後的欄位順序。",
+            help="每行一個欄位名稱。可直接剪下/貼上調整欄位順序。Streamlit 原生表格目前無法穩定讀取滑鼠拖拉後的欄位順序。",
         )
-        c1, c2, c3 = st.columns([1, 1, 2])
-        applied = False
-        with c1:
-            if st.button("💾 套用欄位設定 / Apply", key=f"apply_cols::{_safe_widget_suffix(table_id)}", use_container_width=True):
-                new_cols = {}
-                for _, row in edited_cfg.iterrows():
-                    key = str(row.get("欄位 / Column", "")).strip()
-                    if not key:
-                        continue
-                    new_cols[key] = {
-                        "source": key,
-                        "label": str(row.get("標題 / Header") or key),
-                        "visible": bool(row.get("顯示 / Visible", True)),
-                        "width": str(row.get("欄寬 / Width") or "medium"),
-                        "order": int(row.get("順序 / Order", 999)),
-                    }
-                try:
-                    text_order = [x.strip() for x in str(order_text).splitlines() if x.strip()]
-                    used = set()
-                    order_no = 0
-                    for key in text_order:
-                        if key in new_cols and key not in used:
-                            new_cols[key]["order"] = order_no
-                            used.add(key)
-                            order_no += 1
-                    for key in new_cols:
-                        if key not in used:
-                            new_cols[key]["order"] = order_no
-                            order_no += 1
-                except Exception:
-                    pass
-                table_setting["columns"] = new_cols
-                _save_table_setting(table_id, table_setting)
-                st.success("欄位設定已永久保存。")
-                applied = True
-        with c2:
-            if st.button("↩️ 恢復預設 / Reset", key=f"reset_cols::{_safe_widget_suffix(table_id)}", use_container_width=True):
-                table_setting["columns"] = {str(c): {**_default_column_setting(str(c)), "order": i} for i, c in enumerate(df.columns)}
-                _save_table_setting(table_id, table_setting)
-                st.warning("已恢復此表格欄位預設設定。")
-                applied = True
-        with c3:
-            st.caption(f"表格ID：{table_id}")
+        st.caption(f"表格ID：{table_id}")
+
+    # Auto-save settings without using st.button, so this wrapper is safe inside st.form.
+    new_cols = {}
+    try:
+        for _, row in edited_cfg.iterrows():
+            key = str(row.get("欄位 / Column", "")).strip()
+            if not key:
+                continue
+            new_cols[key] = {
+                "source": key,
+                "label": str(row.get("標題 / Header") or key),
+                "visible": bool(row.get("顯示 / Visible", True)),
+                "width": str(row.get("欄寬 / Width") or "medium"),
+                "order": int(row.get("順序 / Order", 999)),
+            }
+        text_order = [x.strip() for x in str(order_text).splitlines() if x.strip()]
+        used = set()
+        order_no = 0
+        for key in text_order:
+            if key in new_cols and key not in used:
+                new_cols[key]["order"] = order_no
+                used.add(key)
+                order_no += 1
+        for key in new_cols:
+            if key not in used:
+                new_cols[key]["order"] = order_no
+                order_no += 1
+    except Exception:
+        new_cols = dict(col_settings)
+
+    applied = False
+    if new_cols and new_cols != table_setting.get("columns", {}):
+        table_setting["columns"] = new_cols
+        _save_table_setting(table_id, table_setting)
+        applied = True
+        # 不使用 success toast，避免每次 rerun 過度干擾畫面。
+
     if applied:
         table_setting = _get_table_setting(table_id, [str(c) for c in df.columns])
     return table_setting, applied
@@ -480,7 +489,7 @@ def clear_editor_draft(table_key_contains: str | None = None) -> int:
 
 
 
-# ===== V1.72 全表格啟動/停止編輯保護 =====
+# ===== V1.72 全表格啟動/停止編輯保護（V1.73 已停用自動顯示，保留函式供相容） =====
 def _edit_mode_state_key(table_id: str) -> str:
     return f"_spt_table_edit_enabled::{_safe_widget_suffix(table_id)}"
 
@@ -540,18 +549,16 @@ def install_column_settings_patch() -> None:
             key = kwargs.get("key")
             table_id = _stable_table_id(df, key=key, kind="data_editor")
             table_setting, _ = _settings_editor(table_id, df, editable=True)
-            edit_enabled = _render_editor_lock_controls(table_id)
+            # V1.73：不在全域 wrapper 內再產生「啟動/停止編輯」按鈕。
+            # 各頁若已有自己的編輯保護按鈕，保留各頁原本的一組；避免重複顯示與 st.form 內 st.button 錯誤。
             kwargs.setdefault("use_container_width", True)
             kwargs.setdefault("key", f"spt_data_editor::{_safe_widget_suffix(table_id)}")
             kwargs["column_config"] = {**_build_column_config(df, table_setting), **kwargs.get("column_config", {})}
             kwargs["column_order"] = kwargs.get("column_order") or _visible_order(df, table_setting, editable=True)
-            if not edit_enabled:
-                kwargs["disabled"] = True
             draft_df = _get_editor_draft(table_id, df)
             edited = original_data_editor(draft_df, *args, **kwargs)
             merged = _merge_hidden_back(draft_df, edited)
-            if edit_enabled:
-                _set_editor_draft(table_id, merged)
+            _set_editor_draft(table_id, merged)
             return merged
         edited = original_data_editor(data, *args, **kwargs)
         return edited
