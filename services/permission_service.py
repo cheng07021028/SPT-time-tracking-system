@@ -505,6 +505,13 @@ def add_login_log(username: str, event_type: str, result: str, message: str = ""
     """, (username, display, now_text(), event_type, result, module_code, module_name, message))
     conn.commit()
     conn.close()
+    # V1.37: 登入紀錄寫入後同步刷新本機永久 audit JSON。
+    # 不在登入當下自動推 GitHub，避免登入頁變慢；第 09 或第 11 頁可一鍵上傳雲端。
+    try:
+        from services.persistence_service import safe_export_audit_after_write
+        safe_export_audit_after_write()
+    except Exception:
+        pass
 
 
 # Backward-compatible aliases for V1.28 code that may import these names.

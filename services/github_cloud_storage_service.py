@@ -26,9 +26,11 @@ STATE_DIR = PROJECT_ROOT / "data" / "persistent_state"
 HISTORY_DIR = STATE_DIR / "history"
 LATEST_STATE = STATE_DIR / "spt_permanent_state.json"
 LATEST_SETTINGS = STATE_DIR / "spt_module_settings.json"
+LATEST_AUDIT = STATE_DIR / "spt_audit_log_state.json"
 
 REMOTE_STATE_ROOT = "data/persistent_state"
 REMOTE_HISTORY_ROOT = "data/persistent_state/history"
+REMOTE_AUDIT_HISTORY_ROOT = "data/persistent_state/audit_history"
 LEGACY_REMOTE_ROOTS = ["date/persistent_state", "data/persisten_state"]
 TABLE_EXCLUDE = {"sqlite_sequence"}
 BUSINESS_TABLES = ["work_orders", "employees", "time_records"]
@@ -177,6 +179,11 @@ def create_permanent_files(force: bool = False) -> Dict[str, Any]:
     if state.get("skipped") and not force:
         return {"ok": False, "message": state.get("warning", "主資料為 0，為避免覆蓋 GitHub 永久檔，已停止建立 latest。"), "state": state}
     module_settings = export_module_settings_state()
+    try:
+        from services.persistence_service import export_audit_state
+        audit_state = export_audit_state(force=True)
+    except Exception as exc:
+        audit_state = {"warning": str(exc)}
     state_history = HISTORY_DIR / f"spt_permanent_state_{stamp}.json"
     settings_history = HISTORY_DIR / f"spt_module_settings_{stamp}.json"
     LATEST_STATE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -190,6 +197,8 @@ def create_permanent_files(force: bool = False) -> Dict[str, Any]:
         "latest_settings": str(LATEST_SETTINGS),
         "history_state": str(state_history),
         "history_settings": str(settings_history),
+        "latest_audit": str(LATEST_AUDIT) if LATEST_AUDIT.exists() else "",
+        "audit_table_counts": audit_state.get("table_counts", {}),
         "table_counts": state.get("table_counts", {}),
         "business_row_count": state.get("business_row_count", 0),
         "warning": state.get("warning", ""),
@@ -299,6 +308,9 @@ def create_and_upload_permanent_files(force: bool = False) -> Dict[str, Any]:
         (Path(created["history_state"]), f"{REMOTE_HISTORY_ROOT}/spt_permanent_state_{stamp}.json"),
         (Path(created["history_settings"]), f"{REMOTE_HISTORY_ROOT}/spt_module_settings_{stamp}.json"),
     ]
+    if LATEST_AUDIT.exists():
+        files.append((LATEST_AUDIT, f"{REMOTE_STATE_ROOT}/spt_audit_log_state.json"))
+        files.append((LATEST_AUDIT, f"{REMOTE_AUDIT_HISTORY_ROOT}/spt_audit_log_state_{stamp}.json"))
     ok_all = True
     for local, remote in files:
         res = upload_file_to_github(local, remote, f"Backup permanent state {stamp}")
@@ -321,6 +333,10 @@ def upload_existing_permanent_files(archive: bool = True) -> Dict[str, Any]:
         uploads.append(upload_file_to_github(LATEST_SETTINGS, f"{REMOTE_STATE_ROOT}/spt_module_settings.json", f"Upload module settings {stamp}"))
         if archive:
             uploads.append(upload_file_to_github(LATEST_SETTINGS, f"{REMOTE_HISTORY_ROOT}/spt_module_settings_{stamp}.json", f"Archive module settings {stamp}"))
+    if LATEST_AUDIT.exists():
+        uploads.append(upload_file_to_github(LATEST_AUDIT, f"{REMOTE_STATE_ROOT}/spt_audit_log_state.json", f"Upload audit logs {stamp}"))
+        if archive:
+            uploads.append(upload_file_to_github(LATEST_AUDIT, f"{REMOTE_AUDIT_HISTORY_ROOT}/spt_audit_log_state_{stamp}.json", f"Archive audit logs {stamp}"))
     return {"ok": all(bool(x.get("ok")) for x in uploads), "uploads": uploads, "remote_root": REMOTE_STATE_ROOT}
 
 
@@ -349,6 +365,7 @@ def download_latest_permanent_files_from_github(allow_legacy: bool = True) -> Di
         found_any = False
         state_res = download_text_from_github(f"{root}/spt_permanent_state.json")
         settings_res = download_text_from_github(f"{root}/spt_module_settings.json")
+        audit_res = download_text_from_github(f"{root}/spt_audit_log_state.json")
         if state_res.get("ok"):
             LATEST_STATE.write_text(str(state_res["text"]), encoding="utf-8")
             downloaded.append({"local": str(LATEST_STATE), "remote": state_res["path"], "ok": True})
@@ -356,6 +373,10 @@ def download_latest_permanent_files_from_github(allow_legacy: bool = True) -> Di
         if settings_res.get("ok"):
             LATEST_SETTINGS.write_text(str(settings_res["text"]), encoding="utf-8")
             downloaded.append({"local": str(LATEST_SETTINGS), "remote": settings_res["path"], "ok": True})
+            found_any = True
+        if audit_res.get("ok"):
+            LATEST_AUDIT.write_text(str(audit_res["text"]), encoding="utf-8")
+            downloaded.append({"local": str(LATEST_AUDIT), "remote": audit_res["path"], "ok": True})
             found_any = True
         if found_any:
             return {"ok": True, "message": f"已從 GitHub 雲端下載永久檔：{root}", "source_root": root, "downloaded": downloaded}
@@ -379,7 +400,13 @@ def restore_from_github_if_database_empty(force: bool = False) -> Dict[str, Any]
         if not dl.get("ok"):
             return dl
         restored = restore_latest_available_state(mode="replace")
-        return {"ok": bool(restored.get("ok")), "download": dl, "restore": restored, "message": "已嘗試從 GitHub latest JSON 還原 SQLite。"}
+        audit_restored = {}
+        try:
+            from services.persistence_service import restore_audit_state
+            audit_restored = restore_audit_state(mode="append")
+        except Exception as exc:
+            audit_restored = {"ok": False, "message": str(exc)}
+        return {"ok": bool(restored.get("ok") or audit_restored.get("ok")), "download": dl, "restore": restored, "audit_restore": audit_restored, "message": "已嘗試從 GitHub latest JSON 還原 SQLite 與登入紀錄。"}
     except Exception as exc:
         return {"ok": False, "message": f"GitHub 自動還原失敗：{exc}"}
 
@@ -390,6 +417,7 @@ def github_cloud_file_status() -> Dict[str, Any]:
     for path in [
         f"{REMOTE_STATE_ROOT}/spt_permanent_state.json",
         f"{REMOTE_STATE_ROOT}/spt_module_settings.json",
+        f"{REMOTE_STATE_ROOT}/spt_audit_log_state.json",
         *[f"{root}/spt_permanent_state.json" for root in LEGACY_REMOTE_ROOTS],
         *[f"{root}/spt_module_settings.json" for root in LEGACY_REMOTE_ROOTS],
     ]:
@@ -423,6 +451,24 @@ def migrate_legacy_date_path_to_data_path() -> Dict[str, Any]:
                 results.append({"from": old_path, "to": f"{REMOTE_STATE_ROOT}/{filename}", "skipped": True, "reason": dl.get("message")})
     return {"ok": migrated, "message": "已嘗試將舊路徑 date/persistent_state 搬到 data/persistent_state", "results": results}
 
+
+
+
+def upload_audit_logs_to_github(archive: bool = True) -> Dict[str, Any]:
+    """Create/upload only login/system audit log permanent JSON."""
+    ensure_dirs()
+    stamp = _stamp()
+    try:
+        from services.persistence_service import export_audit_state
+        audit = export_audit_state(force=True)
+    except Exception as exc:
+        return {"ok": False, "message": f"建立登入紀錄永久檔失敗：{exc}"}
+    uploads: List[Dict[str, Any]] = []
+    if LATEST_AUDIT.exists():
+        uploads.append(upload_file_to_github(LATEST_AUDIT, f"{REMOTE_STATE_ROOT}/spt_audit_log_state.json", f"Upload audit logs {stamp}"))
+        if archive:
+            uploads.append(upload_file_to_github(LATEST_AUDIT, f"{REMOTE_AUDIT_HISTORY_ROOT}/spt_audit_log_state_{stamp}.json", f"Archive audit logs {stamp}"))
+    return {"ok": all(bool(x.get("ok")) for x in uploads), "audit": audit, "uploads": uploads, "remote_root": REMOTE_STATE_ROOT}
 
 # Backward-compatible function names used by older page versions.
 def backup_all_to_files() -> Dict[str, Any]:

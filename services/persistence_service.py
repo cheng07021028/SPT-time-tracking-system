@@ -32,6 +32,8 @@ ARCHIVE_DIR = STATE_DIR / "archive"
 HISTORY_DIR = STATE_DIR / "history"
 STATE_JSON = STATE_DIR / "spt_permanent_state.json"
 SETTINGS_JSON = STATE_DIR / "spt_module_settings.json"
+AUDIT_JSON = STATE_DIR / "spt_audit_log_state.json"
+AUDIT_HISTORY_DIR = STATE_DIR / "audit_history"
 DB_COPY_DIR = STATE_DIR / "db_copy"
 LOCK_FILE = STATE_DIR / ".restore_lock"
 
@@ -73,10 +75,12 @@ def _ensure_dirs() -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
     HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+    AUDIT_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
     DB_COPY_DIR.mkdir(parents=True, exist_ok=True)
     (BACKUP_DIR / ".gitkeep").write_text("keep this folder for persistent GitHub backups\n", encoding="utf-8")
     (STATE_DIR / ".gitkeep").write_text("", encoding="utf-8")
     (HISTORY_DIR / ".gitkeep").write_text("", encoding="utf-8")
+    (AUDIT_HISTORY_DIR / ".gitkeep").write_text("", encoding="utf-8")
 
 
 def connect_db() -> sqlite3.Connection:
@@ -373,6 +377,97 @@ def safe_export_after_write() -> dict[str, Any]:
         return {"ok": False, "message": str(exc)}
 
 
+
+# -----------------------------------------------------------------------------
+# V1.37 audit/login-log permanent state
+# -----------------------------------------------------------------------------
+AUDIT_TABLES = ["auth_login_logs", "system_logs"]
+
+
+def export_audit_state(force: bool = True) -> dict[str, Any]:
+    """Export login/security logs to a dedicated permanent JSON.
+
+    This file is independent from business data. It prevents login logs from
+    disappearing after Streamlit Cloud redeploys, while avoiding full GitHub
+    backup on every login.
+    """
+    _ensure_dirs()
+    state: dict[str, Any] = {
+        "version": "V1.37",
+        "exported_at": _now(),
+        "description": "SPT login/system audit logs permanent state",
+        "tables": {},
+        "table_counts": {},
+    }
+    if not DB_PATH.exists():
+        state["warning"] = f"SQLite database not found: {DB_PATH}"
+        AUDIT_JSON.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        return state
+    conn = connect_db()
+    try:
+        for table in AUDIT_TABLES:
+            if table_exists(conn, table):
+                rows = export_table(conn, table)
+                state["tables"][table] = rows
+                state["table_counts"][table] = len(rows)
+        AUDIT_JSON.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        hist = AUDIT_HISTORY_DIR / f"spt_audit_log_state_{_stamp()}.json"
+        hist.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        state["latest_audit"] = str(AUDIT_JSON)
+        state["history_audit"] = str(hist)
+        return state
+    finally:
+        conn.close()
+
+
+def restore_audit_state(json_path: str | Path | None = None, mode: str = "append") -> dict[str, Any]:
+    """Restore login/security logs from dedicated audit JSON.
+
+    Default mode is append to avoid deleting current session logs. Duplicate IDs
+    are ignored/replaced by SQLite if the primary key exists.
+    """
+    _ensure_dirs()
+    target = Path(json_path) if json_path else AUDIT_JSON
+    if not target.exists():
+        return {"ok": False, "message": f"找不到登入紀錄永久檔：{target}"}
+    payload = _load_json(target) or {}
+    tables = payload.get("tables", {})
+    if not isinstance(tables, dict):
+        return {"ok": False, "message": "登入紀錄永久檔格式不正確。"}
+    try:
+        from services.permission_service import init_permission_tables
+        init_permission_tables()
+    except Exception:
+        pass
+    conn = connect_db()
+    restored: dict[str, int] = {}
+    try:
+        for table_name in AUDIT_TABLES:
+            rows = tables.get(table_name, [])
+            if isinstance(rows, list) and table_exists(conn, table_name):
+                restored[table_name] = _insert_rows(conn, table_name, rows, mode="replace" if mode == "replace" else "append")
+        conn.commit()
+        return {"ok": True, "restored": restored, "source": str(target)}
+    finally:
+        conn.close()
+
+
+def safe_export_audit_after_write() -> dict[str, Any]:
+    try:
+        return export_audit_state(force=True)
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}
+
+
+def audit_state_status() -> dict[str, Any]:
+    payload = _load_json(AUDIT_JSON) or {}
+    return {
+        "exists": AUDIT_JSON.exists(),
+        "path": str(AUDIT_JSON),
+        "table_counts": payload.get("table_counts", {}),
+        "exported_at": payload.get("exported_at", ""),
+    }
+
 # -----------------------------------------------------------------------------
 # V1.10 compatibility functions for 09 backup page
 # -----------------------------------------------------------------------------
@@ -447,6 +542,7 @@ def create_persistent_backup(include_excel: bool = True, include_csv: bool = Tru
     LATEST_MANIFEST.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     created_files.append(str(LATEST_MANIFEST.relative_to(PROJECT_ROOT)))
     export_permanent_state(include_logs=True, force=False)
+    export_audit_state(force=True)
     return BackupResult(True, f"永久備份完成，共 {len(tables)} 個資料表。", str(batch_dir), created_files)
 
 
