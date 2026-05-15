@@ -372,3 +372,31 @@ def bootstrap_audit_log_service() -> Dict[str, Any]:
     if count_login_logs() == 0:
         record_login_log(username="SYSTEM", display_name="系統", event_type="BOOTSTRAP", result="SUCCESS", message="Audit log service initialized", module_code="11_login_logs")
     return {"ok": True, "message": "audit_log_service ready", "count": count_login_logs()}
+
+# ===== V1.46 compatibility aliases for older/newer pages =====
+# Some page versions import these names directly. Keep all aliases to avoid ImportError.
+audit_state_status = get_audit_permanent_status
+get_audit_state_status = get_audit_permanent_status
+login_log_state_status = get_audit_permanent_status
+
+export_audit_logs_to_state = export_audit_logs_to_permanent_file
+create_audit_logs_state = export_audit_logs_to_permanent_file
+build_audit_logs_state = export_audit_logs_to_permanent_file
+export_login_logs_to_state = export_audit_logs_to_permanent_file
+
+restore_audit_logs_from_state = restore_audit_logs_from_permanent_file
+restore_login_logs_from_state = restore_audit_logs_from_permanent_file
+
+# Older page versions used clear_login_logs_by_date(start_date, end_date)
+def clear_login_logs_by_date(start_date: str, end_date: str, **kwargs: Any) -> int:
+    return delete_login_logs_by_date_range(start_date, end_date)
+
+# Extra common aliases
+clear_login_logs = clear_login_logs_by_date
+clear_audit_logs_by_date = clear_login_logs_by_date
+upload_audit_logs_to_github_cloud = upload_audit_logs_to_github
+upload_audit_logs_to_state_github = upload_audit_logs_to_github
+
+# Optional no-op fallback used by some versions to avoid login page slowdown.
+def maybe_record_session_login(*args: Any, **kwargs: Any) -> None:
+    return auto_record_session_login(*args, **kwargs)
