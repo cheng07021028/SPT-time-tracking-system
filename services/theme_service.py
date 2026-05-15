@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """SPT Time Tracking System - Visual theme helpers.
 
-V1.31
+V1.34
 - Keep existing logo/header/sidebar breathing glow.
-- Add global light-color input fields for all modules.
-- Make text/password/number/date/select/textarea/data-editor inputs clearly readable without breaking dark tech style.
+- Strengthen all input/editing text color to dark, especially st.data_editor active cells.
+- Fix light input boxes where typed text appeared too pale/white.
 """
 from __future__ import annotations
 
@@ -447,6 +447,88 @@ div[aria-disabled="true"] input {
   .spt-title-main { font-size: 28px; }
   [data-testid="stSidebarNav"] a { font-size: 15px !important; }
 }
+
+
+/* ===== V1.34 表格與全模組輸入文字強制深色 / Force dark text in editable inputs ===== */
+/* Highest-priority rule for all actual input controls. Fixes Data Editor active cell text being white on light background. */
+html body input,
+html body textarea,
+html body [contenteditable="true"],
+html body [role="textbox"] {
+  color: #06182a !important;
+  -webkit-text-fill-color: #06182a !important;
+  caret-color: #006d92 !important;
+  text-shadow: none !important;
+}
+
+/* Streamlit Data Editor uses an overlay editor; this catches both normal and overlay inputs. */
+[data-testid="stDataEditor"] input,
+[data-testid="stDataEditor"] textarea,
+[data-testid="stDataEditor"] select,
+[data-testid="stDataEditor"] [contenteditable="true"],
+[data-testid="stDataEditor"] [role="textbox"],
+[data-testid="stDataFrame"] input,
+[data-testid="stDataFrame"] textarea,
+[data-testid="stDataFrame"] [contenteditable="true"],
+[data-testid="stDataFrame"] [role="textbox"],
+.glide-data-editor input,
+.glide-data-editor textarea,
+.dvn-scroller input,
+.dvn-scroller textarea,
+.gdg-input,
+.gdg-input input,
+.gdg-cell-editing input,
+.gdg-cell-editing textarea {
+  background: rgba(245, 250, 255, 0.98) !important;
+  color: #06182a !important;
+  -webkit-text-fill-color: #06182a !important;
+  caret-color: #006d92 !important;
+  border: 1px solid rgba(52, 232, 255, 0.72) !important;
+  border-radius: 8px !important;
+  font-weight: 850 !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+}
+
+/* BaseWeb wrappers sometimes set inherited color; force descendants inside light input boxes to dark. */
+div[data-baseweb="input"] *,
+div[data-baseweb="base-input"] *,
+div[data-baseweb="textarea"] *,
+div[data-baseweb="select"] * {
+  -webkit-text-fill-color: #06182a !important;
+}
+
+/* But keep labels and sidebar text bright. */
+.stTextInput label *,
+.stTextArea label *,
+.stSelectbox label *,
+.stMultiSelect label *,
+.stDateInput label *,
+.stTimeInput label *,
+.stNumberInput label *,
+.stFileUploader label *,
+.stCheckbox label *,
+.stRadio label *,
+[data-testid="stSidebar"] * {
+  -webkit-text-fill-color: unset !important;
+}
+
+/* Selected/active editable cell glow. */
+[data-testid="stDataEditor"] [role="gridcell"]:focus-within,
+[data-testid="stDataEditor"] [aria-selected="true"],
+[data-testid="stDataFrame"] [role="gridcell"]:focus-within {
+  box-shadow:
+    inset 0 0 0 1px rgba(52, 232, 255, 0.92),
+    0 0 18px rgba(52, 232, 255, 0.30) !important;
+}
+
+/* Placeholder and password dots remain visible on light background. */
+html body input::placeholder,
+html body textarea::placeholder {
+  color: rgba(18, 45, 68, 0.62) !important;
+  -webkit-text-fill-color: rgba(18, 45, 68, 0.62) !important;
+}
+
 </style>
         """,
         unsafe_allow_html=True,
