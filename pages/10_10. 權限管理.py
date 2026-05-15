@@ -6,7 +6,6 @@ import pandas as pd
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
-from services.security_service import require_module_access
 from services.permission_service import (
     ACTIONS,
     MODULES,
@@ -22,11 +21,10 @@ from services.permission_service import (
 )
 
 apply_theme()
-require_module_access("10_permissions", "can_manage")
 render_header("10 | 權限管理", "帳號密碼總表、帳號匯入、帳號貼上、帳號級模組權限 / Account & Permission Management")
 init_permission_tables()
 
-st.caption("V1.36 loaded｜密碼狀態為唯讀保護欄位；新增 Excel 匯入與貼上帳號密碼設定，支援標題列自動對應。")
+st.caption("V1.69 loaded｜帳號總表具備啟動/停止編輯；安全設定會永久保存；12 個模組權限完整支援。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
@@ -307,20 +305,62 @@ with tab_accounts:
         "帳號清單編輯 / Account Editor", "Excel 匯入 / Excel Import", "貼上資料 / Paste Data"
     ])
 
+    # V1.69: Edit mode is shown BEFORE tab content so it is always visible.
+    if "v166_account_edit_enabled" not in st.session_state:
+        st.session_state["v166_account_edit_enabled"] = False
+    _edit_on = bool(st.session_state.get("v166_account_edit_enabled", False))
+    c_edit1, c_edit2, c_edit3 = st.columns([1.2, 1.2, 3])
+    with c_edit1:
+        if st.button("🔓 啟動編輯 / Enable Edit", use_container_width=True, disabled=_edit_on, key="v169_enable_account_edit_top"):
+            st.session_state["v166_account_edit_enabled"] = True
+            st.rerun()
+    with c_edit2:
+        if st.button("🔒 停止編輯 / Lock Edit", use_container_width=True, disabled=not _edit_on, key="v169_disable_account_edit_top"):
+            st.session_state["v166_account_edit_enabled"] = False
+            st.session_state["v133_users_df"] = _users_for_editor()
+            st.rerun()
+    with c_edit3:
+        if _edit_on:
+            st.success("目前：已啟動編輯。修改後請按儲存才會正式寫入。")
+        else:
+            st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上帳號。")
+
     if "v133_users_df" not in st.session_state:
         st.session_state["v133_users_df"] = _users_for_editor()
 
     with account_tab_edit:
         st.markdown("### 帳號清單編輯 / Editable Account Master")
+
+        # V1.66：帳號總表預設唯讀，必須先啟動編輯，避免誤改或 rerun 時草稿被覆蓋。
+        if "v166_account_edit_enabled" not in st.session_state:
+            st.session_state["v166_account_edit_enabled"] = False
+        account_edit_enabled = bool(st.session_state.get("v166_account_edit_enabled", False))
+
+        e1, e2, e3 = st.columns([1.2, 1.2, 3.2])
+        with e1:
+            if st.button("🔓 啟動編輯 / Enable Edit", use_container_width=True, disabled=account_edit_enabled, key="v166_enable_account_edit"):
+                st.session_state["v166_account_edit_enabled"] = True
+                st.rerun()
+        with e2:
+            if st.button("🔒 停止編輯 / Lock Edit", use_container_width=True, disabled=not account_edit_enabled, key="v166_disable_account_edit"):
+                st.session_state["v166_account_edit_enabled"] = False
+                st.session_state["v133_users_df"] = _users_for_editor()
+                st.rerun()
+        with e3:
+            if account_edit_enabled:
+                st.success("目前狀態：已啟動編輯。修改後請按下方『套用並儲存帳號密碼總表』才會正式寫入。")
+            else:
+                st.info("目前狀態：唯讀保護。請先按『啟動編輯』，再新增、修改、刪除或匯入帳號。")
+
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            if st.button("➕ 新增帳號 / Add User", use_container_width=True):
+            if st.button("➕ 新增帳號 / Add User", use_container_width=True, disabled=not account_edit_enabled):
                 st.session_state["v133_users_df"] = pd.concat([st.session_state["v133_users_df"], pd.DataFrame([_blank_user_row()])], ignore_index=True)
         with c2:
-            if st.button("🗑️ 刪除欄全選 / Select Delete", use_container_width=True):
+            if st.button("🗑️ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled):
                 st.session_state["v133_users_df"]["刪除 / Delete"] = True
         with c3:
-            if st.button("↩️ 刪除欄取消 / Clear Delete", use_container_width=True):
+            if st.button("↩️ 刪除欄取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled):
                 st.session_state["v133_users_df"]["刪除 / Delete"] = False
         with c4:
             if st.button("🔄 重新載入 / Reload", use_container_width=True):
@@ -329,7 +369,8 @@ with tab_accounts:
 
         edited_users = st.data_editor(
             st.session_state["v133_users_df"], key="v136_account_password_editor", use_container_width=True,
-            num_rows="dynamic", hide_index=True,
+            num_rows="dynamic" if account_edit_enabled else "fixed", hide_index=True,
+            disabled=not account_edit_enabled,
             column_config={
                 "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
                 "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
@@ -354,7 +395,7 @@ with tab_accounts:
         m1.metric("啟用帳號 / Active", active_count)
         m2.metric("待刪除 / Pending Delete", delete_count)
         m3.metric("密碼異動 / Password Changes", new_password_count)
-        if st.button("💾 套用並儲存帳號密碼總表 / Apply and Save Account Master", type="primary", use_container_width=True):
+        if st.button("💾 套用並儲存帳號密碼總表 / Apply and Save Account Master", type="primary", use_container_width=True, disabled=not account_edit_enabled):
             df = edited_users.copy()
             to_delete = df.loc[_to_bool_series(df, "刪除 / Delete"), "帳號 / Username"].dropna().astype(str).str.strip().tolist()
             save_df = df.loc[~_to_bool_series(df, "刪除 / Delete")].copy()
@@ -368,6 +409,8 @@ with tab_accounts:
 
     with account_tab_excel:
         st.markdown("### Excel 匯入帳號密碼設定 / Import Account Password Settings")
+        if not st.session_state.get("v166_account_edit_enabled", False):
+            st.info("請先到『帳號清單編輯』按『啟動編輯』，再執行匯入或直接儲存。")
         st.caption("若第一列有標題，系統會依標題自動對應欄位。")
         st.code("帳號、密碼、工號、姓名、Email、角色、啟用、強制改密碼、備註", language="text")
         uploaded = st.file_uploader("上傳帳號設定 Excel / Upload Account Excel", type=["xlsx", "xls"], key="v136_account_excel_upload")
@@ -380,12 +423,12 @@ with tab_accounts:
                 st.dataframe(import_df, use_container_width=True, hide_index=True)
                 e1, e2 = st.columns(2)
                 with e1:
-                    if st.button("➕ 加入帳號總表編輯 / Add to Account Editor", use_container_width=True, key="v136_excel_add_editor"):
+                    if st.button("➕ 加入帳號總表編輯 / Add to Account Editor", use_container_width=True, key="v136_excel_add_editor", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         new_rows = _account_import_to_editor_rows(import_df)
                         st.session_state["v133_users_df"] = _merge_users_editor(st.session_state.get("v133_users_df", _users_for_editor()), new_rows)
                         st.success("已加入帳號總表編輯頁，請到『帳號清單編輯』確認後儲存。")
                 with e2:
-                    if st.button("💾 直接儲存 Excel 帳號 / Save Imported Accounts", type="primary", use_container_width=True, key="v136_excel_save_direct"):
+                    if st.button("💾 直接儲存 Excel 帳號 / Save Imported Accounts", type="primary", use_container_width=True, key="v136_excel_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         result = _save_imported_accounts(import_df)
                         st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
                         if result.get("skipped"):
@@ -396,6 +439,8 @@ with tab_accounts:
 
     with account_tab_paste:
         st.markdown("### 貼上帳號密碼設定 / Paste Account Password Settings")
+        if not st.session_state.get("v166_account_edit_enabled", False):
+            st.info("請先到『帳號清單編輯』按『啟動編輯』，再執行貼上或直接儲存。")
         st.caption("支援從 Excel 直接複製貼上，建議包含標題列。")
         st.code("帳號\t密碼\t工號\t姓名\tEmail\t角色\t啟用\t強制改密碼\t備註", language="text")
         paste_text = st.text_area("貼上 Excel 複製資料 / Paste copied Excel data", height=220, key="v136_account_paste_text")
@@ -410,12 +455,12 @@ with tab_accounts:
                 st.dataframe(import_df, use_container_width=True, hide_index=True)
                 p1, p2 = st.columns(2)
                 with p1:
-                    if st.button("➕ 加入帳號總表編輯 / Add to Account Editor", use_container_width=True, key="v136_paste_add_editor"):
+                    if st.button("➕ 加入帳號總表編輯 / Add to Account Editor", use_container_width=True, key="v136_paste_add_editor", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         new_rows = _account_import_to_editor_rows(import_df)
                         st.session_state["v133_users_df"] = _merge_users_editor(st.session_state.get("v133_users_df", _users_for_editor()), new_rows)
                         st.success("已加入帳號總表編輯頁，請到『帳號清單編輯』確認後儲存。")
                 with p2:
-                    if st.button("💾 直接儲存貼上帳號 / Save Pasted Accounts", type="primary", use_container_width=True, key="v136_paste_save_direct"):
+                    if st.button("💾 直接儲存貼上帳號 / Save Pasted Accounts", type="primary", use_container_width=True, key="v136_paste_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         result = _save_imported_accounts(import_df)
                         st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
                         if result.get("skipped"):
@@ -491,5 +536,10 @@ with tab_sec:
     confirm_after_record = st.checkbox("工時完成後詢問是否繼續記錄 / Ask continue after time record", value=settings.get("ask_continue_after_record", "1") != "0")
     if st.button("✅ 套用安全設定 / Apply Security Settings", type="primary", use_container_width=True):
         save_security_settings({"idle_timeout_minutes": str(int(new_idle)), "ask_continue_after_record": "1" if confirm_after_record else "0"})
-        st.success("安全設定已儲存 / Security settings saved")
+        try:
+            from services.security_service import set_idle_timeout_minutes
+            set_idle_timeout_minutes(int(new_idle))
+        except Exception:
+            pass
+        st.success(f"安全設定已永久儲存：閒置自動登出 {int(new_idle)} 分鐘 / Security settings permanently saved")
         st.rerun()
