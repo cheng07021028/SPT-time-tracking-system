@@ -32,6 +32,10 @@ st.info(
     "工時計算會依這裡啟用的休息時間扣除。"
 )
 
+_pending_message = st.session_state.pop("_spt_13_pending_apply_message", "")
+if _pending_message:
+    st.success(_pending_message)
+
 
 def _normalize_delete_column(df: pd.DataFrame, delete_col: str = "刪除") -> pd.DataFrame:
     out = df.copy()
@@ -61,6 +65,30 @@ def _export_permanent_settings(message: str) -> None:
 
 def _set_edit_mode(key: str, enabled: bool) -> None:
     st.session_state[key] = bool(enabled)
+    st.rerun()
+
+
+def _clear_editor_state(*keys: str) -> None:
+    """Clear data_editor/form states so the next paint reloads data from DB."""
+    prefixes = tuple(str(k) for k in keys if k)
+    for k in list(st.session_state.keys()):
+        sk = str(k)
+        if sk in prefixes or any(sk.startswith(p) for p in prefixes):
+            st.session_state.pop(k, None)
+
+
+def _refresh_after_apply(message: str, *edit_mode_keys: str) -> None:
+    """After confirm/apply, leave edit mode and force a clean screen reload."""
+    for k in edit_mode_keys:
+        if k:
+            st.session_state[k] = False
+    _clear_editor_state(
+        "system_process_options_editor_v192",
+        "system_process_apply_action_v192",
+        "system_rest_periods_editor_v192",
+        "system_rest_apply_action_v192",
+    )
+    st.session_state["_spt_13_pending_apply_message"] = message
     st.rerun()
 
 
@@ -110,19 +138,23 @@ if can_manage and st.session_state.get(proc_edit_key, False):
             save_df = edited_proc.drop(columns=["刪除"], errors="ignore")
             count = save_process_options_df(save_df)
             _export_permanent_settings(f"已套用工段名稱設定 {count} 筆")
-            st.session_state[proc_edit_key] = False
-            st.rerun()
+            _refresh_after_apply(f"已套用工段名稱設定 {count} 筆，畫面已重新整理。", proc_edit_key)
         else:
+            selected_df = edited_proc[edited_proc["刪除"].astype(bool)].copy() if "刪除" in edited_proc.columns else pd.DataFrame()
             try:
-                ids = [int(float(x)) for x in edited_proc[edited_proc["刪除"].astype(bool)]["id"].dropna().tolist()]
+                ids = [int(float(x)) for x in selected_df["id"].dropna().tolist() if str(x).strip().lower() not in {"", "nan", "none"}]
             except Exception:
                 ids = []
-            if not ids:
-                st.warning("請先勾選要刪除的既有工段，再按確認套用。新增尚未儲存的空白列不需要刪除，直接清空即可。")
+            transient_count = 0
+            if not selected_df.empty and "id" in selected_df.columns:
+                transient_count = int(selected_df["id"].isna().sum())
+            if not ids and transient_count <= 0:
+                st.warning("請先勾選要刪除的工段，再按確認套用。")
             else:
-                count = delete_process_options(ids)
+                count = delete_process_options(ids) if ids else 0
                 _export_permanent_settings(f"已刪除工段名稱設定 {count} 筆")
-                st.rerun()
+                extra = f"；另已清除未儲存新增列 {transient_count} 筆" if transient_count else ""
+                _refresh_after_apply(f"已刪除工段名稱設定 {count} 筆{extra}，畫面已重新整理。", proc_edit_key)
 else:
     render_table(proc_view.drop(columns=["刪除"], errors="ignore"), "system_process_options", editable=False, height=420)
 
@@ -174,19 +206,23 @@ if can_manage and st.session_state.get(rest_edit_key, False):
             save_df = edited_rest.drop(columns=["刪除"], errors="ignore")
             count = save_rest_periods_df(save_df)
             _export_permanent_settings(f"已套用休息時間設定 {count} 筆")
-            st.session_state[rest_edit_key] = False
-            st.rerun()
+            _refresh_after_apply(f"已套用休息時間設定 {count} 筆，畫面已重新整理。", rest_edit_key)
         else:
+            selected_df = edited_rest[edited_rest["刪除"].astype(bool)].copy() if "刪除" in edited_rest.columns else pd.DataFrame()
             try:
-                ids = [int(float(x)) for x in edited_rest[edited_rest["刪除"].astype(bool)]["id"].dropna().tolist()]
+                ids = [int(float(x)) for x in selected_df["id"].dropna().tolist() if str(x).strip().lower() not in {"", "nan", "none"}]
             except Exception:
                 ids = []
-            if not ids:
-                st.warning("請先勾選要刪除的既有休息時間，再按確認套用。新增尚未儲存的空白列不需要刪除，直接清空即可。")
+            transient_count = 0
+            if not selected_df.empty and "id" in selected_df.columns:
+                transient_count = int(selected_df["id"].isna().sum())
+            if not ids and transient_count <= 0:
+                st.warning("請先勾選要刪除的休息時間，再按確認套用。")
             else:
-                count = delete_rest_periods(ids)
+                count = delete_rest_periods(ids) if ids else 0
                 _export_permanent_settings(f"已刪除休息時間設定 {count} 筆")
-                st.rerun()
+                extra = f"；另已清除未儲存新增列 {transient_count} 筆" if transient_count else ""
+                _refresh_after_apply(f"已刪除休息時間設定 {count} 筆{extra}，畫面已重新整理。", rest_edit_key)
 else:
     render_table(rest_view.drop(columns=["刪除"], errors="ignore"), "system_rest_periods", editable=False, height=360)
 
