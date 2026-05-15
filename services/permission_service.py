@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import json
 import secrets
 import sqlite3
 from datetime import datetime
@@ -605,3 +606,84 @@ def add_login_log(username: str, event_type: str, result: str, message: str = ""
 # Backward-compatible aliases for V1.28 code that may import these names.
 init_auth_tables = init_permission_tables
 check_permission = has_permission
+
+
+# ===== V1.69 persistent security setting compatibility =====
+_SECURITY_PERSISTENT_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_security_settings.json"
+_SECURITY_MODULE_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
+
+def _v169_load_persistent_security_settings() -> Dict[str, str]:
+    data: Dict[str, str] = {}
+    for path in (_SECURITY_PERSISTENT_FILE, _SECURITY_MODULE_FILE):
+        try:
+            if path.exists():
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                raw = payload.get("security_settings", payload)
+                if isinstance(raw, dict):
+                    for k, v in raw.items():
+                        if v is not None:
+                            data[str(k)] = str(v)
+        except Exception:
+            continue
+    return data
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    """Read security settings with permanent JSON priority.
+
+    This prevents idle_timeout_minutes from reverting to 15 after logout/redeploy.
+    """
+    init_permission_tables()
+    result: Dict[str, str] = {
+        "idle_timeout_minutes": "15",
+        "ask_continue_after_record": "1",
+    }
+    conn = connect_db()
+    cur = conn.cursor()
+    _ensure_security_setting_tables(cur)
+    for table in ("security_settings", "auth_security_settings"):
+        try:
+            rows = cur.execute(f"SELECT setting_key, setting_value FROM {table}").fetchall()
+            for r in rows:
+                result[str(r["setting_key"])] = str(r["setting_value"])
+        except Exception:
+            pass
+    conn.close()
+    # Permanent files are the source of truth across Cloud rebuilds.
+    result.update(_v169_load_persistent_security_settings())
+    return result
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    init_permission_tables()
+    merged = get_security_settings()
+    merged.update({str(k): str(v) for k, v in settings.items()})
+
+    conn = connect_db()
+    cur = conn.cursor()
+    _ensure_security_setting_tables(cur)
+    for k, v in merged.items():
+        for table in ("auth_security_settings", "security_settings"):
+            cur.execute(f"""
+                INSERT INTO {table}(setting_key, setting_value, note, updated_at)
+                VALUES (?,?,?,?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (k, str(v), "V1.69 synchronized security setting", now_text()))
+    conn.commit()
+    conn.close()
+
+    if st is not None:
+        try:
+            idle = int(float(merged.get("idle_timeout_minutes", "15") or 15))
+            st.session_state["_spt_idle_timeout_cache"] = {"minutes": max(1, idle), "ts": 0}
+            st.session_state["spt_security_settings"] = dict(merged)
+        except Exception:
+            pass
+    clear_permission_runtime_cache()
+    _persist_security_settings_files(merged)
+    try:
+        from services.auto_github_sync_service import auto_sync_after_save
+        auto_sync_after_save("10_permissions", reason="security_settings_saved_v169")
+    except Exception:
+        pass

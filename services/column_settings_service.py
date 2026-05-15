@@ -290,7 +290,7 @@ def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[D
             "欄位順序 / Column order（每行一個欄位；可剪下貼上調整順序，按套用後永久保存）",
             value="\n".join(current_order),
             key=f"column_order_text::{_safe_widget_suffix(table_id)}",
-            height=260,
+            height=420,
             help="每行一個欄位名稱。可直接在這個大型文字框內剪下/貼上調整欄位順序，按套用後會永久保存。Streamlit 原生表格目前無法穩定讀取滑鼠拖拉後的欄位順序。",
         )
         c1, c2, c3 = st.columns([1, 1, 2])

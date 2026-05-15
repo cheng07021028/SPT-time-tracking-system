@@ -18,6 +18,8 @@ import hmac
 import os
 import time
 from datetime import datetime
+from pathlib import Path
+import json
 from typing import Any
 
 import pandas as pd
@@ -728,3 +730,109 @@ def create_or_update_user(username: str, display_name: str, password: str = "", 
 def login_logs_df(limit: int = 1000) -> pd.DataFrame:
     ensure_security_schema()
     return query_df("SELECT * FROM security_login_logs ORDER BY id DESC LIMIT ?", (int(limit),))
+
+
+# ===== V1.69 persistent security settings override =====
+_SECURITY_PERSISTENT_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_security_settings.json"
+_SECURITY_MODULE_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
+
+def _v169_load_persistent_security_settings() -> dict[str, str]:
+    """Load security settings from permanent JSON files.
+
+    This keeps idle logout settings after Streamlit Cloud rebuilds SQLite.
+    Latest file value intentionally overrides stale default DB values.
+    """
+    data: dict[str, str] = {}
+    for path in (_SECURITY_PERSISTENT_FILE, _SECURITY_MODULE_FILE):
+        try:
+            if path.exists():
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                raw = payload.get("security_settings", payload)
+                if isinstance(raw, dict):
+                    for k, v in raw.items():
+                        if v is not None:
+                            data[str(k)] = str(v)
+        except Exception:
+            continue
+    return data
+
+def _v169_write_persistent_security_settings(settings: dict[str, str]) -> None:
+    try:
+        now = _now()
+        payload = {"version": "V1.69", "updated_at": now, "security_settings": dict(settings)}
+        for path in (_SECURITY_PERSISTENT_FILE, _SECURITY_MODULE_FILE):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+def get_idle_timeout_minutes() -> int:  # type: ignore[override]
+    """Read idle timeout from session, DB and permanent JSON.
+
+    Priority: current session cache -> permanent JSON -> DB -> default.
+    Permanent JSON is used so logout/redeploy does not revert to 15 minutes.
+    """
+    try:
+        cache = st.session_state.get("_spt_idle_timeout_cache")
+        now_ts = time.time()
+        if cache and now_ts - float(cache.get("ts", 0)) < 60:
+            return max(1, int(cache.get("minutes", DEFAULT_IDLE_MINUTES)))
+    except Exception:
+        pass
+
+    ensure_security_schema()
+    minutes = DEFAULT_IDLE_MINUTES
+    file_settings = _v169_load_persistent_security_settings()
+    if file_settings.get("idle_timeout_minutes") not in (None, ""):
+        try:
+            minutes = int(float(file_settings["idle_timeout_minutes"]))
+        except Exception:
+            minutes = DEFAULT_IDLE_MINUTES
+    else:
+        for table in ("auth_security_settings", "security_settings"):
+            try:
+                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
+                if row and row.get("setting_value") not in (None, ""):
+                    minutes = int(float(row["setting_value"]))
+                    break
+            except Exception:
+                pass
+    minutes = max(1, int(minutes))
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+    except Exception:
+        pass
+    return minutes
+
+def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
+    """Write idle timeout to runtime DB and permanent JSON."""
+    ensure_security_schema()
+    minutes = max(1, int(minutes))
+    settings = _v169_load_persistent_security_settings()
+    settings["idle_timeout_minutes"] = str(minutes)
+    for table in ("security_settings", "auth_security_settings"):
+        try:
+            execute(f"""
+                CREATE TABLE IF NOT EXISTS {table} (
+                    setting_key TEXT PRIMARY KEY,
+                    setting_value TEXT,
+                    note TEXT,
+                    updated_at TEXT
+                )
+            """)
+            execute(f"""
+                INSERT INTO {table} (setting_key, setting_value, note, updated_at)
+                VALUES ('idle_timeout_minutes', ?, '閒置多久自動登出，單位分鐘', ?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (str(minutes), _now()))
+        except Exception:
+            pass
+    _v169_write_persistent_security_settings(settings)
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+        st.session_state["spt_security_settings"] = dict(settings)
+    except Exception:
+        pass
