@@ -6,12 +6,21 @@ import streamlit as st
 from services.theme_service import apply_theme, render_header
 from services.security_service import (
     check_permission,
+    get_current_user,
     require_module_access,
     render_post_record_continue_prompt,
     trigger_post_record_continue_prompt,
 )
 from services.master_data_service import load_employees, load_work_orders
-from services.time_record_service import get_active_record, get_active_group, start_work, finish_work, today_records
+from services.time_record_service import (
+    delete_time_records,
+    finish_work,
+    get_active_group,
+    get_active_record,
+    save_time_records,
+    start_work,
+    today_records,
+)
 from services.db_service import query_one
 from services.table_ui_service import render_table
 
@@ -58,7 +67,10 @@ with left:
             st.error("權限不足：你沒有新增工時紀錄權限。")
         else:
             rid = start_work(employee, work_order, process, remark, auto_pause_old=auto_pause)
-            st.success(f"已開始作業，紀錄編號：{rid}")
+            trigger_post_record_continue_prompt(
+                f"已開始作業，紀錄編號：{rid}。請確認是否繼續操作下一筆紀錄；若不繼續，系統會立即登出帳號。",
+                title="已開始計時",
+            )
             st.rerun()
 
 with right:
@@ -89,24 +101,72 @@ with right:
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
                 n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=True)
-                trigger_post_record_continue_prompt(f"已同步暫停 {n} 筆並平均計算工時。")
+                trigger_post_record_continue_prompt(f"已同步暫停 {n} 筆並平均計算工時。", title="工時已暫停")
                 st.rerun()
         if c2.button("🏁 完工 / Complete", use_container_width=True):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
                 n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=True)
-                trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。")
+                trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。", title="工時已完工")
                 st.rerun()
         if c3.button("🌙 下班 / Off Duty", use_container_width=True):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
                 n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=True)
-                trigger_post_record_continue_prompt(f"已同步下班 {n} 筆並平均計算工時。")
+                trigger_post_record_continue_prompt(f"已同步下班 {n} 筆並平均計算工時。", title="工時已結束")
                 st.rerun()
 
 st.divider()
 st.subheader("今日工時紀錄 / Today Records")
 df = today_records()
 render_table(df, "today_records", editable=False, height=420)
+
+# V1.81：修改、刪除、存檔功能只允許管理員看見與操作。
+# 一般作業人員只能開始/暫停/下班/完工，不顯示人工維護工具，避免冒用或誤刪資料。
+user = get_current_user() or {}
+is_admin = "admin" in [str(x).lower() for x in user.get("roles", [])]
+
+if is_admin:
+    st.divider()
+    with st.expander("🔐 管理員工時紀錄維護｜修改、刪除、存檔", expanded=False):
+        st.warning("此區僅管理員可見。修改或刪除會直接影響正式工時紀錄，請確認後再存檔。")
+        if df.empty:
+            st.info("今日目前沒有可維護的工時紀錄。")
+        else:
+            admin_df = df.copy()
+            admin_df.insert(0, "刪除", False)
+            edited_admin = render_table(
+                admin_df,
+                "today_records_admin_maintenance",
+                editable=True,
+                disabled=["id", "record_key", "created_at", "updated_at"],
+                key="today_records_admin_editor",
+                height=460,
+            )
+            if edited_admin is not None:
+                b1, b2 = st.columns(2)
+                if b1.button("💾 管理員存檔修改", use_container_width=True, key="admin_save_today_records"):
+                    save_df = edited_admin.drop(columns=["刪除"], errors="ignore")
+                    count = save_time_records(save_df)
+                    st.success(f"已由管理員存檔修改 {count} 筆今日工時紀錄。")
+                    st.rerun()
+
+                delete_ids = []
+                try:
+                    delete_rows = edited_admin[edited_admin["刪除"].astype(bool)]
+                    delete_ids = [int(x) for x in delete_rows["id"].dropna().tolist()]
+                except Exception:
+                    delete_ids = []
+
+                delete_disabled = len(delete_ids) == 0
+                if b2.button(
+                    f"🗑️ 管理員刪除勾選紀錄（{len(delete_ids)}）",
+                    use_container_width=True,
+                    key="admin_delete_today_records",
+                    disabled=delete_disabled,
+                ):
+                    count = delete_time_records(delete_ids, reason="01 工時紀錄管理員維護區刪除")
+                    st.success(f"已由管理員刪除 {count} 筆今日工時紀錄。")
+                    st.rerun()
