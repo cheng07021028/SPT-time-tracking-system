@@ -37,6 +37,7 @@ MODULES: List[Dict[str, str]] = [
     {"module_code": "10", "module_name_zh": "權限管理", "module_name_en": "Permission Management"},
     {"module_code": "11", "module_name_zh": "登入紀錄", "module_name_en": "Login Logs"},
     {"module_code": "12", "module_name_zh": "模組永久紀錄中心", "module_name_en": "Module Permanent Records"},
+    {"module_code": "13", "module_name_zh": "系統設定", "module_name_en": "System Settings"},
 ]
 
 ACTIONS: List[Tuple[str, str, str]] = [

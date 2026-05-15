@@ -150,6 +150,8 @@ def export_module_settings_state() -> Dict[str, Any]:
     ensure_dirs()
     settings_tables = [
         "system_settings",
+        "rest_periods",
+        "process_options",
         "table_column_settings",
         "table_sort_settings",
         "auth_users",

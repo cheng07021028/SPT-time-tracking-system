@@ -44,7 +44,7 @@ AUTH_SECURITY_SQL_MARKERS = (
 
 BUSINESS_SQL_MARKERS = (
     "work_orders", "employees", "time_records", "rest_periods",
-    "table_column_settings", "table_sort_settings", "system_settings",
+    "table_column_settings", "table_sort_settings", "system_settings", "process_options",
 )
 
 
@@ -222,6 +222,19 @@ def _init_schema(conn: sqlite3.Connection) -> None:
     )
     """)
 
+    # 工段名稱設定：供 01 工時紀錄下拉選單使用，避免寫死在程式內。
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS process_options (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        process_name TEXT UNIQUE NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        note TEXT,
+        created_at TEXT,
+        updated_at TEXT
+    )
+    """)
+
     # 系統設定
     cur.execute("""
     CREATE TABLE IF NOT EXISTS system_settings (
@@ -320,6 +333,8 @@ def _init_schema(conn: sqlite3.Connection) -> None:
     )
     """)
 
+    now = _now()
+
     default_rests = [
         (1, "上午休息", "10:30", "10:45", 1),
         (2, "午休", "12:00", "13:00", 2),
@@ -332,7 +347,15 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         VALUES (?, ?, ?, ?, 1, ?)
     """, default_rests)
 
-    now = _now()
+    default_processes = [
+        "前置鈑金", "LP改造", "骨架組立", "配電", "模組", "水平", "S.T.", "清潔", "收機", "包機",
+        "Packing", "異常", "設變", "重工", "教育訓練", "IPQC", "其他",
+    ]
+    cur.executemany("""
+        INSERT OR IGNORE INTO process_options(process_name, is_active, sort_order, note, created_at, updated_at)
+        VALUES (?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)
+    """, [(name, idx, now, now) for idx, name in enumerate(default_processes, start=1)])
+
     settings = [
         ("company_name", "超慧科技", "公司名稱"),
         ("system_name", "製造部智慧工時紀錄系統", "系統名稱"),

@@ -281,3 +281,58 @@ def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工
             level="WARN",
         )
     return deleted
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:
+    """Recalculate work_hours for selected records from start/end timestamps.
+
+    This is used by administrator maintenance on 01 and 02.  It keeps the same
+    time_records table, so recalculated values are immediately reflected in
+    02 歷史紀錄 and all analysis modules.
+    """
+    if record_ids:
+        ids = []
+        for x in record_ids:
+            try:
+                i = int(x)
+                if i > 0 and i not in ids:
+                    ids.append(i)
+            except Exception:
+                continue
+        if not ids:
+            return 0
+        placeholder = ",".join(["?"] * len(ids))
+        df = query_df(f"SELECT * FROM time_records WHERE id IN ({placeholder}) ORDER BY id", ids)
+    else:
+        df = query_df("SELECT * FROM time_records WHERE start_timestamp IS NOT NULL AND end_timestamp IS NOT NULL ORDER BY id")
+    if df.empty:
+        return 0
+
+    now = _now()
+    count = 0
+    for _, r in df.iterrows():
+        start_ts = r.get("start_timestamp")
+        end_ts = r.get("end_timestamp")
+        if not start_ts or not end_ts or pd.isna(start_ts) or pd.isna(end_ts):
+            continue
+        try:
+            hours = calculate_work_hours(str(start_ts), str(end_ts))
+            start_date, start_time = split_timestamp(str(start_ts))
+            end_date, end_time = split_timestamp(str(end_ts))
+            status = r.get("status") or "已結束"
+            if str(status) == "作業中":
+                status = r.get("end_action") or "已結束"
+            execute(
+                """
+                UPDATE time_records
+                SET work_hours=?, start_date=?, start_time=?, end_date=?, end_time=?, status=?, updated_at=?
+                WHERE id=?
+                """,
+                (hours, start_date, start_time, end_date, end_time, status, now, int(r["id"])),
+            )
+            count += 1
+        except Exception as exc:
+            write_log("RECALC_TIME_RECORD_ERROR", f"重新計算工時失敗 #{r.get('id')}: {exc}", "time_records", r.get("id"), level="ERROR")
+    if count:
+        write_log("RECALC_TIME_RECORDS", f"管理員重新計算工時 {count} 筆，已同步反映至 02 歷史紀錄", "time_records")
+    return count

@@ -47,6 +47,8 @@ SETTING_TABLE_CANDIDATES = [
     "page_settings",
     "ui_settings",
     "system_settings",
+    "rest_periods",
+    "process_options",
     "auth_users",
     "auth_account_permissions",
     "auth_security_settings",

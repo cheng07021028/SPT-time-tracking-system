@@ -202,6 +202,42 @@ def _format_duration_columns_for_display(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _apply_quick_header_sort(table_key: str, df: pd.DataFrame) -> pd.DataFrame:
+    """Clickable column-title sort bar.
+
+    Streamlit data_editor does not reliably provide native header sorting in every mode/theme.
+    This lightweight bar gives every table the same behavior: click a column title once for ASC,
+    click the same title again for DESC.  It is intentionally outside the table so it works for
+    both dataframe and editable data_editor without breaking cell editing.
+    """
+    if df is None or df.empty or len(df.columns) == 0:
+        return df
+    sort_state_key = f"_spt_quick_sort_{table_key}"
+    state = st.session_state.get(sort_state_key, {"column": None, "ascending": True})
+    with st.container():
+        st.caption("點選欄位標題可快速排序；再次點同一欄會切換升冪/降冪。")
+        cols_per_row = 6
+        columns = list(df.columns)
+        for base in range(0, len(columns), cols_per_row):
+            row_cols = st.columns(min(cols_per_row, len(columns) - base))
+            for i, col in enumerate(columns[base:base + cols_per_row]):
+                active = state.get("column") == col
+                arrow = " ▲" if active and state.get("ascending", True) else (" ▼" if active else "")
+                label = f"↕ {label_for(col)}{arrow}"
+                if row_cols[i].button(label, key=f"quick_sort_{table_key}_{base}_{col}", use_container_width=True):
+                    ascending = not bool(state.get("ascending", True)) if active else True
+                    st.session_state[sort_state_key] = {"column": col, "ascending": ascending}
+                    st.rerun()
+    state = st.session_state.get(sort_state_key, {})
+    sort_col = state.get("column")
+    if sort_col in df.columns:
+        try:
+            return df.sort_values(sort_col, ascending=bool(state.get("ascending", True)), kind="mergesort", na_position="last").reset_index(drop=True)
+        except Exception:
+            return df
+    return df
+
+
 def _render_sort_controls(table_key: str, df: pd.DataFrame) -> pd.DataFrame:
     """Add explicit sorting controls because Streamlit table sorting is not always obvious in edit mode."""
     if df is None or df.empty or len(df.columns) == 0:
@@ -224,6 +260,7 @@ def render_table(df: pd.DataFrame, table_key: str, *, editable: bool = False, di
         st.info("目前沒有資料 / No data")
         return None
     df = _render_sort_controls(table_key, df)
+    df = _apply_quick_header_sort(table_key, df)
     render_width_settings(table_key, df)
     display_df = _format_duration_columns_for_display(df)
     cfg = build_column_config(table_key, display_df)

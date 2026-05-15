@@ -86,6 +86,12 @@ MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
         "tables": ["users", "roles", "user_roles", "role_permissions", "user_module_permissions"],
         "settings_keys": ["table_columns", "sort", "filters", "security", "ui"],
     },
+    "13_system_settings": {
+        "name_zh": "系統設定",
+        "name_en": "System Settings",
+        "tables": ["process_options", "rest_periods", "system_settings"],
+        "settings_keys": ["process", "rest_periods", "ui"],
+    },
     "11_login_logs": {
         "name_zh": "登入紀錄",
         "name_en": "Login Logs",
