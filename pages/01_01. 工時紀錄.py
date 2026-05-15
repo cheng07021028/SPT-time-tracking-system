@@ -14,6 +14,7 @@ from services.security_service import (
 from services.master_data_service import load_employees, load_work_orders
 from services.time_record_service import (
     delete_time_records,
+    recalculate_time_records,
     finish_work,
     get_active_group,
     get_active_record,
@@ -23,6 +24,7 @@ from services.time_record_service import (
 )
 from services.db_service import query_one
 from services.table_ui_service import render_table
+from services.system_settings_service import get_process_options
 
 st.set_page_config(page_title="01. 工時紀錄", page_icon="▶️", layout="wide")
 apply_theme()
@@ -30,7 +32,7 @@ require_module_access("01_time_record")
 render_header("01｜工時紀錄", "快速開始、同步作業、暫停、下班、完工｜自動記錄時間與扣除休息")
 render_post_record_continue_prompt()
 
-PROCESS_OPTIONS = ["前置鈑金", "LP改造", "骨架組立", "配電", "模組", "水平", "S.T.", "清潔", "收機", "包機", "Packing", "異常", "設變", "重工", "教育訓練", "IPQC", "其他"]
+PROCESS_OPTIONS = get_process_options()
 
 employees = load_employees(active_only=True, in_factory_only=False)
 work_orders = load_work_orders(active_only=True)
@@ -169,4 +171,9 @@ if is_admin:
                 ):
                     count = delete_time_records(delete_ids, reason="01 工時紀錄管理員維護區刪除")
                     st.success(f"已由管理員刪除 {count} 筆今日工時紀錄。")
+                    st.rerun()
+
+                if st.button("🧮 管理員重新計算勾選紀錄工時並同步 02 歷史紀錄", use_container_width=True, key="admin_recalc_today_records", disabled=delete_disabled):
+                    count = recalculate_time_records(delete_ids)
+                    st.success(f"已重新計算 {count} 筆工時，並同步更新到 02 歷史紀錄。")
                     st.rerun()
