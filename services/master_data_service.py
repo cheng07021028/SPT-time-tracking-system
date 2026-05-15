@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import inspect
 import pandas as pd
 
 from .db_service import execute, query_df
@@ -33,6 +34,73 @@ def _get_any(row: dict, keys: list[str]) -> str:
     return ""
 
 
+def _called_from_time_record_page() -> bool:
+    """V1.64: Detect 01｜工時紀錄 page without requiring page-file rename.
+
+    This lets us keep all existing page functionality while restricting the employee
+    dropdown for normal operators only on the time-recording page.
+    """
+    try:
+        for frame in inspect.stack()[:18]:
+            name = str(frame.filename).replace("\\", "/").lower()
+            if "/pages/" in name and ("01_01" in name or "01_time" in name or "time_record" in name):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _current_login_context() -> tuple[str, str, list[str]]:
+    try:
+        import streamlit as st
+        username = str(st.session_state.get("auth_username", "") or "").strip()
+        employee_id = str(st.session_state.get("auth_employee_id", "") or "").strip()
+        roles = st.session_state.get("auth_roles", []) or []
+        if isinstance(roles, str):
+            roles = [roles]
+        return username, employee_id, [str(r).strip() for r in roles]
+    except Exception:
+        return "", "", []
+
+
+def _filter_employees_for_time_record(df: pd.DataFrame) -> pd.DataFrame:
+    """V1.64: Operators can only see their own employee in 01｜工時紀錄.
+
+    Admin / manager / leader keep full employee list for代登、補登或管理用途.
+    Matching priority:
+    1. auth_employee_id
+    2. username equals employee_id
+    3. display_name equals employee_name
+    """
+    if df is None or df.empty or not _called_from_time_record_page():
+        return df
+    username, employee_id, roles = _current_login_context()
+    role_set = {r.lower() for r in roles}
+    if role_set.intersection({"admin", "manager", "leader"}):
+        return df
+    target = employee_id or username
+    if not target:
+        return df.iloc[0:0].copy()
+    if "employee_id" in df.columns:
+        mask = df["employee_id"].fillna("").astype(str).str.strip().str.lower() == target.lower()
+        if mask.any():
+            return df[mask].copy()
+    if username and "employee_id" in df.columns:
+        mask = df["employee_id"].fillna("").astype(str).str.strip().str.lower() == username.lower()
+        if mask.any():
+            return df[mask].copy()
+    try:
+        import streamlit as st
+        display_name = str(st.session_state.get("auth_display_name", "") or "").strip()
+        if display_name and "employee_name" in df.columns:
+            mask = df["employee_name"].fillna("").astype(str).str.strip() == display_name
+            if mask.any():
+                return df[mask].copy()
+    except Exception:
+        pass
+    return df.iloc[0:0].copy()
+
+
 def load_work_orders(active_only: bool = True) -> pd.DataFrame:
     sql = "SELECT * FROM work_orders"
     if active_only:
@@ -49,7 +117,8 @@ def load_employees(active_only: bool = True, in_factory_only: bool = False) -> p
     if in_factory_only:
         sql += " AND is_in_factory=1"
     sql += " ORDER BY employee_id"
-    return query_df(sql, params)
+    df = query_df(sql, params)
+    return _filter_employees_for_time_record(df)
 
 
 def upsert_work_order(row: dict) -> bool:

@@ -288,34 +288,56 @@ def seed_security_defaults() -> None:
 
 
 def get_idle_timeout_minutes() -> int:
-    """讀取閒置登出設定；同一個 session 內做快取，避免每頁反覆查 DB。"""
+    """讀取閒置登出設定。
+
+    V1.64: read both security_settings and auth_security_settings because 10｜權限管理
+    stores settings through permission_service. This prevents the value from reverting
+    to the old default 15 minutes after logout / rerun.
+    """
     cache = st.session_state.get("_spt_idle_timeout_cache")
     now_ts = time.time()
     if cache and now_ts - float(cache.get("ts", 0)) < _PERMISSION_CACHE_TTL_SECONDS:
         return int(cache.get("minutes", DEFAULT_IDLE_MINUTES))
     ensure_security_schema()
-    row = query_one("SELECT setting_value FROM security_settings WHERE setting_key='idle_timeout_minutes'")
-    try:
-        minutes = int(float(row["setting_value"])) if row else DEFAULT_IDLE_MINUTES
-    except Exception:
-        minutes = DEFAULT_IDLE_MINUTES
-    minutes = max(1, minutes)
+    minutes = DEFAULT_IDLE_MINUTES
+    for table in ("auth_security_settings", "security_settings"):
+        try:
+            row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
+            if row and row.get("setting_value") not in (None, ""):
+                minutes = int(float(row["setting_value"]))
+                break
+        except Exception:
+            pass
+    minutes = max(1, int(minutes))
     st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": now_ts}
     return minutes
 
 
 def set_idle_timeout_minutes(minutes: int) -> None:
+    """Write idle timeout to both runtime and permission tables."""
     ensure_security_schema()
     minutes = max(1, int(minutes))
-    execute("""
-        INSERT INTO security_settings (setting_key, setting_value, note, updated_at)
-        VALUES ('idle_timeout_minutes', ?, '閒置多久自動登出，單位分鐘', ?)
-        ON CONFLICT(setting_key) DO UPDATE SET
-            setting_value=excluded.setting_value,
-            note=excluded.note,
-            updated_at=excluded.updated_at
-    """, (str(minutes), _now()))
-    st.session_state.pop("_spt_idle_timeout_cache", None)
+    for table in ("security_settings", "auth_security_settings"):
+        try:
+            execute(f"""
+                CREATE TABLE IF NOT EXISTS {table} (
+                    setting_key TEXT PRIMARY KEY,
+                    setting_value TEXT,
+                    note TEXT,
+                    updated_at TEXT
+                )
+            """)
+            execute(f"""
+                INSERT INTO {table} (setting_key, setting_value, note, updated_at)
+                VALUES ('idle_timeout_minutes', ?, '閒置多久自動登出，單位分鐘', ?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (str(minutes), _now()))
+        except Exception:
+            pass
+    st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": 0}
 
 
 def log_security_event(username: str | None, event_type: str, result: str, message: str = "", module_code: str = "", idle_seconds: int | None = None) -> None:

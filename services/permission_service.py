@@ -442,27 +442,114 @@ def has_permission(username: str, module_code: str, action: str = "can_view") ->
     return bool(row[action]) if action in row.keys() else False
 
 
+def _ensure_security_setting_tables(cur) -> None:
+    """V1.64: keep both permission-page settings and runtime security settings in sync."""
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS auth_security_settings (
+        setting_key TEXT PRIMARY KEY,
+        setting_value TEXT,
+        note TEXT,
+        updated_at TEXT
+    )
+    """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS security_settings (
+        setting_key TEXT PRIMARY KEY,
+        setting_value TEXT,
+        note TEXT,
+        updated_at TEXT
+    )
+    """)
+
+
+def _persist_security_settings_files(settings: Dict[str, str]) -> None:
+    """V1.64: write a small permanent settings file so GitHub backup can keep security settings."""
+    try:
+        import json
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[1]
+        state_dir = root / "data" / "persistent_state"
+        mod_dir = root / "data" / "persistent_modules" / "10_permissions"
+        hist_dir = mod_dir / "history"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        mod_dir.mkdir(parents=True, exist_ok=True)
+        hist_dir.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "version": "V1.64",
+            "updated_at": now_text(),
+            "security_settings": dict(settings),
+        }
+        (state_dir / "spt_security_settings.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        (mod_dir / "10_permissions_settings.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        (hist_dir / f"10_permissions_settings_{stamp}.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def get_security_settings() -> Dict[str, str]:
     init_permission_tables()
     conn = connect_db()
-    rows = conn.execute("SELECT setting_key, setting_value FROM auth_security_settings").fetchall()
+    cur = conn.cursor()
+    _ensure_security_setting_tables(cur)
+    result: Dict[str, str] = {}
+    # Runtime table has priority because security_service reads it during every page load.
+    for table in ("auth_security_settings", "security_settings"):
+        try:
+            rows = cur.execute(f"SELECT setting_key, setting_value FROM {table}").fetchall()
+            for r in rows:
+                result[str(r["setting_key"])] = str(r["setting_value"])
+        except Exception:
+            pass
+    if "idle_timeout_minutes" not in result:
+        result["idle_timeout_minutes"] = "15"
+    if "ask_continue_after_record" not in result:
+        result["ask_continue_after_record"] = "1"
     conn.close()
-    return {r["setting_key"]: r["setting_value"] for r in rows}
+    return result
 
 
 def save_security_settings(settings: Dict[str, str]) -> None:
+    """Save security settings to both tables, session cache and permanent files.
+
+    V1.64 fixes the old issue where 10｜權限管理 wrote auth_security_settings,
+    but runtime idle logout read security_settings, so the value reverted to 15 minutes.
+    """
     init_permission_tables()
+    merged = get_security_settings()
+    merged.update({str(k): str(v) for k, v in settings.items()})
+
     conn = connect_db()
     cur = conn.cursor()
-    for k, v in settings.items():
-        cur.execute("""
-            INSERT INTO auth_security_settings(setting_key, setting_value, updated_at)
-            VALUES (?,?,?)
-            ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value, updated_at=excluded.updated_at
-        """, (k, str(v), now_text()))
+    _ensure_security_setting_tables(cur)
+    for k, v in merged.items():
+        for table in ("auth_security_settings", "security_settings"):
+            cur.execute(f"""
+                INSERT INTO {table}(setting_key, setting_value, note, updated_at)
+                VALUES (?,?,?,?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (k, str(v), "V1.64 synchronized security setting", now_text()))
     conn.commit()
     conn.close()
+
+    # Update live Streamlit session immediately.
+    if st is not None:
+        try:
+            idle = int(float(merged.get("idle_timeout_minutes", "15") or 15))
+            st.session_state["_spt_idle_timeout_cache"] = {"minutes": max(1, idle), "ts": 0}
+            st.session_state["spt_security_settings"] = dict(merged)
+        except Exception:
+            pass
     clear_permission_runtime_cache()
+    _persist_security_settings_files(merged)
+    try:
+        from services.auto_github_sync_service import auto_sync_after_save
+        auto_sync_after_save("10_permissions", reason="security_settings_saved")
+    except Exception:
+        pass
 
 
 def get_login_logs(start_date: str | None = None, end_date: str | None = None) -> List[dict]:
