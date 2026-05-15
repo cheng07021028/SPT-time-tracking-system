@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 """SPT Time Tracking System - Visual theme helpers.
 
-V1.13
-- Embed Super Plus Tech logo directly in this file, so the header never falls back to plain SPT text.
-- Move module header lower to avoid touching the top app toolbar.
-- Enlarge sidebar/module fonts.
-- Strengthen breathing glow for page headers and cards.
+V1.31
+- Keep existing logo/header/sidebar breathing glow.
+- Add global light-color input fields for all modules.
+- Make text/password/number/date/select/textarea/data-editor inputs clearly readable without breaking dark tech style.
 """
 from __future__ import annotations
 
@@ -247,6 +246,198 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 .stButton>button:hover, .stDownloadButton>button:hover {
   border-color: var(--spt-cyan) !important;
   box-shadow: 0 0 28px rgba(52,232,255,.42);
+}
+
+
+
+/* ===== V1.31 全系統輸入區淺色科技風 / Global Light Input Fields ===== */
+/* Text input / Password / Number / Textarea */
+div[data-baseweb="input"],
+div[data-baseweb="base-input"],
+div[data-baseweb="textarea"],
+.stTextInput div[data-baseweb="input"],
+.stNumberInput div[data-baseweb="input"],
+.stTextArea div[data-baseweb="textarea"] {
+  background: rgba(245, 250, 255, 0.94) !important;
+  border: 1px solid rgba(80, 210, 255, 0.56) !important;
+  border-radius: 14px !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 180, 255, 0.08),
+    0 0 16px rgba(52, 232, 255, 0.10) !important;
+  transition: all .18s ease-in-out !important;
+}
+
+div[data-baseweb="input"] input,
+div[data-baseweb="base-input"] input,
+div[data-baseweb="textarea"] textarea,
+.stTextInput input,
+.stNumberInput input,
+.stTextArea textarea,
+textarea,
+input[type="text"],
+input[type="password"],
+input[type="number"] {
+  background: rgba(245, 250, 255, 0.94) !important;
+  color: #06182a !important;
+  caret-color: #006d92 !important;
+  border-radius: 12px !important;
+  font-weight: 760 !important;
+  letter-spacing: .15px !important;
+}
+
+div[data-baseweb="input"] input::placeholder,
+div[data-baseweb="base-input"] input::placeholder,
+div[data-baseweb="textarea"] textarea::placeholder,
+.stTextInput input::placeholder,
+.stTextArea textarea::placeholder,
+textarea::placeholder {
+  color: rgba(18, 45, 68, 0.62) !important;
+  font-weight: 650 !important;
+}
+
+/* Focus glow */
+div[data-baseweb="input"]:focus-within,
+div[data-baseweb="base-input"]:focus-within,
+div[data-baseweb="textarea"]:focus-within,
+.stTextInput:focus-within div[data-baseweb="input"],
+.stNumberInput:focus-within div[data-baseweb="input"],
+.stTextArea:focus-within div[data-baseweb="textarea"] {
+  border-color: rgba(52, 232, 255, 0.95) !important;
+  box-shadow:
+    0 0 0 1px rgba(52, 232, 255, 0.55),
+    0 0 18px rgba(52, 232, 255, 0.28),
+    0 0 42px rgba(30, 134, 255, 0.16),
+    inset 0 0 0 1px rgba(255,255,255,.18) !important;
+}
+
+/* Selectbox / Multiselect / Date / Time */
+div[data-baseweb="select"] > div,
+.stDateInput div[data-baseweb="input"],
+.stTimeInput div[data-baseweb="input"] {
+  background: rgba(245, 250, 255, 0.94) !important;
+  color: #06182a !important;
+  border: 1px solid rgba(80, 210, 255, 0.56) !important;
+  border-radius: 14px !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 180, 255, 0.08),
+    0 0 16px rgba(52, 232, 255, 0.10) !important;
+}
+
+div[data-baseweb="select"] span,
+div[data-baseweb="select"] div,
+div[data-baseweb="select"] input,
+.stDateInput input,
+.stTimeInput input {
+  color: #06182a !important;
+  font-weight: 760 !important;
+}
+
+div[data-baseweb="select"]:focus-within > div,
+.stDateInput:focus-within div[data-baseweb="input"],
+.stTimeInput:focus-within div[data-baseweb="input"] {
+  border-color: rgba(52, 232, 255, 0.95) !important;
+  box-shadow:
+    0 0 0 1px rgba(52, 232, 255, 0.55),
+    0 0 18px rgba(52, 232, 255, 0.28),
+    0 0 42px rgba(30, 134, 255, 0.16) !important;
+}
+
+/* Dropdown menu */
+ul[role="listbox"],
+div[data-baseweb="popover"] {
+  background: rgba(245, 250, 255, 0.98) !important;
+  border: 1px solid rgba(52, 232, 255, 0.42) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.36), 0 0 22px rgba(52,232,255,.18) !important;
+}
+
+ul[role="listbox"] li,
+ul[role="listbox"] div,
+div[role="option"],
+div[role="option"] * {
+  color: #06182a !important;
+  font-weight: 760 !important;
+}
+
+div[role="option"]:hover,
+li[role="option"]:hover {
+  background: rgba(52, 232, 255, 0.16) !important;
+}
+
+/* Multiselect selected tags */
+div[data-baseweb="tag"] {
+  background: linear-gradient(90deg, rgba(52,232,255,.20), rgba(186,92,255,.14)) !important;
+  border: 1px solid rgba(52,232,255,.42) !important;
+  border-radius: 10px !important;
+}
+
+div[data-baseweb="tag"] span,
+div[data-baseweb="tag"] svg {
+  color: #06182a !important;
+  fill: #06182a !important;
+  font-weight: 850 !important;
+}
+
+/* Labels remain bright on dark background */
+.stTextInput label,
+.stTextArea label,
+.stSelectbox label,
+.stMultiSelect label,
+.stDateInput label,
+.stTimeInput label,
+.stNumberInput label,
+.stFileUploader label,
+.stCheckbox label,
+.stRadio label {
+  color: #eaf8ff !important;
+  font-weight: 850 !important;
+  letter-spacing: .25px !important;
+}
+
+/* Data editor editable cells - keep table dark, but make active input readable */
+[data-testid="stDataEditor"] input,
+[data-testid="stDataEditor"] textarea,
+[data-testid="stDataEditor"] select {
+  background: rgba(245, 250, 255, 0.98) !important;
+  color: #06182a !important;
+  border-radius: 8px !important;
+  font-weight: 760 !important;
+}
+
+[data-testid="stDataEditor"] [role="gridcell"]:focus-within,
+[data-testid="stDataFrame"] [role="gridcell"]:focus-within {
+  box-shadow:
+    inset 0 0 0 1px rgba(52, 232, 255, 0.76),
+    0 0 14px rgba(52, 232, 255, 0.22) !important;
+  border-radius: 6px !important;
+}
+
+/* File uploader / drag area */
+[data-testid="stFileUploader"] section {
+  background: rgba(245, 250, 255, 0.92) !important;
+  border: 1px dashed rgba(52,232,255,.70) !important;
+  border-radius: 16px !important;
+  color: #06182a !important;
+}
+[data-testid="stFileUploader"] section * {
+  color: #06182a !important;
+  font-weight: 760 !important;
+}
+
+/* Disabled input */
+input:disabled,
+textarea:disabled,
+div[aria-disabled="true"] input {
+  background: rgba(220, 230, 238, 0.78) !important;
+  color: rgba(20, 40, 60, 0.70) !important;
+}
+
+/* Login page specific visibility */
+.stForm {
+  border: 1px solid rgba(52,232,255,.28) !important;
+  border-radius: 18px !important;
+  padding: 14px 16px !important;
+  background: rgba(7, 16, 30, .48) !important;
 }
 
 @media (max-width: 900px) {
