@@ -7,7 +7,7 @@ import streamlit as st
 
 from services.theme_service import apply_theme, render_header
 from services.security_service import check_permission, require_module_access
-from services.log_service import count_logs_by_date_range, delete_logs_by_date_range, load_logs, write_log
+from services import log_service
 from services.table_ui_service import render_table
 
 st.set_page_config(page_title="06. LOG 查詢", page_icon="🧾", layout="wide")
@@ -15,7 +15,7 @@ apply_theme()
 require_module_access("06_logs")
 render_header("06｜LOG 查詢", "系統操作、異常與資料異動紀錄查詢｜支援日期篩選與區間刪除")
 
-# 查詢條件採「按下套用才查詢」模式，避免每點一次日期/輸入文字就大量讀取 LOG。
+
 def _default_filters() -> dict:
     today = date.today()
     return {
@@ -26,6 +26,36 @@ def _default_filters() -> dict:
         "level": "ALL",
         "keyword": "",
     }
+
+
+def _load_logs_safely(filters: dict):
+    """Call new load_logs signature; fall back to old load_logs(limit) if user missed service update."""
+    try:
+        return log_service.load_logs(
+            limit=int(filters.get("limit", 1000)),
+            start_date=filters.get("start_date"),
+            end_date=filters.get("end_date"),
+            action_type=str(filters.get("action_type", "")).strip() or None,
+            level=str(filters.get("level", "ALL")),
+            keyword=str(filters.get("keyword", "")).strip() or None,
+        )
+    except TypeError:
+        return log_service.load_logs(limit=int(filters.get("limit", 1000)))
+
+
+def _count_logs_safely(start_date, end_date) -> int:
+    if hasattr(log_service, "count_logs_by_date_range"):
+        return int(log_service.count_logs_by_date_range(start_date, end_date) or 0)
+    # fallback: old service cannot count by date; avoid crashing page
+    return 0
+
+
+def _delete_logs_safely(start_date, end_date, username: str) -> int:
+    if not hasattr(log_service, "delete_logs_by_date_range"):
+        st.error("目前 services/log_service.py 尚未更新，缺少 delete_logs_by_date_range。請覆蓋 V2.01 的 services/log_service.py 後重新啟動。")
+        return 0
+    return int(log_service.delete_logs_by_date_range(start_date, end_date, user_name=username) or 0)
+
 
 if "log_query_filters" not in st.session_state:
     st.session_state["log_query_filters"] = _default_filters()
@@ -40,7 +70,9 @@ with st.form("log_query_filter_form", clear_on_submit=False):
 
     c4, c5, c6 = st.columns([1, 1, 2])
     action_type = c4.text_input("動作類型 / Action Type", value=str(f.get("action_type", "")))
-    level = c5.selectbox("等級 / Level", ["ALL", "INFO", "WARN", "ERROR", "FAIL", "SUCCESS"], index=["ALL", "INFO", "WARN", "ERROR", "FAIL", "SUCCESS"].index(str(f.get("level", "ALL"))) if str(f.get("level", "ALL")) in ["ALL", "INFO", "WARN", "ERROR", "FAIL", "SUCCESS"] else 0)
+    levels = ["ALL", "INFO", "WARN", "ERROR", "FAIL", "SUCCESS"]
+    current_level = str(f.get("level", "ALL"))
+    level = c5.selectbox("等級 / Level", levels, index=levels.index(current_level) if current_level in levels else 0)
     keyword = c6.text_input("關鍵字 / Keyword", value=str(f.get("keyword", "")))
 
     c7, c8 = st.columns([1, 1])
@@ -66,14 +98,7 @@ if apply_filter:
     st.rerun()
 
 filters = st.session_state["log_query_filters"]
-df = load_logs(
-    limit=int(filters.get("limit", 1000)),
-    start_date=filters.get("start_date"),
-    end_date=filters.get("end_date"),
-    action_type=str(filters.get("action_type", "")).strip() or None,
-    level=str(filters.get("level", "ALL")),
-    keyword=str(filters.get("keyword", "")).strip() or None,
-)
+df = _load_logs_safely(filters)
 
 st.caption(
     f"目前查詢日期：{filters.get('start_date')} ~ {filters.get('end_date')}｜顯示筆數：{len(df)}｜上限：{filters.get('limit')}"
@@ -91,7 +116,7 @@ if check_permission("06_logs", "can_delete") or check_permission("06_logs", "can
     d1, d2 = st.columns(2)
     delete_start = d1.date_input("刪除開始日期 / Delete Start", value=filters.get("start_date") or date.today(), key="log_delete_start")
     delete_end = d2.date_input("刪除結束日期 / Delete End", value=filters.get("end_date") or date.today(), key="log_delete_end")
-    preview_count = count_logs_by_date_range(delete_start, delete_end) if delete_start <= delete_end else 0
+    preview_count = _count_logs_safely(delete_start, delete_end) if delete_start <= delete_end else 0
     st.info(f"此區間目前符合刪除條件的 LOG 筆數：{preview_count}")
     confirm_delete = st.checkbox("我確認要刪除上述日期區間的 LOG 紀錄 / I confirm deleting logs in this date range", key="confirm_delete_log_range")
     if st.button("🗑️ 刪除指定日期區間 LOG / Delete Range", use_container_width=True, disabled=not confirm_delete):
@@ -99,7 +124,7 @@ if check_permission("06_logs", "can_delete") or check_permission("06_logs", "can
             st.error("刪除開始日期不可大於結束日期。")
         else:
             username = st.session_state.get("auth_username", st.session_state.get("username", "SYSTEM"))
-            deleted = delete_logs_by_date_range(delete_start, delete_end, user_name=username)
+            deleted = _delete_logs_safely(delete_start, delete_end, username=username)
             st.session_state["confirm_delete_log_range"] = False
             st.success(f"已刪除 {deleted} 筆 LOG，並保留一筆刪除稽核紀錄。")
             st.rerun()
