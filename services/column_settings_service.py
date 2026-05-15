@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-V1.68 Column Settings Service
+V1.72 Column Settings Service
 全系統表格欄位設定：顯示/隱藏、順序、欄寬、中文/英文標題，永久保存到 JSON。
 
 設計原則：
@@ -478,6 +478,40 @@ def clear_editor_draft(table_key_contains: str | None = None) -> int:
                 removed += 1
     return removed
 
+
+
+# ===== V1.72 全表格啟動/停止編輯保護 =====
+def _edit_mode_state_key(table_id: str) -> str:
+    return f"_spt_table_edit_enabled::{_safe_widget_suffix(table_id)}"
+
+
+def _render_editor_lock_controls(table_id: str) -> bool:
+    """Render a consistent edit lock bar for every st.data_editor table.
+
+    Default is locked/read-only.  The user must click Enable Edit before editing.
+    This prevents Streamlit reruns from repeatedly rebuilding an editable table
+    while the user is still entering data.
+    """
+    state_key = _edit_mode_state_key(table_id)
+    if state_key not in st.session_state:
+        st.session_state[state_key] = False
+
+    c1, c2, c3 = st.columns([1, 1, 2.7])
+    with c1:
+        if st.button("🔓 啟動編輯 / Enable Edit", key=f"enable_edit::{_safe_widget_suffix(table_id)}", use_container_width=True):
+            st.session_state[state_key] = True
+    with c2:
+        if st.button("🔒 停止編輯 / Lock Edit", key=f"lock_edit::{_safe_widget_suffix(table_id)}", use_container_width=True):
+            st.session_state[state_key] = False
+            # Stop editing means cancel current unsaved draft for this table only.
+            clear_editor_draft(table_id)
+    with c3:
+        if bool(st.session_state.get(state_key)):
+            st.success("目前狀態：已啟動編輯。修改完成後請按本頁的儲存 / 套用按鈕，資料才會正式寫入。")
+        else:
+            st.info("目前狀態：唯讀保護。請先按『啟動編輯』再修改表格資料。")
+    return bool(st.session_state.get(state_key))
+
 def install_column_settings_patch() -> None:
     """全域安裝表格欄位設定包裝，不需要逐頁改程式。"""
     if getattr(st, "_spt_column_settings_installed", False):
@@ -506,13 +540,18 @@ def install_column_settings_patch() -> None:
             key = kwargs.get("key")
             table_id = _stable_table_id(df, key=key, kind="data_editor")
             table_setting, _ = _settings_editor(table_id, df, editable=True)
+            edit_enabled = _render_editor_lock_controls(table_id)
             kwargs.setdefault("use_container_width", True)
+            kwargs.setdefault("key", f"spt_data_editor::{_safe_widget_suffix(table_id)}")
             kwargs["column_config"] = {**_build_column_config(df, table_setting), **kwargs.get("column_config", {})}
             kwargs["column_order"] = kwargs.get("column_order") or _visible_order(df, table_setting, editable=True)
+            if not edit_enabled:
+                kwargs["disabled"] = True
             draft_df = _get_editor_draft(table_id, df)
             edited = original_data_editor(draft_df, *args, **kwargs)
             merged = _merge_hidden_back(draft_df, edited)
-            _set_editor_draft(table_id, merged)
+            if edit_enabled:
+                _set_editor_draft(table_id, merged)
             return merged
         edited = original_data_editor(data, *args, **kwargs)
         return edited
