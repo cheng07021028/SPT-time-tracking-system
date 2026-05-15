@@ -37,6 +37,7 @@ MODULES: List[Dict[str, str]] = [
     {"module_code": "09", "module_name_zh": "資料永久保存與備份", "module_name_en": "Permanent Backup"},
     {"module_code": "10", "module_name_zh": "權限管理", "module_name_en": "Permission Management"},
     {"module_code": "11", "module_name_zh": "登入紀錄", "module_name_en": "Login Logs"},
+    {"module_code": "12", "module_name_zh": "模組永久紀錄中心", "module_name_en": "Module Permanent Records"},
 ]
 
 ACTIONS: List[Tuple[str, str, str]] = [
@@ -495,6 +496,10 @@ def save_security_settings(settings: Dict[str, str]) -> None:
     clear_permission_runtime_cache()
     try:
         st.session_state.pop("_spt_idle_timeout_cache", None)
+        if "idle_timeout_minutes" in settings:
+            st.session_state["_spt_idle_timeout_minutes_runtime"] = int(float(settings.get("idle_timeout_minutes") or 15))
+        if "ask_continue_after_record" in settings:
+            st.session_state["_spt_ask_continue_after_record_runtime"] = str(settings.get("ask_continue_after_record", "1"))
     except Exception:
         pass
 

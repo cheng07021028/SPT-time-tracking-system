@@ -238,6 +238,7 @@ def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[D
             key=f"column_setting_editor::{table_id}",
             use_container_width=True,
             hide_index=True,
+            height=360,
             num_rows="fixed",
             column_config={
                 "顯示 / Visible": st.column_config.CheckboxColumn("顯示 / Visible"),
@@ -256,8 +257,8 @@ def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[D
             "欄位順序 / Column order（每行一個欄位；可剪下貼上調整順序，按套用後永久保存）",
             value="\n".join(current_order),
             key=f"column_order_text::{table_id}",
-            height=120,
-            help="Streamlit 原生表格目前無法穩定讀取滑鼠拖拉後的欄位順序；此處提供可永久保存的順序設定。",
+            height=260,
+            help="每行一個欄位名稱。可直接在這個大型文字框內剪下/貼上調整欄位順序，按套用後會永久保存。Streamlit 原生表格目前無法穩定讀取滑鼠拖拉後的欄位順序。",
         )
         c1, c2, c3 = st.columns([1, 1, 2])
         applied = False

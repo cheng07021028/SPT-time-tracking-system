@@ -289,6 +289,12 @@ def seed_security_defaults() -> None:
 
 def get_idle_timeout_minutes() -> int:
     """讀取閒置登出設定；同一個 session 內做快取，避免每頁反覆查 DB。"""
+    try:
+        runtime_minutes = st.session_state.get("_spt_idle_timeout_minutes_runtime")
+        if runtime_minutes is not None:
+            return max(1, int(runtime_minutes))
+    except Exception:
+        pass
     cache = st.session_state.get("_spt_idle_timeout_cache")
     now_ts = time.time()
     if cache and now_ts - float(cache.get("ts", 0)) < _PERMISSION_CACHE_TTL_SECONDS:
@@ -344,6 +350,12 @@ def set_security_setting(setting_key: str, setting_value: str, note: str = "") -
 
 
 def should_ask_continue_after_record() -> bool:
+    try:
+        runtime_value = st.session_state.get("_spt_ask_continue_after_record_runtime")
+        if runtime_value is not None:
+            return str(runtime_value) != "0"
+    except Exception:
+        pass
     return get_security_setting("ask_continue_after_record", "1") != "0"
 
 
@@ -539,21 +551,32 @@ def render_login_form() -> None:
 
 def render_idle_watchdog() -> None:
     seconds = get_idle_timeout_minutes() * 60
-    # 前端偵測無滑鼠/鍵盤活動後重新整理，後端在下一次 rerun 時判斷並登出。
+    # V1.61: 前端逾時後帶 spt_idle_logout=1 重新整理，後端會立即登出。
+    # 這比單純 reload 後比對 session timestamp 更可靠。
     components.html(
         f"""
 <script>
 (function() {{
   const idleMs = {seconds * 1000};
   let timer = null;
+  const events = ['mousemove','mousedown','keydown','scroll','touchstart','click'];
+  function goIdleLogout() {{
+    try {{
+      const loc = window.parent.location;
+      const url = new URL(loc.href);
+      url.searchParams.set('spt_idle_logout', '1');
+      url.searchParams.set('spt_idle_ts', String(Date.now()));
+      loc.href = url.toString();
+    }} catch(e) {{
+      try {{ window.parent.location.reload(); }} catch(err) {{ window.location.reload(); }}
+    }}
+  }}
   function resetTimer() {{
     if (timer) clearTimeout(timer);
-    timer = setTimeout(function() {{
-      try {{ window.parent.location.reload(); }} catch(e) {{ window.location.reload(); }}
-    }}, idleMs + 3000);
+    timer = setTimeout(goIdleLogout, idleMs);
   }}
-  ['mousemove','mousedown','keydown','scroll','touchstart','click'].forEach(function(evt) {{
-    window.parent.document.addEventListener(evt, resetTimer, true);
+  events.forEach(function(evt) {{
+    try {{ window.parent.document.addEventListener(evt, resetTimer, true); }} catch(e) {{}}
   }});
   resetTimer();
 }})();
@@ -562,6 +585,27 @@ def render_idle_watchdog() -> None:
         height=0,
         width=0,
     )
+
+
+def _consume_idle_logout_query() -> bool:
+    try:
+        qp = st.query_params
+        flag = qp.get("spt_idle_logout")
+        if isinstance(flag, list):
+            flag = flag[0] if flag else ""
+        if str(flag) == "1":
+            try:
+                qp.pop("spt_idle_logout", None)
+                qp.pop("spt_idle_ts", None)
+            except Exception:
+                try:
+                    st.query_params.clear()
+                except Exception:
+                    pass
+            return True
+    except Exception:
+        return False
+    return False
 
 
 def _check_idle_timeout() -> None:
@@ -605,6 +649,12 @@ def render_user_bar(module_code: str = "") -> None:
 
 def require_login(module_code: str = "") -> None:
     ensure_security_schema()
+    if st.session_state.get("auth_logged_in") and _consume_idle_logout_query():
+        timeout_min = get_idle_timeout_minutes()
+        logout(f"閒置超過 {timeout_min} 分鐘，自動登出")
+        st.warning("帳號已因閒置逾時自動登出，請重新登入。")
+        render_login_form()
+        st.stop()
     if not st.session_state.get("auth_logged_in"):
         render_login_form()
         st.stop()

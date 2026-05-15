@@ -365,6 +365,73 @@ div[data-baseweb="popover"] div[role="option"][aria-selected="true"], div[data-b
     background:#36e7f7 !important; color:#04101d !important; -webkit-text-fill-color:#04101d !important;
 }
 
+
+/* ===== V1.61 permanent readability + sizing fixes ===== */
+/* 強制所有可輸入區：淺色底、深色字。放在 CSS 最後，避免後續主題覆蓋。 */
+.stTextInput input, .stPasswordInput input, .stNumberInput input,
+.stTextArea textarea, .stDateInput input, .stTimeInput input,
+div[data-baseweb="input"] input, div[data-baseweb="base-input"] input,
+div[data-baseweb="textarea"] textarea, input, textarea {
+    background-color: #f3f9ff !important;
+    color: #061423 !important;
+    -webkit-text-fill-color: #061423 !important;
+    caret-color: #061423 !important;
+    font-weight: 850 !important;
+}
+.stTextInput input::placeholder, .stPasswordInput input::placeholder, .stTextArea textarea::placeholder,
+input::placeholder, textarea::placeholder {
+    color: rgba(20, 42, 62, .62) !important;
+    -webkit-text-fill-color: rgba(20, 42, 62, .62) !important;
+}
+/* Chrome/Edge autofill 造成深色字消失時強制修正 */
+input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #f3f9ff inset !important;
+    -webkit-text-fill-color: #061423 !important;
+}
+/* Data editor 編輯中的儲存格與表格下拉 */
+[data-testid="stDataEditor"] input, [data-testid="stDataEditor"] textarea, [data-testid="stDataEditor"] select,
+[data-testid="stDataEditor"] [contenteditable="true"] {
+    background-color: #f3f9ff !important;
+    color: #061423 !important;
+    -webkit-text-fill-color: #061423 !important;
+    caret-color: #061423 !important;
+    font-weight: 850 !important;
+}
+/* 下拉選單：展開深底淺字，選中亮底深字 */
+div[data-baseweb="popover"], div[data-baseweb="popover"] ul, div[data-baseweb="popover"] div[role="listbox"],
+ul[role="listbox"], div[role="listbox"] {
+    background: #061423 !important;
+    color: #ecfbff !important;
+}
+div[data-baseweb="popover"] [role="option"], div[data-baseweb="popover"] [role="option"] *,
+ul[role="listbox"] li, ul[role="listbox"] li *, div[role="option"], div[role="option"] * {
+    color: #ecfbff !important;
+    -webkit-text-fill-color: #ecfbff !important;
+    font-weight: 850 !important;
+}
+div[data-baseweb="popover"] [role="option"][aria-selected="true"],
+ul[role="listbox"] li[aria-selected="true"], div[role="option"][aria-selected="true"] {
+    background: #36e7f7 !important;
+    color: #04101d !important;
+    -webkit-text-fill-color: #04101d !important;
+}
+div[data-baseweb="popover"] [role="option"][aria-selected="true"] *,
+ul[role="listbox"] li[aria-selected="true"] *, div[role="option"][aria-selected="true"] * {
+    color: #04101d !important;
+    -webkit-text-fill-color: #04101d !important;
+}
+/* 欄位順序大型輸入框 */
+.stTextArea textarea {
+    min-height: 180px !important;
+    line-height: 1.55 !important;
+    font-size: 18px !important;
+}
+/* 安全設定數字輸入比例 */
+.stNumberInput input {
+    font-size: 28px !important;
+    min-height: 54px !important;
+    font-weight: 950 !important;
+}
 </style>
 """,
         unsafe_allow_html=True,
