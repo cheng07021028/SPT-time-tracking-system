@@ -27,7 +27,10 @@ employees = load_employees(active_only=True, in_factory_only=False)
 work_orders = load_work_orders(active_only=True)
 
 if employees.empty or work_orders.empty:
-    st.warning("請先到『03. 製令管理』與『04. 人員名單』匯入或新增資料。")
+    if st.session_state.get("_spt_employee_binding_required"):
+        st.warning("該人員未在人員名單，請洽管理員設定。")
+    else:
+        st.warning("請先到『03. 製令管理』與『04. 人員名單』匯入或新增資料。")
     st.stop()
 
 left, right = st.columns([1.1, 1])
