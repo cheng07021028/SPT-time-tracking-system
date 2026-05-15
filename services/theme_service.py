@@ -255,16 +255,64 @@ def app_theme() -> None:
     apply_theme()
 
 
+def _strip_module_no_from_text(text: str, module_no: str | None = None) -> str:
+    """Remove accidental leading/trailing module number fragments from titles."""
+    import re
+    t = str(text or "").strip()
+    if not t:
+        return ""
+    candidates = []
+    if module_no:
+        no = str(module_no).strip().zfill(2) if str(module_no).strip().isdigit() else str(module_no).strip()
+        candidates.extend([no, str(module_no).strip()])
+    # Remove common leading number patterns: 11｜, 11 |, 11., 11  
+    for no in candidates:
+        if no:
+            t = re.sub(rf"^\s*{re.escape(no)}\s*[｜|.、\-:]\s*", "", t)
+            t = re.sub(rf"\s*[｜|.、\-:]\s*{re.escape(no)}\s*$", "", t)
+    return t.strip()
+
+
+def _looks_like_description(text: str) -> bool:
+    t = str(text or "").strip()
+    if not t:
+        return False
+    # Module description normally contains separators / verbs / long mixed text.
+    desc_tokens = ["、", "與", "和", "查詢", "設定", "保存", "備份", "records", "settings", "audit", "history", "Streamlit", "SQLite"]
+    return len(t) >= 18 or any(tok in t for tok in desc_tokens)
+
+
 def render_header(title: str, subtitle: str = "", module_no: str | None = None, **_: Any) -> None:
-    """Unified module header."""
-    display_title = f"{module_no}｜{title}" if module_no and not str(title).strip().startswith(str(module_no)) else title
+    """Unified module header.
+
+    V1.58 rule:
+    - Module number is always shown at the FRONT: 01｜工時紀錄.
+    - If an older page accidentally passes description as title and module name as subtitle,
+      auto-swap them so the header style stays consistent across all modules.
+    """
+    title_text = str(title or "").strip()
+    subtitle_text = str(subtitle or "").strip()
+
+    # Fix older pages that pass: render_header(description, module_name, module_no)
+    if subtitle_text and _looks_like_description(title_text) and not _looks_like_description(subtitle_text):
+        title_text, subtitle_text = subtitle_text, title_text
+
+    title_text = _strip_module_no_from_text(title_text, module_no)
+    subtitle_text = _strip_module_no_from_text(subtitle_text, module_no)
+
+    no = str(module_no or "").strip()
+    if no and no.isdigit():
+        no = no.zfill(2)
+
+    display_title = f"{no}｜{title_text}" if no else title_text
+
     st.markdown(
         f"""
 <div class="spt-header-wrap">
   <div class="spt-logo-box">{_logo_html()}</div>
   <div>
     <div class="spt-header-title">{display_title}</div>
-    <div class="spt-header-subtitle">{subtitle or ''}</div>
+    <div class="spt-header-subtitle">{subtitle_text or ''}</div>
   </div>
 </div>
         """,
