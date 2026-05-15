@@ -223,6 +223,17 @@ def ensure_security_schema(force: bool = False) -> None:
     )
     """)
     seed_security_defaults()
+
+    # V1.78: login and page permission checks must see the permanent
+    # account/permission settings after GitHub/Streamlit rebuilds.
+    # SQLite is runtime-only, so restore auth_users/auth_account_permissions
+    # from data/persistent_state before authentication continues.
+    try:
+        from services.permission_service import restore_permission_settings_from_permanent_files
+        restore_permission_settings_from_permanent_files(force=False)
+    except Exception:
+        pass
+
     _SECURITY_SCHEMA_READY = True
 
 
@@ -835,21 +846,27 @@ _SECURITY_PERSISTENT_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_se
 _SECURITY_MODULE_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
 
 def _v169_load_persistent_security_settings() -> dict[str, str]:
-    """Load security settings from permanent JSON files.
+    """Load only real security settings from permanent JSON files.
 
-    This keeps idle logout settings after Streamlit Cloud rebuilds SQLite.
-    Latest file value intentionally overrides stale default DB values.
+    Some files such as spt_module_settings.json contain full module payloads
+    (version/exported_at/tables/table_counts).  Older code treated the whole
+    payload as settings, causing garbage keys to appear in security settings.
     """
     data: dict[str, str] = {}
     for path in (_SECURITY_PERSISTENT_FILE, _SECURITY_MODULE_FILE):
         try:
-            if path.exists():
-                payload = json.loads(path.read_text(encoding="utf-8"))
-                raw = payload.get("security_settings", payload)
-                if isinstance(raw, dict):
-                    for k, v in raw.items():
-                        if v is not None:
-                            data[str(k)] = str(v)
+            if not path.exists():
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            raw = payload.get("security_settings")
+            if raw is None and isinstance(payload.get("tables"), dict):
+                rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
+                if isinstance(rows, list):
+                    raw = {str(r.get("setting_key")): str(r.get("setting_value")) for r in rows if isinstance(r, dict) and r.get("setting_key")}
+            if isinstance(raw, dict):
+                for k, v in raw.items():
+                    if v is not None and str(k) in {"idle_timeout_minutes", "ask_continue_after_record"}:
+                        data[str(k)] = str(v)
         except Exception:
             continue
     return data

@@ -190,6 +190,179 @@ def _ensure_legacy_security_tables(cur) -> None:
     """)
 
 
+# ===== V1.78 permanent permission setting restore/export =====
+
+def _json_load(path: Path) -> dict:
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def _permission_persistent_candidates() -> list[Path]:
+    """Return newest-first permanent files that may contain auth tables.
+
+    Streamlit Cloud does not persist SQLite.  Therefore account master,
+    module permissions and security settings must be restored from JSON files
+    committed/uploaded to GitHub.
+    """
+    root = PROJECT_ROOT
+    candidates: list[Path] = []
+    direct = [
+        root / "data" / "persistent_state" / "spt_module_settings.json",
+        root / "data" / "persistent_state" / "spt_permanent_state.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+    ]
+    candidates.extend([p for p in direct if p.exists()])
+    for pattern in [
+        "data/persistent_state/history/spt_module_settings_*.json",
+        "data/persistent_state/history/spt_permanent_state_*.json",
+        "data/persistent_modules/10_permissions/history/10_permissions_settings_*.json",
+        "data/persistent_modules/10_permissions/history/10_permissions_records_*.json",
+    ]:
+        candidates.extend(root.glob(pattern))
+    # newest first, remove duplicates
+    uniq: dict[str, Path] = {}
+    for p in candidates:
+        uniq[str(p)] = p
+    return sorted(uniq.values(), key=lambda x: x.stat().st_mtime if x.exists() else 0, reverse=True)
+
+
+def _tables_from_payload(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        return {}
+    raw = payload.get("tables")
+    if isinstance(raw, dict):
+        return raw
+    # Small security-only file created by _persist_security_settings_files.
+    sec = payload.get("security_settings")
+    if isinstance(sec, dict):
+        return {"auth_security_settings": [
+            {"setting_key": str(k), "setting_value": str(v), "note": "restored from permanent security file", "updated_at": now_text()}
+            for k, v in sec.items()
+        ]}
+    return {}
+
+
+def _insert_or_replace_rows(cur, table: str, rows: list[dict]) -> int:
+    if not rows:
+        return 0
+    info = cur.execute(f'PRAGMA table_info("{table}")').fetchall()
+    cols = [str(r[1]) for r in info]
+    if not cols:
+        return 0
+    insert_cols = [c for c in cols if c != "id"]
+    count = 0
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        data = {c: r.get(c) for c in insert_cols if c in r}
+        if not data:
+            continue
+        keys = list(data.keys())
+        placeholders = ",".join(["?"] * len(keys))
+        update_cols = [c for c in keys if c not in ("username", "module_code", "setting_key")]
+        if table == "auth_users" and "username" in keys:
+            conflict = "username"
+        elif table == "auth_account_permissions" and {"username", "module_code"}.issubset(keys):
+            conflict = "username,module_code"
+        elif table in ("auth_security_settings", "security_settings") and "setting_key" in keys:
+            conflict = "setting_key"
+        elif table == "security_users" and "username" in keys:
+            conflict = "username"
+        elif table == "security_user_roles" and {"username", "role_code"}.issubset(keys):
+            conflict = "username,role_code"
+        else:
+            continue
+        if update_cols:
+            update_sql = ",".join([f'{c}=excluded.{c}' for c in update_cols])
+            sql = f'INSERT INTO "{table}" ({",".join(keys)}) VALUES ({placeholders}) ON CONFLICT({conflict}) DO UPDATE SET {update_sql}'
+        else:
+            sql = f'INSERT OR IGNORE INTO "{table}" ({",".join(keys)}) VALUES ({placeholders})'
+        cur.execute(sql, [data[k] for k in keys])
+        count += 1
+    return count
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:
+    """Restore account/permission/security settings from permanent JSON.
+
+    This is intentionally limited to permission-related tables.  It prevents
+    GitHub/Streamlit updates from resetting the permission page to defaults.
+    """
+    conn = connect_db()
+    cur = conn.cursor()
+    _ensure_legacy_security_tables(cur)
+    _ensure_security_setting_tables(cur)
+    current_users = int(cur.execute("SELECT COUNT(*) FROM auth_users").fetchone()[0] or 0)
+    current_perms = int(cur.execute("SELECT COUNT(*) FROM auth_account_permissions").fetchone()[0] or 0)
+    restored: dict[str, int] = {}
+    source = ""
+    try:
+        for path in _permission_persistent_candidates():
+            payload = _json_load(path)
+            tables = _tables_from_payload(payload)
+            if not tables:
+                continue
+            users = tables.get("auth_users", []) or []
+            perms = tables.get("auth_account_permissions", []) or []
+            settings = tables.get("auth_security_settings", []) or tables.get("security_settings", []) or []
+            should_restore = force
+            if users and len(users) >= current_users:
+                # Restore when persistent file contains all default users or extra user accounts such as spt142.
+                should_restore = True
+            if perms and len(perms) >= current_perms:
+                should_restore = True
+            if settings:
+                should_restore = True
+            if not should_restore:
+                continue
+            for table in ("auth_users", "auth_account_permissions", "auth_security_settings", "security_users", "security_user_roles", "security_settings"):
+                rows = tables.get(table, []) or []
+                if rows:
+                    restored[table] = restored.get(table, 0) + _insert_or_replace_rows(cur, table, rows)
+            # Keep security_settings synchronized if only auth_security_settings exists.
+            if tables.get("auth_security_settings"):
+                restored["security_settings"] = restored.get("security_settings", 0) + _insert_or_replace_rows(cur, "security_settings", tables.get("auth_security_settings", []))
+            source = str(path)
+            break
+        conn.commit()
+    finally:
+        conn.close()
+    if restored:
+        # Avoid recursive init_permission_tables() while schema initialization is still running.
+        # The caller runs sync_auth_users_to_runtime_security() immediately after init.
+        if _PERMISSION_SCHEMA_READY:
+            try:
+                sync_auth_users_to_runtime_security()
+            except Exception:
+                pass
+        clear_permission_runtime_cache()
+    return {"ok": bool(restored), "source": source, "restored": restored}
+
+
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:
+    """Export account/permission/security settings locally and to GitHub if configured."""
+    results: dict = {"ok": True, "reason": reason}
+    try:
+        from services.auto_github_sync_service import auto_sync_after_write
+        results["auto_sync"] = auto_sync_after_write(source=reason, force=True, archive=True)
+    except Exception as exc:
+        results["ok"] = False
+        results["auto_sync_error"] = str(exc)
+        # Fallback: still create local JSON files even when cloud helper fails.
+        try:
+            from services.auto_github_sync_service import export_all_local_permanent_files
+            results["local_export"] = export_all_local_permanent_files(force=True, source=reason)
+            results["ok"] = True
+        except Exception as exc2:
+            results["local_export_error"] = str(exc2)
+    return results
+
+
 def sync_auth_users_to_runtime_security(usernames: Iterable[str] | None = None) -> int:
     """Synchronize auth_users into security_users/security_user_roles.
 
@@ -324,6 +497,15 @@ def init_permission_tables(force: bool = False) -> None:
 
     conn.commit()
     conn.close()
+
+    # V1.78: after schema/default seed, immediately restore account master,
+    # account permissions and security settings from permanent JSON files.
+    # This prevents GitHub/Streamlit rebuilds from reverting settings to defaults.
+    try:
+        restore_permission_settings_from_permanent_files(force=False)
+    except Exception:
+        pass
+
     ensure_permissions_for_all_users(force=True)
     try:
         sync_auth_users_to_runtime_security()
@@ -404,7 +586,8 @@ def save_users(rows: Iterable[dict]) -> dict:
     except Exception:
         pass
     clear_permission_runtime_cache()
-    return {"saved": saved, "skipped": skipped}
+    export_result = export_permission_settings_permanently("auth_users_saved")
+    return {"saved": saved, "skipped": skipped, "permanent_save": export_result}
 
 
 def delete_users(usernames: Iterable[str]) -> int:
@@ -426,6 +609,10 @@ def delete_users(usernames: Iterable[str]) -> int:
     conn.commit()
     conn.close()
     clear_permission_runtime_cache()
+    try:
+        export_permission_settings_permanently("auth_users_deleted")
+    except Exception:
+        pass
     return len(usernames)
 
 
@@ -520,6 +707,10 @@ def save_account_permissions(rows: Iterable[dict]) -> int:
     conn.commit()
     conn.close()
     clear_permission_runtime_cache()
+    try:
+        export_permission_settings_permanently("auth_account_permissions_saved")
+    except Exception:
+        pass
     return saved
 
 
@@ -643,8 +834,8 @@ def save_security_settings(settings: Dict[str, str]) -> None:
     clear_permission_runtime_cache()
     _persist_security_settings_files(merged)
     try:
-        from services.auto_github_sync_service import auto_sync_after_save
-        auto_sync_after_save("10_permissions", reason="security_settings_saved")
+        from services.auto_github_sync_service import auto_sync_after_write
+        auto_sync_after_write(source="security_settings_saved", force=True, archive=True)
     except Exception:
         pass
 
@@ -709,16 +900,27 @@ _SECURITY_PERSISTENT_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_se
 _SECURITY_MODULE_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
 
 def _v169_load_persistent_security_settings() -> Dict[str, str]:
+    """Load only real security settings from permanent JSON files.
+
+    Some files such as spt_module_settings.json contain full module payloads
+    (version/exported_at/tables/table_counts).  Older code treated the whole
+    payload as settings, causing garbage keys to appear in security settings.
+    """
     data: Dict[str, str] = {}
     for path in (_SECURITY_PERSISTENT_FILE, _SECURITY_MODULE_FILE):
         try:
-            if path.exists():
-                payload = json.loads(path.read_text(encoding="utf-8"))
-                raw = payload.get("security_settings", payload)
-                if isinstance(raw, dict):
-                    for k, v in raw.items():
-                        if v is not None:
-                            data[str(k)] = str(v)
+            if not path.exists():
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            raw = payload.get("security_settings")
+            if raw is None and isinstance(payload.get("tables"), dict):
+                rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
+                if isinstance(rows, list):
+                    raw = {str(r.get("setting_key")): str(r.get("setting_value")) for r in rows if isinstance(r, dict) and r.get("setting_key")}
+            if isinstance(raw, dict):
+                for k, v in raw.items():
+                    if v is not None and str(k) in {"idle_timeout_minutes", "ask_continue_after_record"}:
+                        data[str(k)] = str(v)
         except Exception:
             continue
     return data
@@ -779,7 +981,7 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
     clear_permission_runtime_cache()
     _persist_security_settings_files(merged)
     try:
-        from services.auto_github_sync_service import auto_sync_after_save
-        auto_sync_after_save("10_permissions", reason="security_settings_saved_v169")
+        from services.auto_github_sync_service import auto_sync_after_write
+        auto_sync_after_write(source="security_settings_saved_v169", force=True, archive=True)
     except Exception:
         pass
