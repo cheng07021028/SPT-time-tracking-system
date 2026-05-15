@@ -118,14 +118,22 @@ if check_permission("06_logs", "can_delete") or check_permission("06_logs", "can
     delete_end = d2.date_input("刪除結束日期 / Delete End", value=filters.get("end_date") or date.today(), key="log_delete_end")
     preview_count = _count_logs_safely(delete_start, delete_end) if delete_start <= delete_end else 0
     st.info(f"此區間目前符合刪除條件的 LOG 筆數：{preview_count}")
-    confirm_delete = st.checkbox("我確認要刪除上述日期區間的 LOG 紀錄 / I confirm deleting logs in this date range", key="confirm_delete_log_range")
+    # V2.03: checkbox uses a rotating key.  Streamlit forbids assigning
+    # st.session_state[widget_key] after the widget has been instantiated; the
+    # old code did that after Delete and caused StreamlitAPIException.
+    delete_token = int(st.session_state.get("log_delete_confirm_token", 0))
+    confirm_key = f"confirm_delete_log_range_{delete_token}"
+    confirm_delete = st.checkbox(
+        "我確認要刪除上述日期區間的 LOG 紀錄 / I confirm deleting logs in this date range",
+        key=confirm_key,
+    )
     if st.button("🗑️ 刪除指定日期區間 LOG / Delete Range", use_container_width=True, disabled=not confirm_delete):
         if delete_start > delete_end:
             st.error("刪除開始日期不可大於結束日期。")
         else:
             username = st.session_state.get("auth_username", st.session_state.get("username", "SYSTEM"))
             deleted = _delete_logs_safely(delete_start, delete_end, username=username)
-            st.session_state["confirm_delete_log_range"] = False
+            st.session_state["log_delete_confirm_token"] = delete_token + 1
             st.success(f"已刪除 {deleted} 筆 LOG，並保留一筆刪除稽核紀錄。")
             st.rerun()
 else:
