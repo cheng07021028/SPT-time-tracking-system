@@ -138,6 +138,79 @@ def verify_password(password: str, stored_hash: str | None) -> bool:
     return False
 
 
+def _ensure_sqlite_columns(table: str, columns: dict[str, str]) -> None:
+    """Add newly introduced columns when Streamlit/GitHub keeps an older SQLite table.
+
+    SQLite CREATE TABLE IF NOT EXISTS does not upgrade existing tables, so older
+    deployments can miss can_backup/can_restore/can_manage and crash during
+    default permission seeding.
+    """
+    try:
+        existing_df = query_df(f"PRAGMA table_info({table})")
+        existing = set(existing_df["name"].astype(str).tolist()) if not existing_df.empty else set()
+    except Exception:
+        existing = set()
+    for col, ddl in columns.items():
+        if col not in existing:
+            try:
+                execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+            except Exception:
+                # Ignore duplicate-column race conditions on Streamlit reruns.
+                pass
+
+
+def _migrate_security_schema_columns() -> None:
+    _ensure_sqlite_columns("security_users", {
+        "employee_id": "TEXT",
+        "display_name": "TEXT",
+        "email": "TEXT",
+        "is_active": "INTEGER DEFAULT 1",
+        "force_password_change": "INTEGER DEFAULT 0",
+        "last_login_at": "TEXT",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+    })
+    _ensure_sqlite_columns("security_roles", {
+        "role_name_en": "TEXT",
+        "description": "TEXT",
+        "is_system_role": "INTEGER DEFAULT 1",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+    })
+    _ensure_sqlite_columns("security_module_permissions", {
+        "module_no": "TEXT",
+        "module_name": "TEXT",
+        "module_name_en": "TEXT",
+        "can_view": "INTEGER DEFAULT 0",
+        "can_create": "INTEGER DEFAULT 0",
+        "can_edit": "INTEGER DEFAULT 0",
+        "can_delete": "INTEGER DEFAULT 0",
+        "can_import": "INTEGER DEFAULT 0",
+        "can_export": "INTEGER DEFAULT 0",
+        "can_backup": "INTEGER DEFAULT 0",
+        "can_restore": "INTEGER DEFAULT 0",
+        "can_manage": "INTEGER DEFAULT 0",
+        "updated_at": "TEXT",
+    })
+    _ensure_sqlite_columns("security_settings", {
+        "setting_value": "TEXT",
+        "note": "TEXT",
+        "updated_at": "TEXT",
+    })
+    _ensure_sqlite_columns("security_login_logs", {
+        "display_name": "TEXT",
+        "event_type": "TEXT",
+        "result": "TEXT",
+        "message": "TEXT",
+        "module_code": "TEXT",
+        "login_time": "TEXT",
+        "logout_time": "TEXT",
+        "idle_seconds": "INTEGER",
+        "user_agent": "TEXT",
+        "created_at": "TEXT",
+    })
+
+
 def ensure_security_schema(force: bool = False) -> None:
     global _SECURITY_SCHEMA_READY
     if _SECURITY_SCHEMA_READY and not force:
@@ -223,6 +296,7 @@ def ensure_security_schema(force: bool = False) -> None:
         created_at TEXT
     )
     """)
+    _migrate_security_schema_columns()
     seed_security_defaults()
 
     # V1.78: login and page permission checks must see the permanent

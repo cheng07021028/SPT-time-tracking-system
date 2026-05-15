@@ -414,6 +414,65 @@ def sync_auth_users_to_runtime_security(usernames: Iterable[str] | None = None) 
     return count
 
 
+def _ensure_auth_columns(cur, table: str, columns: dict[str, str]) -> None:
+    try:
+        existing = {str(row["name"]) for row in cur.execute(f"PRAGMA table_info({table})").fetchall()}
+    except Exception:
+        existing = set()
+    for col, ddl in columns.items():
+        if col not in existing:
+            try:
+                cur.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+            except Exception:
+                pass
+
+
+def _migrate_permission_schema_columns(cur) -> None:
+    _ensure_auth_columns(cur, "auth_users", {
+        "password_hint": "TEXT",
+        "employee_id": "TEXT",
+        "display_name": "TEXT",
+        "email": "TEXT",
+        "role_code": "TEXT DEFAULT 'operator'",
+        "is_active": "INTEGER DEFAULT 1",
+        "force_password_change": "INTEGER DEFAULT 0",
+        "last_login_at": "TEXT",
+        "note": "TEXT",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+    })
+    _ensure_auth_columns(cur, "auth_account_permissions", {
+        "module_name_zh": "TEXT",
+        "module_name_en": "TEXT",
+        "can_view": "INTEGER DEFAULT 0",
+        "can_create": "INTEGER DEFAULT 0",
+        "can_edit": "INTEGER DEFAULT 0",
+        "can_delete": "INTEGER DEFAULT 0",
+        "can_import": "INTEGER DEFAULT 0",
+        "can_export": "INTEGER DEFAULT 0",
+        "can_backup": "INTEGER DEFAULT 0",
+        "can_restore": "INTEGER DEFAULT 0",
+        "can_manage": "INTEGER DEFAULT 0",
+        "updated_at": "TEXT",
+    })
+    _ensure_auth_columns(cur, "auth_security_settings", {
+        "setting_value": "TEXT",
+        "note": "TEXT",
+        "updated_at": "TEXT",
+    })
+    _ensure_auth_columns(cur, "auth_login_logs", {
+        "display_name": "TEXT",
+        "event_time": "TEXT",
+        "event_type": "TEXT",
+        "result": "TEXT",
+        "module_code": "TEXT",
+        "module_name": "TEXT",
+        "message": "TEXT",
+        "ip_address": "TEXT",
+        "user_agent": "TEXT",
+    })
+
+
 def init_permission_tables(force: bool = False) -> None:
     global _PERMISSION_SCHEMA_READY
     if _PERMISSION_SCHEMA_READY and not force:
@@ -481,6 +540,9 @@ def init_permission_tables(force: bool = False) -> None:
         updated_at TEXT
     )
     """)
+
+    _migrate_permission_schema_columns(cur)
+    conn.commit()
 
     n = cur.execute("SELECT COUNT(*) AS c FROM auth_users").fetchone()["c"]
     if n == 0:
