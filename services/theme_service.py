@@ -432,6 +432,105 @@ ul[role="listbox"] li[aria-selected="true"] *, div[role="option"][aria-selected=
     min-height: 54px !important;
     font-weight: 950 !important;
 }
+
+
+/* ===== V1.96 clickable controls readability fix =====
+   所有可點選控制項改成淺色底、深色字，避免深色主題下看不到文字。
+   Covers: buttons, radio options, checkbox labels, toggles, download buttons, form submit buttons.
+*/
+.stButton > button,
+.stDownloadButton > button,
+div[data-testid="stFormSubmitButton"] button,
+button[kind="secondary"],
+button[kind="primary"],
+button[data-testid="baseButton-secondary"],
+button[data-testid="baseButton-primary"] {
+    background: linear-gradient(180deg, #f4fbff 0%, #d9f5ff 100%) !important;
+    color: #04101d !important;
+    -webkit-text-fill-color: #04101d !important;
+    border: 1px solid rgba(35, 230, 255, .92) !important;
+    border-radius: 12px !important;
+    font-weight: 950 !important;
+    text-shadow: none !important;
+    box-shadow: 0 0 0 1px rgba(35,230,255,.20) inset, 0 0 14px rgba(35,230,255,.18) !important;
+}
+.stButton > button:hover,
+.stDownloadButton > button:hover,
+div[data-testid="stFormSubmitButton"] button:hover,
+button[kind="secondary"]:hover,
+button[kind="primary"]:hover,
+button[data-testid="baseButton-secondary"]:hover,
+button[data-testid="baseButton-primary"]:hover {
+    background: linear-gradient(180deg, #ffffff 0%, #bdf2ff 100%) !important;
+    color: #020914 !important;
+    -webkit-text-fill-color: #020914 !important;
+    border-color: #63f4ff !important;
+    box-shadow: 0 0 0 1px rgba(35,230,255,.50) inset, 0 0 22px rgba(35,230,255,.46) !important;
+}
+.stButton > button:disabled,
+.stDownloadButton > button:disabled,
+div[data-testid="stFormSubmitButton"] button:disabled,
+button:disabled {
+    background: rgba(190, 203, 214, .72) !important;
+    color: rgba(20, 35, 48, .72) !important;
+    -webkit-text-fill-color: rgba(20, 35, 48, .72) !important;
+    border-color: rgba(170, 190, 205, .62) !important;
+    opacity: .70 !important;
+}
+/* Radio / Checkbox / Toggle: make the whole clickable row readable. */
+div[role="radiogroup"] label,
+.stRadio label,
+.stCheckbox label,
+.stToggle label,
+label[data-baseweb="radio"],
+label[data-baseweb="checkbox"] {
+    color: #f5fbff !important;
+    -webkit-text-fill-color: #f5fbff !important;
+    font-weight: 900 !important;
+    text-shadow: 0 0 8px rgba(35,230,255,.22) !important;
+}
+div[role="radiogroup"] label > div,
+.stRadio label > div,
+.stCheckbox label > div,
+.stToggle label > div,
+label[data-baseweb="radio"] > div,
+label[data-baseweb="checkbox"] > div {
+    color: #f5fbff !important;
+    -webkit-text-fill-color: #f5fbff !important;
+}
+/* Give option text a subtle light chip so Delete / Recalculate choices stay visible. */
+div[role="radiogroup"] label span,
+.stRadio label span,
+.stCheckbox label span,
+.stToggle label span,
+label[data-baseweb="radio"] span,
+label[data-baseweb="checkbox"] span {
+    color: #f5fbff !important;
+    -webkit-text-fill-color: #f5fbff !important;
+    font-weight: 900 !important;
+}
+/* Checked controls use light cyan fill and dark check mark for contrast. */
+div[data-baseweb="checkbox"] [aria-checked="true"],
+div[data-baseweb="radio"] [aria-checked="true"] {
+    background-color: #dffaff !important;
+    border-color: #67f5ff !important;
+    color: #04101d !important;
+}
+/* Data editor checkbox cells: keep clickable checkbox visible on dark table. */
+[data-testid="stDataEditor"] input[type="checkbox"],
+[data-testid="stDataEditor"] [role="checkbox"] {
+    accent-color: #dffaff !important;
+    outline: 1px solid rgba(223,250,255,.70) !important;
+    box-shadow: 0 0 8px rgba(35,230,255,.22) !important;
+}
+/* Expander headers and clickable captions should stay bright. */
+div[data-testid="stExpander"] summary,
+div[data-testid="stExpander"] summary * {
+    color: #f4fbff !important;
+    -webkit-text-fill-color: #f4fbff !important;
+    font-weight: 900 !important;
+}
+
 </style>
 """,
         unsafe_allow_html=True,
