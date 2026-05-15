@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 from datetime import datetime, date
+import sqlite3
 import uuid
 import pandas as pd
 
-from .db_service import execute, query_df, query_one
+from .db_service import DB_PATH, clear_query_cache, execute, mark_data_changed, query_df, query_one
 from .calculation_service import calculate_work_hours, split_timestamp
 from .log_service import write_log
 from .duration_service import hms_to_hours
@@ -248,11 +249,25 @@ def save_time_records(df: pd.DataFrame) -> int:
     return count
 
 
-def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:
-    """Delete selected time records. Admin-only visibility is enforced by page layer.
+def _audit_user_name() -> str:
+    try:
+        import streamlit as st  # type: ignore
+        user = st.session_state.get("user") or st.session_state.get("current_user") or {}
+        if isinstance(user, dict):
+            return str(user.get("username") or user.get("account") or user.get("user_name") or "system")
+    except Exception:
+        pass
+    return "system"
 
-    Keep the delete operation centralized so future pages can reuse the same
-    audit/log behavior instead of issuing raw DELETE SQL directly.
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:
+    """Fast delete selected time records in one transaction.
+
+    V1.90: the old implementation used execute() for each DELETE and write_log()
+    for each audit row.  execute() triggered permanent export / possible GitHub
+    sync, so deleting one row could take ~20 seconds.  This version performs
+    SELECT + DELETE + LOG in one SQLite transaction, then only marks data as
+    pending backup once.
     """
     ids: list[int] = []
     for rid in record_ids or []:
@@ -265,30 +280,57 @@ def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工
     if not ids:
         return 0
 
+    now = _now()
+    user_name = _audit_user_name()
     deleted = 0
-    for rid in ids:
-        rec = query_one("SELECT * FROM time_records WHERE id=?", (rid,))
-        if not rec:
-            continue
-        execute("DELETE FROM time_records WHERE id=?", (rid,))
-        deleted += 1
-        write_log(
-            "DELETE_TIME_RECORD",
-            f"{reason}：#{rid} {rec.get('employee_id','')} {rec.get('employee_name','')} {rec.get('work_order','')} {rec.get('process_name','')}",
-            "time_records",
-            rid,
-            detail=str(rec),
-            level="WARN",
-        )
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA busy_timeout=8000")
+        conn.execute("BEGIN")
+        for rid in ids:
+            rec = conn.execute("SELECT * FROM time_records WHERE id=?", (rid,)).fetchone()
+            if not rec:
+                continue
+            rec_dict = dict(rec)
+            conn.execute("DELETE FROM time_records WHERE id=?", (rid,))
+            conn.execute(
+                """
+                INSERT INTO system_logs
+                (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    now,
+                    user_name,
+                    "DELETE_TIME_RECORD",
+                    "time_records",
+                    str(rid),
+                    f"{reason}：#{rid} {rec_dict.get('employee_id','')} {rec_dict.get('employee_name','')} {rec_dict.get('work_order','')} {rec_dict.get('process_name','')}",
+                    str(rec_dict),
+                    "WARN",
+                ),
+            )
+            deleted += 1
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    if deleted:
+        clear_query_cache()
+        mark_data_changed(f"已刪除工時紀錄 {deleted} 筆，待手動永久備份。", "FAST_DELETE time_records")
     return deleted
 
 
 def recalculate_time_records(record_ids: list[int] | None = None) -> int:
-    """Recalculate work_hours for selected records from start/end timestamps.
+    """Recalculate selected records only and update in one transaction.
 
-    This is used by administrator maintenance on 01 and 02.  It keeps the same
-    time_records table, so recalculated values are immediately reflected in
-    02 歷史紀錄 and all analysis modules.
+    V1.90: avoids per-row execute() so recalculating a few selected records does
+    not repeatedly export permanent JSON or trigger cloud work.
     """
     if record_ids:
         ids = []
@@ -304,12 +346,15 @@ def recalculate_time_records(record_ids: list[int] | None = None) -> int:
         placeholder = ",".join(["?"] * len(ids))
         df = query_df(f"SELECT * FROM time_records WHERE id IN ({placeholder}) ORDER BY id", ids)
     else:
+        # Safety: administrator page should pass selected IDs.  If not, keep the
+        # old behavior but this can be heavy on large history tables.
         df = query_df("SELECT * FROM time_records WHERE start_timestamp IS NOT NULL AND end_timestamp IS NOT NULL ORDER BY id")
     if df.empty:
         return 0
 
+    updates: list[tuple[float, str, str, str, str, str, str, int]] = []
+    errors: list[str] = []
     now = _now()
-    count = 0
     for _, r in df.iterrows():
         start_ts = r.get("start_timestamp")
         end_ts = r.get("end_timestamp")
@@ -322,17 +367,52 @@ def recalculate_time_records(record_ids: list[int] | None = None) -> int:
             status = r.get("status") or "已結束"
             if str(status) == "作業中":
                 status = r.get("end_action") or "已結束"
-            execute(
+            updates.append((hours, start_date, start_time, end_date, end_time, status, now, int(r["id"])))
+        except Exception as exc:
+            errors.append(f"重新計算工時失敗 #{r.get('id')}: {exc}")
+
+    if not updates and not errors:
+        return 0
+
+    user_name = _audit_user_name()
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
+    try:
+        conn.execute("PRAGMA busy_timeout=8000")
+        conn.execute("BEGIN")
+        if updates:
+            conn.executemany(
                 """
                 UPDATE time_records
                 SET work_hours=?, start_date=?, start_time=?, end_date=?, end_time=?, status=?, updated_at=?
                 WHERE id=?
                 """,
-                (hours, start_date, start_time, end_date, end_time, status, now, int(r["id"])),
+                updates,
             )
-            count += 1
-        except Exception as exc:
-            write_log("RECALC_TIME_RECORD_ERROR", f"重新計算工時失敗 #{r.get('id')}: {exc}", "time_records", r.get("id"), level="ERROR")
-    if count:
-        write_log("RECALC_TIME_RECORDS", f"管理員重新計算工時 {count} 筆，已同步反映至 02 歷史紀錄", "time_records")
-    return count
+            conn.execute(
+                """
+                INSERT INTO system_logs
+                (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (now, user_name, "RECALC_TIME_RECORDS", "time_records", "", f"管理員重新計算工時 {len(updates)} 筆，已同步反映至 02 歷史紀錄", "", "INFO"),
+            )
+        for msg in errors[:50]:
+            conn.execute(
+                """
+                INSERT INTO system_logs
+                (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (now, user_name, "RECALC_TIME_RECORD_ERROR", "time_records", "", msg, "", "ERROR"),
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    clear_query_cache()
+    mark_data_changed(f"已重新計算工時 {len(updates)} 筆，待手動永久備份。", "FAST_RECALC time_records")
+    return len(updates)

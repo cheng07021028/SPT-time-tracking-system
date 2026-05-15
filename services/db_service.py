@@ -11,6 +11,8 @@ SPT Time Tracking V1.39 - DB Service with Page Switch Speed Guard
 """
 from __future__ import annotations
 
+import json
+import os
 import sqlite3
 import time
 from datetime import datetime
@@ -22,6 +24,8 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DB_DIR = PROJECT_ROOT / "data" / "database"
 DB_PATH = DB_DIR / "spt_time_tracking.db"
+STATE_DIR = PROJECT_ROOT / "data" / "persistent_state"
+PENDING_BACKUP_MARKER = STATE_DIR / ".pending_backup.json"
 
 _SCHEMA_READY = False
 _RESTORE_CHECKED = False
@@ -77,24 +81,21 @@ def _should_run_data_guard(sql: str | None = None) -> bool:
 
 
 def _should_after_write_sync(sql: str | None = None) -> bool:
-    """Only business/settings writes refresh permanent files.
+    """Return True for writes that should mark business data as changed.
 
-    登入成功/失敗紀錄很頻繁，不應每次都重新匯出 JSON 或上傳 GitHub。
+    V1.90: normal writes no longer export the whole permanent JSON or upload GitHub
+    immediately.  They only set a tiny pending-backup marker, so deleting one row
+    does not spend 10-20 seconds doing cloud persistence work.
     """
     if not sql:
         return True
-    if _is_auth_or_security_sql(sql) and not _is_business_sql(sql):
-        return False
     low = _normalise_sql(sql)
-    # Schema/seed operations must never trigger permanent export or GitHub sync.
-    # These run during page initialization and were one of the causes of modules
-    # looking like they were always running after 13｜系統設定 was added.
-    no_sync_prefixes = (
-        " create ",
-        " pragma ",
-        " insert or ignore ",
-    )
-    if any(low.startswith(prefix) for prefix in no_sync_prefixes):
+    if low.startswith((" create ", " pragma ", " select ", " with ")):
+        return False
+    # Logs are high-frequency audit writes; they must never trigger permanent export.
+    if " system_logs " in low or " auth_login_logs " in low or " security_login_logs " in low:
+        return False
+    if _is_auth_or_security_sql(sql) and not _is_business_sql(sql):
         return False
     return True
 
@@ -488,24 +489,112 @@ def get_connection() -> sqlite3.Connection:
     return _open_connection()
 
 
-def _after_write() -> None:
-    """寫入後刷新永久檔；若已設定 Token，節流上傳 latest 到 GitHub。"""
-    global _LAST_CLOUD_SYNC_TS
+def _auto_export_after_write_enabled() -> bool:
+    """Optional compatibility switch.
+
+    Default is OFF because automatic GitHub/permanent JSON export after every
+    delete/update was the main cause of 20-second operations.  If a deployment
+    explicitly needs the old behavior, set SPT_AUTO_EXPORT_AFTER_WRITE=1.
+    """
+    return str(os.environ.get("SPT_AUTO_EXPORT_AFTER_WRITE", "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def mark_data_changed(reason: str = "資料已變更，待備份", source_sql: str | None = None) -> None:
+    """Create a tiny marker that page 09 can show as 'pending backup'."""
     try:
-        from services.persistence_service import safe_export_after_write
-        safe_export_after_write()
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        old: dict[str, Any] = {}
+        if PENDING_BACKUP_MARKER.exists():
+            try:
+                old = json.loads(PENDING_BACKUP_MARKER.read_text(encoding="utf-8")) or {}
+            except Exception:
+                old = {}
+        payload = {
+            "pending": True,
+            "reason": reason,
+            "updated_at": _now(),
+            "first_pending_at": old.get("first_pending_at") or _now(),
+            "change_count": int(old.get("change_count") or 0) + 1,
+            "source_sql": (source_sql or "")[:300],
+        }
+        PENDING_BACKUP_MARKER.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception:
         pass
 
-    # GitHub API 上傳可能較慢，採簡易節流，避免同一秒大量寫入造成 API 過多請求。
+
+def clear_pending_backup_marker() -> None:
+    try:
+        PENDING_BACKUP_MARKER.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def pending_backup_status() -> dict[str, Any]:
+    try:
+        if not PENDING_BACKUP_MARKER.exists():
+            return {"pending": False, "message": "目前沒有待備份變更。"}
+        data = json.loads(PENDING_BACKUP_MARKER.read_text(encoding="utf-8")) or {}
+        data.setdefault("pending", True)
+        return data
+    except Exception as exc:
+        return {"pending": False, "message": str(exc)}
+
+
+def flush_pending_permanent_state(upload_github: bool = False) -> dict[str, Any]:
+    """Manual backup helper: export latest JSON, optionally upload to GitHub."""
+    result: dict[str, Any] = {"ok": False, "steps": []}
+    try:
+        from services.persistence_service import safe_export_after_write
+        export_res = safe_export_after_write()
+        result["steps"].append({"step": "export_permanent_state", **(export_res if isinstance(export_res, dict) else {"result": str(export_res)})})
+        ok = bool(isinstance(export_res, dict) and not export_res.get("skipped") and export_res.get("business_row_count", 1) != 0)
+        result["ok"] = ok or bool(isinstance(export_res, dict) and export_res.get("version"))
+    except Exception as exc:
+        result["steps"].append({"step": "export_permanent_state", "ok": False, "message": str(exc)})
+        result["ok"] = False
+
+    if upload_github:
+        try:
+            from services.github_cloud_storage_service import upload_existing_permanent_files
+            upload_res = upload_existing_permanent_files(archive=True)
+            result["steps"].append({"step": "upload_github", **(upload_res if isinstance(upload_res, dict) else {"result": str(upload_res)})})
+            result["ok"] = bool(result.get("ok")) and bool(isinstance(upload_res, dict) and upload_res.get("ok"))
+        except Exception as exc:
+            result["steps"].append({"step": "upload_github", "ok": False, "message": str(exc)})
+            result["ok"] = False
+
+    if result.get("ok"):
+        clear_pending_backup_marker()
+        result["message"] = "永久備份已完成，待備份標記已清除。"
+    else:
+        result.setdefault("message", "永久備份未完成，請查看 steps。")
+    return result
+
+
+def _after_write(sql: str | None = None) -> None:
+    """V1.90 fast write path.
+
+    Previous versions exported the full permanent JSON and could also upload to
+    GitHub after ordinary DELETE/UPDATE operations.  That made deleting one time
+    record take 20 seconds.  Now ordinary writes only clear the SELECT cache and
+    mark a small 'pending backup' flag.  Page 09 / manual backup performs the
+    heavy persistence work.
+    """
+    global _LAST_CLOUD_SYNC_TS
+    clear_query_cache()
+    mark_data_changed("資料已變更，請到 09｜資料永久保存與備份執行備份。", sql)
+
+    if not _auto_export_after_write_enabled():
+        return
+
+    # Compatibility mode only: export/upload is throttled and opt-in.
     now_ts = time.time()
     if now_ts - _LAST_CLOUD_SYNC_TS < _CLOUD_SYNC_INTERVAL_SEC:
         return
     try:
-        from services.github_cloud_storage_service import github_config, upload_existing_permanent_files
-        if github_config().get("token"):
-            upload_existing_permanent_files(archive=False)
-            _LAST_CLOUD_SYNC_TS = now_ts
+        from services.persistence_service import safe_export_after_write
+        safe_export_after_write()
+        _LAST_CLOUD_SYNC_TS = now_ts
     except Exception:
         pass
 
@@ -522,7 +611,7 @@ def execute(sql: str, params: Iterable[Any] | None = None) -> int:
         last_id = cur.lastrowid
     clear_query_cache()
     if _should_after_write_sync(sql):
-        _after_write()
+        _after_write(sql)
     return int(last_id or 0)
 
 
@@ -535,7 +624,7 @@ def executemany(sql: str, rows: list[Iterable[Any]]) -> None:
         conn.commit()
     clear_query_cache()
     if _should_after_write_sync(sql):
-        _after_write()
+        _after_write(sql)
 
 
 def query_df(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:
