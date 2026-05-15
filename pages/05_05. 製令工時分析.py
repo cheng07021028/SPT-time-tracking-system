@@ -151,8 +151,10 @@ with tab4:
 
 with tab5:
     st.caption("此處編輯的是分析來源明細，儲存後會影響歷史紀錄與後續統計。工時欄位以 00:00:00 顯示，需調整時請改開始/結束時間後重新計算。")
-    edited = render_table(df.drop(columns=["work_time_text"], errors="ignore"), "analysis_detail_records", editable=True, disabled=["id", "record_key", "created_at", "updated_at", "work_hours"], key="analysis_detail_editor", height=520)
-    submitted_analysis_detail = st.button("💾 儲存分析明細 / Save Detail Records", use_container_width=True)
+    st.info("V1.89：明細編輯已改成確認後才儲存。表格內輸入不會立即觸發整頁運算。")
+    with st.form("analysis_detail_commit_form", clear_on_submit=False):
+        edited = render_table(df.drop(columns=["work_time_text"], errors="ignore"), "analysis_detail_records", editable=True, disabled=["id", "record_key", "created_at", "updated_at", "work_hours"], key="analysis_detail_editor", height=520)
+        submitted_analysis_detail = st.form_submit_button("💾 確認儲存分析明細 / Save Detail Records", type="primary", use_container_width=True)
     if submitted_analysis_detail and edited is not None:
         count = save_time_records(edited)
         st.success(f"已儲存 {count} 筆明細。")

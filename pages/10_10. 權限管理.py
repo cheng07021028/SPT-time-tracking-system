@@ -598,10 +598,13 @@ with tab_perm:
     }
     for key, zh, en in ACTIONS:
         col_cfg[key] = st.column_config.CheckboxColumn(f"{zh} / {en}")
-    edited_perm = st.data_editor(view_df[base_cols + ACTION_COLS], key="v136_permission_editor", use_container_width=True, hide_index=True, column_config=col_cfg)
-    st.markdown("#### 即時計算預覽 / Live Calculation Preview")
+    st.info("V1.89：權限表已改成確認後才套用。勾選權限時不會每一下都觸發整頁運算。")
+    with st.form("permission_editor_commit_form", clear_on_submit=False):
+        edited_perm = st.data_editor(view_df[base_cols + ACTION_COLS], key="v189_permission_editor", use_container_width=True, hide_index=True, column_config=col_cfg)
+        submitted_perm = st.form_submit_button("✅ 確認套用並儲存權限 / Apply and Save Permissions", type="primary", use_container_width=True)
+    st.markdown("#### 權限摘要預覽 / Permission Summary Preview")
     st.dataframe(_permission_summary(edited_perm), use_container_width=True, hide_index=True)
-    if st.button("✅ 套用並儲存權限 / Apply and Save Permissions", type="primary", use_container_width=True):
+    if submitted_perm:
         saved = save_account_permissions(edited_perm.to_dict("records"))
         st.success(f"權限已套用並儲存：{saved} 筆 / Permissions saved")
         st.rerun()
@@ -610,9 +613,11 @@ with tab_sec:
     st.subheader("安全設定 / Security Settings")
     settings = get_security_settings()
     idle = int(settings.get("idle_timeout_minutes", "15") or 15)
-    new_idle = st.number_input("閒置自動登出分鐘數 / Idle Auto Logout Minutes", min_value=1, max_value=240, value=idle, step=1)
-    confirm_after_record = st.checkbox("工時完成後詢問是否繼續記錄 / Ask continue after time record", value=settings.get("ask_continue_after_record", "1") != "0")
-    if st.button("✅ 套用安全設定 / Apply Security Settings", type="primary", use_container_width=True):
+    with st.form("security_settings_commit_form", clear_on_submit=False):
+        new_idle = st.number_input("閒置自動登出分鐘數 / Idle Auto Logout Minutes", min_value=1, max_value=240, value=idle, step=1)
+        confirm_after_record = st.checkbox("工時完成後詢問是否繼續記錄 / Ask continue after time record", value=settings.get("ask_continue_after_record", "1") != "0")
+        submitted_security = st.form_submit_button("✅ 確認套用安全設定 / Apply Security Settings", type="primary", use_container_width=True)
+    if submitted_security:
         save_security_settings({"idle_timeout_minutes": str(int(new_idle)), "ask_continue_after_record": "1" if confirm_after_record else "0"})
         try:
             from services.security_service import set_idle_timeout_minutes

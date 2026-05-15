@@ -139,22 +139,25 @@ if is_admin:
         else:
             admin_df = df.copy()
             admin_df.insert(0, "刪除", False)
-            edited_admin = render_table(
-                admin_df,
-                "today_records_admin_maintenance",
-                editable=True,
-                disabled=["id", "record_key", "created_at", "updated_at"],
-                key="today_records_admin_editor",
-                height=460,
-            )
-            if edited_admin is not None:
-                b1, b2 = st.columns(2)
-                if b1.button("💾 管理員存檔修改", use_container_width=True, key="admin_save_today_records"):
-                    save_df = edited_admin.drop(columns=["刪除"], errors="ignore")
-                    count = save_time_records(save_df)
-                    st.success(f"已由管理員存檔修改 {count} 筆今日工時紀錄。")
-                    st.rerun()
+            st.info("V1.89：此維護表格已改成『確認後才執行』。在表格內輸入、勾選、切換欄位時不會立即存檔、刪除或重新計算；按下下方確認執行才會處理。")
+            with st.form("today_records_admin_commit_form", clear_on_submit=False):
+                edited_admin = render_table(
+                    admin_df,
+                    "today_records_admin_maintenance",
+                    editable=True,
+                    disabled=["id", "record_key", "created_at", "updated_at"],
+                    key="today_records_admin_editor",
+                    height=460,
+                )
+                admin_action = st.radio(
+                    "確認後執行動作",
+                    ["僅儲存修改", "重新計算勾選紀錄工時並同步 02 歷史紀錄", "刪除勾選整列紀錄"],
+                    horizontal=True,
+                    key="today_records_admin_action",
+                )
+                submitted_admin = st.form_submit_button("✅ 確認執行 / Confirm", type="primary", use_container_width=True)
 
+            if submitted_admin and edited_admin is not None:
                 delete_ids = []
                 try:
                     delete_rows = edited_admin[edited_admin["刪除"].astype(bool)]
@@ -162,18 +165,22 @@ if is_admin:
                 except Exception:
                     delete_ids = []
 
-                delete_disabled = len(delete_ids) == 0
-                if b2.button(
-                    f"🗑️ 管理員刪除勾選紀錄（{len(delete_ids)}）",
-                    use_container_width=True,
-                    key="admin_delete_today_records",
-                    disabled=delete_disabled,
-                ):
-                    count = delete_time_records(delete_ids, reason="01 工時紀錄管理員維護區刪除")
-                    st.success(f"已由管理員刪除 {count} 筆今日工時紀錄。")
+                if admin_action == "僅儲存修改":
+                    save_df = edited_admin.drop(columns=["刪除"], errors="ignore")
+                    count = save_time_records(save_df)
+                    st.success(f"已由管理員存檔修改 {count} 筆今日工時紀錄。")
                     st.rerun()
-
-                if st.button("🧮 管理員重新計算勾選紀錄工時並同步 02 歷史紀錄", use_container_width=True, key="admin_recalc_today_records", disabled=delete_disabled):
-                    count = recalculate_time_records(delete_ids)
-                    st.success(f"已重新計算 {count} 筆工時，並同步更新到 02 歷史紀錄。")
-                    st.rerun()
+                elif admin_action == "重新計算勾選紀錄工時並同步 02 歷史紀錄":
+                    if not delete_ids:
+                        st.warning("請先在『刪除』勾選欄勾選要重新計算的紀錄，再按確認執行。")
+                    else:
+                        count = recalculate_time_records(delete_ids)
+                        st.success(f"已重新計算 {count} 筆工時，並同步更新到 02 歷史紀錄。")
+                        st.rerun()
+                else:
+                    if not delete_ids:
+                        st.warning("請先在『刪除』勾選欄勾選要刪除的紀錄，再按確認執行。")
+                    else:
+                        count = delete_time_records(delete_ids, reason="01 工時紀錄管理員維護區刪除")
+                        st.success(f"已由管理員刪除 {count} 筆今日工時紀錄。")
+                        st.rerun()

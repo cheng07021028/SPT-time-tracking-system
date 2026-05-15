@@ -61,32 +61,45 @@ else:
         edit_df = df.copy()
         if "刪除" not in edit_df.columns:
             edit_df.insert(0, "刪除", False)
-        edited = render_table(edit_df, "history_records", editable=True, disabled=["id", "record_key", "created_at", "updated_at"], key="history_editor", height=560)
-        if edited is not None:
+        st.info("V1.89：歷史紀錄已改成『確認後才運算』。表格內輸入或勾選不會立即重算；選擇動作後按確認執行才會儲存、重算或刪除。")
+        with st.form("history_records_commit_form", clear_on_submit=False):
+            edited = render_table(edit_df, "history_records", editable=True, disabled=["id", "record_key", "created_at", "updated_at"], key="history_editor", height=560)
+            history_action = st.radio(
+                "確認後執行動作",
+                ["儲存編輯", "重新計算勾選紀錄工時", "刪除勾選整列紀錄"],
+                horizontal=True,
+                key="history_action",
+            )
+            submitted_history = st.form_submit_button("✅ 確認執行 / Confirm", type="primary", use_container_width=True)
+
+        if submitted_history and edited is not None:
             try:
                 delete_rows = edited[edited["刪除"].astype(bool)] if "刪除" in edited.columns else pd.DataFrame()
                 delete_ids = [int(x) for x in delete_rows["id"].dropna().tolist()]
             except Exception:
                 delete_ids = []
 
-            csave, crecalc, cdelete = st.columns(3)
-            if csave.button("💾 儲存編輯 / Save Changes", use_container_width=True, key="history_save_changes"):
+            if history_action == "儲存編輯":
                 save_df = edited.drop(columns=["刪除"], errors="ignore")
                 count = save_time_records(save_df)
                 st.success(f"已儲存 {count} 筆歷史紀錄。")
                 st.rerun()
-
-            if crecalc.button("🧮 重新計算勾選紀錄工時", use_container_width=True, key="history_recalc_selected", disabled=len(delete_ids) == 0):
-                count = recalculate_time_records(delete_ids)
-                st.success(f"已重新計算 {count} 筆工時。")
-                st.rerun()
-
-            if cdelete.button(f"🗑️ 刪除勾選整列紀錄（{len(delete_ids)}）", use_container_width=True, key="history_delete_selected", disabled=(len(delete_ids) == 0 or not can_delete)):
-                count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
-                st.success(f"已刪除 {count} 筆歷史紀錄。")
-                st.rerun()
-            if delete_ids and not can_delete:
-                st.warning("你已勾選刪除，但目前帳號沒有 02 歷史紀錄的刪除權限。")
+            elif history_action == "重新計算勾選紀錄工時":
+                if not delete_ids:
+                    st.warning("請先在『刪除』勾選欄勾選要重新計算的紀錄，再按確認執行。")
+                else:
+                    count = recalculate_time_records(delete_ids)
+                    st.success(f"已重新計算 {count} 筆工時。")
+                    st.rerun()
+            else:
+                if not can_delete:
+                    st.error("權限不足：你沒有刪除歷史紀錄權限。")
+                elif not delete_ids:
+                    st.warning("請先在『刪除』勾選欄勾選要刪除的紀錄，再按確認執行。")
+                else:
+                    count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
+                    st.success(f"已刪除 {count} 筆歷史紀錄。")
+                    st.rerun()
     else:
         render_table(df, "history_records", editable=False, height=520)
 
