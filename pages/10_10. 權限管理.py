@@ -331,26 +331,10 @@ with tab_accounts:
     with account_tab_edit:
         st.markdown("### 帳號清單編輯 / Editable Account Master")
 
-        # V1.66：帳號總表預設唯讀，必須先啟動編輯，避免誤改或 rerun 時草稿被覆蓋。
+        # V1.74：啟動/停止編輯只保留頁面上方唯一一組，避免帳號總表區重複顯示。
         if "v166_account_edit_enabled" not in st.session_state:
             st.session_state["v166_account_edit_enabled"] = False
         account_edit_enabled = bool(st.session_state.get("v166_account_edit_enabled", False))
-
-        e1, e2, e3 = st.columns([1.2, 1.2, 3.2])
-        with e1:
-            if st.button("🔓 啟動編輯 / Enable Edit", use_container_width=True, disabled=account_edit_enabled, key="v166_enable_account_edit"):
-                st.session_state["v166_account_edit_enabled"] = True
-                st.rerun()
-        with e2:
-            if st.button("🔒 停止編輯 / Lock Edit", use_container_width=True, disabled=not account_edit_enabled, key="v166_disable_account_edit"):
-                st.session_state["v166_account_edit_enabled"] = False
-                st.session_state["v133_users_df"] = _users_for_editor()
-                st.rerun()
-        with e3:
-            if account_edit_enabled:
-                st.success("目前狀態：已啟動編輯。修改後請按下方『套用並儲存帳號密碼總表』才會正式寫入。")
-            else:
-                st.info("目前狀態：唯讀保護。請先按『啟動編輯』，再新增、修改、刪除或匯入帳號。")
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
