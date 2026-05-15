@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-SPT Time Tracking System - System Settings Service V1.82
+SPT Time Tracking System - System Settings Service V1.88
 
 集中管理：
-1. 工段名稱下拉選單（原本寫死在 01 工時紀錄程式內）
+1. 工段名稱下拉選單（供 01 工時紀錄使用）
 2. 休息時間設定（供工時計算扣除休息使用）
 
-所有寫入都走 db_service.execute，因此會觸發既有永久 JSON / GitHub 備份流程。
+V1.88 修正重點：
+- 查詢設定時不再每次執行 INSERT OR IGNORE，避免一般切換模組也觸發永久備份/GitHub 同步。
+- 系統設定 schema 只在每個 Python process 初始化一次。
+- 只有真正按下儲存/刪除時才寫入資料庫。
 """
 from __future__ import annotations
 
@@ -15,7 +18,7 @@ from typing import Iterable
 
 import pandas as pd
 
-from .db_service import execute, query_df
+from .db_service import execute, query_df, query_one
 from .log_service import write_log
 
 DEFAULT_PROCESS_OPTIONS = [
@@ -31,12 +34,36 @@ DEFAULT_REST_PERIODS = [
     {"name": "晚上休息", "start_time": "20:00", "end_time": "20:15", "is_active": 1, "sort_order": 5},
 ]
 
+_SYSTEM_SETTINGS_SCHEMA_READY = False
+_PROCESS_OPTIONS_CACHE: list[str] | None = None
+
 
 def _now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _clear_settings_cache() -> None:
+    global _PROCESS_OPTIONS_CACHE
+    _PROCESS_OPTIONS_CACHE = None
+    try:
+        from .calculation_service import clear_rest_periods_cache
+        clear_rest_periods_cache()
+    except Exception:
+        pass
+
+
 def ensure_system_settings_schema() -> None:
+    """Prepare setting tables once without causing repeated backup sync.
+
+    Important: do not run seed INSERT statements on every read. Even INSERT OR IGNORE
+    is still a write operation to our db_service and may trigger expensive permanent
+    export/GitHub sync. This was the main reason pages looked like they were always
+    running after adding 13｜系統設定.
+    """
+    global _SYSTEM_SETTINGS_SCHEMA_READY
+    if _SYSTEM_SETTINGS_SCHEMA_READY:
+        return
+
     execute(
         """
         CREATE TABLE IF NOT EXISTS process_options (
@@ -50,15 +77,51 @@ def ensure_system_settings_schema() -> None:
         )
         """
     )
-    now = _now()
-    for idx, name in enumerate(DEFAULT_PROCESS_OPTIONS, start=1):
-        execute(
-            """
-            INSERT OR IGNORE INTO process_options(process_name, is_active, sort_order, note, created_at, updated_at)
-            VALUES (?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)
-            """,
-            (name, idx, now, now),
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS rest_periods (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0
         )
+        """
+    )
+
+    now = _now()
+
+    # Seed only when the table is truly empty. Do not use INSERT OR IGNORE on every page load.
+    try:
+        row = query_one("SELECT COUNT(*) AS c FROM process_options") or {"c": 0}
+        if int(row.get("c") or 0) == 0:
+            for idx, name in enumerate(DEFAULT_PROCESS_OPTIONS, start=1):
+                execute(
+                    """
+                    INSERT INTO process_options(process_name, is_active, sort_order, note, created_at, updated_at)
+                    VALUES (?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)
+                    """,
+                    (name, idx, now, now),
+                )
+    except Exception:
+        pass
+
+    try:
+        row = query_one("SELECT COUNT(*) AS c FROM rest_periods") or {"c": 0}
+        if int(row.get("c") or 0) == 0:
+            for item in DEFAULT_REST_PERIODS:
+                execute(
+                    """
+                    INSERT INTO rest_periods(name, start_time, end_time, is_active, sort_order)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (item["name"], item["start_time"], item["end_time"], item["is_active"], item["sort_order"]),
+                )
+    except Exception:
+        pass
+
+    _SYSTEM_SETTINGS_SCHEMA_READY = True
 
 
 def load_process_options_df(active_only: bool = False) -> pd.DataFrame:
@@ -72,11 +135,19 @@ def load_process_options_df(active_only: bool = False) -> pd.DataFrame:
 
 
 def get_process_options() -> list[str]:
-    df = load_process_options_df(active_only=True)
-    if df.empty:
-        return DEFAULT_PROCESS_OPTIONS.copy()
-    names = [str(x).strip() for x in df["process_name"].dropna().tolist() if str(x).strip()]
-    return names or DEFAULT_PROCESS_OPTIONS.copy()
+    global _PROCESS_OPTIONS_CACHE
+    if _PROCESS_OPTIONS_CACHE:
+        return list(_PROCESS_OPTIONS_CACHE)
+    try:
+        df = load_process_options_df(active_only=True)
+        if df.empty:
+            _PROCESS_OPTIONS_CACHE = DEFAULT_PROCESS_OPTIONS.copy()
+        else:
+            names = [str(x).strip() for x in df["process_name"].dropna().tolist() if str(x).strip()]
+            _PROCESS_OPTIONS_CACHE = names or DEFAULT_PROCESS_OPTIONS.copy()
+    except Exception:
+        _PROCESS_OPTIONS_CACHE = DEFAULT_PROCESS_OPTIONS.copy()
+    return list(_PROCESS_OPTIONS_CACHE)
 
 
 def save_process_options_df(df: pd.DataFrame) -> int:
@@ -86,7 +157,6 @@ def save_process_options_df(df: pd.DataFrame) -> int:
     now = _now()
     count = 0
     work = df.copy().fillna("")
-    # 重新整理順序與空白列；process_name 是設定值主鍵，不允許空白。
     for idx, (_, r) in enumerate(work.iterrows(), start=1):
         name = str(r.get("process_name", "")).strip()
         if not name:
@@ -121,6 +191,7 @@ def save_process_options_df(df: pd.DataFrame) -> int:
                 (name, is_active, sort_order, note, now, now),
             )
         count += 1
+    _clear_settings_cache()
     write_log("SAVE_PROCESS_OPTIONS", f"儲存工段名稱設定 {count} 筆", "process_options")
     return count
 
@@ -136,6 +207,7 @@ def delete_process_options(ids: Iterable[int]) -> int:
         execute("DELETE FROM process_options WHERE id=?", (i,))
         count += 1
     if count:
+        _clear_settings_cache()
         write_log("DELETE_PROCESS_OPTIONS", f"刪除工段名稱設定 {count} 筆", "process_options", level="WARN")
     return count
 
@@ -186,6 +258,7 @@ def save_rest_periods_df(df: pd.DataFrame) -> int:
                 (name, start_time, end_time, is_active, sort_order),
             )
         count += 1
+    _clear_settings_cache()
     write_log("SAVE_REST_PERIODS", f"儲存休息時間設定 {count} 筆", "rest_periods")
     return count
 
@@ -201,5 +274,6 @@ def delete_rest_periods(ids: Iterable[int]) -> int:
         execute("DELETE FROM rest_periods WHERE id=?", (i,))
         count += 1
     if count:
+        _clear_settings_cache()
         write_log("DELETE_REST_PERIODS", f"刪除休息時間設定 {count} 筆", "rest_periods", level="WARN")
     return count

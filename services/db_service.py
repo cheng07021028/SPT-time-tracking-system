@@ -85,9 +85,16 @@ def _should_after_write_sync(sql: str | None = None) -> bool:
         return True
     if _is_auth_or_security_sql(sql) and not _is_business_sql(sql):
         return False
-    ddl_prefixes = (" create ", " pragma ")
     low = _normalise_sql(sql)
-    if any(low.startswith(prefix) for prefix in ddl_prefixes):
+    # Schema/seed operations must never trigger permanent export or GitHub sync.
+    # These run during page initialization and were one of the causes of modules
+    # looking like they were always running after 13｜系統設定 was added.
+    no_sync_prefixes = (
+        " create ",
+        " pragma ",
+        " insert or ignore ",
+    )
+    if any(low.startswith(prefix) for prefix in no_sync_prefixes):
         return False
     return True
 

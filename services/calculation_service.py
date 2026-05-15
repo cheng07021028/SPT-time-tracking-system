@@ -1,7 +1,18 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
+
+import time as _time_mod
 from datetime import datetime, date, time, timedelta
 from .db_service import query_df
+
+_DEFAULT_RESTS = [("10:30", "10:45"), ("12:00", "13:00"), ("15:00", "15:15"), ("18:00", "18:30"), ("20:00", "20:15")]
+_REST_CACHE: dict[str, object] = {"ts": 0.0, "data": None}
+_REST_CACHE_TTL_SEC = 60.0
+
+
+def clear_rest_periods_cache() -> None:
+    _REST_CACHE["ts"] = 0.0
+    _REST_CACHE["data"] = None
 
 
 def parse_dt(value: str | datetime) -> datetime:
@@ -21,10 +32,21 @@ def _combine(d: date, hhmm: str) -> datetime:
 
 
 def load_rest_periods() -> list[tuple[str, str]]:
-    df = query_df("SELECT start_time, end_time FROM rest_periods WHERE is_active=1 ORDER BY sort_order, id")
-    if df.empty:
-        return [("10:30", "10:45"), ("12:00", "13:00"), ("15:00", "15:15"), ("18:00", "18:30"), ("20:00", "20:15")]
-    return list(df[["start_time", "end_time"]].itertuples(index=False, name=None))
+    now = _time_mod.time()
+    cached = _REST_CACHE.get("data")
+    if cached is not None and now - float(_REST_CACHE.get("ts") or 0) <= _REST_CACHE_TTL_SEC:
+        return list(cached)  # type: ignore[arg-type]
+    try:
+        df = query_df("SELECT start_time, end_time FROM rest_periods WHERE is_active=1 ORDER BY sort_order, id")
+        if df.empty:
+            data = list(_DEFAULT_RESTS)
+        else:
+            data = [(str(a), str(b)) for a, b in df[["start_time", "end_time"]].itertuples(index=False, name=None)]
+    except Exception:
+        data = list(_DEFAULT_RESTS)
+    _REST_CACHE["ts"] = now
+    _REST_CACHE["data"] = data
+    return list(data)
 
 
 def calculate_work_hours(start_ts: str | datetime, end_ts: str | datetime) -> float:
