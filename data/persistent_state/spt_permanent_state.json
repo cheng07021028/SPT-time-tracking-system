@@ -1,9 +1,9 @@
 {
   "version": "V1.30",
-  "exported_at": "2026-05-15 11:11:04",
+  "exported_at": "2026-05-15 11:21:49",
   "db_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
   "db_exists": true,
-  "business_row_count": 684,
+  "business_row_count": 685,
   "table_counts": {
     "auth_account_permissions": 96,
     "auth_login_logs": 0,
@@ -12,18 +12,18 @@
     "employees": 74,
     "login_logs": 1,
     "rest_periods": 5,
-    "security_login_logs": 34,
+    "security_login_logs": 40,
     "security_module_permissions": 66,
     "security_roles": 6,
     "security_settings": 1,
     "security_user_roles": 8,
     "security_users": 8,
-    "system_logs": 9,
+    "system_logs": 11,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 0,
-    "time_records": 7,
+    "time_records": 8,
     "work_orders": 603
   },
   "tables": {
@@ -1784,10 +1784,10 @@
         "role_code": "operator",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-15 10:50:40",
+        "last_login_at": "2026-05-15 11:18:26",
         "note": "",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-15 10:58:34"
+        "updated_at": "2026-05-15 11:18:26"
       },
       {
         "id": 9,
@@ -1800,10 +1800,10 @@
         "role_code": "operator",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-15 10:59:01",
+        "last_login_at": "2026-05-15 11:21:46",
         "note": "",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-15 10:59:01"
+        "updated_at": "2026-05-15 11:21:46"
       }
     ],
     "employees": [
@@ -3305,6 +3305,90 @@
         "idle_seconds": null,
         "user_agent": "streamlit",
         "created_at": "2026-05-15 10:59:01"
+      },
+      {
+        "id": 35,
+        "username": "B211",
+        "display_name": "B211",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-15 11:13:59",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 11:13:59"
+      },
+      {
+        "id": 36,
+        "username": "B211",
+        "display_name": "B211",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置超過 1 分鐘，自動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-15 11:15:13",
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 11:15:13"
+      },
+      {
+        "id": 37,
+        "username": "",
+        "display_name": "",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置自動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-15 11:15:13",
+        "idle_seconds": 73,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 11:15:13"
+      },
+      {
+        "id": 38,
+        "username": "spt142",
+        "display_name": "spt142",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-15 11:18:26",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 11:18:26"
+      },
+      {
+        "id": 39,
+        "username": "spt142",
+        "display_name": "spt142",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-15 11:18:36",
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 11:18:36"
+      },
+      {
+        "id": 40,
+        "username": "B211",
+        "display_name": "B211",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-15 11:21:46",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 11:21:46"
       }
     ],
     "security_module_permissions": [
@@ -4705,9 +4789,9 @@
         "email": "",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-15 10:50:40",
+        "last_login_at": "2026-05-15 11:18:26",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-15 10:58:34"
+        "updated_at": "2026-05-15 11:18:26"
       },
       {
         "id": 6430,
@@ -4718,9 +4802,9 @@
         "email": "",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-15 10:59:01",
+        "last_login_at": "2026-05-15 11:21:46",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-15 10:59:01"
+        "updated_at": "2026-05-15 11:21:46"
       }
     ],
     "system_logs": [
@@ -4821,6 +4905,28 @@
         "target_id": "3",
         "message": "結束工時紀錄 #3，同步結束=1筆，狀態=完工，群組總工時=1.34，平均工時=1.34",
         "detail": "3",
+        "level": "INFO"
+      },
+      {
+        "id": 10,
+        "log_time": "2026-05-15 11:11:08",
+        "user_name": "appuser",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "7",
+        "message": "結束工時紀錄 #7，同步結束=1筆，狀態=暫停，群組總工時=0.20，平均工時=0.20",
+        "detail": "7",
+        "level": "INFO"
+      },
+      {
+        "id": 11,
+        "log_time": "2026-05-15 11:11:08",
+        "user_name": "appuser",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "8",
+        "message": "張瑀榛 開始 21M0241-03 / 配電",
+        "detail": "",
         "level": "INFO"
       }
     ],
@@ -5054,6 +5160,33 @@
         "source": "streamlit",
         "created_at": "2026-05-15 10:59:10",
         "updated_at": "2026-05-15 11:11:04"
+      },
+      {
+        "id": 8,
+        "record_key": "B211|21M0241-03|配電|2026-05-15 11:11:04|e33395ae",
+        "status": "暫停",
+        "work_order": "21M0241-03",
+        "part_no": "4TRSC020-004-02",
+        "type_name": "NTB 3 PORT",
+        "process_name": "配電",
+        "employee_id": "B211",
+        "employee_name": "張瑀榛",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-15 11:11:04",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-15 11:21:49",
+        "remark": "",
+        "start_date": "2026-05-15",
+        "start_time": "11:11:04",
+        "end_date": "2026-05-15",
+        "end_time": "11:21:49",
+        "work_hours": 0.18,
+        "assembly_location": "竹東",
+        "group_key": "B211|配電|2026-05-15",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-15 11:11:04",
+        "updated_at": "2026-05-15 11:21:49"
       }
     ],
     "work_orders": [
