@@ -81,6 +81,46 @@ DEFAULT_WIDTHS: dict[str, int] = {
 }
 
 
+BOOLEAN_COLUMNS = {"is_active", "is_in_factory", "is_today_attendance", "is_group_work", "刪除", "delete", "selected"}
+NUMBER_COLUMNS = {"id", "record_count", "active_count", "today_record_count", "count", "sort_order", "order", "display_order"}
+
+
+def _to_bool_value(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    try:
+        if pd.isna(value):
+            return False
+    except Exception:
+        pass
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "y", "on", "啟用", "是", "勾選"}:
+        return True
+    if text in {"0", "false", "no", "n", "off", "停用", "否", ""}:
+        return False
+    return bool(value)
+
+
+def _prepare_display_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize dtypes before Streamlit data_editor renders.
+
+    Streamlit 1.4x is stricter about column_config compatibility: a CheckboxColumn
+    cannot render SQLite 0/1 integer columns, and a TextColumn cannot render numeric
+    columns in editable mode.  This function keeps user-visible values stable while
+    preventing StreamlitAPIException on system setting tables and admin edit tables.
+    """
+    out = df.copy()
+    for col in out.columns:
+        col_name = str(col)
+        if col_name in BOOLEAN_COLUMNS:
+            out[col] = out[col].map(_to_bool_value).astype(bool)
+        elif col_name in NUMBER_COLUMNS:
+            out[col] = pd.to_numeric(out[col], errors="coerce")
+    return out
+
+
 _TABLE_UI_SCHEMA_READY = False
 _WIDTH_CACHE_TTL_SECONDS = 300
 
@@ -148,22 +188,28 @@ def save_widths(table_key: str, widths: dict[str, int]) -> None:
         pass
 
 
-def _column_config(col: str, width: int | None = None):
+def _column_config(col: str, width: int | None = None, series: pd.Series | None = None):
     label = label_for(col)
     w = int(width or DEFAULT_WIDTHS.get(col, 140))
-    if col in {"is_active", "is_in_factory", "is_today_attendance", "is_group_work", "刪除", "delete", "selected"}:
+    col_name = str(col)
+    if col_name in BOOLEAN_COLUMNS:
         return st.column_config.CheckboxColumn(label, width=w)
-    if col in {"work_hours", "total_hours", "avg_hours"}:
+    if col_name in {"work_hours", "total_hours", "avg_hours"}:
         return st.column_config.TextColumn(label, width=w)
-    if col in {"id", "record_count", "active_count", "today_record_count", "count"}:
+    if col_name in NUMBER_COLUMNS:
         return st.column_config.NumberColumn(label, width=w)
+    try:
+        if series is not None and pd.api.types.is_bool_dtype(series):
+            return st.column_config.CheckboxColumn(label, width=w)
+        if series is not None and pd.api.types.is_numeric_dtype(series):
+            return st.column_config.NumberColumn(label, width=w)
+    except Exception:
+        pass
     return st.column_config.TextColumn(label, width=w)
-
 
 def build_column_config(table_key: str, df: pd.DataFrame) -> dict:
     widths = load_widths(table_key)
-    return {col: _column_config(col, widths.get(col)) for col in df.columns}
-
+    return {col: _column_config(str(col), widths.get(str(col)), df[col] if col in df.columns else None) for col in df.columns}
 
 def render_width_settings(table_key: str, df: pd.DataFrame, title: str = "欄寬設定 / Column Width Settings") -> None:
     """Lazy width editor.
@@ -263,6 +309,7 @@ def render_table(df: pd.DataFrame, table_key: str, *, editable: bool = False, di
     df = _apply_quick_header_sort(table_key, df)
     render_width_settings(table_key, df)
     display_df = _format_duration_columns_for_display(df)
+    display_df = _prepare_display_dataframe(display_df)
     cfg = build_column_config(table_key, display_df)
     disabled_cols = list(disabled or [])
     if "work_hours" in display_df.columns and "work_hours" not in disabled_cols:
