@@ -305,10 +305,12 @@ def render_table(df: pd.DataFrame, table_key: str, *, editable: bool = False, di
     if df is None or df.empty:
         st.info("目前沒有資料 / No data")
         return None
-    # V1.85: Do not render external sort buttons/controls.
-    # Sorting is left to Streamlit's native table header interaction, matching the
-    # original modules: users click the column header/menu inside the table.
-    render_width_settings(table_key, df)
+    # V1.89: Editable tables are usually placed inside st.form so edits do not rerun
+    # the entire page on every cell click. Do not render width controls inside
+    # editable tables because normal buttons cannot live inside st.form and the
+    # extra widgets slow down editing. Read-only tables keep the existing width tool.
+    if not editable:
+        render_width_settings(table_key, df)
     display_df = _format_duration_columns_for_display(df)
     display_df = _prepare_display_dataframe(display_df)
     cfg = build_column_config(table_key, display_df)
