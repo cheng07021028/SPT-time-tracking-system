@@ -384,6 +384,108 @@ div[role="option"][aria-selected="true"] * {
     font-weight: 850 !important;
 }
 
+
+
+/* ===== V1.56 Sidebar Restore: larger font + breathing glow ===== */
+[data-testid="stSidebar"] {
+    background:
+        radial-gradient(circle at 20% 8%, rgba(32,230,255,0.11), transparent 34%),
+        linear-gradient(180deg, rgba(4, 12, 25, 0.99), rgba(5, 20, 36, 0.99)) !important;
+    border-right: 1px solid rgba(32, 230, 255, 0.34) !important;
+    box-shadow:
+        10px 0 30px rgba(0, 0, 0, 0.34),
+        0 0 22px rgba(32, 230, 255, 0.12) !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stSidebarHeader"],
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+    color: #f4fbff !important;
+}
+
+[data-testid="stSidebarNav"] {
+    padding-top: 0.5rem !important;
+}
+
+[data-testid="stSidebarNav"] a,
+[data-testid="stSidebarNav"] li a,
+[data-testid="stSidebarNav"] a span,
+[data-testid="stSidebarNav"] a p,
+[data-testid="stSidebarNav"] li span,
+[data-testid="stSidebarNav"] li p {
+    color: #f4fbff !important;
+    font-size: 1.14rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.25px !important;
+    text-shadow: 0 0 8px rgba(190, 245, 255, 0.18) !important;
+}
+
+[data-testid="stSidebarNav"] a {
+    min-height: 42px !important;
+    padding: 10px 14px !important;
+    margin: 7px 10px !important;
+    border-radius: 13px !important;
+    border: 1px solid rgba(32, 230, 255, 0.00) !important;
+    transition: all 0.18s ease-in-out !important;
+}
+
+[data-testid="stSidebarNav"] a:hover {
+    background: linear-gradient(90deg, rgba(32,230,255,0.18), rgba(98,70,190,0.20)) !important;
+    border-color: rgba(32,230,255,0.28) !important;
+    box-shadow:
+        0 0 14px rgba(32,230,255,0.22),
+        inset 0 0 12px rgba(32,230,255,0.08) !important;
+    transform: translateX(1px) !important;
+}
+
+[data-testid="stSidebarNav"] a[aria-current="page"],
+[data-testid="stSidebarNav"] li div[aria-current="page"],
+[data-testid="stSidebarNav"] li:has(a[aria-current="page"]) a {
+    background: linear-gradient(90deg, rgba(28, 208, 230, 0.42), rgba(92, 65, 190, 0.68)) !important;
+    border-left: 4px solid #20e6ff !important;
+    border-top: 1px solid rgba(32,230,255,0.38) !important;
+    border-bottom: 1px solid rgba(32,230,255,0.18) !important;
+    box-shadow:
+        0 0 16px rgba(32, 230, 255, 0.42),
+        0 0 34px rgba(108, 75, 210, 0.18),
+        inset 0 0 16px rgba(32,230,255,0.12) !important;
+    animation: sptSidebarBreath 2.8s ease-in-out infinite !important;
+}
+
+[data-testid="stSidebarNav"] a[aria-current="page"] span,
+[data-testid="stSidebarNav"] a[aria-current="page"] p,
+[data-testid="stSidebarNav"] li:has(a[aria-current="page"]) a span,
+[data-testid="stSidebarNav"] li:has(a[aria-current="page"]) a p {
+    color: #ffffff !important;
+    text-shadow: 0 0 10px rgba(255,255,255,0.40), 0 0 18px rgba(32,230,255,0.26) !important;
+}
+
+@keyframes sptSidebarBreath {
+    0%, 100% {
+        box-shadow:
+            0 0 12px rgba(32,230,255,0.28),
+            0 0 24px rgba(108,75,210,0.12),
+            inset 0 0 12px rgba(32,230,255,0.08);
+    }
+    50% {
+        box-shadow:
+            0 0 22px rgba(32,230,255,0.50),
+            0 0 38px rgba(108,75,210,0.24),
+            inset 0 0 18px rgba(32,230,255,0.16);
+    }
+}
+
+/* Sidebar collapse arrow and app label clarity */
+[data-testid="stSidebar"] button,
+[data-testid="stSidebar"] button * {
+    color: #f4fbff !important;
+}
+
+[data-testid="stSidebar"] small,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] div {
+    font-weight: 800 !important;
+}
+
 @media (max-width: 900px) {
     .spt-header { flex-direction: column; align-items: flex-start; }
     .spt-logo-wrap { width: 260px; }
