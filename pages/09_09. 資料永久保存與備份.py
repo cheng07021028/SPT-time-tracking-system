@@ -9,7 +9,7 @@ import streamlit as st
 
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access
-from services.db_service import DB_PATH, database_business_row_count, ensure_data_guard_restore
+from services.db_service import DB_PATH, clear_pending_backup_marker, database_business_row_count, ensure_data_guard_restore, pending_backup_status
 from services.github_cloud_storage_service import (
     LATEST_SETTINGS,
     LATEST_STATE,
@@ -55,13 +55,26 @@ with st.expander("GitHub 雲端設定檢查 / Cloud Settings", expanded=True):
 
 st.divider()
 
+st.subheader("待備份狀態 / Pending Backup Status")
+pending = pending_backup_status()
+if pending.get("pending"):
+    st.warning(
+        f"資料已有變更尚未備份：{pending.get('reason', '')}\n\n"
+        f"第一次變更：{pending.get('first_pending_at', '')}｜最後變更：{pending.get('updated_at', '')}｜變更次數：{pending.get('change_count', '')}"
+    )
+else:
+    st.success(pending.get("message", "目前沒有待備份變更。"))
+
+st.divider()
+
 st.subheader("一鍵操作 / Actions")
 c1, c2, c3, c4 = st.columns(4)
 with c1:
     if st.button("建立本機永久檔", use_container_width=True):
         res = create_permanent_files()
         if res.get("ok"):
-            st.success("永久檔案已建立。")
+            clear_pending_backup_marker()
+            st.success("永久檔案已建立，待備份標記已清除。")
         else:
             st.warning(res.get("message", "建立失敗或被安全機制阻擋。"))
         st.json(res)
@@ -69,7 +82,8 @@ with c2:
     if st.button("上傳既有永久檔到 GitHub", use_container_width=True):
         res = upload_existing_permanent_files(archive=True)
         if res.get("ok"):
-            st.success("已上傳既有永久檔到 GitHub。")
+            clear_pending_backup_marker()
+            st.success("已上傳既有永久檔到 GitHub，待備份標記已清除。")
         else:
             st.error(res.get("message", "上傳失敗"))
         st.json(res)
@@ -77,7 +91,8 @@ with c3:
     if st.button("建立永久檔並上傳 GitHub", use_container_width=True):
         res = create_and_upload_permanent_files()
         if res.get("ok"):
-            st.success("永久備份完成，已存到 GitHub。")
+            clear_pending_backup_marker()
+            st.success("永久備份完成，已存到 GitHub，待備份標記已清除。")
         else:
             st.error(res.get("message", "永久備份未完成；請看 JSON。"))
         st.json(res)
