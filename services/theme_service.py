@@ -1,24 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-SPT Time Tracking - Unified Theme Service
-V1.53: restore legacy visual style, fix render_kpi_cards compatibility,
-restore logo rendering, sidebar styling and dropdown/input contrast.
+SPT Time Tracking System - Unified Theme Service
+V1.55 stable no-bat theme patch
 
-This file is intentionally self-contained and backwards-compatible.
-It provides the function names used by old and new pages:
-- apply_theme / app_theme
-- render_home_header
-- render_header
-- render_kpi_cards
-- render_module_cards
+目的：
+1. 不再需要另外執行 apply_xxx.bat。
+2. 所有頁面只要 import 本檔，即可套用一致 Logo、標題、Sidebar、輸入框與下拉選單樣式。
+3. 保留舊版相容函式名稱，避免 streamlit_app.py 或各頁面 ImportError。
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Iterable
 import base64
-import html
+from pathlib import Path
+from typing import Any, Iterable, Mapping, Sequence
 
 import streamlit as st
 
@@ -27,423 +22,388 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOGO_CANDIDATES = [
     PROJECT_ROOT / "data" / "logo" / "super_plus_logo.png",
     PROJECT_ROOT / "data" / "logo" / "logococo(黑字).png",
-    PROJECT_ROOT / "super_plus_logo.png",
+    PROJECT_ROOT / "data" / "logo" / "logo.png",
 ]
 
 
-def _logo_base64() -> str:
-    """Return base64 for logo if available; otherwise empty string."""
+def _read_logo_base64() -> str:
     for p in LOGO_CANDIDATES:
         try:
-            if p.exists() and p.is_file():
+            if p.exists() and p.stat().st_size > 0:
                 return base64.b64encode(p.read_bytes()).decode("utf-8")
         except Exception:
             continue
     return ""
 
 
-def _safe_text(value: Any) -> str:
-    if value is None:
-        return ""
-    return html.escape(str(value))
+def _html_escape(value: Any) -> str:
+    text = "" if value is None else str(value)
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#39;")
+    )
 
 
 def apply_theme() -> None:
-    """Apply global Streamlit visual theme. Safe to call repeatedly."""
-    logo_b64 = _logo_base64()
+    """全系統共用樣式。每個頁面可重複呼叫，不會破壞功能。"""
     st.markdown(
-        f"""
+        """
 <style>
-/* =========================================================
-   SPT Unified War-Room Theme V1.53
-   ========================================================= */
-
-:root {{
-    --spt-bg: #06111f;
-    --spt-bg-2: #071a2c;
-    --spt-card: rgba(7, 26, 44, 0.82);
-    --spt-card-2: rgba(10, 41, 64, 0.74);
+:root {
+    --spt-bg-0: #050b16;
+    --spt-bg-1: #071322;
+    --spt-bg-2: #092033;
+    --spt-panel: rgba(8, 30, 48, 0.88);
+    --spt-panel-2: rgba(11, 46, 68, 0.82);
     --spt-cyan: #20e6ff;
-    --spt-cyan-2: #63f3ff;
-    --spt-blue: #1a74ff;
-    --spt-purple: #34205f;
-    --spt-text: #f3fbff;
-    --spt-muted: rgba(215, 232, 245, .72);
-    --spt-line: rgba(32, 230, 255, .30);
-}}
+    --spt-cyan-soft: rgba(32, 230, 255, 0.38);
+    --spt-text: #f2fbff;
+    --spt-muted: #9eb4c7;
+    --spt-input-bg: #edf7ff;
+    --spt-input-text: #071827;
+}
 
-html, body, [data-testid="stAppViewContainer"] {{
+/* ===== Base ===== */
+html, body, [data-testid="stAppViewContainer"] {
     background:
-      radial-gradient(circle at 12% 0%, rgba(80, 54, 140, .26), transparent 30%),
-      radial-gradient(circle at 92% 12%, rgba(0, 180, 255, .18), transparent 28%),
-      linear-gradient(135deg, #050b18 0%, #071524 45%, #082238 100%) !important;
+        radial-gradient(circle at 18% 8%, rgba(69, 42, 140, 0.28), transparent 30%),
+        radial-gradient(circle at 88% 12%, rgba(0, 170, 210, 0.18), transparent 34%),
+        linear-gradient(135deg, #070b1d 0%, #06182a 42%, #071323 100%) !important;
     color: var(--spt-text) !important;
-}}
+}
 
-[data-testid="stHeader"] {{
-    background: rgba(4, 10, 18, .78) !important;
-    border-bottom: 1px solid rgba(32, 230, 255, .08) !important;
-}}
+[data-testid="stHeader"] {
+    background: rgba(4, 10, 20, 0.88) !important;
+    border-bottom: 1px solid rgba(42, 220, 255, 0.10) !important;
+}
 
-.block-container {{
-    padding-top: 2.1rem !important;
-    padding-left: 2rem !important;
-    padding-right: 2rem !important;
-    max-width: 96rem !important;
-}}
+.block-container {
+    padding-top: 2.2rem !important;
+    padding-bottom: 3rem !important;
+    max-width: 1700px !important;
+}
 
-/* Sidebar restored style */
-[data-testid="stSidebar"] {{
+/* ===== Sidebar ===== */
+[data-testid="stSidebar"] {
     background:
-      radial-gradient(circle at 0% 15%, rgba(47, 34, 95, .35), transparent 28%),
-      linear-gradient(180deg, #07111f 0%, #061827 100%) !important;
-    border-right: 1px solid rgba(32, 230, 255, .20) !important;
-}}
+        linear-gradient(180deg, rgba(5, 13, 26, 0.98), rgba(6, 20, 34, 0.98)) !important;
+    border-right: 1px solid rgba(32, 230, 255, 0.18) !important;
+    box-shadow: 10px 0 26px rgba(0, 0, 0, 0.26) !important;
+}
 
-[data-testid="stSidebar"] * {{
-    color: #f5fbff !important;
+[data-testid="stSidebar"] * {
+    color: #f2fbff !important;
     font-weight: 700 !important;
-}}
+}
 
-[data-testid="stSidebar"] [data-testid="stSidebarNav"] {{
-    padding-top: 1.2rem !important;
-}}
+[data-testid="stSidebarNav"] a {
+    border-radius: 12px !important;
+    margin: 5px 10px !important;
+    padding: 9px 12px !important;
+    font-size: 1.02rem !important;
+    letter-spacing: 0.2px !important;
+}
 
-[data-testid="stSidebar"] a {{
-    border-radius: 11px !important;
-    margin: 4px 8px !important;
-    padding: 8px 10px !important;
-    transition: all .16s ease-in-out !important;
-}}
+[data-testid="stSidebarNav"] a:hover {
+    background: rgba(32, 230, 255, 0.12) !important;
+    box-shadow: 0 0 16px rgba(32, 230, 255, 0.16) !important;
+}
 
-[data-testid="stSidebar"] a:hover {{
-    background: linear-gradient(90deg, rgba(32,230,255,.22), rgba(80,54,140,.28)) !important;
-    box-shadow: 0 0 16px rgba(32, 230, 255, .12) !important;
-}}
+[data-testid="stSidebarNav"] a[aria-current="page"],
+[data-testid="stSidebarNav"] li div[aria-current="page"] {
+    background: linear-gradient(90deg, rgba(28, 208, 230, 0.34), rgba(96, 63, 190, 0.60)) !important;
+    border-left: 3px solid #20e6ff !important;
+    box-shadow: 0 0 18px rgba(32, 230, 255, 0.34) !important;
+}
 
-[data-testid="stSidebar"] a[aria-current="page"] {{
-    background: linear-gradient(90deg, rgba(32,230,255,.38), rgba(80,54,140,.55)) !important;
-    box-shadow:
-      inset 3px 0 0 var(--spt-cyan),
-      0 0 22px rgba(32, 230, 255, .18) !important;
-}}
-
-/* Unified module header */
-.spt-header {{
-    position: relative;
+/* ===== Unified Header ===== */
+.spt-header {
     display: flex;
     align-items: center;
-    gap: 26px;
-    min-height: 128px;
-    padding: 22px 30px;
-    margin: 18px 0 28px 0;
-    border: 1px solid rgba(32, 230, 255, .55);
+    gap: 30px;
+    padding: 24px 30px;
+    margin: 0 0 30px 0;
+    min-height: 118px;
+    border: 1px solid rgba(32, 230, 255, 0.58);
     border-radius: 22px;
     background:
-       linear-gradient(90deg, rgba(7, 18, 32, .92), rgba(8, 72, 98, .70)),
-       radial-gradient(circle at 80% 35%, rgba(32, 230, 255, .14), transparent 30%);
+        radial-gradient(circle at 16% 50%, rgba(32, 230, 255, 0.12), transparent 34%),
+        linear-gradient(90deg, rgba(8, 25, 42, 0.98), rgba(8, 70, 95, 0.84), rgba(6, 24, 38, 0.96));
     box-shadow:
-       0 0 0 1px rgba(32, 230, 255, .08) inset,
-       0 0 28px rgba(32, 230, 255, .15),
-       0 0 55px rgba(49, 76, 255, .10);
-    overflow: hidden;
-}}
-
-.spt-header::before {{
-    content: "";
-    position: absolute;
-    inset: -2px;
-    border-radius: 24px;
-    background: linear-gradient(120deg, transparent, rgba(32,230,255,.22), transparent);
-    opacity: .50;
+        0 0 0 1px rgba(32, 230, 255, 0.08) inset,
+        0 0 28px rgba(32, 230, 255, 0.22),
+        0 18px 44px rgba(0, 0, 0, 0.36);
     animation: sptBreath 3.2s ease-in-out infinite;
-    pointer-events: none;
-}}
+}
 
-@keyframes sptBreath {{
-    0%,100% {{ opacity: .23; filter: blur(.2px); }}
-    50% {{ opacity: .75; filter: blur(1px); }}
-}}
+@keyframes sptBreath {
+    0%, 100% {
+        box-shadow:
+            0 0 0 1px rgba(32, 230, 255, 0.08) inset,
+            0 0 18px rgba(32, 230, 255, 0.18),
+            0 18px 44px rgba(0, 0, 0, 0.32);
+    }
+    50% {
+        box-shadow:
+            0 0 0 1px rgba(32, 230, 255, 0.16) inset,
+            0 0 34px rgba(32, 230, 255, 0.38),
+            0 20px 52px rgba(0, 0, 0, 0.42);
+    }
+}
 
-.spt-logo-box {{
-    flex: 0 0 238px;
-    width: 238px;
-    height: 86px;
+.spt-logo-wrap {
+    flex: 0 0 auto;
+    width: 300px;
+    height: 92px;
     border-radius: 14px;
-    background: rgba(255,255,255,.96);
+    background: rgba(255, 255, 255, 0.96);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    box-shadow: 0 10px 35px rgba(0,0,0,.28);
-}}
+    box-shadow: 0 0 20px rgba(255,255,255,0.10);
+}
 
-.spt-logo-box img {{
-    max-width: 100%;
-    max-height: 100%;
+.spt-logo-wrap img {
+    max-width: 94%;
+    max-height: 86%;
     object-fit: contain;
-}}
+}
 
-.spt-logo-fallback {{
-    font-size: 1.7rem;
-    letter-spacing: .28rem;
-    color: #071524 !important;
-    font-weight: 900 !important;
-}}
+.spt-logo-fallback {
+    font-size: 2rem;
+    letter-spacing: 0.28rem;
+    color: #071827;
+    font-weight: 900;
+}
 
-.spt-header-main {{
-    position: relative;
-    z-index: 1;
-}}
+.spt-header-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
 
-.spt-header-title {{
-    font-size: clamp(2.0rem, 3vw, 3.0rem);
-    line-height: 1.08;
-    font-weight: 950;
-    letter-spacing: .05rem;
-    color: #f7fdff;
-    text-shadow: 0 0 14px rgba(32,230,255,.24);
-}}
+.spt-title {
+    font-size: clamp(2.0rem, 3.0vw, 3.15rem);
+    line-height: 1.12;
+    font-weight: 900;
+    color: #f5fbff;
+    text-shadow: 0 0 14px rgba(190, 245, 255, 0.52);
+    letter-spacing: 1px;
+    white-space: normal;
+}
 
-.spt-header-subtitle {{
-    margin-top: .65rem;
-    font-size: 1.08rem;
+.spt-subtitle {
+    margin-top: 10px;
+    font-size: clamp(0.98rem, 1.15vw, 1.25rem);
+    line-height: 1.4;
+    color: #c4d9e8;
     font-weight: 700;
-    color: rgba(230, 244, 255, .72);
-}}
+    letter-spacing: 0.2px;
+}
 
-/* KPI cards */
-.spt-kpi-grid {{
+/* ===== KPI / Cards ===== */
+.spt-card-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(180px, 1fr));
-    gap: 14px;
-    margin: 14px 0 22px 0;
-}}
+    gap: 16px;
+    margin: 18px 0 28px 0;
+}
 
-.spt-kpi-card {{
-    border: 1px solid rgba(32, 230, 255, .30);
+.spt-kpi-card, .spt-module-card {
+    border: 1px solid rgba(32, 230, 255, 0.28);
     border-radius: 16px;
-    background: rgba(7, 26, 44, .72);
-    padding: 16px 18px;
-    min-height: 94px;
-    box-shadow: 0 0 20px rgba(32, 230, 255, .08);
-}}
+    background: rgba(8, 27, 45, 0.84);
+    padding: 18px 20px;
+    box-shadow: 0 0 18px rgba(32, 230, 255, 0.08);
+}
 
-.spt-kpi-label {{
-    font-size: .95rem;
-    color: rgba(225, 242, 255, .82);
-    font-weight: 800;
-}}
+.spt-kpi-label, .spt-module-desc {
+    font-size: 0.92rem;
+    color: #b9cddd;
+    font-weight: 700;
+}
 
-.spt-kpi-value {{
-    margin-top: .5rem;
-    font-size: 2rem;
-    line-height: 1.0;
+.spt-kpi-value {
+    font-size: 2.0rem;
     color: #ffffff;
     font-weight: 900;
-    letter-spacing: .03rem;
-}}
+    margin-top: 6px;
+}
 
-/* Module cards */
-.spt-module-grid {{
+.spt-module-no {
+    color: #20e6ff;
+    font-size: 0.95rem;
+    font-weight: 900;
+    margin-bottom: 4px;
+}
+
+.spt-module-name {
+    font-size: 1.32rem;
+    color: #ffffff;
+    font-weight: 900;
+    margin-bottom: 8px;
+}
+
+.spt-module-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(220px, 1fr));
-    gap: 16px;
-    margin: 16px 0 26px 0;
-}}
+    gap: 18px;
+    margin-top: 16px;
+}
 
-.spt-module-card {{
-    border: 1px solid rgba(32, 230, 255, .23);
-    border-radius: 14px;
-    background: rgba(7, 18, 32, .74);
-    padding: 20px 18px;
+.spt-module-card {
     min-height: 112px;
-    box-shadow: 0 0 18px rgba(32, 230, 255, .06);
-}}
+}
 
-.spt-module-no {{
-    color: var(--spt-cyan-2);
-    font-size: .95rem;
-    font-weight: 900;
-}}
-
-.spt-module-name {{
-    color: #ffffff;
-    font-size: 1.55rem;
-    font-weight: 950;
-    margin-top: .18rem;
-}}
-
-.spt-module-desc {{
-    color: rgba(224, 239, 250, .70);
-    font-size: .92rem;
-    margin-top: .55rem;
-    font-weight: 650;
-}}
-
-/* Inputs - light background and dark text */
-div[data-baseweb="input"] input,
-div[data-baseweb="base-input"] input,
-div[data-baseweb="textarea"] textarea,
+/* ===== Inputs: light background + dark text ===== */
+.stTextInput input,
+.stNumberInput input,
+.stPasswordInput input,
+.stDateInput input,
+.stTimeInput input,
+.stTextArea textarea,
 textarea,
 input[type="text"],
 input[type="password"],
-input[type="number"] {{
-    background: rgba(245, 250, 255, .94) !important;
-    color: #081827 !important;
-    -webkit-text-fill-color: #081827 !important;
-    border: 1px solid rgba(93, 218, 255, .55) !important;
+input[type="number"] {
+    background: var(--spt-input-bg) !important;
+    color: var(--spt-input-text) !important;
+    border: 1px solid rgba(32, 230, 255, 0.58) !important;
     border-radius: 12px !important;
-    font-weight: 750 !important;
-}}
-
-div[data-baseweb="input"] input::placeholder,
-div[data-baseweb="textarea"] textarea::placeholder,
-textarea::placeholder {{
-    color: rgba(30, 60, 86, .62) !important;
-    -webkit-text-fill-color: rgba(30, 60, 86, .62) !important;
-}}
-
-/* Select closed state */
-div[data-baseweb="select"] > div {{
-    background: rgba(245, 250, 255, .94) !important;
-    border: 1px solid rgba(93, 218, 255, .55) !important;
-    border-radius: 12px !important;
-}}
-
-div[data-baseweb="select"] > div * {{
-    color: #081827 !important;
-    -webkit-text-fill-color: #081827 !important;
     font-weight: 800 !important;
-}}
+    caret-color: #071827 !important;
+}
 
-/* Select dropdown menu: dark background + light text */
+.stTextInput input::placeholder,
+.stTextArea textarea::placeholder {
+    color: rgba(7, 24, 39, 0.62) !important;
+    font-weight: 700 !important;
+}
+
+.stTextInput input:focus,
+.stNumberInput input:focus,
+.stPasswordInput input:focus,
+.stDateInput input:focus,
+.stTimeInput input:focus,
+.stTextArea textarea:focus {
+    box-shadow: 0 0 0 1px rgba(32,230,255,0.75), 0 0 18px rgba(32,230,255,0.32) !important;
+}
+
+/* Selectbox closed state */
+div[data-baseweb="select"] > div {
+    background: var(--spt-input-bg) !important;
+    color: var(--spt-input-text) !important;
+    border: 1px solid rgba(32, 230, 255, 0.58) !important;
+    border-radius: 12px !important;
+}
+
+div[data-baseweb="select"] > div * {
+    color: var(--spt-input-text) !important;
+    font-weight: 800 !important;
+}
+
+/* Select dropdown opened state */
 div[data-baseweb="popover"],
 div[data-baseweb="popover"] > div,
-ul[role="listbox"],
-[role="listbox"] {{
-    background: #06111f !important;
-    border: 1px solid rgba(32, 230, 255, .38) !important;
-    border-radius: 12px !important;
-    box-shadow: 0 16px 34px rgba(0,0,0,.45) !important;
-}}
+ul[role="listbox"] {
+    background: #061827 !important;
+    border: 1px solid rgba(32, 230, 255, 0.45) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.48), 0 0 18px rgba(32,230,255,0.18) !important;
+}
 
 ul[role="listbox"] li,
-ul[role="listbox"] div,
-[role="option"],
-[role="option"] * {{
+ul[role="listbox"] li *,
+div[role="option"],
+div[role="option"] * {
     background: transparent !important;
-    color: #f5fbff !important;
-    -webkit-text-fill-color: #f5fbff !important;
+    color: #f4fbff !important;
     font-weight: 850 !important;
-}}
+}
 
 ul[role="listbox"] li:hover,
-[role="option"]:hover {{
-    background: rgba(32, 230, 255, .18) !important;
-}}
+div[role="option"]:hover {
+    background: rgba(32, 230, 255, 0.18) !important;
+}
 
 ul[role="listbox"] li[aria-selected="true"],
-[role="option"][aria-selected="true"] {{
-    background: #27e6f2 !important;
-}}
+div[role="option"][aria-selected="true"] {
+    background: #22e5f5 !important;
+}
 
 ul[role="listbox"] li[aria-selected="true"] *,
-[role="option"][aria-selected="true"] * {{
-    color: #06111f !important;
-    -webkit-text-fill-color: #06111f !important;
-}}
+div[role="option"][aria-selected="true"] * {
+    color: #061827 !important;
+    font-weight: 900 !important;
+}
 
-/* Data editor */
+/* st.data_editor editable cells */
 [data-testid="stDataEditor"] input,
 [data-testid="stDataEditor"] textarea,
-[data-testid="stDataEditor"] [contenteditable="true"] {{
-    background: rgba(245, 250, 255, .96) !important;
-    color: #081827 !important;
-    -webkit-text-fill-color: #081827 !important;
+[data-testid="stDataEditor"] select {
+    background: var(--spt-input-bg) !important;
+    color: var(--spt-input-text) !important;
+    border-radius: 8px !important;
     font-weight: 850 !important;
-}}
+}
 
-[data-testid="stDataEditor"] [role="gridcell"] {{
-    color: #f3fbff !important;
-    font-weight: 700 !important;
-}}
-
-[data-testid="stDataEditor"] [role="columnheader"] {{
-    background: rgba(255,255,255,.08) !important;
-    color: #eaf8ff !important;
-    font-weight: 850 !important;
-}}
+/* Labels */
+.stTextInput label, .stTextArea label, .stSelectbox label,
+.stMultiSelect label, .stDateInput label, .stTimeInput label,
+.stNumberInput label, .stPasswordInput label {
+    color: #effaff !important;
+    font-weight: 800 !important;
+}
 
 /* Buttons */
-.stButton > button {{
-    border: 1px solid rgba(32, 230, 255, .48) !important;
+.stButton > button {
+    border: 1px solid rgba(32, 230, 255, 0.55) !important;
+    background: rgba(7, 55, 82, 0.70) !important;
+    color: #f4fbff !important;
     border-radius: 12px !important;
-    background: rgba(8, 61, 91, .72) !important;
-    color: #f5fbff !important;
     font-weight: 850 !important;
-    box-shadow: 0 0 14px rgba(32,230,255,.08) !important;
-}}
+    min-height: 42px !important;
+    box-shadow: 0 0 14px rgba(32,230,255,0.10) !important;
+}
 
-.stButton > button:hover {{
-    border-color: rgba(32, 230, 255, .85) !important;
-    box-shadow: 0 0 20px rgba(32,230,255,.20) !important;
-}}
+.stButton > button:hover {
+    border-color: rgba(32, 230, 255, 0.92) !important;
+    box-shadow: 0 0 20px rgba(32,230,255,0.28) !important;
+}
 
-/* Alert readability */
-.stAlert {{
-    border-radius: 12px !important;
-}}
+/* Dataframe headers */
+[data-testid="stDataFrame"] div[role="columnheader"],
+[data-testid="stDataEditor"] div[role="columnheader"] {
+    background: rgba(255, 255, 255, 0.07) !important;
+    color: #f4fbff !important;
+    font-weight: 850 !important;
+}
 
-/* Prevent raw code-like header boxes from previous bad HTML */
-pre, code {{
-    white-space: pre-wrap !important;
-}}
-
-@media (max-width: 1000px) {{
-    .spt-header {{
-        flex-direction: column;
-        align-items: flex-start;
-    }}
-    .spt-logo-box {{
-        width: 220px;
-        flex-basis: 78px;
-    }}
-    .spt-kpi-grid,
-    .spt-module-grid {{
-        grid-template-columns: repeat(2, minmax(180px, 1fr));
-    }}
-}}
+@media (max-width: 900px) {
+    .spt-header { flex-direction: column; align-items: flex-start; }
+    .spt-logo-wrap { width: 260px; }
+    .spt-card-grid, .spt-module-grid { grid-template-columns: 1fr; }
+}
 </style>
         """,
         unsafe_allow_html=True,
     )
 
 
-def app_theme() -> None:
-    apply_theme()
+# 舊版函式相容：有些頁面 import app_theme
+app_theme = apply_theme
 
 
-def _render_header_html(title: str, subtitle: str = "", number: str | None = None) -> None:
-    logo_b64 = _logo_base64()
-    if logo_b64:
-        logo_html = f'<img src="data:image/png;base64,{logo_b64}" alt="SPT Logo" />'
-    else:
-        logo_html = '<div class="spt-logo-fallback">SPT</div>'
-
-    prefix = f"{_safe_text(number)}｜" if number else ""
-    st.markdown(
-        f"""
-<div class="spt-header">
-  <div class="spt-logo-box">{logo_html}</div>
-  <div class="spt-header-main">
-    <div class="spt-header-title">{prefix}{_safe_text(title)}</div>
-    <div class="spt-header-subtitle">{_safe_text(subtitle)}</div>
-  </div>
-</div>
-        """,
-        unsafe_allow_html=True,
-    )
+def _logo_html() -> str:
+    b64 = _read_logo_base64()
+    if b64:
+        return f'<img src="data:image/png;base64,{b64}" alt="Super Plus Tech Logo" />'
+    return '<div class="spt-logo-fallback">SPT</div>'
 
 
 def render_home_header(
@@ -452,110 +412,168 @@ def render_home_header(
     *args: Any,
     **kwargs: Any,
 ) -> None:
-    _render_header_html(title=title, subtitle=subtitle, number=None)
+    """首頁標題。"""
+    apply_theme()
+    st.markdown(
+        f"""
+<div class="spt-header">
+  <div class="spt-logo-wrap">{_logo_html()}</div>
+  <div class="spt-header-text">
+    <div class="spt-title">{_html_escape(title)}</div>
+    <div class="spt-subtitle">{_html_escape(subtitle)}</div>
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_header(
     title: str = "",
     subtitle: str = "",
-    number: str | None = None,
-    module_no: str | None = None,
-    module_number: str | None = None,
+    module_no: str | int | None = None,
     *args: Any,
     **kwargs: Any,
 ) -> None:
-    no = module_no or module_number or number
-    _render_header_html(title=title, subtitle=subtitle, number=no)
+    """各模組標題。相容多種舊版呼叫方式。"""
+    apply_theme()
 
+    # 相容 render_header("01", "工時紀錄", "說明") 這類舊呼叫
+    if module_no is None and args:
+        # 若 title 很像數字，則 title=module_no, subtitle=module title, args[0]=desc
+        t = str(title).strip()
+        if t.replace(".", "").isdigit():
+            module_no = t
+            title = str(subtitle)
+            subtitle = str(args[0]) if args else ""
 
-def _normalise_kpi_item(item: Any) -> tuple[str, str]:
-    """Accept dicts, tuples/lists, or scalar labels without crashing."""
-    if isinstance(item, dict):
-        label = item.get("label") or item.get("name") or item.get("title") or item.get("key") or ""
-        value = item.get("value") or item.get("count") or item.get("text") or ""
-        return str(label), str(value)
-    if isinstance(item, (list, tuple)):
-        if len(item) >= 2:
-            return str(item[0]), str(item[1])
-        if len(item) == 1:
-            return str(item[0]), ""
-        return "", ""
-    return str(item), ""
-
-
-def render_kpi_cards(*items: Any, **kwargs: Any) -> None:
-    """
-    Backward-compatible KPI renderer.
-    Supports:
-      render_kpi_cards([("label", "value"), ...])
-      render_kpi_cards(("label", "value"), ...)
-      render_kpi_cards(cards=[...])
-      render_kpi_cards({"label": "...", "value": "..."})
-    """
-    cards = kwargs.get("cards", None)
-    if cards is None and len(items) == 1 and isinstance(items[0], (list, tuple)) and not (
-        len(items[0]) >= 2 and not isinstance(items[0][0], (list, tuple, dict))
-    ):
-        cards = items[0]
-    elif cards is None:
-        cards = items
-
-    normalised = [_normalise_kpi_item(x) for x in list(cards or [])]
-    if not normalised:
-        return
-
-    html_cards = []
-    for label, value in normalised:
-        html_cards.append(
-            f"""
-<div class="spt-kpi-card">
-  <div class="spt-kpi-label">{_safe_text(label)}</div>
-  <div class="spt-kpi-value">{_safe_text(value)}</div>
-</div>
-            """
-        )
+    no = "" if module_no is None else str(module_no).strip()
+    clean_title = str(title).strip()
+    if no and not clean_title.startswith(no):
+        full_title = f"{no}｜{clean_title}"
+    else:
+        full_title = clean_title or "超慧科技製造部｜智慧工時紀錄系統"
 
     st.markdown(
-        '<div class="spt-kpi-grid">' + "\n".join(html_cards) + "</div>",
+        f"""
+<div class="spt-header">
+  <div class="spt-logo-wrap">{_logo_html()}</div>
+  <div class="spt-header-text">
+    <div class="spt-title">{_html_escape(full_title)}</div>
+    <div class="spt-subtitle">{_html_escape(subtitle)}</div>
+  </div>
+</div>
+        """,
         unsafe_allow_html=True,
     )
 
 
-def _normalise_module_item(item: Any) -> tuple[str, str, str]:
-    if isinstance(item, dict):
-        no = item.get("no") or item.get("number") or item.get("module_no") or ""
-        name = item.get("name") or item.get("title") or ""
-        desc = item.get("desc") or item.get("description") or item.get("subtitle") or ""
-        return str(no), str(name), str(desc)
-    if isinstance(item, (list, tuple)):
-        no = str(item[0]) if len(item) > 0 else ""
-        name = str(item[1]) if len(item) > 1 else ""
-        desc = str(item[2]) if len(item) > 2 else ""
-        return no, name, desc
-    return "", str(item), ""
+def render_kpi_cards(cards: Any = None, *args: Any, **kwargs: Any) -> None:
+    """
+    首頁 KPI 卡片。
+    相容：
+    - list[dict]: [{"label": "...", "value": "..."}]
+    - list[tuple]: [("label", "value")]
+    - dict: {"label": "value"}
+    """
+    apply_theme()
+    if cards is None:
+        cards = [
+            {"label": "核心模組 / Modules", "value": "12"},
+            {"label": "資料庫 / Database", "value": "SQLite"},
+            {"label": "雲端保存 / Cloud", "value": "GitHub"},
+            {"label": "系統狀態 / Status", "value": "Online"},
+        ]
 
+    normalized: list[tuple[str, str]] = []
+    try:
+        if isinstance(cards, Mapping):
+            normalized = [(str(k), str(v)) for k, v in cards.items()]
+        else:
+            for item in cards:
+                if isinstance(item, Mapping):
+                    label = item.get("label") or item.get("title") or item.get("name") or ""
+                    value = item.get("value") or item.get("metric") or item.get("count") or ""
+                    normalized.append((str(label), str(value)))
+                elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                    normalized.append((str(item[0]), str(item[1])))
+    except Exception:
+        normalized = []
 
-def render_module_cards(modules: Iterable[Any] | None = None, *args: Any, **kwargs: Any) -> None:
-    if modules is None:
-        modules = kwargs.get("cards") or kwargs.get("items") or []
+    if not normalized:
+        normalized = [("系統狀態 / Status", "Online")]
 
-    normalised = [_normalise_module_item(m) for m in modules]
-    if not normalised:
-        return
-
-    html_cards = []
-    for no, name, desc in normalised:
-        html_cards.append(
+    html = ['<div class="spt-card-grid">']
+    for label, value in normalized:
+        html.append(
             f"""
-<div class="spt-module-card">
-  <div class="spt-module-no">{_safe_text(no)}</div>
-  <div class="spt-module-name">{_safe_text(name)}</div>
-  <div class="spt-module-desc">{_safe_text(desc)}</div>
+<div class="spt-kpi-card">
+  <div class="spt-kpi-label">{_html_escape(label)}</div>
+  <div class="spt-kpi-value">{_html_escape(value)}</div>
 </div>
             """
         )
+    html.append("</div>")
+    st.markdown("\n".join(html), unsafe_allow_html=True)
 
+
+def render_module_cards(modules: Any = None, *args: Any, **kwargs: Any) -> None:
+    """首頁模組卡片。"""
+    apply_theme()
+    if modules is None:
+        modules = [
+            ("01", "工時紀錄", "快速開始、同步作業、暫停、下班、完工與工時計算"),
+            ("02", "歷史紀錄", "完整工時明細查詢、編輯、儲存與 Excel 匯出"),
+            ("03", "製令管理", "Excel 匯入、貼上資料、手動新增與製令主檔維護"),
+            ("04", "人員名單", "人員主檔、在廠狀態、今日出勤勾選與清單維護"),
+            ("05", "製令工時分析", "製令累積工時、工段分析與明細查詢"),
+            ("06", "LOG查詢", "系統操作、異常與資料異動紀錄查詢"),
+            ("07", "今日未紀錄名單", "出勤但未登錄工時的人員即時提示"),
+            ("08", "人員每日工時", "每日累積工時、合理區間與異常提醒"),
+            ("09", "資料永久保存與備份", "永久檔、GitHub 雲端保存與還原"),
+            ("10", "權限管理", "帳號、角色與模組權限設定"),
+            ("11", "登入紀錄", "登入、登出、閒置與權限事件查詢"),
+            ("12", "模組永久紀錄中心", "各模組獨立永久紀錄與設定檔管理"),
+        ]
+
+    normalized: list[tuple[str, str, str]] = []
+    try:
+        for idx, item in enumerate(modules, start=1):
+            if isinstance(item, Mapping):
+                no = str(item.get("no") or item.get("module_no") or f"{idx:02d}")
+                name = str(item.get("name") or item.get("title") or "")
+                desc = str(item.get("desc") or item.get("description") or "")
+                normalized.append((no, name, desc))
+            elif isinstance(item, (list, tuple)):
+                no = str(item[0]) if len(item) > 0 else f"{idx:02d}"
+                name = str(item[1]) if len(item) > 1 else ""
+                desc = str(item[2]) if len(item) > 2 else ""
+                normalized.append((no, name, desc))
+    except Exception:
+        normalized = []
+
+    html = ['<div class="spt-module-grid">']
+    for no, name, desc in normalized:
+        html.append(
+            f"""
+<div class="spt-module-card">
+  <div class="spt-module-no">{_html_escape(no)}</div>
+  <div class="spt-module-name">{_html_escape(name)}</div>
+  <div class="spt-module-desc">{_html_escape(desc)}</div>
+</div>
+            """
+        )
+    html.append("</div>")
+    st.markdown("\n".join(html), unsafe_allow_html=True)
+
+
+def render_page_title(*args: Any, **kwargs: Any) -> None:
+    """部分舊頁可能使用此名稱。"""
+    render_header(*args, **kwargs)
+
+
+def spt_divider() -> None:
     st.markdown(
-        '<div class="spt-module-grid">' + "\n".join(html_cards) + "</div>",
+        '<hr style="border:0;border-top:1px solid rgba(32,230,255,0.18);margin:26px 0;">',
         unsafe_allow_html=True,
     )
