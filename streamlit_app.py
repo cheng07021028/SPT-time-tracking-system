@@ -20,7 +20,7 @@ render_home_header()
 st.success("系統初始化成功。請從左側選單進入各功能頁。")
 
 render_kpi_cards([
-    ("核心模組 / Modules", "11"),
+    ("核心模組 / Modules", "13"),
     ("資料庫 / Database", "SQLite"),
     ("雲端保存 / GitHub", "Ready"),
     ("權限系統 / Permission", "Enabled"),
@@ -40,6 +40,7 @@ all_modules = [
     ("09", "資料永久保存與備份", "JSON 備份、GitHub 雲端永久保存與還原", "09_persistence"),
     ("10", "權限管理", "帳號、角色、模組權限與閒置自動登出設定", "10_permissions"),
     ("11", "登入紀錄", "登入、登出、權限不足與安全事件查詢", "11_login_logs"),
+    ("13", "系統設定", "工段名稱、休息時間與跨模組共用設定", "13_system_settings"),
 ]
 modules = [(no, name, desc) for no, name, desc, code in all_modules if check_permission(code, "can_view")]
 if modules:
