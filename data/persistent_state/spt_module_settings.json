@@ -1,9 +1,7 @@
 {
-  "version": "V1.30",
-  "exported_at": "2026-05-15 06:12:20",
+  "schema_version": "v1.30",
+  "export_time": "2026-05-15 06:14:28",
   "tables": {
-    "table_column_settings": [],
-    "table_sort_settings": [],
     "system_settings": [
       {
         "setting_key": "company_name",
@@ -42,6 +40,8 @@
         "updated_at": "2026-05-15 03:42:53"
       }
     ],
+    "table_column_settings": [],
+    "table_sort_settings": [],
     "auth_users": [
       {
         "id": 1,
@@ -1274,9 +1274,9 @@
     ]
   },
   "table_counts": {
+    "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "system_settings": 6,
     "auth_users": 6,
     "auth_account_permissions": 66,
     "auth_security_settings": 1
