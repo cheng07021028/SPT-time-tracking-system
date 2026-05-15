@@ -1,11 +1,11 @@
 {
   "version": "V1.30",
-  "exported_at": "2026-05-15 13:59:09",
+  "exported_at": "2026-05-15 14:02:23",
   "db_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
   "db_exists": true,
   "business_row_count": 685,
   "table_counts": {
-    "auth_account_permissions": 96,
+    "auth_account_permissions": 104,
     "auth_login_logs": 0,
     "auth_security_settings": 2,
     "auth_users": 8,
@@ -1658,6 +1658,142 @@
         "can_restore": 0,
         "can_manage": 0,
         "updated_at": "2026-05-15 10:58:31"
+      },
+      {
+        "id": 87145,
+        "username": "admin",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-15 14:01:25"
+      },
+      {
+        "id": 87158,
+        "username": "manager",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-15 14:01:25"
+      },
+      {
+        "id": 87171,
+        "username": "leader",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 1,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-15 14:01:25"
+      },
+      {
+        "id": 87184,
+        "username": "operator",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-15 14:01:25"
+      },
+      {
+        "id": 87197,
+        "username": "viewer",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 1,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 1,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-15 14:01:25"
+      },
+      {
+        "id": 87210,
+        "username": "auditor",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 1,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 1,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-15 14:01:25"
+      },
+      {
+        "id": 87223,
+        "username": "spt142",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-15 14:01:25"
+      },
+      {
+        "id": 87236,
+        "username": "B211",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-15 14:01:25"
       }
     ],
     "auth_login_logs": [],
@@ -5100,7 +5236,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:23:39",
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 11:23:39"
+        "updated_at": "2026-05-15 14:02:23"
       },
       {
         "id": 2,
@@ -5113,7 +5249,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 10:58:34"
+        "updated_at": "2026-05-15 14:02:23"
       },
       {
         "id": 3,
@@ -5126,7 +5262,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 10:58:34"
+        "updated_at": "2026-05-15 14:02:23"
       },
       {
         "id": 4,
@@ -5139,7 +5275,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 10:58:34"
+        "updated_at": "2026-05-15 14:02:23"
       },
       {
         "id": 5,
@@ -5152,7 +5288,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 10:58:34"
+        "updated_at": "2026-05-15 14:02:23"
       },
       {
         "id": 6,
@@ -5165,7 +5301,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 10:58:34"
+        "updated_at": "2026-05-15 14:02:23"
       },
       {
         "id": 6425,
@@ -5178,7 +5314,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:18:26",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-15 11:18:26"
+        "updated_at": "2026-05-15 14:02:23"
       },
       {
         "id": 6430,
@@ -5191,7 +5327,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:21:46",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-15 11:21:46"
+        "updated_at": "2026-05-15 14:02:23"
       }
     ],
     "system_logs": [
