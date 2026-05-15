@@ -330,6 +330,41 @@ ul[role="listbox"] li[aria-selected="true"], div[role="option"][aria-selected="t
     font-size: 16px !important;
 }
 .stButton > button:hover { box-shadow: 0 0 16px rgba(35,230,255,.38) !important; border-color: rgba(35,230,255,.90) !important; }
+
+
+/* ===== V1.60 stable UI fixes: user bar, header numbers, module numbers, large inputs ===== */
+.block-container { padding-top: 2.6rem !important; }
+.spt-user-bar {
+    display: grid; grid-template-columns: 1.4fr 1.4fr; gap: 14px; align-items: center;
+    min-height: 44px; padding: 10px 14px 6px 14px; margin: 8px 0 14px 0;
+    color: rgba(235,248,255,.88); font-size: 16px !important; line-height: 1.55 !important;
+    font-weight: 800 !important; letter-spacing: .35px !important;
+    text-shadow: 0 0 8px rgba(35,230,255,.14);
+}
+.spt-user-bar b { color:#ffffff; font-weight:950; }
+.spt-user-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.spt-header-no {
+    display: inline-block !important; font-size: 44px !important; line-height: 1 !important;
+    min-width: 62px !important; text-align: center !important; color: #72f6ff !important;
+    font-weight: 1000 !important; margin-right: 10px !important;
+    text-shadow: 0 0 12px rgba(114,246,255,.55), 0 0 28px rgba(35,230,255,.25) !important;
+}
+.spt-module-no { font-size: 21px !important; line-height: 1.05 !important; color:#5ef4ff !important; font-weight:1000 !important; margin-bottom:10px !important; letter-spacing:.6px !important; }
+.spt-module-title { font-size: 31px !important; line-height: 1.15 !important; }
+.spt-module-desc { font-size: 17px !important; line-height: 1.58 !important; }
+.spt-kpi-value { font-size: 38px !important; line-height: 1.1 !important; font-weight: 950 !important; }
+.stNumberInput input, div[data-baseweb="input"] input[type="number"] {
+    font-size:24px !important; min-height:48px !important; padding-top:8px !important; padding-bottom:8px !important; font-weight:950 !important;
+}
+.stDateInput input, .stTimeInput input, .stTextInput input, .stTextArea textarea { font-size:18px !important; line-height:1.45 !important; }
+div[data-baseweb="popover"] div[role="listbox"], div[data-baseweb="popover"] ul[role="listbox"] { background:#061423 !important; color:#ecfbff !important; }
+div[data-baseweb="popover"] div[role="option"], div[data-baseweb="popover"] li[role="option"], div[data-baseweb="popover"] [role="option"] * {
+    color:#ecfbff !important; -webkit-text-fill-color:#ecfbff !important; font-size:16px !important; font-weight:850 !important;
+}
+div[data-baseweb="popover"] div[role="option"][aria-selected="true"], div[data-baseweb="popover"] li[role="option"][aria-selected="true"] {
+    background:#36e7f7 !important; color:#04101d !important; -webkit-text-fill-color:#04101d !important;
+}
+
 </style>
 """,
         unsafe_allow_html=True,
@@ -338,6 +373,13 @@ ul[role="listbox"] li[aria-selected="true"], div[role="option"][aria-selected="t
 
 def apply_theme() -> None:
     _inject_css()
+    # V1.60: install global table column settings once.
+    # Best-effort only; visual theme must never break a page.
+    try:
+        from services.column_settings_service import install_column_settings_patch
+        install_column_settings_patch()
+    except Exception:
+        pass
 
 
 def app_theme() -> None:

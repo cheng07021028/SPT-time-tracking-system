@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import html
 import os
 import time
 from datetime import datetime
@@ -317,6 +318,35 @@ def set_idle_timeout_minutes(minutes: int) -> None:
     st.session_state.pop("_spt_idle_timeout_cache", None)
 
 
+def get_security_setting(setting_key: str, default: str = "") -> str:
+    ensure_security_schema()
+    try:
+        row = query_one("SELECT setting_value FROM security_settings WHERE setting_key=?", (setting_key,))
+        if row and row.get("setting_value") is not None:
+            return str(row.get("setting_value"))
+    except Exception:
+        pass
+    return str(default)
+
+
+def set_security_setting(setting_key: str, setting_value: str, note: str = "") -> None:
+    ensure_security_schema()
+    execute("""
+        INSERT INTO security_settings (setting_key, setting_value, note, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value=excluded.setting_value,
+            note=excluded.note,
+            updated_at=excluded.updated_at
+    """, (setting_key, str(setting_value), note, _now()))
+    if setting_key == "idle_timeout_minutes":
+        st.session_state.pop("_spt_idle_timeout_cache", None)
+
+
+def should_ask_continue_after_record() -> bool:
+    return get_security_setting("ask_continue_after_record", "1") != "0"
+
+
 def log_security_event(username: str | None, event_type: str, result: str, message: str = "", module_code: str = "", idle_seconds: int | None = None) -> None:
     try:
         execute("""
@@ -556,12 +586,21 @@ def render_user_bar(module_code: str = "") -> None:
         return
     render_idle_watchdog()
     roles = ", ".join(user.get("roles", [])) or "未設定角色"
-    c1, c2, c3 = st.columns([2, 2, 1])
-    c1.caption(f"登入帳號：{user['display_name']}（{user['username']}）")
-    c2.caption(f"角色：{roles}｜閒置自動登出：{get_idle_timeout_minutes()} 分鐘")
-    if c3.button("登出 / Logout", use_container_width=True, key=f"logout_{module_code}"):
-        logout("使用者手動登出")
-        st.rerun()
+    idle_minutes = get_idle_timeout_minutes()
+    name = html.escape(str(user.get("display_name", "")))
+    username = html.escape(str(user.get("username", "")))
+    roles_html = html.escape(str(roles))
+    c1, c2 = st.columns([4.5, 1])
+    with c1:
+        st.markdown(
+            f'<div class="spt-user-bar"><div class="spt-user-meta">登入帳號：<b>{name}</b>（{username}）</div><div class="spt-user-meta">角色：<b>{roles_html}</b>｜閒置自動登出：<b>{idle_minutes}</b> 分鐘</div></div>',
+            unsafe_allow_html=True,
+        )
+    with c2:
+        st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
+        if st.button("登出 / Logout", use_container_width=True, key=f"logout_{module_code}"):
+            logout("使用者手動登出")
+            st.rerun()
 
 
 def require_login(module_code: str = "") -> None:
@@ -586,6 +625,9 @@ def mark_activity() -> None:
 
 
 def trigger_post_record_continue_prompt(message: str = "工時紀錄已完成") -> None:
+    # V1.60: respect 10｜權限管理 → 安全設定.
+    if not should_ask_continue_after_record():
+        return
     st.session_state["post_record_prompt"] = True
     st.session_state["post_record_message"] = message
 

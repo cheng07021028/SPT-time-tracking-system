@@ -22,6 +22,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR = PROJECT_ROOT / "data" / "persistent_state"
 SETTINGS_PATH = STATE_DIR / "spt_table_column_settings.json"
 
+_ORIGINAL_DATAFRAME = None
+_ORIGINAL_DATA_EDITOR = None
+
+
 # 常見欄位中文/英文對照；找不到時仍保留原欄位名
 COLUMN_LABELS = {
     "id": "ID / ID",
@@ -228,7 +232,8 @@ def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[D
                 "欄寬 / Width": meta.get("width", "medium"),
             })
         cfg_df = pd.DataFrame(rows)
-        edited_cfg = st.data_editor(
+        _editor_func = _ORIGINAL_DATA_EDITOR or st.data_editor
+        edited_cfg = _editor_func(
             cfg_df,
             key=f"column_setting_editor::{table_id}",
             use_container_width=True,
@@ -241,6 +246,18 @@ def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[D
                 "順序 / Order": st.column_config.NumberColumn("順序 / Order", min_value=0, step=1),
                 "欄寬 / Width": st.column_config.SelectboxColumn("欄寬 / Width", options=list(WIDTH_OPTIONS.values())),
             },
+        )
+        st.markdown("#### 欄位順序快速設定 / Column Order")
+        current_order = sorted(
+            [str(c) for c in df.columns],
+            key=lambda x: int(col_settings.get(x, _default_column_setting(x)).get("order", 999)),
+        )
+        order_text = st.text_area(
+            "欄位順序 / Column order（每行一個欄位；可剪下貼上調整順序，按套用後永久保存）",
+            value="\n".join(current_order),
+            key=f"column_order_text::{table_id}",
+            height=120,
+            help="Streamlit 原生表格目前無法穩定讀取滑鼠拖拉後的欄位順序；此處提供可永久保存的順序設定。",
         )
         c1, c2, c3 = st.columns([1, 1, 2])
         applied = False
@@ -258,6 +275,21 @@ def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[D
                         "width": str(row.get("欄寬 / Width") or "medium"),
                         "order": int(row.get("順序 / Order", 999)),
                     }
+                try:
+                    text_order = [x.strip() for x in str(order_text).splitlines() if x.strip()]
+                    used = set()
+                    order_no = 0
+                    for key in text_order:
+                        if key in new_cols and key not in used:
+                            new_cols[key]["order"] = order_no
+                            used.add(key)
+                            order_no += 1
+                    for key in new_cols:
+                        if key not in used:
+                            new_cols[key]["order"] = order_no
+                            order_no += 1
+                except Exception:
+                    pass
                 table_setting["columns"] = new_cols
                 _save_table_setting(table_id, table_setting)
                 st.success("欄位設定已永久保存。")
@@ -305,8 +337,11 @@ def install_column_settings_patch() -> None:
     if getattr(st, "_spt_column_settings_installed", False):
         return
 
+    global _ORIGINAL_DATAFRAME, _ORIGINAL_DATA_EDITOR
     original_dataframe = st.dataframe
     original_data_editor = st.data_editor
+    _ORIGINAL_DATAFRAME = original_dataframe
+    _ORIGINAL_DATA_EDITOR = original_data_editor
 
     def dataframe_wrapper(data=None, *args, **kwargs):
         df = _normalize_df(data)

@@ -18,6 +18,8 @@ try:
 except Exception:  # tools / batch scripts may import without Streamlit context
     st = None
 
+from services.db_service import execute as core_execute, query_one as core_query_one
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
 _PERMISSION_SCHEMA_READY = False
@@ -442,14 +444,32 @@ def has_permission(username: str, module_code: str, action: str = "can_view") ->
 
 
 def get_security_settings() -> Dict[str, str]:
+    """Read security settings from both permission UI table and runtime security table."""
     init_permission_tables()
+    out: Dict[str, str] = {}
     conn = connect_db()
     rows = conn.execute("SELECT setting_key, setting_value FROM auth_security_settings").fetchall()
     conn.close()
-    return {r["setting_key"]: r["setting_value"] for r in rows}
+    out.update({r["setting_key"]: r["setting_value"] for r in rows})
+    try:
+        row = core_query_one("SELECT setting_value FROM security_settings WHERE setting_key='idle_timeout_minutes'")
+        if row and row.get("setting_value") is not None:
+            out["idle_timeout_minutes"] = str(row.get("setting_value"))
+    except Exception:
+        pass
+    try:
+        row = core_query_one("SELECT setting_value FROM security_settings WHERE setting_key='ask_continue_after_record'")
+        if row and row.get("setting_value") is not None:
+            out["ask_continue_after_record"] = str(row.get("setting_value"))
+    except Exception:
+        pass
+    out.setdefault("idle_timeout_minutes", "15")
+    out.setdefault("ask_continue_after_record", "1")
+    return out
 
 
 def save_security_settings(settings: Dict[str, str]) -> None:
+    """Persist settings and synchronize to runtime security_settings immediately."""
     init_permission_tables()
     conn = connect_db()
     cur = conn.cursor()
@@ -459,9 +479,24 @@ def save_security_settings(settings: Dict[str, str]) -> None:
             VALUES (?,?,?)
             ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value, updated_at=excluded.updated_at
         """, (k, str(v), now_text()))
+        try:
+            core_execute("""
+                INSERT INTO security_settings(setting_key, setting_value, note, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (k, str(v), "權限管理安全設定同步 / Permission security setting sync", now_text()))
+        except Exception:
+            pass
     conn.commit()
     conn.close()
     clear_permission_runtime_cache()
+    try:
+        st.session_state.pop("_spt_idle_timeout_cache", None)
+    except Exception:
+        pass
 
 
 def get_login_logs(start_date: str | None = None, end_date: str | None = None) -> List[dict]:
