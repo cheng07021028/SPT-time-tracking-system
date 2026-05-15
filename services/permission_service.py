@@ -158,6 +158,88 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
+def _ensure_legacy_security_tables(cur) -> None:
+    """Ensure legacy runtime login tables exist.
+
+    V1.77：權限管理頁主要寫 auth_users，但登入服務曾只讀 security_users。
+    這裡同步舊表，讓新舊模組都讀到同一批帳號。
+    """
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS security_users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        employee_id TEXT,
+        display_name TEXT,
+        email TEXT,
+        is_active INTEGER DEFAULT 1,
+        force_password_change INTEGER DEFAULT 0,
+        last_login_at TEXT,
+        created_at TEXT,
+        updated_at TEXT
+    )
+    """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS security_user_roles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        role_code TEXT NOT NULL,
+        created_at TEXT,
+        UNIQUE(username, role_code)
+    )
+    """)
+
+
+def sync_auth_users_to_runtime_security(usernames: Iterable[str] | None = None) -> int:
+    """Synchronize auth_users into security_users/security_user_roles.
+
+    回傳同步帳號數。密碼 hash 直接同步，登入端 V1.77 已支援 auth_users 的 hash 格式。
+    """
+    init_permission_tables()
+    conn = connect_db()
+    cur = conn.cursor()
+    _ensure_legacy_security_tables(cur)
+    params: list[str] = []
+    where = ""
+    if usernames:
+        clean = [str(u).strip() for u in usernames if str(u).strip()]
+        if clean:
+            where = " WHERE username IN ({})".format(",".join(["?"] * len(clean)))
+            params = clean
+    rows = cur.execute("SELECT * FROM auth_users" + where, params).fetchall()
+    count = 0
+    for r in rows:
+        username = str(r["username"]).strip()
+        if not username:
+            continue
+        cur.execute("""
+            INSERT INTO security_users
+            (username,password_hash,employee_id,display_name,email,is_active,force_password_change,last_login_at,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(username) DO UPDATE SET
+                password_hash=excluded.password_hash,
+                employee_id=excluded.employee_id,
+                display_name=excluded.display_name,
+                email=excluded.email,
+                is_active=excluded.is_active,
+                force_password_change=excluded.force_password_change,
+                last_login_at=excluded.last_login_at,
+                updated_at=excluded.updated_at
+        """, (
+            username, r["password_hash"], r["employee_id"], r["display_name"], r["email"],
+            int(r["is_active"] or 0), int(r["force_password_change"] or 0), r["last_login_at"],
+            r["created_at"] or now_text(), now_text(),
+        ))
+        role = str(r["role_code"] or "").strip()
+        if role:
+            cur.execute("INSERT OR IGNORE INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
+        count += 1
+    conn.commit()
+    conn.close()
+    clear_permission_runtime_cache()
+    return count
+
+
 def init_permission_tables(force: bool = False) -> None:
     global _PERMISSION_SCHEMA_READY
     if _PERMISSION_SCHEMA_READY and not force:
@@ -243,6 +325,10 @@ def init_permission_tables(force: bool = False) -> None:
     conn.commit()
     conn.close()
     ensure_permissions_for_all_users(force=True)
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
     _PERMISSION_SCHEMA_READY = True
 
 
@@ -313,6 +399,10 @@ def save_users(rows: Iterable[dict]) -> dict:
     conn.commit()
     conn.close()
     ensure_permissions_for_all_users(force=True)
+    try:
+        sync_auth_users_to_runtime_security([str(r.get("username", "")).strip() for r in rows])
+    except Exception:
+        pass
     clear_permission_runtime_cache()
     return {"saved": saved, "skipped": skipped}
 
@@ -327,6 +417,12 @@ def delete_users(usernames: Iterable[str]) -> int:
     for u in usernames:
         cur.execute("DELETE FROM auth_account_permissions WHERE username=?", (u,))
         cur.execute("DELETE FROM auth_users WHERE username=?", (u,))
+        try:
+            _ensure_legacy_security_tables(cur)
+            cur.execute("DELETE FROM security_user_roles WHERE username=?", (u,))
+            cur.execute("DELETE FROM security_users WHERE username=?", (u,))
+        except Exception:
+            pass
     conn.commit()
     conn.close()
     clear_permission_runtime_cache()

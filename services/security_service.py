@@ -99,19 +99,42 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, stored_hash: str | None) -> bool:
+    """Verify both runtime security hashes and permission-page account hashes.
+
+    V1.77 修正：
+    - services.security_service 使用格式：pbkdf2_sha256$iterations$salt_base64$hash_base64
+    - services.permission_service 使用格式：pbkdf2_sha256$salt_hex_text$hash_hex
+
+    舊版登入只認第一種格式，導致在「10｜權限管理」建立/修改的帳號
+    例如 spt142 會一直顯示帳號或密碼錯誤。
+    """
     if not stored_hash:
         return False
     try:
-        algo, iter_s, salt_b64, hash_b64 = stored_hash.split("$", 3)
-        if algo != "pbkdf2_sha256":
-            return False
-        iterations = int(iter_s)
-        salt = base64.b64decode(salt_b64.encode("ascii"))
-        expected = base64.b64decode(hash_b64.encode("ascii"))
-        actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
-        return hmac.compare_digest(actual, expected)
+        parts = str(stored_hash).split("$")
+        if len(parts) == 4:
+            algo, iter_s, salt_b64, hash_b64 = parts
+            if algo != "pbkdf2_sha256":
+                return False
+            iterations = int(iter_s)
+            salt = base64.b64decode(salt_b64.encode("ascii"))
+            expected = base64.b64decode(hash_b64.encode("ascii"))
+            actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+            return hmac.compare_digest(actual, expected)
+        if len(parts) == 3:
+            algo, salt_text, digest_hex = parts
+            if algo != "pbkdf2_sha256":
+                return False
+            actual_hex = hashlib.pbkdf2_hmac(
+                "sha256",
+                password.encode("utf-8"),
+                salt_text.encode("utf-8"),
+                120000,
+            ).hex()
+            return hmac.compare_digest(actual_hex, digest_hex)
     except Exception:
         return False
+    return False
 
 
 def ensure_security_schema(force: bool = False) -> None:
@@ -387,10 +410,64 @@ def get_current_user() -> dict[str, Any] | None:
     }
 
 
+def _auth_user_row(username: str) -> dict[str, Any] | None:
+    """Read the V1.29+ account master row used by 10｜權限管理."""
+    try:
+        return query_one("SELECT * FROM auth_users WHERE username=?", (username,))
+    except Exception:
+        return None
+
+
+def _sync_auth_user_to_security_runtime(auth_row: dict[str, Any]) -> None:
+    """Keep legacy security_users/security_user_roles in sync for older pages.
+
+    登入以 auth_users 為優先來源，但同步回舊表可讓舊版查詢頁、登入紀錄
+    或未改到的模組仍能讀到同一個帳號，避免雙帳號表再次分裂。
+    """
+    try:
+        username = str(auth_row.get("username", "")).strip()
+        if not username:
+            return
+        now = _now()
+        execute("""
+            INSERT INTO security_users
+            (username, password_hash, employee_id, display_name, email, is_active, force_password_change, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(username) DO UPDATE SET
+                password_hash=excluded.password_hash,
+                employee_id=excluded.employee_id,
+                display_name=excluded.display_name,
+                email=excluded.email,
+                is_active=excluded.is_active,
+                force_password_change=excluded.force_password_change,
+                updated_at=excluded.updated_at
+        """, (
+            username,
+            auth_row.get("password_hash") or "",
+            auth_row.get("employee_id") or "",
+            auth_row.get("display_name") or username,
+            auth_row.get("email") or "",
+            int(auth_row.get("is_active", 1) or 0),
+            int(auth_row.get("force_password_change", 0) or 0),
+            now,
+            now,
+        ))
+        role_code = str(auth_row.get("role_code", "") or "").strip()
+        if role_code:
+            execute("INSERT OR IGNORE INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
+    except Exception:
+        pass
+
+
 def authenticate(username: str, password: str) -> tuple[bool, str]:
     ensure_security_schema()
     username = (username or "").strip()
-    row = query_one("SELECT * FROM security_users WHERE username=?", (username,))
+
+    # V1.77：優先讀取「10｜權限管理」使用的 auth_users。
+    # 舊版登入只讀 security_users，導致 spt142 這類在權限管理建立的帳號無法登入。
+    auth_row = _auth_user_row(username)
+    row = auth_row or query_one("SELECT * FROM security_users WHERE username=?", (username,))
+
     if not row:
         log_security_event(username, "LOGIN", "FAIL", "帳號不存在")
         return False, "帳號或密碼錯誤。"
@@ -401,7 +478,15 @@ def authenticate(username: str, password: str) -> tuple[bool, str]:
         log_security_event(username, "LOGIN", "FAIL", "密碼錯誤")
         return False, "帳號或密碼錯誤。"
 
+    if auth_row:
+        _sync_auth_user_to_security_runtime(auth_row)
+
     roles = _user_roles(username)
+    # 若帳號來自 auth_users，角色存在 role_code，不一定已同步到 security_user_roles。
+    auth_role = str(row.get("role_code", "") or "").strip()
+    if auth_role and auth_role not in roles:
+        roles.append(auth_role)
+
     st.session_state["auth_logged_in"] = True
     st.session_state["auth_username"] = username
     st.session_state["auth_display_name"] = row.get("display_name") or username
@@ -412,7 +497,15 @@ def authenticate(username: str, password: str) -> tuple[bool, str]:
     now_ts = time.time()
     st.session_state["auth_login_ts"] = now_ts
     st.session_state["auth_last_activity_ts"] = now_ts
-    execute("UPDATE security_users SET last_login_at=?, updated_at=? WHERE username=?", (_now(), _now(), username))
+    if auth_row:
+        try:
+            execute("UPDATE auth_users SET last_login_at=?, updated_at=? WHERE username=?", (_now(), _now(), username))
+        except Exception:
+            pass
+    try:
+        execute("UPDATE security_users SET last_login_at=?, updated_at=? WHERE username=?", (_now(), _now(), username))
+    except Exception:
+        pass
     log_security_event(username, "LOGIN", "SUCCESS", f"roles={','.join(roles)}")
     return True, "登入成功。"
 
