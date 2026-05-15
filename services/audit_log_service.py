@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
-"""V1.44 Audit / Login Log Compatibility Service.
-Fixes ImportError for pages/11_11. 登入紀錄.py after V1.43.
-Keeps old function names compatible and avoids GitHub/network work during import/login.
+"""SPT Time Tracking - Audit/Login log service V1.49.
+
+Fixes:
+- Login records showing 0 because some versions wrote to security_login_logs
+  while page 11 read login_logs.
+- Keeps aliases used by older pages to prevent ImportError.
+- Writes independent permanent files for login logs without requiring GitHub on import.
 """
 from __future__ import annotations
 
@@ -50,6 +54,11 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
+def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()
+    return row is not None
+
+
 def ensure_login_logs_table() -> None:
     _ensure_dirs()
     conn = get_connection()
@@ -78,11 +87,53 @@ def ensure_login_logs_table() -> None:
     conn.close()
 
 
-# old names compatibility
 ensure_audit_log_table = ensure_login_logs_table
 ensure_audit_tables = ensure_login_logs_table
 init_audit_log_table = ensure_login_logs_table
 init_login_logs = ensure_login_logs_table
+
+
+def _security_login_rows(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
+    """Read legacy security_login_logs rows if that table exists."""
+    if not _table_exists(conn, "security_login_logs"):
+        return []
+    rows = conn.execute("SELECT * FROM security_login_logs ORDER BY id DESC").fetchall()
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        d = dict(r)
+        idle_seconds = d.get("idle_seconds")
+        try:
+            idle_minutes = round(float(idle_seconds) / 60, 2) if idle_seconds not in (None, "") else None
+        except Exception:
+            idle_minutes = None
+        out.append({
+            "id": f"S{d.get('id')}",
+            "source": "security_login_logs",
+            "username": d.get("username"),
+            "display_name": d.get("display_name"),
+            "event_type": d.get("event_type"),
+            "result": d.get("result"),
+            "message": d.get("message"),
+            "module_code": d.get("module_code"),
+            "login_time": d.get("login_time") or d.get("created_at"),
+            "logout_time": d.get("logout_time"),
+            "idle_minutes": idle_minutes,
+            "ip_address": "",
+            "user_agent": d.get("user_agent"),
+            "created_at": d.get("created_at"),
+        })
+    return out
+
+
+def _primary_login_rows(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
+    ensure_login_logs_table()
+    rows = conn.execute("SELECT * FROM login_logs ORDER BY id DESC").fetchall()
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        d = dict(r)
+        d["source"] = "login_logs"
+        out.append(d)
+    return out
 
 
 def record_login_log(
@@ -99,7 +150,7 @@ def record_login_log(
     user_agent: str = "",
     **kwargs: Any,
 ) -> int:
-    """Insert one login/audit event. No GitHub upload here, to keep login fast."""
+    """Insert one audit event into login_logs. Lightweight: no GitHub upload here."""
     ensure_login_logs_table()
     login_time = login_time or _now()
     created_at = kwargs.get("created_at") or _now()
@@ -132,7 +183,6 @@ save_login_log = record_login_log
 
 
 def auto_record_session_login(username: str = "", display_name: str = "", roles: str = "", **kwargs: Any) -> None:
-    """Record LOGIN once per Streamlit session when possible."""
     if not username:
         return
     try:
@@ -140,58 +190,105 @@ def auto_record_session_login(username: str = "", display_name: str = "", roles:
         key = f"_spt_login_recorded_{username}"
         if st.session_state.get(key):
             return
-        record_login_log(username=username, display_name=display_name, event_type="LOGIN",
-                         result="SUCCESS", message=f"roles={roles}" if roles else kwargs.get("message", ""),
-                         module_code=kwargs.get("module_code", ""))
+        record_login_log(username=username, display_name=display_name, event_type="LOGIN", result="SUCCESS",
+                         message=f"roles={roles}" if roles else kwargs.get("message", ""),
+                         module_code=kwargs.get("module_code", "LOGIN"))
         st.session_state[key] = True
     except Exception:
         try:
-            record_login_log(username=username, display_name=display_name, event_type="LOGIN",
-                             result="SUCCESS", message=f"roles={roles}" if roles else "")
+            record_login_log(username=username, display_name=display_name, event_type="LOGIN", result="SUCCESS",
+                             message=f"roles={roles}" if roles else "", module_code="LOGIN")
         except Exception:
             pass
 
 
 record_session_login_once = auto_record_session_login
 ensure_session_login_recorded = auto_record_session_login
+maybe_record_session_login = auto_record_session_login
+
+
+def migrate_security_login_logs_to_login_logs() -> int:
+    """Copy legacy security_login_logs rows into login_logs if not already copied."""
+    ensure_login_logs_table()
+    conn = get_connection()
+    if not _table_exists(conn, "security_login_logs"):
+        conn.close()
+        return 0
+    legacy = conn.execute("SELECT * FROM security_login_logs ORDER BY id ASC").fetchall()
+    inserted = 0
+    cur = conn.cursor()
+    for r in legacy:
+        d = dict(r)
+        marker = f"legacy_security_login_logs_id={d.get('id')}"
+        exists = conn.execute("SELECT 1 FROM login_logs WHERE message LIKE ? LIMIT 1", (f"%{marker}%",)).fetchone()
+        if exists:
+            continue
+        msg = (d.get("message") or "") + (" | " if d.get("message") else "") + marker
+        idle_seconds = d.get("idle_seconds")
+        try:
+            idle_minutes = round(float(idle_seconds) / 60, 2) if idle_seconds not in (None, "") else None
+        except Exception:
+            idle_minutes = None
+        cur.execute("""
+        INSERT INTO login_logs (
+            username, display_name, event_type, result, message, module_code,
+            login_time, logout_time, idle_minutes, ip_address, user_agent, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (d.get("username"), d.get("display_name"), d.get("event_type"), d.get("result"), msg,
+              d.get("module_code"), d.get("login_time") or d.get("created_at"), d.get("logout_time"),
+              idle_minutes, "", d.get("user_agent"), d.get("created_at") or d.get("login_time") or _now()))
+        inserted += 1
+    conn.commit()
+    conn.close()
+    if inserted:
+        try:
+            export_audit_logs_to_permanent_file(create_history=True)
+        except Exception:
+            pass
+    return inserted
+
+
+def _filter_records(records: List[Dict[str, Any]], start_date: Optional[str], end_date: Optional[str], keyword: str,
+                    event_types: Optional[List[str]], results: Optional[List[str]]) -> List[Dict[str, Any]]:
+    def get_date(r: Dict[str, Any]) -> str:
+        return str(r.get("login_time") or r.get("created_at") or "")[:10]
+    out = []
+    kw = (keyword or "").strip().lower()
+    for r in records:
+        d = get_date(r)
+        if start_date and d and d < str(start_date):
+            continue
+        if end_date and d and d > str(end_date):
+            continue
+        if event_types and r.get("event_type") not in event_types:
+            continue
+        if results and r.get("result") not in results:
+            continue
+        if kw:
+            blob = " ".join(str(v) for v in r.values()).lower()
+            if kw not in blob:
+                continue
+        out.append(r)
+    return out
 
 
 def load_login_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "",
                     limit: int = 1000, event_types: Optional[List[str]] = None,
-                    results: Optional[List[str]] = None, **kwargs: Any):
+                    results: Optional[List[str]] = None, include_legacy: bool = True, **kwargs: Any):
     ensure_login_logs_table()
-    sql = "SELECT * FROM login_logs WHERE 1=1"
-    params: List[Any] = []
-    if start_date:
-        sql += " AND date(COALESCE(login_time, created_at)) >= date(?)"
-        params.append(str(start_date))
-    if end_date:
-        sql += " AND date(COALESCE(login_time, created_at)) <= date(?)"
-        params.append(str(end_date))
-    if keyword:
-        kw = f"%{keyword}%"
-        sql += " AND (username LIKE ? OR display_name LIKE ? OR message LIKE ? OR module_code LIKE ?)"
-        params += [kw, kw, kw, kw]
-    if event_types:
-        ph = ",".join(["?"] * len(event_types))
-        sql += f" AND event_type IN ({ph})"
-        params += list(event_types)
-    if results:
-        ph = ",".join(["?"] * len(results))
-        sql += f" AND result IN ({ph})"
-        params += list(results)
-    sql += " ORDER BY id DESC"
-    if limit:
-        sql += " LIMIT ?"
-        params.append(int(limit))
     conn = get_connection()
-    if pd is not None:
-        df = pd.read_sql_query(sql, conn, params=params)
-        conn.close()
-        return df
-    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    records = _primary_login_rows(conn)
+    if include_legacy:
+        # include legacy security_login_logs in search even before migration
+        records.extend(_security_login_rows(conn))
     conn.close()
-    return rows
+    records = _filter_records(records, start_date, end_date, keyword, event_types, results)
+    records.sort(key=lambda r: str(r.get("login_time") or r.get("created_at") or ""), reverse=True)
+    if limit:
+        records = records[:int(limit)]
+    if pd is not None:
+        return pd.DataFrame(records)
+    return records
 
 
 get_login_logs = load_login_logs
@@ -199,12 +296,9 @@ query_login_logs = load_login_logs
 load_audit_logs = load_login_logs
 
 
-def count_login_logs() -> int:
-    ensure_login_logs_table()
-    conn = get_connection()
-    n = int(conn.execute("SELECT COUNT(*) FROM login_logs").fetchone()[0])
-    conn.close()
-    return n
+def count_login_logs(include_legacy: bool = True) -> int:
+    logs = load_login_logs(limit=100000, include_legacy=include_legacy)
+    return int(len(logs))
 
 
 def get_login_log_stats(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "") -> Dict[str, int]:
@@ -231,6 +325,13 @@ def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:
           AND date(COALESCE(login_time, created_at)) <= date(?)
     """, (str(start_date), str(end_date)))
     deleted = int(cur.rowcount if cur.rowcount is not None else 0)
+    if _table_exists(conn, "security_login_logs"):
+        cur.execute("""
+            DELETE FROM security_login_logs
+            WHERE date(COALESCE(login_time, created_at)) >= date(?)
+              AND date(COALESCE(login_time, created_at)) <= date(?)
+        """, (str(start_date), str(end_date)))
+        deleted += int(cur.rowcount if cur.rowcount is not None else 0)
     conn.commit()
     conn.close()
     try:
@@ -245,6 +346,14 @@ delete_audit_logs_by_date_range = delete_login_logs_by_date_range
 clear_audit_logs_by_date_range = delete_login_logs_by_date_range
 
 
+def clear_login_logs_by_date(start_date: str, end_date: str, **kwargs: Any) -> int:
+    return delete_login_logs_by_date_range(start_date, end_date)
+
+
+clear_login_logs = clear_login_logs_by_date
+clear_audit_logs_by_date = clear_login_logs_by_date
+
+
 def _to_records(obj: Any) -> List[Dict[str, Any]]:
     if pd is not None and hasattr(obj, "to_dict"):
         return obj.to_dict(orient="records")
@@ -254,19 +363,13 @@ def _to_records(obj: Any) -> List[Dict[str, Any]]:
 def export_audit_logs_to_permanent_file(create_history: bool = True) -> Dict[str, Any]:
     _ensure_dirs()
     ensure_login_logs_table()
-    records = _to_records(load_login_logs(limit=100000))
-    payload = {
-        "version": "V1.44",
-        "exported_at": _now(),
-        "table": "login_logs",
-        "count": len(records),
-        "records": records,
-    }
+    records = _to_records(load_login_logs(limit=100000, include_legacy=True))
+    payload = {"version": "V1.49", "exported_at": _now(), "table": "login_logs", "count": len(records), "records": records}
     AUDIT_STATE_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     MODULE_RECORDS_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     MODULE_SETTINGS_PATH.write_text(json.dumps({
-        "version": "V1.44", "exported_at": _now(), "module": "11_login_logs",
-        "settings": {"auto_github_upload_on_login": False, "retention_policy": "manual date range cleanup"}
+        "version": "V1.49", "exported_at": _now(), "module": "11_login_logs",
+        "settings": {"source_tables": ["login_logs", "security_login_logs"], "auto_github_upload_on_login": False}
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     hist = ""
     if create_history:
@@ -284,6 +387,10 @@ create_audit_permanent_file = export_audit_logs_to_permanent_file
 create_login_log_permanent_file = export_audit_logs_to_permanent_file
 build_login_log_permanent_file = export_audit_logs_to_permanent_file
 save_audit_logs_to_permanent_file = export_audit_logs_to_permanent_file
+export_audit_logs_to_state = export_audit_logs_to_permanent_file
+create_audit_logs_state = export_audit_logs_to_permanent_file
+build_audit_logs_state = export_audit_logs_to_permanent_file
+export_login_logs_to_state = export_audit_logs_to_permanent_file
 
 
 def restore_audit_logs_from_permanent_file(path: Optional[str] = None) -> Dict[str, Any]:
@@ -300,12 +407,16 @@ def restore_audit_logs_from_permanent_file(path: Optional[str] = None) -> Dict[s
     cur = conn.cursor()
     cur.execute("DELETE FROM login_logs")
     for r in records:
+        # skip legacy string id rows when restoring into integer pk
+        rid = r.get("id")
+        if not isinstance(rid, int):
+            rid = None
         cur.execute("""
         INSERT INTO login_logs (
             id, username, display_name, event_type, result, message, module_code,
             login_time, logout_time, idle_minutes, ip_address, user_agent, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (r.get("id"), r.get("username"), r.get("display_name"), r.get("event_type"),
+        """, (rid, r.get("username"), r.get("display_name"), r.get("event_type"),
               r.get("result"), r.get("message"), r.get("module_code"), r.get("login_time"),
               r.get("logout_time"), r.get("idle_minutes"), r.get("ip_address"), r.get("user_agent"), r.get("created_at")))
     conn.commit()
@@ -315,6 +426,8 @@ def restore_audit_logs_from_permanent_file(path: Optional[str] = None) -> Dict[s
 
 restore_login_logs_from_permanent_file = restore_audit_logs_from_permanent_file
 restore_audit_logs = restore_audit_logs_from_permanent_file
+restore_audit_logs_from_state = restore_audit_logs_from_permanent_file
+restore_login_logs_from_state = restore_audit_logs_from_permanent_file
 
 
 def upload_audit_logs_to_github() -> Dict[str, Any]:
@@ -345,6 +458,7 @@ def upload_audit_logs_to_github() -> Dict[str, Any]:
 
 upload_login_logs_to_github = upload_audit_logs_to_github
 upload_audit_logs_to_github_cloud = upload_audit_logs_to_github
+upload_audit_logs_to_state_github = upload_audit_logs_to_github
 
 
 def get_audit_permanent_status() -> Dict[str, Any]:
@@ -363,40 +477,13 @@ def get_audit_permanent_status() -> Dict[str, Any]:
 
 
 audit_permanent_status = get_audit_permanent_status
+get_audit_state_status = get_audit_permanent_status
+login_log_state_status = get_audit_permanent_status
 get_login_log_permanent_status = get_audit_permanent_status
 
 
 def bootstrap_audit_log_service() -> Dict[str, Any]:
     ensure_login_logs_table()
     _ensure_dirs()
-    if count_login_logs() == 0:
-        record_login_log(username="SYSTEM", display_name="系統", event_type="BOOTSTRAP", result="SUCCESS", message="Audit log service initialized", module_code="11_login_logs")
-    return {"ok": True, "message": "audit_log_service ready", "count": count_login_logs()}
-
-# ===== V1.46 compatibility aliases for older/newer pages =====
-# Some page versions import these names directly. Keep all aliases to avoid ImportError.
-audit_state_status = get_audit_permanent_status
-get_audit_state_status = get_audit_permanent_status
-login_log_state_status = get_audit_permanent_status
-
-export_audit_logs_to_state = export_audit_logs_to_permanent_file
-create_audit_logs_state = export_audit_logs_to_permanent_file
-build_audit_logs_state = export_audit_logs_to_permanent_file
-export_login_logs_to_state = export_audit_logs_to_permanent_file
-
-restore_audit_logs_from_state = restore_audit_logs_from_permanent_file
-restore_login_logs_from_state = restore_audit_logs_from_permanent_file
-
-# Older page versions used clear_login_logs_by_date(start_date, end_date)
-def clear_login_logs_by_date(start_date: str, end_date: str, **kwargs: Any) -> int:
-    return delete_login_logs_by_date_range(start_date, end_date)
-
-# Extra common aliases
-clear_login_logs = clear_login_logs_by_date
-clear_audit_logs_by_date = clear_login_logs_by_date
-upload_audit_logs_to_github_cloud = upload_audit_logs_to_github
-upload_audit_logs_to_state_github = upload_audit_logs_to_github
-
-# Optional no-op fallback used by some versions to avoid login page slowdown.
-def maybe_record_session_login(*args: Any, **kwargs: Any) -> None:
-    return auto_record_session_login(*args, **kwargs)
+    # Do not fabricate records unless DB is completely empty and page wants status.
+    return {"ok": True, "message": "audit_log_service ready", "count": count_login_logs(include_legacy=True)}
