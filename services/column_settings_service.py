@@ -333,6 +333,118 @@ def _merge_hidden_back(original: pd.DataFrame, edited: Any) -> Any:
         return edited
 
 
+
+def _cell_to_text(v: Any) -> str:
+    try:
+        if pd.isna(v):
+            return ""
+    except Exception:
+        pass
+    return str(v)
+
+
+def _source_signature(df: pd.DataFrame) -> str:
+    """Lightweight signature for deciding whether an editor source is the same table.
+
+    We intentionally do NOT hash every cell, because that would reset the unsaved draft
+    whenever the page rebuilds the source dataframe from DB during a rerun.  The goal is
+    to keep the user's in-progress edits until they explicitly save/reload.
+    """
+    try:
+        cols = [str(c) for c in df.columns]
+        row_count = len(df)
+        id_hint = ""
+        for key_col in ("id", "ID / ID", "帳號 / Username", "username", "employee_id", "work_order", "record_key"):
+            if key_col in df.columns:
+                vals = [_cell_to_text(x) for x in df[key_col].head(80).tolist()]
+                id_hint = "|".join(vals)
+                break
+        return f"rows={row_count};cols={'|'.join(cols)};ids={id_hint}"
+    except Exception:
+        return f"rows={len(df)};cols={'|'.join(map(str, df.columns))}"
+
+
+def _align_draft_to_source(draft: pd.DataFrame, source: pd.DataFrame) -> pd.DataFrame:
+    """Keep unsaved draft edits while accepting new rows/columns from source."""
+    try:
+        out = draft.copy()
+        # Add new columns from source.
+        for col in source.columns:
+            if col not in out.columns:
+                out[col] = None
+                if len(source) >= len(out):
+                    out.loc[: len(out) - 1, col] = list(source[col].iloc[: len(out)])
+        # If the page added rows to the source, append them to the draft.
+        if len(source) > len(out):
+            extra = source.iloc[len(out):].copy()
+            for col in out.columns:
+                if col not in extra.columns:
+                    extra[col] = None
+            out = pd.concat([out, extra[out.columns]], ignore_index=True)
+        # Preserve column order based on source, but keep extra columns at the end.
+        ordered = [c for c in source.columns if c in out.columns] + [c for c in out.columns if c not in source.columns]
+        return out[ordered].reset_index(drop=True)
+    except Exception:
+        return draft
+
+
+def _get_editor_draft(table_id: str, source_df: pd.DataFrame) -> pd.DataFrame:
+    """Return a persistent in-session draft for st.data_editor.
+
+    This prevents the common Streamlit rerun problem where a user edits a cell, then a
+    selectbox/expander/button reruns the page and the table is rebuilt from the database,
+    making the just-entered value appear to disappear before pressing Save.
+    """
+    draft_key = f"_spt_editor_draft::{table_id}"
+    sig_key = f"_spt_editor_source_sig::{table_id}"
+    current_sig = _source_signature(source_df)
+    existing = st.session_state.get(draft_key)
+    existing_sig = st.session_state.get(sig_key)
+    if isinstance(existing, pd.DataFrame):
+        # Same table shape/keyset: keep user's unsaved edits.
+        if existing_sig == current_sig:
+            return _align_draft_to_source(existing, source_df)
+        # If only row count/columns changed, still try to preserve edits and append source rows.
+        try:
+            old_cols = set(map(str, existing.columns))
+            new_cols = set(map(str, source_df.columns))
+            if old_cols == new_cols and len(source_df) >= len(existing):
+                merged = _align_draft_to_source(existing, source_df)
+                st.session_state[draft_key] = merged
+                st.session_state[sig_key] = current_sig
+                return merged
+        except Exception:
+            pass
+    draft = source_df.copy()
+    st.session_state[draft_key] = draft
+    st.session_state[sig_key] = current_sig
+    return draft
+
+
+def _set_editor_draft(table_id: str, edited: Any) -> None:
+    try:
+        if isinstance(edited, pd.DataFrame):
+            st.session_state[f"_spt_editor_draft::{table_id}"] = edited.copy()
+        else:
+            st.session_state[f"_spt_editor_draft::{table_id}"] = pd.DataFrame(edited)
+    except Exception:
+        pass
+
+
+def clear_editor_draft(table_key_contains: str | None = None) -> int:
+    """Clear saved editor drafts.  Useful after a real Save/Reload action.
+
+    This function is safe to import from pages; it does nothing if no drafts exist.
+    """
+    keys = list(st.session_state.keys())
+    removed = 0
+    for k in keys:
+        if k.startswith("_spt_editor_draft::") or k.startswith("_spt_editor_source_sig::"):
+            if table_key_contains is None or table_key_contains in k:
+                st.session_state.pop(k, None)
+                removed += 1
+    return removed
+
 def install_column_settings_patch() -> None:
     """全域安裝表格欄位設定包裝，不需要逐頁改程式。"""
     if getattr(st, "_spt_column_settings_installed", False):
@@ -364,9 +476,13 @@ def install_column_settings_patch() -> None:
             kwargs.setdefault("use_container_width", True)
             kwargs["column_config"] = {**_build_column_config(df, table_setting), **kwargs.get("column_config", {})}
             kwargs["column_order"] = kwargs.get("column_order") or _visible_order(df, table_setting, editable=True)
-            edited = original_data_editor(data, *args, **kwargs)
-            return _merge_hidden_back(df, edited)
-        return original_data_editor(data, *args, **kwargs)
+            draft_df = _get_editor_draft(table_id, df)
+            edited = original_data_editor(draft_df, *args, **kwargs)
+            merged = _merge_hidden_back(draft_df, edited)
+            _set_editor_draft(table_id, merged)
+            return merged
+        edited = original_data_editor(data, *args, **kwargs)
+        return edited
 
     st.dataframe = dataframe_wrapper
     st.data_editor = data_editor_wrapper
