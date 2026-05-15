@@ -246,3 +246,38 @@ def save_time_records(df: pd.DataFrame) -> int:
         count += 1
     write_log("SAVE_TIME_RECORDS", f"人工編輯並儲存工時紀錄 {count} 筆", "time_records")
     return count
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:
+    """Delete selected time records. Admin-only visibility is enforced by page layer.
+
+    Keep the delete operation centralized so future pages can reuse the same
+    audit/log behavior instead of issuing raw DELETE SQL directly.
+    """
+    ids: list[int] = []
+    for rid in record_ids or []:
+        try:
+            i = int(rid)
+            if i > 0 and i not in ids:
+                ids.append(i)
+        except Exception:
+            continue
+    if not ids:
+        return 0
+
+    deleted = 0
+    for rid in ids:
+        rec = query_one("SELECT * FROM time_records WHERE id=?", (rid,))
+        if not rec:
+            continue
+        execute("DELETE FROM time_records WHERE id=?", (rid,))
+        deleted += 1
+        write_log(
+            "DELETE_TIME_RECORD",
+            f"{reason}：#{rid} {rec.get('employee_id','')} {rec.get('employee_name','')} {rec.get('work_order','')} {rec.get('process_name','')}",
+            "time_records",
+            rid,
+            detail=str(rec),
+            level="WARN",
+        )
+    return deleted

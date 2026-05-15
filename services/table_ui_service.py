@@ -151,7 +151,7 @@ def save_widths(table_key: str, widths: dict[str, int]) -> None:
 def _column_config(col: str, width: int | None = None):
     label = label_for(col)
     w = int(width or DEFAULT_WIDTHS.get(col, 140))
-    if col in {"is_active", "is_in_factory", "is_today_attendance", "is_group_work"}:
+    if col in {"is_active", "is_in_factory", "is_today_attendance", "is_group_work", "刪除", "delete", "selected"}:
         return st.column_config.CheckboxColumn(label, width=w)
     if col in {"work_hours", "total_hours", "avg_hours"}:
         return st.column_config.TextColumn(label, width=w)

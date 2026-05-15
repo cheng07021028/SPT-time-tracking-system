@@ -729,9 +729,10 @@ def mark_activity() -> None:
     st.session_state["auth_last_activity_ts"] = time.time()
 
 
-def trigger_post_record_continue_prompt(message: str = "工時紀錄已完成") -> None:
+def trigger_post_record_continue_prompt(message: str = "工時紀錄已完成", title: str = "工時紀錄完成") -> None:
     st.session_state["post_record_prompt"] = True
     st.session_state["post_record_message"] = message
+    st.session_state["post_record_title"] = title
 
 
 def render_post_record_continue_prompt() -> None:
@@ -740,7 +741,8 @@ def render_post_record_continue_prompt() -> None:
 
     def _content() -> None:
         st.success(st.session_state.get("post_record_message", "工時紀錄已完成"))
-        st.markdown("### 是否繼續記錄下一筆工時？")
+        st.markdown("### 是否繼續操作下一筆工時紀錄？")
+        st.caption("若選擇不繼續，系統會立即登出目前帳號，避免其他人冒用此帳號記錄工時。")
         c1, c2 = st.columns(2)
         if c1.button("是，繼續記錄 / Continue", use_container_width=True, key="post_continue_yes"):
             st.session_state["post_record_prompt"] = False
@@ -751,12 +753,12 @@ def render_post_record_continue_prompt() -> None:
             st.rerun()
 
     if hasattr(st, "dialog"):
-        @st.dialog("工時紀錄完成 / Record Completed")
+        @st.dialog(f"{st.session_state.get('post_record_title', '工時紀錄完成')} / Record Notice")
         def _dialog():
             _content()
         _dialog()
     else:
-        st.warning("工時紀錄完成，請選擇是否繼續記錄。")
+        st.warning("工時紀錄已處理，請選擇是否繼續操作下一筆紀錄。")
         _content()
 
 
