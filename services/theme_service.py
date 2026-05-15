@@ -1,272 +1,392 @@
 # -*- coding: utf-8 -*-
-"""SPT Time Tracking - Unified theme service V1.49.
-
-Goals:
-- One unified module header style for every page.
-- Keep Super Plus Tech logo, breathing glow, dark technology theme.
-- Keep compatibility with old page calls: apply_theme(), app_theme(), render_header(...).
-- Improve input/dropdown/table editor contrast globally.
 """
+SPT Time Tracking System - Unified Theme Service
+V1.52
+- Restore Super Plus Tech logo rendering.
+- Prevent raw <div> HTML text from appearing.
+- Restore unified module header style.
+- Restore sidebar visual style.
+- Keep backward compatible functions used by older pages.
+"""
+
 from __future__ import annotations
 
 import base64
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterable
 
 import streamlit as st
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOGO_CANDIDATES = [
     PROJECT_ROOT / "data" / "logo" / "super_plus_logo.png",
     PROJECT_ROOT / "data" / "logo" / "logococo(黑字).png",
-    PROJECT_ROOT / "logococo(黑字).png",
+    PROJECT_ROOT / "data" / "logo" / "logo.png",
 ]
 
 
-def _logo_data_uri() -> str:
-    for path in LOGO_CANDIDATES:
-        try:
-            if path.exists() and path.stat().st_size > 0:
-                data = base64.b64encode(path.read_bytes()).decode("ascii")
-                ext = path.suffix.lower().replace('.', '') or 'png'
-                if ext == 'jpg':
-                    ext = 'jpeg'
-                return f"data:image/{ext};base64,{data}"
-        except Exception:
-            pass
+def _file_to_base64(path: Path) -> str:
+    try:
+        if path.exists() and path.is_file():
+            return base64.b64encode(path.read_bytes()).decode("utf-8")
+    except Exception:
+        pass
     return ""
 
 
+def _logo_base64() -> str:
+    for p in LOGO_CANDIDATES:
+        b64 = _file_to_base64(p)
+        if b64:
+            return b64
+    return ""
+
+
+def _logo_html() -> str:
+    b64 = _logo_base64()
+    if b64:
+        return f'<img class="spt-logo-img" src="data:image/png;base64,{b64}" alt="Super Plus Tech Logo" />'
+    return '<div class="spt-logo-fallback">SPT</div>'
+
+
 def apply_theme() -> None:
-    """Apply global SPT dark/technology theme once per rerun."""
+    """Apply global dark-tech theme and component fixes."""
     st.markdown(
         """
 <style>
 :root {
-  --spt-bg-0: #050b18;
-  --spt-bg-1: #071426;
-  --spt-panel: rgba(7, 26, 45, 0.86);
-  --spt-panel-2: rgba(10, 43, 70, 0.82);
-  --spt-cyan: #16e6ff;
-  --spt-cyan-soft: rgba(22, 230, 255, 0.36);
-  --spt-text: #f2f8ff;
-  --spt-muted: #a9bad0;
+    --spt-bg-0: #050b18;
+    --spt-bg-1: #071626;
+    --spt-bg-2: #09233a;
+    --spt-card: rgba(8, 28, 48, 0.86);
+    --spt-card-2: rgba(10, 43, 70, 0.72);
+    --spt-cyan: #23e6ff;
+    --spt-cyan-soft: rgba(35, 230, 255, 0.32);
+    --spt-blue: #3ea7ff;
+    --spt-purple: #5431a8;
+    --spt-text: #f2fbff;
+    --spt-muted: rgba(226, 243, 255, .72);
+    --spt-border: rgba(35, 230, 255, .42);
 }
-html, body, [data-testid="stAppViewContainer"] {
-  background:
-    radial-gradient(circle at 12% 5%, rgba(55, 32, 112, .35), transparent 30%),
-    radial-gradient(circle at 88% 0%, rgba(0, 178, 255, .18), transparent 32%),
-    linear-gradient(135deg, #060b1b 0%, #06182a 46%, #062137 100%) !important;
-  color: var(--spt-text) !important;
+
+/* App background */
+.stApp {
+    background:
+        radial-gradient(circle at 12% 10%, rgba(78, 47, 163, .28), transparent 28%),
+        radial-gradient(circle at 88% 0%, rgba(20, 166, 210, .20), transparent 28%),
+        linear-gradient(135deg, #06091a 0%, #071728 48%, #081d2d 100%) !important;
+    color: var(--spt-text) !important;
 }
-[data-testid="stHeader"] { background: rgba(2, 8, 18, 0.78) !important; }
-[data-testid="stSidebar"] {
-  background: linear-gradient(180deg, #07162a 0%, #04101f 100%) !important;
-  border-right: 1px solid rgba(22,230,255,.18) !important;
+
+/* Main block width and spacing */
+.block-container {
+    padding-top: 2.0rem !important;
+    padding-bottom: 3rem !important;
+    max-width: 1680px !important;
 }
-[data-testid="stSidebar"] * { color: #eef8ff !important; font-weight: 700 !important; }
-[data-testid="stSidebarNav"] a { font-size: 1.05rem !important; }
-[data-testid="stSidebarNav"] a[aria-current="page"],
-[data-testid="stSidebarNav"] a:hover {
-  background: linear-gradient(90deg, rgba(22,230,255,.26), rgba(109,76,255,.28)) !important;
-  border-radius: 10px !important;
-  box-shadow: 0 0 18px rgba(22,230,255,.22) !important;
+
+/* Hide Streamlit default noise a bit */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+
+/* Typography */
+html, body, [class*="css"], .stMarkdown, .stText, p, label, span, div {
+    font-family: "Microsoft JhengHei", "Noto Sans TC", "Segoe UI", Arial, sans-serif;
 }
+
+h1, h2, h3 {
+    color: var(--spt-text) !important;
+    letter-spacing: .4px;
+}
+
+/* ===== Unified SPT header ===== */
 .spt-header-wrap {
-  margin: 28px 0 30px 0;
-  padding: 20px 28px;
-  border-radius: 22px;
-  border: 1px solid rgba(22,230,255,.56);
-  background: linear-gradient(105deg, rgba(8,31,50,.92), rgba(8,76,101,.72));
-  box-shadow: 0 0 0 1px rgba(22,230,255,.08) inset, 0 0 28px rgba(22,230,255,.22), 0 0 58px rgba(92,67,255,.12);
-  animation: sptBreath 3.6s ease-in-out infinite;
+    width: 100%;
+    margin: 1.0rem 0 1.55rem 0;
+    padding: 1.25rem 1.45rem;
+    border: 1px solid var(--spt-border);
+    border-radius: 20px;
+    background:
+        linear-gradient(105deg, rgba(4, 17, 33, .96), rgba(9, 78, 104, .72) 74%, rgba(3, 31, 53, .86)),
+        radial-gradient(circle at 14% 0%, rgba(35, 230, 255, .22), transparent 34%);
+    box-shadow:
+        0 0 0 1px rgba(35, 230, 255, .08) inset,
+        0 0 22px rgba(35, 230, 255, .20),
+        0 0 52px rgba(51, 88, 255, .10);
+    animation: sptBreath 3.8s ease-in-out infinite;
 }
-@keyframes sptBreath {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(22,230,255,.08) inset, 0 0 20px rgba(22,230,255,.18), 0 0 42px rgba(92,67,255,.10); }
-  50% { box-shadow: 0 0 0 1px rgba(22,230,255,.18) inset, 0 0 34px rgba(22,230,255,.32), 0 0 72px rgba(92,67,255,.20); }
+
+.spt-header-inner {
+    display: flex;
+    align-items: center;
+    gap: 2.0rem;
 }
-.spt-header-flex { display:flex; align-items:center; gap:28px; }
+
 .spt-logo-box {
-  background: rgba(255,255,255,.96);
-  border-radius: 15px;
-  padding: 10px 16px;
-  min-width: 250px;
-  max-width: 320px;
-  height: 86px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  box-shadow: 0 12px 26px rgba(0,0,0,.20);
+    width: 285px;
+    min-width: 230px;
+    height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, .96);
+    box-shadow:
+        0 8px 18px rgba(0, 0, 0, .22),
+        0 0 18px rgba(255, 255, 255, .12);
+    overflow: hidden;
 }
-.spt-logo-box img { max-height: 70px; max-width: 285px; object-fit: contain; }
-.spt-logo-fallback { font-size: 2rem; font-weight: 900; color:#0b1f33; letter-spacing:.08em; }
-.spt-header-no { font-size: 2.65rem; font-weight: 900; letter-spacing: .03em; color: #ffffff; text-shadow: 0 0 20px rgba(22,230,255,.34); line-height:1; }
-.spt-header-title { font-size: 2.45rem; font-weight: 900; color: #f6fbff; text-shadow: 0 0 22px rgba(22,230,255,.30); line-height:1.12; }
-.spt-header-subtitle { margin-top: 12px; font-size: 1.08rem; font-weight: 700; color: rgba(225,238,250,.78); }
-@media (max-width: 900px) {
-  .spt-header-flex { flex-direction:column; align-items:flex-start; }
-  .spt-logo-box { min-width: 220px; height: 76px; }
-  .spt-header-title { font-size: 2rem; }
-  .spt-header-no { font-size: 2.15rem; }
+
+.spt-logo-img {
+    max-width: 93%;
+    max-height: 82%;
+    object-fit: contain;
 }
-/* cards/buttons */
-.stButton > button, .stDownloadButton > button {
-  border: 1px solid rgba(22,230,255,.55) !important;
-  background: rgba(8, 57, 87, .72) !important;
-  color: #f5fbff !important;
-  border-radius: 11px !important;
-  font-weight: 800 !important;
-  box-shadow: 0 0 16px rgba(22,230,255,.10) !important;
+
+.spt-logo-fallback {
+    font-size: 2.0rem;
+    letter-spacing: 10px;
+    font-weight: 900;
+    color: #071728;
 }
-.stButton > button:hover, .stDownloadButton > button:hover {
-  border-color: rgba(22,230,255,.90) !important;
-  box-shadow: 0 0 22px rgba(22,230,255,.24) !important;
-  transform: translateY(-1px);
+
+.spt-header-text {
+    min-width: 0;
+    flex: 1;
 }
-/* input light mode for visibility */
+
+.spt-header-title {
+    color: #f6fbff;
+    font-size: 2.55rem;
+    line-height: 1.15;
+    font-weight: 900;
+    letter-spacing: .8px;
+    text-shadow:
+        0 0 10px rgba(255,255,255,.26),
+        0 0 22px rgba(35,230,255,.28);
+    white-space: nowrap;
+}
+
+.spt-header-subtitle {
+    color: rgba(230, 243, 255, .74);
+    margin-top: .45rem;
+    font-size: 1.08rem;
+    font-weight: 650;
+    letter-spacing: .15px;
+}
+
+@keyframes sptBreath {
+    0%, 100% {
+        box-shadow:
+            0 0 0 1px rgba(35, 230, 255, .08) inset,
+            0 0 18px rgba(35, 230, 255, .16),
+            0 0 46px rgba(51, 88, 255, .09);
+    }
+    50% {
+        box-shadow:
+            0 0 0 1px rgba(35, 230, 255, .18) inset,
+            0 0 28px rgba(35, 230, 255, .32),
+            0 0 70px rgba(51, 88, 255, .18);
+    }
+}
+
+/* ===== KPI / Cards ===== */
+.spt-kpi-grid, .spt-module-grid {
+    display: grid;
+    gap: 1rem;
+    margin: 1rem 0 1.5rem 0;
+}
+.spt-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.spt-module-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.spt-kpi-card, .spt-module-card {
+    border: 1px solid rgba(35, 230, 255, .28);
+    border-radius: 14px;
+    background: rgba(6, 22, 39, .78);
+    padding: 1.08rem 1.15rem;
+    box-shadow: 0 0 18px rgba(35, 230, 255, .08);
+}
+.spt-kpi-label, .spt-module-desc {
+    color: rgba(232, 246, 255, .70);
+    font-weight: 650;
+    font-size: .95rem;
+}
+.spt-kpi-value {
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 850;
+    margin-top: .35rem;
+}
+.spt-module-name {
+    color: #fff;
+    font-size: 1.45rem;
+    font-weight: 900;
+    margin-bottom: .45rem;
+}
+
+/* ===== Sidebar restore ===== */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #071223 0%, #071827 52%, #06111d 100%) !important;
+    border-right: 1px solid rgba(35, 230, 255, .18);
+}
+
+section[data-testid="stSidebar"] * {
+    color: #f1fbff !important;
+    font-weight: 760 !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a,
+section[data-testid="stSidebar"] a {
+    font-size: 1.02rem !important;
+    border-radius: 10px !important;
+    margin: .18rem .25rem !important;
+    padding: .42rem .55rem !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {
+    background: rgba(35, 230, 255, .10) !important;
+}
+
+section[data-testid="stSidebar"] [aria-current="page"],
+section[data-testid="stSidebar"] a[aria-current="page"] {
+    background: linear-gradient(90deg, rgba(35, 230, 255, .34), rgba(80, 45, 150, .58)) !important;
+    box-shadow: 0 0 16px rgba(35, 230, 255, .20) !important;
+}
+
+/* ===== Buttons ===== */
+.stButton > button, button[kind="primary"], button[kind="secondary"] {
+    border-radius: 11px !important;
+    border: 1px solid rgba(35, 230, 255, .55) !important;
+    background: rgba(8, 61, 91, .68) !important;
+    color: #f7fdff !important;
+    font-weight: 800 !important;
+    box-shadow: 0 0 12px rgba(35, 230, 255, .10) !important;
+}
+.stButton > button:hover {
+    border-color: rgba(35, 230, 255, .92) !important;
+    box-shadow: 0 0 22px rgba(35, 230, 255, .22) !important;
+}
+
+/* ===== Inputs: light background + dark text ===== */
 div[data-baseweb="input"] input,
 div[data-baseweb="base-input"] input,
 div[data-baseweb="textarea"] textarea,
 textarea,
-input[type="text"], input[type="password"], input[type="number"] {
-  background: rgba(245,250,255,.96) !important;
-  color: #07192a !important;
-  -webkit-text-fill-color: #07192a !important;
-  caret-color: #07192a !important;
-  border: 1px solid rgba(61,210,255,.70) !important;
-  border-radius: 12px !important;
-  font-weight: 700 !important;
+input[type="text"],
+input[type="password"],
+input[type="number"] {
+    background: rgba(245, 250, 255, 0.95) !important;
+    color: #071827 !important;
+    -webkit-text-fill-color: #071827 !important;
+    caret-color: #071827 !important;
+    border: 1px solid rgba(80, 220, 255, .62) !important;
+    border-radius: 11px !important;
+    font-weight: 800 !important;
 }
-input::placeholder, textarea::placeholder { color: rgba(34,67,92,.62) !important; -webkit-text-fill-color: rgba(34,67,92,.62) !important; }
-div[data-baseweb="input"]:focus-within, div[data-baseweb="textarea"]:focus-within {
-  box-shadow: 0 0 0 1px rgba(22,230,255,.65), 0 0 20px rgba(22,230,255,.20) !important;
-  border-radius: 14px !important;
-}
-/* select closed state: light box, dark text */
+
+/* Select input collapsed */
 div[data-baseweb="select"] > div {
-  background: rgba(245,250,255,.96) !important;
-  color: #07192a !important;
-  border: 1px solid rgba(61,210,255,.70) !important;
-  border-radius: 12px !important;
+    background: rgba(245, 250, 255, .95) !important;
+    border: 1px solid rgba(80, 220, 255, .62) !important;
+    border-radius: 11px !important;
 }
-div[data-baseweb="select"] > div * { color: #07192a !important; -webkit-text-fill-color: #07192a !important; font-weight: 800 !important; }
-/* select dropdown: dark background, light text; selected cyan */
-ul[role="listbox"], div[role="listbox"] {
-  background: #061426 !important;
-  border: 1px solid rgba(22,230,255,.55) !important;
-  border-radius: 12px !important;
-  box-shadow: 0 12px 32px rgba(0,0,0,.45), 0 0 22px rgba(22,230,255,.18) !important;
+div[data-baseweb="select"] > div * {
+    color: #071827 !important;
+    -webkit-text-fill-color: #071827 !important;
+    font-weight: 820 !important;
 }
-ul[role="listbox"] li, div[role="option"], div[role="listbox"] * {
-  color: #f2fbff !important;
-  -webkit-text-fill-color: #f2fbff !important;
-  font-weight: 800 !important;
+
+/* Select dropdown menu: dark bg + light text */
+div[data-baseweb="popover"],
+div[data-baseweb="popover"] > div,
+ul[role="listbox"],
+div[role="listbox"] {
+    background: #061522 !important;
+    border: 1px solid rgba(35, 230, 255, .42) !important;
+    box-shadow: 0 14px 34px rgba(0,0,0,.45), 0 0 22px rgba(35,230,255,.16) !important;
 }
-ul[role="listbox"] li[aria-selected="true"], div[role="option"][aria-selected="true"] {
-  background: #23e9ff !important;
-  color: #061426 !important;
-  -webkit-text-fill-color: #061426 !important;
+ul[role="listbox"] li,
+div[role="option"],
+div[data-baseweb="menu"] li,
+div[data-baseweb="menu"] div {
+    color: #f4fbff !important;
+    -webkit-text-fill-color: #f4fbff !important;
+    background: #061522 !important;
+    font-weight: 850 !important;
 }
-/* date / time / number */
-.stDateInput input, .stTimeInput input, .stNumberInput input { background: rgba(245,250,255,.96) !important; color:#07192a !important; -webkit-text-fill-color:#07192a !important; }
-/* data editor */
+ul[role="listbox"] li:hover,
+div[role="option"]:hover,
+div[aria-selected="true"] {
+    background: #26e6ff !important;
+    color: #061522 !important;
+    -webkit-text-fill-color: #061522 !important;
+    font-weight: 900 !important;
+}
+
+/* Data editor editing widgets */
 [data-testid="stDataEditor"] input,
-[data-testid="stDataEditor"] textarea,
-[data-testid="stDataEditor"] select {
-  background: rgba(245,250,255,.98) !important;
-  color: #07192a !important;
-  -webkit-text-fill-color: #07192a !important;
-  font-weight: 800 !important;
+[data-testid="stDataEditor"] textarea {
+    background: rgba(245, 250, 255, .96) !important;
+    color: #071827 !important;
+    -webkit-text-fill-color: #071827 !important;
+    font-weight: 850 !important;
 }
-[data-testid="stDataEditor"] [role="gridcell"] { color:#f4fbff !important; font-weight:700 !important; }
-[data-testid="stDataEditor"] [role="columnheader"] { color:#d9eaff !important; font-weight:900 !important; }
-/* metric cards */
-[data-testid="stMetric"] {
-  background: rgba(8, 30, 50, .78);
-  border: 1px solid rgba(22,230,255,.24);
-  border-radius: 15px;
-  padding: 14px 18px;
+
+/* Tables */
+[data-testid="stDataFrame"], [data-testid="stDataEditor"] {
+    border: 1px solid rgba(35, 230, 255, .32) !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
 }
-hr { border-color: rgba(22,230,255,.16) !important; }
+
+/* Expander */
+.streamlit-expanderHeader {
+    color: #f1fbff !important;
+    font-weight: 850 !important;
+    border-radius: 10px !important;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+    .spt-header-inner { gap: 1rem; }
+    .spt-logo-box { width: 220px; min-width: 190px; height: 78px; }
+    .spt-header-title { font-size: 2.0rem; white-space: normal; }
+    .spt-kpi-grid, .spt-module-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 </style>
         """,
         unsafe_allow_html=True,
     )
 
 
-app_theme = apply_theme
-inject_global_css = apply_theme
+def app_theme() -> None:
+    """Backward compatible alias."""
+    apply_theme()
 
 
-def _parse_header_args(*args: Any, **kwargs: Any) -> tuple[str, str, str]:
-    module_no = str(kwargs.get("module_no", "") or "")
-    title = str(kwargs.get("title", "") or "")
-    subtitle = str(kwargs.get("subtitle", "") or "")
+def render_header(title: str, subtitle: str = "", module_no: str | int | None = None, **_: Any) -> None:
+    """Render unified module header. Always uses unsafe_allow_html=True."""
+    apply_theme()
 
-    if len(args) >= 3:
-        module_no = str(args[0] or module_no)
-        title = str(args[1] or title)
-        subtitle = str(args[2] or subtitle)
-    elif len(args) == 2:
-        a0, a1 = str(args[0] or ""), str(args[1] or "")
-        if "|" in a0:
-            left, right = [x.strip() for x in a0.split("|", 1)]
-            module_no = left or module_no
-            title = right or title
-            subtitle = a1 or subtitle
-        else:
-            title = a0 or title
-            subtitle = a1 or subtitle
-    elif len(args) == 1:
-        a0 = str(args[0] or "")
-        if "|" in a0:
-            left, right = [x.strip() for x in a0.split("|", 1)]
-            module_no = left or module_no
-            title = right or title
-        elif a0.strip().isdigit():
-            module_no = a0
-        else:
-            title = a0 or title
+    no = ""
+    if module_no is not None and str(module_no).strip():
+        raw = str(module_no).strip()
+        no = raw.zfill(2) if raw.isdigit() else raw
 
-    # normalize forms like "09_09. 資料永久保存與備份" or "09. 資料..."
-    if module_no and not module_no[:2].isdigit() and len(module_no) >= 2:
-        pass
-    if title and title[:2].isdigit() and ("." in title[:5] or "|" in title[:5]):
-        raw = title.replace("|", ".", 1)
-        parts = raw.split(".", 1)
-        if parts[0].strip().isdigit():
-            module_no = parts[0].strip().zfill(2)
-            title = parts[1].strip() if len(parts) > 1 else title
-    if module_no:
-        module_no = module_no.strip().replace(".", "").zfill(2) if module_no.strip().isdigit() else module_no.strip()
-    return module_no, title, subtitle
+    if no:
+        header_title = f"{no}｜{title}"
+    else:
+        header_title = str(title)
 
-
-def render_header(*args: Any, **kwargs: Any) -> None:
-    """Render the unified SPT page header.
-
-    Compatible call styles:
-    - render_header("04", "人員名單", "...")
-    - render_header("04 | 人員名單", "...")
-    - render_header(title="人員名單", module_no="04", subtitle="...")
-    """
-    module_no, title, subtitle = _parse_header_args(*args, **kwargs)
-    logo = _logo_data_uri()
-    logo_html = f'<img src="{logo}" alt="SPT Logo" />' if logo else '<div class="spt-logo-fallback">SPT</div>'
-    no_html = f'<div class="spt-header-no">{module_no}</div>' if module_no else ''
-    title_html = f'<div class="spt-header-title">{title}</div>' if title else ''
-    subtitle_html = f'<div class="spt-header-subtitle">{subtitle}</div>' if subtitle else ''
     st.markdown(
         f"""
 <div class="spt-header-wrap">
-  <div class="spt-header-flex">
-    <div class="spt-logo-box">{logo_html}</div>
-    <div>
-      <div style="display:flex; align-items:center; gap:18px; flex-wrap:wrap;">
-        {no_html}
-        {title_html}
-      </div>
-      {subtitle_html}
+  <div class="spt-header-inner">
+    <div class="spt-logo-box">{_logo_html()}</div>
+    <div class="spt-header-text">
+      <div class="spt-header-title">{header_title}</div>
+      <div class="spt-header-subtitle">{subtitle or ""}</div>
     </div>
   </div>
 </div>
@@ -275,191 +395,92 @@ def render_header(*args: Any, **kwargs: Any) -> None:
     )
 
 
-render_page_header = render_header
+def render_home_header(
+    title: str = "超慧科技製造部｜智慧工時紀錄系統",
+    subtitle: str = "Super Plus Tech Manufacturing Time Tracking System｜Streamlit + SQLite + GitHub Cloud Storage",
+    **_: Any,
+) -> None:
+    """Home page header."""
+    render_header(title=title, subtitle=subtitle, module_no=None)
 
 
-def render_home_header(*args: Any, **kwargs: Any) -> None:
-    subtitle = kwargs.get("subtitle") or "Super Plus Tech Manufacturing Time Tracking System｜Streamlit + SQLite + GitHub Cloud Storage"
-    render_header("", "超慧科技製造部｜智慧工時紀錄系統", subtitle)
-
-
-def render_kpi_cards(items: list[tuple[str, Any]] | None = None) -> None:
+def render_kpi_cards(items: Any | None = None, **_: Any) -> None:
+    """Render KPI cards. Accepts list[dict], dict, or None."""
     if not items:
-        return
-    cols = st.columns(len(items))
-    for col, item in zip(cols, items):
-        label, value = item
-        with col:
-            st.metric(label, value)
+        items = [
+            {"label": "核心模組 / Modules", "value": "12"},
+            {"label": "資料庫 / Database", "value": "SQLite"},
+            {"label": "雲端保存 / Cloud Storage", "value": "GitHub"},
+            {"label": "系統狀態 / Status", "value": "Online"},
+        ]
 
-# ===== SPT V1.51 COMPATIBILITY FIX START =====
-def render_module_cards(items=None):
-    """Render home module cards. Compatibility function required by streamlit_app.py.
+    if isinstance(items, dict):
+        items = [{"label": k, "value": v} for k, v in items.items()]
 
-    Accepts either a list of tuples/lists/dicts, or uses the standard SPT module list.
-    This function intentionally uses Streamlit native columns + markdown so it is robust
-    across Streamlit Cloud versions and will not display raw HTML as text.
-    """
-    import streamlit as st
-
-    default_items = [
-        ("01", "工時紀錄", "Time Records", "快速開始、暫停、下班、完工與工時計算"),
-        ("02", "歷史紀錄", "History", "完整工時明細查詢、編輯、儲存與 Excel 匯出"),
-        ("03", "製令管理", "Work Orders", "Excel 匯入、貼上資料、手動新增、頁面編輯"),
-        ("04", "人員名單", "Employees", "人員主檔、在廠狀態、今日出勤勾選"),
-        ("05", "製令工時分析", "Analysis", "製令累積工時、工段分析與明細查詢"),
-        ("06", "LOG查詢", "Logs", "系統操作、異常與資料異動紀錄查詢"),
-        ("07", "今日未紀錄名單", "Missing Today", "出勤但未登錄工時的人員即時提示"),
-        ("08", "人員每日工時", "Daily Hours", "每日累積工時與合理區間異常提醒"),
-        ("09", "資料永久保存與備份", "Persistence", "永久檔、GitHub 雲端、還原與備份"),
-        ("10", "權限管理", "Permission", "帳號、密碼、角色與模組權限設定"),
-        ("11", "登入紀錄", "Audit Logs", "登入、登出、權限不足與安全事件查詢"),
-        ("12", "模組永久紀錄中心", "Module Persistence", "各模組獨立紀錄檔與設定檔管理"),
-    ]
-    if not items:
-        items = default_items
-
-    normalized = []
+    html = ['<div class="spt-kpi-grid">']
     for item in items:
-        if isinstance(item, dict):
-            no = str(item.get("no") or item.get("module_no") or item.get("id") or "")
-            name = str(item.get("name") or item.get("title") or "")
-            en = str(item.get("en") or item.get("english") or item.get("subtitle") or "")
-            desc = str(item.get("desc") or item.get("description") or "")
+        label = str(item.get("label", ""))
+        value = str(item.get("value", ""))
+        html.append(f"""
+<div class="spt-kpi-card">
+  <div class="spt-kpi-label">{label}</div>
+  <div class="spt-kpi-value">{value}</div>
+</div>
+""")
+    html.append("</div>")
+    st.markdown("\n".join(html), unsafe_allow_html=True)
+
+
+def render_module_cards(modules: Any | None = None, **_: Any) -> None:
+    """Render home module cards. Kept for streamlit_app.py compatibility."""
+    if not modules:
+        modules = [
+            ("01. 工時紀錄", "快速開始、暫停、下班、完工與工時計算"),
+            ("02. 歷史紀錄", "完整工時明細查詢、編輯、儲存與匯出"),
+            ("03. 製令管理", "Excel 匯入、貼上資料、頁面編輯與儲存"),
+            ("04. 人員名單", "人員主檔、在廠狀態、今日出勤勾選"),
+            ("05. 製令工時分析", "製令、工段、人員累積工時分析"),
+            ("06. LOG查詢", "系統操作、異常與資料異動紀錄"),
+            ("07. 今日未紀錄名單", "出勤但未登錄工時的人員即時提示"),
+            ("08. 人員每日工時", "每日累積工時、合理區間與異常提醒"),
+            ("09. 資料永久保存與備份", "GitHub 雲端永久保存、還原與防遺失"),
+            ("10. 權限管理", "帳號、密碼、角色與模組權限設定"),
+            ("11. 登入紀錄", "登入、登出、權限不足與安全事件查詢"),
+            ("12. 模組永久紀錄中心", "各模組獨立紀錄檔、設定檔與歷史備份"),
+        ]
+
+    html = ['<div class="spt-module-grid">']
+    for mod in modules:
+        if isinstance(mod, dict):
+            name = str(mod.get("name") or mod.get("title") or "")
+            desc = str(mod.get("desc") or mod.get("description") or "")
         else:
-            seq = list(item) if isinstance(item, (tuple, list)) else [str(item)]
-            no = str(seq[0]) if len(seq) > 0 else ""
-            name = str(seq[1]) if len(seq) > 1 else ""
-            en = str(seq[2]) if len(seq) > 2 else ""
-            desc = str(seq[3]) if len(seq) > 3 else ""
-        normalized.append((no, name, en, desc))
-
-    st.markdown("### 系統模組 / System Modules")
-    for row_start in range(0, len(normalized), 4):
-        cols = st.columns(4)
-        for col, (no, name, en, desc) in zip(cols, normalized[row_start:row_start + 4]):
-            with col:
-                st.markdown(
-                    f"""
-                    <div class="spt-module-card">
-                        <div class="spt-module-no">{no}</div>
-                        <div class="spt-module-name">{name}</div>
-                        <div class="spt-module-en">{en}</div>
-                        <div class="spt-module-desc">{desc}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+            name = str(mod[0]) if len(mod) > 0 else ""
+            desc = str(mod[1]) if len(mod) > 1 else ""
+        html.append(f"""
+<div class="spt-module-card">
+  <div class="spt-module-name">{name}</div>
+  <div class="spt-module-desc">{desc}</div>
+</div>
+""")
+    html.append("</div>")
+    st.markdown("\n".join(html), unsafe_allow_html=True)
 
 
-# Strong dropdown contrast CSS, kept in the final theme file instead of injection-only patch.
-def apply_dropdown_contrast_fix():
-    import streamlit as st
-    st.markdown(r'''
-    <style>
-    div[data-baseweb="select"] > div,
-    div[data-baseweb="input"] input,
-    div[data-baseweb="base-input"] input,
-    div[data-baseweb="textarea"] textarea,
-    textarea,
-    input[type="text"],
-    input[type="password"],
-    input[type="number"] {
-        background-color: #eef7ff !important;
-        color: #071827 !important;
-        caret-color: #071827 !important;
-        border: 1px solid rgba(34, 211, 238, 0.85) !important;
-        border-radius: 10px !important;
-        font-weight: 700 !important;
-        text-shadow: none !important;
-    }
-    div[data-baseweb="select"] span,
-    div[data-baseweb="select"] div {
-        color: #071827 !important;
-        text-shadow: none !important;
-    }
-    div[data-baseweb="popover"],
-    div[data-baseweb="popover"] > div,
-    div[data-baseweb="menu"],
-    ul[role="listbox"],
-    div[role="listbox"] {
-        background-color: #071322 !important;
-        color: #f2fbff !important;
-        border: 1px solid rgba(34, 211, 238, 0.72) !important;
-        border-radius: 12px !important;
-        box-shadow: 0 14px 36px rgba(0,0,0,.58), 0 0 22px rgba(34,211,238,.18) !important;
-    }
-    ul[role="listbox"] li,
-    ul[role="listbox"] li *,
-    div[role="option"],
-    div[role="option"] *,
-    div[data-baseweb="menu"] li,
-    div[data-baseweb="menu"] li *,
-    div[data-baseweb="popover"] div[role="option"],
-    div[data-baseweb="popover"] div[role="option"] * {
-        background-color: transparent !important;
-        color: #f2fbff !important;
-        font-weight: 750 !important;
-        text-shadow: none !important;
-    }
-    ul[role="listbox"] li:hover,
-    ul[role="listbox"] li[aria-selected="true"],
-    div[role="option"]:hover,
-    div[role="option"][aria-selected="true"],
-    div[data-baseweb="popover"] div[role="option"]:hover,
-    div[data-baseweb="popover"] div[role="option"][aria-selected="true"] {
-        background-color: #22d3ee !important;
-        color: #03121f !important;
-    }
-    ul[role="listbox"] li:hover *,
-    ul[role="listbox"] li[aria-selected="true"] *,
-    div[role="option"]:hover *,
-    div[role="option"][aria-selected="true"] *,
-    div[data-baseweb="popover"] div[role="option"]:hover *,
-    div[data-baseweb="popover"] div[role="option"][aria-selected="true"] * {
-        color: #03121f !important;
-        font-weight: 850 !important;
-    }
-    [data-testid="stDataEditor"] input,
-    [data-testid="stDataEditor"] textarea,
-    [data-testid="stDataEditor"] [contenteditable="true"] {
-        background-color: #eef7ff !important;
-        color: #071827 !important;
-        caret-color: #071827 !important;
-        font-weight: 700 !important;
-        text-shadow: none !important;
-    }
-    div[data-baseweb="tag"] {
-        background-color: rgba(34, 211, 238, 0.25) !important;
-        border: 1px solid rgba(34, 211, 238, 0.65) !important;
-        border-radius: 9px !important;
-    }
-    div[data-baseweb="tag"] span,
-    div[data-baseweb="tag"] svg,
-    div[data-baseweb="select"] svg {
-        color: #071827 !important;
-        fill: #071827 !important;
-    }
-    </style>
-    ''', unsafe_allow_html=True)
+def render_section_title(title: str, subtitle: str = "") -> None:
+    st.markdown(f"### {title}")
+    if subtitle:
+        st.caption(subtitle)
 
-# Wrap existing theme functions once, without recursive redefinition.
-try:
-    _spt_v151_original_apply_theme = apply_theme
-    def apply_theme(*args, **kwargs):
-        result = _spt_v151_original_apply_theme(*args, **kwargs)
-        apply_dropdown_contrast_fix()
-        return result
-except Exception:
-    pass
 
-try:
-    _spt_v151_original_app_theme = app_theme
-    def app_theme(*args, **kwargs):
-        result = _spt_v151_original_app_theme(*args, **kwargs)
-        apply_dropdown_contrast_fix()
-        return result
-except Exception:
-    def app_theme(*args, **kwargs):
-        return apply_theme(*args, **kwargs)
-# ===== SPT V1.51 COMPATIBILITY FIX END =====
+# Additional backward-compatible names used by earlier patches
+def render_page_header(title: str, subtitle: str = "", module_no: str | int | None = None, **kwargs: Any) -> None:
+    render_header(title=title, subtitle=subtitle, module_no=module_no, **kwargs)
+
+
+def spt_header(title: str, subtitle: str = "", module_no: str | int | None = None, **kwargs: Any) -> None:
+    render_header(title=title, subtitle=subtitle, module_no=module_no, **kwargs)
+
+
+def inject_global_css() -> None:
+    apply_theme()
