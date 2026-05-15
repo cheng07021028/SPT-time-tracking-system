@@ -598,13 +598,10 @@ with tab_perm:
     }
     for key, zh, en in ACTIONS:
         col_cfg[key] = st.column_config.CheckboxColumn(f"{zh} / {en}")
-    st.caption("效能模式：權限勾選不會每點一格就重新運算；只有按下套用才會寫入永久設定。")
-    with st.form("permission_editor_batch_form", clear_on_submit=False):
-        edited_perm = st.data_editor(view_df[base_cols + ACTION_COLS], key="v136_permission_editor", use_container_width=True, hide_index=True, column_config=col_cfg)
-        submitted_perm = st.form_submit_button("✅ 套用並儲存權限 / Apply and Save Permissions", type="primary", use_container_width=True)
-    st.markdown("#### 設定摘要 / Permission Summary")
+    edited_perm = st.data_editor(view_df[base_cols + ACTION_COLS], key="v136_permission_editor", use_container_width=True, hide_index=True, column_config=col_cfg)
+    st.markdown("#### 即時計算預覽 / Live Calculation Preview")
     st.dataframe(_permission_summary(edited_perm), use_container_width=True, hide_index=True)
-    if submitted_perm:
+    if st.button("✅ 套用並儲存權限 / Apply and Save Permissions", type="primary", use_container_width=True):
         saved = save_account_permissions(edited_perm.to_dict("records"))
         st.success(f"權限已套用並儲存：{saved} 筆 / Permissions saved")
         st.rerun()
