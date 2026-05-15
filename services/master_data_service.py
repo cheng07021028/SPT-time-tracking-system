@@ -63,42 +63,79 @@ def _current_login_context() -> tuple[str, str, list[str]]:
         return "", "", []
 
 
-def _filter_employees_for_time_record(df: pd.DataFrame) -> pd.DataFrame:
-    """V1.64: Operators can only see their own employee in 01｜工時紀錄.
+def _set_employee_binding_required(required: bool, username: str = "") -> None:
+    """Store 01｜工時紀錄 employee-binding status for the page message.
 
-    Admin / manager / leader keep full employee list for代登、補登或管理用途.
-    Matching priority:
-    1. auth_employee_id
-    2. username equals employee_id
-    3. display_name equals employee_name
+    Do not show all employees when an operator account is not mapped to a valid
+    employee_id.  The page will display:「該人員未在人員名單，請洽管理員設定。」
     """
+    try:
+        import streamlit as st
+        st.session_state["_spt_employee_binding_required"] = bool(required)
+        if username:
+            st.session_state["_spt_employee_binding_username"] = username
+    except Exception:
+        pass
+
+
+def _filter_employees_for_time_record(df: pd.DataFrame) -> pd.DataFrame:
+    """Filter employee dropdown on 01｜工時紀錄 without exposing all employees.
+
+    V1.64 曾將 operator 限制成只能看到自己的工號；但如果帳號尚未綁定
+    employee_id，或帳號名稱如 spt142 不存在於人員名單，01 頁會被誤判成
+    「請先匯入 03 / 04」，即使製令與人員資料其實都已存在。
+
+    V1.80 修正：
+    1. 管理類角色維持可看全部。
+    2. operator 若能對應到工號/姓名，仍只顯示本人。
+    3. operator 若無法對應，不再顯示全部人員，也不再誤判 03/04 未匯入；
+       改由 01 頁顯示「該人員未在人員名單，請洽管理員設定。」
+    """
+    _set_employee_binding_required(False)
     if df is None or df.empty or not _called_from_time_record_page():
         return df
+
     username, employee_id, roles = _current_login_context()
     role_set = {r.lower() for r in roles}
     if role_set.intersection({"admin", "manager", "leader"}):
         return df
+
     target = employee_id or username
-    if not target:
+
+    def _block_unbound_account() -> pd.DataFrame:
+        _set_employee_binding_required(True, username)
         return df.iloc[0:0].copy()
+
+    if not target:
+        return _block_unbound_account()
+
     if "employee_id" in df.columns:
-        mask = df["employee_id"].fillna("").astype(str).str.strip().str.lower() == target.lower()
+        employee_id_series = df["employee_id"].fillna("").astype(str).str.strip().str.lower()
+        mask = employee_id_series == target.lower()
         if mask.any():
+            _set_employee_binding_required(False)
             return df[mask].copy()
-    if username and "employee_id" in df.columns:
-        mask = df["employee_id"].fillna("").astype(str).str.strip().str.lower() == username.lower()
-        if mask.any():
-            return df[mask].copy()
+
+        # Common account/user input may be lowercase while employee master is uppercase.
+        # Also support account like spt142 vs employee_id SPT142.
+        if username:
+            mask = employee_id_series == username.lower()
+            if mask.any():
+                _set_employee_binding_required(False)
+                return df[mask].copy()
+
     try:
         import streamlit as st
         display_name = str(st.session_state.get("auth_display_name", "") or "").strip()
         if display_name and "employee_name" in df.columns:
             mask = df["employee_name"].fillna("").astype(str).str.strip() == display_name
             if mask.any():
+                _set_employee_binding_required(False)
                 return df[mask].copy()
     except Exception:
         pass
-    return df.iloc[0:0].copy()
+
+    return _block_unbound_account()
 
 
 def load_work_orders(active_only: bool = True) -> pd.DataFrame:
