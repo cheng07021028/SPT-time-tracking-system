@@ -24,7 +24,7 @@ apply_theme()
 render_header("10 | 權限管理", "帳號密碼總表、帳號匯入、帳號貼上、帳號級模組權限 / Account & Permission Management")
 init_permission_tables()
 
-st.caption("V1.71 loaded｜帳號總表改用表單式編輯，輸入資料不會因切換儲存格或 rerun 消失。")
+st.caption("V1.75 loaded｜新增帳號改用專用表單；帳號總表仍保留表單式編輯，避免切換儲存格造成資料消失。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
@@ -329,6 +329,58 @@ with tab_accounts:
         st.session_state["v133_users_df"] = _users_for_editor()
 
     with account_tab_edit:
+        st.markdown("### 新增帳號專用表單 / Stable Add User Form")
+        st.caption("建議新增帳號先使用此表單；送出後會直接寫入資料庫，不會因表格 rerun 造成資料消失。")
+        with st.form("v175_create_account_form", clear_on_submit=True):
+            f1, f2, f3, f4 = st.columns([1.2, 1.2, 1.2, 1.2])
+            with f1:
+                new_username = st.text_input("帳號 / Username", key="v175_new_username", disabled=not _edit_on)
+                new_emp_id = st.text_input("工號 / Employee ID", key="v175_new_employee_id", disabled=not _edit_on)
+            with f2:
+                new_password = st.text_input("新密碼 / New Password", type="password", key="v175_new_password", disabled=not _edit_on)
+                new_name = st.text_input("姓名 / Display Name", key="v175_new_display_name", disabled=not _edit_on)
+            with f3:
+                new_email = st.text_input("Email", key="v175_new_email", disabled=not _edit_on)
+                new_role = st.selectbox("角色 / Role", ROLE_OPTIONS, index=ROLE_OPTIONS.index("operator"), key="v175_new_role", disabled=not _edit_on)
+            with f4:
+                new_active = st.checkbox("啟用 / Active", value=True, key="v175_new_active", disabled=not _edit_on)
+                new_force_change = st.checkbox("強制改密碼 / Force Change", value=False, key="v175_new_force_change", disabled=not _edit_on)
+            new_note = st.text_input("備註 / Note", key="v175_new_note", disabled=not _edit_on)
+            submit_new_user = st.form_submit_button("✅ 建立帳號 / Create User", type="primary", use_container_width=True, disabled=not _edit_on)
+
+        if submit_new_user:
+            username = str(new_username or "").strip()
+            password = str(new_password or "").strip()
+            display_name = str(new_name or "").strip() or username
+            if not username:
+                st.error("請輸入帳號 / Username is required")
+            elif not password:
+                st.error("新增帳號必須輸入新密碼 / New password is required for new account")
+            else:
+                result = save_users([{
+                    "username": username,
+                    "new_password": password,
+                    "employee_id": str(new_emp_id or "").strip(),
+                    "display_name": display_name,
+                    "email": str(new_email or "").strip(),
+                    "role_code": str(new_role or "operator").strip() or "operator",
+                    "is_active": bool(new_active),
+                    "force_password_change": bool(new_force_change),
+                    "note": str(new_note or "").strip(),
+                }])
+                if result.get("saved", 0) > 0:
+                    st.success(f"帳號已建立 / Account created：{username}")
+                    st.session_state["v133_users_df"] = _users_for_editor()
+                    try:
+                        from services.column_settings_service import clear_editor_draft
+                        clear_editor_draft("account")
+                    except Exception:
+                        pass
+                    st.rerun()
+                if result.get("skipped"):
+                    st.warning("；".join(result.get("skipped", [])))
+
+
         st.markdown("### 帳號清單編輯 / Editable Account Master")
 
         # V1.74：啟動/停止編輯只保留頁面上方唯一一組，避免帳號總表區重複顯示。
