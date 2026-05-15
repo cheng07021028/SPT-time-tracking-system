@@ -1028,3 +1028,136 @@ def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
         st.session_state["spt_security_settings"] = dict(settings)
     except Exception:
         pass
+
+
+# ===== V1.99 idle setting permanence + permission reconciliation =====
+def _v199_security_setting_paths() -> list[Path]:
+    root = Path(__file__).resolve().parents[1]
+    return [
+        root / "data" / "config" / "security_settings.json",
+        root / "data" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
+    ]
+
+
+def _v169_load_persistent_security_settings() -> dict[str, str]:  # type: ignore[override]
+    data: dict[str, str] = {}
+    allowed = {"idle_timeout_minutes", "ask_continue_after_record"}
+    for path in _v199_security_setting_paths():
+        try:
+            if not path.exists():
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            raw = payload.get("security_settings") if isinstance(payload, dict) else None
+            if raw is None and isinstance(payload, dict):
+                raw = payload.get("settings")
+            if raw is None and isinstance(payload, dict) and isinstance(payload.get("tables"), dict):
+                rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
+                if isinstance(rows, list):
+                    raw = {str(r.get("setting_key")): str(r.get("setting_value")) for r in rows if isinstance(r, dict) and r.get("setting_key")}
+            if isinstance(raw, dict):
+                for k, v in raw.items():
+                    if str(k) in allowed and v is not None:
+                        data[str(k)] = str(v)
+        except Exception:
+            continue
+    return data
+
+
+def _v169_write_persistent_security_settings(settings: dict[str, str]) -> None:  # type: ignore[override]
+    safe = {
+        "idle_timeout_minutes": str(settings.get("idle_timeout_minutes", DEFAULT_IDLE_MINUTES) or DEFAULT_IDLE_MINUTES),
+        "ask_continue_after_record": str(settings.get("ask_continue_after_record", "1") or "1"),
+    }
+    payload = {"version": "V1.99", "updated_at": _now(), "security_settings": safe}
+    for path in _v199_security_setting_paths():
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+
+def get_idle_timeout_minutes() -> int:  # type: ignore[override]
+    """V1.99: idle timeout priority = session cache -> permanent JSON -> DB -> default."""
+    try:
+        cache = st.session_state.get("_spt_idle_timeout_cache")
+        now_ts = time.time()
+        if cache and now_ts - float(cache.get("ts", 0)) < 60:
+            return max(1, int(cache.get("minutes", DEFAULT_IDLE_MINUTES)))
+    except Exception:
+        pass
+
+    ensure_security_schema()
+    minutes = DEFAULT_IDLE_MINUTES
+    file_settings = _v169_load_persistent_security_settings()
+    if file_settings.get("idle_timeout_minutes") not in (None, ""):
+        try:
+            minutes = int(float(file_settings["idle_timeout_minutes"]))
+        except Exception:
+            minutes = DEFAULT_IDLE_MINUTES
+    else:
+        for table in ("auth_security_settings", "security_settings"):
+            try:
+                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
+                if row and row.get("setting_value") not in (None, ""):
+                    minutes = int(float(row["setting_value"]))
+                    break
+            except Exception:
+                pass
+    minutes = max(1, int(minutes))
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+    except Exception:
+        pass
+    return minutes
+
+
+def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
+    """V1.99: write idle timeout to DB and permanent JSON files."""
+    ensure_security_schema()
+    minutes = max(1, int(minutes))
+    settings = _v169_load_persistent_security_settings()
+    settings["idle_timeout_minutes"] = str(minutes)
+    settings.setdefault("ask_continue_after_record", "1")
+    for table in ("security_settings", "auth_security_settings"):
+        try:
+            execute(f"""
+                CREATE TABLE IF NOT EXISTS {table} (
+                    setting_key TEXT PRIMARY KEY,
+                    setting_value TEXT,
+                    note TEXT,
+                    updated_at TEXT
+                )
+            """)
+            execute(f"""
+                INSERT INTO {table} (setting_key, setting_value, note, updated_at)
+                VALUES ('idle_timeout_minutes', ?, '閒置多久自動登出，單位分鐘', ?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (str(minutes), _now()))
+        except Exception:
+            pass
+    _v169_write_persistent_security_settings(settings)
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+        st.session_state["spt_security_settings"] = dict(settings)
+    except Exception:
+        pass
+
+
+_old_check_permission_v199 = check_permission
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    """V1.99: check permission after ensuring newly-added modules have rows."""
+    try:
+        from services.permission_service import reconcile_permission_matrix_for_current_modules
+        reconcile_permission_matrix_for_current_modules()
+        # Permission rows may have been inserted; avoid stale negative cache.
+        clear_permission_cache(st.session_state.get("auth_username"))
+    except Exception:
+        pass
+    return _old_check_permission_v199(module_code, action)

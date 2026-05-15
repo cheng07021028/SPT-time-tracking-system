@@ -1048,3 +1048,170 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
         auto_sync_after_write(source="security_settings_saved_v169", force=True, archive=True)
     except Exception:
         pass
+
+
+# ===== V1.99 permission/settings hardening =====
+def _v199_security_setting_paths() -> list[Path]:
+    root = Path(__file__).resolve().parents[1]
+    return [
+        root / "data" / "config" / "security_settings.json",
+        root / "data" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
+    ]
+
+
+def _v199_read_security_settings_from_files() -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    allowed = {"idle_timeout_minutes", "ask_continue_after_record"}
+    for path in _v199_security_setting_paths():
+        try:
+            if not path.exists():
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            raw = payload.get("security_settings") if isinstance(payload, dict) else None
+            if raw is None and isinstance(payload, dict):
+                raw = payload.get("settings")
+            if raw is None and isinstance(payload, dict) and isinstance(payload.get("tables"), dict):
+                rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
+                if isinstance(rows, list):
+                    raw = {str(r.get("setting_key")): str(r.get("setting_value")) for r in rows if isinstance(r, dict) and r.get("setting_key")}
+            if isinstance(raw, dict):
+                for k, v in raw.items():
+                    if str(k) in allowed and v is not None:
+                        out[str(k)] = str(v)
+        except Exception:
+            continue
+    return out
+
+
+def _v199_write_security_settings_to_files(settings: Dict[str, str]) -> None:
+    safe_settings = {
+        "idle_timeout_minutes": str(settings.get("idle_timeout_minutes", "15") or "15"),
+        "ask_continue_after_record": str(settings.get("ask_continue_after_record", "1") or "1"),
+    }
+    payload = {
+        "version": "V1.99",
+        "updated_at": now_text(),
+        "security_settings": safe_settings,
+    }
+    for path in _v199_security_setting_paths():
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    """V1.99: Read idle/logout settings from DB plus permanent JSON.
+
+    Permanent JSON is used as source of truth after Streamlit/GitHub rebuilds.
+    This fixes the recurring issue where idle_timeout_minutes returned to 15.
+    """
+    init_permission_tables()
+    result: Dict[str, str] = {
+        "idle_timeout_minutes": "15",
+        "ask_continue_after_record": "1",
+    }
+    try:
+        conn = connect_db()
+        cur = conn.cursor()
+        _ensure_security_setting_tables(cur)
+        # DB first, then permanent files override so GitHub-restored config wins.
+        for table in ("security_settings", "auth_security_settings"):
+            try:
+                rows = cur.execute(f"SELECT setting_key, setting_value FROM {table}").fetchall()
+                for r in rows:
+                    if str(r["setting_key"]) in result and r["setting_value"] is not None:
+                        result[str(r["setting_key"])] = str(r["setting_value"])
+            except Exception:
+                pass
+        conn.close()
+    except Exception:
+        pass
+    result.update(_v199_read_security_settings_from_files())
+    return result
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    """V1.99: Save security settings to both DB tables and permanent files.
+
+    The page can still upload to GitHub through 09｜資料永久保存與備份, but the
+    local permanent JSON is created immediately on Apply.
+    """
+    init_permission_tables()
+    merged = get_security_settings()
+    merged.update({str(k): str(v) for k, v in settings.items()})
+    try:
+        idle = max(1, int(float(merged.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    merged["idle_timeout_minutes"] = str(idle)
+    merged["ask_continue_after_record"] = "1" if str(merged.get("ask_continue_after_record", "1")) not in ("0", "False", "false") else "0"
+
+    conn = connect_db()
+    cur = conn.cursor()
+    _ensure_security_setting_tables(cur)
+    for k, v in merged.items():
+        for table in ("auth_security_settings", "security_settings"):
+            cur.execute(f"""
+                INSERT INTO {table}(setting_key, setting_value, note, updated_at)
+                VALUES (?,?,?,?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (k, str(v), "V1.99 synchronized permanent security setting", now_text()))
+    conn.commit()
+    conn.close()
+
+    _v199_write_security_settings_to_files(merged)
+    try:
+        _persist_security_settings_files(merged)
+    except Exception:
+        pass
+    if st is not None:
+        try:
+            st.session_state["_spt_idle_timeout_cache"] = {"minutes": idle, "ts": 0}
+            st.session_state["spt_security_settings"] = dict(merged)
+        except Exception:
+            pass
+    clear_permission_runtime_cache()
+    try:
+        from services.db_service import mark_data_changed
+        mark_data_changed("安全設定已更新，請到 09｜資料永久保存與備份 上傳 GitHub。", "security_settings_saved_v199")
+    except Exception:
+        pass
+
+
+def reconcile_permission_matrix_for_current_modules() -> None:
+    """V1.99: Ensure newly-added modules always appear in permission matrix.
+
+    Existing deployed databases may not have rows for modules added later, such
+    as 08_daily_hours or 13_system_settings.  This function safely inserts
+    missing rows without overwriting existing user choices.
+    """
+    init_permission_tables()
+    ensure_permissions_for_all_users(force=True)
+
+
+# Keep wrappers at the very end so pages importing these names get the hardened versions.
+_old_get_account_permissions_v199 = get_account_permissions
+
+def get_account_permissions() -> List[dict]:  # type: ignore[override]
+    reconcile_permission_matrix_for_current_modules()
+    return _old_get_account_permissions_v199()
+
+
+_old_has_permission_v199 = has_permission
+
+def has_permission(username: str, module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    # Insert missing permission rows for newly-added modules before checking.
+    try:
+        reconcile_permission_matrix_for_current_modules()
+    except Exception:
+        pass
+    return _old_has_permission_v199(username, module_code, action)
+
+check_permission = has_permission
