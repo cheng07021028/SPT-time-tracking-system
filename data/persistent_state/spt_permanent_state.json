@@ -1,6 +1,6 @@
 {
   "schema_version": "v1.30",
-  "export_time": "2026-05-15 15:49:16",
+  "export_time": "2026-05-15 17:35:12",
   "database_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
   "tables": {
     "auth_account_permissions": [
@@ -1777,15 +1777,15 @@
     "auth_security_settings": [
       {
         "setting_key": "idle_timeout_minutes",
-        "setting_value": "15",
-        "note": "V1.69 synchronized security setting",
-        "updated_at": "2026-05-15 11:23:50"
+        "setting_value": "1",
+        "note": "閒置多久自動登出，單位分鐘",
+        "updated_at": "2026-05-15 17:27:38"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
-        "note": "V1.69 synchronized security setting",
-        "updated_at": "2026-05-15 11:23:50"
+        "note": "V1.99 synchronized permanent security setting",
+        "updated_at": "2026-05-15 17:27:38"
       }
     ],
     "auth_users": [
@@ -1800,10 +1800,10 @@
         "role_code": "admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-15 11:23:39",
+        "last_login_at": "2026-05-15 17:31:51",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-15 11:23:39"
+        "updated_at": "2026-05-15 17:31:51"
       },
       {
         "id": 2,
@@ -1912,10 +1912,10 @@
         "role_code": "operator",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-15 11:21:46",
+        "last_login_at": "2026-05-15 17:31:29",
         "note": "",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-15 11:21:46"
+        "updated_at": "2026-05-15 17:31:29"
       }
     ],
     "employees": [
@@ -2891,12 +2891,27 @@
         "result": "SUCCESS",
         "message": "roles=admin",
         "module_code": "11_login_logs",
-        "login_time": "2026-05-15 15:46:01",
+        "login_time": "2026-05-15 17:27:26",
         "logout_time": null,
         "idle_minutes": null,
         "ip_address": "",
         "user_agent": "",
-        "created_at": "2026-05-15 15:46:01"
+        "created_at": "2026-05-15 17:27:26"
+      },
+      {
+        "id": 2,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "11_login_logs",
+        "login_time": "2026-05-15 17:27:55",
+        "logout_time": null,
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "",
+        "created_at": "2026-05-15 17:27:55"
       }
     ],
     "process_options": [
@@ -3684,6 +3699,132 @@
         "idle_seconds": null,
         "user_agent": "streamlit",
         "created_at": "2026-05-15 11:23:39"
+      },
+      {
+        "id": 43,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "",
+        "login_time": "2026-05-15 17:27:51",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 17:27:51"
+      },
+      {
+        "id": 44,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置超過 1 分鐘，自動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-15 17:29:24",
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 17:29:24"
+      },
+      {
+        "id": 45,
+        "username": "",
+        "display_name": "",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置自動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-15 17:29:24",
+        "idle_seconds": 79,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 17:29:24"
+      },
+      {
+        "id": 46,
+        "username": "B211",
+        "display_name": "B211",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-15 17:29:31",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 17:29:31"
+      },
+      {
+        "id": 47,
+        "username": "B211",
+        "display_name": "B211",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置超過 1 分鐘，自動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-15 17:31:13",
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 17:31:13"
+      },
+      {
+        "id": 48,
+        "username": "",
+        "display_name": "",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置自動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-15 17:31:13",
+        "idle_seconds": 73,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 17:31:13"
+      },
+      {
+        "id": 49,
+        "username": "B211",
+        "display_name": "B211",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-15 17:31:29",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 17:31:29"
+      },
+      {
+        "id": 50,
+        "username": "B211",
+        "display_name": "B211",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-15 17:31:37",
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 17:31:37"
+      },
+      {
+        "id": 51,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "",
+        "login_time": "2026-05-15 17:31:51",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 17:31:51"
       }
     ],
     "security_module_permissions": [
@@ -5157,15 +5298,15 @@
     "security_settings": [
       {
         "setting_key": "idle_timeout_minutes",
-        "setting_value": "15",
-        "note": "V1.69 synchronized security setting",
-        "updated_at": "2026-05-15 11:23:50"
+        "setting_value": "1",
+        "note": "閒置多久自動登出，單位分鐘",
+        "updated_at": "2026-05-15 17:27:38"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
-        "note": "V1.69 synchronized security setting",
-        "updated_at": "2026-05-15 11:23:50"
+        "note": "V1.99 synchronized permanent security setting",
+        "updated_at": "2026-05-15 17:27:38"
       }
     ],
     "security_user_roles": [
@@ -5228,9 +5369,9 @@
         "email": "Admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-15 11:23:39",
+        "last_login_at": "2026-05-15 17:31:51",
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 15:46:15"
+        "updated_at": "2026-05-15 17:31:51"
       },
       {
         "id": 2,
@@ -5319,9 +5460,9 @@
         "email": "",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-15 11:21:46",
+        "last_login_at": "2026-05-15 17:31:29",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-15 15:46:15"
+        "updated_at": "2026-05-15 17:31:29"
       }
     ],
     "system_logs": [
@@ -5588,6 +5729,72 @@
         "message": "02 歷史紀錄啟動編輯後整列刪除：#7 B211 張瑀榛 21M0241-03 骨架組立",
         "detail": "{'id': 7, 'record_key': 'B211|21M0241-03|骨架組立|2026-05-15 10:59:10|90921f16', 'status': '暫停', 'work_order': '21M0241-03', 'part_no': '4TRSC020-004-02', 'type_name': 'NTB 3 PORT', 'process_name': '骨架組立', 'employee_id': 'B211', 'employee_name': '張瑀榛', 'start_action': '開始', 'start_timestamp': '2026-05-15 10:59:10', 'end_action': '暫停', 'end_timestamp': '2026-05-15 11:11:04', 'remark': '系統自動暫停：同一人員切換不同工段或不同日期作業', 'start_date': '2026-05-15', 'start_time': '10:59:10', 'end_date': '2026-05-15', 'end_time': '11:11:04', 'work_hours': 0.2, 'assembly_location': '竹東', 'group_key': 'B211|骨架組立|2026-05-15', 'is_group_work': 0, 'source': 'streamlit', 'created_at': '2026-05-15 10:59:10', 'updated_at': '2026-05-15 15:08:11'}",
         "level": "WARN"
+      },
+      {
+        "id": 25,
+        "log_time": "2026-05-15 17:25:05",
+        "user_name": "system",
+        "action_type": "DELETE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "6",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：#6 B002 張文品 21M0241-01 配電",
+        "detail": "{'id': 6, 'record_key': 'B002|21M0241-01|配電|2026-05-15 08:52:34|fbdb56a8', 'status': '作業中', 'work_order': '21M0241-01', 'part_no': '4TRSC020-004-02', 'type_name': 'NTB 3 PORT', 'process_name': '配電', 'employee_id': 'B002', 'employee_name': '張文品', 'start_action': '開始', 'start_timestamp': '2026-05-15 08:52:34', 'end_action': None, 'end_timestamp': None, 'remark': '', 'start_date': '2026-05-15', 'start_time': '08:52:34', 'end_date': None, 'end_time': None, 'work_hours': 0.0, 'assembly_location': '竹東', 'group_key': 'B002|配電|2026-05-15', 'is_group_work': 0, 'source': 'streamlit', 'created_at': '2026-05-15 08:52:34', 'updated_at': '2026-05-15 15:08:11'}",
+        "level": "WARN"
+      },
+      {
+        "id": 26,
+        "log_time": "2026-05-15 17:25:11",
+        "user_name": "system",
+        "action_type": "DELETE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "5",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：#5 B030 沈啟頤 21M0241-02 配電",
+        "detail": "{'id': 5, 'record_key': 'B030|21M0241-02|配電|2026-05-15 08:41:33|fe0efd51', 'status': '作業中', 'work_order': '21M0241-02', 'part_no': '4TRSC020-004-02', 'type_name': 'NTB 3 PORT', 'process_name': '配電', 'employee_id': 'B030', 'employee_name': '沈啟頤', 'start_action': '開始', 'start_timestamp': '2026-05-15 08:41:33', 'end_action': None, 'end_timestamp': None, 'remark': '', 'start_date': '2026-05-15', 'start_time': '08:41:33', 'end_date': None, 'end_time': None, 'work_hours': 0.0, 'assembly_location': '竹東', 'group_key': 'B030|配電|2026-05-15', 'is_group_work': 0, 'source': 'streamlit', 'created_at': '2026-05-15 08:41:33', 'updated_at': '2026-05-15 15:08:11'}",
+        "level": "WARN"
+      },
+      {
+        "id": 27,
+        "log_time": "2026-05-15 17:29:38",
+        "user_name": "appuser",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "7",
+        "message": "張瑀榛 開始 21M0241-04 / 前置鈑金",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 28,
+        "log_time": "2026-05-15 17:32:28",
+        "user_name": "appuser",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "人工編輯並儲存工時紀錄 4 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 29,
+        "log_time": "2026-05-15 17:33:23",
+        "user_name": "appuser",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "人工編輯並儲存工時紀錄 4 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 30,
+        "log_time": "2026-05-15 17:34:29",
+        "user_name": "appuser",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "8",
+        "message": "廖紫攸 開始 22M0100-31 / 模組",
+        "detail": "",
+        "level": "INFO"
       }
     ],
     "system_settings": [
@@ -5657,7 +5864,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 05:10:22",
-        "updated_at": "2026-05-15 15:08:11"
+        "updated_at": "2026-05-15 17:33:23"
       },
       {
         "id": 3,
@@ -5684,7 +5891,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 06:12:20",
-        "updated_at": "2026-05-15 15:08:11"
+        "updated_at": "2026-05-15 17:33:23"
       },
       {
         "id": 4,
@@ -5711,61 +5918,61 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 07:38:16",
-        "updated_at": "2026-05-15 15:08:11"
+        "updated_at": "2026-05-15 17:33:23"
       },
       {
-        "id": 5,
-        "record_key": "B030|21M0241-02|配電|2026-05-15 08:41:33|fe0efd51",
+        "id": 7,
+        "record_key": "B211|21M0241-04|前置鈑金|2026-05-15 17:29:38|97174822",
         "status": "作業中",
-        "work_order": "21M0241-02",
+        "work_order": "21M0241-04",
         "part_no": "4TRSC020-004-02",
         "type_name": "NTB 3 PORT",
-        "process_name": "配電",
-        "employee_id": "B030",
-        "employee_name": "沈啟頤",
+        "process_name": "前置鈑金",
+        "employee_id": "B211",
+        "employee_name": "張瑀榛",
         "start_action": "開始",
-        "start_timestamp": "2026-05-15 08:41:33",
+        "start_timestamp": "2026-05-15 17:29:38",
         "end_action": null,
         "end_timestamp": null,
         "remark": "",
         "start_date": "2026-05-15",
-        "start_time": "08:41:33",
+        "start_time": "17:29:38",
         "end_date": null,
         "end_time": null,
         "work_hours": 0.0,
         "assembly_location": "竹東",
-        "group_key": "B030|配電|2026-05-15",
+        "group_key": "B211|前置鈑金|2026-05-15",
         "is_group_work": 0,
         "source": "streamlit",
-        "created_at": "2026-05-15 08:41:33",
-        "updated_at": "2026-05-15 15:08:11"
+        "created_at": "2026-05-15 17:29:38",
+        "updated_at": "2026-05-15 17:33:23"
       },
       {
-        "id": 6,
-        "record_key": "B002|21M0241-01|配電|2026-05-15 08:52:34|fbdb56a8",
+        "id": 8,
+        "record_key": "B031|22M0100-31|模組|2026-05-15 17:34:29|237d331f",
         "status": "作業中",
-        "work_order": "21M0241-01",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "配電",
-        "employee_id": "B002",
-        "employee_name": "張文品",
+        "work_order": "22M0100-31",
+        "part_no": "4TRSC020-005-03",
+        "type_name": "NTB 4Port",
+        "process_name": "模組",
+        "employee_id": "B031",
+        "employee_name": "廖紫攸",
         "start_action": "開始",
-        "start_timestamp": "2026-05-15 08:52:34",
+        "start_timestamp": "2026-05-15 17:34:29",
         "end_action": null,
         "end_timestamp": null,
         "remark": "",
         "start_date": "2026-05-15",
-        "start_time": "08:52:34",
+        "start_time": "17:34:29",
         "end_date": null,
         "end_time": null,
         "work_hours": 0.0,
         "assembly_location": "竹東",
-        "group_key": "B002|配電|2026-05-15",
+        "group_key": "B031|模組|2026-05-15",
         "is_group_work": 0,
         "source": "streamlit",
-        "created_at": "2026-05-15 08:52:34",
-        "updated_at": "2026-05-15 15:08:11"
+        "created_at": "2026-05-15 17:34:29",
+        "updated_at": "2026-05-15 17:34:29"
       }
     ],
     "work_orders": [
@@ -13013,16 +13220,16 @@
     "auth_security_settings": 2,
     "auth_users": 8,
     "employees": 74,
-    "login_logs": 1,
+    "login_logs": 2,
     "process_options": 17,
     "rest_periods": 5,
-    "security_login_logs": 42,
+    "security_login_logs": 51,
     "security_module_permissions": 78,
     "security_roles": 6,
     "security_settings": 2,
     "security_user_roles": 8,
     "security_users": 8,
-    "system_logs": 24,
+    "system_logs": 30,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
