@@ -245,5 +245,12 @@ def render_table(df: pd.DataFrame, table_key: str, *, editable: bool = False, di
             key=key or f"editor_{table_key}",
             height=height,
         )
-    st.dataframe(display_df, use_container_width=True, hide_index=True, column_config=cfg, height=height)
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config=cfg,
+        height=height,
+        key=key or f"frame_{table_key}",
+    )
     return None

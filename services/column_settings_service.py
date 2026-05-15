@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-V1.41 Column Settings Service
+V1.68 Column Settings Service
 全系統表格欄位設定：顯示/隱藏、順序、欄寬、中文/英文標題，永久保存到 JSON。
 
 設計原則：
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import hashlib
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
@@ -139,12 +140,44 @@ def _current_page_name() -> str:
     return "unknown_page"
 
 
+def _callsite_signature() -> str:
+    """Return a stable page call-site signature to avoid duplicate widget keys.
+
+    Several pages render different tables through the same shared helper.  If the
+    column settings wrapper only uses the dataframe columns, two tables with the
+    same structure can receive the same Streamlit widget key and crash with
+    StreamlitDuplicateElementKey.  We include the real page filename + line number
+    that called the helper, while ignoring this service and Streamlit internals.
+    """
+    try:
+        frames = inspect.stack()
+        candidates = []
+        for frame in frames:
+            filename = str(frame.filename).replace("\\", "/")
+            if "/site-packages/" in filename or filename.endswith("column_settings_service.py"):
+                continue
+            if filename.endswith("table_ui_service.py"):
+                continue
+            if "/pages/" in filename or filename.endswith("streamlit_app.py"):
+                candidates.append(f"{Path(filename).stem}:{frame.lineno}")
+        if candidates:
+            return candidates[-1]
+    except Exception:
+        pass
+    return "unknown_callsite"
+
+
+def _safe_widget_suffix(value: str) -> str:
+    return hashlib.md5(str(value).encode("utf-8", errors="ignore")).hexdigest()[:16]
+
+
 def _stable_table_id(df: pd.DataFrame, key: Any = None, kind: str = "table") -> str:
     page = _current_page_name()
+    callsite = _callsite_signature()
     if key:
-        return f"{page}::{kind}::{key}"
+        return f"{page}::{callsite}::{kind}::{key}"
     cols = "|".join([str(c) for c in df.columns])[:180]
-    return f"{page}::{kind}::{abs(hash(cols))}"
+    return f"{page}::{callsite}::{kind}::{abs(hash(cols))}"
 
 
 def _default_column_setting(col: str) -> Dict[str, Any]:
@@ -235,7 +268,7 @@ def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[D
         _editor_func = _ORIGINAL_DATA_EDITOR or st.data_editor
         edited_cfg = _editor_func(
             cfg_df,
-            key=f"column_setting_editor::{table_id}",
+            key=f"column_setting_editor::{_safe_widget_suffix(table_id)}",
             use_container_width=True,
             hide_index=True,
             height=360,
@@ -256,14 +289,14 @@ def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[D
         order_text = st.text_area(
             "欄位順序 / Column order（每行一個欄位；可剪下貼上調整順序，按套用後永久保存）",
             value="\n".join(current_order),
-            key=f"column_order_text::{table_id}",
+            key=f"column_order_text::{_safe_widget_suffix(table_id)}",
             height=260,
             help="每行一個欄位名稱。可直接在這個大型文字框內剪下/貼上調整欄位順序，按套用後會永久保存。Streamlit 原生表格目前無法穩定讀取滑鼠拖拉後的欄位順序。",
         )
         c1, c2, c3 = st.columns([1, 1, 2])
         applied = False
         with c1:
-            if st.button("💾 套用欄位設定 / Apply", key=f"apply_cols::{table_id}", use_container_width=True):
+            if st.button("💾 套用欄位設定 / Apply", key=f"apply_cols::{_safe_widget_suffix(table_id)}", use_container_width=True):
                 new_cols = {}
                 for _, row in edited_cfg.iterrows():
                     key = str(row.get("欄位 / Column", "")).strip()
@@ -296,7 +329,7 @@ def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[D
                 st.success("欄位設定已永久保存。")
                 applied = True
         with c2:
-            if st.button("↩️ 恢復預設 / Reset", key=f"reset_cols::{table_id}", use_container_width=True):
+            if st.button("↩️ 恢復預設 / Reset", key=f"reset_cols::{_safe_widget_suffix(table_id)}", use_container_width=True):
                 table_setting["columns"] = {str(c): {**_default_column_setting(str(c)), "order": i} for i, c in enumerate(df.columns)}
                 _save_table_setting(table_id, table_setting)
                 st.warning("已恢復此表格欄位預設設定。")
