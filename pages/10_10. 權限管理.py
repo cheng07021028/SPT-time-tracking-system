@@ -24,7 +24,7 @@ apply_theme()
 render_header("10 | 權限管理", "帳號密碼總表、帳號匯入、帳號貼上、帳號級模組權限 / Account & Permission Management")
 init_permission_tables()
 
-st.caption("V1.75 loaded｜新增帳號改用專用表單；帳號總表仍保留表單式編輯，避免切換儲存格造成資料消失。")
+st.caption("V1.76 loaded｜密碼欄可直接輸入修改；******** 代表維持原密碼，不會顯示明碼。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
@@ -56,9 +56,9 @@ ACCOUNT_DISPLAY_COLUMNS = {
 with st.expander("📘 權限設定使用說明 / User Guide", expanded=False):
     st.markdown("""
 ### 密碼欄位說明 / Password Field Design
-- **密碼狀態 / Password Status** 是唯讀保護欄位，無法輸入是正常的。
-- 系統不會顯示密碼明碼，只顯示 `********` 或狀態提示。
-- 要新增或修改密碼，請填 **新密碼 / New Password** 或匯入資料中的 **密碼 / Password** 欄。
+- **密碼 / Password** 欄可直接輸入新密碼；既有帳號顯示 `********` 代表維持原密碼。
+- 系統不會顯示既有密碼明碼，只顯示 `********` 或狀態提示。
+- 要新增或修改密碼，可填 **密碼 / Password** 或 **新密碼 / New Password**；匯入資料中的 **密碼 / Password** 也會套用。
 - 空白代表維持原密碼，不會清掉密碼。
 
 ### 匯入帳號格式 / Account Import Format
@@ -126,12 +126,32 @@ def _users_for_editor() -> pd.DataFrame:
     return out
 
 
+def _password_from_editor_row(r: pd.Series) -> str:
+    """Return a new password only when the user really typed one.
+
+    V1.76：使用者常誤以為「密碼狀態」不能輸入是錯誤。
+    現在允許直接在該欄輸入新密碼；若仍為 ******** 或提示文字，代表維持原密碼。
+    """
+    explicit = str(r.get("新密碼 / New Password", "") or "").strip()
+    if explicit:
+        return explicit
+    status_value = str(r.get("密碼狀態 / Password Status", "") or "").strip()
+    blocked_values = {
+        "", "none", "nan", "********", "*******", "******",
+        "新帳號請輸入新密碼", "匯入後將更新密碼", "未提供密碼，維持原密碼",
+        "已設定", "維持原密碼", "password set",
+    }
+    if status_value.lower() in blocked_values or set(status_value) == {"*"}:
+        return ""
+    return status_value
+
+
 def _users_to_service_rows(df: pd.DataFrame) -> list[dict]:
     rows = []
     for _, r in df.iterrows():
         rows.append({
             "username": str(r.get("帳號 / Username", "")).strip(),
-            "new_password": str(r.get("新密碼 / New Password", "")).strip(),
+            "new_password": _password_from_editor_row(r),
             "employee_id": str(r.get("工號 / Employee ID", "")).strip(),
             "display_name": str(r.get("姓名 / Display Name", "")).strip(),
             "email": str(r.get("Email", "")).strip(),
@@ -300,7 +320,7 @@ tab_accounts, tab_perm, tab_sec = st.tabs([
 
 with tab_accounts:
     st.subheader("帳號密碼總表 / Account & Password Master")
-    st.info("『密碼狀態 / Password Status』是保護欄位，無法輸入是正常的；要修改密碼請填『新密碼 / New Password』。")
+    st.info("V1.76：密碼欄可直接輸入新密碼。若顯示 ******** 代表維持原密碼；系統不會顯示既有密碼明碼。也可使用『新密碼 / New Password』欄。")
     account_tab_edit, account_tab_excel, account_tab_paste = st.tabs([
         "帳號清單編輯 / Account Editor", "Excel 匯入 / Excel Import", "貼上資料 / Paste Data"
     ])
@@ -403,7 +423,7 @@ with tab_accounts:
                 st.session_state["v133_users_df"] = _users_for_editor()
                 st.rerun()
 
-        st.warning("V1.71：此表格已改成表單式編輯。請先啟動編輯，完成整列或多欄輸入後，再按下方『套用並儲存』；切換儲存格不會立即 rerun，因此輸入內容不會中途消失。")
+        st.warning("V1.76：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。")
 
         # V1.71：帳號總表使用 st.form 包住 data_editor。
         # 原因：Streamlit 一般 data_editor 每次切換儲存格、勾選、下拉或其他元件互動都可能 rerun，
@@ -418,7 +438,7 @@ with tab_accounts:
                 column_config={
                     "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
                     "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
-                    "密碼狀態 / Password Status": st.column_config.TextColumn("密碼狀態 / Password Status", disabled=True, help="唯讀：系統不顯示明碼"),
+                    "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
                     "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
                     "工號 / Employee ID": st.column_config.TextColumn("工號 / Employee ID"),
                     "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
@@ -434,7 +454,7 @@ with tab_accounts:
 
             active_count = int(_to_bool_series(edited_users, "啟用 / Active").sum())
             delete_count = int(_to_bool_series(edited_users, "刪除 / Delete").sum())
-            new_password_count = int((edited_users.get("新密碼 / New Password", pd.Series(dtype=str)).fillna("").astype(str).str.strip() != "").sum())
+            new_password_count = int(sum(1 for _, _row in edited_users.iterrows() if _password_from_editor_row(_row)))
             m1, m2, m3 = st.columns(3)
             m1.metric("啟用帳號 / Active", active_count)
             m2.metric("待刪除 / Pending Delete", delete_count)
