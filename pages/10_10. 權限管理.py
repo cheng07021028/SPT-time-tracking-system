@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
+from services.security_service import require_module_access, check_permission
 from services.permission_service import (
     ACTIONS,
     MODULES,
@@ -21,10 +22,11 @@ from services.permission_service import (
 )
 
 apply_theme()
+require_module_access("10_permissions", "can_manage")
 render_header("10 | 權限管理", "帳號密碼總表、帳號匯入、帳號貼上、帳號級模組權限 / Account & Permission Management")
 init_permission_tables()
 
-st.caption("V1.76 loaded｜密碼欄可直接輸入修改；******** 代表維持原密碼，不會顯示明碼。")
+st.caption("V1.78 loaded｜權限管理頁已受 can_manage 管制；帳號、權限、安全設定會永久保存到 GitHub 設定檔。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
