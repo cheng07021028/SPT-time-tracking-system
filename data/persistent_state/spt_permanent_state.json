@@ -1,9 +1,9 @@
 {
   "version": "V1.30",
-  "exported_at": "2026-05-15 07:33:02",
+  "exported_at": "2026-05-15 07:38:17",
   "db_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
   "db_exists": true,
-  "business_row_count": 680,
+  "business_row_count": 681,
   "table_counts": {
     "auth_account_permissions": 66,
     "auth_login_logs": 0,
@@ -12,18 +12,18 @@
     "employees": 74,
     "login_logs": 1,
     "rest_periods": 5,
-    "security_login_logs": 4,
+    "security_login_logs": 6,
     "security_module_permissions": 66,
     "security_roles": 6,
     "security_settings": 1,
     "security_user_roles": 6,
     "security_users": 6,
-    "system_logs": 8,
+    "system_logs": 9,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 0,
-    "time_records": 3,
+    "time_records": 4,
     "work_orders": 603
   },
   "tables": {
@@ -2343,6 +2343,34 @@
         "idle_seconds": null,
         "user_agent": "streamlit",
         "created_at": "2026-05-15 05:26:06"
+      },
+      {
+        "id": 5,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-15 07:33:36",
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 07:33:36"
+      },
+      {
+        "id": 6,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "",
+        "login_time": "2026-05-15 07:34:12",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 07:34:12"
       }
     ],
     "security_module_permissions": [
@@ -3653,9 +3681,9 @@
         "email": null,
         "is_active": 1,
         "force_password_change": 1,
-        "last_login_at": "2026-05-15 05:26:06",
+        "last_login_at": "2026-05-15 07:34:12",
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 05:26:06"
+        "updated_at": "2026-05-15 07:34:12"
       },
       {
         "id": 2,
@@ -3811,6 +3839,17 @@
         "message": "沈啟頤 開始 21M0241-03 / 骨架組立",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 9,
+        "log_time": "2026-05-15 07:33:06",
+        "user_name": "appuser",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "3",
+        "message": "結束工時紀錄 #3，同步結束=1筆，狀態=完工，群組總工時=1.34，平均工時=1.34",
+        "detail": "3",
+        "level": "INFO"
       }
     ],
     "system_settings": [
@@ -3935,6 +3974,33 @@
         "source": "streamlit",
         "created_at": "2026-05-15 06:12:20",
         "updated_at": "2026-05-15 07:33:02"
+      },
+      {
+        "id": 4,
+        "record_key": "B052|21M0241-04|前置鈑金|2026-05-15 07:38:16|9971c6aa",
+        "status": "作業中",
+        "work_order": "21M0241-04",
+        "part_no": "4TRSC020-004-02",
+        "type_name": "NTB 3 PORT",
+        "process_name": "前置鈑金",
+        "employee_id": "B052",
+        "employee_name": "張傑威",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-15 07:38:16",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-15",
+        "start_time": "07:38:16",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B052|前置鈑金|2026-05-15",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-15 07:38:16",
+        "updated_at": "2026-05-15 07:38:16"
       }
     ],
     "work_orders": [
