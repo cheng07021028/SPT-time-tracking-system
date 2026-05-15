@@ -67,6 +67,38 @@ ROLE_PRESET = {
     "auditor":  {"can_view": 1, "can_create": 0, "can_edit": 0, "can_delete": 0, "can_import": 0, "can_export": 1, "can_backup": 0, "can_restore": 0, "can_manage": 0},
 }
 
+ROLE_DESCRIPTIONS = {
+    "admin": {
+        "zh": "系統管理員",
+        "en": "System Administrator",
+        "desc": "最高權限。可管理帳號、權限、備份、還原、刪除、匯入匯出與所有模組。建議只給系統負責人。",
+    },
+    "manager": {
+        "zh": "製造主管",
+        "en": "Manufacturing Manager",
+        "desc": "可查看與管理製造資料、製令、人員、歷史工時與分析報表。刪除與還原建議額外勾選才開放。",
+    },
+    "leader": {
+        "zh": "現場幹部",
+        "en": "Line Leader",
+        "desc": "可管理現場當日作業、人員在廠/出勤狀態、今日未紀錄名單與人員每日工時。",
+    },
+    "operator": {
+        "zh": "作業人員",
+        "en": "Operator",
+        "desc": "主要使用工時紀錄。建議只開放自己的紀錄、開始/暫停/下班/完工，不開放主檔與備份。",
+    },
+    "viewer": {
+        "zh": "查詢者",
+        "en": "Viewer",
+        "desc": "只讀權限。可看授權報表，不可新增、編輯、刪除、匯入、備份或還原。",
+    },
+    "auditor": {
+        "zh": "稽核",
+        "en": "Auditor",
+        "desc": "稽核查詢。建議開放歷史紀錄、LOG、登入紀錄與匯出，不允許修改資料。",
+    },
+}
 
 def _cache_get(key: str):
     if st is None:
@@ -220,7 +252,10 @@ def get_users() -> List[dict]:
         return cache.get("data", [])
     conn = connect_db()
     rows = conn.execute("""
-        SELECT id, username, '' AS new_password, employee_id, display_name, email, role_code,
+        SELECT id, username,
+               '********' AS password_display,
+               '' AS new_password,
+               employee_id, display_name, email, role_code,
                is_active, force_password_change, last_login_at, note, created_at, updated_at
         FROM auth_users
         ORDER BY username
