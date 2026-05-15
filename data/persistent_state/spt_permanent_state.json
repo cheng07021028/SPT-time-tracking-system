@@ -1,6 +1,6 @@
 {
   "schema_version": "v1.30",
-  "export_time": "2026-05-15 15:48:36",
+  "export_time": "2026-05-15 15:49:16",
   "database_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
   "tables": {
     "auth_account_permissions": [
@@ -3043,6 +3043,15 @@
         "note": "系統預設工段，可於 13 系統設定修改",
         "created_at": "2026-05-15 11:47:14",
         "updated_at": "2026-05-15 11:47:14"
+      },
+      {
+        "id": 34,
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-15 15:48:43",
+        "updated_at": "2026-05-15 15:48:43"
       }
     ],
     "rest_periods": [
@@ -13005,7 +13014,7 @@
     "auth_users": 8,
     "employees": 74,
     "login_logs": 1,
-    "process_options": 16,
+    "process_options": 17,
     "rest_periods": 5,
     "security_login_logs": 42,
     "security_module_permissions": 78,
