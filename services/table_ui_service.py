@@ -305,8 +305,9 @@ def render_table(df: pd.DataFrame, table_key: str, *, editable: bool = False, di
     if df is None or df.empty:
         st.info("目前沒有資料 / No data")
         return None
-    df = _render_sort_controls(table_key, df)
-    df = _apply_quick_header_sort(table_key, df)
+    # V1.85: Do not render external sort buttons/controls.
+    # Sorting is left to Streamlit's native table header interaction, matching the
+    # original modules: users click the column header/menu inside the table.
     render_width_settings(table_key, df)
     display_df = _format_duration_columns_for_display(df)
     display_df = _prepare_display_dataframe(display_df)
