@@ -24,8 +24,11 @@ from services.github_cloud_storage_service import (
     upload_existing_permanent_files,
 )
 
+# V1.45: keep page 09 header style consistent with other modules.
+# Use the common two-argument render_header format to avoid showing only the module number.
+
 apply_theme()
-render_header("09", "資料永久保存與備份", "GitHub 雲端永久保存｜啟動自動還原｜防止空資料覆蓋")
+render_header("09｜資料永久保存與備份", "GitHub 雲端永久保存｜啟動自動還原｜防止空資料覆蓋")
 
 st.subheader("資料防消失中心 / Data Guard Center")
 st.info(
