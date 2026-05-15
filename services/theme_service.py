@@ -291,3 +291,175 @@ def render_kpi_cards(items: list[tuple[str, Any]] | None = None) -> None:
         label, value = item
         with col:
             st.metric(label, value)
+
+# ===== SPT V1.51 COMPATIBILITY FIX START =====
+def render_module_cards(items=None):
+    """Render home module cards. Compatibility function required by streamlit_app.py.
+
+    Accepts either a list of tuples/lists/dicts, or uses the standard SPT module list.
+    This function intentionally uses Streamlit native columns + markdown so it is robust
+    across Streamlit Cloud versions and will not display raw HTML as text.
+    """
+    import streamlit as st
+
+    default_items = [
+        ("01", "工時紀錄", "Time Records", "快速開始、暫停、下班、完工與工時計算"),
+        ("02", "歷史紀錄", "History", "完整工時明細查詢、編輯、儲存與 Excel 匯出"),
+        ("03", "製令管理", "Work Orders", "Excel 匯入、貼上資料、手動新增、頁面編輯"),
+        ("04", "人員名單", "Employees", "人員主檔、在廠狀態、今日出勤勾選"),
+        ("05", "製令工時分析", "Analysis", "製令累積工時、工段分析與明細查詢"),
+        ("06", "LOG查詢", "Logs", "系統操作、異常與資料異動紀錄查詢"),
+        ("07", "今日未紀錄名單", "Missing Today", "出勤但未登錄工時的人員即時提示"),
+        ("08", "人員每日工時", "Daily Hours", "每日累積工時與合理區間異常提醒"),
+        ("09", "資料永久保存與備份", "Persistence", "永久檔、GitHub 雲端、還原與備份"),
+        ("10", "權限管理", "Permission", "帳號、密碼、角色與模組權限設定"),
+        ("11", "登入紀錄", "Audit Logs", "登入、登出、權限不足與安全事件查詢"),
+        ("12", "模組永久紀錄中心", "Module Persistence", "各模組獨立紀錄檔與設定檔管理"),
+    ]
+    if not items:
+        items = default_items
+
+    normalized = []
+    for item in items:
+        if isinstance(item, dict):
+            no = str(item.get("no") or item.get("module_no") or item.get("id") or "")
+            name = str(item.get("name") or item.get("title") or "")
+            en = str(item.get("en") or item.get("english") or item.get("subtitle") or "")
+            desc = str(item.get("desc") or item.get("description") or "")
+        else:
+            seq = list(item) if isinstance(item, (tuple, list)) else [str(item)]
+            no = str(seq[0]) if len(seq) > 0 else ""
+            name = str(seq[1]) if len(seq) > 1 else ""
+            en = str(seq[2]) if len(seq) > 2 else ""
+            desc = str(seq[3]) if len(seq) > 3 else ""
+        normalized.append((no, name, en, desc))
+
+    st.markdown("### 系統模組 / System Modules")
+    for row_start in range(0, len(normalized), 4):
+        cols = st.columns(4)
+        for col, (no, name, en, desc) in zip(cols, normalized[row_start:row_start + 4]):
+            with col:
+                st.markdown(
+                    f"""
+                    <div class="spt-module-card">
+                        <div class="spt-module-no">{no}</div>
+                        <div class="spt-module-name">{name}</div>
+                        <div class="spt-module-en">{en}</div>
+                        <div class="spt-module-desc">{desc}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+
+# Strong dropdown contrast CSS, kept in the final theme file instead of injection-only patch.
+def apply_dropdown_contrast_fix():
+    import streamlit as st
+    st.markdown(r'''
+    <style>
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="input"] input,
+    div[data-baseweb="base-input"] input,
+    div[data-baseweb="textarea"] textarea,
+    textarea,
+    input[type="text"],
+    input[type="password"],
+    input[type="number"] {
+        background-color: #eef7ff !important;
+        color: #071827 !important;
+        caret-color: #071827 !important;
+        border: 1px solid rgba(34, 211, 238, 0.85) !important;
+        border-radius: 10px !important;
+        font-weight: 700 !important;
+        text-shadow: none !important;
+    }
+    div[data-baseweb="select"] span,
+    div[data-baseweb="select"] div {
+        color: #071827 !important;
+        text-shadow: none !important;
+    }
+    div[data-baseweb="popover"],
+    div[data-baseweb="popover"] > div,
+    div[data-baseweb="menu"],
+    ul[role="listbox"],
+    div[role="listbox"] {
+        background-color: #071322 !important;
+        color: #f2fbff !important;
+        border: 1px solid rgba(34, 211, 238, 0.72) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 14px 36px rgba(0,0,0,.58), 0 0 22px rgba(34,211,238,.18) !important;
+    }
+    ul[role="listbox"] li,
+    ul[role="listbox"] li *,
+    div[role="option"],
+    div[role="option"] *,
+    div[data-baseweb="menu"] li,
+    div[data-baseweb="menu"] li *,
+    div[data-baseweb="popover"] div[role="option"],
+    div[data-baseweb="popover"] div[role="option"] * {
+        background-color: transparent !important;
+        color: #f2fbff !important;
+        font-weight: 750 !important;
+        text-shadow: none !important;
+    }
+    ul[role="listbox"] li:hover,
+    ul[role="listbox"] li[aria-selected="true"],
+    div[role="option"]:hover,
+    div[role="option"][aria-selected="true"],
+    div[data-baseweb="popover"] div[role="option"]:hover,
+    div[data-baseweb="popover"] div[role="option"][aria-selected="true"] {
+        background-color: #22d3ee !important;
+        color: #03121f !important;
+    }
+    ul[role="listbox"] li:hover *,
+    ul[role="listbox"] li[aria-selected="true"] *,
+    div[role="option"]:hover *,
+    div[role="option"][aria-selected="true"] *,
+    div[data-baseweb="popover"] div[role="option"]:hover *,
+    div[data-baseweb="popover"] div[role="option"][aria-selected="true"] * {
+        color: #03121f !important;
+        font-weight: 850 !important;
+    }
+    [data-testid="stDataEditor"] input,
+    [data-testid="stDataEditor"] textarea,
+    [data-testid="stDataEditor"] [contenteditable="true"] {
+        background-color: #eef7ff !important;
+        color: #071827 !important;
+        caret-color: #071827 !important;
+        font-weight: 700 !important;
+        text-shadow: none !important;
+    }
+    div[data-baseweb="tag"] {
+        background-color: rgba(34, 211, 238, 0.25) !important;
+        border: 1px solid rgba(34, 211, 238, 0.65) !important;
+        border-radius: 9px !important;
+    }
+    div[data-baseweb="tag"] span,
+    div[data-baseweb="tag"] svg,
+    div[data-baseweb="select"] svg {
+        color: #071827 !important;
+        fill: #071827 !important;
+    }
+    </style>
+    ''', unsafe_allow_html=True)
+
+# Wrap existing theme functions once, without recursive redefinition.
+try:
+    _spt_v151_original_apply_theme = apply_theme
+    def apply_theme(*args, **kwargs):
+        result = _spt_v151_original_apply_theme(*args, **kwargs)
+        apply_dropdown_contrast_fix()
+        return result
+except Exception:
+    pass
+
+try:
+    _spt_v151_original_app_theme = app_theme
+    def app_theme(*args, **kwargs):
+        result = _spt_v151_original_app_theme(*args, **kwargs)
+        apply_dropdown_contrast_fix()
+        return result
+except Exception:
+    def app_theme(*args, **kwargs):
+        return apply_theme(*args, **kwargs)
+# ===== SPT V1.51 COMPATIBILITY FIX END =====
