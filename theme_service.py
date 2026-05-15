@@ -525,12 +525,78 @@ div[data-baseweb="radio"] [aria-checked="true"] {
     outline: 1px solid rgba(223,250,255,.70) !important;
     box-shadow: 0 0 8px rgba(35,230,255,.22) !important;
 }
+
+/* V2.03: checkbox/radio/toggle rows use light background so confirmations are clearly visible. */
+[data-testid="stCheckbox"] > label,
+[data-testid="stRadio"] label,
+[data-testid="stToggle"] > label {
+    background: linear-gradient(180deg, #f5fbff 0%, #dff7ff 100%) !important;
+    color: #04101d !important;
+    -webkit-text-fill-color: #04101d !important;
+    border: 1px solid rgba(35, 230, 255, .78) !important;
+    border-radius: 10px !important;
+    padding: 8px 12px !important;
+    box-shadow: 0 0 0 1px rgba(35,230,255,.12) inset, 0 0 12px rgba(35,230,255,.16) !important;
+}
+[data-testid="stCheckbox"] > label *,
+[data-testid="stRadio"] label *,
+[data-testid="stToggle"] > label * {
+    color: #04101d !important;
+    -webkit-text-fill-color: #04101d !important;
+    text-shadow: none !important;
+    font-weight: 950 !important;
+}
+[data-testid="stCheckbox"] input[type="checkbox"],
+[data-testid="stCheckbox"] [role="checkbox"] {
+    accent-color: #18d7f0 !important;
+    outline: 2px solid rgba(4,16,29,.55) !important;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.8), 0 0 10px rgba(35,230,255,.35) !important;
+}
+
 /* Expander headers and clickable captions should stay bright. */
 div[data-testid="stExpander"] summary,
 div[data-testid="stExpander"] summary * {
     color: #f4fbff !important;
     -webkit-text-fill-color: #f4fbff !important;
     font-weight: 900 !important;
+}
+
+
+/* ===== V2.02 login user bar: larger, clear, tech breathing glow ===== */
+.spt-login-pill {
+    min-height: 58px;
+    padding: 10px 18px;
+    margin: 4px 0 10px 0;
+    border: 1px solid rgba(98, 244, 255, .65);
+    border-radius: 16px;
+    background: linear-gradient(105deg, rgba(4, 32, 54, .92), rgba(5, 74, 105, .70), rgba(39, 24, 90, .58));
+    box-shadow: 0 0 0 1px rgba(35,230,255,.18) inset, 0 0 18px rgba(35,230,255,.28), 0 0 34px rgba(112,61,255,.14);
+    animation: sptLoginBreath 2.6s ease-in-out infinite;
+}
+.spt-login-label {
+    color: rgba(207, 246, 255, .88);
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: .7px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+.spt-login-value {
+    color: #ffffff;
+    font-size: 22px;
+    line-height: 1.25;
+    font-weight: 1000;
+    letter-spacing: .4px;
+    text-shadow: 0 0 10px rgba(255,255,255,.28), 0 0 22px rgba(35,230,255,.38);
+}
+.spt-login-value span {
+    color: #aef7ff;
+    font-size: 18px;
+    font-weight: 950;
+}
+@keyframes sptLoginBreath {
+    0%,100% { box-shadow: 0 0 0 1px rgba(35,230,255,.18) inset, 0 0 14px rgba(35,230,255,.22), 0 0 28px rgba(112,61,255,.12); }
+    50% { box-shadow: 0 0 0 1px rgba(35,230,255,.42) inset, 0 0 30px rgba(35,230,255,.55), 0 0 58px rgba(112,61,255,.30); }
 }
 
 </style>

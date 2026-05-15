@@ -5,18 +5,42 @@ from datetime import date, datetime
 import getpass
 from typing import Any
 
-from .db_service import execute, query_df, clear_query_cache
+from .db_service import execute, query_df
+
+try:
+    from .db_service import clear_query_cache
+except Exception:  # 舊版相容
+    def clear_query_cache() -> None:  # type: ignore
+        return None
 
 
 def _date_text(value: Any) -> str | None:
+    """Convert date/datetime/string to YYYY-MM-DD text for SQLite date() filtering."""
     if value in (None, ""):
         return None
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
     if isinstance(value, date):
         return value.strftime("%Y-%m-%d")
     return str(value)[:10]
 
 
-def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:
+def _safe_int(value: Any, default: int = 500) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return default
+
+
+def write_log(
+    action_type: str,
+    message: str,
+    target_table: str = "",
+    target_id: str = "",
+    detail: str = "",
+    level: str = "INFO",
+    user_name: str | None = None,
+) -> None:
     execute(
         """
         INSERT INTO system_logs
@@ -46,7 +70,7 @@ def load_logs(
 ):
     """Load system logs with optional SQL-side filtering.
 
-    V2.00：支援 06｜LOG查詢 依日期區間查詢，避免每次先載入大量 LOG 再前端過濾。
+    V2.01：保留舊版 load_logs(limit) 相容，並支援 06｜LOG查詢 日期、類型、等級、關鍵字篩選。
     """
     where: list[str] = []
     params: list[Any] = []
@@ -60,56 +84,71 @@ def load_logs(
         where.append("date(log_time) <= date(?)")
         params.append(e)
     if action_type:
-        where.append("action_type = ?")
+        where.append("COALESCE(action_type,'') = ?")
         params.append(str(action_type))
     if level and str(level).upper() != "ALL":
-        where.append("level = ?")
+        where.append("COALESCE(level,'') = ?")
         params.append(str(level))
     if keyword:
         kw = f"%{keyword}%"
-        where.append("(" + " OR ".join([
-            "COALESCE(user_name,'') LIKE ?",
-            "COALESCE(action_type,'') LIKE ?",
-            "COALESCE(target_table,'') LIKE ?",
-            "COALESCE(target_id,'') LIKE ?",
-            "COALESCE(message,'') LIKE ?",
-            "COALESCE(detail,'') LIKE ?",
-            "COALESCE(level,'') LIKE ?",
-        ]) + ")")
+        where.append(
+            "(" + " OR ".join([
+                "COALESCE(user_name,'') LIKE ?",
+                "COALESCE(action_type,'') LIKE ?",
+                "COALESCE(target_table,'') LIKE ?",
+                "COALESCE(target_id,'') LIKE ?",
+                "COALESCE(message,'') LIKE ?",
+                "COALESCE(detail,'') LIKE ?",
+                "COALESCE(level,'') LIKE ?",
+            ]) + ")"
+        )
         params.extend([kw] * 7)
 
     sql = "SELECT * FROM system_logs"
     if where:
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY id DESC LIMIT ?"
-    params.append(int(limit or 500))
+    params.append(max(1, _safe_int(limit, 500)))
     return query_df(sql, tuple(params))
 
 
 def count_logs_by_date_range(start_date: Any, end_date: Any) -> int:
+    """Count logs in date range. Kept as top-level function to avoid ImportError in page 06."""
     s = _date_text(start_date)
     e = _date_text(end_date)
     if not s or not e:
         return 0
     df = query_df(
-        "SELECT COUNT(*) AS cnt FROM system_logs WHERE date(log_time) >= date(?) AND date(log_time) <= date(?)",
+        """
+        SELECT COUNT(*) AS cnt
+        FROM system_logs
+        WHERE date(log_time) >= date(?) AND date(log_time) <= date(?)
+        """,
         (s, e),
     )
-    if df.empty:
+    if df is None or df.empty:
         return 0
     return int(df.iloc[0].get("cnt", 0) or 0)
 
 
-def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit: bool = True, user_name: str | None = None) -> int:
+def delete_logs_by_date_range(
+    start_date: Any,
+    end_date: Any,
+    keep_delete_audit: bool = True,
+    user_name: str | None = None,
+) -> int:
     """Delete system_logs in a date range and keep one audit log after deletion.
 
-    不使用文字輸入 DELETE；頁面會用 checkbox 確認。
+    V2.01：此函式必須存在，避免 06｜LOG查詢 import error。
+    刪除確認由頁面用 checkbox 控制，不再要求輸入 DELETE。
     """
     s = _date_text(start_date)
     e = _date_text(end_date)
     if not s or not e:
         return 0
     before = count_logs_by_date_range(s, e)
+    if before <= 0:
+        return 0
     execute(
         "DELETE FROM system_logs WHERE date(log_time) >= date(?) AND date(log_time) <= date(?)",
         (s, e),
