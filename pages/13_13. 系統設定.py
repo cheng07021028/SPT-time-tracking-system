@@ -35,30 +35,50 @@ proc_edit = proc_df.copy()
 if "刪除" not in proc_edit.columns:
     proc_edit.insert(0, "刪除", False)
 
-edited_proc = render_table(
-    proc_edit,
-    "system_process_options",
-    editable=can_manage,
-    disabled=["id", "created_at", "updated_at"] if can_manage else list(proc_edit.columns),
-    key="system_process_options_editor",
-    height=420,
-)
+if can_manage:
+    st.caption("效能模式：修改工段表格不會立即重跑；按下『執行』才會永久儲存或刪除。")
+    with st.form("system_process_options_batch_form", clear_on_submit=False):
+        edited_proc = render_table(
+            proc_edit,
+            "system_process_options",
+            editable=True,
+            disabled=["id", "created_at", "updated_at"],
+            key="system_process_options_editor",
+            height=420,
+        )
+        proc_action = st.radio(
+            "工段設定動作 / Action",
+            ["💾 套用並永久儲存工段名稱設定", "🗑️ 刪除勾選工段"],
+            horizontal=True,
+            key="system_process_options_action",
+        )
+        proc_submitted = st.form_submit_button("✅ 執行 / Apply", use_container_width=True)
 
-if can_manage and edited_proc is not None:
-    p1, p2 = st.columns(2)
-    if p1.button("💾 套用並永久儲存工段名稱設定", use_container_width=True, key="save_process_options"):
-        save_df = edited_proc.drop(columns=["刪除"], errors="ignore")
-        count = save_process_options_df(save_df)
-        st.success(f"已永久儲存工段名稱設定 {count} 筆。")
-        st.rerun()
-    try:
-        delete_ids = [int(x) for x in edited_proc[edited_proc["刪除"].astype(bool)]["id"].dropna().tolist()]
-    except Exception:
-        delete_ids = []
-    if p2.button(f"🗑️ 刪除勾選工段（{len(delete_ids)}）", use_container_width=True, key="delete_process_options", disabled=len(delete_ids) == 0):
-        count = delete_process_options(delete_ids)
-        st.success(f"已刪除工段名稱設定 {count} 筆。")
-        st.rerun()
+    if proc_submitted and edited_proc is not None:
+        if proc_action.startswith("💾"):
+            save_df = edited_proc.drop(columns=["刪除"], errors="ignore")
+            count = save_process_options_df(save_df)
+            st.success(f"已永久儲存工段名稱設定 {count} 筆。")
+            st.rerun()
+        else:
+            try:
+                delete_ids = [int(x) for x in edited_proc[edited_proc["刪除"].astype(bool)]["id"].dropna().tolist()]
+            except Exception:
+                delete_ids = []
+            if not delete_ids:
+                st.warning("請先勾選要刪除的工段。")
+            else:
+                count = delete_process_options(delete_ids)
+                st.success(f"已刪除工段名稱設定 {count} 筆。")
+                st.rerun()
+else:
+    render_table(
+        proc_edit,
+        "system_process_options",
+        editable=False,
+        key="system_process_options_view",
+        height=420,
+    )
 
 st.divider()
 st.subheader("二、休息時間設定 / Rest Periods")
@@ -70,27 +90,47 @@ rest_edit = rest_df.copy()
 if "刪除" not in rest_edit.columns:
     rest_edit.insert(0, "刪除", False)
 
-edited_rest = render_table(
-    rest_edit,
-    "system_rest_periods",
-    editable=can_manage,
-    disabled=["id"] if can_manage else list(rest_edit.columns),
-    key="system_rest_periods_editor",
-    height=360,
-)
+if can_manage:
+    st.caption("效能模式：修改休息時間表格不會立即重跑；按下『執行』才會永久儲存或刪除。")
+    with st.form("system_rest_periods_batch_form", clear_on_submit=False):
+        edited_rest = render_table(
+            rest_edit,
+            "system_rest_periods",
+            editable=True,
+            disabled=["id"],
+            key="system_rest_periods_editor",
+            height=360,
+        )
+        rest_action = st.radio(
+            "休息時間設定動作 / Action",
+            ["💾 套用並永久儲存休息時間設定", "🗑️ 刪除勾選休息時間"],
+            horizontal=True,
+            key="system_rest_periods_action",
+        )
+        rest_submitted = st.form_submit_button("✅ 執行 / Apply", use_container_width=True)
 
-if can_manage and edited_rest is not None:
-    r1, r2 = st.columns(2)
-    if r1.button("💾 套用並永久儲存休息時間設定", use_container_width=True, key="save_rest_periods"):
-        save_df = edited_rest.drop(columns=["刪除"], errors="ignore")
-        count = save_rest_periods_df(save_df)
-        st.success(f"已永久儲存休息時間設定 {count} 筆，後續工時計算會套用新規則。")
-        st.rerun()
-    try:
-        rest_delete_ids = [int(x) for x in edited_rest[edited_rest["刪除"].astype(bool)]["id"].dropna().tolist()]
-    except Exception:
-        rest_delete_ids = []
-    if r2.button(f"🗑️ 刪除勾選休息時間（{len(rest_delete_ids)}）", use_container_width=True, key="delete_rest_periods", disabled=len(rest_delete_ids) == 0):
-        count = delete_rest_periods(rest_delete_ids)
-        st.success(f"已刪除休息時間設定 {count} 筆。")
-        st.rerun()
+    if rest_submitted and edited_rest is not None:
+        if rest_action.startswith("💾"):
+            save_df = edited_rest.drop(columns=["刪除"], errors="ignore")
+            count = save_rest_periods_df(save_df)
+            st.success(f"已永久儲存休息時間設定 {count} 筆，後續工時計算會套用新規則。")
+            st.rerun()
+        else:
+            try:
+                rest_delete_ids = [int(x) for x in edited_rest[edited_rest["刪除"].astype(bool)]["id"].dropna().tolist()]
+            except Exception:
+                rest_delete_ids = []
+            if not rest_delete_ids:
+                st.warning("請先勾選要刪除的休息時間。")
+            else:
+                count = delete_rest_periods(rest_delete_ids)
+                st.success(f"已刪除休息時間設定 {count} 筆。")
+                st.rerun()
+else:
+    render_table(
+        rest_edit,
+        "system_rest_periods",
+        editable=False,
+        key="system_rest_periods_view",
+        height=360,
+    )

@@ -233,31 +233,34 @@ with tab1:
 
     st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。製令 / Work Order 為必填。")
 
-    edited = st.data_editor(
-        st.session_state[STATE_KEY],
-        hide_index=True,
-        use_container_width=True,
-        num_rows="dynamic",
-        height=560,
-        column_order=COLS,
-        column_config={
-            "_delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small"),
-            "id": st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
-            "work_order": st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
-            "part_no": st.column_config.TextColumn("P/N / Part No.", width="medium"),
-            "type_name": st.column_config.TextColumn("機型 / Type", width="large"),
-            "assembly_location": st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
-            "customer": st.column_config.TextColumn("客戶 / Customer", width="medium"),
-            "note": st.column_config.TextColumn("備註 / Note", width="large"),
-            "is_active": st.column_config.CheckboxColumn("啟用 / Active", width="small"),
-            "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
-            "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
-        },
-        key="work_orders_data_editor_v138",
-    )
-    st.session_state[STATE_KEY] = ensure_cols(edited)
+    st.caption("效能模式：編輯表格時不會每點一格就重新運算；只有按下儲存才會寫入與重新載入。")
+    with st.form("work_orders_editor_batch_form", clear_on_submit=False):
+        edited = st.data_editor(
+            st.session_state[STATE_KEY],
+            hide_index=True,
+            use_container_width=True,
+            num_rows="dynamic",
+            height=560,
+            column_order=COLS,
+            column_config={
+                "_delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small"),
+                "id": st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
+                "work_order": st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
+                "part_no": st.column_config.TextColumn("P/N / Part No.", width="medium"),
+                "type_name": st.column_config.TextColumn("機型 / Type", width="large"),
+                "assembly_location": st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
+                "customer": st.column_config.TextColumn("客戶 / Customer", width="medium"),
+                "note": st.column_config.TextColumn("備註 / Note", width="large"),
+                "is_active": st.column_config.CheckboxColumn("啟用 / Active", width="small"),
+                "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
+                "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
+            },
+            key="work_orders_data_editor_v138",
+        )
+        submitted_work_orders = st.form_submit_button("💾 儲存製令清單 / Save Work Orders", type="primary", use_container_width=True)
 
-    if st.button("💾 儲存製令清單 / Save Work Orders", type="primary", use_container_width=True):
+    if submitted_work_orders:
+        st.session_state[STATE_KEY] = ensure_cols(edited)
         result = save_work_orders(st.session_state[STATE_KEY])
         reload_data()
         st.success(f"儲存完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
