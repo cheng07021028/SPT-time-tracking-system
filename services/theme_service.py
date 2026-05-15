@@ -525,6 +525,34 @@ div[data-baseweb="radio"] [aria-checked="true"] {
     outline: 1px solid rgba(223,250,255,.70) !important;
     box-shadow: 0 0 8px rgba(35,230,255,.22) !important;
 }
+
+/* V2.03: checkbox/radio/toggle rows use light background so confirmations are clearly visible. */
+[data-testid="stCheckbox"] > label,
+[data-testid="stRadio"] label,
+[data-testid="stToggle"] > label {
+    background: linear-gradient(180deg, #f5fbff 0%, #dff7ff 100%) !important;
+    color: #04101d !important;
+    -webkit-text-fill-color: #04101d !important;
+    border: 1px solid rgba(35, 230, 255, .78) !important;
+    border-radius: 10px !important;
+    padding: 8px 12px !important;
+    box-shadow: 0 0 0 1px rgba(35,230,255,.12) inset, 0 0 12px rgba(35,230,255,.16) !important;
+}
+[data-testid="stCheckbox"] > label *,
+[data-testid="stRadio"] label *,
+[data-testid="stToggle"] > label * {
+    color: #04101d !important;
+    -webkit-text-fill-color: #04101d !important;
+    text-shadow: none !important;
+    font-weight: 950 !important;
+}
+[data-testid="stCheckbox"] input[type="checkbox"],
+[data-testid="stCheckbox"] [role="checkbox"] {
+    accent-color: #18d7f0 !important;
+    outline: 2px solid rgba(4,16,29,.55) !important;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.8), 0 0 10px rgba(35,230,255,.35) !important;
+}
+
 /* Expander headers and clickable captions should stay bright. */
 div[data-testid="stExpander"] summary,
 div[data-testid="stExpander"] summary * {

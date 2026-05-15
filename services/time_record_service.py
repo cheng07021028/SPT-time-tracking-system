@@ -416,3 +416,191 @@ def recalculate_time_records(record_ids: list[int] | None = None) -> int:
     clear_query_cache()
     mark_data_changed(f"已重新計算工時 {len(updates)} 筆，待手動永久備份。", "FAST_RECALC time_records")
     return len(updates)
+
+
+def _to_clean_value(v):
+    """Normalize values coming from Excel/paste imports before DB writes."""
+    try:
+        if pd.isna(v):
+            return None
+    except Exception:
+        pass
+    if isinstance(v, (datetime, date)):
+        if isinstance(v, datetime):
+            return v.strftime("%Y-%m-%d %H:%M:%S")
+        return v.strftime("%Y-%m-%d")
+    text = str(v).strip() if v is not None else ""
+    return text if text != "" else None
+
+
+def _combine_date_time(date_value, time_value) -> str | None:
+    d = _to_clean_value(date_value)
+    t = _to_clean_value(time_value)
+    if not d:
+        return None
+    if t:
+        return f"{str(d)[:10]} {str(t)}"[:19]
+    # If d already looks like a timestamp, keep it.
+    return str(d)[:19]
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:
+    """Import parsed history/time records from 02 History Excel/Paste.
+
+    Added back in V2.03 because pages/02 imports this function.  It performs a
+    single transaction and returns counts, so importing history does not cause
+    partial writes or repeated slow cloud sync work.
+    """
+    result = {"inserted": 0, "updated": 0, "skipped": 0, "errors": []}
+    if df is None or df.empty:
+        return result
+
+    now = _now()
+    user_name = _audit_user_name()
+    insert_cols = [
+        "record_key", "status", "work_order", "part_no", "type_name", "process_name",
+        "employee_id", "employee_name", "start_action", "start_timestamp", "end_action",
+        "end_timestamp", "remark", "start_date", "start_time", "end_date", "end_time",
+        "work_hours", "assembly_location", "group_key", "is_group_work", "source",
+        "created_at", "updated_at",
+    ]
+    update_cols = [c for c in insert_cols if c not in ("record_key", "created_at")]
+
+    rows_to_insert = []
+    rows_to_update = []
+    errors = []
+
+    for idx, r in df.iterrows():
+        try:
+            employee_id = _to_clean_value(r.get("employee_id"))
+            work_order = _to_clean_value(r.get("work_order"))
+            process_name = _to_clean_value(r.get("process_name"))
+            start_ts = _to_clean_value(r.get("start_timestamp"))
+            end_ts = _to_clean_value(r.get("end_timestamp"))
+
+            if not start_ts:
+                start_ts = _combine_date_time(r.get("start_date"), r.get("start_time"))
+            if not end_ts:
+                end_ts = _combine_date_time(r.get("end_date"), r.get("end_time"))
+
+            if not (employee_id and work_order and process_name and start_ts):
+                result["skipped"] += 1
+                errors.append(f"第 {idx + 1} 筆缺少必要欄位：工號、製令、工段或開始時間。")
+                continue
+
+            try:
+                start_date, start_time = split_timestamp(str(start_ts))
+            except Exception:
+                start_date = _to_clean_value(r.get("start_date")) or str(start_ts)[:10]
+                start_time = _to_clean_value(r.get("start_time")) or (str(start_ts)[11:19] if len(str(start_ts)) >= 19 else "")
+            if end_ts:
+                try:
+                    end_date, end_time = split_timestamp(str(end_ts))
+                except Exception:
+                    end_date = _to_clean_value(r.get("end_date")) or str(end_ts)[:10]
+                    end_time = _to_clean_value(r.get("end_time")) or (str(end_ts)[11:19] if len(str(end_ts)) >= 19 else "")
+            else:
+                end_date, end_time = _to_clean_value(r.get("end_date")), _to_clean_value(r.get("end_time"))
+
+            work_hours = _to_clean_value(r.get("work_hours"))
+            if recalc and start_ts and end_ts:
+                try:
+                    work_hours = calculate_work_hours(str(start_ts), str(end_ts))
+                except Exception as exc:
+                    errors.append(f"第 {idx + 1} 筆工時計算失敗，保留原工時：{exc}")
+            elif work_hours is not None:
+                work_hours = hms_to_hours(work_hours)
+            else:
+                work_hours = 0
+
+            status = _to_clean_value(r.get("status")) or ("已結束" if end_ts else "作業中")
+            record_key = _to_clean_value(r.get("record_key")) or make_record_key(str(employee_id), str(work_order), str(process_name), str(start_ts))
+            is_group_work = r.get("is_group_work", 0)
+            try:
+                is_group_work = int(bool(is_group_work))
+            except Exception:
+                is_group_work = 0
+
+            record = {
+                "record_key": record_key,
+                "status": status,
+                "work_order": work_order,
+                "part_no": _to_clean_value(r.get("part_no")),
+                "type_name": _to_clean_value(r.get("type_name")),
+                "process_name": process_name,
+                "employee_id": employee_id,
+                "employee_name": _to_clean_value(r.get("employee_name")),
+                "start_action": _to_clean_value(r.get("start_action")) or "開始",
+                "start_timestamp": str(start_ts),
+                "end_action": _to_clean_value(r.get("end_action")) or ("完工" if end_ts else None),
+                "end_timestamp": str(end_ts) if end_ts else None,
+                "remark": _to_clean_value(r.get("remark")),
+                "start_date": start_date,
+                "start_time": start_time,
+                "end_date": end_date,
+                "end_time": end_time,
+                "work_hours": work_hours,
+                "assembly_location": _to_clean_value(r.get("assembly_location")),
+                "group_key": _to_clean_value(r.get("group_key")),
+                "is_group_work": is_group_work,
+                "source": source,
+                "created_at": now,
+                "updated_at": now,
+            }
+            rid = _to_clean_value(r.get("id"))
+            if rid:
+                try:
+                    rows_to_update.append((int(rid), record))
+                except Exception:
+                    rows_to_insert.append(record)
+            else:
+                rows_to_insert.append(record)
+        except Exception as exc:
+            result["skipped"] += 1
+            errors.append(f"第 {idx + 1} 筆匯入失敗：{exc}")
+
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
+    try:
+        conn.execute("PRAGMA busy_timeout=8000")
+        conn.execute("BEGIN")
+        for rid, record in rows_to_update:
+            exists = conn.execute("SELECT id FROM time_records WHERE id=?", (rid,)).fetchone()
+            if not exists:
+                rows_to_insert.append(record)
+                continue
+            vals = [record[c] for c in update_cols] + [rid]
+            conn.execute(
+                f"UPDATE time_records SET {', '.join([c + '=?' for c in update_cols])} WHERE id=?",
+                vals,
+            )
+            result["updated"] += 1
+        for record in rows_to_insert:
+            vals = [record[c] for c in insert_cols]
+            placeholders = ",".join(["?"] * len(insert_cols))
+            conn.execute(
+                f"INSERT OR REPLACE INTO time_records ({', '.join(insert_cols)}) VALUES ({placeholders})",
+                vals,
+            )
+            result["inserted"] += 1
+        conn.execute(
+            """
+            INSERT INTO system_logs
+            (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (now, user_name, "IMPORT_TIME_RECORDS", "time_records", "", f"歷史紀錄匯入：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}", source, "INFO"),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    clear_query_cache()
+    if result["inserted"] or result["updated"]:
+        mark_data_changed("歷史紀錄匯入已變更，待手動永久備份。", "IMPORT time_records")
+    result["errors"] = errors
+    return result
+
