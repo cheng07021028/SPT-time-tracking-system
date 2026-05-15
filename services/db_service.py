@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-SPT Time Tracking V1.30 - DB Service with Cloud Auto Restore Guard
+SPT Time Tracking V1.39 - DB Service with Page Switch Speed Guard
 
 重點：
 1. 自動建立 SQLite schema，包含工時主資料、UI設定、權限管理資料表。
 2. Streamlit Cloud 更新/重啟後，如果 SQLite 不存在或主資料為 0，會自動從 GitHub data/persistent_state 還原。
 3. 寫入資料後自動刷新永久 JSON；若已設定 GitHub Token，會嘗試同步 latest JSON 到 GitHub。
 4. 嚴格避免「空資料庫」覆蓋 GitHub 上既有永久資料。
+5. 登入/權限/安全紀錄類 SQL 不觸發 GitHub 還原與雲端同步，避免登入頁緩慢。
 """
 from __future__ import annotations
 
@@ -25,7 +26,70 @@ DB_PATH = DB_DIR / "spt_time_tracking.db"
 _SCHEMA_READY = False
 _RESTORE_CHECKED = False
 _LAST_CLOUD_SYNC_TS = 0.0
-_CLOUD_SYNC_INTERVAL_SEC = 20.0
+# GitHub API upload is useful but slow; keep it throttled heavily. Manual backup remains available on page 09.
+_CLOUD_SYNC_INTERVAL_SEC = 180.0
+
+# Lightweight in-process SELECT cache. Streamlit reruns the script frequently; this prevents
+# repeated SQL reads while switching tabs/pages. Cache is cleared after any write.
+_QUERY_CACHE: dict[tuple[str, tuple[Any, ...]], tuple[float, pd.DataFrame]] = {}
+_QUERY_CACHE_TTL_SEC = 10.0
+_QUERY_CACHE_MAX_ITEMS = 120
+
+
+AUTH_SECURITY_SQL_MARKERS = (
+    " auth_", " security_", "auth_users", "auth_account_permissions", "auth_login_logs",
+    "auth_security_settings", "security_users", "security_roles", "security_user_roles",
+    "security_module_permissions", "security_settings", "security_login_logs",
+)
+
+BUSINESS_SQL_MARKERS = (
+    "work_orders", "employees", "time_records", "rest_periods",
+    "table_column_settings", "table_sort_settings", "system_settings",
+)
+
+
+def _normalise_sql(sql: str) -> str:
+    return " " + " ".join(str(sql or "").lower().replace('\n', ' ').split()) + " "
+
+
+def _is_auth_or_security_sql(sql: str) -> bool:
+    low = _normalise_sql(sql)
+    return any(marker in low for marker in AUTH_SECURITY_SQL_MARKERS)
+
+
+def _is_business_sql(sql: str) -> bool:
+    low = _normalise_sql(sql)
+    return any(marker in low for marker in BUSINESS_SQL_MARKERS)
+
+
+def _should_run_data_guard(sql: str | None = None) -> bool:
+    """Return False for login / permission / security SQL.
+
+    登入頁慢的主因是每次帳號驗證、登入紀錄、權限表查詢都觸發
+    GitHub permanent JSON 檢查與同步。安全資料表不需要啟動資料還原，
+    因此直接跳過。
+    """
+    if not sql:
+        return True
+    if _is_auth_or_security_sql(sql) and not _is_business_sql(sql):
+        return False
+    return True
+
+
+def _should_after_write_sync(sql: str | None = None) -> bool:
+    """Only business/settings writes refresh permanent files.
+
+    登入成功/失敗紀錄很頻繁，不應每次都重新匯出 JSON 或上傳 GitHub。
+    """
+    if not sql:
+        return True
+    if _is_auth_or_security_sql(sql) and not _is_business_sql(sql):
+        return False
+    ddl_prefixes = (" create ", " pragma ")
+    low = _normalise_sql(sql)
+    if any(low.startswith(prefix) for prefix in ddl_prefixes):
+        return False
+    return True
 
 
 def _now() -> str:
@@ -34,9 +98,34 @@ def _now() -> str:
 
 def _open_connection() -> sqlite3.Connection:
     DB_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=15)
     conn.row_factory = sqlite3.Row
+    # Connection-level pragmas: reduce locking and speed up read-heavy Streamlit reruns.
+    try:
+        conn.execute("PRAGMA busy_timeout=8000")
+        conn.execute("PRAGMA temp_store=MEMORY")
+        conn.execute("PRAGMA cache_size=-20000")
+        conn.execute("PRAGMA synchronous=NORMAL")
+    except Exception:
+        pass
     return conn
+
+
+def _is_select_sql(sql: str | None) -> bool:
+    low = _normalise_sql(sql or "")
+    return low.startswith(" select ") or low.startswith(" with ")
+
+
+def _query_cache_key(sql: str, params: Iterable[Any] | None) -> tuple[str, tuple[Any, ...]]:
+    return (" ".join(str(sql or "").split()), tuple(params or ()))
+
+
+def clear_query_cache() -> None:
+    """Clear read cache after writes or manual refresh."""
+    try:
+        _QUERY_CACHE.clear()
+    except Exception:
+        pass
 
 
 def _init_schema(conn: sqlite3.Connection) -> None:
@@ -267,6 +356,28 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         SELECT ?, 'SYSTEM', 'AUTO_INIT_DATABASE', 'ALL', '', '自動初始化資料庫完成', ?, 'INFO'
         WHERE NOT EXISTS (SELECT 1 FROM system_logs WHERE action_type='AUTO_INIT_DATABASE')
     """, (now, str(DB_PATH)))
+
+
+    # 常用查詢索引：避免切換模組時歷史/人員/製令查詢變慢。
+    for idx_sql in [
+        "CREATE INDEX IF NOT EXISTS idx_work_orders_order ON work_orders(work_order)",
+        "CREATE INDEX IF NOT EXISTS idx_work_orders_active ON work_orders(is_active)",
+        "CREATE INDEX IF NOT EXISTS idx_employees_empid ON employees(employee_id)",
+        "CREATE INDEX IF NOT EXISTS idx_employees_active_factory ON employees(is_active, is_in_factory, is_today_attendance)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_emp_date ON time_records(employee_id, start_date)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_work_order ON time_records(work_order)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_status ON time_records(status)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_start_date ON time_records(start_date)",
+        "CREATE INDEX IF NOT EXISTS idx_auth_users_username ON auth_users(username)",
+        "CREATE INDEX IF NOT EXISTS idx_auth_perm_user_module ON auth_account_permissions(username, module_code)",
+        "CREATE INDEX IF NOT EXISTS idx_auth_login_logs_time ON auth_login_logs(event_time)",
+        "CREATE INDEX IF NOT EXISTS idx_security_users_username ON security_users(username)",
+        "CREATE INDEX IF NOT EXISTS idx_security_login_logs_time ON security_login_logs(login_time, created_at)",
+    ]:
+        try:
+            cur.execute(idx_sql)
+        except Exception:
+            pass
     conn.commit()
 
 
@@ -302,9 +413,21 @@ def ensure_data_guard_restore(force: bool = False) -> dict[str, Any]:
         return {"ok": True, "skipped": True, "message": "已檢查過自動還原。"}
 
     ensure_database()
+
+    # V1.39 speed guard:
+    # If business data already exists locally, never call GitHub on normal page entry.
+    # Network calls were the main reason every module felt slow after permissions/persistence were added.
+    if not force:
+        try:
+            if database_business_row_count() > 0:
+                _RESTORE_CHECKED = True
+                return {"ok": True, "skipped": True, "message": "本機主資料已存在，略過 GitHub 自動還原檢查。"}
+        except Exception:
+            pass
+
     results: list[dict[str, Any]] = []
 
-    # 1) 先從 GitHub 下載 latest JSON，這對 Streamlit Cloud 最重要。
+    # 1) 先從 GitHub 下載 latest JSON，這對 Streamlit Cloud 最重要，但只在 DB 空白或手動 force 時執行。
     try:
         from services.github_cloud_storage_service import restore_from_github_if_database_empty
         res = restore_from_github_if_database_empty(force=force)
@@ -359,38 +482,65 @@ def _after_write() -> None:
 
 def execute(sql: str, params: Iterable[Any] | None = None) -> int:
     ensure_database()
-    ensure_data_guard_restore()
+    if _should_run_data_guard(sql):
+        ensure_data_guard_restore()
     if params is None:
         params = ()
     with _open_connection() as conn:
         cur = conn.execute(sql, tuple(params))
         conn.commit()
         last_id = cur.lastrowid
-    _after_write()
+    clear_query_cache()
+    if _should_after_write_sync(sql):
+        _after_write()
     return int(last_id or 0)
 
 
 def executemany(sql: str, rows: list[Iterable[Any]]) -> None:
     ensure_database()
-    ensure_data_guard_restore()
+    if _should_run_data_guard(sql):
+        ensure_data_guard_restore()
     with _open_connection() as conn:
         conn.executemany(sql, rows)
         conn.commit()
-    _after_write()
+    clear_query_cache()
+    if _should_after_write_sync(sql):
+        _after_write()
 
 
 def query_df(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:
     ensure_database()
-    ensure_data_guard_restore()
+    if _should_run_data_guard(sql):
+        ensure_data_guard_restore()
     if params is None:
         params = ()
+
+    cacheable = _is_select_sql(sql)
+    key = _query_cache_key(sql, params)
+    now_ts = time.time()
+    if cacheable:
+        cached = _QUERY_CACHE.get(key)
+        if cached and now_ts - cached[0] <= _QUERY_CACHE_TTL_SEC:
+            return cached[1].copy()
+
     with _open_connection() as conn:
-        return pd.read_sql_query(sql, conn, params=tuple(params))
+        df = pd.read_sql_query(sql, conn, params=tuple(params))
+
+    if cacheable:
+        try:
+            if len(_QUERY_CACHE) >= _QUERY_CACHE_MAX_ITEMS:
+                oldest = min(_QUERY_CACHE.items(), key=lambda kv: kv[1][0])[0]
+                _QUERY_CACHE.pop(oldest, None)
+            _QUERY_CACHE[key] = (now_ts, df.copy())
+        except Exception:
+            pass
+    return df
 
 
 def query_one(sql: str, params: Iterable[Any] | None = None) -> dict | None:
     ensure_database()
-    ensure_data_guard_restore()
+    if _should_run_data_guard(sql):
+        ensure_data_guard_restore()
     if params is None:
         params = ()
     with _open_connection() as conn:

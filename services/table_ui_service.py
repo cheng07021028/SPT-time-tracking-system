@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Iterable
 
 import pandas as pd
@@ -80,11 +81,18 @@ DEFAULT_WIDTHS: dict[str, int] = {
 }
 
 
+_TABLE_UI_SCHEMA_READY = False
+_WIDTH_CACHE_TTL_SECONDS = 300
+
+
 def label_for(col: str) -> str:
     return COLUMN_LABELS.get(col, f"{col} / {col}")
 
 
 def ensure_table_ui_schema() -> None:
+    global _TABLE_UI_SCHEMA_READY
+    if _TABLE_UI_SCHEMA_READY:
+        return
     execute(
         """
         CREATE TABLE IF NOT EXISTS table_ui_settings (
@@ -94,18 +102,32 @@ def ensure_table_ui_schema() -> None:
         )
         """
     )
+    _TABLE_UI_SCHEMA_READY = True
 
 
 def load_widths(table_key: str) -> dict[str, int]:
     ensure_table_ui_schema()
+    cache_key = f"_spt_width_cache_{table_key}"
+    try:
+        cached = st.session_state.get(cache_key)
+        if cached and time.time() - float(cached.get("ts", 0)) < _WIDTH_CACHE_TTL_SECONDS:
+            return dict(cached.get("data", {}))
+    except Exception:
+        pass
     row = query_one("SELECT widths_json FROM table_ui_settings WHERE table_key=?", (table_key,))
     if not row or not row.get("widths_json"):
-        return {}
+        widths = {}
+    else:
+        try:
+            data = json.loads(row["widths_json"])
+            widths = {str(k): int(v) for k, v in data.items() if str(v).isdigit() or isinstance(v, int)}
+        except Exception:
+            widths = {}
     try:
-        data = json.loads(row["widths_json"])
-        return {str(k): int(v) for k, v in data.items() if str(v).isdigit() or isinstance(v, int)}
+        st.session_state[cache_key] = {"ts": time.time(), "data": widths}
     except Exception:
-        return {}
+        pass
+    return widths
 
 
 def save_widths(table_key: str, widths: dict[str, int]) -> None:
@@ -120,6 +142,10 @@ def save_widths(table_key: str, widths: dict[str, int]) -> None:
         """,
         (table_key, json.dumps(widths, ensure_ascii=False)),
     )
+    try:
+        st.session_state[f"_spt_width_cache_{table_key}"] = {"ts": time.time(), "data": dict(widths)}
+    except Exception:
+        pass
 
 
 def _column_config(col: str, width: int | None = None):
@@ -140,11 +166,21 @@ def build_column_config(table_key: str, df: pd.DataFrame) -> dict:
 
 
 def render_width_settings(table_key: str, df: pd.DataFrame, title: str = "欄寬設定 / Column Width Settings") -> None:
+    """Lazy width editor.
+
+    Streamlit executes widgets inside collapsed expanders, so the old version generated
+    dozens of number_input widgets on every page load. This made module switching slow.
+    V1.39 keeps the feature, but only renders the heavy controls when the user explicitly opens it.
+    """
     if df is None or df.empty:
         return
+    show_key = f"show_widths_{table_key}"
+    show = st.toggle(f"⚙️ 顯示{title}", value=False, key=show_key)
+    if not show:
+        return
     widths = load_widths(table_key)
-    with st.expander(title, expanded=False):
-        st.caption("目前 Streamlit 無法直接讀取滑鼠拖拉後的欄寬，因此此處提供可永久儲存的欄寬設定。調整後按儲存，換頁或重開仍會保留。")
+    with st.expander(title, expanded=True):
+        st.caption("目前 Streamlit 無法直接讀取滑鼠拖拉後的欄寬，因此此處提供可永久儲存的欄寬設定。平常保持關閉可加快模組載入速度。")
         new_widths: dict[str, int] = {}
         cols = st.columns(4)
         for idx, col in enumerate(df.columns):
