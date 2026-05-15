@@ -19,19 +19,12 @@ from services.audit_log_service import (
     auto_record_session_login,
 )
 
-try:
-    from services.security_service import require_login, require_permission
-except Exception:
-    require_login = None
-    require_permission = None
+from services.security_service import require_module_access
 
 apply_theme()
-if require_login:
-    require_login()
-if require_permission:
-    require_permission("11_login_logs", "can_view")
+require_module_access("11_login_logs", "can_view")
 
-render_header("11", "登入紀錄", "登入、登出、閒置自動登出、權限不足與安全事件查詢")
+render_header("11｜登入紀錄", "登入、登出、閒置自動登出、權限不足與安全事件查詢")
 
 # Make sure the current logged-in session is represented at least once.
 try:

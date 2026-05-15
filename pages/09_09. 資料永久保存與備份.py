@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
+from services.security_service import require_module_access
 from services.db_service import DB_PATH, database_business_row_count, ensure_data_guard_restore
 from services.github_cloud_storage_service import (
     LATEST_SETTINGS,
@@ -28,6 +29,7 @@ from services.github_cloud_storage_service import (
 # Use the common two-argument render_header format to avoid showing only the module number.
 
 apply_theme()
+require_module_access("09_persistence", "can_view")
 render_header("09｜資料永久保存與備份", "GitHub 雲端永久保存｜啟動自動還原｜防止空資料覆蓋")
 
 st.subheader("資料防消失中心 / Data Guard Center")

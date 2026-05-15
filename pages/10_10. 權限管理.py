@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
+from services.security_service import require_module_access
 from services.permission_service import (
     ACTIONS,
     MODULES,
@@ -21,6 +22,7 @@ from services.permission_service import (
 )
 
 apply_theme()
+require_module_access("10_permissions", "can_manage")
 render_header("10 | 權限管理", "帳號密碼總表、帳號匯入、帳號貼上、帳號級模組權限 / Account & Permission Management")
 init_permission_tables()
 
@@ -484,26 +486,10 @@ with tab_perm:
 with tab_sec:
     st.subheader("安全設定 / Security Settings")
     settings = get_security_settings()
-    try:
-        idle = int(float(settings.get("idle_timeout_minutes", "15") or 15))
-    except Exception:
-        idle = 15
-    st.info("此設定按下『套用安全設定』後會立即寫入執行中的安全設定與永久設定，重新整理或切換頁面仍會生效。")
-    c_idle_1, c_idle_2 = st.columns([2, 1])
-    with c_idle_1:
-        new_idle = st.number_input(
-            "閒置自動登出分鐘數 / Idle Auto Logout Minutes",
-            min_value=1, max_value=240, value=max(1, idle), step=1,
-            help="超過此分鐘數沒有操作，系統會自動登出。"
-        )
-    with c_idle_2:
-        st.metric("目前設定 / Current", f"{idle} 分鐘")
-    confirm_after_record = st.checkbox(
-        "工時完成後詢問是否繼續記錄 / Ask continue after time record",
-        value=settings.get("ask_continue_after_record", "1") != "0"
-    )
+    idle = int(settings.get("idle_timeout_minutes", "15") or 15)
+    new_idle = st.number_input("閒置自動登出分鐘數 / Idle Auto Logout Minutes", min_value=1, max_value=240, value=idle, step=1)
+    confirm_after_record = st.checkbox("工時完成後詢問是否繼續記錄 / Ask continue after time record", value=settings.get("ask_continue_after_record", "1") != "0")
     if st.button("✅ 套用安全設定 / Apply Security Settings", type="primary", use_container_width=True):
         save_security_settings({"idle_timeout_minutes": str(int(new_idle)), "ask_continue_after_record": "1" if confirm_after_record else "0"})
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": int(new_idle), "ts": 0}
-        st.success(f"安全設定已儲存並立即生效：閒置 {int(new_idle)} 分鐘自動登出。")
+        st.success("安全設定已儲存 / Security settings saved")
         st.rerun()

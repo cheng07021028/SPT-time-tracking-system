@@ -15,19 +15,12 @@ from services.module_persistence_service import (
     rebuild_global_index,
 )
 
-try:
-    from services.security_service import require_login, require_permission
-except Exception:
-    require_login = None
-    require_permission = None
+from services.security_service import require_module_access
 
 apply_theme()
-if require_login:
-    require_login()
-if require_permission:
-    require_permission("09_persistence", "can_view")
+require_module_access("12_module_persistence", "can_view")
 
-render_header("12", "模組永久紀錄中心", "每個模組獨立 records、settings、audit 與 history 時間戳備份")
+render_header("12｜模組永久紀錄中心", "每個模組獨立 records、settings、audit 與 history 時間戳備份")
 
 st.markdown("### 模組獨立永久紀錄 / Independent Permanent Module Records")
 st.info("每個模組都有獨立 records.json、settings.json、audit.jsonl 與 history 時間戳備份。這些檔案位於 data/persistent_modules/，更新程式模組時不應覆蓋。")
