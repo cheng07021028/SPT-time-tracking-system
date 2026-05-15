@@ -1,6 +1,6 @@
 {
   "version": "V1.30",
-  "exported_at": "2026-05-15 14:47:44",
+  "exported_at": "2026-05-15 14:51:12",
   "db_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
   "db_exists": true,
   "business_row_count": 685,
@@ -18,7 +18,7 @@
     "security_settings": 2,
     "security_user_roles": 8,
     "security_users": 8,
-    "system_logs": 16,
+    "system_logs": 18,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
@@ -5507,6 +5507,28 @@
         "message": "管理員重新計算工時 1 筆，已同步反映至 02 歷史紀錄",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 17,
+        "log_time": "2026-05-15 14:50:34",
+        "user_name": "appuser",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "人工編輯並儲存工時紀錄 8 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 18,
+        "log_time": "2026-05-15 14:50:40",
+        "user_name": "appuser",
+        "action_type": "RECALC_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "管理員重新計算工時 1 筆，已同步反映至 02 歷史紀錄",
+        "detail": "",
+        "level": "INFO"
       }
     ],
     "system_settings": [
@@ -5576,7 +5598,7 @@
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-15 05:09:51",
-        "updated_at": "2026-05-15 05:27:32"
+        "updated_at": "2026-05-15 14:50:34"
       },
       {
         "id": 2,
@@ -5603,7 +5625,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 05:10:22",
-        "updated_at": "2026-05-15 05:42:37"
+        "updated_at": "2026-05-15 14:50:34"
       },
       {
         "id": 3,
@@ -5630,7 +5652,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 06:12:20",
-        "updated_at": "2026-05-15 07:33:02"
+        "updated_at": "2026-05-15 14:50:34"
       },
       {
         "id": 4,
@@ -5657,7 +5679,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 07:38:16",
-        "updated_at": "2026-05-15 07:38:16"
+        "updated_at": "2026-05-15 14:50:34"
       },
       {
         "id": 5,
@@ -5684,7 +5706,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 08:41:33",
-        "updated_at": "2026-05-15 08:41:33"
+        "updated_at": "2026-05-15 14:50:34"
       },
       {
         "id": 6,
@@ -5711,7 +5733,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 08:52:34",
-        "updated_at": "2026-05-15 08:52:34"
+        "updated_at": "2026-05-15 14:50:34"
       },
       {
         "id": 7,
@@ -5738,7 +5760,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 10:59:10",
-        "updated_at": "2026-05-15 11:11:04"
+        "updated_at": "2026-05-15 14:50:34"
       },
       {
         "id": 8,
@@ -5751,21 +5773,21 @@
         "employee_id": "B211",
         "employee_name": "張瑀榛",
         "start_action": "開始",
-        "start_timestamp": "2026-05-15 11:11:04",
+        "start_timestamp": "2026-05-15 09:00:00",
         "end_action": "暫停",
-        "end_timestamp": "2026-05-15 11:21:49",
+        "end_timestamp": "2026-05-15 12:00:00",
         "remark": "",
         "start_date": "2026-05-15",
-        "start_time": "11:11:04",
+        "start_time": "09:00:00",
         "end_date": "2026-05-15",
-        "end_time": "11:21:49",
-        "work_hours": 0.18,
+        "end_time": "12:00:00",
+        "work_hours": 2.75,
         "assembly_location": "竹東",
         "group_key": "B211|配電|2026-05-15",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 11:11:04",
-        "updated_at": "2026-05-15 14:28:44"
+        "updated_at": "2026-05-15 14:50:40"
       }
     ],
     "work_orders": [
