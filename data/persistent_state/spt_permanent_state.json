@@ -1,31 +1,7 @@
 {
-  "version": "V1.30",
-  "exported_at": "2026-05-15 15:21:15",
-  "db_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
-  "db_exists": true,
-  "business_row_count": 683,
-  "table_counts": {
-    "auth_account_permissions": 104,
-    "auth_login_logs": 0,
-    "auth_security_settings": 2,
-    "auth_users": 8,
-    "employees": 74,
-    "process_options": 17,
-    "rest_periods": 5,
-    "security_login_logs": 42,
-    "security_module_permissions": 78,
-    "security_roles": 6,
-    "security_settings": 2,
-    "security_user_roles": 8,
-    "security_users": 8,
-    "system_logs": 22,
-    "system_settings": 6,
-    "table_column_settings": 0,
-    "table_sort_settings": 0,
-    "table_ui_settings": 0,
-    "time_records": 6,
-    "work_orders": 603
-  },
+  "schema_version": "v1.30",
+  "export_time": "2026-05-15 15:48:36",
+  "database_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
   "tables": {
     "auth_account_permissions": [
       {
@@ -2906,6 +2882,23 @@
         "updated_at": "2026-05-15 03:48:15"
       }
     ],
+    "login_logs": [
+      {
+        "id": 1,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "11_login_logs",
+        "login_time": "2026-05-15 15:46:01",
+        "logout_time": null,
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "",
+        "created_at": "2026-05-15 15:46:01"
+      }
+    ],
     "process_options": [
       {
         "id": 1,
@@ -3047,15 +3040,6 @@
         "process_name": "IPQC",
         "is_active": 1,
         "sort_order": 16,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-15 11:47:14",
-        "updated_at": "2026-05-15 11:47:14"
-      },
-      {
-        "id": 17,
-        "process_name": "其他",
-        "is_active": 1,
-        "sort_order": 17,
         "note": "系統預設工段，可於 13 系統設定修改",
         "created_at": "2026-05-15 11:47:14",
         "updated_at": "2026-05-15 11:47:14"
@@ -5237,7 +5221,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:23:39",
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 15:21:01"
+        "updated_at": "2026-05-15 15:46:15"
       },
       {
         "id": 2,
@@ -5250,7 +5234,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 15:21:01"
+        "updated_at": "2026-05-15 15:46:15"
       },
       {
         "id": 3,
@@ -5263,7 +5247,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 15:21:01"
+        "updated_at": "2026-05-15 15:46:15"
       },
       {
         "id": 4,
@@ -5276,7 +5260,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 15:21:01"
+        "updated_at": "2026-05-15 15:46:15"
       },
       {
         "id": 5,
@@ -5289,7 +5273,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 15:21:01"
+        "updated_at": "2026-05-15 15:46:15"
       },
       {
         "id": 6,
@@ -5302,7 +5286,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-15 15:21:01"
+        "updated_at": "2026-05-15 15:46:15"
       },
       {
         "id": 6425,
@@ -5315,7 +5299,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:18:26",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-15 15:21:01"
+        "updated_at": "2026-05-15 15:46:15"
       },
       {
         "id": 6430,
@@ -5328,7 +5312,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:21:46",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-15 15:21:01"
+        "updated_at": "2026-05-15 15:46:15"
       }
     ],
     "system_logs": [
@@ -5573,6 +5557,28 @@
         "message": "人工編輯並儲存工時紀錄 8 筆",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 23,
+        "log_time": "2026-05-15 15:45:30",
+        "user_name": "appuser",
+        "action_type": "DELETE_PROCESS_OPTIONS",
+        "target_table": "process_options",
+        "target_id": "",
+        "message": "刪除工段名稱設定 1 筆",
+        "detail": "",
+        "level": "WARN"
+      },
+      {
+        "id": 24,
+        "log_time": "2026-05-15 15:47:12",
+        "user_name": "system",
+        "action_type": "DELETE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "7",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：#7 B211 張瑀榛 21M0241-03 骨架組立",
+        "detail": "{'id': 7, 'record_key': 'B211|21M0241-03|骨架組立|2026-05-15 10:59:10|90921f16', 'status': '暫停', 'work_order': '21M0241-03', 'part_no': '4TRSC020-004-02', 'type_name': 'NTB 3 PORT', 'process_name': '骨架組立', 'employee_id': 'B211', 'employee_name': '張瑀榛', 'start_action': '開始', 'start_timestamp': '2026-05-15 10:59:10', 'end_action': '暫停', 'end_timestamp': '2026-05-15 11:11:04', 'remark': '系統自動暫停：同一人員切換不同工段或不同日期作業', 'start_date': '2026-05-15', 'start_time': '10:59:10', 'end_date': '2026-05-15', 'end_time': '11:11:04', 'work_hours': 0.2, 'assembly_location': '竹東', 'group_key': 'B211|骨架組立|2026-05-15', 'is_group_work': 0, 'source': 'streamlit', 'created_at': '2026-05-15 10:59:10', 'updated_at': '2026-05-15 15:08:11'}",
+        "level": "WARN"
       }
     ],
     "system_settings": [
@@ -5750,33 +5756,6 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 08:52:34",
-        "updated_at": "2026-05-15 15:08:11"
-      },
-      {
-        "id": 7,
-        "record_key": "B211|21M0241-03|骨架組立|2026-05-15 10:59:10|90921f16",
-        "status": "暫停",
-        "work_order": "21M0241-03",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "骨架組立",
-        "employee_id": "B211",
-        "employee_name": "張瑀榛",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-15 10:59:10",
-        "end_action": "暫停",
-        "end_timestamp": "2026-05-15 11:11:04",
-        "remark": "系統自動暫停：同一人員切換不同工段或不同日期作業",
-        "start_date": "2026-05-15",
-        "start_time": "10:59:10",
-        "end_date": "2026-05-15",
-        "end_time": "11:11:04",
-        "work_hours": 0.2,
-        "assembly_location": "竹東",
-        "group_key": "B211|骨架組立|2026-05-15",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-15 10:59:10",
         "updated_at": "2026-05-15 15:08:11"
       }
     ],
@@ -13018,5 +12997,29 @@
         "updated_at": "2026-05-15 05:08:50"
       }
     ]
-  }
+  },
+  "table_counts": {
+    "auth_account_permissions": 104,
+    "auth_login_logs": 0,
+    "auth_security_settings": 2,
+    "auth_users": 8,
+    "employees": 74,
+    "login_logs": 1,
+    "process_options": 16,
+    "rest_periods": 5,
+    "security_login_logs": 42,
+    "security_module_permissions": 78,
+    "security_roles": 6,
+    "security_settings": 2,
+    "security_user_roles": 8,
+    "security_users": 8,
+    "system_logs": 24,
+    "system_settings": 6,
+    "table_column_settings": 0,
+    "table_sort_settings": 0,
+    "table_ui_settings": 0,
+    "time_records": 5,
+    "work_orders": 603
+  },
+  "business_row_count": 682
 }
