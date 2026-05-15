@@ -28,6 +28,8 @@ from services.db_service import execute, query_df, query_one
 
 PBKDF2_ITERATIONS = 180_000
 DEFAULT_IDLE_MINUTES = 15
+_PERMISSION_CACHE_TTL_SECONDS = 300
+_SECURITY_SCHEMA_READY = False
 
 PERMISSION_COLUMNS = [
     "can_view", "can_create", "can_edit", "can_delete", "can_import", "can_export",
@@ -47,6 +49,9 @@ MODULES = [
     {"module_code": "10_permissions", "module_no": "10", "module_name": "權限管理", "module_name_en": "Permissions"},
     {"module_code": "11_login_logs", "module_no": "11", "module_name": "登入紀錄", "module_name_en": "Login Logs"},
 ]
+
+MODULE_CODE_TO_NO = {m["module_code"]: m["module_no"] for m in MODULES}
+MODULE_NO_TO_CODE = {m["module_no"]: m["module_code"] for m in MODULES}
 
 ROLES = [
     ("admin", "系統管理員", "System Admin"),
@@ -101,7 +106,10 @@ def verify_password(password: str, stored_hash: str | None) -> bool:
         return False
 
 
-def ensure_security_schema() -> None:
+def ensure_security_schema(force: bool = False) -> None:
+    global _SECURITY_SCHEMA_READY
+    if _SECURITY_SCHEMA_READY and not force:
+        return
     execute("""
     CREATE TABLE IF NOT EXISTS security_users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,6 +192,7 @@ def ensure_security_schema() -> None:
     )
     """)
     seed_security_defaults()
+    _SECURITY_SCHEMA_READY = True
 
 
 def _role_perm_template(role_code: str, module_code: str) -> dict[str, int]:
@@ -278,13 +287,20 @@ def seed_security_defaults() -> None:
 
 
 def get_idle_timeout_minutes() -> int:
+    """讀取閒置登出設定；同一個 session 內做快取，避免每頁反覆查 DB。"""
+    cache = st.session_state.get("_spt_idle_timeout_cache")
+    now_ts = time.time()
+    if cache and now_ts - float(cache.get("ts", 0)) < _PERMISSION_CACHE_TTL_SECONDS:
+        return int(cache.get("minutes", DEFAULT_IDLE_MINUTES))
     ensure_security_schema()
     row = query_one("SELECT setting_value FROM security_settings WHERE setting_key='idle_timeout_minutes'")
     try:
         minutes = int(float(row["setting_value"])) if row else DEFAULT_IDLE_MINUTES
     except Exception:
         minutes = DEFAULT_IDLE_MINUTES
-    return max(1, minutes)
+    minutes = max(1, minutes)
+    st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": now_ts}
+    return minutes
 
 
 def set_idle_timeout_minutes(minutes: int) -> None:
@@ -298,6 +314,7 @@ def set_idle_timeout_minutes(minutes: int) -> None:
             note=excluded.note,
             updated_at=excluded.updated_at
     """, (str(minutes), _now()))
+    st.session_state.pop("_spt_idle_timeout_cache", None)
 
 
 def log_security_event(username: str | None, event_type: str, result: str, message: str = "", module_code: str = "", idle_seconds: int | None = None) -> None:
@@ -360,6 +377,8 @@ def authenticate(username: str, password: str) -> tuple[bool, str]:
     st.session_state["auth_display_name"] = row.get("display_name") or username
     st.session_state["auth_employee_id"] = row.get("employee_id") or ""
     st.session_state["auth_roles"] = roles
+    clear_permission_cache(username)
+    _load_permission_cache(username, roles, force=True)
     now_ts = time.time()
     st.session_state["auth_login_ts"] = now_ts
     st.session_state["auth_last_activity_ts"] = now_ts
@@ -376,31 +395,100 @@ def logout(reason: str = "使用者登出") -> None:
     if "完成工時" in reason:
         event_type = "POST_RECORD_LOGOUT"
     log_security_event(username, event_type, "SUCCESS", reason)
+    clear_permission_cache(username)
     for k in list(st.session_state.keys()):
-        if k.startswith("auth_") or k.startswith("post_record_"):
+        if k.startswith("auth_") or k.startswith("post_record_") or k.startswith("_spt_idle_timeout_cache"):
             del st.session_state[k]
 
 
-def check_permission(module_code: str, action: str = "can_view") -> bool:
+def _load_permission_cache(username: str, roles: list[str], force: bool = False) -> dict[str, dict[str, bool]]:
+    """一次載入目前帳號所有模組權限，避免每個模組 / 按鈕都查 SQL。
+
+    優先使用 V1.29 帳號級 auth_account_permissions；若尚未設定，回退到 V1.28 role-based security_module_permissions。
+    """
+    cache_key = f"_spt_perm_cache_{username}"
+    now_ts = time.time()
+    cached = st.session_state.get(cache_key)
+    if cached and not force and now_ts - float(cached.get("ts", 0)) < _PERMISSION_CACHE_TTL_SECONDS:
+        return cached.get("data", {})
+
     ensure_security_schema()
+    data: dict[str, dict[str, bool]] = {}
+
+    if "admin" in roles:
+        for m in MODULES:
+            data[m["module_code"]] = {c: True for c in PERMISSION_COLUMNS}
+        st.session_state[cache_key] = {"ts": now_ts, "data": data}
+        return data
+
+    # V1.29 帳號級權限表：module_code 為 01, 02...，需映射成 01_time_record...
+    try:
+        df_account = query_df("""
+            SELECT p.*
+            FROM auth_account_permissions p
+            JOIN auth_users u ON u.username = p.username
+            WHERE p.username=? AND COALESCE(u.is_active, 0)=1
+        """, (username,))
+    except Exception:
+        df_account = pd.DataFrame()
+
+    if not df_account.empty:
+        for _, r in df_account.iterrows():
+            no = str(r.get("module_code", "")).zfill(2)
+            code = MODULE_NO_TO_CODE.get(no, no)
+            row = {c: bool(int(r.get(c, 0) or 0)) for c in PERMISSION_COLUMNS}
+            if row.get("can_manage"):
+                row = {c: True for c in PERMISSION_COLUMNS}
+            data[code] = row
+        st.session_state[cache_key] = {"ts": now_ts, "data": data}
+        return data
+
+    # V1.28 角色權限表 fallback
+    if roles:
+        placeholders = ",".join(["?"] * len(roles))
+        try:
+            df_role = query_df(f"""
+                SELECT module_code,
+                       MAX(can_view) AS can_view, MAX(can_create) AS can_create, MAX(can_edit) AS can_edit,
+                       MAX(can_delete) AS can_delete, MAX(can_import) AS can_import, MAX(can_export) AS can_export,
+                       MAX(can_backup) AS can_backup, MAX(can_restore) AS can_restore, MAX(can_manage) AS can_manage
+                FROM security_module_permissions
+                WHERE role_code IN ({placeholders})
+                GROUP BY module_code
+            """, tuple(roles))
+        except Exception:
+            df_role = pd.DataFrame()
+        for _, r in df_role.iterrows():
+            code = str(r.get("module_code", ""))
+            row = {c: bool(int(r.get(c, 0) or 0)) for c in PERMISSION_COLUMNS}
+            if row.get("can_manage"):
+                row = {c: True for c in PERMISSION_COLUMNS}
+            data[code] = row
+
+    st.session_state[cache_key] = {"ts": now_ts, "data": data}
+    return data
+
+
+def clear_permission_cache(username: str | None = None) -> None:
+    """權限儲存後可呼叫；也會在登入/登出時自動清掉。"""
+    keys = list(st.session_state.keys())
+    for k in keys:
+        if k.startswith("_spt_perm_cache_") and (username is None or k.endswith(str(username))):
+            st.session_state.pop(k, None)
+
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:
     user = get_current_user()
     if not user:
         return False
     roles = user.get("roles", [])
-    if "admin" in roles:
-        return True
     if action not in PERMISSION_COLUMNS:
         action = "can_view"
-    if not roles:
-        return False
-    placeholders = ",".join(["?"] * len(roles))
-    sql = f"""
-        SELECT MAX({action}) AS allowed
-        FROM security_module_permissions
-        WHERE module_code=? AND role_code IN ({placeholders})
-    """
-    row = query_one(sql, tuple([module_code] + roles))
-    return bool(row and int(row.get("allowed") or 0) == 1)
+    perms = _load_permission_cache(user["username"], roles)
+    row = perms.get(module_code) or perms.get(MODULE_CODE_TO_NO.get(module_code, module_code), {})
+    if row.get("can_manage"):
+        return True
+    return bool(row.get(action, False))
 
 
 def render_login_form() -> None:
