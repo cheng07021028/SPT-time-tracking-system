@@ -135,11 +135,19 @@ else:
 st.divider()
 st.markdown("### 清除登入紀錄 / Clear Login Logs")
 st.warning("刪除前建議先建立登入紀錄永久檔或上傳 GitHub，避免稽核紀錄遺失。")
-confirm = st.text_input("若要清除，請輸入 DELETE / Type DELETE to confirm", value="")
-if st.button("🗑️ 清除日期區間內登入紀錄 / Delete Logs in Date Range", type="secondary", use_container_width=True):
-    if confirm.strip().upper() != "DELETE":
-        st.error("未輸入 DELETE，已取消。")
+
+# V1.99：改成點選確認，不再要求輸入 DELETE。
+# 深色主題下文字輸入框容易看不清楚，也不符合使用者要求的「點選確認」。
+confirm_delete_logs = st.checkbox(
+    "我確認要清除目前日期區間內的登入紀錄 / Confirm delete login logs in selected date range",
+    value=False,
+    key="v199_confirm_delete_login_logs",
+)
+if st.button("🗑️ 確認清除日期區間內登入紀錄 / Delete Logs in Date Range", type="secondary", use_container_width=True):
+    if not confirm_delete_logs:
+        st.error("請先勾選確認刪除，系統不會使用文字輸入 DELETE。")
     else:
         count = delete_login_logs_by_date_range(str(start), str(end))
         st.success(f"已清除 {count} 筆登入紀錄 / Deleted {count} logs")
+        st.session_state["v199_confirm_delete_login_logs"] = False
         st.rerun()
