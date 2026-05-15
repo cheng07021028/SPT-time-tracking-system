@@ -42,6 +42,24 @@ def _now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _valid_hhmm(value: str) -> bool:
+    text = str(value or "").strip()
+    parts = text.split(":")
+    if len(parts) != 2:
+        return False
+    try:
+        h = int(parts[0]); m = int(parts[1])
+    except Exception:
+        return False
+    return 0 <= h <= 23 and 0 <= m <= 59
+
+
+def _normalize_hhmm(value: str) -> str:
+    text = str(value or "").strip()
+    h, m = [int(x) for x in text.split(":")[:2]]
+    return f"{h:02d}:{m:02d}"
+
+
 def _clear_settings_cache() -> None:
     global _PROCESS_OPTIONS_CACHE
     _PROCESS_OPTIONS_CACHE = None
@@ -156,12 +174,13 @@ def save_process_options_df(df: pd.DataFrame) -> int:
         return 0
     now = _now()
     count = 0
-    work = df.copy().fillna("")
+    work = df.copy().drop(columns=["刪除", "delete", "selected"], errors="ignore").fillna("")
     for idx, (_, r) in enumerate(work.iterrows(), start=1):
         name = str(r.get("process_name", "")).strip()
         if not name:
             continue
-        is_active = 1 if bool(r.get("is_active", True)) else 0
+        active_raw = str(r.get("is_active", True)).strip().lower()
+        is_active = 0 if active_raw in {"0", "false", "no", "n", "off", "停用", "否"} else 1
         try:
             sort_order = int(r.get("sort_order") or idx)
         except Exception:
@@ -234,7 +253,8 @@ def save_rest_periods_df(df: pd.DataFrame) -> int:
         end_time = str(r.get("end_time", "")).strip()
         if not start_time or not end_time:
             continue
-        is_active = 1 if bool(r.get("is_active", True)) else 0
+        active_raw = str(r.get("is_active", True)).strip().lower()
+        is_active = 0 if active_raw in {"0", "false", "no", "n", "off", "停用", "否"} else 1
         try:
             sort_order = int(r.get("sort_order") or idx)
         except Exception:

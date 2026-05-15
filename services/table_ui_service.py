@@ -301,7 +301,16 @@ def _render_sort_controls(table_key: str, df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def render_table(df: pd.DataFrame, table_key: str, *, editable: bool = False, disabled: Iterable[str] | None = None, key: str | None = None, height: int | None = None) -> pd.DataFrame | None:
+def render_table(
+    df: pd.DataFrame,
+    table_key: str,
+    *,
+    editable: bool = False,
+    disabled: Iterable[str] | None = None,
+    key: str | None = None,
+    height: int | None = None,
+    num_rows: str = "fixed",
+) -> pd.DataFrame | None:
     if df is None or df.empty:
         st.info("目前沒有資料 / No data")
         return None
@@ -328,7 +337,7 @@ def render_table(df: pd.DataFrame, table_key: str, *, editable: bool = False, di
             hide_index=True,
             column_config=cfg,
             disabled=disabled_cols,
-            num_rows="fixed",
+            num_rows=num_rows,
             key=key or f"editor_{table_key}",
             height=height,
         )
