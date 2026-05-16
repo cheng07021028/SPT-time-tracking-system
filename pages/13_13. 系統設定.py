@@ -10,8 +10,10 @@ from services.table_ui_service import render_table
 from services.system_settings_service import (
     delete_process_options,
     delete_rest_periods,
+    get_live_page_reset_time,
     load_process_options_df,
     load_rest_periods_df,
+    save_live_page_reset_time,
     save_process_options_df,
     save_rest_periods_df,
 )
@@ -226,5 +228,31 @@ if can_manage and st.session_state.get(rest_edit_key, False):
 else:
     render_table(rest_view.drop(columns=["刪除"], errors="ignore"), "system_rest_periods", editable=False, height=360)
 
+
 st.divider()
-st.success("設定套用後的串接：01｜工時紀錄工段下拉選單立即讀取啟用工段；工時計算與 02｜歷史紀錄重新計算會使用啟用中的休息時間。")
+# -----------------------------------------------------------------------------
+# 3) Live page reset time
+# -----------------------------------------------------------------------------
+st.subheader("三、01 工時紀錄每日重新整理時間 / Live Page Reset Time")
+st.caption("控制 01｜工時紀錄何時自動隱藏舊週期已完成紀錄。只影響 01 頁面顯示，不刪除 02｜歷史紀錄。格式 HH:MM，例如 02:00。")
+try:
+    current_reset = get_live_page_reset_time()
+except Exception:
+    current_reset = "02:00"
+if can_manage:
+    with st.form("system_live_reset_time_form", clear_on_submit=False):
+        new_reset_time = st.text_input("每日重新整理時間 / Daily reset time", value=current_reset, key="system_live_reset_time_value")
+        submit_reset_time = st.form_submit_button("✅ 套用 01 顯示重新整理時間 / Apply Reset Time", type="primary", use_container_width=True)
+    if submit_reset_time:
+        try:
+            saved_time = save_live_page_reset_time(new_reset_time)
+            _export_permanent_settings(f"已套用 01 工時紀錄每日重新整理時間：{saved_time}")
+            st.session_state["_spt_13_pending_apply_message"] = f"已套用 01 工時紀錄每日重新整理時間：{saved_time}，畫面已重新整理。"
+            st.rerun()
+        except Exception as exc:
+            st.error(str(exc))
+else:
+    st.info(f"目前設定：{current_reset}")
+
+st.divider()
+st.success("設定套用後的串接：01｜工時紀錄工段下拉選單立即讀取啟用工段；工時計算與 02｜歷史紀錄重新計算會使用啟用中的休息時間；01 顯示重新整理時間會套用到今日工時紀錄顯示。")

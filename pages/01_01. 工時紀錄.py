@@ -27,7 +27,7 @@ from services.time_record_service import (
 )
 from services.db_service import query_one
 from services.table_ui_service import render_table
-from services.system_settings_service import get_process_options
+from services.system_settings_service import get_process_options, get_live_page_reset_time
 
 st.set_page_config(page_title="01. 工時紀錄", page_icon="▶️", layout="wide")
 apply_theme()
@@ -63,8 +63,8 @@ with left:
     auto_pause = st.checkbox("切換不同工段時，自動暫停同人員其他未結束作業｜Auto pause different process", value=True)
 
     active = get_active_record(emp_id)
-    duplicate = get_active_same_work(emp_id, wo_no, process)
-    conflicts = get_conflicting_active_records(emp_id, process)
+    duplicate = get_active_same_work(emp_id, wo_no, process, employee_name=str(employee.get("employee_name") or "").strip())
+    conflicts = get_conflicting_active_records(emp_id, process, employee_name=str(employee.get("employee_name") or "").strip())
     if active:
         group = get_active_group(int(active["id"]))
         st.info(f"目前作業中：{active['process_name']}，同步計時 {len(group)} 筆。同工段不同製令可同步作業；不同工段需先暫停舊紀錄。")
@@ -137,17 +137,22 @@ with right:
 
 st.divider()
 st.subheader("今日工時紀錄 / Today Records")
+try:
+    _reset_time = get_live_page_reset_time()
+except Exception:
+    _reset_time = "02:00"
+st.caption(f"顯示規則：目前作業週期內的所有紀錄都會顯示；每日 {_reset_time} 重新整理後，只保留未結束作業在 01 頁面顯示，02｜歷史紀錄不受影響。")
 user = get_current_user() or {}
 is_admin = "admin" in [str(x).lower() for x in user.get("roles", [])]
-show_unfinished_only = True
+show_unfinished_only = False
 if is_admin:
     c_filter1, c_filter2 = st.columns([1.3, 2.7])
     with c_filter1:
-        show_unfinished_only = st.checkbox("只顯示未結束目前作業 / Unfinished only", value=True, key="today_unfinished_only")
+        show_unfinished_only = st.checkbox("只顯示未結束目前作業 / Unfinished only", value=False, key="today_unfinished_only")
     with c_filter2:
-        if st.button("🧹 清除當日完工紀錄顯示（不影響 02 歷史紀錄）", use_container_width=True, key="clear_today_finished_view"):
+        if st.button("🧹 立即重新整理 01 顯示（隱藏舊週期已完工，不影響 02 歷史紀錄）", use_container_width=True, key="clear_today_finished_view"):
             n = clear_today_finished_from_work_page()
-            st.success(f"已清除 01 頁當日完工紀錄顯示邏輯；02 歷史紀錄不受影響。當日已完成筆數：{n}")
+            st.success(f"已重新整理 01 頁顯示；02 歷史紀錄不受影響。已隱藏舊週期完成筆數：{n}")
             st.rerun()
 df = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
 render_table(df, "today_records", editable=False, height=420)

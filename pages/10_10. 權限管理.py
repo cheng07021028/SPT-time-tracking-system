@@ -412,7 +412,9 @@ with tab_accounts:
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            if st.button("➕ 新增帳號 / Add User", use_container_width=True, disabled=not account_edit_enabled, key="v204_add_user_row_once"):
+            if st.button("➕ 新增帳號 / Add User", use_container_width=True, disabled=not account_edit_enabled, key="v205_add_user_row_once"):
+                # 只更新帳號編輯暫存，不額外 st.rerun；Streamlit 點擊按鈕本身會重跑一次，
+                # 避免雙重 rerun 造成看起來像無限運算。
                 st.session_state["v133_users_df"] = pd.concat([st.session_state["v133_users_df"], pd.DataFrame([_blank_user_row()])], ignore_index=True)
                 try:
                     from services.column_settings_service import clear_editor_draft
@@ -420,7 +422,6 @@ with tab_accounts:
                     clear_editor_draft("account")
                 except Exception:
                     pass
-                st.rerun()
         with c2:
             if st.button("🗑️ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_select_delete"):
                 st.session_state["v133_users_df"]["刪除 / Delete"] = True
