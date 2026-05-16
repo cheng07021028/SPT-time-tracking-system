@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from io import BytesIO
 import re
 import pandas as pd
+from services.timezone_service import today_date
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
@@ -244,8 +245,8 @@ employees = load_employees(active_only=False)
 work_orders = load_work_orders(active_only=False)
 
 c1, c2, c3, c4 = st.columns(4)
-start = c1.date_input("開始日期 / Start Date", value=date.today() - timedelta(days=7))
-end = c2.date_input("結束日期 / End Date", value=date.today())
+start = c1.date_input("開始日期 / Start Date", value=today_date() - timedelta(days=7))
+end = c2.date_input("結束日期 / End Date", value=today_date())
 emp_opts = [""] + ([] if employees.empty else employees["employee_id"].astype(str).tolist())
 wo_opts = [""] + ([] if work_orders.empty else work_orders["work_order"].astype(str).tolist())
 emp = c3.selectbox("工號 / Employee ID", emp_opts)

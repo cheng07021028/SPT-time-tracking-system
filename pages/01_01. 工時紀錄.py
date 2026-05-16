@@ -13,11 +13,14 @@ from services.security_service import (
 )
 from services.master_data_service import load_employees, load_work_orders
 from services.time_record_service import (
+    clear_today_finished_from_work_page,
     delete_time_records,
     recalculate_time_records,
     finish_work,
     get_active_group,
     get_active_record,
+    get_conflicting_active_records,
+    get_active_same_work,
     save_time_records,
     start_work,
     today_records,
@@ -60,20 +63,32 @@ with left:
     auto_pause = st.checkbox("切換不同工段時，自動暫停同人員其他未結束作業｜Auto pause different process", value=True)
 
     active = get_active_record(emp_id)
+    duplicate = get_active_same_work(emp_id, wo_no, process)
+    conflicts = get_conflicting_active_records(emp_id, process)
     if active:
         group = get_active_group(int(active["id"]))
-        st.info(f"目前作業中：{active['process_name']}，同步計時 {len(group)} 筆。開始其中任一不同工段時，舊工段會自動暫停。")
+        st.info(f"目前作業中：{active['process_name']}，同步計時 {len(group)} 筆。同工段不同製令可同步作業；不同工段需先暫停舊紀錄。")
+    if duplicate:
+        st.error(f"禁止重複紀錄：此人員已有相同製令與工段正在計時：{wo_no} / {process}")
+    confirm_pause = True
+    if not conflicts.empty:
+        st.warning(f"此人員目前有 {len(conflicts)} 筆不同工段正在計時。若要開始新工段，系統會先暫停前一工段紀錄，請確認。")
+        render_table(conflicts, "start_conflicting_active_records", editable=False, height=180)
+        confirm_pause = st.checkbox("我確認先暫停前一個不同工段紀錄，再開始新紀錄", value=False, key="confirm_pause_before_start")
 
-    if st.button("▶ 開始作業 / Start", use_container_width=True):
+    if st.button("▶ 開始作業 / Start", use_container_width=True, disabled=bool(duplicate) or (not confirm_pause)):
         if not check_permission("01_time_record", "can_create"):
             st.error("權限不足：你沒有新增工時紀錄權限。")
         else:
-            rid = start_work(employee, work_order, process, remark, auto_pause_old=auto_pause)
-            trigger_post_record_continue_prompt(
-                f"已開始作業，紀錄編號：{rid}。請確認是否繼續操作下一筆紀錄；若不繼續，系統會立即登出帳號。",
-                title="已開始計時",
-            )
-            st.rerun()
+            try:
+                rid = start_work(employee, work_order, process, remark, auto_pause_old=(confirm_pause if not conflicts.empty else auto_pause))
+                trigger_post_record_continue_prompt(
+                    f"已開始作業，紀錄編號：{rid}。請確認是否繼續操作下一筆紀錄；若不繼續，系統會立即登出帳號。",
+                    title="已開始計時",
+                )
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
 
 with right:
     st.subheader("結束目前作業 / Finish Work")
@@ -122,14 +137,23 @@ with right:
 
 st.divider()
 st.subheader("今日工時紀錄 / Today Records")
-df = today_records()
+user = get_current_user() or {}
+is_admin = "admin" in [str(x).lower() for x in user.get("roles", [])]
+show_unfinished_only = True
+if is_admin:
+    c_filter1, c_filter2 = st.columns([1.3, 2.7])
+    with c_filter1:
+        show_unfinished_only = st.checkbox("只顯示未結束目前作業 / Unfinished only", value=True, key="today_unfinished_only")
+    with c_filter2:
+        if st.button("🧹 清除當日完工紀錄顯示（不影響 02 歷史紀錄）", use_container_width=True, key="clear_today_finished_view"):
+            n = clear_today_finished_from_work_page()
+            st.success(f"已清除 01 頁當日完工紀錄顯示邏輯；02 歷史紀錄不受影響。當日已完成筆數：{n}")
+            st.rerun()
+df = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
 render_table(df, "today_records", editable=False, height=420)
 
 # V1.81：修改、刪除、存檔功能只允許管理員看見與操作。
 # 一般作業人員只能開始/暫停/下班/完工，不顯示人工維護工具，避免冒用或誤刪資料。
-user = get_current_user() or {}
-is_admin = "admin" in [str(x).lower() for x in user.get("roles", [])]
-
 if is_admin:
     st.divider()
     with st.expander("🔐 管理員工時紀錄維護｜修改、刪除、存檔", expanded=False):

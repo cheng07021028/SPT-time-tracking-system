@@ -412,14 +412,23 @@ with tab_accounts:
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            if st.button("➕ 新增帳號 / Add User", use_container_width=True, disabled=not account_edit_enabled):
+            if st.button("➕ 新增帳號 / Add User", use_container_width=True, disabled=not account_edit_enabled, key="v204_add_user_row_once"):
                 st.session_state["v133_users_df"] = pd.concat([st.session_state["v133_users_df"], pd.DataFrame([_blank_user_row()])], ignore_index=True)
+                try:
+                    from services.column_settings_service import clear_editor_draft
+                    clear_editor_draft("v171_account_password_editor")
+                    clear_editor_draft("account")
+                except Exception:
+                    pass
+                st.rerun()
         with c2:
-            if st.button("🗑️ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled):
+            if st.button("🗑️ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_select_delete"):
                 st.session_state["v133_users_df"]["刪除 / Delete"] = True
+                st.rerun()
         with c3:
-            if st.button("↩️ 刪除欄取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled):
+            if st.button("↩️ 刪除欄取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_clear_delete"):
                 st.session_state["v133_users_df"]["刪除 / Delete"] = False
+                st.rerun()
         with c4:
             if st.button("🔄 重新載入 / Reload", use_container_width=True):
                 st.session_state["v133_users_df"] = _users_for_editor()

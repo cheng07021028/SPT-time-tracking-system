@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import pandas as pd
+from services.timezone_service import today_date
 import plotly.express as px
 import streamlit as st
 
@@ -19,8 +20,8 @@ require_module_access("05_analysis")
 render_header("05｜製令工時分析", "製令、工段、人員累積工時分析與明細編輯")
 
 c1, c2 = st.columns(2)
-start = c1.date_input("開始日期 / Start Date", value=date.today() - timedelta(days=30))
-end = c2.date_input("結束日期 / End Date", value=date.today())
+start = c1.date_input("開始日期 / Start Date", value=today_date() - timedelta(days=30))
+end = c2.date_input("結束日期 / End Date", value=today_date())
 df = load_records(str(start), str(end))
 
 if df.empty:

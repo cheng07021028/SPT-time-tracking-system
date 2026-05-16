@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 import pandas as pd
+from services.timezone_service import today_date
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
@@ -85,9 +86,9 @@ st.divider()
 st.markdown("### 登入紀錄查詢 / Login Log Search")
 fc1, fc2, fc3 = st.columns([1, 1, 2])
 with fc1:
-    start = st.date_input("開始日期 / Start Date", value=date.today() - timedelta(days=30))
+    start = st.date_input("開始日期 / Start Date", value=today_date() - timedelta(days=30))
 with fc2:
-    end = st.date_input("結束日期 / End Date", value=date.today())
+    end = st.date_input("結束日期 / End Date", value=today_date())
 with fc3:
     keyword = st.text_input("關鍵字 / Keyword", value="", placeholder="帳號、姓名、事件、訊息...")
 

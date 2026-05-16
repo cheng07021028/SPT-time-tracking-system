@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 import pandas as pd
+from services.timezone_service import today_date
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
@@ -133,7 +134,7 @@ else:
 
 st.divider()
 st.subheader("今日未紀錄名單 / Missing Today")
-today = date.today().strftime("%Y-%m-%d")
+today = today_date().strftime("%Y-%m-%d")
 df = query_df(
     """
     SELECT e.employee_id, e.employee_name, e.department, e.title, e.is_in_factory, e.is_today_attendance,

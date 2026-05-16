@@ -9,6 +9,7 @@ from services.security_service import require_module_access
 from services.db_service import query_df
 from services.table_ui_service import render_table
 from services.duration_service import hours_to_hms
+from services.timezone_service import today_date
 
 st.set_page_config(page_title="08. 人員每日工時", page_icon="⏱️", layout="wide")
 apply_theme()
@@ -79,7 +80,7 @@ with fc_b:
 with st.expander("🔎 篩選條件 / Filters", expanded=True):
     with st.form("daily_hours_filter_form", clear_on_submit=False):
         c1, c2, c3, c4 = st.columns(4)
-        selected = c1.date_input("日期 / Date", value=st.session_state.get("daily_hours_date", date.today()))
+        selected = c1.date_input("日期 / Date", value=st.session_state.get("daily_hours_date", today_date()))
         employee_id_keyword = c2.text_input("工號 / Employee ID", value=st.session_state.get("daily_hours_employee_id", ""))
         employee_name_keyword = c3.text_input("姓名 / Name", value=st.session_state.get("daily_hours_employee_name", ""))
         selected_departments = c4.multiselect(
@@ -111,7 +112,7 @@ with st.expander("🔎 篩選條件 / Filters", expanded=True):
             st.session_state["daily_hours_no_record_only"] = show_only_no_record
 
 # 以 session_state 的條件為準；避免使用者輸入到一半就立即改查詢。
-selected = st.session_state.get("daily_hours_date", date.today())
+selected = st.session_state.get("daily_hours_date", today_date())
 employee_id_keyword = st.session_state.get("daily_hours_employee_id", "")
 employee_name_keyword = st.session_state.get("daily_hours_employee_name", "")
 selected_departments = st.session_state.get("daily_hours_departments", [])
