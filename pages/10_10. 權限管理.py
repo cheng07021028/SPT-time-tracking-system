@@ -488,7 +488,7 @@ with tab_accounts:
             save_df = df.loc[~_to_bool_series(df, "刪除 / Delete")].copy()
             result = save_users(_users_to_service_rows(save_df))
             deleted = delete_users(to_delete)
-            st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
+            st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆；角色同步權限：{len(result.get('role_synced_users', []))} 個帳號 / Accounts saved, deleted and role permissions synced")
             if result.get("skipped"):
                 st.warning("；".join(result["skipped"]))
             st.session_state.pop("v133_users_df", None)
@@ -518,7 +518,7 @@ with tab_accounts:
                 with e2:
                     if st.button("💾 直接儲存 Excel 帳號 / Save Imported Accounts", type="primary", use_container_width=True, key="v136_excel_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         result = _save_imported_accounts(import_df)
-                        st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
+                        st.success(f"帳號已儲存：{result['saved']} 筆；角色同步權限：{len(result.get('role_synced_users', []))} 個帳號 / Accounts saved and role permissions synced")
                         if result.get("skipped"):
                             st.warning("；".join(result["skipped"]))
                         st.session_state.pop("v133_users_df", None)
@@ -550,7 +550,7 @@ with tab_accounts:
                 with p2:
                     if st.button("💾 直接儲存貼上帳號 / Save Pasted Accounts", type="primary", use_container_width=True, key="v136_paste_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         result = _save_imported_accounts(import_df)
-                        st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
+                        st.success(f"帳號已儲存：{result['saved']} 筆；角色同步權限：{len(result.get('role_synced_users', []))} 個帳號 / Accounts saved and role permissions synced")
                         if result.get("skipped"):
                             st.warning("；".join(result["skipped"]))
                         st.session_state.pop("v133_users_df", None)
