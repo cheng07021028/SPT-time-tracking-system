@@ -138,10 +138,15 @@ def ensure_table_ui_schema() -> None:
         CREATE TABLE IF NOT EXISTS table_ui_settings (
             table_key TEXT PRIMARY KEY,
             widths_json TEXT,
+            order_json TEXT,
             updated_at TEXT DEFAULT (datetime('now','localtime'))
         )
         """
     )
+    try:
+        execute("ALTER TABLE table_ui_settings ADD COLUMN order_json TEXT")
+    except Exception:
+        pass
     _TABLE_UI_SCHEMA_READY = True
 
 
@@ -188,6 +193,46 @@ def save_widths(table_key: str, widths: dict[str, int]) -> None:
         pass
 
 
+def load_column_order(table_key: str) -> list[str]:
+    ensure_table_ui_schema()
+    row = query_one("SELECT order_json FROM table_ui_settings WHERE table_key=?", (table_key,))
+    if not row or not row.get("order_json"):
+        return []
+    try:
+        data = json.loads(row["order_json"])
+        return [str(x) for x in data if str(x)] if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def save_column_order(table_key: str, order: Iterable[str]) -> None:
+    ensure_table_ui_schema()
+    cols = [str(c) for c in order if str(c)]
+    execute(
+        """
+        INSERT INTO table_ui_settings(table_key, order_json, updated_at)
+        VALUES (?, ?, datetime('now','localtime'))
+        ON CONFLICT(table_key) DO UPDATE SET
+            order_json=excluded.order_json,
+            updated_at=excluded.updated_at
+        """,
+        (table_key, json.dumps(cols, ensure_ascii=False)),
+    )
+
+
+def apply_column_order(table_key: str, df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+    order = load_column_order(table_key)
+    if not order:
+        return df
+    ordered = [c for c in order if c in df.columns]
+    rest = [c for c in df.columns if c not in ordered]
+    if not ordered:
+        return df
+    return df[ordered + rest]
+
+
 def _column_config(col: str, width: int | None = None, series: pd.Series | None = None):
     label = label_for(col)
     w = int(width or DEFAULT_WIDTHS.get(col, 140))
@@ -226,16 +271,24 @@ def render_width_settings(table_key: str, df: pd.DataFrame, title: str = "欄寬
         return
     widths = load_widths(table_key)
     with st.expander(title, expanded=True):
-        st.caption("目前 Streamlit 無法直接讀取滑鼠拖拉後的欄寬，因此此處提供可永久儲存的欄寬設定。平常保持關閉可加快模組載入速度。")
+        st.caption("欄寬與欄位順序會永久保存。順序數字越小越靠左；平常保持關閉可加快模組載入速度。")
+        saved_order = load_column_order(table_key)
+        order_index = {c: i + 1 for i, c in enumerate(saved_order)}
         new_widths: dict[str, int] = {}
+        new_orders: dict[str, int] = {}
         cols = st.columns(4)
         for idx, col in enumerate(df.columns):
             default_width = int(widths.get(col, DEFAULT_WIDTHS.get(col, 140)))
+            default_order = int(order_index.get(str(col), idx + 1))
             with cols[idx % 4]:
-                new_widths[col] = st.number_input(label_for(col), min_value=60, max_value=700, value=default_width, step=10, key=f"width_{table_key}_{col}")
-        if st.button("儲存欄寬設定 / Save Column Widths", key=f"save_widths_{table_key}", use_container_width=True):
+                st.markdown(f"**{label_for(col)}**")
+                new_widths[col] = st.number_input("欄寬", min_value=60, max_value=700, value=default_width, step=10, key=f"width_{table_key}_{col}")
+                new_orders[col] = st.number_input("順序", min_value=1, max_value=max(len(df.columns), 1), value=default_order, step=1, key=f"order_{table_key}_{col}")
+        if st.button("儲存欄位設定 / Save Column Settings", key=f"save_widths_{table_key}", use_container_width=True):
             save_widths(table_key, new_widths)
-            st.success("已儲存欄寬設定。")
+            ordered_cols = [c for c, _ in sorted(new_orders.items(), key=lambda kv: (kv[1], str(kv[0])))]
+            save_column_order(table_key, ordered_cols)
+            st.success("已永久儲存欄寬與欄位順序設定。")
             st.rerun()
 
 
@@ -320,6 +373,7 @@ def render_table(
     # extra widgets slow down editing. Read-only tables keep the existing width tool.
     if not editable:
         render_width_settings(table_key, df)
+    df = apply_column_order(table_key, df)
     display_df = _format_duration_columns_for_display(df)
     display_df = _prepare_display_dataframe(display_df)
     cfg = build_column_config(table_key, display_df)

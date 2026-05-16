@@ -49,7 +49,7 @@ def write_log(
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            now_text(),
             user_name or getpass.getuser(),
             action_type,
             target_table,

@@ -13,7 +13,7 @@ V1.88 修正重點：
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, time
 from typing import Iterable
 
 import pandas as pd
@@ -35,6 +35,9 @@ DEFAULT_REST_PERIODS = [
     {"name": "晚餐休息", "start_time": "18:00", "end_time": "18:30", "is_active": 1, "sort_order": 4},
     {"name": "晚上休息", "start_time": "20:00", "end_time": "20:15", "is_active": 1, "sort_order": 5},
 ]
+
+DEFAULT_LIVE_PAGE_RESET_TIME = "02:00"
+_LIVE_PAGE_RESET_TIME_CACHE: str | None = None
 
 _SYSTEM_SETTINGS_SCHEMA_READY = False
 _PROCESS_OPTIONS_CACHE: list[str] | None = None
@@ -63,8 +66,9 @@ def _normalize_hhmm(value: str) -> str:
 
 
 def _clear_settings_cache() -> None:
-    global _PROCESS_OPTIONS_CACHE
+    global _PROCESS_OPTIONS_CACHE, _LIVE_PAGE_RESET_TIME_CACHE
     _PROCESS_OPTIONS_CACHE = None
+    _LIVE_PAGE_RESET_TIME_CACHE = None
     try:
         from .calculation_service import clear_rest_periods_cache
         clear_rest_periods_cache()
@@ -106,6 +110,16 @@ def ensure_system_settings_schema() -> None:
             end_time TEXT NOT NULL,
             is_active INTEGER DEFAULT 1,
             sort_order INTEGER DEFAULT 0
+        )
+        """
+    )
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT,
+            note TEXT,
+            updated_at TEXT
         )
         """
     )
@@ -299,3 +313,48 @@ def delete_rest_periods(ids: Iterable[int]) -> int:
         _clear_settings_cache()
         write_log("DELETE_REST_PERIODS", f"刪除休息時間設定 {count} 筆", "rest_periods", level="WARN")
     return count
+
+
+
+def get_live_page_reset_time() -> str:
+    """Return the 01 live work page daily refresh time (HH:MM).
+
+    The page shows all records in the current work cycle.  After this time each
+    day, completed records from the previous cycle disappear from 01 while 02
+    history remains unchanged.  Unfinished records are always kept visible.
+    """
+    global _LIVE_PAGE_RESET_TIME_CACHE
+    if _LIVE_PAGE_RESET_TIME_CACHE:
+        return _LIVE_PAGE_RESET_TIME_CACHE
+    try:
+        ensure_system_settings_schema()
+        row = query_one("SELECT setting_value FROM app_settings WHERE setting_key='live_page_reset_time'")
+        value = str((row or {}).get("setting_value") or DEFAULT_LIVE_PAGE_RESET_TIME).strip()
+        if not _valid_hhmm(value):
+            value = DEFAULT_LIVE_PAGE_RESET_TIME
+    except Exception:
+        value = DEFAULT_LIVE_PAGE_RESET_TIME
+    _LIVE_PAGE_RESET_TIME_CACHE = _normalize_hhmm(value)
+    return _LIVE_PAGE_RESET_TIME_CACHE
+
+
+def save_live_page_reset_time(value: str) -> str:
+    ensure_system_settings_schema()
+    if not _valid_hhmm(value):
+        raise ValueError("01 工時紀錄每日清理時間格式錯誤，請使用 HH:MM，例如 02:00。")
+    value = _normalize_hhmm(value)
+    now = _now()
+    execute(
+        """
+        INSERT INTO app_settings(setting_key, setting_value, note, updated_at)
+        VALUES ('live_page_reset_time', ?, '01 工時紀錄每日重新整理時間；只影響 01 顯示，不刪除 02 歷史紀錄', ?)
+        ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value=excluded.setting_value,
+            note=excluded.note,
+            updated_at=excluded.updated_at
+        """,
+        (value, now),
+    )
+    _clear_settings_cache()
+    write_log("SAVE_LIVE_PAGE_RESET_TIME", f"儲存 01 工時紀錄每日重新整理時間：{value}", "app_settings")
+    return value
