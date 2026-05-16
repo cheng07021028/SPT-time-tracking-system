@@ -8,16 +8,18 @@ from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access, check_permission
 from services.table_ui_service import render_table
 from services.system_settings_service import (
+    SYSTEM_SETTINGS_FILES,
     delete_process_options,
     delete_rest_periods,
+    export_system_settings_permanent,
     get_live_page_reset_time,
     load_process_options_df,
     load_rest_periods_df,
+    restore_system_settings_from_permanent,
     save_live_page_reset_time,
     save_process_options_df,
     save_rest_periods_df,
 )
-from services.db_service import flush_pending_permanent_state
 
 st.set_page_config(page_title="13. 系統設定", page_icon="⚙️", layout="wide")
 apply_theme()
@@ -29,10 +31,23 @@ if not can_manage:
     st.warning("你目前只有查看權限，設定修改需由管理員或具備 13 系統設定 can_manage / can_edit 權限的人員操作。")
 
 st.info(
-    "設定套用後會立即寫入資料庫，並建立永久設定檔。"
+    "設定套用後會立即寫入資料庫，並同步建立 13｜系統設定專用永久設定檔。"
+    "Streamlit / GitHub 更新後，會優先從永久設定檔還原，不會再恢復系統預設。"
     "01｜工時紀錄的工段下拉選單會讀取這裡的啟用工段；"
     "工時計算會依這裡啟用的休息時間扣除。"
 )
+with st.expander("📌 13｜系統設定永久檔案位置", expanded=False):
+    for _p in SYSTEM_SETTINGS_FILES:
+        st.code(str(_p.relative_to(_p.parents[2]) if len(_p.parents) > 2 else _p), language="text")
+    if can_manage:
+        c_restore, c_export = st.columns(2)
+        if c_restore.button("↩️ 從永久設定檔還原到目前資料庫", key="restore_13_system_settings", use_container_width=True):
+            res = restore_system_settings_from_permanent(force=True)
+            st.success(f"已從永久設定檔還原：{res.get('restored', {})}") if res.get("ok") else st.warning(str(res))
+            st.rerun()
+        if c_export.button("💾 立即重建 13 系統設定永久檔", key="export_13_system_settings", use_container_width=True):
+            res = export_system_settings_permanent("manual_export_from_page13", write_history=True)
+            st.success(f"已重建永久設定檔：{res.get('table_counts', {})}") if res.get("ok") else st.warning(str(res))
 
 _pending_message = st.session_state.pop("_spt_13_pending_apply_message", "")
 if _pending_message:
@@ -49,20 +64,19 @@ def _normalize_delete_column(df: pd.DataFrame, delete_col: str = "刪除") -> pd
 
 
 def _export_permanent_settings(message: str) -> None:
-    """Create local permanent JSON immediately, but do not push GitHub here.
+    """Create 13｜系統設定 dedicated permanent JSON immediately.
 
-    GitHub push is intentionally kept on 09｜資料永久保存與備份 to avoid the
-    10~20 second delay after every settings change.  The local permanent JSON is
-    enough to survive normal project reload/update flows when committed or backed up.
+    GitHub push remains on 09｜資料永久保存與備份, but this local JSON must be
+    created immediately so future code updates do not restore default settings.
     """
     try:
-        res = flush_pending_permanent_state(upload_github=False)
+        res = export_system_settings_permanent("page13_apply", write_history=True)
         if res.get("ok"):
-            st.success(message + "，已建立永久設定檔。")
+            st.success(message + "，已建立 13 系統設定永久檔。")
         else:
-            st.warning(message + "，但永久設定檔建立結果需到 09｜資料永久保存與備份確認。")
+            st.warning(message + "，但 13 系統設定永久檔建立結果需確認。")
     except Exception as exc:
-        st.warning(f"{message}，但永久設定檔建立失敗：{exc}")
+        st.warning(f"{message}，但 13 系統設定永久檔建立失敗：{exc}")
 
 
 def _set_edit_mode(key: str, enabled: bool) -> None:
