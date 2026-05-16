@@ -601,21 +601,104 @@ def get_users() -> List[dict]:
     return data
 
 
+
+def _role_preset_for_module(role: str, module_code: str) -> dict:
+    """Return the effective default permission preset for a role/module.
+
+    V2.06: account master role changes must immediately propagate to the
+    account-module permission matrix.  Keep the same role exceptions used when
+    initially seeding permission rows so the synchronized result matches the
+    normal default for that role.
+    """
+    role = (role or "operator").strip() or "operator"
+    module_code = str(module_code).zfill(2)
+    preset = ROLE_PRESET.get(role, ROLE_PRESET["operator"]).copy()
+    if role == "operator" and module_code in ("01", "02", "08"):
+        preset["can_view"] = 1
+        if module_code == "01":
+            preset["can_create"] = 1
+            preset["can_edit"] = 1
+    if role == "leader" and module_code in ("01", "02", "04", "07", "08"):
+        preset["can_view"] = 1
+    if role == "auditor" and module_code in ("02", "06", "11"):
+        preset["can_view"] = 1
+    return preset
+
+
+def sync_user_permissions_from_roles(usernames: Iterable[str], reason: str = "role_changed") -> int:
+    """Overwrite selected users' module permissions from their current roles.
+
+    This is intentionally different from ensure_permissions_for_all_users(),
+    which only INSERT OR IGNOREs missing rows.  When an admin changes a user's
+    role in the account master, the permission matrix must follow that new role
+    immediately; otherwise the page shows a new role but still keeps the old
+    module permissions.
+    """
+    init_permission_tables()
+    target_users = sorted({str(u or "").strip() for u in usernames if str(u or "").strip()})
+    if not target_users:
+        return 0
+    conn = connect_db()
+    cur = conn.cursor()
+    updated = 0
+    for username in target_users:
+        u = cur.execute("SELECT username, role_code FROM auth_users WHERE username=?", (username,)).fetchone()
+        if not u:
+            continue
+        role = u["role_code"] or "operator"
+        for m in MODULES:
+            preset = _role_preset_for_module(role, m["module_code"])
+            cur.execute("""
+                INSERT INTO auth_account_permissions
+                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(username,module_code) DO UPDATE SET
+                    module_name_zh=excluded.module_name_zh,
+                    module_name_en=excluded.module_name_en,
+                    can_view=excluded.can_view,
+                    can_create=excluded.can_create,
+                    can_edit=excluded.can_edit,
+                    can_delete=excluded.can_delete,
+                    can_import=excluded.can_import,
+                    can_export=excluded.can_export,
+                    can_backup=excluded.can_backup,
+                    can_restore=excluded.can_restore,
+                    can_manage=excluded.can_manage,
+                    updated_at=excluded.updated_at
+            """, (
+                username, m["module_code"], m["module_name_zh"], m["module_name_en"],
+                preset["can_view"], preset["can_create"], preset["can_edit"], preset["can_delete"],
+                preset["can_import"], preset["can_export"], preset["can_backup"], preset["can_restore"], preset["can_manage"], now_text()
+            ))
+            updated += 1
+    conn.commit()
+    conn.close()
+    clear_permission_runtime_cache()
+    try:
+        export_permission_settings_permanently(f"auth_account_permissions_synced_{reason}")
+    except Exception:
+        pass
+    return updated
+
 def save_users(rows: Iterable[dict]) -> dict:
     init_permission_tables()
+    input_rows = list(rows)
     conn = connect_db()
     cur = conn.cursor()
     saved = 0
     skipped = []
-    for r in rows:
+    role_sync_users: list[str] = []
+    saved_usernames: list[str] = []
+    for r in input_rows:
         username = str(r.get("username", "")).strip()
         if not username:
             continue
         display_name = str(r.get("display_name", "")).strip() or username
         role_code = str(r.get("role_code", "operator")).strip() or "operator"
         new_password = str(r.get("new_password", "")).strip()
-        exists = cur.execute("SELECT username FROM auth_users WHERE username=?", (username,)).fetchone()
+        exists = cur.execute("SELECT username, role_code FROM auth_users WHERE username=?", (username,)).fetchone()
         if exists:
+            old_role = str(exists["role_code"] or "operator").strip() or "operator"
             params = [
                 str(r.get("employee_id", "")).strip(), display_name, str(r.get("email", "")).strip(),
                 role_code, int(bool(r.get("is_active", True))), int(bool(r.get("force_password_change", False))),
@@ -629,6 +712,8 @@ def save_users(rows: Iterable[dict]) -> dict:
             """, params)
             if new_password:
                 cur.execute("UPDATE auth_users SET password_hash=?, updated_at=? WHERE username=?", (hash_password(new_password), now_text(), username))
+            if old_role != role_code:
+                role_sync_users.append(username)
         else:
             if not new_password:
                 skipped.append(f"{username} 未設定新密碼 / new password required")
@@ -642,17 +727,32 @@ def save_users(rows: Iterable[dict]) -> dict:
                 display_name, str(r.get("email", "")).strip(), role_code, int(bool(r.get("is_active", True))),
                 int(bool(r.get("force_password_change", False))), str(r.get("note", "")).strip(), now_text(), now_text()
             ))
+            role_sync_users.append(username)
         saved += 1
+        saved_usernames.append(username)
     conn.commit()
     conn.close()
+
+    # First make sure missing module rows exist; then overwrite only the users
+    # whose role was changed or newly created.  This keeps other users' manual
+    # permission adjustments untouched while still making role changes effective.
     ensure_permissions_for_all_users(force=True)
+    synced_permissions = 0
+    if role_sync_users:
+        synced_permissions = sync_user_permissions_from_roles(role_sync_users, reason="account_role_changed")
     try:
-        sync_auth_users_to_runtime_security([str(r.get("username", "")).strip() for r in rows])
+        sync_auth_users_to_runtime_security(saved_usernames)
     except Exception:
         pass
     clear_permission_runtime_cache()
     export_result = export_permission_settings_permanently("auth_users_saved")
-    return {"saved": saved, "skipped": skipped, "permanent_save": export_result}
+    return {
+        "saved": saved,
+        "skipped": skipped,
+        "role_synced_users": sorted(set(role_sync_users)),
+        "synced_permissions": synced_permissions,
+        "permanent_save": export_result,
+    }
 
 
 def delete_users(usernames: Iterable[str]) -> int:
