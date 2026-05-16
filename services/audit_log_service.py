@@ -15,6 +15,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from services.timezone_service import now_text, now_stamp, today_text, today_date
+
 try:
     import pandas as pd
 except Exception:  # pragma: no cover
@@ -32,11 +34,11 @@ MODULE_AUDIT_PATH = MODULE_DIR / "11_login_logs_audit.jsonl"
 
 
 def _now() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return now_text()
 
 
 def _now_file() -> str:
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+    return now_stamp()
 
 
 def _ensure_dirs() -> None:

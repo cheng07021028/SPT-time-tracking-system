@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from services.timezone_service import now_text, now_stamp, today_text, today_date
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
@@ -114,11 +115,11 @@ MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
 }
 
 def _now() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return now_text()
 
 
 def _stamp() -> str:
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+    return now_stamp()
 
 
 def _json_default(obj: Any) -> str:

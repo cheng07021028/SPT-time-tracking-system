@@ -6,6 +6,8 @@ import sqlite3
 import uuid
 import pandas as pd
 
+from services.timezone_service import now_text, now_stamp, today_text, today_date
+
 from .db_service import DB_PATH, clear_query_cache, execute, mark_data_changed, query_df, query_one
 from .calculation_service import calculate_work_hours, split_timestamp
 from .log_service import write_log
@@ -13,7 +15,7 @@ from .duration_service import hms_to_hours
 
 
 def _now() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return now_text()
 
 
 def make_record_key(employee_id: str, work_order: str, process_name: str, start_ts: str) -> str:
@@ -74,16 +76,51 @@ def _pause_conflicting_active_records(employee_id: str, process_name: str, start
     return closed
 
 
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None) -> dict | None:
+    start_date = start_date or today_text()
+    return query_one(
+        """
+        SELECT * FROM time_records
+        WHERE employee_id=? AND work_order=? AND process_name=? AND start_date=? AND end_timestamp IS NULL
+        ORDER BY id DESC LIMIT 1
+        """,
+        (employee_id, work_order, process_name, start_date),
+    )
+
+
+def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None) -> pd.DataFrame:
+    """Active records that must be paused before starting a new non-parallel process."""
+    start_date = start_date or today_text()
+    active = get_active_records(employee_id=employee_id)
+    if active.empty:
+        return active
+    return active[(active["process_name"].astype(str) != str(process_name)) | (active["start_date"].astype(str) != str(start_date))].copy()
+
 def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:
     now = _now()
     start_date, start_time = split_timestamp(now)
-    employee_id = employee.get("employee_id")
+    employee_id = str(employee.get("employee_id") or "").strip()
+    employee_name = str(employee.get("employee_name") or "").strip()
+    wo_no = str(work_order.get("work_order") or "").strip()
+    process_name = str(process_name or "").strip()
 
-    # V1.3 規則：同一人、同一天、同一工段可以同時多筆製令計時；不同工段才自動暫停舊作業。
-    if auto_pause_old:
+    if not employee_id or not wo_no or not process_name:
+        raise ValueError("工號、製令、工段名稱不可空白。")
+
+    # 規則 1：同工號/姓名、同製令、同工段名稱不可重複計時。
+    duplicate = get_active_same_work(employee_id, wo_no, process_name, start_date)
+    if duplicate:
+        raise ValueError(f"此人員已有相同製令與工段正在計時，禁止重複紀錄：{wo_no} / {process_name}")
+
+    # 規則 2：同人員同工段、不同製令可視為同步作業；不同工段必須先暫停前一個作業。
+    conflicts = get_conflicting_active_records(employee_id, process_name, start_date)
+    if not conflicts.empty:
+        if not auto_pause_old:
+            raise ValueError("此人員已有不同工段正在計時，請先確認暫停前一筆作業後再開始新紀錄。")
         _pause_conflicting_active_records(employee_id, process_name, start_date)
 
-    record_key = make_record_key(employee_id, work_order.get("work_order"), process_name, now)
+    record_key = make_record_key(employee_id, wo_no, process_name, now)
     group_key = f"{employee_id}|{process_name}|{start_date}"
     rid = execute(
         """
@@ -97,12 +134,12 @@ def start_work(employee: dict, work_order: dict, process_name: str, remark: str 
         (
             record_key,
             "作業中",
-            work_order.get("work_order"),
+            wo_no,
             work_order.get("part_no", ""),
             work_order.get("type_name", ""),
             process_name,
             employee_id,
-            employee.get("employee_name"),
+            employee_name,
             "開始",
             now,
             remark,
@@ -123,10 +160,8 @@ def start_work(employee: dict, work_order: dict, process_name: str, remark: str 
             "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND process_name=? AND start_date=? AND end_timestamp IS NULL",
             (group_key, now, employee_id, process_name, start_date),
         )
-    write_log("START_WORK", f"{employee.get('employee_name')} 開始 {work_order.get('work_order')} / {process_name}", "time_records", rid)
+    write_log("START_WORK", f"{employee_name} 開始 {wo_no} / {process_name}", "time_records", rid)
     return rid
-
-
 def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:
     """Finish work record.
 
@@ -207,8 +242,32 @@ def load_records(start_date: str | None = None, end_date: str | None = None, emp
     return query_df(sql, params)
 
 
-def today_records() -> pd.DataFrame:
-    return load_records(date.today().strftime("%Y-%m-%d"), date.today().strftime("%Y-%m-%d"))
+def today_records(include_finished: bool = False, unfinished_only: bool = True) -> pd.DataFrame:
+    """Records shown on 01｜工時紀錄.
+
+    Default: only today's unfinished records. Finished records remain in the same
+    database table and are still visible in 02｜歷史紀錄, but they do not clutter
+    the live operation page.
+    """
+    today = today_text()
+    if include_finished and not unfinished_only:
+        return load_records(today, today)
+    df = query_df("SELECT * FROM time_records WHERE start_date=? AND end_timestamp IS NULL ORDER BY id DESC", (today,))
+    return df
+
+
+def clear_today_finished_from_work_page() -> int:
+    """Clear finished items from 01 page view without deleting history records.
+
+    Since 01 and 02 intentionally share time_records as source of truth, this
+    action only confirms the live page should show unfinished records.  It does
+    not delete/update finished rows, so 02｜歷史紀錄 remains intact.
+    """
+    today = today_text()
+    row = query_one("SELECT COUNT(*) AS n FROM time_records WHERE start_date=? AND end_timestamp IS NOT NULL", (today,)) or {}
+    n = int(row.get("n") or 0)
+    write_log("CLEAR_TODAY_FINISHED_VIEW", f"01 工時紀錄清除當日完工顯示：{today}，不影響 02 歷史紀錄，筆數={n}", "time_records")
+    return n
 
 
 def save_time_records(df: pd.DataFrame) -> int:

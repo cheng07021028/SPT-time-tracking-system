@@ -24,6 +24,8 @@ from html import escape
 from typing import Any
 
 import pandas as pd
+
+from services.timezone_service import now_text, now_stamp, today_text, today_date
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -33,6 +35,11 @@ from services.db_service import execute, query_df, query_one
 # Streamlit Cloud imports this module during app startup, so missing PROJECT_ROOT
 # causes the whole app to fail before login.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+IDLE_TIMEOUT_FILES = [
+    PROJECT_ROOT / "data" / "config" / "idle_timeout_settings.json",
+    PROJECT_ROOT / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+]
 
 PBKDF2_ITERATIONS = 180_000
 DEFAULT_IDLE_MINUTES = 15
@@ -83,7 +90,7 @@ DEFAULT_USERS = [
 
 
 def _now() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return now_text()
 
 
 def _bool(value: Any) -> int:
@@ -404,31 +411,61 @@ def seed_security_defaults() -> None:
     """, (str(DEFAULT_IDLE_MINUTES), now))
 
 
-def get_idle_timeout_minutes() -> int:
-    """讀取閒置登出設定。
 
-    V1.64: read both security_settings and auth_security_settings because 10｜權限管理
-    stores settings through permission_service. This prevents the value from reverting
-    to the old default 15 minutes after logout / rerun.
+def _read_idle_timeout_from_files() -> int | None:
+    """Read idle timeout from permanent JSON files first.
+
+    SQLite on Streamlit Cloud can be rebuilt after GitHub deploy.  These JSON
+    files are committed as permanent settings, so the configured value will not
+    fall back to 15 minutes after update/relogin.
     """
+    for path in IDLE_TIMEOUT_FILES:
+        try:
+            if not path.exists() or path.stat().st_size <= 0:
+                continue
+            data = json.loads(path.read_text(encoding="utf-8"))
+            raw = data.get("idle_timeout_minutes") or data.get("setting_value")
+            if raw not in (None, ""):
+                return max(1, int(float(raw)))
+        except Exception:
+            continue
+    return None
+
+
+def _write_idle_timeout_files(minutes: int) -> None:
+    payload = {
+        "idle_timeout_minutes": int(minutes),
+        "updated_at": _now(),
+        "note": "閒置自動登出分鐘數永久設定；GitHub 更新或 SQLite 重建後優先讀取此檔。",
+    }
+    for path in IDLE_TIMEOUT_FILES:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+def get_idle_timeout_minutes() -> int:
+    """讀取閒置登出設定，優先讀永久 JSON，再回退 SQLite。"""
     cache = st.session_state.get("_spt_idle_timeout_cache")
     now_ts = time.time()
     if cache and now_ts - float(cache.get("ts", 0)) < _PERMISSION_CACHE_TTL_SECONDS:
         return int(cache.get("minutes", DEFAULT_IDLE_MINUTES))
     ensure_security_schema()
-    minutes = DEFAULT_IDLE_MINUTES
-    for table in ("auth_security_settings", "security_settings"):
-        try:
-            row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
-            if row and row.get("setting_value") not in (None, ""):
-                minutes = int(float(row["setting_value"]))
-                break
-        except Exception:
-            pass
+    minutes = _read_idle_timeout_from_files()
+    if minutes is None:
+        minutes = DEFAULT_IDLE_MINUTES
+        for table in ("auth_security_settings", "security_settings"):
+            try:
+                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
+                if row and row.get("setting_value") not in (None, ""):
+                    minutes = int(float(row["setting_value"]))
+                    break
+            except Exception:
+                pass
     minutes = max(1, int(minutes))
     st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": now_ts}
     return minutes
-
 
 def set_idle_timeout_minutes(minutes: int) -> None:
     """Write idle timeout to both runtime and permission tables."""
@@ -454,6 +491,7 @@ def set_idle_timeout_minutes(minutes: int) -> None:
             """, (str(minutes), _now()))
         except Exception:
             pass
+    _write_idle_timeout_files(minutes)
     st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": 0}
 
 

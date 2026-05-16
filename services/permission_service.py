@@ -13,6 +13,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
+from services.timezone_service import now_text, now_stamp, today_text, today_date
 
 try:
     import streamlit as st
@@ -140,7 +141,8 @@ def connect_db() -> sqlite3.Connection:
 
 
 def now_text() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    from services.timezone_service import now_text as _nt
+    return _nt()
 
 
 def hash_password(password: str, salt: str | None = None) -> str:
@@ -1064,7 +1066,12 @@ def _v199_security_setting_paths() -> list[Path]:
 def _v199_read_security_settings_from_files() -> Dict[str, str]:
     out: Dict[str, str] = {}
     allowed = {"idle_timeout_minutes", "ask_continue_after_record"}
-    for path in _v199_security_setting_paths():
+    extra_idle_paths = [
+        PROJECT_ROOT / "data" / "config" / "idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+    ]
+    for path in _v199_security_setting_paths() + extra_idle_paths:
         try:
             if not path.exists():
                 continue
@@ -1076,6 +1083,8 @@ def _v199_read_security_settings_from_files() -> Dict[str, str]:
                 rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
                 if isinstance(rows, list):
                     raw = {str(r.get("setting_key")): str(r.get("setting_value")) for r in rows if isinstance(r, dict) and r.get("setting_key")}
+            if raw is None and isinstance(payload, dict) and payload.get("idle_timeout_minutes") is not None:
+                raw = {"idle_timeout_minutes": payload.get("idle_timeout_minutes")}
             if isinstance(raw, dict):
                 for k, v in raw.items():
                     if str(k) in allowed and v is not None:
@@ -1083,6 +1092,25 @@ def _v199_read_security_settings_from_files() -> Dict[str, str]:
         except Exception:
             continue
     return out
+
+
+def _v204_write_idle_timeout_files(minutes: int) -> None:
+    payload = {
+        "idle_timeout_minutes": int(minutes),
+        "updated_at": now_text(),
+        "note": "閒置自動登出分鐘數永久設定；GitHub 更新或 SQLite 重建後優先讀取此檔。",
+    }
+    paths = [
+        PROJECT_ROOT / "data" / "config" / "idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+    ]
+    for path in paths:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
 
 
 def _v199_write_security_settings_to_files(settings: Dict[str, str]) -> None:
@@ -1167,6 +1195,7 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
     conn.close()
 
     _v199_write_security_settings_to_files(merged)
+    _v204_write_idle_timeout_files(idle)
     try:
         _persist_security_settings_files(merged)
     except Exception:

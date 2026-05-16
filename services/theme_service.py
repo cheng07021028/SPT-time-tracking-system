@@ -583,15 +583,15 @@ div[data-testid="stExpander"] summary * {
 }
 .spt-login-value {
     color: #ffffff;
-    font-size: 22px;
-    line-height: 1.25;
+    font-size: 30px;
+    line-height: 1.18;
     font-weight: 1000;
     letter-spacing: .4px;
     text-shadow: 0 0 10px rgba(255,255,255,.28), 0 0 22px rgba(35,230,255,.38);
 }
 .spt-login-value span {
     color: #aef7ff;
-    font-size: 18px;
+    font-size: 22px;
     font-weight: 950;
 }
 @keyframes sptLoginBreath {

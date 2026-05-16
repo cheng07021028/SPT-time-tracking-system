@@ -18,6 +18,8 @@ from typing import Iterable
 
 import pandas as pd
 
+from services.timezone_service import now_text, now_stamp, today_text, today_date
+
 from .db_service import execute, query_df, query_one
 from .log_service import write_log
 
@@ -39,7 +41,7 @@ _PROCESS_OPTIONS_CACHE: list[str] | None = None
 
 
 def _now() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return now_text()
 
 
 def _valid_hhmm(value: str) -> bool:

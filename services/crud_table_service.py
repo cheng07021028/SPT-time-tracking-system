@@ -8,6 +8,8 @@ from typing import Any
 
 import pandas as pd
 
+from services.timezone_service import now_text, now_stamp, today_text, today_date
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
 
@@ -18,7 +20,8 @@ def get_conn() -> sqlite3.Connection:
     return conn
 
 def now_text() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    from services.timezone_service import now_text as _nt
+    return _nt()
 
 def ensure_tables() -> None:
     conn = get_conn()

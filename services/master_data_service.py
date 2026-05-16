@@ -5,12 +5,14 @@ from datetime import datetime
 import inspect
 import pandas as pd
 
+from services.timezone_service import now_text, now_stamp, today_text, today_date
+
 from .db_service import execute, query_df
 from .log_service import write_log
 
 
 def _now() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return now_text()
 
 
 def _clean_value(value) -> str:
