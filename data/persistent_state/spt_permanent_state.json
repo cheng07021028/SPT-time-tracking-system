@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-16 14:29:55",
+  "exported_at": "2026-05-16 23:03:59",
   "source": "auth_users_saved",
   "db_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
-  "business_row_count": 679,
+  "business_row_count": 681,
   "table_counts": {
     "auth_account_permissions": 117,
     "auth_login_logs": 0,
@@ -13,18 +13,18 @@
     "login_logs": 1,
     "process_options": 17,
     "rest_periods": 5,
-    "security_login_logs": 77,
+    "security_login_logs": 82,
     "security_module_permissions": 78,
     "security_roles": 6,
     "security_settings": 2,
-    "security_user_roles": 9,
+    "security_user_roles": 10,
     "security_users": 9,
-    "system_logs": 73,
+    "system_logs": 77,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 0,
-    "time_records": 1,
+    "time_records": 3,
     "work_orders": 604
   },
   "tables": {
@@ -2025,13 +2025,13 @@
         "setting_key": "idle_timeout_minutes",
         "setting_value": "1",
         "note": "閒置多久自動登出，單位分鐘",
-        "updated_at": "2026-05-15 17:27:38"
+        "updated_at": "2026-05-16 22:51:40"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
         "note": "V1.99 synchronized permanent security setting",
-        "updated_at": "2026-05-15 17:27:38"
+        "updated_at": "2026-05-16 22:51:40"
       }
     ],
     "auth_users": [
@@ -2046,10 +2046,10 @@
         "role_code": "admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-16 14:21:05",
+        "last_login_at": "2026-05-16 23:02:52",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 2,
@@ -2065,7 +2065,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 3,
@@ -2081,7 +2081,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 4,
@@ -2097,7 +2097,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 5,
@@ -2113,7 +2113,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 6,
@@ -2129,7 +2129,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 8,
@@ -2139,13 +2139,13 @@
         "employee_id": "",
         "display_name": "黃沂澂",
         "email": "",
-        "role_code": "operator",
+        "role_code": "admin",
         "is_active": 1,
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:18:26",
         "note": "",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 9,
@@ -2161,7 +2161,7 @@
         "last_login_at": "2026-05-16 11:50:11",
         "note": "",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 19193,
@@ -2177,7 +2177,7 @@
         "last_login_at": null,
         "note": "",
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       }
     ],
     "employees": [
@@ -3153,12 +3153,12 @@
         "result": "SUCCESS",
         "message": "roles=admin",
         "module_code": "11_login_logs",
-        "login_time": "2026-05-16 11:42:56",
+        "login_time": "2026-05-16 22:52:00",
         "logout_time": null,
         "idle_minutes": null,
         "ip_address": "",
         "user_agent": "",
-        "created_at": "2026-05-16 11:42:56"
+        "created_at": "2026-05-16 22:52:00"
       }
     ],
     "process_options": [
@@ -4436,6 +4436,76 @@
         "idle_seconds": null,
         "user_agent": "streamlit",
         "created_at": "2026-05-16 14:21:05"
+      },
+      {
+        "id": 78,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置超過 1 分鐘，自動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-16 22:55:15",
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-16 22:55:15"
+      },
+      {
+        "id": 79,
+        "username": "",
+        "display_name": "",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置自動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-16 22:55:15",
+        "idle_seconds": 79,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-16 22:55:15"
+      },
+      {
+        "id": 80,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "",
+        "login_time": "2026-05-16 22:55:35",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-16 22:55:35"
+      },
+      {
+        "id": 81,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "",
+        "login_time": "2026-05-16 23:00:23",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-16 23:00:23"
+      },
+      {
+        "id": 82,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "",
+        "login_time": "2026-05-16 23:02:52",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-16 23:02:52"
       }
     ],
     "security_module_permissions": [
@@ -5911,13 +5981,13 @@
         "setting_key": "idle_timeout_minutes",
         "setting_value": "1",
         "note": "閒置多久自動登出，單位分鐘",
-        "updated_at": "2026-05-15 17:27:38"
+        "updated_at": "2026-05-16 22:51:40"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
         "note": "V1.99 synchronized permanent security setting",
-        "updated_at": "2026-05-15 17:27:38"
+        "updated_at": "2026-05-16 22:51:40"
       }
     ],
     "security_user_roles": [
@@ -5974,6 +6044,12 @@
         "username": "Ethan",
         "role_code": "admin",
         "created_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 38318,
+        "username": "spt142",
+        "role_code": "admin",
+        "created_at": "2026-05-16 23:03:59"
       }
     ],
     "security_users": [
@@ -5986,9 +6062,9 @@
         "email": "Admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-16 14:21:05",
+        "last_login_at": "2026-05-16 23:02:52",
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 2,
@@ -6001,7 +6077,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 3,
@@ -6014,7 +6090,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 4,
@@ -6027,7 +6103,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 5,
@@ -6040,7 +6116,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 6,
@@ -6053,7 +6129,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 6425,
@@ -6066,7 +6142,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:18:26",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 6430,
@@ -6079,7 +6155,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-16 11:50:11",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       },
       {
         "id": 38031,
@@ -6092,7 +6168,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-16 14:29:55"
+        "updated_at": "2026-05-16 23:03:59"
       }
     ],
     "system_logs": [
@@ -6898,6 +6974,50 @@
         "message": "人工編輯並儲存工時紀錄 1 筆",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 74,
+        "log_time": "2026-05-16 14:52:52",
+        "user_name": "appuser",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "24",
+        "message": "沈啟頤 開始 21M0241-04 / 前置鈑金",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 75,
+        "log_time": "2026-05-16 14:53:54",
+        "user_name": "appuser",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "25",
+        "message": "沈啟頤 開始 22M0100-26 / 前置鈑金",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 76,
+        "log_time": "2026-05-16 14:55:49",
+        "user_name": "appuser",
+        "action_type": "END_WORK_GROUP",
+        "target_table": "time_records",
+        "target_id": "25",
+        "message": "結束工時紀錄 #25，同步結束=2筆，狀態=暫停，群組總工時=0.05，平均工時=0.03",
+        "detail": "24,25",
+        "level": "INFO"
+      },
+      {
+        "id": 77,
+        "log_time": "2026-05-16 15:00:36",
+        "user_name": "appuser",
+        "action_type": "CLEAR_TODAY_FINISHED_VIEW",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01 工時紀錄清除當日完工顯示：2026-05-16，不影響 02 歷史紀錄，筆數=2",
+        "detail": "",
+        "level": "INFO"
       }
     ],
     "system_settings": [
@@ -6968,6 +7088,60 @@
         "source": "streamlit",
         "created_at": "2026-05-16 14:01:47",
         "updated_at": "2026-05-16 14:22:39"
+      },
+      {
+        "id": 24,
+        "record_key": "B030|21M0241-04|前置鈑金|2026-05-16 22:52:52|e8d687bc",
+        "status": "暫停",
+        "work_order": "21M0241-04",
+        "part_no": "4TRSC020-004-02",
+        "type_name": "NTB 3 PORT",
+        "process_name": "前置鈑金",
+        "employee_id": "B030",
+        "employee_name": "沈啟頤",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-16 22:52:52",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-16 22:55:49",
+        "remark": "同步作業平均分配：2筆，群組總工時=0.05，平均=0.03",
+        "start_date": "2026-05-16",
+        "start_time": "22:52:52",
+        "end_date": "2026-05-16",
+        "end_time": "22:55:49",
+        "work_hours": 0.03,
+        "assembly_location": "竹東",
+        "group_key": "B030|前置鈑金|2026-05-16",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-16 22:52:52",
+        "updated_at": "2026-05-16 22:55:49"
+      },
+      {
+        "id": 25,
+        "record_key": "B030|22M0100-26|前置鈑金|2026-05-16 22:53:54|3f2e459a",
+        "status": "暫停",
+        "work_order": "22M0100-26",
+        "part_no": "4TRSC020-005-03",
+        "type_name": "NTB 4Port",
+        "process_name": "前置鈑金",
+        "employee_id": "B030",
+        "employee_name": "沈啟頤",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-16 22:53:54",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-16 22:55:49",
+        "remark": "同步作業平均分配：2筆，群組總工時=0.05，平均=0.03",
+        "start_date": "2026-05-16",
+        "start_time": "22:53:54",
+        "end_date": "2026-05-16",
+        "end_time": "22:55:49",
+        "work_hours": 0.03,
+        "assembly_location": "竹東",
+        "group_key": "B030|前置鈑金|2026-05-16",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-16 22:53:54",
+        "updated_at": "2026-05-16 22:55:49"
       }
     ],
     "work_orders": [
