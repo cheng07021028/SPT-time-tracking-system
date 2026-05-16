@@ -14,6 +14,7 @@ from services.security_service import (
 from services.master_data_service import load_employees, load_work_orders
 from services.time_record_service import (
     clear_today_finished_from_work_page,
+    restore_today_hidden_records,
     delete_time_records,
     recalculate_time_records,
     finish_work,
@@ -141,18 +142,23 @@ try:
     _reset_time = get_live_page_reset_time()
 except Exception:
     _reset_time = "02:00"
-st.caption(f"顯示規則：目前作業週期內的所有紀錄都會顯示；每日 {_reset_time} 重新整理後，只保留未結束作業在 01 頁面顯示，02｜歷史紀錄不受影響。")
+st.caption(f"顯示規則：在系統設定時間 {_reset_time} 前，今日作業明細不論是否已結束都會顯示；按下『立即重新整理 01 顯示』後，只隱藏設定時間前已結束且已有工時小計/結束紀錄的資料。按下『恢復已隱藏紀錄』可還原 01 顯示；02｜歷史紀錄不受影響。")
 user = get_current_user() or {}
 is_admin = "admin" in [str(x).lower() for x in user.get("roles", [])]
 show_unfinished_only = False
 if is_admin:
-    c_filter1, c_filter2 = st.columns([1.3, 2.7])
+    c_filter1, c_filter2, c_filter3 = st.columns([1.15, 2.1, 1.55])
     with c_filter1:
         show_unfinished_only = st.checkbox("只顯示未結束目前作業 / Unfinished only", value=False, key="today_unfinished_only")
     with c_filter2:
-        if st.button("🧹 立即重新整理 01 顯示（隱藏舊週期已完工，不影響 02 歷史紀錄）", use_container_width=True, key="clear_today_finished_view"):
+        if st.button("🧹 立即重新整理 01 顯示（依系統設定時間隱藏已結束，不影響 02 歷史紀錄）", use_container_width=True, key="clear_today_finished_view"):
             n = clear_today_finished_from_work_page()
-            st.success(f"已重新整理 01 頁顯示；02 歷史紀錄不受影響。已隱藏舊週期完成筆數：{n}")
+            st.success(f"已重新整理 01 頁顯示；02 歷史紀錄不受影響。已隱藏設定時間前已結束筆數：{n}")
+            st.rerun()
+    with c_filter3:
+        if st.button("↩️ 恢復已隱藏紀錄", use_container_width=True, key="restore_today_hidden_view"):
+            restore_today_hidden_records()
+            st.success("已恢復 01 頁已隱藏紀錄；02 歷史紀錄不受影響。")
             st.rerun()
 df = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
 render_table(df, "today_records", editable=False, height=420)
