@@ -1,6 +1,6 @@
 {
   "schema_version": "v1.30",
-  "export_time": "2026-05-16 23:50:42",
+  "export_time": "2026-05-16 23:55:46",
   "database_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
   "tables": {
     "app_settings": [
@@ -2029,10 +2029,10 @@
         "role_code": "admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-16 23:02:52",
+        "last_login_at": "2026-05-16 23:54:25",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-16 23:54:25"
       },
       {
         "id": 2,
@@ -3284,6 +3284,46 @@
     ],
     "rest_periods": [
       {
+        "id": 1,
+        "name": "上午休息",
+        "start_time": "10:30",
+        "end_time": "10:45",
+        "is_active": 1,
+        "sort_order": 1
+      },
+      {
+        "id": 2,
+        "name": "午休",
+        "start_time": "12:00",
+        "end_time": "13:00",
+        "is_active": 1,
+        "sort_order": 2
+      },
+      {
+        "id": 3,
+        "name": "下午休息",
+        "start_time": "15:00",
+        "end_time": "15:15",
+        "is_active": 1,
+        "sort_order": 3
+      },
+      {
+        "id": 4,
+        "name": "晚餐休息",
+        "start_time": "18:00",
+        "end_time": "18:30",
+        "is_active": 1,
+        "sort_order": 4
+      },
+      {
+        "id": 5,
+        "name": "晚上休息",
+        "start_time": "20:00",
+        "end_time": "20:15",
+        "is_active": 1,
+        "sort_order": 5
+      },
+      {
         "id": 6,
         "name": "上午休息",
         "start_time": "10:30",
@@ -4472,6 +4512,20 @@
         "idle_seconds": null,
         "user_agent": "streamlit",
         "created_at": "2026-05-16 23:02:52"
+      },
+      {
+        "id": 83,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "",
+        "login_time": "2026-05-16 23:54:25",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-16 23:54:25"
       }
     ],
     "security_module_permissions": [
@@ -6028,9 +6082,9 @@
         "email": "Admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-16 23:02:52",
+        "last_login_at": "2026-05-16 23:54:25",
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-16 23:54:25"
       },
       {
         "id": 2,
@@ -6043,7 +6097,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-16 23:52:31"
       },
       {
         "id": 3,
@@ -6056,7 +6110,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-16 23:52:31"
       },
       {
         "id": 4,
@@ -6069,7 +6123,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-16 23:52:31"
       },
       {
         "id": 5,
@@ -6082,7 +6136,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-16 23:52:31"
       },
       {
         "id": 6,
@@ -6095,7 +6149,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-16 23:52:31"
       },
       {
         "id": 6425,
@@ -6108,7 +6162,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:18:26",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-16 23:52:31"
       },
       {
         "id": 6430,
@@ -6121,7 +6175,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-16 11:50:11",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-16 23:52:31"
       },
       {
         "id": 38031,
@@ -6134,7 +6188,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-16 23:52:31"
       }
     ],
     "system_logs": [
@@ -14380,8 +14434,8 @@
     "auth_users": 9,
     "employees": 74,
     "process_options": 17,
-    "rest_periods": 5,
-    "security_login_logs": 82,
+    "rest_periods": 10,
+    "security_login_logs": 83,
     "security_module_permissions": 78,
     "security_roles": 6,
     "security_settings": 2,
