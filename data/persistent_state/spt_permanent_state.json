@@ -1,14 +1,20 @@
 {
   "schema_version": "v1.30",
-  "export_time": "2026-05-17 00:16:44",
+  "export_time": "2026-05-17 00:30:07",
   "database_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
   "tables": {
     "app_settings": [
       {
+        "setting_key": "live_page_manual_refresh_timestamp",
+        "setting_value": "20260517_002852",
+        "note": "01 工時紀錄手動重新整理顯示截止時間；只影響 01 顯示，不刪除 02 歷史紀錄",
+        "updated_at": "2026-05-17 00:28:52"
+      },
+      {
         "setting_key": "live_page_reset_time",
-        "setting_value": "23:00",
+        "setting_value": "18:00",
         "note": "01 工時紀錄每日重新整理時間；只影響 01 顯示，不刪除 02 歷史紀錄",
-        "updated_at": "2026-05-16 23:50:06"
+        "updated_at": "2026-05-17 00:29:18"
       }
     ],
     "auth_account_permissions": [
@@ -2008,13 +2014,13 @@
         "setting_key": "idle_timeout_minutes",
         "setting_value": "1",
         "note": "閒置多久自動登出，單位分鐘",
-        "updated_at": "2026-05-17 00:16:03"
+        "updated_at": "2026-05-17 00:29:51"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
         "note": "V1.99 synchronized permanent security setting",
-        "updated_at": "2026-05-17 00:16:03"
+        "updated_at": "2026-05-17 00:29:51"
       }
     ],
     "auth_users": [
@@ -3129,7 +3135,7 @@
     ],
     "process_options": [
       {
-        "id": 35,
+        "id": 52,
         "process_name": "前置鈑金",
         "is_active": 1,
         "sort_order": 1,
@@ -3138,7 +3144,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 36,
+        "id": 53,
         "process_name": "LP改造",
         "is_active": 1,
         "sort_order": 2,
@@ -3147,7 +3153,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 37,
+        "id": 54,
         "process_name": "骨架組立",
         "is_active": 1,
         "sort_order": 3,
@@ -3156,7 +3162,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 38,
+        "id": 55,
         "process_name": "配電",
         "is_active": 1,
         "sort_order": 4,
@@ -3165,7 +3171,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 39,
+        "id": 56,
         "process_name": "模組",
         "is_active": 1,
         "sort_order": 5,
@@ -3174,7 +3180,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 40,
+        "id": 57,
         "process_name": "水平",
         "is_active": 1,
         "sort_order": 6,
@@ -3183,7 +3189,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 41,
+        "id": 58,
         "process_name": "S.T.",
         "is_active": 1,
         "sort_order": 7,
@@ -3192,7 +3198,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 42,
+        "id": 59,
         "process_name": "清潔",
         "is_active": 1,
         "sort_order": 8,
@@ -3201,7 +3207,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 43,
+        "id": 60,
         "process_name": "收機",
         "is_active": 1,
         "sort_order": 9,
@@ -3210,7 +3216,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 44,
+        "id": 61,
         "process_name": "包機",
         "is_active": 1,
         "sort_order": 10,
@@ -3219,7 +3225,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 45,
+        "id": 62,
         "process_name": "Packing",
         "is_active": 1,
         "sort_order": 11,
@@ -3228,7 +3234,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 46,
+        "id": 63,
         "process_name": "異常",
         "is_active": 1,
         "sort_order": 12,
@@ -3237,7 +3243,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 47,
+        "id": 64,
         "process_name": "設變",
         "is_active": 1,
         "sort_order": 13,
@@ -3246,7 +3252,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 48,
+        "id": 65,
         "process_name": "重工",
         "is_active": 1,
         "sort_order": 14,
@@ -3255,7 +3261,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 49,
+        "id": 66,
         "process_name": "教育訓練",
         "is_active": 1,
         "sort_order": 15,
@@ -3264,7 +3270,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 50,
+        "id": 67,
         "process_name": "IPQC",
         "is_active": 1,
         "sort_order": 16,
@@ -3273,7 +3279,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 51,
+        "id": 68,
         "process_name": "其他",
         "is_active": 1,
         "sort_order": 17,
@@ -3284,7 +3290,7 @@
     ],
     "rest_periods": [
       {
-        "id": 1,
+        "id": 11,
         "name": "上午休息",
         "start_time": "10:30",
         "end_time": "10:45",
@@ -3292,7 +3298,15 @@
         "sort_order": 1
       },
       {
-        "id": 2,
+        "id": 12,
+        "name": "上午休息",
+        "start_time": "10:30",
+        "end_time": "10:45",
+        "is_active": 1,
+        "sort_order": 1
+      },
+      {
+        "id": 13,
         "name": "午休",
         "start_time": "12:00",
         "end_time": "13:00",
@@ -3300,7 +3314,15 @@
         "sort_order": 2
       },
       {
-        "id": 3,
+        "id": 14,
+        "name": "午休",
+        "start_time": "12:00",
+        "end_time": "13:00",
+        "is_active": 1,
+        "sort_order": 2
+      },
+      {
+        "id": 15,
         "name": "下午休息",
         "start_time": "15:00",
         "end_time": "15:15",
@@ -3308,7 +3330,15 @@
         "sort_order": 3
       },
       {
-        "id": 4,
+        "id": 16,
+        "name": "下午休息",
+        "start_time": "15:00",
+        "end_time": "15:15",
+        "is_active": 1,
+        "sort_order": 3
+      },
+      {
+        "id": 17,
         "name": "晚餐休息",
         "start_time": "18:00",
         "end_time": "18:30",
@@ -3316,7 +3346,15 @@
         "sort_order": 4
       },
       {
-        "id": 5,
+        "id": 18,
+        "name": "晚餐休息",
+        "start_time": "18:00",
+        "end_time": "18:30",
+        "is_active": 1,
+        "sort_order": 4
+      },
+      {
+        "id": 19,
         "name": "晚上休息",
         "start_time": "20:00",
         "end_time": "20:15",
@@ -3324,39 +3362,7 @@
         "sort_order": 5
       },
       {
-        "id": 6,
-        "name": "上午休息",
-        "start_time": "10:30",
-        "end_time": "10:45",
-        "is_active": 1,
-        "sort_order": 1
-      },
-      {
-        "id": 7,
-        "name": "午休",
-        "start_time": "12:00",
-        "end_time": "13:00",
-        "is_active": 1,
-        "sort_order": 2
-      },
-      {
-        "id": 8,
-        "name": "下午休息",
-        "start_time": "15:00",
-        "end_time": "15:15",
-        "is_active": 1,
-        "sort_order": 3
-      },
-      {
-        "id": 9,
-        "name": "晚餐休息",
-        "start_time": "18:00",
-        "end_time": "18:30",
-        "is_active": 1,
-        "sort_order": 4
-      },
-      {
-        "id": 10,
+        "id": 20,
         "name": "晚上休息",
         "start_time": "20:00",
         "end_time": "20:15",
@@ -6001,13 +6007,13 @@
         "setting_key": "idle_timeout_minutes",
         "setting_value": "1",
         "note": "閒置多久自動登出，單位分鐘",
-        "updated_at": "2026-05-17 00:16:03"
+        "updated_at": "2026-05-17 00:29:51"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
         "note": "V1.99 synchronized permanent security setting",
-        "updated_at": "2026-05-17 00:16:03"
+        "updated_at": "2026-05-17 00:29:51"
       }
     ],
     "security_user_roles": [
@@ -7047,6 +7053,28 @@
         "target_table": "app_settings",
         "target_id": "",
         "message": "儲存 01 工時紀錄每日重新整理時間：23:00，已寫入 13 系統設定永久檔",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 79,
+        "log_time": "2026-05-17 00:28:52",
+        "user_name": "appuser",
+        "action_type": "CLEAR_TODAY_FINISHED_VIEW",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01 工時紀錄手動重新整理顯示：cutoff=20260517_002852，隱藏已結束紀錄，不影響 02 歷史紀錄，筆數=2",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 80,
+        "log_time": "2026-05-17 00:29:18",
+        "user_name": "appuser",
+        "action_type": "SAVE_LIVE_PAGE_RESET_TIME",
+        "target_table": "app_settings",
+        "target_id": "",
+        "message": "儲存 01 工時紀錄每日重新整理時間：18:00，已寫入 13 系統設定永久檔",
         "detail": "",
         "level": "INFO"
       }
@@ -14427,7 +14455,7 @@
     ]
   },
   "table_counts": {
-    "app_settings": 1,
+    "app_settings": 2,
     "auth_account_permissions": 117,
     "auth_login_logs": 0,
     "auth_security_settings": 2,
@@ -14441,7 +14469,7 @@
     "security_settings": 2,
     "security_user_roles": 10,
     "security_users": 9,
-    "system_logs": 78,
+    "system_logs": 80,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
