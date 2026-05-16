@@ -396,7 +396,7 @@ def seed_security_defaults() -> None:
         existing = query_one("SELECT username FROM security_users WHERE username=?", (username,))
         if not existing:
             execute("""
-                INSERT INTO security_users
+                INSERT OR IGNORE INTO security_users
                 (username, password_hash, display_name, is_active, force_password_change, created_at, updated_at)
                 VALUES (?, ?, ?, 1, 1, ?, ?)
             """, (username, hash_password(password), display_name, now, now))
