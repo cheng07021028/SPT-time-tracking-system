@@ -307,18 +307,50 @@ def _manual_refresh_timestamp() -> str | None:
     return str(val).strip() if val else None
 
 
+def _restore_hidden_reset_key() -> str | None:
+    """Return the reset-cutoff key for which admin has restored hidden rows."""
+    row = query_one("SELECT setting_value FROM app_settings WHERE setting_key='live_page_restore_hidden_reset_key'") or {}
+    val = row.get("setting_value")
+    return str(val).strip() if val else None
+
+
+def _effective_refresh_cutoff_for_now() -> str | None:
+    """Cutoff used by manual refresh.
+
+    Business rule V2.15:
+    The admin setting time is the boundary for cleaning the live 01 display.
+    Pressing 「立即重新整理 01 顯示」 after that boundary should hide rows that
+    were already finished before the configured boundary; it must not cause rows
+    finished after the boundary to disappear immediately.
+    """
+    scheduled = _current_reset_timestamp()
+    return scheduled or now_stamp()
+
+
 def _live_page_cutoff_timestamp() -> str | None:
     """Latest cutoff used to hide completed rows from 01 display.
 
-    V2.07 rule:
-    - Before the configured reset time, 01 shows today's/current-cycle records.
-    - After the configured reset time, completed rows ended before the reset time
-      are hidden automatically.
-    - If admin clicks 「立即重新整理 01 顯示」, all rows completed up to that
-      click time are hidden immediately.
-    - Unfinished rows are always visible.
+    V2.15 rule:
+    - Before the configured reset time, 01 shows current-cycle rows regardless of
+      whether they have ended.
+    - After the configured reset time, 01 hides only rows that were already ended
+      at or before that reset-time cutoff.
+    - Pressing 「立即重新整理 01 顯示」 uses the configured reset-time cutoff, not
+      the current click time, so ending a job after the reset time will not
+      immediately disappear unless the next refresh boundary applies.
+    - 「恢復已隱藏紀錄」 cancels the current reset cutoff display filtering until
+      the next reset boundary changes.
     """
-    candidates = [x for x in [_current_reset_timestamp(), _manual_refresh_timestamp()] if x]
+    scheduled = _current_reset_timestamp()
+    manual = _manual_refresh_timestamp()
+    restore_key = _restore_hidden_reset_key()
+
+    # If admin restored the records for this reset boundary, ignore that scheduled
+    # cutoff. A future day/reset has a different key and will work normally.
+    if scheduled and restore_key == scheduled:
+        scheduled = None
+
+    candidates = [x for x in [scheduled, manual] if x]
     return max(candidates) if candidates else None
 
 
@@ -364,10 +396,10 @@ def today_records(include_finished: bool = True, unfinished_only: bool = False) 
 
     cutoff = _live_page_cutoff_timestamp()
     if cutoff:
-        # Keep unfinished rows and rows that belong to the current cycle and were
-        # not already finished before the cutoff.  Legacy rows with status != 作業中
-        # but blank end_timestamp are treated as ended by updated_at/start_timestamp
-        # when possible, while normal finished rows use end_timestamp.
+        # Keep all unfinished rows and all current-cycle rows whose finished marker
+        # is after the cutoff. Hide only rows that were already ended before the
+        # configured reset boundary. Finished is determined by status, end timestamp,
+        # or non-zero work_hours, because legacy records may have inconsistent fields.
         return query_df(
             f"""
             SELECT * FROM time_records
@@ -375,26 +407,18 @@ def today_records(include_finished: bool = True, unfinished_only: bool = False) 
                 ({unfinished_where})
                 OR (
                     start_date>=?
-                    AND (
-                        -- normal finished rows completed after the cutoff remain visible
+                    AND NOT (
                         (
-                            end_timestamp IS NOT NULL
-                            AND TRIM(COALESCE(end_timestamp,''))<>''
-                            AND LOWER(TRIM(COALESCE(end_timestamp,'')))<>'none'
-                            AND end_timestamp>?
+                            COALESCE(status,'')<>'作業中'
+                            OR (end_timestamp IS NOT NULL AND TRIM(COALESCE(end_timestamp,''))<>'' AND LOWER(TRIM(COALESCE(end_timestamp,'')))<>'none')
+                            OR CAST(COALESCE(work_hours, 0) AS REAL) > 0
                         )
-                        OR
-                        -- legacy finished rows without end_timestamp: keep only if updated after cutoff
-                        (
-                            (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='' OR LOWER(TRIM(COALESCE(end_timestamp,'')))='none')
-                            AND COALESCE(status,'')<>'作業中'
-                            AND COALESCE(updated_at, start_timestamp, created_at, '')>?
-                        )
+                        AND COALESCE(NULLIF(TRIM(COALESCE(end_timestamp,'')), ''), updated_at, start_timestamp, created_at, '') <= ?
                     )
                 )
             ORDER BY id DESC
             """,
-            (cycle_start, cutoff, cutoff),
+            (cycle_start, cutoff),
         )
 
     return query_df(
@@ -409,22 +433,7 @@ def today_records(include_finished: bool = True, unfinished_only: bool = False) 
         (cycle_start,),
     )
 
-def clear_today_finished_from_work_page() -> int:
-    """Manual refresh for 01 page display only; does not delete 02 history.
-
-    It records a display cutoff timestamp. Any row with end_timestamp not null and
-    end_timestamp <= cutoff will disappear from 01, while all source records remain
-    in 02｜歷史紀錄.
-    """
-    cutoff = now_stamp()
-    row = query_one(
-        "SELECT COUNT(*) AS n FROM time_records WHERE end_timestamp IS NOT NULL AND end_timestamp<=?",
-        (cutoff,),
-    ) or {}
-    n = int(row.get("n") or 0)
-    # 確保舊資料庫也有 app_settings；欄位名稱統一使用 note，不使用 description。
-    # 舊版 V2.10 曾寫入 description 欄位，若現場資料表只有 note 會造成
-    # sqlite3.OperationalError，按「立即重新整理 01 顯示」即報錯。
+def _ensure_app_settings_table() -> None:
     execute(
         """
         CREATE TABLE IF NOT EXISTS app_settings (
@@ -435,24 +444,79 @@ def clear_today_finished_from_work_page() -> int:
         )
         """
     )
+
+
+def _upsert_app_setting(key: str, value: str, note: str) -> None:
+    _ensure_app_settings_table()
     execute(
         """
         INSERT INTO app_settings(setting_key, setting_value, note, updated_at)
-        VALUES ('live_page_manual_refresh_timestamp', ?, '01 工時紀錄手動重新整理顯示截止時間；只影響 01 顯示，不刪除 02 歷史紀錄', ?)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT(setting_key) DO UPDATE SET
             setting_value=excluded.setting_value,
             note=excluded.note,
             updated_at=excluded.updated_at
         """,
-        (cutoff, _now()),
+        (key, value, note, _now()),
     )
+
+
+def clear_today_finished_from_work_page() -> int:
+    """Manual refresh for 01 page display only; does not delete 02 history.
+
+    V2.15: Use the configured reset-time boundary as cutoff. This means records
+    finished after the configured boundary remain visible until the next boundary
+    or another rule applies; pressing 暫停/完工/下班 after the reset time will not
+    make the row disappear immediately.
+    """
+    cutoff = _effective_refresh_cutoff_for_now()
+    row = query_one(
+        """
+        SELECT COUNT(*) AS n FROM time_records
+        WHERE (
+            COALESCE(status,'')<>'作業中'
+            OR (end_timestamp IS NOT NULL AND TRIM(COALESCE(end_timestamp,''))<>'' AND LOWER(TRIM(COALESCE(end_timestamp,'')))<>'none')
+            OR CAST(COALESCE(work_hours, 0) AS REAL) > 0
+        )
+        AND COALESCE(NULLIF(TRIM(COALESCE(end_timestamp,'')), ''), updated_at, start_timestamp, created_at, '') <= ?
+        """,
+        (cutoff,),
+    ) or {}
+    n = int(row.get("n") or 0)
+    _upsert_app_setting(
+        "live_page_manual_refresh_timestamp",
+        cutoff,
+        "01 工時紀錄手動重新整理顯示截止時間；依系統設定時間判斷，只影響 01 顯示，不刪除 02 歷史紀錄",
+    )
+    # Manual refresh cancels a previous restore for the same boundary.
+    execute("DELETE FROM app_settings WHERE setting_key='live_page_restore_hidden_reset_key'")
     clear_query_cache()
     write_log(
         "CLEAR_TODAY_FINISHED_VIEW",
-        f"01 工時紀錄手動重新整理顯示：cutoff={cutoff}，隱藏已結束紀錄，不影響 02 歷史紀錄，筆數={n}",
+        f"01 工時紀錄手動重新整理顯示：cutoff={cutoff}，隱藏設定時間前已結束紀錄，不影響 02 歷史紀錄，筆數={n}",
         "time_records",
     )
     return n
+
+
+def restore_today_hidden_records() -> int:
+    """Restore rows hidden from 01 display for the current reset boundary."""
+    scheduled = _current_reset_timestamp()
+    manual = _manual_refresh_timestamp()
+    key = scheduled or manual or now_stamp()
+    _upsert_app_setting(
+        "live_page_restore_hidden_reset_key",
+        key,
+        "恢復 01 工時紀錄已隱藏紀錄；只影響 01 顯示，不刪除或更改 02 歷史紀錄",
+    )
+    execute("DELETE FROM app_settings WHERE setting_key='live_page_manual_refresh_timestamp'")
+    clear_query_cache()
+    write_log(
+        "RESTORE_TODAY_HIDDEN_VIEW",
+        f"恢復 01 工時紀錄已隱藏紀錄：reset_key={key}，不影響 02 歷史紀錄",
+        "time_records",
+    )
+    return 1
 
 def save_time_records(df: pd.DataFrame) -> int:
     if df is None or df.empty:
