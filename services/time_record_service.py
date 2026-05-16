@@ -388,10 +388,27 @@ def clear_today_finished_from_work_page() -> int:
         (cutoff,),
     ) or {}
     n = int(row.get("n") or 0)
+    # 確保舊資料庫也有 app_settings；欄位名稱統一使用 note，不使用 description。
+    # 舊版 V2.10 曾寫入 description 欄位，若現場資料表只有 note 會造成
+    # sqlite3.OperationalError，按「立即重新整理 01 顯示」即報錯。
     execute(
         """
-        INSERT OR REPLACE INTO app_settings(setting_key, setting_value, description, updated_at)
+        CREATE TABLE IF NOT EXISTS app_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT,
+            note TEXT,
+            updated_at TEXT
+        )
+        """
+    )
+    execute(
+        """
+        INSERT INTO app_settings(setting_key, setting_value, note, updated_at)
         VALUES ('live_page_manual_refresh_timestamp', ?, '01 工時紀錄手動重新整理顯示截止時間；只影響 01 顯示，不刪除 02 歷史紀錄', ?)
+        ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value=excluded.setting_value,
+            note=excluded.note,
+            updated_at=excluded.updated_at
         """,
         (cutoff, _now()),
     )
