@@ -346,9 +346,15 @@ def _unfinished_live_where() -> str:
 def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:
     """Records shown on 01｜工時紀錄. 02｜歷史紀錄 is never affected.
 
-    Before the configured/manual refresh cutoff, 01 shows all records in the
-    current work cycle.  After cutoff, 01 must show only unfinished active work.
-    Finished means status is not 作業中 OR there is an end timestamp/work subtotal.
+    Correct display rule V2.14:
+    - If admin selects unfinished_only, show only genuinely active records.
+    - Before any scheduled/manual display refresh cutoff, show all records in the
+      current work cycle plus unfinished older records.
+    - After a scheduled/manual display refresh cutoff, hide only records that had
+      already ended at or before that cutoff.
+    - Records started/ended after the cutoff must still appear on 01 until the
+      next refresh. This prevents pressing 暫停/完工/下班 after a refresh from
+      making the new record disappear immediately.
     """
     cycle_start = _business_cycle_start_date()
     unfinished_where = _unfinished_live_where()
@@ -358,10 +364,38 @@ def today_records(include_finished: bool = True, unfinished_only: bool = False) 
 
     cutoff = _live_page_cutoff_timestamp()
     if cutoff:
-        # V2.10: once scheduled/manual refresh is active, 01 display keeps only
-        # genuinely unfinished rows.  暫停/完工/下班 are hidden from 01 even when
-        # they are in the current cycle; 02 history remains unchanged.
-        return query_df(f"SELECT * FROM time_records WHERE {unfinished_where} ORDER BY id DESC")
+        # Keep unfinished rows and rows that belong to the current cycle and were
+        # not already finished before the cutoff.  Legacy rows with status != 作業中
+        # but blank end_timestamp are treated as ended by updated_at/start_timestamp
+        # when possible, while normal finished rows use end_timestamp.
+        return query_df(
+            f"""
+            SELECT * FROM time_records
+            WHERE
+                ({unfinished_where})
+                OR (
+                    start_date>=?
+                    AND (
+                        -- normal finished rows completed after the cutoff remain visible
+                        (
+                            end_timestamp IS NOT NULL
+                            AND TRIM(COALESCE(end_timestamp,''))<>''
+                            AND LOWER(TRIM(COALESCE(end_timestamp,'')))<>'none'
+                            AND end_timestamp>?
+                        )
+                        OR
+                        -- legacy finished rows without end_timestamp: keep only if updated after cutoff
+                        (
+                            (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='' OR LOWER(TRIM(COALESCE(end_timestamp,'')))='none')
+                            AND COALESCE(status,'')<>'作業中'
+                            AND COALESCE(updated_at, start_timestamp, created_at, '')>?
+                        )
+                    )
+                )
+            ORDER BY id DESC
+            """,
+            (cycle_start, cutoff, cutoff),
+        )
 
     return query_df(
         """
