@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-16 14:26:06",
+  "exported_at": "2026-05-16 14:29:55",
   "source": "auth_users_saved",
   "tables": {
     "system_settings": [
@@ -58,7 +58,7 @@
         "last_login_at": "2026-05-16 14:21:05",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 2,
@@ -74,7 +74,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 3,
@@ -90,7 +90,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 4,
@@ -106,7 +106,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 5,
@@ -122,7 +122,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 6,
@@ -138,7 +138,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 8,
@@ -154,7 +154,7 @@
         "last_login_at": "2026-05-15 11:18:26",
         "note": "",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 9,
@@ -170,7 +170,23 @@
         "last_login_at": "2026-05-16 11:50:11",
         "note": "",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 19193,
+        "username": "Ethan",
+        "password_hash": "pbkdf2_sha256$4a2137fb90480f1b82a4721549f178ff$e85de92dedccb2791d7c297a55882100182babccdb5fd0485b63bfa5ac24bca0",
+        "password_hint": "由權限管理頁建立",
+        "employee_id": "SPT142",
+        "display_name": "Ethan",
+        "email": "",
+        "role_code": "admin",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "note": "",
+        "created_at": "2026-05-16 14:29:55",
+        "updated_at": "2026-05-16 14:29:55"
       }
     ],
     "auth_account_permissions": [
@@ -1941,6 +1957,227 @@
         "can_restore": 0,
         "can_manage": 0,
         "updated_at": "2026-05-15 14:01:25"
+      },
+      {
+        "id": 535697,
+        "username": "Ethan",
+        "module_code": "01",
+        "module_name_zh": "工時紀錄",
+        "module_name_en": "Time Recording",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 535698,
+        "username": "Ethan",
+        "module_code": "02",
+        "module_name_zh": "歷史紀錄",
+        "module_name_en": "History Records",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 535699,
+        "username": "Ethan",
+        "module_code": "03",
+        "module_name_zh": "製令管理",
+        "module_name_en": "Work Order Management",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 535700,
+        "username": "Ethan",
+        "module_code": "04",
+        "module_name_zh": "人員名單",
+        "module_name_en": "Employee Master",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 535701,
+        "username": "Ethan",
+        "module_code": "05",
+        "module_name_zh": "製令工時分析",
+        "module_name_en": "Work Order Time Analysis",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 535702,
+        "username": "Ethan",
+        "module_code": "06",
+        "module_name_zh": "LOG查詢",
+        "module_name_en": "Log Inquiry",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 535703,
+        "username": "Ethan",
+        "module_code": "07",
+        "module_name_zh": "今日未紀錄名單",
+        "module_name_en": "Missing Records Today",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 535704,
+        "username": "Ethan",
+        "module_code": "08",
+        "module_name_zh": "人員每日工時",
+        "module_name_en": "Daily Employee Hours",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 535705,
+        "username": "Ethan",
+        "module_code": "09",
+        "module_name_zh": "資料永久保存與備份",
+        "module_name_en": "Permanent Backup",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 535706,
+        "username": "Ethan",
+        "module_code": "10",
+        "module_name_zh": "權限管理",
+        "module_name_en": "Permission Management",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 535707,
+        "username": "Ethan",
+        "module_code": "11",
+        "module_name_zh": "登入紀錄",
+        "module_name_en": "Login Logs",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 535708,
+        "username": "Ethan",
+        "module_code": "12",
+        "module_name_zh": "模組永久紀錄中心",
+        "module_name_en": "Module Permanent Records",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 535709,
+        "username": "Ethan",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-16 14:29:55"
       }
     ],
     "auth_security_settings": [
@@ -1969,7 +2206,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-16 14:21:05",
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 2,
@@ -1982,7 +2219,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 3,
@@ -1995,7 +2232,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 4,
@@ -2008,7 +2245,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 5,
@@ -2021,7 +2258,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 6,
@@ -2034,7 +2271,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 6425,
@@ -2047,7 +2284,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:18:26",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
       },
       {
         "id": 6430,
@@ -2060,7 +2297,20 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-16 11:50:11",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-16 14:26:05"
+        "updated_at": "2026-05-16 14:29:55"
+      },
+      {
+        "id": 38031,
+        "username": "Ethan",
+        "password_hash": "pbkdf2_sha256$4a2137fb90480f1b82a4721549f178ff$e85de92dedccb2791d7c297a55882100182babccdb5fd0485b63bfa5ac24bca0",
+        "employee_id": "SPT142",
+        "display_name": "Ethan",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-16 14:29:55",
+        "updated_at": "2026-05-16 14:29:55"
       }
     ],
     "security_roles": [
@@ -2173,6 +2423,12 @@
         "username": "B211",
         "role_code": "operator",
         "created_at": "2026-05-15 10:58:31"
+      },
+      {
+        "id": 38307,
+        "username": "Ethan",
+        "role_code": "admin",
+        "created_at": "2026-05-16 14:29:55"
       }
     ],
     "security_module_permissions": [
@@ -3600,12 +3856,12 @@
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "auth_users": 8,
-    "auth_account_permissions": 104,
+    "auth_users": 9,
+    "auth_account_permissions": 117,
     "auth_security_settings": 2,
-    "security_users": 8,
+    "security_users": 9,
     "security_roles": 6,
-    "security_user_roles": 8,
+    "security_user_roles": 9,
     "security_module_permissions": 78,
     "security_settings": 2
   }
