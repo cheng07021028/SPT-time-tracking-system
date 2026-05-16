@@ -272,35 +272,135 @@ def _business_cycle_start_date() -> str:
     return start_day.strftime("%Y-%m-%d")
 
 
-def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:
-    """Records shown on 01｜工時紀錄.
+def _parse_reset_hour_minute() -> tuple[int, int]:
+    try:
+        from services.system_settings_service import get_live_page_reset_time
+        reset = get_live_page_reset_time()
+    except Exception:
+        reset = "02:00"
+    try:
+        h, m = [int(x) for x in str(reset).split(":")[:2]]
+        if not (0 <= h <= 23 and 0 <= m <= 59):
+            raise ValueError
+        return h, m
+    except Exception:
+        return 2, 0
 
-    V2.05 rule:
-    - During the current daily cycle, show all records created in the cycle.
-    - After the administrator-defined reset time, completed records from older
-      cycles disappear from 01 automatically.
-    - Unfinished records are always shown, even if they started before the cycle.
-    - 02｜歷史紀錄 remains the source of truth and is never deleted by this display rule.
+
+def _current_reset_timestamp() -> str | None:
+    """Return today's scheduled display-reset timestamp if it has already passed.
+
+    This is only a display cutoff for 01｜工時紀錄. It never deletes or changes
+    02｜歷史紀錄.
+    """
+    now_dt = taiwan_now()
+    h, m = _parse_reset_hour_minute()
+    reset_dt = now_dt.replace(hour=h, minute=m, second=0, microsecond=0)
+    if now_dt >= reset_dt:
+        return reset_dt.strftime("%Y-%m-%d %H:%M:%S")
+    return None
+
+
+def _manual_refresh_timestamp() -> str | None:
+    row = query_one("SELECT setting_value FROM app_settings WHERE setting_key='live_page_manual_refresh_timestamp'") or {}
+    val = row.get("setting_value")
+    return str(val).strip() if val else None
+
+
+def _live_page_cutoff_timestamp() -> str | None:
+    """Latest cutoff used to hide completed rows from 01 display.
+
+    V2.07 rule:
+    - Before the configured reset time, 01 shows today's/current-cycle records.
+    - After the configured reset time, completed rows ended before the reset time
+      are hidden automatically.
+    - If admin clicks 「立即重新整理 01 顯示」, all rows completed up to that
+      click time are hidden immediately.
+    - Unfinished rows are always visible.
+    """
+    candidates = [x for x in [_current_reset_timestamp(), _manual_refresh_timestamp()] if x]
+    return max(candidates) if candidates else None
+
+
+def _unfinished_live_where() -> str:
+    """SQL condition for records that are still allowed to remain on 01 display.
+
+    Business rule V2.10:
+    - 01｜工時紀錄 after scheduled/manual refresh should keep only records
+      that are genuinely still working.
+    - Any row whose status is not 作業中 is treated as already ended for 01
+      display, even if legacy data has inconsistent timestamp values.
+    - Any row with an end timestamp is also treated as ended.
+    - This is display-only and never changes 02｜歷史紀錄.
+    """
+    return """
+        COALESCE(status, '')='作業中'
+        AND (
+            end_timestamp IS NULL
+            OR TRIM(COALESCE(end_timestamp, ''))=''
+            OR LOWER(TRIM(COALESCE(end_timestamp, '')))='none'
+        )
+    """
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:
+    """Records shown on 01｜工時紀錄. 02｜歷史紀錄 is never affected.
+
+    Before the configured/manual refresh cutoff, 01 shows all records in the
+    current work cycle.  After cutoff, 01 must show only unfinished active work.
+    Finished means status is not 作業中 OR there is an end timestamp/work subtotal.
     """
     cycle_start = _business_cycle_start_date()
+    unfinished_where = _unfinished_live_where()
+
     if unfinished_only:
-        return query_df("SELECT * FROM time_records WHERE end_timestamp IS NULL ORDER BY id DESC")
+        return query_df(f"SELECT * FROM time_records WHERE {unfinished_where} ORDER BY id DESC")
+
+    cutoff = _live_page_cutoff_timestamp()
+    if cutoff:
+        # V2.10: once scheduled/manual refresh is active, 01 display keeps only
+        # genuinely unfinished rows.  暫停/完工/下班 are hidden from 01 even when
+        # they are in the current cycle; 02 history remains unchanged.
+        return query_df(f"SELECT * FROM time_records WHERE {unfinished_where} ORDER BY id DESC")
+
     return query_df(
         """
         SELECT * FROM time_records
-        WHERE start_date>=? OR end_timestamp IS NULL
+        WHERE start_date>=? OR (
+            COALESCE(status, '')='作業中'
+            AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='' OR LOWER(TRIM(COALESCE(end_timestamp,'')))='none')
+        )
         ORDER BY id DESC
         """,
         (cycle_start,),
     )
 
-
 def clear_today_finished_from_work_page() -> int:
-    """Manual refresh for 01 page display only; does not delete 02 history."""
-    cycle_start = _business_cycle_start_date()
-    row = query_one("SELECT COUNT(*) AS n FROM time_records WHERE start_date<? AND end_timestamp IS NOT NULL", (cycle_start,)) or {}
+    """Manual refresh for 01 page display only; does not delete 02 history.
+
+    It records a display cutoff timestamp. Any row with end_timestamp not null and
+    end_timestamp <= cutoff will disappear from 01, while all source records remain
+    in 02｜歷史紀錄.
+    """
+    cutoff = now_stamp()
+    row = query_one(
+        "SELECT COUNT(*) AS n FROM time_records WHERE end_timestamp IS NOT NULL AND end_timestamp<=?",
+        (cutoff,),
+    ) or {}
     n = int(row.get("n") or 0)
-    write_log("CLEAR_TODAY_FINISHED_VIEW", f"01 工時紀錄重新整理顯示：cycle_start={cycle_start}，隱藏舊週期完工顯示，不影響 02 歷史紀錄，筆數={n}", "time_records")
+    execute(
+        """
+        INSERT OR REPLACE INTO app_settings(setting_key, setting_value, description, updated_at)
+        VALUES ('live_page_manual_refresh_timestamp', ?, '01 工時紀錄手動重新整理顯示截止時間；只影響 01 顯示，不刪除 02 歷史紀錄', ?)
+        """,
+        (cutoff, _now()),
+    )
+    clear_query_cache()
+    write_log(
+        "CLEAR_TODAY_FINISHED_VIEW",
+        f"01 工時紀錄手動重新整理顯示：cutoff={cutoff}，隱藏已結束紀錄，不影響 02 歷史紀錄，筆數={n}",
+        "time_records",
+    )
     return n
 
 def save_time_records(df: pd.DataFrame) -> int:
