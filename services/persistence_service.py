@@ -51,6 +51,7 @@ SETTING_TABLE_CANDIDATES = [
     "system_settings",
     "rest_periods",
     "process_options",
+    "app_settings",
     "auth_users",
     "auth_account_permissions",
     "auth_security_settings",
