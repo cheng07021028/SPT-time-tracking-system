@@ -805,13 +805,6 @@ def apply_theme() -> None:
     _inject_multiselect_tag_height_fix()
     _clear_all_persistent_message_state()
     _clear_transient_selection_on_page_change()
-    # V2.71: dropdown CSS is applied on every Streamlit rerun.
-    # The visible settings panel is rendered explicitly from streamlit_app.py and 13_system_settings
-    # to avoid duplicate widget keys when apply_theme()/render_header() are both called.
-    try:
-        apply_v269_configurable_dropdown_css()
-    except Exception:
-        pass
     # V2.18: apply global font scale to every module page.
     # Best-effort only; visual theme must never break a page.
     try:
@@ -824,23 +817,6 @@ def apply_theme() -> None:
     try:
         from services.column_settings_service import install_column_settings_patch
         install_column_settings_patch()
-    except Exception:
-        pass
-    # V2.74: final dropdown contrast patch must run on every rerun, after older theme CSS.
-    try:
-        apply_v274_dropdown_visible_text_every_state()
-    except Exception:
-        pass
-    # V2.76: professional cyber dropdown skin must also run on every rerun.
-    # Keep this after all older dropdown CSS so readability and breathing-glow styling win.
-    try:
-        apply_v276_dropdown_professional_cyber_breathing_glow()
-    except Exception:
-        pass
-    # V2.77: form input spacing / no-clipping patch for login and all text/password fields.
-    # Inject last so outer glow and vertical gaps are not cut by older rules.
-    try:
-        apply_v277_form_input_spacing_no_clip()
     except Exception:
         pass
 
@@ -2996,11 +2972,14 @@ def render_dropdown_size_settings_panel():
     except Exception:
         return
 
-    # V2.71: do not use persistent session_state render guards here.
-    # Streamlit keeps session_state across reruns, which made this panel disappear.
+    # 避免同一頁多次 render。
+    if st.session_state.get("_spt_v269_dropdown_panel_rendered"):
+        return
+    st.session_state["_spt_v269_dropdown_panel_rendered"] = True
+
     cfg = _spt_load_dropdown_settings()
-    with st.sidebar.expander("▾ 下拉選單尺寸設定（已強制展開）", expanded=True):
-        st.caption("此設定區已改為強制顯示；調整後按永久套用，所有模組共用。")
+    with st.sidebar.expander("▾ 下拉選單尺寸設定", expanded=False):
+        st.caption("隱藏設定區｜調整後按永久套用，所有模組共用。")
         enabled = st.checkbox("啟用自訂下拉尺寸", value=bool(cfg.get("enabled", True)), key="spt_dd_enabled")
         outer = st.slider("外框高度 px", 48, 120, int(cfg["outer_height"]), 1, key="spt_dd_outer")
         inner = st.slider("內層容器 px", 42, 116, int(cfg["inner_height"]), 1, key="spt_dd_inner")
@@ -3025,13 +3004,11 @@ def render_dropdown_size_settings_panel():
                     "text_color": "#03121f",
                 }
                 _spt_save_dropdown_settings(new_cfg)
-                st.success("下拉選單尺寸已永久記錄，畫面立即重新整理套用。")
-                st.rerun()
+                st.success("下拉選單尺寸已永久記錄。請重新整理或切換頁面後套用。")
         with col2:
             if st.button("↺ 預設值", key="spt_dd_reset", use_container_width=True):
                 _spt_save_dropdown_settings(dict(_SPT_UI_DROPDOWN_DEFAULTS))
-                st.success("已恢復下拉選單預設尺寸，畫面立即重新整理套用。")
-                st.rerun()
+                st.success("已恢復下拉選單預設尺寸。請重新整理或切換頁面後套用。")
 
 # Apply CSS and render hidden panel on import.
 try:
@@ -3039,8 +3016,10 @@ try:
 except Exception:
     pass
 
-# V2.71: do not render widgets at import time. apply_theme() renders the panel every rerun.
-# Import-time widgets can disappear after Streamlit reruns or page switches.
+try:
+    render_dropdown_size_settings_panel()
+except Exception:
+    pass
 # ===== V2.69 USER CONFIGURABLE DROPDOWN SIZE END =====
 
 
@@ -3049,19 +3028,21 @@ def render_dropdown_size_settings_panel_main_fallback():
     """
     V2.70:
     Some Streamlit deployments do not show widgets rendered in st.sidebar from imported theme modules.
-    This fallback renders an expanded panel in the main page so the setting is always visible.
+    This fallback renders a collapsed panel in the main page so the setting is always visible.
     """
     try:
         import streamlit as st
     except Exception:
         return
 
-    # V2.71: never hide this with persistent session_state.
-    # apply_theme may run more than once, so use a per-run lightweight marker on Streamlit's script context is not reliable;
-    # instead render this panel near the top through apply_theme and keep it expanded/visible.
+    # One panel per page render.
+    if st.session_state.get("_spt_v270_dropdown_main_panel_rendered"):
+        return
+    st.session_state["_spt_v270_dropdown_main_panel_rendered"] = True
+
     cfg = _spt_load_dropdown_settings()
 
-    with st.expander("⚙ 下拉選單尺寸設定 / Dropdown Size Settings（已展開顯示）", expanded=True):
+    with st.expander("⚙ 下拉選單尺寸設定 / Dropdown Size Settings（收合）", expanded=False):
         st.caption("此設定會永久保存，所有模組共用。若下拉文字被切掉，先把外框高度與內層容器調大。")
 
         c1, c2, c3 = st.columns(3)
@@ -3100,8 +3081,7 @@ def render_dropdown_size_settings_panel_main_fallback():
                     "text_color": "#03121f",
                 }
                 _spt_save_dropdown_settings(new_cfg)
-                st.success("下拉選單尺寸已永久保存，畫面立即重新整理套用。")
-                st.rerun()
+                st.success("下拉選單尺寸已永久保存。請按重新整理或切換頁面後生效。")
         with b2:
             if st.button("↺ 恢復建議值", key="spt_v270_dd_recommended", use_container_width=True):
                 new_cfg = dict(_SPT_UI_DROPDOWN_DEFAULTS)
@@ -3114,1552 +3094,344 @@ def render_dropdown_size_settings_panel_main_fallback():
                     "tag_height": 42,
                 })
                 _spt_save_dropdown_settings(new_cfg)
-                st.success("已套用建議值：外框80、內層76、文字40、字體17，畫面立即重新整理套用。")
-                st.rerun()
+                st.success("已套用建議值：外框80、內層76、文字40、字體17。請重新整理或切換頁面後生效。")
         with b3:
             if st.button("↺ 恢復預設值", key="spt_v270_dd_reset", use_container_width=True):
                 _spt_save_dropdown_settings(dict(_SPT_UI_DROPDOWN_DEFAULTS))
-                st.success("已恢復預設值，畫面立即重新整理套用。")
-                st.rerun()
+                st.success("已恢復預設值。請重新整理或切換頁面後生效。")
 
-# V2.71: main-page fallback is called from apply_theme(), not at import time.
+# Render the main-page fallback after CSS is applied.
+try:
+    render_dropdown_size_settings_panel_main_fallback()
+except Exception:
+    pass
 # ===== V2.70 MAIN PAGE DROPDOWN SIZE PANEL FALLBACK END =====
 
 
-# ===== V2.72 MULTISELECT PLACEHOLDER CENTER / TEXT CLIP FINAL FIX START =====
-def apply_v272_multiselect_placeholder_center_text_clip_fix():
-    """
-    V2.72:
-    Fix the issue shown in 02｜歷史紀錄 filters where multiselect/select placeholder text
-    such as "Choose options" or "No options to select" is clipped at the top.
-
-    Root cause:
-    Earlier V2.67~V2.69 CSS enlarged outer/inner select containers, but kept the actual
-    BaseWeb input/placeholder text layer at a smaller 36px line-height and forced several
-    value/input containers to fixed heights. In Streamlit/BaseWeb multiselect, the placeholder
-    is rendered inside the input layer, so it stayed top-aligned inside a taller 66~70px box.
-
-    This final override keeps the user-configurable sizes but centers the real text/input layer
-    vertically and prevents parent rows from clipping it.
+# ===== V2.79 FUTURE CYBER FIELD UI START =====
+def apply_v279_future_cyber_field_ui():
+    """Future-cyber UI for select / multiselect / input fields.
+    Goal: reduce flat white blocks, restore professional futuristic glass look,
+    while preserving strong text contrast and readable dropdown options.
     """
     try:
         import streamlit as st
     except Exception:
         return
 
-    cfg = _spt_load_dropdown_settings()
-    if not cfg.get("enabled", True):
-        return
-
-    outer = int(cfg.get("outer_height", 70))
-    inner = int(cfg.get("inner_height", 66))
-    line = int(cfg.get("text_line_height", 36))
-    font = int(cfg.get("font_size", 16))
-    option = int(cfg.get("option_height", 46))
-    tag = int(cfg.get("tag_height", 40))
-    field_bg = str(cfg.get("field_bg", "#edf8ff"))
-    panel_bg = str(cfg.get("panel_bg", "#eaf8ff"))
-    text_color = str(cfg.get("text_color", "#03121f"))
-
-    # The visual text line can remain 36px, but the actual input placeholder layer must use
-    # the inner height as its CSS line-height to be vertically centered in BaseWeb.
     st.markdown(
-        f"""
-        <style id="spt-v272-multiselect-placeholder-center-text-clip-fix">
-        :root {{
-            --spt-dd-outer-h: {outer}px;
-            --spt-dd-inner-h: {inner}px;
-            --spt-dd-text-line-h: {line}px;
-            --spt-dd-font-size: {font}px;
-            --spt-dd-option-h: {option}px;
-            --spt-dd-tag-h: {tag}px;
-            --spt-dd-field-bg: {field_bg};
-            --spt-dd-panel-bg: {panel_bg};
-            --spt-dd-text-color: {text_color};
-        }}
+        """
+        <style>
+        /* V2.79｜Future cyber field UI */
+        :root {
+            --spt-v279-field-bg1: rgba(7, 20, 44, 0.92);
+            --spt-v279-field-bg2: rgba(13, 34, 68, 0.88);
+            --spt-v279-field-bg3: rgba(8, 18, 39, 0.95);
+            --spt-v279-text: #eefbff;
+            --spt-v279-text-soft: #bfefff;
+            --spt-v279-text-dim: #85b9d8;
+            --spt-v279-border: rgba(84, 221, 255, 0.78);
+            --spt-v279-border-soft: rgba(84, 221, 255, 0.32);
+            --spt-v279-glow-1: rgba(0, 225, 255, 0.20);
+            --spt-v279-glow-2: rgba(75, 122, 255, 0.18);
+            --spt-v279-menu-bg: rgba(7, 19, 41, 0.96);
+            --spt-v279-menu-bg-2: rgba(11, 29, 56, 0.98);
+            --spt-v279-active: linear-gradient(90deg, rgba(79, 233, 255, 0.94), rgba(108, 144, 255, 0.94));
+        }
 
-        /* Keep enough vertical room for label + field. */
+        @keyframes sptV279Breath {
+            0% {
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.08),
+                    0 0 0 1px rgba(84, 221, 255, 0.18),
+                    0 0 10px rgba(0, 225, 255, 0.10),
+                    0 0 24px rgba(57, 112, 255, 0.08),
+                    0 10px 22px rgba(0, 0, 0, 0.26);
+            }
+            50% {
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.14),
+                    0 0 0 1px rgba(84, 221, 255, 0.34),
+                    0 0 16px rgba(0, 225, 255, 0.16),
+                    0 0 30px rgba(57, 112, 255, 0.14),
+                    0 14px 28px rgba(0, 0, 0, 0.30);
+            }
+            100% {
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.08),
+                    0 0 0 1px rgba(84, 221, 255, 0.18),
+                    0 0 10px rgba(0, 225, 255, 0.10),
+                    0 0 24px rgba(57, 112, 255, 0.08),
+                    0 10px 22px rgba(0, 0, 0, 0.26);
+            }
+        }
+
+        /* 外層保留空間，讓光暈不被切掉 */
         .stSelectbox,
         .stMultiSelect,
+        .stTextInput,
+        .stDateInput,
+        .stNumberInput,
+        .stTextArea,
         div[data-testid="stSelectbox"],
-        div[data-testid="stMultiSelect"] {{
-            min-height: calc(var(--spt-dd-outer-h) + 30px) !important;
-            height: auto !important;
+        div[data-testid="stMultiSelect"],
+        div[data-testid="stTextInput"],
+        div[data-testid="stDateInput"],
+        div[data-testid="stNumberInput"],
+        div[data-testid="stTextArea"] {
             overflow: visible !important;
-        }}
-        .stSelectbox > div,
-        .stMultiSelect > div,
-        div[data-testid="stSelectbox"] > div,
-        div[data-testid="stMultiSelect"] > div {{
-            overflow: visible !important;
-        }}
+        }
 
-        /* Real clickable select frame. */
-        div[data-baseweb="select"] {{
-            min-height: var(--spt-dd-outer-h) !important;
-            height: var(--spt-dd-outer-h) !important;
-            max-height: none !important;
-            display: flex !important;
-            align-items: center !important;
-            box-sizing: border-box !important;
-            overflow: visible !important;
-            background: var(--spt-dd-field-bg) !important;
-            border-radius: 14px !important;
-        }}
-        div[data-baseweb="select"] > div {{
-            min-height: var(--spt-dd-outer-h) !important;
-            height: var(--spt-dd-outer-h) !important;
-            max-height: none !important;
-            display: flex !important;
-            align-items: center !important;
-            box-sizing: border-box !important;
-            padding-top: 0 !important;
-            padding-bottom: 0 !important;
-            padding-left: 16px !important;
-            padding-right: 14px !important;
-            overflow: visible !important;
-            background: var(--spt-dd-field-bg) !important;
-            color: var(--spt-dd-text-color) !important;
-            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
-            border-radius: 14px !important;
-        }}
+        /* Select / multiselect 可視欄位 */
+        div[data-baseweb="select"] > div {
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 16%, rgba(255,255,255,0.00) 17%),
+                linear-gradient(135deg, var(--spt-v279-field-bg1) 0%, var(--spt-v279-field-bg2) 56%, var(--spt-v279-field-bg3) 100%) !important;
+            border: 1px solid var(--spt-v279-border) !important;
+            border-radius: 16px !important;
+            color: var(--spt-v279-text) !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.08),
+                0 0 0 1px var(--spt-v279-border-soft),
+                0 0 14px var(--spt-v279-glow-1),
+                0 0 28px var(--spt-v279-glow-2),
+                0 10px 24px rgba(0,0,0,0.28) !important;
+            animation: sptV279Breath 3.6s ease-in-out infinite !important;
+            backdrop-filter: blur(10px) saturate(125%) !important;
+            -webkit-backdrop-filter: blur(10px) saturate(125%) !important;
+        }
 
-        /* BaseWeb inner layers: center, but do not create a clipped top-aligned text layer. */
-        div[data-baseweb="select"] > div > div,
-        div[data-baseweb="select"] > div > div > div,
-        div[data-baseweb="select"] div[aria-haspopup="listbox"],
-        div[data-baseweb="select"] div[aria-expanded],
-        div[data-baseweb="select"] div[role="combobox"],
-        div[data-baseweb="select"] div[class*="ValueContainer"],
-        div[data-baseweb="select"] div[class*="valueContainer"],
-        div[data-baseweb="select"] div[class*="InputContainer"],
-        div[data-baseweb="select"] div[class*="inputContainer"] {{
-            min-height: var(--spt-dd-inner-h) !important;
-            height: var(--spt-dd-inner-h) !important;
-            max-height: none !important;
-            line-height: var(--spt-dd-inner-h) !important;
-            display: flex !important;
-            align-items: center !important;
-            align-content: center !important;
-            box-sizing: border-box !important;
-            padding-top: 0 !important;
-            padding-bottom: 0 !important;
-            margin-top: 0 !important;
-            margin-bottom: 0 !important;
-            overflow: visible !important;
-            background: transparent !important;
-            color: var(--spt-dd-text-color) !important;
-            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
-        }}
+        div[data-baseweb="select"] > div:hover {
+            border-color: rgba(112, 236, 255, 0.95) !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.12),
+                0 0 0 1px rgba(112, 236, 255, 0.28),
+                0 0 18px rgba(0, 225, 255, 0.18),
+                0 0 36px rgba(74, 119, 255, 0.16),
+                0 14px 28px rgba(0,0,0,0.32) !important;
+        }
 
-        /* Placeholder / selected value text. */
-        div[data-baseweb="select"] div[class*="Placeholder"],
-        div[data-baseweb="select"] div[class*="placeholder"],
-        div[data-baseweb="select"] div[class*="SingleValue"],
-        div[data-baseweb="select"] div[class*="singleValue"],
-        div[data-baseweb="select"] span,
-        div[data-baseweb="select"] p {{
-            min-height: var(--spt-dd-text-line-h) !important;
-            height: auto !important;
-            line-height: var(--spt-dd-text-line-h) !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            box-sizing: border-box !important;
-            overflow: visible !important;
-            white-space: nowrap !important;
-            text-overflow: ellipsis !important;
-            color: var(--spt-dd-text-color) !important;
-            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
-            font-size: var(--spt-dd-font-size) !important;
-            font-weight: 900 !important;
-            text-shadow: none !important;
-            opacity: 1 !important;
-            transform: none !important;
-            position: relative !important;
-            top: 0 !important;
-            z-index: 50 !important;
-        }}
+        div[data-baseweb="select"] > div:focus-within {
+            border-color: #72f5ff !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.14),
+                0 0 0 1px rgba(114, 245, 255, 0.30),
+                0 0 20px rgba(0, 235, 255, 0.22),
+                0 0 40px rgba(92, 133, 255, 0.20),
+                0 14px 28px rgba(0,0,0,0.34) !important;
+        }
 
-        /* Critical fix: BaseWeb multiselect placeholder is often the input placeholder.
-           Use inner-height line-height here, not 36px, otherwise it hugs the top of the box. */
-        div[data-baseweb="select"] input,
-        div[data-baseweb="select"] input[type="text"],
-        div[data-baseweb="select"] input[aria-autocomplete],
-        div[data-baseweb="select"] input[role="combobox"] {{
-            min-height: var(--spt-dd-inner-h) !important;
-            height: var(--spt-dd-inner-h) !important;
-            max-height: none !important;
-            line-height: var(--spt-dd-inner-h) !important;
-            padding-top: 0 !important;
-            padding-bottom: 0 !important;
-            margin-top: 0 !important;
-            margin-bottom: 0 !important;
-            box-sizing: border-box !important;
-            display: block !important;
-            align-self: center !important;
-            overflow: visible !important;
-            color: var(--spt-dd-text-color) !important;
-            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
-            font-size: var(--spt-dd-font-size) !important;
-            font-weight: 900 !important;
-            background: transparent !important;
-            border: 0 !important;
-            box-shadow: none !important;
-            outline: none !important;
-            opacity: 1 !important;
-            caret-color: transparent !important;
-            transform: none !important;
-            position: relative !important;
-            top: 0 !important;
-            z-index: 60 !important;
-        }}
-        div[data-baseweb="select"] input::placeholder {{
-            color: var(--spt-dd-text-color) !important;
-            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
-            font-size: var(--spt-dd-font-size) !important;
-            font-weight: 900 !important;
-            opacity: 1 !important;
-        }}
-
-        /* Arrow layer should not cover text. */
-        div[data-baseweb="select"] svg,
-        div[data-baseweb="select"] [role="button"] svg {{
-            color: var(--spt-dd-text-color) !important;
-            fill: var(--spt-dd-text-color) !important;
-            flex-shrink: 0 !important;
-            position: relative !important;
-            z-index: 80 !important;
-        }}
-
-        /* Multiselect selected tags. */
-        div[data-baseweb="tag"] {{
-            min-height: var(--spt-dd-tag-h) !important;
-            height: var(--spt-dd-tag-h) !important;
-            line-height: var(--spt-dd-tag-h) !important;
-            padding: 0 12px !important;
-            margin: 4px 6px 4px 0 !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            overflow: visible !important;
-            color: var(--spt-dd-text-color) !important;
-            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
-            font-weight: 900 !important;
-            border-radius: 10px !important;
-            background: linear-gradient(135deg, #c9fbff, #83edff) !important;
-            border: 1px solid rgba(36, 226, 255, 0.85) !important;
-        }}
-        div[data-baseweb="tag"] * {{
-            color: var(--spt-dd-text-color) !important;
-            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
-            fill: var(--spt-dd-text-color) !important;
-            font-weight: 900 !important;
-            background: transparent !important;
-            opacity: 1 !important;
-        }}
-
-        /* Dropdown popup/options: keep readable. */
-        div[data-baseweb="popover"],
-        div[data-baseweb="menu"],
-        ul[role="listbox"] {{
-            background: var(--spt-dd-panel-bg) !important;
-            color: var(--spt-dd-text-color) !important;
-            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
-            border: 1px solid rgba(102, 232, 249, .95) !important;
-            border-radius: 12px !important;
-            box-shadow: 0 0 0 1px rgba(102,232,249,.35), 0 12px 32px rgba(0,255,255,.22) !important;
-            z-index: 999999 !important;
-            overflow-y: auto !important;
-        }}
-        div[data-baseweb="popover"] *,
-        div[data-baseweb="menu"] *,
-        ul[role="listbox"] * {{
-            color: var(--spt-dd-text-color) !important;
-            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
-            text-shadow: none !important;
-            opacity: 1 !important;
-        }}
-        div[role="option"],
-        li[role="option"],
-        ul[role="listbox"] li {{
-            min-height: var(--spt-dd-option-h) !important;
-            height: var(--spt-dd-option-h) !important;
-            line-height: var(--spt-dd-option-h) !important;
-            display: flex !important;
-            align-items: center !important;
-            padding: 0 14px !important;
-            background: var(--spt-dd-panel-bg) !important;
-            color: var(--spt-dd-text-color) !important;
-            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
-            font-size: var(--spt-dd-font-size) !important;
-            font-weight: 900 !important;
-        }}
-        div[role="option"] *,
-        li[role="option"] * {{
-            color: var(--spt-dd-text-color) !important;
-            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
-            fill: var(--spt-dd-text-color) !important;
-            font-size: var(--spt-dd-font-size) !important;
-            font-weight: 900 !important;
-            background: transparent !important;
-        }}
-        div[role="option"]:hover,
-        li[role="option"]:hover,
-        ul[role="listbox"] li:hover,
-        div[role="option"][aria-selected="true"],
-        li[role="option"][aria-selected="true"] {{
-            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
-            color: #020817 !important;
-            -webkit-text-fill-color: #020817 !important;
-        }}
-        div[role="option"]:hover *,
-        li[role="option"]:hover *,
-        div[role="option"][aria-selected="true"] *,
-        li[role="option"][aria-selected="true"] * {{
-            color: #020817 !important;
-            -webkit-text-fill-color: #020817 !important;
-            fill: #020817 !important;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-try:
-    apply_v272_multiselect_placeholder_center_text_clip_fix()
-except Exception:
-    pass
-# ===== V2.72 MULTISELECT PLACEHOLDER CENTER / TEXT CLIP FINAL FIX END =====
-
-# ===== V2.73 DROPDOWN CONTRAST STANDARD FINAL START =====
-def apply_v273_dropdown_contrast_standard_final():
-    """
-    V2.73:
-    Unified dropdown/readability contrast standard.
-
-    Rule:
-    - Light/white/cyan dropdown fields and option panels must use dark text.
-    - Dark panels/labels outside the dropdown must use light text.
-    - Override BaseWeb hover/active/selected states that can turn text white on a light option.
-
-    This is intentionally injected after V2.72 so it wins CSS cascade order.
-    """
-    try:
-        import streamlit as st
-    except Exception:
-        return
-
-    cfg = _spt_load_dropdown_settings()
-    field_bg = str(cfg.get("field_bg", "#edf8ff"))
-    panel_bg = str(cfg.get("panel_bg", "#eaf8ff"))
-    dark_text = str(cfg.get("text_color", "#03121f"))
-    light_text = "#f8fdff"
-    hover_bg = "#67e8f9"
-    selected_bg = "#c4f7ff"
-
-    st.markdown(
-        f"""
-        <style id="spt-v273-dropdown-contrast-standard-final">
-        /*
-        V2.73｜下拉式選單顏色規範最終覆蓋
-        規範：白底/淺色底 = 深色字；深色底 = 淺色字。
-        目的：避免 Choose options、No options to select、選項文字、hover/selected 狀態變成看不到。
-        */
-
-        :root {{
-            --spt-dd-light-bg: {field_bg};
-            --spt-dd-panel-bg: {panel_bg};
-            --spt-dd-dark-text: {dark_text};
-            --spt-dd-light-text: {light_text};
-            --spt-dd-hover-bg: {hover_bg};
-            --spt-dd-selected-bg: {selected_bg};
-        }}
-
-        /* 深色頁面/篩選框標籤：使用淺色字，避免標籤灰掉。 */
-        .stSelectbox label,
-        .stMultiSelect label,
-        div[data-testid="stSelectbox"] label,
-        div[data-testid="stMultiSelect"] label,
-        div[data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
-        div[data-testid="stMultiSelect"] [data-testid="stWidgetLabel"],
-        div[data-testid="stSelectbox"] [data-testid="stWidgetLabel"] *,
-        div[data-testid="stMultiSelect"] [data-testid="stWidgetLabel"] * {{
-            color: var(--spt-dd-light-text) !important;
-            -webkit-text-fill-color: var(--spt-dd-light-text) !important;
-            opacity: 1 !important;
-            font-weight: 900 !important;
-            text-shadow: 0 0 8px rgba(125, 249, 255, .18) !important;
-        }}
-
-        /* 可視下拉欄位：一律淺底深字。 */
-        div[data-baseweb="select"],
-        div[data-baseweb="select"] > div,
-        div[data-baseweb="select"] > div > div,
-        div[data-baseweb="select"] > div > div > div,
-        div[data-baseweb="select"] div[aria-haspopup="listbox"],
-        div[data-baseweb="select"] div[aria-expanded],
-        div[data-baseweb="select"] div[role="combobox"],
-        div[data-baseweb="select"] div[class*="Value"],
-        div[data-baseweb="select"] div[class*="value"],
-        div[data-baseweb="select"] div[class*="Placeholder"],
-        div[data-baseweb="select"] div[class*="placeholder"],
-        div[data-baseweb="select"] div[class*="Input"],
-        div[data-baseweb="select"] div[class*="input"] {{
-            background-color: var(--spt-dd-light-bg) !important;
-            color: var(--spt-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-        }}
-
+        /* 內部文字 / placeholder / input 全部改為淺色，避免慘白外框效果 */
         div[data-baseweb="select"] span,
         div[data-baseweb="select"] p,
-        div[data-baseweb="select"] label,
         div[data-baseweb="select"] input,
-        div[data-baseweb="select"] input[type="text"],
-        div[data-baseweb="select"] input[aria-autocomplete],
-        div[data-baseweb="select"] input[role="combobox"],
-        div[data-baseweb="select"] input::placeholder {{
-            color: var(--spt-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Placeholder"],
+        div[data-baseweb="select"] div[class*="singleValue"],
+        div[data-baseweb="select"] div[class*="SingleValue"],
+        div[data-baseweb="select"] div[class*="valueContainer"],
+        div[data-baseweb="select"] div[class*="ValueContainer"] {
+            background: transparent !important;
+            color: var(--spt-v279-text) !important;
+            -webkit-text-fill-color: var(--spt-v279-text) !important;
+            text-shadow: 0 0 12px rgba(120, 234, 255, 0.06) !important;
+        }
+
+        div[data-baseweb="select"] input::placeholder,
+        .stTextInput input::placeholder,
+        .stTextArea textarea::placeholder,
+        .stDateInput input::placeholder,
+        .stNumberInput input::placeholder {
+            color: var(--spt-v279-text-dim) !important;
+            -webkit-text-fill-color: var(--spt-v279-text-dim) !important;
             opacity: 1 !important;
-            text-shadow: none !important;
+        }
+
+        div[data-baseweb="select"] svg {
+            fill: #93f2ff !important;
+            color: #93f2ff !important;
+            filter: drop-shadow(0 0 6px rgba(0, 225, 255, 0.18));
+        }
+
+        /* multiselect 標籤採亮色科技籤，不用大片白底 */
+        div[data-baseweb="tag"] {
+            background: linear-gradient(135deg, rgba(110, 237, 255, 0.92) 0%, rgba(148, 197, 255, 0.92) 100%) !important;
+            border: 1px solid rgba(183, 243, 255, 0.95) !important;
+            border-radius: 11px !important;
+            box-shadow: 0 0 10px rgba(0, 225, 255, 0.16) !important;
+            color: #071523 !important;
+        }
+        div[data-baseweb="tag"] *,
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div {
+            color: #071523 !important;
+            -webkit-text-fill-color: #071523 !important;
             font-weight: 900 !important;
-        }}
+        }
 
-        div[data-baseweb="select"] svg,
-        div[data-baseweb="select"] [role="button"],
-        div[data-baseweb="select"] [role="button"] *,
-        div[data-baseweb="select"] [role="button"] svg {{
-            color: var(--spt-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
-            fill: var(--spt-dd-dark-text) !important;
-            opacity: 1 !important;
-        }}
+        /* 文字 / 日期 / 數字 / 備註輸入框 */
+        .stTextInput input,
+        .stDateInput input,
+        .stNumberInput input,
+        .stTextArea textarea,
+        div[data-testid="stTextInputRootElement"] input,
+        div[data-testid="stNumberInputRootElement"] input,
+        div[data-testid="stDateInputField"] input {
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 16%, rgba(255,255,255,0.00) 17%),
+                linear-gradient(135deg, var(--spt-v279-field-bg1) 0%, var(--spt-v279-field-bg2) 56%, var(--spt-v279-field-bg3) 100%) !important;
+            color: var(--spt-v279-text) !important;
+            -webkit-text-fill-color: var(--spt-v279-text) !important;
+            border: 1px solid var(--spt-v279-border) !important;
+            border-radius: 16px !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.08),
+                0 0 0 1px var(--spt-v279-border-soft),
+                0 0 14px var(--spt-v279-glow-1),
+                0 0 28px var(--spt-v279-glow-2),
+                0 10px 24px rgba(0,0,0,0.28) !important;
+            animation: sptV279Breath 3.6s ease-in-out infinite !important;
+            caret-color: #aef7ff !important;
+        }
 
-        /* 展開清單容器：一律淺底深字。BaseWeb 會掛在 body portal，所以不能只抓父層。 */
+        .stTextInput input:focus,
+        .stDateInput input:focus,
+        .stNumberInput input:focus,
+        .stTextArea textarea:focus {
+            border-color: #72f5ff !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.12),
+                0 0 0 1px rgba(114,245,255,0.28),
+                0 0 18px rgba(0,235,255,0.18),
+                0 0 34px rgba(92,133,255,0.16),
+                0 12px 28px rgba(0,0,0,0.32) !important;
+        }
+
+        /* 數字輸入外框右側 +/- 區 */
+        .stNumberInput button,
+        div[data-testid="stNumberInputStepUp"],
+        div[data-testid="stNumberInputStepDown"] {
+            background: linear-gradient(135deg, rgba(8, 22, 46, 0.96), rgba(18, 40, 76, 0.94)) !important;
+            color: #c7f8ff !important;
+            border: 1px solid rgba(84, 221, 255, 0.42) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 10px rgba(0,225,255,0.10) !important;
+        }
+
+        /* 展開下拉選單面板：深色玻璃科技感 */
         div[data-baseweb="popover"],
-        div[data-baseweb="popover"] > div,
-        div[data-baseweb="popover"] div[data-baseweb="menu"],
         div[data-baseweb="menu"],
-        ul[role="listbox"] {{
-            background-color: var(--spt-dd-panel-bg) !important;
-            color: var(--spt-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-        }}
+        ul[role="listbox"] {
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 14%, rgba(255,255,255,0.00) 15%),
+                linear-gradient(135deg, var(--spt-v279-menu-bg) 0%, var(--spt-v279-menu-bg-2) 100%) !important;
+            border: 1px solid rgba(104, 232, 255, 0.62) !important;
+            border-radius: 16px !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.08),
+                0 0 0 1px rgba(84,221,255,0.22),
+                0 0 18px rgba(0,225,255,0.18),
+                0 0 32px rgba(74,119,255,0.14),
+                0 16px 40px rgba(0,0,0,0.42) !important;
+            backdrop-filter: blur(14px) saturate(135%) !important;
+            -webkit-backdrop-filter: blur(14px) saturate(135%) !important;
+            overflow: hidden !important;
+        }
 
-        div[data-baseweb="popover"] *,
-        div[data-baseweb="menu"] *,
-        ul[role="listbox"] * {{
-            color: var(--spt-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
-            fill: var(--spt-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-        }}
-
-        /* 每一列選項：白/淺色底一定深色字。 */
+        /* 選項文字：預設就看得到，不必 hover 才看見 */
         div[role="option"],
         li[role="option"],
         ul[role="listbox"] li,
-        div[data-baseweb="menu"] div[role="option"],
-        div[data-baseweb="popover"] div[role="option"] {{
-            background: var(--spt-dd-panel-bg) !important;
-            background-color: var(--spt-dd-panel-bg) !important;
-            color: var(--spt-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            font-weight: 900 !important;
-        }}
-
-        div[role="option"] *,
-        li[role="option"] *,
-        ul[role="listbox"] li *,
-        div[data-baseweb="menu"] div[role="option"] *,
-        div[data-baseweb="popover"] div[role="option"] * {{
+        div[data-baseweb="menu"] div {
             background: transparent !important;
-            color: var(--spt-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
-            fill: var(--spt-dd-dark-text) !important;
-            opacity: 1 !important;
+            color: var(--spt-v279-text) !important;
+            -webkit-text-fill-color: var(--spt-v279-text) !important;
+            font-weight: 800 !important;
+            border-radius: 10px !important;
+            margin: 4px 6px !important;
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
             text-shadow: none !important;
-            font-weight: 900 !important;
-        }}
+        }
+        div[data-baseweb="popover"] *,
+        div[data-baseweb="menu"] *,
+        ul[role="listbox"] * {
+            color: var(--spt-v279-text) !important;
+            -webkit-text-fill-color: var(--spt-v279-text) !important;
+        }
 
-        /* hover / active / selected 狀態也屬淺色底，所以仍用深色字。 */
         div[role="option"]:hover,
         li[role="option"]:hover,
         ul[role="listbox"] li:hover,
-        div[data-baseweb="menu"] div[role="option"]:hover,
-        div[data-baseweb="popover"] div[role="option"]:hover {{
-            background: linear-gradient(90deg, var(--spt-dd-hover-bg), var(--spt-dd-selected-bg)) !important;
-            background-color: var(--spt-dd-hover-bg) !important;
-            color: var(--spt-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
-        }}
+        div[data-baseweb="menu"] div:hover {
+            background: linear-gradient(90deg, rgba(70, 233, 255, 0.16), rgba(104, 134, 255, 0.22)) !important;
+            color: #f9feff !important;
+            -webkit-text-fill-color: #f9feff !important;
+            box-shadow: inset 0 0 0 1px rgba(107, 232, 255, 0.18) !important;
+        }
 
+        div[aria-selected="true"],
+        li[aria-selected="true"],
         div[role="option"][aria-selected="true"],
-        li[role="option"][aria-selected="true"],
-        div[role="option"][aria-current="true"],
-        li[role="option"][aria-current="true"],
-        div[role="option"][data-highlighted="true"],
-        li[role="option"][data-highlighted="true"] {{
-            background: linear-gradient(90deg, var(--spt-dd-hover-bg), var(--spt-dd-selected-bg)) !important;
-            background-color: var(--spt-dd-selected-bg) !important;
-            color: var(--spt-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
-        }}
+        li[role="option"][aria-selected="true"] {
+            background: var(--spt-v279-active) !important;
+            color: #051321 !important;
+            -webkit-text-fill-color: #051321 !important;
+            font-weight: 950 !important;
+            box-shadow: 0 0 12px rgba(87, 223, 255, 0.20) !important;
+        }
 
-        div[role="option"]:hover *,
-        li[role="option"]:hover *,
-        ul[role="listbox"] li:hover *,
-        div[role="option"][aria-selected="true"] *,
-        li[role="option"][aria-selected="true"] *,
-        div[role="option"][aria-current="true"] *,
-        li[role="option"][aria-current="true"] *,
-        div[role="option"][data-highlighted="true"] *,
-        li[role="option"][data-highlighted="true"] * {{
-            background: transparent !important;
-            color: var(--spt-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
-            fill: var(--spt-dd-dark-text) !important;
-            opacity: 1 !important;
-        }}
-
-        /* disabled / no option 狀態：仍然必須看得到。 */
         div[aria-disabled="true"],
-        li[aria-disabled="true"],
-        div[data-baseweb="menu"] div[aria-disabled="true"],
-        div[data-baseweb="popover"] div[aria-disabled="true"] {{
-            background: var(--spt-dd-panel-bg) !important;
-            color: #26394c !important;
-            -webkit-text-fill-color: #26394c !important;
-            opacity: 1 !important;
-            font-weight: 900 !important;
-        }}
-        div[aria-disabled="true"] *,
-        li[aria-disabled="true"] * {{
-            color: #26394c !important;
-            -webkit-text-fill-color: #26394c !important;
-            fill: #26394c !important;
-            opacity: 1 !important;
-        }}
+        li[aria-disabled="true"] {
+            color: #86a9bf !important;
+            -webkit-text-fill-color: #86a9bf !important;
+            opacity: 0.82 !important;
+        }
 
-        /* Streamlit data_editor/select editor popup compatibility. */
-        [data-baseweb="popover"] [role="listbox"],
-        [data-baseweb="popover"] [role="listbox"] *,
-        [data-baseweb="menu"] [role="option"],
-        [data-baseweb="menu"] [role="option"] * {{
-            color: var(--spt-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
-            fill: var(--spt-dd-dark-text) !important;
-            opacity: 1 !important;
-        }}
+        /* 讓欄位標籤更俐落但維持可讀 */
+        .stSelectbox label,
+        .stMultiSelect label,
+        .stTextInput label,
+        .stDateInput label,
+        .stNumberInput label,
+        .stTextArea label,
+        div[data-testid="stWidgetLabel"] label {
+            color: #eefcff !important;
+            text-shadow: 0 0 12px rgba(82, 219, 255, 0.14) !important;
+            letter-spacing: 0.3px !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
 try:
-    apply_v273_dropdown_contrast_standard_final()
+    apply_v279_future_cyber_field_ui()
 except Exception:
     pass
-# ===== V2.73 DROPDOWN CONTRAST STANDARD FINAL END =====
 
-
-# ===== V2.74 DROPDOWN VISIBLE TEXT EVERY STATE START =====
-def apply_v274_dropdown_visible_text_every_state():
-    """
-    Final high-specificity dropdown readability patch.
-
-    Problem fixed:
-    BaseWeb/Streamlit dropdown menus are rendered in a body portal and older CSS can
-    make non-hover option text light/white while the menu background is light. This
-    patch is injected from apply_theme() on every rerun, after legacy theme CSS.
-
-    Rule:
-    - Dropdown field/menu/option light background = dark text.
-    - Hover/selected cyan background = dark text.
-    - Page labels on dark cards remain light text.
-    """
-    try:
-        import streamlit as st
-    except Exception:
-        return
-    try:
-        cfg = _spt_load_dropdown_settings()
-    except Exception:
-        cfg = {}
-    field_bg = str(cfg.get("field_bg", "#edf8ff"))
-    panel_bg = str(cfg.get("panel_bg", "#eaf8ff"))
-    dark_text = str(cfg.get("text_color", "#03121f"))
-    placeholder_text = "#20364a"
-    disabled_text = "#385066"
-    hover_bg = "#67e8f9"
-    selected_bg = "#bff7ff"
-
-    st.markdown(
-        f"""
-        <style id="spt-v274-dropdown-visible-text-every-state">
-        :root {{
-            --spt-v274-dd-field-bg: {field_bg};
-            --spt-v274-dd-panel-bg: {panel_bg};
-            --spt-v274-dd-dark-text: {dark_text};
-            --spt-v274-dd-placeholder-text: {placeholder_text};
-            --spt-v274-dd-disabled-text: {disabled_text};
-            --spt-v274-dd-hover-bg: {hover_bg};
-            --spt-v274-dd-selected-bg: {selected_bg};
-        }}
-
-        /* Labels sit on the dark professional filter card, so they stay light. */
-        [data-testid="stSelectbox"] label,
-        [data-testid="stMultiSelect"] label,
-        [data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
-        [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"],
-        [data-testid="stSelectbox"] [data-testid="stWidgetLabel"] *,
-        [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"] * {{
-            color: #f7fcff !important;
-            -webkit-text-fill-color: #f7fcff !important;
-            opacity: 1 !important;
-        }}
-
-        /* Closed select/multiselect field: always light background, dark readable text. */
-        [data-baseweb="select"],
-        [data-baseweb="select"] > div,
-        [data-baseweb="select"] [role="combobox"],
-        [data-baseweb="select"] [aria-haspopup="listbox"],
-        [data-baseweb="select"] [aria-expanded],
-        [data-baseweb="select"] div[class*="control" i],
-        [data-baseweb="select"] div[class*="value" i],
-        [data-baseweb="select"] div[class*="placeholder" i],
-        [data-baseweb="select"] div[class*="input" i] {{
-            background-color: var(--spt-v274-dd-field-bg) !important;
-            color: var(--spt-v274-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-        }}
-        [data-baseweb="select"] *,
-        [data-baseweb="select"] span,
-        [data-baseweb="select"] p,
-        [data-baseweb="select"] input,
-        [data-baseweb="select"] input::placeholder {{
-            color: var(--spt-v274-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            font-weight: 900 !important;
-        }}
-        [data-baseweb="select"] svg,
-        [data-baseweb="select"] svg * {{
-            fill: var(--spt-v274-dd-dark-text) !important;
-            color: var(--spt-v274-dd-dark-text) !important;
-            opacity: 1 !important;
-        }}
-
-        /* BaseWeb popover/menu/listbox is mounted outside the widget. Target broadly. */
-        body div[data-baseweb="popover"],
-        body div[data-baseweb="popover"] > div,
-        body div[data-baseweb="popover"] [data-baseweb="menu"],
-        body div[data-baseweb="menu"],
-        body ul[role="listbox"],
-        body div[role="listbox"] {{
-            background: var(--spt-v274-dd-panel-bg) !important;
-            background-color: var(--spt-v274-dd-panel-bg) !important;
-            color: var(--spt-v274-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-        }}
-
-        /* All option rows, including BaseWeb rows without role=option. */
-        body div[data-baseweb="popover"] [role="option"],
-        body div[data-baseweb="popover"] li,
-        body div[data-baseweb="popover"] ul li,
-        body div[data-baseweb="popover"] [id],
-        body div[data-baseweb="menu"] [role="option"],
-        body div[data-baseweb="menu"] li,
-        body div[data-baseweb="menu"] [id],
-        body ul[role="listbox"] li,
-        body ul[role="listbox"] div,
-        body div[role="listbox"] div,
-        body div[role="option"],
-        body li[role="option"] {{
-            background-color: var(--spt-v274-dd-panel-bg) !important;
-            color: var(--spt-v274-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            font-weight: 900 !important;
-            filter: none !important;
-        }}
-
-        /* Text nodes inside option rows. This is the key fix for non-hover invisible text. */
-        body div[data-baseweb="popover"] [role="option"] *,
-        body div[data-baseweb="popover"] li *,
-        body div[data-baseweb="popover"] ul li *,
-        body div[data-baseweb="popover"] [id] *,
-        body div[data-baseweb="menu"] [role="option"] *,
-        body div[data-baseweb="menu"] li *,
-        body div[data-baseweb="menu"] [id] *,
-        body ul[role="listbox"] li *,
-        body ul[role="listbox"] div *,
-        body div[role="listbox"] div *,
-        body div[role="option"] *,
-        body li[role="option"] * {{
-            color: var(--spt-v274-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
-            fill: var(--spt-v274-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            font-weight: 900 !important;
-            filter: none !important;
-        }}
-
-        /* Hover/focus/selected/current/highlighted states: cyan is still light, so text stays dark. */
-        body div[data-baseweb="popover"] [role="option"]:hover,
-        body div[data-baseweb="popover"] li:hover,
-        body div[data-baseweb="menu"] [role="option"]:hover,
-        body div[data-baseweb="menu"] li:hover,
-        body ul[role="listbox"] li:hover,
-        body div[role="option"]:hover,
-        body li[role="option"]:hover,
-        body div[role="option"][aria-selected="true"],
-        body li[role="option"][aria-selected="true"],
-        body div[role="option"][aria-current="true"],
-        body li[role="option"][aria-current="true"],
-        body div[role="option"][data-highlighted="true"],
-        body li[role="option"][data-highlighted="true"],
-        body [aria-selected="true"],
-        body [data-highlighted="true"] {{
-            background: linear-gradient(90deg, var(--spt-v274-dd-hover-bg), var(--spt-v274-dd-selected-bg)) !important;
-            background-color: var(--spt-v274-dd-selected-bg) !important;
-            color: var(--spt-v274-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-        }}
-        body div[data-baseweb="popover"] [role="option"]:hover *,
-        body div[data-baseweb="popover"] li:hover *,
-        body div[data-baseweb="menu"] [role="option"]:hover *,
-        body div[data-baseweb="menu"] li:hover *,
-        body ul[role="listbox"] li:hover *,
-        body div[role="option"]:hover *,
-        body li[role="option"]:hover *,
-        body [aria-selected="true"] *,
-        body [data-highlighted="true"] * {{
-            color: var(--spt-v274-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
-            fill: var(--spt-v274-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-        }}
-
-        /* Disabled/no-options rows: visible muted dark text on light background. */
-        body div[data-baseweb="popover"] [aria-disabled="true"],
-        body div[data-baseweb="popover"] [aria-disabled="true"] *,
-        body div[data-baseweb="menu"] [aria-disabled="true"],
-        body div[data-baseweb="menu"] [aria-disabled="true"] *,
-        body [role="option"][aria-disabled="true"],
-        body [role="option"][aria-disabled="true"] * {{
-            color: var(--spt-v274-dd-disabled-text) !important;
-            -webkit-text-fill-color: var(--spt-v274-dd-disabled-text) !important;
-            opacity: 1 !important;
-            font-weight: 900 !important;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-try:
-    apply_v274_dropdown_visible_text_every_state()
-except Exception:
-    pass
-# ===== V2.74 DROPDOWN VISIBLE TEXT EVERY STATE END =====
-
-
-# ===== V2.75 DROPDOWN CYBER UI + READABILITY FINAL START =====
-def apply_v275_dropdown_cyber_ui_readability_final():
-    """
-    V2.75:
-    Unified cyber/professional dropdown appearance for all modules.
-
-    Non-negotiable readability rule:
-    - Light/white/cyan backgrounds use dark text.
-    - Dark page/card labels use light text.
-    - Closed fields, expanded menus, un-hovered options, hovered options,
-      selected options, disabled/no-options rows must all remain readable.
-
-    This patch is intentionally injected after V2.74 so it wins the cascade.
-    """
-    try:
-        import streamlit as st
-    except Exception:
-        return
-    try:
-        cfg = _spt_load_dropdown_settings()
-    except Exception:
-        cfg = {}
-
-    field_bg = str(cfg.get("field_bg", "#eefaff"))
-    panel_bg = str(cfg.get("panel_bg", "#f2fbff"))
-    dark_text = str(cfg.get("text_color", "#03121f"))
-    muted_text = "#28445c"
-    label_text = "#f7fcff"
-    border = "#66e8ff"
-    border_soft = "rgba(102, 232, 255, .42)"
-    glow = "rgba(103, 232, 249, .36)"
-    hover_bg = "#bdf8ff"
-    selected_bg = "#8fecff"
-    option_divider = "rgba(6, 37, 58, .10)"
-
-    st.markdown(
-        f"""
-        <style id="spt-v275-dropdown-cyber-ui-readability-final">
-        :root {{
-            --spt-v275-dd-field-bg: {field_bg};
-            --spt-v275-dd-panel-bg: {panel_bg};
-            --spt-v275-dd-dark-text: {dark_text};
-            --spt-v275-dd-muted-text: {muted_text};
-            --spt-v275-dd-label-text: {label_text};
-            --spt-v275-dd-border: {border};
-            --spt-v275-dd-border-soft: {border_soft};
-            --spt-v275-dd-glow: {glow};
-            --spt-v275-dd-hover-bg: {hover_bg};
-            --spt-v275-dd-selected-bg: {selected_bg};
-            --spt-v275-dd-option-divider: {option_divider};
-        }}
-
-        /* Labels remain bright because the surrounding filter panels are dark. */
-        [data-testid="stSelectbox"] label,
-        [data-testid="stMultiSelect"] label,
-        [data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
-        [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"],
-        [data-testid="stSelectbox"] [data-testid="stWidgetLabel"] *,
-        [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"] * {{
-            color: var(--spt-v275-dd-label-text) !important;
-            -webkit-text-fill-color: var(--spt-v275-dd-label-text) !important;
-            opacity: 1 !important;
-            font-weight: 950 !important;
-            letter-spacing: .01em !important;
-            text-shadow: 0 0 10px rgba(125,249,255,.22) !important;
-        }}
-
-        /* Closed select/multiselect: cyber glass field, but still light background + dark text. */
-        [data-baseweb="select"],
-        [data-baseweb="select"] > div,
-        [data-baseweb="select"] [role="combobox"],
-        [data-baseweb="select"] [aria-haspopup="listbox"],
-        [data-baseweb="select"] [aria-expanded],
-        [data-baseweb="select"] div[class*="control" i],
-        [data-baseweb="select"] div[class*="value" i],
-        [data-baseweb="select"] div[class*="placeholder" i],
-        [data-baseweb="select"] div[class*="input" i] {{
-            background: linear-gradient(180deg, #f8fdff 0%, var(--spt-v275-dd-field-bg) 100%) !important;
-            color: var(--spt-v275-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
-            border-color: var(--spt-v275-dd-border-soft) !important;
-            border-radius: 12px !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            box-shadow:
-                inset 0 0 0 1px rgba(255,255,255,.72),
-                0 0 0 1px var(--spt-v275-dd-border-soft),
-                0 10px 22px rgba(0, 12, 28, .18),
-                0 0 18px rgba(103,232,249,.18) !important;
-        }}
-
-        [data-baseweb="select"]:hover,
-        [data-baseweb="select"]:focus-within,
-        [data-baseweb="select"] > div:hover,
-        [data-baseweb="select"] > div:focus-within {{
-            border-color: var(--spt-v275-dd-border) !important;
-            box-shadow:
-                inset 0 0 0 1px rgba(255,255,255,.82),
-                0 0 0 1px var(--spt-v275-dd-border),
-                0 12px 26px rgba(0, 12, 28, .22),
-                0 0 24px var(--spt-v275-dd-glow) !important;
-        }}
-
-        [data-baseweb="select"] *,
-        [data-baseweb="select"] span,
-        [data-baseweb="select"] p,
-        [data-baseweb="select"] input,
-        [data-baseweb="select"] input::placeholder {{
-            color: var(--spt-v275-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            font-weight: 900 !important;
-            filter: none !important;
-        }}
-
-        [data-baseweb="select"] div[class*="placeholder" i],
-        [data-baseweb="select"] input::placeholder {{
-            color: var(--spt-v275-dd-muted-text) !important;
-            -webkit-text-fill-color: var(--spt-v275-dd-muted-text) !important;
-        }}
-
-        [data-baseweb="select"] svg,
-        [data-baseweb="select"] svg *,
-        [data-baseweb="select"] [role="button"],
-        [data-baseweb="select"] [role="button"] * {{
-            fill: var(--spt-v275-dd-dark-text) !important;
-            color: var(--spt-v275-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
-            opacity: 1 !important;
-        }}
-
-        /* Multiselect tags/chips: visible dark text on pale neon chips. */
-        [data-baseweb="tag"],
-        [data-baseweb="tag"] *,
-        [data-baseweb="select"] [data-baseweb="tag"],
-        [data-baseweb="select"] [data-baseweb="tag"] * {{
-            background: linear-gradient(90deg, #d7fbff, #eefaff) !important;
-            color: var(--spt-v275-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
-            border-radius: 999px !important;
-            border-color: rgba(37, 190, 215, .48) !important;
-            opacity: 1 !important;
-            font-weight: 900 !important;
-            text-shadow: none !important;
-        }}
-
-        /* Expanded portal/menu: mounted on body, so target globally. */
-        body div[data-baseweb="popover"],
-        body div[data-baseweb="popover"] > div,
-        body div[data-baseweb="popover"] [data-baseweb="menu"],
-        body div[data-baseweb="menu"],
-        body ul[role="listbox"],
-        body div[role="listbox"] {{
-            background: linear-gradient(180deg, #fbfeff 0%, var(--spt-v275-dd-panel-bg) 100%) !important;
-            color: var(--spt-v275-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
-            border: 1px solid var(--spt-v275-dd-border) !important;
-            border-radius: 14px !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            box-shadow:
-                0 20px 45px rgba(0, 8, 24, .38),
-                0 0 0 1px rgba(255,255,255,.72) inset,
-                0 0 30px rgba(103,232,249,.28) !important;
-            overflow: hidden !important;
-        }}
-
-        /* Every option row: readable before hover, not only on hover. */
-        body div[data-baseweb="popover"] [role="option"],
-        body div[data-baseweb="popover"] li,
-        body div[data-baseweb="popover"] ul li,
-        body div[data-baseweb="menu"] [role="option"],
-        body div[data-baseweb="menu"] li,
-        body ul[role="listbox"] li,
-        body div[role="option"],
-        body li[role="option"] {{
-            background: transparent !important;
-            color: var(--spt-v275-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
-            border-bottom: 1px solid var(--spt-v275-dd-option-divider) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            font-weight: 900 !important;
-            filter: none !important;
-        }}
-
-        body div[data-baseweb="popover"] [role="option"] *,
-        body div[data-baseweb="popover"] li *,
-        body div[data-baseweb="popover"] ul li *,
-        body div[data-baseweb="menu"] [role="option"] *,
-        body div[data-baseweb="menu"] li *,
-        body ul[role="listbox"] li *,
-        body div[role="option"] *,
-        body li[role="option"] * {{
-            color: var(--spt-v275-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
-            fill: var(--spt-v275-dd-dark-text) !important;
-            background: transparent !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            font-weight: 900 !important;
-            filter: none !important;
-        }}
-
-        /* Hover/keyboard/selected: light cyan tech highlight, dark text remains. */
-        body div[data-baseweb="popover"] [role="option"]:hover,
-        body div[data-baseweb="popover"] li:hover,
-        body div[data-baseweb="menu"] [role="option"]:hover,
-        body div[data-baseweb="menu"] li:hover,
-        body ul[role="listbox"] li:hover,
-        body div[role="option"]:hover,
-        body li[role="option"]:hover,
-        body div[role="option"][aria-selected="true"],
-        body li[role="option"][aria-selected="true"],
-        body div[role="option"][aria-current="true"],
-        body li[role="option"][aria-current="true"],
-        body div[role="option"][data-highlighted="true"],
-        body li[role="option"][data-highlighted="true"],
-        body [aria-selected="true"],
-        body [data-highlighted="true"] {{
-            background: linear-gradient(90deg, var(--spt-v275-dd-selected-bg), var(--spt-v275-dd-hover-bg)) !important;
-            color: var(--spt-v275-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
-            border-left: 4px solid var(--spt-v275-dd-border) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            box-shadow: inset 0 0 18px rgba(103,232,249,.22) !important;
-        }}
-
-        body div[data-baseweb="popover"] [role="option"]:hover *,
-        body div[data-baseweb="popover"] li:hover *,
-        body div[data-baseweb="menu"] [role="option"]:hover *,
-        body div[data-baseweb="menu"] li:hover *,
-        body ul[role="listbox"] li:hover *,
-        body div[role="option"]:hover *,
-        body li[role="option"]:hover *,
-        body [aria-selected="true"] *,
-        body [data-highlighted="true"] * {{
-            color: var(--spt-v275-dd-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
-            fill: var(--spt-v275-dd-dark-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-        }}
-
-        /* Disabled / no options rows: still readable, muted dark text. */
-        body div[data-baseweb="popover"] [aria-disabled="true"],
-        body div[data-baseweb="popover"] [aria-disabled="true"] *,
-        body div[data-baseweb="menu"] [aria-disabled="true"],
-        body div[data-baseweb="menu"] [aria-disabled="true"] *,
-        body [role="option"][aria-disabled="true"],
-        body [role="option"][aria-disabled="true"] * {{
-            color: var(--spt-v275-dd-muted-text) !important;
-            -webkit-text-fill-color: var(--spt-v275-dd-muted-text) !important;
-            opacity: 1 !important;
-            font-weight: 900 !important;
-            text-shadow: none !important;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-try:
-    apply_v275_dropdown_cyber_ui_readability_final()
-except Exception:
-    pass
-# ===== V2.75 DROPDOWN CYBER UI + READABILITY FINAL END =====
-
-
-# ===== V2.76 PROFESSIONAL CYBER DROPDOWN BREATHING GLOW START =====
-def apply_v276_dropdown_professional_cyber_breathing_glow():
-    """
-    V2.76:
-    Professional high-tech dropdown/select skin for all modules.
-
-    Design rules requested by user:
-    - Light field / light menu background must always use dark text.
-    - Dark page/panel labels must always use light text.
-    - Expanded menu options must be readable before hover; hover is only a highlight, not required for visibility.
-    - Add blue breathing glow and cyber border without sacrificing readability.
-    - Apply every Streamlit rerun after all older CSS patches.
-    """
-    try:
-        import streamlit as st
-    except Exception:
-        return
-    try:
-        cfg = _spt_load_dropdown_settings()
-    except Exception:
-        cfg = {}
-
-    outer = int(cfg.get("outer_height", 70))
-    inner = int(cfg.get("inner_height", 66))
-    font = int(cfg.get("font_size", 16))
-    option = int(cfg.get("option_height", 46))
-    dark_text = str(cfg.get("text_color", "#03121f"))
-
-    st.markdown(
-        f"""
-        <style id="spt-v276-dropdown-professional-cyber-breathing-glow">
-        :root {{
-            --spt-dd-v276-outer: {outer}px;
-            --spt-dd-v276-inner: {inner}px;
-            --spt-dd-v276-font: {font}px;
-            --spt-dd-v276-option: {option}px;
-            --spt-dd-v276-dark: {dark_text};
-            --spt-dd-v276-muted: #26445d;
-            --spt-dd-v276-light-label: #f5fdff;
-            --spt-dd-v276-field-top: #fbfeff;
-            --spt-dd-v276-field-mid: #edfaff;
-            --spt-dd-v276-field-bottom: #dff4ff;
-            --spt-dd-v276-menu-top: #ffffff;
-            --spt-dd-v276-menu-bottom: #eaf9ff;
-            --spt-dd-v276-neon: #67e8f9;
-            --spt-dd-v276-neon-2: #38bdf8;
-            --spt-dd-v276-neon-3: #a5f3fc;
-            --spt-dd-v276-line: rgba(8, 46, 72, .12);
-        }}
-
-        @keyframes sptDropdownBreathingGlowV276 {{
-            0%, 100% {{
-                box-shadow:
-                    inset 0 0 0 1px rgba(255,255,255,.86),
-                    inset 0 0 18px rgba(103,232,249,.08),
-                    0 0 0 1px rgba(103,232,249,.45),
-                    0 10px 24px rgba(0, 12, 28, .20),
-                    0 0 12px rgba(103,232,249,.24) !important;
-            }}
-            50% {{
-                box-shadow:
-                    inset 0 0 0 1px rgba(255,255,255,.95),
-                    inset 0 0 22px rgba(103,232,249,.14),
-                    0 0 0 1px rgba(103,232,249,.82),
-                    0 12px 28px rgba(0, 12, 28, .24),
-                    0 0 28px rgba(103,232,249,.48) !important;
-            }}
-        }}
-
-        @keyframes sptDropdownMenuPulseV276 {{
-            0%, 100% {{ box-shadow: 0 18px 44px rgba(0,8,24,.38), 0 0 22px rgba(103,232,249,.22) !important; }}
-            50% {{ box-shadow: 0 20px 48px rgba(0,8,24,.42), 0 0 38px rgba(103,232,249,.36) !important; }}
-        }}
-
-        /* Widget labels are on dark panels: keep them bright and crisp. */
-        [data-testid="stSelectbox"] label,
-        [data-testid="stMultiSelect"] label,
-        [data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
-        [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"],
-        [data-testid="stSelectbox"] [data-testid="stWidgetLabel"] *,
-        [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"] * {{
-            color: var(--spt-dd-v276-light-label) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-light-label) !important;
-            font-weight: 950 !important;
-            opacity: 1 !important;
-            letter-spacing: .02em !important;
-            text-shadow: 0 0 12px rgba(103,232,249,.30) !important;
-        }}
-
-        .stSelectbox,
-        .stMultiSelect,
-        div[data-testid="stSelectbox"],
-        div[data-testid="stMultiSelect"] {{
-            overflow: visible !important;
-        }}
-
-        /* Closed select frame: light professional surface + blue breathing border. */
-        [data-baseweb="select"] {{
-            position: relative !important;
-            min-height: var(--spt-dd-v276-outer) !important;
-            height: var(--spt-dd-v276-outer) !important;
-            max-height: none !important;
-            display: flex !important;
-            align-items: center !important;
-            border-radius: 16px !important;
-            border: 1px solid rgba(103,232,249,.68) !important;
-            background:
-                linear-gradient(135deg, rgba(103,232,249,.18) 0%, rgba(255,255,255,0) 28%),
-                linear-gradient(180deg, var(--spt-dd-v276-field-top) 0%, var(--spt-dd-v276-field-mid) 56%, var(--spt-dd-v276-field-bottom) 100%) !important;
-            color: var(--spt-dd-v276-dark) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
-            overflow: visible !important;
-            animation: sptDropdownBreathingGlowV276 3.2s ease-in-out infinite !important;
-            transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease !important;
-        }}
-
-        [data-baseweb="select"]::before {{
-            content: "" !important;
-            position: absolute !important;
-            inset: 2px !important;
-            border-radius: 14px !important;
-            pointer-events: none !important;
-            background:
-                linear-gradient(90deg, rgba(103,232,249,.38), rgba(255,255,255,0) 24%, rgba(255,255,255,0) 76%, rgba(103,232,249,.26)),
-                radial-gradient(circle at 12% 15%, rgba(103,232,249,.32), rgba(255,255,255,0) 26%) !important;
-            opacity: .85 !important;
-        }}
-
-        [data-baseweb="select"]::after {{
-            content: "" !important;
-            position: absolute !important;
-            left: 14px !important;
-            right: 14px !important;
-            bottom: 6px !important;
-            height: 1px !important;
-            border-radius: 999px !important;
-            background: linear-gradient(90deg, rgba(103,232,249,0), rgba(56,189,248,.76), rgba(103,232,249,0)) !important;
-            pointer-events: none !important;
-        }}
-
-        [data-baseweb="select"]:hover,
-        [data-baseweb="select"]:focus-within {{
-            border-color: rgba(103,232,249,.98) !important;
-            transform: translateY(-1px) !important;
-        }}
-
-        [data-baseweb="select"] > div,
-        [data-baseweb="select"] > div > div,
-        [data-baseweb="select"] > div > div > div,
-        [data-baseweb="select"] [role="combobox"],
-        [data-baseweb="select"] [aria-haspopup="listbox"],
-        [data-baseweb="select"] [aria-expanded],
-        [data-baseweb="select"] div[class*="value" i],
-        [data-baseweb="select"] div[class*="placeholder" i],
-        [data-baseweb="select"] div[class*="input" i] {{
-            min-height: var(--spt-dd-v276-inner) !important;
-            height: var(--spt-dd-v276-inner) !important;
-            max-height: none !important;
-            display: flex !important;
-            align-items: center !important;
-            background: transparent !important;
-            color: var(--spt-dd-v276-dark) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            overflow: visible !important;
-            z-index: 2 !important;
-            box-shadow: none !important;
-        }}
-
-        [data-baseweb="select"] *,
-        [data-baseweb="select"] span,
-        [data-baseweb="select"] p,
-        [data-baseweb="select"] input,
-        [data-baseweb="select"] input::placeholder {{
-            color: var(--spt-dd-v276-dark) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
-            opacity: 1 !important;
-            font-size: var(--spt-dd-v276-font) !important;
-            font-weight: 900 !important;
-            text-shadow: none !important;
-            filter: none !important;
-        }}
-
-        [data-baseweb="select"] div[class*="placeholder" i],
-        [data-baseweb="select"] input::placeholder {{
-            color: var(--spt-dd-v276-muted) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-muted) !important;
-        }}
-
-        [data-baseweb="select"] svg,
-        [data-baseweb="select"] svg *,
-        [data-baseweb="select"] [role="button"],
-        [data-baseweb="select"] [role="button"] * {{
-            color: var(--spt-dd-v276-dark) !important;
-            fill: var(--spt-dd-v276-dark) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
-            opacity: 1 !important;
-            z-index: 3 !important;
-        }}
-
-        /* Multiselect chips: pale cyan, dark readable text. */
-        [data-baseweb="tag"],
-        [data-baseweb="tag"] * {{
-            background: linear-gradient(90deg, #d9fbff, #f4fdff) !important;
-            color: var(--spt-dd-v276-dark) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
-            fill: var(--spt-dd-v276-dark) !important;
-            border: 1px solid rgba(56,189,248,.58) !important;
-            border-radius: 999px !important;
-            opacity: 1 !important;
-            font-weight: 900 !important;
-            text-shadow: none !important;
-        }}
-
-        /* Expanded dropdown portal: mounted outside the widget tree, so target body globally. */
-        body div[data-baseweb="popover"],
-        body div[data-baseweb="popover"] > div,
-        body div[data-baseweb="menu"],
-        body ul[role="listbox"],
-        body div[role="listbox"] {{
-            background:
-                linear-gradient(135deg, rgba(103,232,249,.16), rgba(255,255,255,0) 32%),
-                linear-gradient(180deg, var(--spt-dd-v276-menu-top) 0%, var(--spt-dd-v276-menu-bottom) 100%) !important;
-            color: var(--spt-dd-v276-dark) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
-            border: 1px solid rgba(103,232,249,.92) !important;
-            border-radius: 16px !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            overflow: hidden !important;
-            animation: sptDropdownMenuPulseV276 3.4s ease-in-out infinite !important;
-            backdrop-filter: blur(10px) saturate(1.12) !important;
-        }}
-
-        body div[data-baseweb="popover"] *,
-        body div[data-baseweb="menu"] *,
-        body ul[role="listbox"] *,
-        body div[role="listbox"] * {{
-            color: var(--spt-dd-v276-dark) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
-            fill: var(--spt-dd-v276-dark) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            filter: none !important;
-        }}
-
-        body div[data-baseweb="popover"] [role="option"],
-        body div[data-baseweb="popover"] li,
-        body div[data-baseweb="menu"] [role="option"],
-        body div[data-baseweb="menu"] li,
-        body ul[role="listbox"] li,
-        body div[role="option"],
-        body li[role="option"] {{
-            min-height: var(--spt-dd-v276-option) !important;
-            height: auto !important;
-            display: flex !important;
-            align-items: center !important;
-            padding: 0 18px !important;
-            background: rgba(255,255,255,.28) !important;
-            color: var(--spt-dd-v276-dark) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
-            border-bottom: 1px solid var(--spt-dd-v276-line) !important;
-            font-size: var(--spt-dd-v276-font) !important;
-            font-weight: 900 !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            filter: none !important;
-            transition: background .14s ease, border-left-color .14s ease, transform .14s ease !important;
-        }}
-
-        body div[data-baseweb="popover"] [role="option"] *,
-        body div[data-baseweb="popover"] li *,
-        body div[data-baseweb="menu"] [role="option"] *,
-        body div[data-baseweb="menu"] li *,
-        body ul[role="listbox"] li *,
-        body div[role="option"] *,
-        body li[role="option"] * {{
-            color: var(--spt-dd-v276-dark) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
-            fill: var(--spt-dd-v276-dark) !important;
-            background: transparent !important;
-            opacity: 1 !important;
-            font-weight: 900 !important;
-            text-shadow: none !important;
-            filter: none !important;
-        }}
-
-        body div[data-baseweb="popover"] [role="option"]:hover,
-        body div[data-baseweb="popover"] li:hover,
-        body div[data-baseweb="menu"] [role="option"]:hover,
-        body div[data-baseweb="menu"] li:hover,
-        body ul[role="listbox"] li:hover,
-        body div[role="option"]:hover,
-        body li[role="option"]:hover,
-        body div[role="option"][aria-selected="true"],
-        body li[role="option"][aria-selected="true"],
-        body div[role="option"][aria-current="true"],
-        body li[role="option"][aria-current="true"],
-        body div[role="option"][data-highlighted="true"],
-        body li[role="option"][data-highlighted="true"],
-        body [aria-selected="true"],
-        body [data-highlighted="true"] {{
-            background:
-                linear-gradient(90deg, rgba(56,189,248,.95), rgba(165,243,252,.72)) !important;
-            color: var(--spt-dd-v276-dark) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
-            border-left: 5px solid var(--spt-dd-v276-neon-2) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            box-shadow: inset 0 0 18px rgba(103,232,249,.26) !important;
-        }}
-
-        body div[data-baseweb="popover"] [role="option"]:hover *,
-        body div[data-baseweb="popover"] li:hover *,
-        body div[data-baseweb="menu"] [role="option"]:hover *,
-        body div[data-baseweb="menu"] li:hover *,
-        body ul[role="listbox"] li:hover *,
-        body div[role="option"]:hover *,
-        body li[role="option"]:hover *,
-        body [aria-selected="true"] *,
-        body [data-highlighted="true"] * {{
-            color: var(--spt-dd-v276-dark) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
-            fill: var(--spt-dd-v276-dark) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-        }}
-
-        body [role="option"][aria-disabled="true"],
-        body [role="option"][aria-disabled="true"] *,
-        body div[data-baseweb="popover"] [aria-disabled="true"],
-        body div[data-baseweb="popover"] [aria-disabled="true"] *,
-        body div[data-baseweb="menu"] [aria-disabled="true"],
-        body div[data-baseweb="menu"] [aria-disabled="true"] * {{
-            color: var(--spt-dd-v276-muted) !important;
-            -webkit-text-fill-color: var(--spt-dd-v276-muted) !important;
-            opacity: 1 !important;
-            font-weight: 850 !important;
-            text-shadow: none !important;
-        }}
-
-        @media (prefers-reduced-motion: reduce) {{
-            [data-baseweb="select"],
-            body div[data-baseweb="popover"],
-            body div[data-baseweb="menu"],
-            body ul[role="listbox"],
-            body div[role="listbox"] {{
-                animation: none !important;
-            }}
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-try:
-    apply_v276_dropdown_professional_cyber_breathing_glow()
-except Exception:
-    pass
-# ===== V2.76 PROFESSIONAL CYBER DROPDOWN BREATHING GLOW END =====
-
-def apply_v277_form_input_spacing_no_clip():
-    """V2.77: increase vertical spacing and prevent glowing input borders from being clipped."""
-    try:
-        import streamlit as st
-    except Exception:
-        return
-    st.markdown(
-        """
-        <style id="spt-v277-form-input-spacing-no-clip">
-        /*
-          V2.77｜表單輸入框間距與外框不裁切修正
-          目標：帳號/密碼/一般文字框保留科技藍框光暈，同時上下留空，避免看起來被切掉。
-        */
-
-        div[data-testid="stTextInput"],
-        div[data-testid="stPasswordInput"],
-        div[data-testid="stNumberInput"],
-        div[data-testid="stDateInput"],
-        div[data-testid="stTimeInput"],
-        div[data-testid="stTextArea"] {
-            margin-top: 6px !important;
-            margin-bottom: 18px !important;
-            padding-top: 3px !important;
-            padding-bottom: 6px !important;
-            overflow: visible !important;
-        }
-
-        div[data-testid="stTextInput"] label,
-        div[data-testid="stPasswordInput"] label,
-        div[data-testid="stNumberInput"] label,
-        div[data-testid="stDateInput"] label,
-        div[data-testid="stTimeInput"] label,
-        div[data-testid="stTextArea"] label {
-            margin-bottom: 8px !important;
-            padding-bottom: 2px !important;
-            overflow: visible !important;
-            color: #f2fbff !important;
-            -webkit-text-fill-color: #f2fbff !important;
-            font-weight: 950 !important;
-            text-shadow: 0 0 8px rgba(91, 241, 255, .22) !important;
-        }
-
-        div[data-baseweb="input"],
-        div[data-baseweb="base-input"],
-        div[data-baseweb="textarea"],
-        div[data-testid="stTextInput"] div[data-baseweb="input"],
-        div[data-testid="stPasswordInput"] div[data-baseweb="input"],
-        div[data-testid="stNumberInput"] div[data-baseweb="input"],
-        div[data-testid="stDateInput"] div[data-baseweb="input"],
-        div[data-testid="stTimeInput"] div[data-baseweb="input"] {
-            min-height: 58px !important;
-            height: auto !important;
-            overflow: visible !important;
-            border-radius: 15px !important;
-            border: 1px solid rgba(105, 231, 255, .86) !important;
-            background: linear-gradient(180deg, rgba(248,253,255,.98), rgba(230,244,252,.98)) !important;
-            box-shadow:
-                0 0 0 1px rgba(105, 231, 255, .20),
-                0 0 16px rgba(72, 227, 255, .16),
-                inset 0 1px 0 rgba(255,255,255,.84) !important;
-            box-sizing: border-box !important;
-        }
-
-        div[data-baseweb="input"]:focus-within,
-        div[data-baseweb="base-input"]:focus-within,
-        div[data-baseweb="textarea"]:focus-within {
-            border-color: rgba(93, 238, 255, 1) !important;
-            box-shadow:
-                0 0 0 1px rgba(93, 238, 255, .55),
-                0 0 22px rgba(93, 238, 255, .34),
-                0 0 42px rgba(122, 118, 255, .16),
-                inset 0 1px 0 rgba(255,255,255,.90) !important;
-        }
-
-        div[data-baseweb="input"] input,
-        div[data-baseweb="base-input"] input,
-        div[data-testid="stTextInput"] input,
-        div[data-testid="stPasswordInput"] input,
-        div[data-testid="stNumberInput"] input,
-        div[data-testid="stDateInput"] input,
-        div[data-testid="stTimeInput"] input {
-            min-height: 56px !important;
-            height: 56px !important;
-            line-height: 28px !important;
-            padding-top: 13px !important;
-            padding-bottom: 13px !important;
-            padding-left: 16px !important;
-            padding-right: 16px !important;
-            background: transparent !important;
-            color: #061423 !important;
-            -webkit-text-fill-color: #061423 !important;
-            caret-color: #061423 !important;
-            font-weight: 900 !important;
-            box-sizing: border-box !important;
-            border: 0 !important;
-            box-shadow: none !important;
-            overflow: visible !important;
-        }
-
-        div[data-baseweb="input"] input::placeholder,
-        div[data-baseweb="base-input"] input::placeholder,
-        div[data-testid="stTextInput"] input::placeholder,
-        div[data-testid="stPasswordInput"] input::placeholder {
-            color: rgba(25, 54, 76, .68) !important;
-            -webkit-text-fill-color: rgba(25, 54, 76, .68) !important;
-            opacity: 1 !important;
-            font-weight: 900 !important;
-        }
-
-        div[data-testid="stPasswordInput"] button,
-        div[data-baseweb="input"] button {
-            min-height: 56px !important;
-            height: 56px !important;
-            border-radius: 0 14px 14px 0 !important;
-            background: linear-gradient(135deg, rgba(138,238,255,.95), rgba(167,188,255,.95)) !important;
-            color: #061423 !important;
-            border-left: 1px solid rgba(67, 209, 255, .60) !important;
-            box-shadow: inset 1px 0 0 rgba(255,255,255,.55) !important;
-        }
-        div[data-testid="stPasswordInput"] button svg,
-        div[data-baseweb="input"] button svg {
-            color: #061423 !important;
-            fill: #061423 !important;
-        }
-
-        div[data-baseweb="textarea"] textarea,
-        div[data-testid="stTextArea"] textarea {
-            min-height: 140px !important;
-            padding: 16px !important;
-            line-height: 1.55 !important;
-            background: transparent !important;
-            color: #061423 !important;
-            -webkit-text-fill-color: #061423 !important;
-            font-weight: 850 !important;
-            border: 0 !important;
-            box-shadow: none !important;
-        }
-
-        [data-testid="stVerticalBlock"] > div:has(> div[data-testid="stTextInput"]),
-        [data-testid="stVerticalBlock"] > div:has(> div[data-testid="stPasswordInput"]),
-        [data-testid="stVerticalBlock"] > div:has(> div[data-testid="stTextArea"]) {
-            margin-bottom: 4px !important;
-            overflow: visible !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
+for _spt_v279_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v279_func = globals().get(_spt_v279_name)
+    if callable(_spt_v279_func) and not getattr(_spt_v279_func, "_spt_v279_wrapped", False):
+        def _spt_v279_make_wrapper(_original):
+            def _spt_v279_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v279_future_cyber_field_ui()
+                except Exception:
+                    pass
+                return result
+            _spt_v279_wrapper._spt_v279_wrapped = True
+            return _spt_v279_wrapper
+        globals()[_spt_v279_name] = _spt_v279_make_wrapper(_spt_v279_func)
+# ===== V2.79 FUTURE CYBER FIELD UI END =====
