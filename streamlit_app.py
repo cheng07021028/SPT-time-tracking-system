@@ -5,6 +5,7 @@ import streamlit as st
 
 from services.theme_service import apply_theme, render_home_header, render_kpi_cards, render_module_cards
 from services.security_service import require_login, check_permission
+from services.home_ui_settings_service import inject_home_font_scale, render_home_font_controls, load_home_ui_settings
 
 st.set_page_config(
     page_title="超慧科技製造部｜智慧工時紀錄系統",
@@ -15,7 +16,12 @@ st.set_page_config(
 
 apply_theme()
 require_login("home")
+_home_ui_settings = load_home_ui_settings()
+inject_home_font_scale(_home_ui_settings.get("home_font_scale_percent", 100))
 render_home_header()
+
+_current_user = st.session_state.get("username") or st.session_state.get("current_user") or "SYSTEM"
+render_home_font_controls(username=str(_current_user))
 
 st.success("系統初始化成功。請從左側選單進入各功能頁。")
 
