@@ -302,37 +302,117 @@ def _date_range_from_preset(preset: str, fallback_start: str, fallback_end: str)
 
 
 def _normalize_end_blank(s: pd.Series) -> pd.Series:
+    """Normalize blank-like end values.
+
+    SQLite / CSV / Excel 讀回來時，空值可能是 None、nan、NaT、空白字串；
+    這裡統一判斷，避免跨日結束篩選漏判。
+    """
     text = s.fillna("").astype(str).str.strip().str.lower()
-    return text.isin(["", "none", "nan", "nat"])
+    return text.isin(["", "none", "nan", "nat", "null"])
+
+
+def _date_text_from_series(series: pd.Series, index) -> pd.Series:
+    """Convert mixed date strings / timestamps into yyyy-mm-dd text.
+
+    支援：
+    - 2026-05-17
+    - 2026/5/17
+    - 2026-05-17 00:00:00
+    - pandas Timestamp
+    - Excel / CSV 讀回來的字串日期
+    """
+    if series is None:
+        return pd.Series("", index=index)
+    raw = series.reindex(index).fillna("").astype(str).str.strip()
+    blank = raw.str.lower().isin(["", "none", "nan", "nat", "null"])
+    parsed = pd.to_datetime(raw.where(~blank, ""), errors="coerce")
+    out = parsed.dt.strftime("%Y-%m-%d").fillna("")
+
+    # Fallback：pd.to_datetime 無法解析時，抓字串內第一個 yyyy/mm/dd 或 yyyy-mm-dd。
+    fallback = raw.str.extract(r"(\d{4})[/-](\d{1,2})[/-](\d{1,2})", expand=True)
+    fallback_text = pd.Series("", index=index)
+    matched = fallback.notna().all(axis=1)
+    if matched.any():
+        fallback_text.loc[matched] = (
+            fallback.loc[matched, 0].astype(str)
+            + "-"
+            + fallback.loc[matched, 1].astype(int).astype(str).str.zfill(2)
+            + "-"
+            + fallback.loc[matched, 2].astype(int).astype(str).str.zfill(2)
+        )
+    out = out.where(out.ne(""), fallback_text)
+    return out.fillna("")
+
+
+def _history_start_end_dates(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+    """Return normalized start/end date series.
+
+    優先順序：
+    1. start_date / end_date
+    2. start_timestamp / end_timestamp
+
+    修正 V2.20 問題：過去直接用字串前 10 碼，遇到 2026/5/17、
+    Timestamp、或日期欄帶時間時，跨日紀錄 / 跨日結束可能篩不出來。
+    """
+    index = df.index
+    start_date = pd.Series("", index=index)
+    end_date = pd.Series("", index=index)
+
+    if "start_date" in df.columns:
+        start_date = _date_text_from_series(df["start_date"], index)
+    if "end_date" in df.columns:
+        end_date = _date_text_from_series(df["end_date"], index)
+
+    if "start_timestamp" in df.columns:
+        ts_start = _date_text_from_series(df["start_timestamp"], index)
+        start_date = start_date.where(start_date.ne(""), ts_start)
+    if "end_timestamp" in df.columns:
+        ts_end = _date_text_from_series(df["end_timestamp"], index)
+        end_date = end_date.where(end_date.ne(""), ts_end)
+
+    return start_date.fillna(""), end_date.fillna("")
+
+
+def _is_cross_day_record_df(df: pd.DataFrame) -> pd.Series:
+    """Return True when start date and end date are different.
+
+    用於『跨日紀錄』：只要開始日期與結束日期不同就列出。
+    """
+    if df is None or df.empty:
+        return pd.Series(False, index=getattr(df, "index", None))
+    start_date, end_date = _history_start_end_dates(df)
+    return start_date.ne("") & end_date.ne("") & start_date.ne(end_date)
 
 
 def _is_cross_day_end_df(df: pd.DataFrame) -> pd.Series:
     """Return True for records that start on one date and finish on another date.
 
-    判斷條件：已結束 + 開始日期與結束日期不同。
-    優先使用 start_date/end_date，若欄位缺漏則從時間戳前 10 碼取日期。
+    用於『跨日結束』：
+    - 開始日期與結束日期不同
+    - 且有結束資訊（end_date 或 end_timestamp）
+
+    不再只靠 end_timestamp，避免歷史資料只有 end_date/end_time 時漏判。
     """
     if df is None or df.empty:
         return pd.Series(False, index=getattr(df, "index", None))
-    index = df.index
-    start_date = pd.Series("", index=index)
-    end_date = pd.Series("", index=index)
-    if "start_date" in df.columns:
-        start_date = df["start_date"].fillna("").astype(str).str.strip()
-    if "end_date" in df.columns:
-        end_date = df["end_date"].fillna("").astype(str).str.strip()
-    if "start_timestamp" in df.columns:
-        ts_start = df["start_timestamp"].fillna("").astype(str).str.strip().str[:10]
-        start_date = start_date.where(start_date.ne(""), ts_start)
+    cross_day = _is_cross_day_record_df(df)
     if "end_timestamp" in df.columns:
-        ts_end = df["end_timestamp"].fillna("").astype(str).str.strip().str[:10]
-        end_date = end_date.where(end_date.ne(""), ts_end)
-
-    if "end_timestamp" in df.columns:
-        ended = ~_normalize_end_blank(df["end_timestamp"])
+        ended_by_ts = ~_normalize_end_blank(df["end_timestamp"])
     else:
-        ended = end_date.ne("")
-    return ended & start_date.ne("") & end_date.ne("") & start_date.ne(end_date)
+        ended_by_ts = pd.Series(False, index=df.index)
+    _, end_date = _history_start_end_dates(df)
+    ended_by_date = end_date.ne("")
+    if "status" in df.columns:
+        status_text = df["status"].fillna("").astype(str).str.strip()
+        ended_by_status = status_text.ne("") & ~status_text.isin(["作業中", "進行中", "running", "active"])
+    else:
+        ended_by_status = pd.Series(False, index=df.index)
+    if "work_hours" in df.columns:
+        ended_by_hours = pd.to_numeric(df["work_hours"], errors="coerce").fillna(0).gt(0)
+    else:
+        ended_by_hours = pd.Series(False, index=df.index)
+    ended = ended_by_ts | ended_by_date | ended_by_status | ended_by_hours
+    return cross_day & ended
 
 
 def _add_cross_day_end_marker(df: pd.DataFrame) -> pd.DataFrame:
@@ -436,10 +516,7 @@ def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
         if "end_timestamp" in out.columns:
             out = out[_normalize_end_blank(out["end_timestamp"])]
     elif anomaly == "跨日紀錄":
-        if "start_date" in out.columns and "end_date" in out.columns:
-            start_text = out["start_date"].fillna("").astype(str).str.strip()
-            end_text = out["end_date"].fillna("").astype(str).str.strip()
-            out = out[start_text.ne("") & end_text.ne("") & start_text.ne(end_text)]
+        out = out[_is_cross_day_record_df(out)]
     elif anomaly == "跨日結束":
         out = out[_is_cross_day_end_df(out)]
     elif anomaly == "有開始無結束":
