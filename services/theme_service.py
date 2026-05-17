@@ -1057,3 +1057,137 @@ try:
 except Exception:
     pass
 # ===== V2.59 SELECT / MULTISELECT TEXT CLIP FIX END =====
+
+# ===== V2.61 SELECT / MULTISELECT HEIGHT FINAL OVERRIDE START =====
+def apply_v261_select_multiselect_height_final_fix():
+    """Final override: increase select/multiselect vertical space to prevent clipped text."""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.61: 下拉式選單高度加大，避免 Choose options / No options to select 被上下切掉 */
+        .stSelectbox,
+        .stMultiSelect {
+            overflow: visible !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"],
+        .stMultiSelect div[data-baseweb="select"] {
+            min-height: 62px !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] > div,
+        .stMultiSelect div[data-baseweb="select"] > div {
+            min-height: 62px !important;
+            height: auto !important;
+            padding-top: 12px !important;
+            padding-bottom: 12px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+        }
+
+        /* BaseWeb 內層文字容器：給足高度與行高 */
+        .stSelectbox div[data-baseweb="select"] div[role="combobox"],
+        .stMultiSelect div[data-baseweb="select"] div[role="combobox"],
+        .stSelectbox div[data-baseweb="select"] div[aria-expanded],
+        .stMultiSelect div[data-baseweb="select"] div[aria-expanded] {
+            min-height: 38px !important;
+            height: auto !important;
+            line-height: 38px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+        }
+
+        /* 顯示文字本體：不要被裁切 */
+        .stSelectbox div[data-baseweb="select"] span,
+        .stMultiSelect div[data-baseweb="select"] span,
+        .stSelectbox div[data-baseweb="select"] p,
+        .stMultiSelect div[data-baseweb="select"] p {
+            line-height: 34px !important;
+            min-height: 34px !important;
+            height: auto !important;
+            overflow: visible !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            color: #061427 !important;
+            font-weight: 850 !important;
+            white-space: nowrap !important;
+        }
+
+        /* 隱藏搜尋 input 不要露出白點，但保留足夠高度 */
+        .stSelectbox div[data-baseweb="select"] input,
+        .stMultiSelect div[data-baseweb="select"] input {
+            min-height: 34px !important;
+            height: 34px !important;
+            line-height: 34px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            color: #061427 !important;
+            caret-color: transparent !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            border: none !important;
+            outline: none !important;
+            overflow: hidden !important;
+        }
+
+        /* 多選已選標籤高度加大 */
+        .stMultiSelect div[data-baseweb="tag"] {
+            min-height: 36px !important;
+            height: auto !important;
+            padding: 7px 12px !important;
+            margin: 4px 5px 4px 0 !important;
+            border-radius: 10px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            line-height: 1.55 !important;
+            background: linear-gradient(135deg, #c9fbff 0%, #86eeff 100%) !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+            color: #061427 !important;
+            font-weight: 900 !important;
+        }
+
+        .stMultiSelect div[data-baseweb="tag"] span,
+        .stMultiSelect div[data-baseweb="tag"] div {
+            line-height: 1.55 !important;
+            min-height: 24px !important;
+            overflow: visible !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            color: #061427 !important;
+            font-weight: 900 !important;
+        }
+
+        /* 下拉選單展開後的選項高度 */
+        ul[role="listbox"] li,
+        div[role="option"] {
+            min-height: 44px !important;
+            height: auto !important;
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
+            line-height: 1.55 !important;
+            display: flex !important;
+            align-items: center !important;
+            font-weight: 800 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v261_select_multiselect_height_final_fix()
+except Exception:
+    pass
+# ===== V2.61 SELECT / MULTISELECT HEIGHT FINAL OVERRIDE END =====
