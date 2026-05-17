@@ -320,12 +320,46 @@ def _map_excel_work_orders(df_raw: pd.DataFrame, mapping: dict[str, str]) -> pd.
 def _compare_work_orders(incoming: pd.DataFrame, current: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     inc = incoming.copy()
     cur = current.copy()
-    inc_keys = set(inc["work_order"].astype(str).str.strip()) if not inc.empty else set()
+    if inc.empty:
+        return ensure_cols(pd.DataFrame()), ensure_cols(pd.DataFrame()), ensure_cols(pd.DataFrame())
+    inc["work_order"] = inc["work_order"].map(_normalize_text)
+    cur["work_order"] = cur["work_order"].map(_normalize_text) if "work_order" in cur.columns else ""
+    # 同一來源檔如果製令重複，只保留最後一筆，避免重複寫入造成結果看似沒變。
+    inc = inc[inc["work_order"] != ""].drop_duplicates(subset=["work_order"], keep="last").reset_index(drop=True)
     cur_keys = set(cur["work_order"].astype(str).str.strip()) if not cur.empty else set()
+    inc_keys = set(inc["work_order"].astype(str).str.strip()) if not inc.empty else set()
     add_df = inc[inc["work_order"].astype(str).str.strip().isin(inc_keys - cur_keys)].copy()
     del_df = cur[cur["work_order"].astype(str).str.strip().isin(cur_keys - inc_keys)].copy()
     upd_df = inc[inc["work_order"].astype(str).str.strip().isin(inc_keys & cur_keys)].copy()
-    return add_df, upd_df, del_df
+    return ensure_cols(add_df), ensure_cols(upd_df), ensure_cols(del_df)
+
+
+def _safe_join(values, limit: int = 30) -> str:
+    vals = [str(x) for x in list(values)[:limit] if str(x).strip()]
+    return "、".join(vals) if vals else "無"
+
+
+def _build_work_order_sync_save_df(add_df: pd.DataFrame, upd_df: pd.DataFrame, del_df: pd.DataFrame, do_delete: bool) -> pd.DataFrame:
+    parts = []
+    if add_df is not None and not add_df.empty:
+        parts.append(add_df.copy())
+    if upd_df is not None and not upd_df.empty:
+        parts.append(upd_df.copy())
+    if do_delete and del_df is not None and not del_df.empty:
+        d = del_df.copy()
+        d["_delete"] = True
+        parts.append(d)
+    if not parts:
+        return ensure_cols(pd.DataFrame())
+    out = pd.concat(parts, ignore_index=True)
+    out["work_order"] = out["work_order"].map(_normalize_text)
+    out = out[out["work_order"] != ""].copy()
+    # 儲存前再次去除新增/更新重複，刪除列保留。
+    if "_delete" in out.columns:
+        normal = out[~out["_delete"].astype(bool)].drop_duplicates(subset=["work_order"], keep="last")
+        deletes = out[out["_delete"].astype(bool)]
+        out = pd.concat([normal, deletes], ignore_index=True)
+    return ensure_cols(out)
 
 if STATE_KEY not in st.session_state:
     reload_data()
@@ -548,14 +582,36 @@ with tab4:
             st.warning("已清除 OneDrive 製令欄位對應永久設定；重新讀取後會回到自動判斷。")
             rerun()
 
-        if st.button("▣ 確認套用對應更新 / Apply Mapped Sync", type="primary", use_container_width=True, key="wo_onedrive_apply_v246"):
-            save_sheet_setting(sheet, int(header_row), mapping, bool(do_delete))
-            save_df = incoming.copy()
-            if do_delete and not del_df.empty:
-                del_mark = del_df.copy()
-                del_mark["_delete"] = True
-                save_df = pd.concat([save_df, del_mark], ignore_index=True)
-            result = save_work_orders(save_df)
-            reload_data()
-            st.success(f"製令同步完成，且已永久記錄欄位對應：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}。新增：{', '.join(add_df['work_order'].head(20).astype(str).tolist()) or '無'}；刪除：{', '.join(del_df['work_order'].head(20).astype(str).tolist()) if do_delete else '未執行刪除'}")
-            rerun()
+        last_msg = st.session_state.get("wo_onedrive_sync_last_message_v248", "")
+        if last_msg:
+            st.success(last_msg)
+
+        st.info("按下確認後才會正式新增、更新或刪除製令；只按『永久記錄目前欄位對應』不會寫入製令清單。")
+        if st.button("▣ 確認套用對應更新 / Apply Mapped Sync", type="primary", use_container_width=True, key=f"wo_onedrive_apply_v248_{sheet}"):
+            if not mapping.get("work_order"):
+                st.error("請先對應『製令 / Work Order』欄位，否則無法新增或更新製令。")
+            elif incoming.empty:
+                st.error("來源資料沒有可寫入的製令。請確認標題列號與製令欄位對應。")
+            else:
+                save_sheet_setting(sheet, int(header_row), mapping, bool(do_delete))
+                save_df = _build_work_order_sync_save_df(add_df, upd_df, del_df, bool(do_delete))
+                if save_df.empty:
+                    msg = "製令同步完成：沒有需要新增、更新或刪除的製令。欄位對應已永久記錄。"
+                    st.session_state["wo_onedrive_sync_last_message_v248"] = msg
+                    st.info(msg)
+                else:
+                    result = save_work_orders(save_df)
+                    reload_data()
+                    msg = (
+                        f"製令同步完成，且已永久記錄欄位對應："
+                        f"應新增 {len(add_df)}、應更新 {len(upd_df)}、"
+                        f"應刪除 {len(del_df) if do_delete else 0}；"
+                        f"實際寫入/覆寫 {result.get('inserted', 0)}、"
+                        f"刪除 {result.get('deleted', 0)}、略過 {result.get('skipped', 0)}。"
+                        f"新增：{_safe_join(add_df['work_order'] if not add_df.empty else [])}；"
+                        f"更新：{_safe_join(upd_df['work_order'] if not upd_df.empty else [])}；"
+                        f"刪除：{_safe_join(del_df['work_order'] if (do_delete and not del_df.empty) else [])}"
+                    )
+                    st.session_state["wo_onedrive_sync_last_message_v248"] = msg
+                    st.success(msg)
+                    rerun()
