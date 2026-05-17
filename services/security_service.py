@@ -972,6 +972,71 @@ div[data-testid="stForm"] button:hover {
   transform: translateY(-1px) !important;
   box-shadow: 0 0 34px rgba(75, 235, 255, .48), 0 16px 38px rgba(0,0,0,.28) !important;
 }
+
+/* V2.29 login input typed text final override: force bright typed text for all Streamlit/BaseWeb input layers. */
+section[data-testid="stSidebar"] input,
+html body div[data-testid="stForm"] div[data-testid="stTextInput"] input,
+html body div[data-testid="stTextInput"] input,
+html body div[data-baseweb="input"] input,
+html body input[type="text"],
+html body input[type="password"] {
+  background: linear-gradient(180deg, rgba(16, 29, 63, .98), rgba(7, 18, 42, .98)) !important;
+  background-color: rgba(10, 22, 52, .98) !important;
+  color: #f7feff !important;
+  -webkit-text-fill-color: #f7feff !important;
+  caret-color: #66f6ff !important;
+  opacity: 1 !important;
+  text-shadow: 0 0 12px rgba(108, 244, 255, .45) !important;
+  font-size: 20px !important;
+  font-weight: 950 !important;
+}
+html body div[data-testid="stForm"] div[data-baseweb="input"],
+html body div[data-testid="stTextInput"] div[data-baseweb="input"],
+html body div[data-baseweb="input"],
+html body div[data-testid="stForm"] div[data-baseweb="base-input"],
+html body div[data-testid="stTextInput"] div[data-baseweb="base-input"],
+html body div[data-baseweb="base-input"] {
+  background: linear-gradient(180deg, rgba(16, 29, 63, .98), rgba(7, 18, 42, .98)) !important;
+  background-color: rgba(10, 22, 52, .98) !important;
+  color: #f7feff !important;
+  -webkit-text-fill-color: #f7feff !important;
+}
+html body div[data-testid="stForm"] input::placeholder,
+html body div[data-testid="stTextInput"] input::placeholder,
+html body input::placeholder {
+  color: rgba(226, 252, 255, .78) !important;
+  -webkit-text-fill-color: rgba(226, 252, 255, .78) !important;
+  opacity: 1 !important;
+}
+html body div[data-testid="stForm"] input:autofill,
+html body div[data-testid="stTextInput"] input:autofill,
+html body div[data-baseweb="input"] input:autofill,
+html body input[type="text"]:autofill,
+html body input[type="password"]:autofill,
+html body div[data-testid="stForm"] input:-webkit-autofill,
+html body div[data-testid="stTextInput"] input:-webkit-autofill,
+html body div[data-baseweb="input"] input:-webkit-autofill,
+html body input[type="text"]:-webkit-autofill,
+html body input[type="password"]:-webkit-autofill,
+html body div[data-testid="stForm"] input:-webkit-autofill:hover,
+html body div[data-testid="stTextInput"] input:-webkit-autofill:hover,
+html body div[data-baseweb="input"] input:-webkit-autofill:hover,
+html body div[data-testid="stForm"] input:-webkit-autofill:focus,
+html body div[data-testid="stTextInput"] input:-webkit-autofill:focus,
+html body div[data-baseweb="input"] input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f7feff !important;
+  color: #f7feff !important;
+  caret-color: #66f6ff !important;
+  transition: background-color 999999s ease-in-out 0s !important;
+  box-shadow: inset 0 0 0 1000px rgba(10, 22, 52, .98), 0 0 0 2px rgba(97, 244, 255, .40) !important;
+}
+/* Keep labels bright without overriding the actual input value back to dark. */
+html body div[data-testid="stTextInput"] label *,
+html body div[data-testid="stForm"] label * {
+  color: #f2feff !important;
+  -webkit-text-fill-color: #f2feff !important;
+}
+
 @media (max-width: 900px) {
   .spt-login-grid { grid-template-columns: 1fr; }
   .spt-login-metrics { grid-template-columns: 1fr; }
@@ -1661,3 +1726,47 @@ def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
         st.session_state["spt_security_settings"] = settings
     except Exception:
         pass
+
+# ===== V2.41 startup/page-entry performance guard =====
+# V1.99 added automatic permission reconciliation inside every check_permission().
+# That is safe but expensive: home/sidebar and module pages call permissions many
+# times, so after updating files every page could spend seconds doing INSERT OR
+# IGNORE loops.  Keep the safety check, but only reconcile occasionally.
+_SECURITY_RECONCILE_DONE_TS_V241 = 0.0
+_SECURITY_RECONCILE_TTL_SECONDS_V241 = 600.0
+
+
+def _v241_security_reconcile_once() -> None:
+    global _SECURITY_RECONCILE_DONE_TS_V241
+    now_ts = time.time()
+    try:
+        ss_ts = float(st.session_state.get("_v241_security_reconcile_ts", 0) or 0)
+        if now_ts - ss_ts < _SECURITY_RECONCILE_TTL_SECONDS_V241:
+            return
+    except Exception:
+        pass
+    try:
+        if now_ts - float(_SECURITY_RECONCILE_DONE_TS_V241 or 0) < _SECURITY_RECONCILE_TTL_SECONDS_V241:
+            return
+    except Exception:
+        pass
+    try:
+        from services.permission_service import reconcile_permission_matrix_for_current_modules
+        reconcile_permission_matrix_for_current_modules(force=False)
+    except Exception:
+        pass
+    try:
+        _SECURITY_RECONCILE_DONE_TS_V241 = now_ts
+        st.session_state["_v241_security_reconcile_ts"] = now_ts
+    except Exception:
+        pass
+
+
+# Replace the previous override with a faster version that still preserves the
+# original permission-cache behavior.
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    try:
+        _v241_security_reconcile_once()
+    except Exception:
+        pass
+    return _old_check_permission_v199(module_code, action)

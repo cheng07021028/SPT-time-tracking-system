@@ -1346,3 +1346,76 @@ def has_permission(username: str, module_code: str, action: str = "can_view") ->
     return _old_has_permission_v199(username, module_code, action)
 
 check_permission = has_permission
+
+# ===== V2.41 startup/page-entry performance guard =====
+# Earlier wrappers reconciled the full permission matrix on every permission check.
+# After a module update this made page entry feel very slow because Streamlit
+# reruns and pages call can_view/can_edit many times.  Reconcile only once per
+# process/session unless explicitly forced by the permission-management page.
+import time as _spt_perf_time
+_RECONCILE_DONE_PROCESS_TS_V241 = 0.0
+_RECONCILE_TTL_SECONDS_V241 = 600.0
+
+
+def _v241_reconcile_recently_done() -> bool:
+    now_ts = _spt_perf_time.time()
+    try:
+        if st is not None:
+            stamp = float(st.session_state.get("_v241_permission_reconcile_ts", 0) or 0)
+            if now_ts - stamp < _RECONCILE_TTL_SECONDS_V241:
+                return True
+    except Exception:
+        pass
+    try:
+        global _RECONCILE_DONE_PROCESS_TS_V241
+        if now_ts - float(_RECONCILE_DONE_PROCESS_TS_V241 or 0) < _RECONCILE_TTL_SECONDS_V241:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _v241_mark_reconcile_done() -> None:
+    now_ts = _spt_perf_time.time()
+    try:
+        global _RECONCILE_DONE_PROCESS_TS_V241
+        _RECONCILE_DONE_PROCESS_TS_V241 = now_ts
+    except Exception:
+        pass
+    try:
+        if st is not None:
+            st.session_state["_v241_permission_reconcile_ts"] = now_ts
+    except Exception:
+        pass
+
+
+def reconcile_permission_matrix_for_current_modules(force: bool = False) -> None:  # type: ignore[override]
+    """Fast module-permission reconciliation.
+
+    - Normal page entry: run at most once per process/session.
+    - 10｜權限管理 saving account/role/module settings may call force=True.
+    - Existing permissions are preserved because INSERT OR IGNORE is used by
+      ensure_permissions_for_all_users().
+    """
+    if not force and _v241_reconcile_recently_done():
+        return
+    init_permission_tables()
+    ensure_permissions_for_all_users(force=False)
+    _v241_mark_reconcile_done()
+
+
+# Override the V1.99 wrappers again so read-only page checks do not cause repeated DB writes.
+def get_account_permissions() -> List[dict]:  # type: ignore[override]
+    reconcile_permission_matrix_for_current_modules(force=False)
+    return _old_get_account_permissions_v199()
+
+
+def has_permission(username: str, module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    try:
+        reconcile_permission_matrix_for_current_modules(force=False)
+    except Exception:
+        pass
+    return _old_has_permission_v199(username, module_code, action)
+
+
+check_permission = has_permission
