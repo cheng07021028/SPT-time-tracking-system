@@ -26,7 +26,7 @@ require_module_access("10_permissions", "can_manage")
 render_header("10 | 權限管理", "帳號密碼總表、帳號匯入、帳號貼上、帳號級模組權限 / Account & Permission Management")
 init_permission_tables()
 
-st.caption("V1.79 loaded｜帳號清單儲存後會同步套用到帳號模組權限；帳號、權限、安全設定會永久保存到 GitHub 設定檔。")
+st.caption("V1.80 loaded｜帳號清單儲存後會同步套用到帳號模組權限，並清除舊角色殘留；帳號、權限、安全設定會永久保存到 GitHub 設定檔。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
@@ -290,6 +290,64 @@ def _merge_users_editor(base_df: pd.DataFrame, new_rows: pd.DataFrame) -> pd.Dat
     return base.reset_index(drop=True)
 
 
+
+def _clear_old_runtime_roles_and_refresh_current_user(usernames: list[str], reason: str = "account_master_saved") -> int:
+    """Clear stale role records after Account Master is saved.
+
+    V1.80 / V2.90：修正角色殘留。
+    以前 sync_auth_users_to_runtime_security() 只 INSERT OR IGNORE 到
+    security_user_roles，若帳號曾經是 admin、後來改成 operator，舊的 admin
+    角色仍可能留在登入列與舊權限表。這裡在「按套用儲存後」明確清掉舊角色，
+    再依 auth_users.role_code 重建，並即時刷新目前登入者 session_state。
+    """
+    clean_users = sorted({str(u or "").strip() for u in usernames if str(u or "").strip()})
+    if not clean_users:
+        return 0
+    fixed = 0
+    try:
+        from services.permission_service import (
+            connect_db,
+            sync_auth_users_to_runtime_security,
+            clear_permission_runtime_cache,
+            export_permission_settings_permanently,
+        )
+        conn = connect_db()
+        cur = conn.cursor()
+        placeholders = ",".join(["?"] * len(clean_users))
+        cur.execute(f"DELETE FROM security_user_roles WHERE username IN ({placeholders})", clean_users)
+        conn.commit()
+        conn.close()
+
+        # Rebuild legacy runtime roles from the authoritative Account Master.
+        sync_auth_users_to_runtime_security(clean_users)
+        clear_permission_runtime_cache()
+
+        # Refresh current login bar immediately, so old roles like "admin, operator"
+        # do not remain after saving the account master.
+        current_username = str(st.session_state.get("auth_username", "") or "").strip()
+        if current_username and current_username in clean_users:
+            conn = connect_db()
+            row = conn.execute(
+                "SELECT username, display_name, employee_id, role_code, is_active FROM auth_users WHERE username=?",
+                (current_username,),
+            ).fetchone()
+            conn.close()
+            if row:
+                role_code = str(row["role_code"] or "operator").strip() or "operator"
+                st.session_state["auth_display_name"] = row["display_name"] or current_username
+                st.session_state["auth_employee_id"] = row["employee_id"] or ""
+                st.session_state["auth_roles"] = [role_code]
+                st.session_state.pop(f"_spt_perm_cache_{current_username}", None)
+                st.session_state["v290_account_role_runtime_refreshed"] = True
+        try:
+            export_permission_settings_permanently(f"{reason}_stale_roles_cleared")
+        except Exception:
+            pass
+        fixed = len(clean_users)
+    except Exception as ex:
+        st.warning(f"帳號已儲存，但清除舊角色殘留時發生提醒：{ex}")
+    return fixed
+
 def _apply_account_master_to_permission_matrix(usernames: list[str], reason: str = "account_master_saved") -> int:
     """Apply saved account roles to Account Module Permissions immediately.
 
@@ -323,6 +381,7 @@ def _apply_account_master_to_permission_matrix(usernames: list[str], reason: str
             pass
     except Exception as ex:
         st.warning(f"帳號已儲存，但同步帳號模組權限時發生提醒：{ex}")
+    _clear_old_runtime_roles_and_refresh_current_user(clean_users, reason)
     st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     return synced
 
@@ -431,7 +490,8 @@ with tab_accounts:
                     "note": str(new_note or "").strip(),
                 }])
                 if result.get("saved", 0) > 0:
-                    st.success(f"帳號已建立 / Account created：{username}")
+                    synced_count = _apply_account_master_to_permission_matrix([username], "account_create_saved")
+                    st.success(f"帳號已建立 / Account created：{username}；帳號模組權限已同步並清除舊角色殘留：{synced_count} 筆")
                     st.session_state["v133_users_df"] = _users_for_editor()
                     try:
                         from services.column_settings_service import clear_editor_draft
@@ -536,7 +596,7 @@ with tab_accounts:
             synced_count = _apply_account_master_to_permission_matrix(saved_usernames, "account_master_editor_saved")
             st.success(
                 f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆；"
-                f"帳號模組權限已同步：{synced_count} 筆 / Accounts and permissions saved"
+                f"帳號模組權限已同步：{synced_count} 筆；舊角色殘留已清除 / Accounts, permissions and stale roles saved"
             )
             if result.get("skipped"):
                 st.warning("；".join(result["skipped"]))
@@ -568,7 +628,7 @@ with tab_accounts:
                 with e2:
                     if st.button("▣ 直接儲存 Excel 帳號 / Save Imported Accounts", type="primary", use_container_width=True, key="v136_excel_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         result = _save_imported_accounts(import_df)
-                        st.success(f"帳號已儲存：{result['saved']} 筆；帳號模組權限已同步：{result.get('permission_matrix_synced', 0)} 筆 / Accounts and permissions saved")
+                        st.success(f"帳號已儲存：{result['saved']} 筆；帳號模組權限已同步並清除舊角色殘留：{result.get('permission_matrix_synced', 0)} 筆 / Accounts, permissions and stale roles saved")
                         if result.get("skipped"):
                             st.warning("；".join(result["skipped"]))
                         st.session_state.pop("v133_users_df", None)
@@ -600,7 +660,7 @@ with tab_accounts:
                 with p2:
                     if st.button("▣ 直接儲存貼上帳號 / Save Pasted Accounts", type="primary", use_container_width=True, key="v136_paste_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         result = _save_imported_accounts(import_df)
-                        st.success(f"帳號已儲存：{result['saved']} 筆；帳號模組權限已同步：{result.get('permission_matrix_synced', 0)} 筆 / Accounts and permissions saved")
+                        st.success(f"帳號已儲存：{result['saved']} 筆；帳號模組權限已同步並清除舊角色殘留：{result.get('permission_matrix_synced', 0)} 筆 / Accounts, permissions and stale roles saved")
                         if result.get("skipped"):
                             st.warning("；".join(result["skipped"]))
                         st.session_state.pop("v133_users_df", None)
