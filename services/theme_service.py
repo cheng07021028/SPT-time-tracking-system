@@ -673,72 +673,49 @@ def _clear_transient_selection_on_page_change() -> None:
 
 
 def _inject_multiselect_tag_height_fix() -> None:
-    """V2.58: readable select/multiselect controls without clipping or white artifacts.
-
-    Streamlit/BaseWeb select controls have nested containers whose default height clips text
-    after global font scaling. This CSS keeps the field tall enough while hiding only the
-    invisible cursor/input artifacts that appeared as white blocks.
-    """
+    """V2.57: keep select/multiselect text readable without white-dot artifacts."""
     try:
         st.markdown(
             """
             <style>
-            /* V2.58｜修正 selectbox / multiselect 文字被切掉，並移除白點/白方塊 */
+            /* V2.57｜修正下拉/多選文字被切掉，同時去除白點 */
             .stSelectbox,
             .stMultiSelect {
                 overflow: visible !important;
             }
 
-            /* Main select shell */
             .stSelectbox div[data-baseweb="select"],
             .stMultiSelect div[data-baseweb="select"] {
-                min-height: 60px !important;
+                min-height: 48px !important;
                 height: auto !important;
-                border-radius: 12px !important;
+                border-radius: 10px !important;
                 background: #eef7fb !important;
-                overflow: hidden !important;
-                display: flex !important;
-                align-items: center !important;
+                overflow: visible !important;
             }
 
-            /* Inner value container */
             .stSelectbox div[data-baseweb="select"] > div,
             .stMultiSelect div[data-baseweb="select"] > div {
-                min-height: 58px !important;
+                min-height: 48px !important;
                 height: auto !important;
-                padding-top: 10px !important;
-                padding-bottom: 10px !important;
+                padding-top: 6px !important;
+                padding-bottom: 6px !important;
                 align-items: center !important;
                 overflow: visible !important;
-                box-sizing: border-box !important;
             }
 
-            /* BaseWeb nested containers: prevent vertical clipping under large font scale */
-            div[data-baseweb="select"] [class*="valueContainer"],
-            div[data-baseweb="select"] [class*="ValueContainer"],
-            div[data-baseweb="select"] [class*="singleValue"],
-            div[data-baseweb="select"] [class*="SingleValue"],
-            div[data-baseweb="select"] [class*="placeholder"],
-            div[data-baseweb="select"] [class*="Placeholder"] {
-                min-height: 34px !important;
-                height: auto !important;
-                line-height: 1.35 !important;
-                overflow: visible !important;
-                display: flex !important;
-                align-items: center !important;
-            }
-
-            /* Display text and placeholder */
+            /* Selectbox / multiselect display text and placeholder */
             div[data-baseweb="select"] span,
-            div[data-baseweb="select"] div {
+            div[data-baseweb="select"] div,
+            div[data-baseweb="select"] input,
+            div[data-baseweb="select"] input[type="text"] {
                 color: #03121f !important;
                 -webkit-text-fill-color: #03121f !important;
                 font-weight: 850 !important;
-                line-height: 1.35 !important;
+                font-size: inherit !important;
+                line-height: 1.45 !important;
                 text-shadow: none !important;
             }
 
-            /* Search input inside select: keep usable, but no white block */
             div[data-baseweb="select"] input,
             div[data-baseweb="select"] input[type="text"],
             div[data-baseweb="select"] input[aria-autocomplete="list"] {
@@ -747,48 +724,37 @@ def _inject_multiselect_tag_height_fix() -> None:
                 border: 0 !important;
                 outline: 0 !important;
                 box-shadow: none !important;
-                min-height: 34px !important;
-                height: 34px !important;
-                line-height: 34px !important;
+                min-height: 28px !important;
+                height: 28px !important;
+                line-height: 28px !important;
                 padding: 0 !important;
                 margin: 0 !important;
-                color: #03121f !important;
-                -webkit-text-fill-color: #03121f !important;
                 caret-color: #03121f !important;
-                font-weight: 850 !important;
             }
 
             div[data-baseweb="select"] input::placeholder {
-                color: rgba(3,18,31,.88) !important;
-                -webkit-text-fill-color: rgba(3,18,31,.88) !important;
+                color: rgba(3,18,31,.78) !important;
+                -webkit-text-fill-color: rgba(3,18,31,.78) !important;
                 opacity: 1 !important;
-                line-height: 1.35 !important;
-            }
-
-            /* Hide empty search-input visual artifact only when it is visually empty */
-            div[data-baseweb="select"] input[value=""] {
-                background: transparent !important;
-                box-shadow: none !important;
             }
 
             /* Multiselect selected tags */
             div[data-baseweb="tag"] {
-                min-height: 36px !important;
+                min-height: 32px !important;
                 height: auto !important;
-                padding: 7px 12px !important;
-                border-radius: 10px !important;
+                padding: 6px 10px !important;
+                border-radius: 9px !important;
                 line-height: 1.35 !important;
                 display: inline-flex !important;
                 align-items: center !important;
-                background: linear-gradient(135deg, #c8fbff, #7ee8ff) !important;
+                background: linear-gradient(135deg, #bff7ff, #7ee8ff) !important;
                 color: #03121f !important;
                 -webkit-text-fill-color: #03121f !important;
                 font-weight: 900 !important;
                 overflow: visible !important;
                 white-space: nowrap !important;
-                margin-top: 3px !important;
-                margin-bottom: 3px !important;
-                box-shadow: 0 0 0 1px rgba(3,18,31,.10) inset !important;
+                margin-top: 2px !important;
+                margin-bottom: 2px !important;
             }
 
             div[data-baseweb="tag"] span,
@@ -808,30 +774,15 @@ def _inject_multiselect_tag_height_fix() -> None:
             }
 
             /* Dropdown list options */
-            div[data-baseweb="popover"] ul[role="listbox"],
-            div[data-baseweb="popover"] div[role="listbox"] {
-                background: #061423 !important;
-                border: 1px solid rgba(35,230,255,.42) !important;
-                border-radius: 12px !important;
-            }
-
             ul[role="listbox"] li,
             div[role="option"] {
-                min-height: 42px !important;
-                height: auto !important;
+                min-height: 38px !important;
                 line-height: 1.45 !important;
-                padding-top: 9px !important;
-                padding-bottom: 9px !important;
-                color: #ecfbff !important;
-                -webkit-text-fill-color: #ecfbff !important;
+                padding-top: 8px !important;
+                padding-bottom: 8px !important;
+                color: #03121f !important;
+                -webkit-text-fill-color: #03121f !important;
                 font-weight: 800 !important;
-                overflow: visible !important;
-            }
-
-            ul[role="listbox"] li *,
-            div[role="option"] * {
-                line-height: 1.45 !important;
-                overflow: visible !important;
             }
             </style>
             """,
@@ -839,6 +790,7 @@ def _inject_multiselect_tag_height_fix() -> None:
         )
     except Exception:
         pass
+
 
 def render_operation_results() -> None:
     """V2.57: legacy helper kept for compatibility; intentionally renders nothing."""
@@ -961,3 +913,147 @@ def render_title(module_no: Any = None, title: Any = None, subtitle: Any = None)
 def render_section_title(title: str, subtitle: str | None = None) -> None:
     apply_theme()
     st.markdown(f"### {_safe_html(title)}" + (f"\n{_safe_html(subtitle)}" if subtitle else ""))
+
+# ===== V2.59 SELECT / MULTISELECT TEXT CLIP FIX START =====
+def apply_v259_select_multiselect_text_fix():
+    """Fix clipped text in Streamlit selectbox / multiselect after global font scaling.
+    Safe to call multiple times. Does not change data, filters, permissions, or calculations.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.59: BaseWeb select / multiselect text clipping final fix */
+        .stSelectbox,
+        .stMultiSelect {
+            overflow: visible !important;
+        }
+
+        /* Outer select shell: keep enough height for larger global font scale */
+        div[data-baseweb="select"] {
+            min-height: 52px !important;
+            height: auto !important;
+            overflow: visible !important;
+            line-height: 1.45 !important;
+        }
+
+        div[data-baseweb="select"] > div {
+            min-height: 52px !important;
+            height: auto !important;
+            padding-top: 7px !important;
+            padding-bottom: 7px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            line-height: 1.45 !important;
+        }
+
+        /* Selected value / placeholder area */
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[class*="valueContainer"] {
+            min-height: 38px !important;
+            height: auto !important;
+            display: flex !important;
+            align-items: center !important;
+            flex-wrap: wrap !important;
+            overflow: visible !important;
+            line-height: 1.45 !important;
+        }
+
+        /* Selectbox visible text and placeholder */
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p,
+        div[data-baseweb="select"] div {
+            line-height: 1.45 !important;
+            white-space: nowrap !important;
+            text-overflow: ellipsis !important;
+            color: #061427 !important;
+            font-weight: 800 !important;
+        }
+
+        /* Internal search input used by BaseWeb select; avoid cropped cursor / white block */
+        div[data-baseweb="select"] input {
+            min-height: 32px !important;
+            height: 32px !important;
+            line-height: 1.45 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            color: #061427 !important;
+            caret-color: #061427 !important;
+            font-weight: 800 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+        }
+
+        /* Multiselect selected tags */
+        div[data-baseweb="tag"] {
+            min-height: 32px !important;
+            height: auto !important;
+            padding: 5px 10px !important;
+            margin: 3px 4px 3px 0 !important;
+            border-radius: 9px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            line-height: 1.45 !important;
+            background: linear-gradient(135deg, #bff7ff 0%, #82e9ff 100%) !important;
+            border: 1px solid rgba(36, 226, 255, 0.75) !important;
+            color: #061427 !important;
+            font-weight: 900 !important;
+        }
+
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div {
+            color: #061427 !important;
+            font-weight: 900 !important;
+            line-height: 1.45 !important;
+            overflow: visible !important;
+        }
+
+        div[data-baseweb="tag"] svg {
+            color: #061427 !important;
+            fill: #061427 !important;
+            stroke: #061427 !important;
+        }
+
+        /* Dropdown list options */
+        ul[role="listbox"],
+        div[role="listbox"] {
+            overflow: auto !important;
+        }
+
+        ul[role="listbox"] li,
+        div[role="option"] {
+            min-height: 40px !important;
+            height: auto !important;
+            padding-top: 9px !important;
+            padding-bottom: 9px !important;
+            display: flex !important;
+            align-items: center !important;
+            line-height: 1.45 !important;
+            font-weight: 800 !important;
+        }
+
+        /* Number input plus/minus should not inherit select fixes */
+        div[data-testid="stNumberInput"] input {
+            line-height: 1.35 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# Apply on import so every module that imports theme_service receives the fix.
+try:
+    apply_v259_select_multiselect_text_fix()
+except Exception:
+    pass
+# ===== V2.59 SELECT / MULTISELECT TEXT CLIP FIX END =====
