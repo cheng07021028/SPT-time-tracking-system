@@ -1436,3 +1436,217 @@ try:
 except Exception:
     pass
 # ===== V2.63 SELECT / MULTISELECT BOX HEIGHT ALIGN PATCH END =====
+
+
+# ===== V2.64 GLOBAL SELECTBOX / MULTISELECT UNIFIED FINAL CSS START =====
+def apply_v264_global_select_unified_final_css():
+    """V2.64: 全系統下拉框統一高度、淺色背景、深色清楚字體，不裁切文字。"""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.64｜所有模組 selectbox / multiselect 統一高度 + 統一淺色字體完整版 */
+        .stSelectbox,
+        .stMultiSelect {
+            overflow: visible !important;
+            min-height: 78px !important;
+        }
+
+        .stSelectbox > div,
+        .stMultiSelect > div {
+            overflow: visible !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"],
+        .stMultiSelect div[data-baseweb="select"] {
+            min-height: 74px !important;
+            height: auto !important;
+            overflow: visible !important;
+            background: transparent !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] > div,
+        .stMultiSelect div[data-baseweb="select"] > div {
+            min-height: 74px !important;
+            height: auto !important;
+            padding: 15px 18px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            border-radius: 14px !important;
+            background: #edf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            border: 1px solid rgba(98, 232, 249, .65) !important;
+            box-shadow: 0 0 0 1px rgba(98,232,249,.12), 0 0 12px rgba(35,230,255,.12) !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] div[role="combobox"],
+        .stMultiSelect div[data-baseweb="select"] div[role="combobox"],
+        .stSelectbox div[data-baseweb="select"] div[aria-expanded],
+        .stMultiSelect div[data-baseweb="select"] div[aria-expanded],
+        .stSelectbox div[data-baseweb="select"] div[class*="control"],
+        .stMultiSelect div[data-baseweb="select"] div[class*="control"],
+        .stSelectbox div[data-baseweb="select"] div[class*="valueContainer"],
+        .stMultiSelect div[data-baseweb="select"] div[class*="valueContainer"] {
+            min-height: 44px !important;
+            height: auto !important;
+            line-height: 44px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] span,
+        .stMultiSelect div[data-baseweb="select"] span,
+        .stSelectbox div[data-baseweb="select"] p,
+        .stMultiSelect div[data-baseweb="select"] p,
+        .stSelectbox div[data-baseweb="select"] div,
+        .stMultiSelect div[data-baseweb="select"] div {
+            min-height: 44px !important;
+            line-height: 44px !important;
+            height: auto !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-size: 17px !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] input,
+        .stMultiSelect div[data-baseweb="select"] input,
+        .stSelectbox div[data-baseweb="select"] input[type="text"],
+        .stMultiSelect div[data-baseweb="select"] input[type="text"] {
+            min-height: 44px !important;
+            height: 44px !important;
+            line-height: 44px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-size: 17px !important;
+            font-weight: 850 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+            caret-color: transparent !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] svg,
+        .stMultiSelect div[data-baseweb="select"] svg {
+            color: #03121f !important;
+            fill: #03121f !important;
+            width: 20px !important;
+            height: 20px !important;
+        }
+
+        .stMultiSelect div[data-baseweb="tag"] {
+            min-height: 40px !important;
+            height: auto !important;
+            padding: 8px 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            border-radius: 10px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            line-height: 24px !important;
+            background: linear-gradient(135deg, #c9fbff 0%, #7ee8ff 100%) !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+            border: 1px solid rgba(36,226,255,.90) !important;
+        }
+
+        .stMultiSelect div[data-baseweb="tag"] span,
+        .stMultiSelect div[data-baseweb="tag"] div {
+            min-height: 24px !important;
+            height: auto !important;
+            line-height: 24px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+        }
+
+        /* 展開下拉選單：淺色底、深色字、足夠高度 */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            border: 1px solid rgba(102,232,249,.95) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 12px 32px rgba(0,255,255,.22) !important;
+            overflow: hidden !important;
+            z-index: 999999 !important;
+        }
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li,
+        div[data-baseweb="menu"] div {
+            min-height: 44px !important;
+            height: auto !important;
+            padding: 10px 14px !important;
+            line-height: 24px !important;
+            display: flex !important;
+            align-items: center !important;
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-size: 16px !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+        }
+
+        div[role="option"] *,
+        li[role="option"] *,
+        ul[role="listbox"] li *,
+        div[data-baseweb="menu"] div * {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            fill: #03121f !important;
+            text-shadow: none !important;
+        }
+
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[data-baseweb="menu"] div:hover {
+            background: linear-gradient(90deg, #99f6ff, #d9fbff) !important;
+            color: #03121f !important;
+        }
+
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"],
+        ul[role="listbox"] li[aria-selected="true"] {
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            font-weight: 950 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v264_global_select_unified_final_css()
+except Exception:
+    pass
+# ===== V2.64 GLOBAL SELECTBOX / MULTISELECT UNIFIED FINAL CSS END =====
