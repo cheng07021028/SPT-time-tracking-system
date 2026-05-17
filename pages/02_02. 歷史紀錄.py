@@ -93,12 +93,23 @@ def _normalize_text(v) -> str:
             return ""
     except Exception:
         pass
-    return str(v).strip()
+    text = str(v)
+    # Excel / browser paste may contain full-width spaces, NBSP, zero-width chars.
+    # Keep internal spaces for model names, but normalize invisible padding so import
+    # will not fail just because cells contain spaces.
+    text = (text.replace("\u3000", " ")
+                .replace("\xa0", " ")
+                .replace("\u200b", "")
+                .replace("\ufeff", ""))
+    return text.strip()
 
 
 def _normalize_header_name(v) -> str:
     text = _normalize_text(v).lower()
-    for ch in [" ", "\t", "\n", "\r", "_", "-", "－", "—", "/", "／", "\\", ".", "．", "：", ":", "（", "）", "(", ")"]:
+    # Remove separators and hidden characters.  This makes headers such as
+    # "工號 / Employee ID", " 工號　/ Employee ID " and duplicated bilingual
+    # headers match the same alias.
+    for ch in [" ", "　", "\t", "\n", "\r", "_", "-", "－", "—", "/", "／", "\\", ".", "．", "：", ":", "（", "）", "(", ")", "[", "]", "【", "】", "\u200b", "\ufeff"]:
         text = text.replace(ch, "")
     return text
 
@@ -291,14 +302,71 @@ def _ensure_history_cols(df: pd.DataFrame) -> pd.DataFrame:
     return df[HISTORY_COLS].copy()
 
 
+def _prepare_source_dataframe(source: pd.DataFrame) -> pd.DataFrame:
+    """Normalize uploaded/pasted Excel tables before column matching.
+
+    Fixes cases where the Excel sheet has blank header cells, duplicated bilingual
+    headers, leading/trailing spaces, or an extra header row after pd.read_excel.
+    It does not remove meaningful spaces inside values such as model names.
+    """
+    if source is None:
+        return pd.DataFrame()
+    df = source.copy()
+    df = df.dropna(how="all").dropna(axis=1, how="all").reset_index(drop=True)
+    if df.empty:
+        return df
+
+    # Clean column names but preserve display text; make duplicates unique.
+    new_cols = []
+    seen = {}
+    for c in df.columns:
+        name = _normalize_text(c)
+        if not name or name.lower().startswith("unnamed"):
+            name = f"col_{len(new_cols)+1}"
+        base = name
+        count = seen.get(base, 0)
+        seen[base] = count + 1
+        if count:
+            name = f"{base}__{count+1}"
+        new_cols.append(name)
+    df.columns = new_cols
+
+    # If pd.read_excel read a blank/incorrect header but first row looks like a
+    # real header, promote the first row.
+    try:
+        first = [_normalize_text(x) for x in df.iloc[0].tolist()]
+        if _row_looks_like_header(first):
+            width = len(first)
+            body = df.iloc[1:].reset_index(drop=True)
+            cols = []
+            seen = {}
+            for i, c in enumerate(first):
+                name = _normalize_text(c) or f"col_{i+1}"
+                base = name
+                count = seen.get(base, 0)
+                seen[base] = count + 1
+                if count:
+                    name = f"{base}__{count+1}"
+                cols.append(name)
+            body = body.iloc[:, :width]
+            body.columns = cols
+            df = body
+    except Exception:
+        pass
+
+    # Clean object values for matching/import; keep internal normal spaces.
+    for c in df.columns:
+        if df[c].dtype == object:
+            df[c] = df[c].map(_normalize_text)
+    return df
+
+
 def parse_history_dataframe(source: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     warnings: list[str] = []
     if source is None or source.empty:
         return _ensure_history_cols(pd.DataFrame()), ["來源資料為空。"]
 
-    source = source.copy()
-    # Some Excel exports have completely blank rows/columns.
-    source = source.dropna(how="all").dropna(axis=1, how="all").reset_index(drop=True)
+    source = _prepare_source_dataframe(source)
     if source.empty:
         return _ensure_history_cols(pd.DataFrame()), ["來源資料沒有有效列。"]
 
@@ -1082,8 +1150,14 @@ with tab2:
         recalc_excel = st.checkbox("匯入時依 13｜系統設定休息時間重新計算工時", value=True, key="history_excel_recalc_v197")
         if uploaded is not None:
             try:
-                source_df = pd.read_excel(uploaded)
+                source_df = pd.read_excel(uploaded, dtype=object)
+                source_df = _prepare_source_dataframe(source_df)
                 parsed, warnings = parse_history_dataframe(source_df)
+                # Keep the parsed rows in session_state.  This makes the import
+                # button reliable after Streamlit reruns and avoids "button clicked
+                # but nothing happened" when the uploaded file is reparsed.
+                st.session_state[HISTORY_IMPORT_PREVIEW_KEY] = parsed.copy()
+                st.session_state[HISTORY_IMPORT_PREVIEW_KEY + "_warnings"] = warnings
                 st.caption("原始 Excel 預覽 / Source Preview")
                 st.dataframe(source_df.head(30), use_container_width=True, height=220)
                 for msg in warnings:
@@ -1092,13 +1166,14 @@ with tab2:
                     st.error("解析後沒有可匯入資料。請確認至少包含：工號、製令、工段、開始時間。")
                 else:
                     st.success(f"已解析 {len(parsed)} 筆歷史工時資料。")
-                    st.info("請先確認下方解析結果，確認無誤後按『確認匯入 Excel 歷史紀錄』。按鈕已放在預覽表格上方，避免資料多時看不到。")
-                    if st.button("⟟ 確認匯入 Excel 歷史紀錄 / Import Excel History", type="primary", use_container_width=True, key="history_excel_import_save_v237_top"):
-                        result = import_time_records(parsed, recalc=recalc_excel, source="history_excel_import")
+                    st.info("請先確認下方解析結果。按『確認匯入 Excel 歷史紀錄』後，結果會永久顯示在頁面上方。")
+                    if st.button("⟟ 確認匯入 Excel 歷史紀錄 / Import Excel History", type="primary", use_container_width=True, key="history_excel_import_save_v240_top"):
+                        import_df = st.session_state.get(HISTORY_IMPORT_PREVIEW_KEY, parsed).copy()
+                        result = import_time_records(import_df, recalc=recalc_excel, source="history_excel_import")
                         _add_history_result("success", f"Excel 匯入完成：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}。", append=False)
                         for msg in result.get("errors", [])[:10]:
                             _add_history_result("warning", msg)
-                        rerun()
+                        st.success(f"Excel 匯入完成：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}。")
                     st.dataframe(parsed, use_container_width=True, height=360)
             except Exception as exc:
                 _add_history_result("error", f"Excel 匯入失敗：{exc}", append=False)
