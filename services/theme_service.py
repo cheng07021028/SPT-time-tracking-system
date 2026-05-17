@@ -11,6 +11,7 @@ This file is self-contained and keeps backward-compatible function names used by
 from __future__ import annotations
 
 import base64
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -605,6 +606,118 @@ div[data-testid="stExpander"] summary * {
     )
 
 
+# ===== V2.47 persistent operation message center =====
+_STATUS_PATCHED = False
+_ORIGINAL_STATUS_FUNCS: dict[str, Any] = {}
+
+def _current_page_id_for_messages() -> str:
+    try:
+        import inspect
+        for frame in inspect.stack():
+            fn = str(getattr(frame, "filename", "") or "").replace("\\", "/")
+            if "/pages/" in fn:
+                return fn.rsplit("/", 1)[-1]
+        return "streamlit_app.py"
+    except Exception:
+        return "streamlit_app.py"
+
+
+def _message_store_key(page_id: str | None = None) -> str:
+    return f"_spt_persistent_messages::{page_id or _current_page_id_for_messages()}"
+
+
+def _plain_message(value: Any) -> str:
+    try:
+        if isinstance(value, (list, tuple)):
+            return "\n".join(str(x) for x in value)
+        return str(value)
+    except Exception:
+        return ""
+
+
+def _remember_operation_message(level: str, body: Any) -> None:
+    try:
+        text = _plain_message(body).strip()
+        if not text:
+            return
+        page_id = _current_page_id_for_messages()
+        key = _message_store_key(page_id)
+        messages = list(st.session_state.get(key, []))
+        now = datetime.now().strftime("%H:%M:%S")
+        # Avoid duplicating the same message repeatedly on auto rerun.
+        if messages and messages[-1].get("level") == level and messages[-1].get("text") == text:
+            messages[-1]["time"] = now
+        else:
+            messages.append({"time": now, "level": level, "text": text})
+        st.session_state[key] = messages[-80:]
+    except Exception:
+        pass
+
+
+def _install_persistent_message_patch() -> None:
+    global _STATUS_PATCHED, _ORIGINAL_STATUS_FUNCS
+    if _STATUS_PATCHED:
+        return
+    try:
+        for name in ("success", "info", "warning", "error"):
+            _ORIGINAL_STATUS_FUNCS[name] = getattr(st, name)
+
+        def _make_wrapper(level: str):
+            original = _ORIGINAL_STATUS_FUNCS[level]
+            def _wrapper(body: Any = None, *args: Any, **kwargs: Any):
+                _remember_operation_message(level, body)
+                return original(body, *args, **kwargs)
+            return _wrapper
+
+        for name in ("success", "info", "warning", "error"):
+            setattr(st, name, _make_wrapper(name))
+        _STATUS_PATCHED = True
+    except Exception:
+        pass
+
+
+def _render_persistent_operation_messages() -> None:
+    try:
+        page_id = _current_page_id_for_messages()
+        key = _message_store_key(page_id)
+        messages = list(st.session_state.get(key, []))
+        if not messages:
+            return
+        icon_map = {
+            "success": "▣",
+            "info": "⌕",
+            "warning": "⟁",
+            "error": "⛔",
+        }
+        rows = []
+        for msg in messages[-12:]:
+            level = str(msg.get("level") or "info").lower()
+            if level not in icon_map:
+                level = "info"
+            rows.append(
+                f'<div class="spt-opmsg-item spt-opmsg-{level}">'
+                f'<div class="spt-opmsg-time">{_safe_html(msg.get("time", ""))}</div>'
+                f'<div class="spt-opmsg-text">{icon_map[level]} {_safe_html(msg.get("text", ""))}</div>'
+                f'</div>'
+            )
+        st.markdown(
+            '<div class="spt-opmsg-wrap">'
+            '<div class="spt-opmsg-title">▣ 執行結果 / Operation Results（保留到手動清除）</div>'
+            + ''.join(rows) +
+            '<div class="spt-opmsg-caption">成功、失敗、警告與匯入/刪除/儲存結果會停留在本頁；按下方按鈕才會清除。</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("◌ 清除本頁執行結果訊息 / Clear Operation Messages", key=f"clear_{key}"):
+            st.session_state.pop(key, None)
+            try:
+                st.rerun()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 def _clear_transient_selection_on_page_change() -> None:
     """Clear batch-selection checkboxes when the user leaves a module page.
 
@@ -632,8 +745,93 @@ def _clear_transient_selection_on_page_change() -> None:
         pass
 
 
+
+def _inject_multiselect_tag_height_fix() -> None:
+    """V2.54: prevent multiselect selected tags/options from being clipped after global font scaling."""
+    try:
+        st.markdown(
+            """
+            <style>
+            /* V2.54｜全系統多選篩選標籤文字被切修正 */
+            div[data-baseweb="select"] {
+                min-height: 46px !important;
+                height: auto !important;
+                overflow: visible !important;
+            }
+
+            div[data-baseweb="select"] > div {
+                min-height: 46px !important;
+                height: auto !important;
+                overflow: visible !important;
+                align-items: center !important;
+                padding-top: 4px !important;
+                padding-bottom: 4px !important;
+            }
+
+            div[data-baseweb="tag"] {
+                min-height: 30px !important;
+                height: auto !important;
+                padding: 5px 10px !important;
+                border-radius: 8px !important;
+                line-height: 1.35 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                background: linear-gradient(135deg, #bff7ff, #7ee8ff) !important;
+                color: #03121f !important;
+                font-weight: 800 !important;
+                overflow: visible !important;
+                white-space: nowrap !important;
+            }
+
+            div[data-baseweb="tag"] span {
+                color: #03121f !important;
+                font-weight: 800 !important;
+                line-height: 1.35 !important;
+                overflow: visible !important;
+            }
+
+            div[data-baseweb="tag"] svg {
+                color: #03121f !important;
+                fill: #03121f !important;
+            }
+
+            div[data-baseweb="select"] input {
+                min-height: 30px !important;
+                line-height: 1.4 !important;
+                color: #03121f !important;
+                font-weight: 800 !important;
+            }
+
+            ul[role="listbox"] li,
+            div[role="option"] {
+                min-height: 36px !important;
+                line-height: 1.45 !important;
+                padding-top: 8px !important;
+                padding-bottom: 8px !important;
+                font-weight: 700 !important;
+            }
+
+            .stMultiSelect,
+            .stSelectbox {
+                overflow: visible !important;
+            }
+
+            .stMultiSelect div,
+            .stSelectbox div {
+                overflow: visible;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        pass
+
+
 def apply_theme() -> None:
     _inject_css()
+    _inject_multiselect_tag_height_fix()
+    _install_persistent_message_patch()
     _clear_transient_selection_on_page_change()
     # V2.18: apply global font scale to every module page.
     # Best-effort only; visual theme must never break a page.
@@ -676,6 +874,7 @@ def render_header(module_no: Any = None, title: Any = None, subtitle: Any = None
 """,
         unsafe_allow_html=True,
     )
+    _render_persistent_operation_messages()
 
 
 def render_home_header() -> None:
