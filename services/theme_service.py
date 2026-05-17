@@ -4337,3 +4337,124 @@ for _spt_v283_name in (
             return _spt_v283_wrapper
         globals()[_spt_v283_name] = _spt_v283_make_wrapper(_spt_v283_func)
 # ===== V2.83 COLLAPSED SELECT DARK TEXT GUARD END =====
+
+
+# ===== V2.84 INPUT FRAME CLIP GUARD START =====
+def apply_v284_input_frame_clip_guard():
+    """Fix clipped outer frame on text/password inputs.
+    Preserve current cyber style while ensuring the full rounded border/glow is visible.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        :root {
+            --spt-v284-login-frame-gap-top: 8px;
+            --spt-v284-login-frame-gap-side: 4px;
+            --spt-v284-login-frame-gap-bottom: 8px;
+        }
+
+        /* 讓文字/密碼輸入元件外層不要裁切光暈與圓角 */
+        .stTextInput,
+        .stTextInput > div,
+        .stTextInput > div > div,
+        div[data-testid="stTextInput"],
+        div[data-testid="stTextInput"] > div,
+        div[data-testid="stTextInputRootElement"],
+        div[data-testid="stTextInputRootElement"] > div,
+        div[data-testid="stPasswordInput"],
+        div[data-testid="stPasswordInput"] > div {
+            overflow: visible !important;
+            box-sizing: border-box !important;
+        }
+
+        /* 給足上/下/左右緩衝，避免外框被容器邊界切掉 */
+        .stTextInput,
+        div[data-testid="stTextInput"],
+        div[data-testid="stPasswordInput"] {
+            padding-top: var(--spt-v284-login-frame-gap-top) !important;
+            padding-right: var(--spt-v284-login-frame-gap-side) !important;
+            padding-bottom: var(--spt-v284-login-frame-gap-bottom) !important;
+            padding-left: var(--spt-v284-login-frame-gap-side) !important;
+            margin-top: 0 !important;
+            margin-bottom: 10px !important;
+        }
+
+        /* 實際輸入框根容器：不再貼邊，也不裁切圓角與光暈 */
+        div[data-testid="stTextInputRootElement"] {
+            padding: 2px !important;
+            border-radius: 18px !important;
+            overflow: visible !important;
+            background: transparent !important;
+        }
+
+        div[data-testid="stTextInputRootElement"] > div {
+            border-radius: 18px !important;
+            overflow: visible !important;
+            background: transparent !important;
+        }
+
+        /* 眼睛按鈕容器也不要把右上圓角切掉 */
+        div[data-testid="stTextInputRootElement"] button,
+        div[data-testid="stPasswordInput"] button,
+        .stTextInput button {
+            overflow: visible !important;
+            border-top-right-radius: 16px !important;
+            border-bottom-right-radius: 16px !important;
+        }
+
+        /* 輸入框本體：移除任何會把外框推到裁切區的負位移感 */
+        .stTextInput input,
+        div[data-testid="stTextInputRootElement"] input,
+        div[data-testid="stPasswordInput"] input {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            position: relative !important;
+            top: 0 !important;
+            left: 0 !important;
+            box-sizing: border-box !important;
+        }
+
+        /* label 與欄位之間多一點距離，避免看起來外框被標籤壓住 */
+        .stTextInput label,
+        div[data-testid="stWidgetLabel"] label {
+            margin-bottom: 8px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v284_input_frame_clip_guard()
+except Exception:
+    pass
+
+for _spt_v284_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v284_func = globals().get(_spt_v284_name)
+    if callable(_spt_v284_func) and not getattr(_spt_v284_func, "_spt_v284_wrapped", False):
+        def _spt_v284_make_wrapper(_original):
+            def _spt_v284_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v284_input_frame_clip_guard()
+                except Exception:
+                    pass
+                return result
+            _spt_v284_wrapper._spt_v284_wrapped = True
+            return _spt_v284_wrapper
+        globals()[_spt_v284_name] = _spt_v284_make_wrapper(_spt_v284_func)
+# ===== V2.84 INPUT FRAME CLIP GUARD END =====
