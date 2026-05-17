@@ -18,7 +18,7 @@ STATE_PATH = ROOT / "data" / "persistent_state" / "spt_work_order_sync_settings.
 MODULE_PATH = ROOT / "data" / "persistent_modules" / "03_work_orders" / "work_order_sync_settings.json"
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
-    "version": "V2.46",
+    "version": "V2.52",
     "last_sheet": "",
     "last_header_row": 1,
     "last_mapping": {},
@@ -74,7 +74,7 @@ def save_work_order_sync_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
     """Write settings to all permanent locations."""
     _ensure_dirs()
     data = _merge_settings(settings or {})
-    data["version"] = "V2.46"
+    data["version"] = "V2.52"
     data["updated_at"] = _now()
     text = json.dumps(data, ensure_ascii=False, indent=2)
     for p in (CONFIG_PATH, STATE_PATH, MODULE_PATH):
@@ -94,10 +94,19 @@ def get_sheet_setting(sheet_name: str) -> Dict[str, Any]:
         "header_row": sheet_cfg.get("header_row", settings.get("last_header_row", 1)),
         "mapping": sheet_cfg.get("mapping", settings.get("last_mapping", {})),
         "delete_missing": sheet_cfg.get("delete_missing", settings.get("last_delete_missing", False)),
+        "import_mode": sheet_cfg.get("import_mode", settings.get("last_import_mode", "master")),
+        "row_key_col": sheet_cfg.get("row_key_col", settings.get("last_row_key_col", "製令&出現次數")),
     }
 
 
-def save_sheet_setting(sheet_name: str, header_row: int, mapping: Dict[str, str], delete_missing: bool = False) -> Dict[str, Any]:
+def save_sheet_setting(
+    sheet_name: str,
+    header_row: int,
+    mapping: Dict[str, str],
+    delete_missing: bool = False,
+    import_mode: str = "master",
+    row_key_col: str = "製令&出現次數",
+) -> Dict[str, Any]:
     settings = load_work_order_sync_settings()
     sheet_name = str(sheet_name or "")
     try:
@@ -105,10 +114,16 @@ def save_sheet_setting(sheet_name: str, header_row: int, mapping: Dict[str, str]
     except Exception:
         header_row = 1
     clean_mapping = {str(k): str(v or "") for k, v in (mapping or {}).items()}
+    import_mode = str(import_mode or "master")
+    if import_mode not in ("master", "source_rows"):
+        import_mode = "master"
+    row_key_col = str(row_key_col or "製令&出現次數")
     settings["last_sheet"] = sheet_name
     settings["last_header_row"] = header_row
     settings["last_mapping"] = clean_mapping
     settings["last_delete_missing"] = bool(delete_missing)
+    settings["last_import_mode"] = import_mode
+    settings["last_row_key_col"] = row_key_col
     sheet_settings = settings.get("sheet_settings")
     if not isinstance(sheet_settings, dict):
         sheet_settings = {}
@@ -117,6 +132,8 @@ def save_sheet_setting(sheet_name: str, header_row: int, mapping: Dict[str, str]
             "header_row": header_row,
             "mapping": clean_mapping,
             "delete_missing": bool(delete_missing),
+            "import_mode": import_mode,
+            "row_key_col": row_key_col,
             "updated_at": _now(),
         }
     settings["sheet_settings"] = sheet_settings
