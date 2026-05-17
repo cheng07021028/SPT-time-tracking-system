@@ -1,6 +1,6 @@
 {
   "schema_version": "v1.30",
-  "export_time": "2026-05-17 09:16:58",
+  "export_time": "2026-05-17 09:19:42",
   "database_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
   "tables": {
     "app_settings": [
@@ -2014,13 +2014,13 @@
         "setting_key": "idle_timeout_minutes",
         "setting_value": "1",
         "note": "閒置多久自動登出，單位分鐘",
-        "updated_at": "2026-05-17 00:29:51"
+        "updated_at": "2026-05-17 09:19:34"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
         "note": "V1.99 synchronized permanent security setting",
-        "updated_at": "2026-05-17 00:29:51"
+        "updated_at": "2026-05-17 09:19:33"
       }
     ],
     "auth_users": [
@@ -3289,6 +3289,46 @@
       }
     ],
     "rest_periods": [
+      {
+        "id": 1,
+        "name": "上午休息",
+        "start_time": "10:30",
+        "end_time": "10:45",
+        "is_active": 1,
+        "sort_order": 1
+      },
+      {
+        "id": 2,
+        "name": "午休",
+        "start_time": "12:00",
+        "end_time": "13:00",
+        "is_active": 1,
+        "sort_order": 2
+      },
+      {
+        "id": 3,
+        "name": "下午休息",
+        "start_time": "15:00",
+        "end_time": "15:15",
+        "is_active": 1,
+        "sort_order": 3
+      },
+      {
+        "id": 4,
+        "name": "晚餐休息",
+        "start_time": "18:00",
+        "end_time": "18:30",
+        "is_active": 1,
+        "sort_order": 4
+      },
+      {
+        "id": 5,
+        "name": "晚上休息",
+        "start_time": "20:00",
+        "end_time": "20:15",
+        "is_active": 1,
+        "sort_order": 5
+      },
       {
         "id": 26,
         "name": "上午休息",
@@ -5967,13 +6007,13 @@
         "setting_key": "idle_timeout_minutes",
         "setting_value": "1",
         "note": "閒置多久自動登出，單位分鐘",
-        "updated_at": "2026-05-17 00:29:51"
+        "updated_at": "2026-05-17 09:19:34"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
         "note": "V1.99 synchronized permanent security setting",
-        "updated_at": "2026-05-17 00:29:51"
+        "updated_at": "2026-05-17 09:19:33"
       }
     ],
     "security_user_roles": [
@@ -6050,7 +6090,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-16 23:54:25",
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 23:54:25"
+        "updated_at": "2026-05-17 09:18:31"
       },
       {
         "id": 2,
@@ -6063,7 +6103,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 23:52:31"
+        "updated_at": "2026-05-17 09:18:31"
       },
       {
         "id": 3,
@@ -6076,7 +6116,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 23:52:31"
+        "updated_at": "2026-05-17 09:18:31"
       },
       {
         "id": 4,
@@ -6089,7 +6129,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 23:52:31"
+        "updated_at": "2026-05-17 09:18:31"
       },
       {
         "id": 5,
@@ -6102,7 +6142,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 23:52:31"
+        "updated_at": "2026-05-17 09:18:31"
       },
       {
         "id": 6,
@@ -6115,7 +6155,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-16 23:52:31"
+        "updated_at": "2026-05-17 09:18:31"
       },
       {
         "id": 6425,
@@ -6128,7 +6168,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:18:26",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-16 23:52:31"
+        "updated_at": "2026-05-17 09:18:31"
       },
       {
         "id": 6430,
@@ -6141,7 +6181,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-16 11:50:11",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-16 23:52:31"
+        "updated_at": "2026-05-17 09:18:31"
       },
       {
         "id": 38031,
@@ -6154,7 +6194,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-16 23:52:31"
+        "updated_at": "2026-05-17 09:18:31"
       }
     ],
     "system_logs": [
@@ -14444,7 +14484,7 @@
     "auth_users": 9,
     "employees": 74,
     "process_options": 17,
-    "rest_periods": 5,
+    "rest_periods": 10,
     "security_login_logs": 83,
     "security_module_permissions": 78,
     "security_roles": 6,
