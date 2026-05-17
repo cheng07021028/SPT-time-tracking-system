@@ -439,6 +439,86 @@ def parse_pasted_history(raw: str) -> tuple[pd.DataFrame, bool, list[str]]:
             warnings.append("未偵測到標題列，已用預設順序解析。")
     return parsed, has_header, warnings
 
+def _date_from_any_value(value):
+    text = _normalize_text(value)
+    if not text:
+        return None
+    try:
+        dt = pd.to_datetime(text, errors="coerce")
+        if not pd.isna(dt):
+            return dt.date()
+    except Exception:
+        pass
+    try:
+        dt = pd.to_datetime(text.replace("/", "-")[:10], errors="coerce")
+        if not pd.isna(dt):
+            return dt.date()
+    except Exception:
+        pass
+    return None
+
+
+def _extract_import_date_range(import_df: pd.DataFrame):
+    """Return min/max dates contained in parsed import rows.
+
+    Excel / paste imports are often outside the current 02 filter range.  The
+    records were written successfully, but the page still showed only the old
+    filtered range, which looked like only one row was imported.  This helper
+    finds the real import date range so the page can switch the filter after a
+    successful import and show all newly imported rows immediately.
+    """
+    dates = []
+    if import_df is None or import_df.empty:
+        return None, None
+    for _, row in import_df.iterrows():
+        for col in ["start_date", "end_date", "start_timestamp", "end_timestamp"]:
+            if col in import_df.columns:
+                d = _date_from_any_value(row.get(col))
+                if d is not None:
+                    dates.append(d)
+    if not dates:
+        return None, None
+    return min(dates), max(dates)
+
+
+def _focus_filter_to_import_rows(import_df: pd.DataFrame, label: str = "匯入資料") -> None:
+    """Persistently switch 02 filter to the imported date range.
+
+    This does not change imported data.  It only updates the visible filter so
+    users can immediately verify all rows just imported, even when the import
+    file contains old dates such as 2026-02 while the default filter is 近30天.
+    """
+    start_d, end_d = _extract_import_date_range(import_df)
+    if start_d is None or end_d is None:
+        _add_history_result("warning", f"{label}已寫入，但系統無法判斷日期範圍；請手動調整上方歷史篩選日期。")
+        return
+    new_filters = load_history_filters()
+    new_filters.update({
+        "date_preset": "自訂區間",
+        "start_date": str(start_d),
+        "end_date": str(end_d),
+        "work_orders": [],
+        "part_nos": [],
+        "type_names": [],
+        "assembly_locations": [],
+        "process_names": [],
+        "employee_ids": [],
+        "employee_names": [],
+        "departments": [],
+        "titles": [],
+        "statuses": [],
+        "end_state": "全部",
+        "anomaly_filter": "全部",
+        "keyword": "",
+        "top_n": "全部",
+        "sort_by": "開始時間由新到舊",
+        "detail_limit": max(int(new_filters.get("detail_limit") or 1000), min(max(len(import_df) + 50, 1000), 50000)),
+    })
+    saved = save_history_filters(new_filters)
+    st.session_state["history_filters_applied_v216"] = saved
+    _add_history_result("info", f"已自動切換 02｜歷史紀錄篩選到{label}日期範圍：{start_d} ~ {end_d}，方便確認全部匯入結果。")
+
+
 
 def _download_history_template():
     template = pd.DataFrame([
@@ -1167,13 +1247,18 @@ with tab2:
                 else:
                     st.success(f"已解析 {len(parsed)} 筆歷史工時資料。")
                     st.info("請先確認下方解析結果。按『確認匯入 Excel 歷史紀錄』後，結果會永久顯示在頁面上方。")
-                    if st.button("⟟ 確認匯入 Excel 歷史紀錄 / Import Excel History", type="primary", use_container_width=True, key="history_excel_import_save_v240_top"):
+                    if st.button("⟟ 確認匯入 Excel 歷史紀錄 / Import Excel History", type="primary", use_container_width=True, key="history_excel_import_save_v242_top"):
                         import_df = st.session_state.get(HISTORY_IMPORT_PREVIEW_KEY, parsed).copy()
                         result = import_time_records(import_df, recalc=recalc_excel, source="history_excel_import")
                         _add_history_result("success", f"Excel 匯入完成：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}。", append=False)
-                        for msg in result.get("errors", [])[:10]:
+                        for msg in result.get("errors", [])[:20]:
                             _add_history_result("warning", msg)
-                        st.success(f"Excel 匯入完成：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}。")
+                        if result.get("inserted", 0) or result.get("updated", 0):
+                            _focus_filter_to_import_rows(import_df, "Excel 匯入資料")
+                            rerun()
+                        else:
+                            _add_history_result("warning", "這次沒有寫入任何資料。請確認解析預覽中的工號、製令、工段名稱、開始時間戳是否正確。")
+                            rerun()
                     st.dataframe(parsed, use_container_width=True, height=360)
             except Exception as exc:
                 _add_history_result("error", f"Excel 匯入失敗：{exc}", append=False)
@@ -1199,8 +1284,9 @@ with tab3:
                 st.error("解析後沒有可匯入資料。請確認至少包含：工號、製令、工段、開始時間。")
             else:
                 st.success(f"已解析 {len(parsed)} 筆歷史工時資料。")
-                if st.button("▣ 確認匯入貼上歷史紀錄 / Save Pasted History", type="primary", use_container_width=True, key="history_paste_save_v236"):
-                    result = import_time_records(parsed, recalc=recalc_paste, source="history_paste_import")
+                if st.button("▣ 確認匯入貼上歷史紀錄 / Save Pasted History", type="primary", use_container_width=True, key="history_paste_save_v242"):
+                    import_df = parsed.copy()
+                    result = import_time_records(import_df, recalc=recalc_paste, source="history_paste_import")
                     _add_history_result("success", f"貼上資料已匯入：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}。", append=False)
                     for msg in result.get("errors", [])[:20]:
                         _add_history_result("warning", msg)
@@ -1211,6 +1297,7 @@ with tab3:
                         # 否則 Streamlit 會拋 StreamlitAPIException。
                         # 改用 key version 方式，成功匯入後下一次 rerun 產生新輸入框，達到清空效果。
                         st.session_state[paste_raw_version_key] = int(st.session_state.get(paste_raw_version_key, 0)) + 1
+                        _focus_filter_to_import_rows(import_df, "貼上匯入資料")
                     rerun()
                 st.caption("匯入前預覽 / Parsed Preview")
                 st.dataframe(parsed, use_container_width=True, height=360)
