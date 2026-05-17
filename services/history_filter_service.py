@@ -22,7 +22,7 @@ MULTI_KEYS = [
 def default_history_filters() -> dict[str, Any]:
     today = today_date()
     return {
-        "version": "V2.19",
+        "version": "V2.20",
         "updated_at": now_text(),
         "date_preset": "近30天",
         "start_date": str(today - timedelta(days=30)),
@@ -85,7 +85,7 @@ def load_history_filters() -> dict[str, Any]:
 
 def save_history_filters(filters: dict[str, Any]) -> dict[str, Any]:
     payload = _normalize(filters)
-    payload["version"] = "V2.19"
+    payload["version"] = "V2.20"
     payload["updated_at"] = now_text()
     for path in (CONFIG_PATH, STATE_PATH, MODULE_PATH):
         path.parent.mkdir(parents=True, exist_ok=True)
