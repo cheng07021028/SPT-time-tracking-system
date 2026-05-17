@@ -76,7 +76,7 @@ def calculate_work_hours(start_ts: str | datetime, end_ts: str | datetime) -> fl
                 rest_seconds += (overlap_end - overlap_start).total_seconds()
         d += timedelta(days=1)
 
-    return round(max((total_seconds - rest_seconds) / 3600, 0), 2)
+    return round(max((total_seconds - rest_seconds) / 3600, 0), 6)
 
 
 def split_timestamp(ts: str | datetime) -> tuple[str, str]:
