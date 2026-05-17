@@ -1871,3 +1871,255 @@ try:
 except Exception:
     pass
 # ===== V2.65 SELECT DISPLAY ABSOLUTE HEIGHT OVERRIDE END =====
+
+
+# ===== V2.66 STATUS HEIGHT UNIFY ALL FILTER FIELDS START =====
+def apply_v266_status_height_unify_all_filter_fields():
+    """
+    Use the readable Status / 狀態 field height as the system standard.
+    Target: selectbox, multiselect, date input, text input, number input visible fields.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /*
+          V2.66｜以「狀態 / Status」欄位高度為基準，統一所有篩選格高度
+          狀態欄目前可讀高度基準：
+          - 外框高度：66px
+          - 內層容器：64px
+          - 文字行高：32px~36px
+        */
+        :root {
+            --spt-filter-field-height: 66px;
+            --spt-filter-inner-height: 64px;
+            --spt-filter-text-line: 36px;
+        }
+
+        /* Streamlit 欄位外層：給足垂直空間 */
+        .stSelectbox,
+        .stMultiSelect,
+        .stTextInput,
+        .stDateInput,
+        .stNumberInput,
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"],
+        div[data-testid="stTextInput"],
+        div[data-testid="stDateInput"],
+        div[data-testid="stNumberInput"] {
+            min-height: 94px !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        /* Select / Multiselect 可視欄位：全部比照 Status 欄位高度 */
+        div[data-baseweb="select"] {
+            min-height: var(--spt-filter-field-height) !important;
+            height: var(--spt-filter-field-height) !important;
+            overflow: visible !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+
+        div[data-baseweb="select"] > div {
+            min-height: var(--spt-filter-field-height) !important;
+            height: var(--spt-filter-field-height) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+            border-radius: 13px !important;
+            background: #edf8ff !important;
+            color: #03121f !important;
+        }
+
+        /* BaseWeb 內層容器：修正文字像凹進去、被裁切 */
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[class*="valueContainer"],
+        div[data-baseweb="select"] div[class*="ValueContainer"],
+        div[data-baseweb="select"] div[class*="singleValue"],
+        div[data-baseweb="select"] div[class*="SingleValue"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Placeholder"] {
+            min-height: var(--spt-filter-inner-height) !important;
+            height: var(--spt-filter-inner-height) !important;
+            line-height: var(--spt-filter-inner-height) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+        }
+
+        /* Select / Multiselect 顯示文字 */
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p {
+            min-height: var(--spt-filter-text-line) !important;
+            line-height: var(--spt-filter-text-line) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        /* Select / Multiselect 內部搜尋 input */
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete="list"] {
+            min-height: var(--spt-filter-text-line) !important;
+            height: var(--spt-filter-text-line) !important;
+            line-height: var(--spt-filter-text-line) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            caret-color: transparent !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+            font-weight: 850 !important;
+        }
+
+        /* Text / Date / Number input 也統一高度 */
+        div[data-baseweb="input"],
+        div[data-baseweb="base-input"] {
+            min-height: var(--spt-filter-field-height) !important;
+            height: var(--spt-filter-field-height) !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            border-radius: 13px !important;
+            background: #edf8ff !important;
+        }
+
+        div[data-baseweb="input"] input,
+        div[data-baseweb="base-input"] input,
+        .stTextInput input,
+        .stDateInput input,
+        .stNumberInput input {
+            min-height: var(--spt-filter-text-line) !important;
+            height: var(--spt-filter-text-line) !important;
+            line-height: var(--spt-filter-text-line) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 850 !important;
+        }
+
+        /* Multiselect 已選標籤高度 */
+        div[data-baseweb="tag"] {
+            min-height: 40px !important;
+            height: 40px !important;
+            padding: 0 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            line-height: 40px !important;
+            overflow: visible !important;
+            background: linear-gradient(135deg, #c9fbff 0%, #83edff 100%) !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+            border-radius: 10px !important;
+            color: #03121f !important;
+            font-weight: 900 !important;
+        }
+
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div {
+            min-height: 24px !important;
+            line-height: 24px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+        }
+
+        /* 下拉展開選單：淺色背景，字清楚 */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            border: 1px solid rgba(102, 232, 249, .95) !important;
+            box-shadow: 0 0 0 1px rgba(102, 232, 249, .35), 0 12px 32px rgba(0, 255, 255, .22) !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            z-index: 999999 !important;
+        }
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li {
+            min-height: 44px !important;
+            height: 44px !important;
+            line-height: 44px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+        }
+
+        div[role="option"] *,
+        li[role="option"] *,
+        ul[role="listbox"] li * {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            fill: #03121f !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+        }
+
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"],
+        ul[role="listbox"] li[aria-selected="true"] {
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            font-weight: 950 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v266_status_height_unify_all_filter_fields()
+except Exception:
+    pass
+# ===== V2.66 STATUS HEIGHT UNIFY ALL FILTER FIELDS END =====
