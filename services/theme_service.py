@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-SPT Time Tracking System - Unified Theme Service V1.59 / V2.55 patch
+SPT Time Tracking System - Unified Theme Service V1.59 / V2.57 patch
 Purpose:
 - Restore unified Super Plus Tech logo header style.
 - Force sidebar/page/menu font size larger and consistent.
@@ -606,10 +606,9 @@ div[data-testid="stExpander"] summary * {
     )
 
 
-# ===== V2.47 persistent operation message center =====
-_STATUS_PATCHED = False
-_ORIGINAL_STATUS_FUNCS: dict[str, Any] = {}
-
+# ===== V2.57 operation message persistence removed =====
+# User requirement: do not replay or retain success/info/warning/error messages
+# across reruns.  Keep native Streamlit messages only for the current execution.
 def _current_page_id_for_messages() -> str:
     try:
         import inspect
@@ -626,91 +625,23 @@ def _message_store_key(page_id: str | None = None) -> str:
     return f"_spt_persistent_messages::{page_id or _current_page_id_for_messages()}"
 
 
-def _plain_message(value: Any) -> str:
+def _clear_all_persistent_message_state() -> None:
     try:
-        if isinstance(value, (list, tuple)):
-            return "\n".join(str(x) for x in value)
-        return str(value)
-    except Exception:
-        return ""
-
-
-def _remember_operation_message(level: str, body: Any) -> None:
-    try:
-        text = _plain_message(body).strip()
-        if not text:
-            return
-        page_id = _current_page_id_for_messages()
-        key = _message_store_key(page_id)
-        messages = list(st.session_state.get(key, []))
-        now = datetime.now().strftime("%H:%M:%S")
-        # Avoid duplicating the same message repeatedly on auto rerun.
-        if messages and messages[-1].get("level") == level and messages[-1].get("text") == text:
-            messages[-1]["time"] = now
-        else:
-            messages.append({"time": now, "level": level, "text": text})
-        st.session_state[key] = messages[-80:]
+        for k in list(st.session_state.keys()):
+            if str(k).startswith("_spt_persistent_messages::"):
+                st.session_state.pop(k, None)
     except Exception:
         pass
 
 
 def _install_persistent_message_patch() -> None:
-    global _STATUS_PATCHED, _ORIGINAL_STATUS_FUNCS
-    if _STATUS_PATCHED:
-        return
-    try:
-        for name in ("success", "info", "warning", "error"):
-            _ORIGINAL_STATUS_FUNCS[name] = getattr(st, name)
-
-        def _make_wrapper(level: str):
-            original = _ORIGINAL_STATUS_FUNCS[level]
-            def _wrapper(body: Any = None, *args: Any, **kwargs: Any):
-                _remember_operation_message(level, body)
-                return original(body, *args, **kwargs)
-            return _wrapper
-
-        for name in ("success", "info", "warning", "error"):
-            setattr(st, name, _make_wrapper(name))
-        _STATUS_PATCHED = True
-    except Exception:
-        pass
+    # No-op since V2.57. Do not monkey-patch st.success/info/warning/error.
+    _clear_all_persistent_message_state()
 
 
 def _render_persistent_operation_messages() -> None:
-    """Re-show retained Streamlit status messages using native st.* boxes.
-
-    V2.56 change:
-    - Do NOT render the separate "執行結果 / Operation Results" panel.
-    - Do NOT render a separate clear button.
-    - Keep the original green/blue/yellow/red Streamlit message style so the
-      message looks like the normal result banner that appeared after the action.
-    """
-    try:
-        page_id = _current_page_id_for_messages()
-        key = _message_store_key(page_id)
-        messages = list(st.session_state.get(key, []))
-        if not messages:
-            return
-
-        # Use original Streamlit functions so replaying messages does not store
-        # duplicates through the monkey patch.
-        funcs = _ORIGINAL_STATUS_FUNCS or {}
-        for msg in messages[-8:]:
-            level = str(msg.get("level") or "info").lower()
-            text = str(msg.get("text") or "").strip()
-            when = str(msg.get("time") or "").strip()
-            if not text:
-                continue
-            body = f"{when}｜{text}" if when else text
-            fn = funcs.get(level)
-            if fn is None:
-                fn = getattr(st, level, None) or getattr(st, "info")
-            try:
-                fn(body)
-            except Exception:
-                st.markdown(f"<div>{_safe_html(body)}</div>", unsafe_allow_html=True)
-    except Exception:
-        pass
+    # No-op since V2.57. Prevent old replay panel / replay banners.
+    _clear_all_persistent_message_state()
 
 
 def _clear_transient_selection_on_page_change() -> None:
@@ -742,83 +673,49 @@ def _clear_transient_selection_on_page_change() -> None:
 
 
 def _inject_multiselect_tag_height_fix() -> None:
-    """V2.54: prevent multiselect selected tags/options from being clipped after global font scaling."""
+    """V2.57: keep select/multiselect text readable without white-dot artifacts."""
     try:
         st.markdown(
             """
             <style>
-            /* V2.54｜全系統多選篩選標籤文字被切修正 */
-            div[data-baseweb="select"] {
-                min-height: 46px !important;
-                height: auto !important;
+            /* V2.57｜修正下拉/多選文字被切掉，同時去除白點 */
+            .stSelectbox,
+            .stMultiSelect {
                 overflow: visible !important;
             }
 
-            div[data-baseweb="select"] > div {
-                min-height: 46px !important;
+            .stSelectbox div[data-baseweb="select"],
+            .stMultiSelect div[data-baseweb="select"] {
+                min-height: 48px !important;
                 height: auto !important;
+                border-radius: 10px !important;
+                background: #eef7fb !important;
                 overflow: visible !important;
+            }
+
+            .stSelectbox div[data-baseweb="select"] > div,
+            .stMultiSelect div[data-baseweb="select"] > div {
+                min-height: 48px !important;
+                height: auto !important;
+                padding-top: 6px !important;
+                padding-bottom: 6px !important;
                 align-items: center !important;
-                padding-top: 4px !important;
-                padding-bottom: 4px !important;
-            }
-
-            div[data-baseweb="tag"] {
-                min-height: 30px !important;
-                height: auto !important;
-                padding: 5px 10px !important;
-                border-radius: 8px !important;
-                line-height: 1.35 !important;
-                display: inline-flex !important;
-                align-items: center !important;
-                background: linear-gradient(135deg, #bff7ff, #7ee8ff) !important;
-                color: #03121f !important;
-                font-weight: 800 !important;
-                overflow: visible !important;
-                white-space: nowrap !important;
-            }
-
-            div[data-baseweb="tag"] span {
-                color: #03121f !important;
-                font-weight: 800 !important;
-                line-height: 1.35 !important;
                 overflow: visible !important;
             }
 
-            div[data-baseweb="tag"] svg {
+            /* Selectbox / multiselect display text and placeholder */
+            div[data-baseweb="select"] span,
+            div[data-baseweb="select"] div,
+            div[data-baseweb="select"] input,
+            div[data-baseweb="select"] input[type="text"] {
                 color: #03121f !important;
-                fill: #03121f !important;
-            }
-
-            div[data-baseweb="select"] input {
-                min-height: 30px !important;
-                line-height: 1.4 !important;
-                color: #03121f !important;
-                font-weight: 800 !important;
-            }
-
-            ul[role="listbox"] li,
-            div[role="option"] {
-                min-height: 36px !important;
+                -webkit-text-fill-color: #03121f !important;
+                font-weight: 850 !important;
+                font-size: inherit !important;
                 line-height: 1.45 !important;
-                padding-top: 8px !important;
-                padding-bottom: 8px !important;
-                font-weight: 700 !important;
+                text-shadow: none !important;
             }
 
-            .stMultiSelect,
-            .stSelectbox {
-                overflow: visible !important;
-            }
-
-            /* V2.55: 不再把 selectbox / multiselect 內所有 div 強制 overflow:visible，
-               否則 BaseWeb 內部隱藏 input 會露出白色方塊。 */
-            .stMultiSelect [data-baseweb="select"],
-            .stSelectbox [data-baseweb="select"] {
-                overflow: visible !important;
-            }
-
-            /* 修正 select / multiselect 內部隱藏輸入游標被全域 input 淺色樣式變成白色方塊 */
             div[data-baseweb="select"] input,
             div[data-baseweb="select"] input[type="text"],
             div[data-baseweb="select"] input[aria-autocomplete="list"] {
@@ -827,25 +724,65 @@ def _inject_multiselect_tag_height_fix() -> None:
                 border: 0 !important;
                 outline: 0 !important;
                 box-shadow: none !important;
-                min-height: 20px !important;
-                height: 20px !important;
+                min-height: 28px !important;
+                height: 28px !important;
+                line-height: 28px !important;
                 padding: 0 !important;
                 margin: 0 !important;
-                color: #03121f !important;
-                -webkit-text-fill-color: #03121f !important;
                 caret-color: #03121f !important;
             }
 
             div[data-baseweb="select"] input::placeholder {
-                color: rgba(3,18,31,.72) !important;
-                -webkit-text-fill-color: rgba(3,18,31,.72) !important;
+                color: rgba(3,18,31,.78) !important;
+                -webkit-text-fill-color: rgba(3,18,31,.78) !important;
+                opacity: 1 !important;
             }
 
-            /* BaseWeb clear / dropdown 圖示維持深色，不要變成浮出的白點 */
+            /* Multiselect selected tags */
+            div[data-baseweb="tag"] {
+                min-height: 32px !important;
+                height: auto !important;
+                padding: 6px 10px !important;
+                border-radius: 9px !important;
+                line-height: 1.35 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                background: linear-gradient(135deg, #bff7ff, #7ee8ff) !important;
+                color: #03121f !important;
+                -webkit-text-fill-color: #03121f !important;
+                font-weight: 900 !important;
+                overflow: visible !important;
+                white-space: nowrap !important;
+                margin-top: 2px !important;
+                margin-bottom: 2px !important;
+            }
+
+            div[data-baseweb="tag"] span,
+            div[data-baseweb="tag"] div {
+                color: #03121f !important;
+                -webkit-text-fill-color: #03121f !important;
+                font-weight: 900 !important;
+                line-height: 1.35 !important;
+                overflow: visible !important;
+            }
+
+            div[data-baseweb="tag"] svg,
             div[data-baseweb="select"] svg,
             div[data-baseweb="select"] [role="button"] svg {
                 color: #03121f !important;
                 fill: #03121f !important;
+            }
+
+            /* Dropdown list options */
+            ul[role="listbox"] li,
+            div[role="option"] {
+                min-height: 38px !important;
+                line-height: 1.45 !important;
+                padding-top: 8px !important;
+                padding-bottom: 8px !important;
+                color: #03121f !important;
+                -webkit-text-fill-color: #03121f !important;
+                font-weight: 800 !important;
             }
             </style>
             """,
@@ -855,26 +792,18 @@ def _inject_multiselect_tag_height_fix() -> None:
         pass
 
 
-
 def render_operation_results() -> None:
-    """Public helper: render the persistent operation-result center on any page.
+    """V2.57: legacy helper kept for compatibility; intentionally renders nothing."""
+    _clear_all_persistent_message_state()
 
-    Pages that do not use render_header can call this after apply_theme().
-    Existing pages using render_header already get the same message center.
-    """
-    _install_persistent_message_patch()
-    _render_persistent_operation_messages()
 
 def clear_operation_results() -> None:
-    try:
-        st.session_state.pop(_message_store_key(_current_page_id_for_messages()), None)
-    except Exception:
-        pass
+    _clear_all_persistent_message_state()
 
 def apply_theme() -> None:
     _inject_css()
     _inject_multiselect_tag_height_fix()
-    _install_persistent_message_patch()
+    _clear_all_persistent_message_state()
     _clear_transient_selection_on_page_change()
     # V2.18: apply global font scale to every module page.
     # Best-effort only; visual theme must never break a page.
@@ -917,7 +846,6 @@ def render_header(module_no: Any = None, title: Any = None, subtitle: Any = None
 """,
         unsafe_allow_html=True,
     )
-    _render_persistent_operation_messages()
 
 
 def render_home_header() -> None:
