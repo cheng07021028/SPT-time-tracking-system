@@ -348,21 +348,27 @@ def restore_permission_settings_from_permanent_files(force: bool = False) -> dic
 
 
 def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:
-    """Export account/permission/security settings locally and to GitHub if configured."""
-    results: dict = {"ok": True, "reason": reason}
+    """Export permission settings to local permanent JSON quickly.
+
+    V2.35: Account-master save must not call GitHub upload immediately.
+    GitHub Contents API can take many seconds, so this function now performs
+    local permanent export only and marks the system as pending backup.  Page
+    09 remains the place to manually upload to GitHub.
+    """
+    results: dict = {"ok": True, "reason": reason, "mode": "local_fast"}
     try:
-        from services.auto_github_sync_service import auto_sync_after_write
-        results["auto_sync"] = auto_sync_after_write(source=reason, force=True, archive=True)
+        from services.auto_github_sync_service import export_all_local_permanent_files
+        results["local_export"] = export_all_local_permanent_files(force=True, source=reason)
+        results["ok"] = bool(results["local_export"].get("ok", True))
     except Exception as exc:
         results["ok"] = False
-        results["auto_sync_error"] = str(exc)
-        # Fallback: still create local JSON files even when cloud helper fails.
-        try:
-            from services.auto_github_sync_service import export_all_local_permanent_files
-            results["local_export"] = export_all_local_permanent_files(force=True, source=reason)
-            results["ok"] = True
-        except Exception as exc2:
-            results["local_export_error"] = str(exc2)
+        results["local_export_error"] = str(exc)
+    try:
+        from services.db_service import mark_data_changed
+        mark_data_changed("權限設定已變更，請到 09｜資料永久保存與備份手動備份到 GitHub。", "auth_users/auth_account_permissions")
+        results["pending_backup"] = True
+    except Exception as exc:
+        results["pending_backup_error"] = str(exc)
     return results
 
 
@@ -674,10 +680,6 @@ def sync_user_permissions_from_roles(usernames: Iterable[str], reason: str = "ro
     conn.commit()
     conn.close()
     clear_permission_runtime_cache()
-    try:
-        export_permission_settings_permanently(f"auth_account_permissions_synced_{reason}")
-    except Exception:
-        pass
     return updated
 
 def save_users(rows: Iterable[dict]) -> dict:
