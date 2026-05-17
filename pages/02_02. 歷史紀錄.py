@@ -100,10 +100,74 @@ HISTORY_COLS = [
     "group_key", "is_group_work", "source",
 ]
 
-DEFAULT_PASTE_ORDER = [
+# No-header paste layouts supported by this page.
+# 1) Extended Excel order used by manufacturing history exports:
+#    狀態、製令、P/N、機型、工段、工號、姓名、開始動作、開始時間戳、結束動作、結束時間戳、開始日期、開始時間、結束日期、結束時間、工時小計、備註、組立地點
+# 2) Legacy compact order:
+#    狀態、製令、P/N、機型、工段、工號、姓名、開始時間戳、結束時間戳、備註、組立地點
+DEFAULT_PASTE_ORDER_EXTENDED = [
+    "status", "work_order", "part_no", "type_name", "process_name", "employee_id", "employee_name",
+    "start_action", "start_timestamp", "end_action", "end_timestamp",
+    "start_date", "start_time", "end_date", "end_time", "work_hours", "remark", "assembly_location",
+]
+
+DEFAULT_PASTE_ORDER_COMPACT = [
     "status", "work_order", "part_no", "type_name", "process_name", "employee_id", "employee_name",
     "start_timestamp", "end_timestamp", "remark", "assembly_location",
 ]
+
+
+def _guess_no_header_order(width: int) -> list[str]:
+    if width >= 15:
+        return DEFAULT_PASTE_ORDER_EXTENDED
+    return DEFAULT_PASTE_ORDER_COMPACT
+
+
+def _merge_date_time_if_possible(d, t) -> str:
+    d_text = _normalize_text(d)
+    t_text = _normalize_text(t)
+    if not d_text:
+        return ""
+    if t_text:
+        # Excel sometimes pastes time as 1900-01-00 09:45:00. Keep only the final HH:MM[:SS].
+        if " " in t_text:
+            t_text = t_text.split()[-1]
+        return f"{d_text[:10]} {t_text}".strip()
+    return d_text
+
+
+def _postprocess_import_rows(parsed: pd.DataFrame) -> pd.DataFrame:
+    if parsed is None or parsed.empty:
+        return parsed
+    parsed = parsed.copy()
+    for c in HISTORY_COLS:
+        if c not in parsed.columns:
+            parsed[c] = ""
+
+    # When pasted data includes separate start/end date + time columns, build timestamps for import.
+    start_blank = parsed["start_timestamp"].map(_normalize_text).eq("")
+    parsed.loc[start_blank, "start_timestamp"] = [
+        _merge_date_time_if_possible(d, t)
+        for d, t in zip(parsed.loc[start_blank, "start_date"], parsed.loc[start_blank, "start_time"])
+    ]
+    end_blank = parsed["end_timestamp"].map(_normalize_text).eq("")
+    parsed.loc[end_blank, "end_timestamp"] = [
+        _merge_date_time_if_possible(d, t)
+        for d, t in zip(parsed.loc[end_blank, "end_date"], parsed.loc[end_blank, "end_time"])
+    ]
+
+    # If timestamp exists but date/time columns are empty, split for preview and downstream consistency.
+    for prefix in ["start", "end"]:
+        ts_col = f"{prefix}_timestamp"
+        d_col = f"{prefix}_date"
+        t_col = f"{prefix}_time"
+        d_blank = parsed[d_col].map(_normalize_text).eq("")
+        t_blank = parsed[t_col].map(_normalize_text).eq("")
+        ts_text = parsed[ts_col].map(_normalize_text)
+        parsed.loc[d_blank & ts_text.ne(""), d_col] = ts_text[d_blank & ts_text.ne("")].str[:10]
+        parsed.loc[t_blank & ts_text.str.len().ge(16), t_col] = ts_text[t_blank & ts_text.str.len().ge(16)].str[11:19]
+
+    return parsed
 
 
 def _find_col(source: pd.DataFrame, aliases: list[str]):
@@ -176,16 +240,23 @@ def parse_history_dataframe(source: pd.DataFrame) -> tuple[pd.DataFrame, list[st
 
     # If no recognizable headers were found, preserve the original columns by position.
     if parsed[["work_order", "process_name", "employee_id", "start_timestamp"]].astype(str).replace("", pd.NA).isna().all().all():
-        warnings.append("未偵測到可辨識標題，已依預設順序解析：狀態、製令、P/N、機型、工段、工號、姓名、開始時間戳、結束時間戳、備註、組立地點。")
-        rows = source.astype(str).fillna("").values.tolist()
+        rows = source.fillna("").astype(str).values.tolist()
+        width = max((len(r) for r in rows), default=0)
+        order = _guess_no_header_order(width)
+        if order is DEFAULT_PASTE_ORDER_EXTENDED:
+            warnings.append("未偵測到可辨識標題，已依擴充順序解析：狀態、製令、P/N、機型、工段、工號、姓名、開始動作、開始時間戳、結束動作、結束時間戳、開始日期、開始時間、結束日期、結束時間、工時小計、備註、組立地點。")
+        else:
+            warnings.append("未偵測到可辨識標題，已依預設順序解析：狀態、製令、P/N、機型、工段、工號、姓名、開始時間戳、結束時間戳、備註、組立地點。")
         normalized = []
         for row in rows:
             item = {c: "" for c in HISTORY_COLS}
-            for idx, col_name in enumerate(DEFAULT_PASTE_ORDER):
+            for idx, col_name in enumerate(order):
                 if idx < len(row):
                     item[col_name] = row[idx]
             normalized.append(item)
         parsed = pd.DataFrame(normalized)
+
+    parsed = _postprocess_import_rows(parsed)
 
     for c in HISTORY_COLS:
         if c not in parsed.columns:
@@ -976,12 +1047,17 @@ with tab3:
                 st.error("解析後沒有可匯入資料。請確認至少包含：工號、製令、工段、開始時間。")
             else:
                 st.success(f"已解析 {len(parsed)} 筆歷史工時資料。")
-                st.dataframe(parsed, use_container_width=True, height=360)
-                if st.button("▣ 直接儲存貼上歷史紀錄 / Save Pasted History", type="primary", use_container_width=True, key="history_paste_save_v197"):
+                if st.button("▣ 確認匯入貼上歷史紀錄 / Save Pasted History", type="primary", use_container_width=True, key="history_paste_save_v236"):
                     result = import_time_records(parsed, recalc=recalc_paste, source="history_paste_import")
                     st.success(f"貼上資料已匯入：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}。")
-                    for msg in result.get("errors", [])[:10]:
+                    for msg in result.get("errors", [])[:20]:
                         st.warning(msg)
+                    if result.get("inserted", 0) == 0 and result.get("updated", 0) == 0:
+                        st.warning("這次沒有寫入任何資料。請確認解析預覽中的工號、製令、工段名稱、開始時間戳是否正確。")
+                    else:
+                        st.session_state[HISTORY_PASTE_RAW_KEY] = ""
                     rerun()
+                st.caption("匯入前預覽 / Parsed Preview")
+                st.dataframe(parsed, use_container_width=True, height=360)
         else:
             st.info("請先貼上 Excel 資料。")
