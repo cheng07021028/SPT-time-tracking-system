@@ -1650,3 +1650,224 @@ try:
 except Exception:
     pass
 # ===== V2.64 GLOBAL SELECTBOX / MULTISELECT UNIFIED FINAL CSS END =====
+
+
+# ===== V2.65 SELECT DISPLAY ABSOLUTE HEIGHT OVERRIDE START =====
+def apply_v265_select_display_absolute_height_fix():
+    """Force selectbox/multiselect visible field height so text is centered and never clipped."""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /*
+          V2.65｜下拉選單顯示框高度最終覆蓋
+          目的：
+          1. 讓所有 selectbox / multiselect 顯示框高度一致放大
+          2. 修正 Choose options / No options to select 被上下裁切
+          3. 保留展開選單淺色背景與深色文字
+          4. 不恢復訊息重播面板，不影響任何資料邏輯
+        */
+
+        /* 外層元件保留可見空間 */
+        .stSelectbox,
+        .stMultiSelect,
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"] {
+            min-height: 92px !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        /* BaseWeb select 根容器 */
+        div[data-baseweb="select"] {
+            min-height: 66px !important;
+            height: 66px !important;
+            overflow: visible !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+
+        /* BaseWeb select 可視輸入框 */
+        div[data-baseweb="select"] > div {
+            min-height: 66px !important;
+            height: 66px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            padding-left: 16px !important;
+            padding-right: 14px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+            border-radius: 13px !important;
+            background: #edf8ff !important;
+            color: #03121f !important;
+        }
+
+        /* 內層所有 flex / combobox / value container 強制置中 */
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[class*="valueContainer"],
+        div[data-baseweb="select"] div[class*="ValueContainer"],
+        div[data-baseweb="select"] div[class*="singleValue"],
+        div[data-baseweb="select"] div[class*="SingleValue"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Placeholder"] {
+            min-height: 64px !important;
+            height: 64px !important;
+            line-height: 64px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+        }
+
+        /* 顯示文字本體：不要被裁切 */
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p {
+            min-height: 32px !important;
+            height: auto !important;
+            line-height: 32px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        /* input 搜尋文字與 placeholder */
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete="list"] {
+            min-height: 36px !important;
+            height: 36px !important;
+            line-height: 36px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            caret-color: transparent !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+            font-weight: 850 !important;
+        }
+
+        /* 下拉箭頭置中 */
+        div[data-baseweb="select"] svg {
+            color: #03121f !important;
+            fill: #03121f !important;
+            flex-shrink: 0 !important;
+        }
+
+        /* multiselect tag 置中顯示 */
+        div[data-baseweb="tag"] {
+            min-height: 38px !important;
+            height: 38px !important;
+            padding: 0 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            line-height: 38px !important;
+            overflow: visible !important;
+            background: linear-gradient(135deg, #c9fbff 0%, #83edff 100%) !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+            border-radius: 10px !important;
+            color: #03121f !important;
+            font-weight: 900 !important;
+        }
+
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div {
+            min-height: 24px !important;
+            line-height: 24px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+        }
+
+        /* 展開選單保持淺色，文字清楚 */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            border: 1px solid rgba(102, 232, 249, .95) !important;
+            box-shadow: 0 0 0 1px rgba(102, 232, 249, .35), 0 12px 32px rgba(0, 255, 255, .22) !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            z-index: 999999 !important;
+        }
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li {
+            min-height: 44px !important;
+            height: 44px !important;
+            line-height: 44px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+        }
+
+        div[role="option"] *,
+        li[role="option"] *,
+        ul[role="listbox"] li * {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            fill: #03121f !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+        }
+
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"],
+        ul[role="listbox"] li[aria-selected="true"] {
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            font-weight: 950 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v265_select_display_absolute_height_fix()
+except Exception:
+    pass
+# ===== V2.65 SELECT DISPLAY ABSOLUTE HEIGHT OVERRIDE END =====
