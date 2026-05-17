@@ -2398,3 +2398,626 @@ try:
 except Exception:
     pass
 # ===== V2.67 SELECT HEIGHT 70 MENU TEXT VISIBLE FINAL END =====
+
+
+# ===== V2.68 FORCE DROPDOWN REAL DOM FIX START =====
+def apply_v268_force_dropdown_real_dom_fix():
+    """
+    V2.68 hard override for Streamlit/BaseWeb dropdowns.
+    This version targets the real nested BaseWeb structure more aggressively:
+    - div[data-baseweb="select"] and every direct child layer
+    - role="combobox"
+    - aria-haspopup="listbox"
+    - input and placeholder layers
+    - popover/listbox/option text layers
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style id="spt-v268-force-dropdown-real-dom-fix">
+        /*
+        V2.68｜真正強制下拉框高度與文字可見
+        原因：前版只改部分層級，BaseWeb 內層 valueContainer/inputContainer 仍維持原高度，
+        所以外觀看起來沒變，文字仍被裁切。這版直接鎖定所有 real DOM 層級。
+        */
+
+        /* 先避免舊版 CSS 的 overflow:hidden 繼續裁切 */
+        .stSelectbox, .stMultiSelect,
+        div[data-testid="stSelectbox"], div[data-testid="stMultiSelect"],
+        div[data-testid="stSelectbox"] *, div[data-testid="stMultiSelect"] * {
+            overflow: visible !important;
+        }
+
+        /* Streamlit widget wrapper 給足高度 */
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"] {
+            min-height: 104px !important;
+            height: auto !important;
+        }
+
+        /* Select 根元件與可點擊框：真正設定 70px */
+        div[data-baseweb="select"],
+        div[data-testid="stSelectbox"] div[data-baseweb="select"],
+        div[data-testid="stMultiSelect"] div[data-baseweb="select"] {
+            min-height: 70px !important;
+            height: 70px !important;
+            max-height: none !important;
+            display: flex !important;
+            align-items: center !important;
+            background: #edf8ff !important;
+            border-radius: 14px !important;
+            box-sizing: border-box !important;
+            overflow: visible !important;
+        }
+
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] > div > div > div,
+        div[data-baseweb="select"] div[aria-haspopup="listbox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[role="combobox"] {
+            min-height: 66px !important;
+            height: 66px !important;
+            max-height: none !important;
+            line-height: 66px !important;
+            display: flex !important;
+            align-items: center !important;
+            align-content: center !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            box-sizing: border-box !important;
+            background: #edf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            overflow: visible !important;
+        }
+
+        /* BaseWeb 常用 class 名會變動，用 class* 抓 value / placeholder / input container */
+        div[data-baseweb="select"] div[class*="Value"],
+        div[data-baseweb="select"] div[class*="value"],
+        div[data-baseweb="select"] div[class*="Placeholder"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Input"],
+        div[data-baseweb="select"] div[class*="input"] {
+            min-height: 66px !important;
+            height: 66px !important;
+            max-height: none !important;
+            line-height: 66px !important;
+            display: flex !important;
+            align-items: center !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            overflow: visible !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            background: transparent !important;
+        }
+
+        /* 顯示文字：36px 行高，深色粗體 */
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p,
+        div[data-baseweb="select"] label {
+            min-height: 36px !important;
+            height: 36px !important;
+            line-height: 36px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-size: 16px !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+            position: relative !important;
+            top: 0 !important;
+            z-index: 50 !important;
+            overflow: visible !important;
+        }
+
+        /* 搜尋 input 不得把 placeholder 蓋黑或裁切 */
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete],
+        div[data-baseweb="select"] input[role="combobox"] {
+            min-height: 36px !important;
+            height: 36px !important;
+            line-height: 36px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-size: 16px !important;
+            font-weight: 900 !important;
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            outline: none !important;
+            opacity: 1 !important;
+            caret-color: transparent !important;
+            z-index: 40 !important;
+            overflow: visible !important;
+        }
+
+        div[data-baseweb="select"] input::placeholder {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            opacity: 1 !important;
+            font-size: 16px !important;
+            font-weight: 900 !important;
+        }
+
+        /* 箭頭 */
+        div[data-baseweb="select"] svg,
+        div[data-baseweb="select"] [role="button"] svg {
+            color: #03121f !important;
+            fill: #03121f !important;
+            z-index: 80 !important;
+        }
+
+        /* MultiSelect tag */
+        div[data-baseweb="tag"] {
+            min-height: 42px !important;
+            height: 42px !important;
+            line-height: 42px !important;
+            padding: 0 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            background: linear-gradient(135deg, #c9fbff, #83edff) !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+            border-radius: 10px !important;
+            opacity: 1 !important;
+            overflow: visible !important;
+        }
+
+        div[data-baseweb="tag"] * {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            fill: #03121f !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+        }
+
+        /* 展開後的下拉選單：強制淺底深字 */
+        div[data-baseweb="popover"],
+        div[data-baseweb="popover"] *,
+        div[data-baseweb="menu"],
+        div[data-baseweb="menu"] *,
+        ul[role="listbox"],
+        ul[role="listbox"] * {
+            background-color: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+        }
+
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            border: 1px solid rgba(102, 232, 249, .95) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 0 0 1px rgba(102,232,249,.35), 0 12px 32px rgba(0,255,255,.22) !important;
+            z-index: 999999 !important;
+            overflow-y: auto !important;
+        }
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li {
+            min-height: 46px !important;
+            height: 46px !important;
+            line-height: 46px !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 0 14px !important;
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-size: 16px !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        div[role="option"] *,
+        li[role="option"] * {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            fill: #03121f !important;
+            font-size: 16px !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+        }
+
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"] {
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+        }
+
+        div[role="option"]:hover *,
+        li[role="option"]:hover *,
+        div[role="option"][aria-selected="true"] *,
+        li[role="option"][aria-selected="true"] * {
+            background: transparent !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            fill: #020817 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v268_force_dropdown_real_dom_fix()
+except Exception:
+    pass
+# ===== V2.68 FORCE DROPDOWN REAL DOM FIX END =====
+
+
+# ===== V2.69 USER CONFIGURABLE DROPDOWN SIZE START =====
+from pathlib import Path as _SPTPath
+import json as _spt_json
+
+_SPT_UI_DROPDOWN_DEFAULTS = {
+    "enabled": True,
+    "outer_height": 70,
+    "inner_height": 66,
+    "text_line_height": 36,
+    "font_size": 16,
+    "option_height": 46,
+    "tag_height": 40,
+    "panel_bg": "#eaf8ff",
+    "field_bg": "#edf8ff",
+    "text_color": "#03121f",
+}
+
+def _spt_dropdown_settings_paths():
+    try:
+        root = PROJECT_ROOT
+    except Exception:
+        root = _SPTPath(__file__).resolve().parents[1]
+    return [
+        root / "data" / "config" / "ui_dropdown_settings.json",
+        root / "data" / "persistent_state" / "ui_dropdown_settings.json",
+        root / "data" / "persistent_modules" / "13_system_settings" / "ui_dropdown_settings.json",
+    ]
+
+def _spt_load_dropdown_settings():
+    cfg = dict(_SPT_UI_DROPDOWN_DEFAULTS)
+    for p in _spt_dropdown_settings_paths():
+        try:
+            if p.exists():
+                raw = _spt_json.loads(p.read_text(encoding="utf-8"))
+                if isinstance(raw, dict):
+                    cfg.update(raw)
+                    break
+        except Exception:
+            pass
+    # Clamp values to safe ranges.
+    def _int(name, lo, hi):
+        try:
+            v = int(cfg.get(name, _SPT_UI_DROPDOWN_DEFAULTS[name]))
+        except Exception:
+            v = _SPT_UI_DROPDOWN_DEFAULTS[name]
+        return max(lo, min(hi, v))
+    cfg["outer_height"] = _int("outer_height", 48, 120)
+    cfg["inner_height"] = _int("inner_height", 42, 116)
+    cfg["text_line_height"] = _int("text_line_height", 24, 72)
+    cfg["font_size"] = _int("font_size", 12, 28)
+    cfg["option_height"] = _int("option_height", 32, 90)
+    cfg["tag_height"] = _int("tag_height", 28, 72)
+    cfg["enabled"] = bool(cfg.get("enabled", True))
+    return cfg
+
+def _spt_save_dropdown_settings(cfg):
+    for p in _spt_dropdown_settings_paths():
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(_spt_json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+def apply_v269_configurable_dropdown_css():
+    """Apply dropdown size CSS from persistent settings."""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+    cfg = _spt_load_dropdown_settings()
+    if not cfg.get("enabled", True):
+        return
+    outer = int(cfg["outer_height"])
+    inner = int(cfg["inner_height"])
+    line = int(cfg["text_line_height"])
+    font = int(cfg["font_size"])
+    option = int(cfg["option_height"])
+    tag = int(cfg["tag_height"])
+    field_bg = str(cfg.get("field_bg", "#edf8ff"))
+    panel_bg = str(cfg.get("panel_bg", "#eaf8ff"))
+    text_color = str(cfg.get("text_color", "#03121f"))
+
+    st.markdown(
+        f"""
+        <style id="spt-v269-configurable-dropdown-css">
+        /*
+          V2.69｜可自行設定下拉選單尺寸
+          目前設定：外框 {outer}px｜內層 {inner}px｜文字行高 {line}px｜字體 {font}px
+        */
+        .stSelectbox,
+        .stMultiSelect,
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"] {{
+            min-height: {outer + 28}px !important;
+            height: auto !important;
+            overflow: visible !important;
+        }}
+
+        div[data-baseweb="select"],
+        div[data-testid="stSelectbox"] div[data-baseweb="select"],
+        div[data-testid="stMultiSelect"] div[data-baseweb="select"] {{
+            min-height: {outer}px !important;
+            height: {outer}px !important;
+            max-height: none !important;
+            display: flex !important;
+            align-items: center !important;
+            background: {field_bg} !important;
+            border-radius: 14px !important;
+            box-sizing: border-box !important;
+            overflow: visible !important;
+        }}
+
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] > div > div > div,
+        div[data-baseweb="select"] div[aria-haspopup="listbox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[class*="Value"],
+        div[data-baseweb="select"] div[class*="value"],
+        div[data-baseweb="select"] div[class*="Placeholder"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Input"],
+        div[data-baseweb="select"] div[class*="input"] {{
+            min-height: {inner}px !important;
+            height: {inner}px !important;
+            max-height: none !important;
+            line-height: {inner}px !important;
+            display: flex !important;
+            align-items: center !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            background: {field_bg} !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+        }}
+
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p,
+        div[data-baseweb="select"] label,
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete],
+        div[data-baseweb="select"] input[role="combobox"] {{
+            min-height: {line}px !important;
+            height: {line}px !important;
+            line-height: {line}px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            font-size: {font}px !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            outline: none !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            position: relative !important;
+            z-index: 80 !important;
+        }}
+
+        div[data-baseweb="select"] input::placeholder {{
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            opacity: 1 !important;
+            font-size: {font}px !important;
+            font-weight: 900 !important;
+        }}
+
+        div[data-baseweb="select"] svg,
+        div[data-baseweb="select"] [role="button"] svg {{
+            color: {text_color} !important;
+            fill: {text_color} !important;
+            z-index: 90 !important;
+        }}
+
+        div[data-baseweb="tag"] {{
+            min-height: {tag}px !important;
+            height: {tag}px !important;
+            line-height: {tag}px !important;
+            padding: 0 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            background: linear-gradient(135deg, #c9fbff, #83edff) !important;
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            font-weight: 900 !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+            border-radius: 10px !important;
+            opacity: 1 !important;
+            overflow: visible !important;
+        }}
+
+        div[data-baseweb="tag"] * {{
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            fill: {text_color} !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+            background: transparent !important;
+        }}
+
+        div[data-baseweb="popover"],
+        div[data-baseweb="popover"] *,
+        div[data-baseweb="menu"],
+        div[data-baseweb="menu"] *,
+        ul[role="listbox"],
+        ul[role="listbox"] * {{
+            background-color: {panel_bg} !important;
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+        }}
+
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {{
+            border: 1px solid rgba(102, 232, 249, .95) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 0 0 1px rgba(102,232,249,.35), 0 12px 32px rgba(0,255,255,.22) !important;
+            z-index: 999999 !important;
+            overflow-y: auto !important;
+        }}
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li {{
+            min-height: {option}px !important;
+            height: {option}px !important;
+            line-height: {option}px !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 0 14px !important;
+            background: {panel_bg} !important;
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            font-size: {font}px !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }}
+
+        div[role="option"] *,
+        li[role="option"] * {{
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            fill: {text_color} !important;
+            font-size: {font}px !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+            background: transparent !important;
+        }}
+
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"] {{
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+        }}
+
+        div[role="option"]:hover *,
+        li[role="option"]:hover *,
+        div[role="option"][aria-selected="true"] *,
+        li[role="option"][aria-selected="true"] * {{
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            fill: #020817 !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+def render_dropdown_size_settings_panel():
+    """Hidden admin-style panel for tuning dropdown sizes. Safe to call on every page."""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    # 避免同一頁多次 render。
+    if st.session_state.get("_spt_v269_dropdown_panel_rendered"):
+        return
+    st.session_state["_spt_v269_dropdown_panel_rendered"] = True
+
+    cfg = _spt_load_dropdown_settings()
+    with st.sidebar.expander("▾ 下拉選單尺寸設定", expanded=False):
+        st.caption("隱藏設定區｜調整後按永久套用，所有模組共用。")
+        enabled = st.checkbox("啟用自訂下拉尺寸", value=bool(cfg.get("enabled", True)), key="spt_dd_enabled")
+        outer = st.slider("外框高度 px", 48, 120, int(cfg["outer_height"]), 1, key="spt_dd_outer")
+        inner = st.slider("內層容器 px", 42, 116, int(cfg["inner_height"]), 1, key="spt_dd_inner")
+        line = st.slider("文字行高 px", 24, 72, int(cfg["text_line_height"]), 1, key="spt_dd_line")
+        font = st.slider("字體大小 px", 12, 28, int(cfg["font_size"]), 1, key="spt_dd_font")
+        option = st.slider("展開選項高度 px", 32, 90, int(cfg["option_height"]), 1, key="spt_dd_option")
+        tag = st.slider("多選標籤高度 px", 28, 72, int(cfg["tag_height"]), 1, key="spt_dd_tag")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("▣ 永久套用", key="spt_dd_save", use_container_width=True):
+                new_cfg = {
+                    "enabled": enabled,
+                    "outer_height": int(outer),
+                    "inner_height": int(inner),
+                    "text_line_height": int(line),
+                    "font_size": int(font),
+                    "option_height": int(option),
+                    "tag_height": int(tag),
+                    "panel_bg": "#eaf8ff",
+                    "field_bg": "#edf8ff",
+                    "text_color": "#03121f",
+                }
+                _spt_save_dropdown_settings(new_cfg)
+                st.success("下拉選單尺寸已永久記錄。請重新整理或切換頁面後套用。")
+        with col2:
+            if st.button("↺ 預設值", key="spt_dd_reset", use_container_width=True):
+                _spt_save_dropdown_settings(dict(_SPT_UI_DROPDOWN_DEFAULTS))
+                st.success("已恢復下拉選單預設尺寸。請重新整理或切換頁面後套用。")
+
+# Apply CSS and render hidden panel on import.
+try:
+    apply_v269_configurable_dropdown_css()
+except Exception:
+    pass
+
+try:
+    render_dropdown_size_settings_panel()
+except Exception:
+    pass
+# ===== V2.69 USER CONFIGURABLE DROPDOWN SIZE END =====
