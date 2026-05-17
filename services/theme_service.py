@@ -607,6 +607,13 @@ div[data-testid="stExpander"] summary * {
 
 def apply_theme() -> None:
     _inject_css()
+    # V2.18: apply global font scale to every module page.
+    # Best-effort only; visual theme must never break a page.
+    try:
+        from services.home_ui_settings_service import inject_global_font_scale
+        inject_global_font_scale()
+    except Exception:
+        pass
     # V1.60: install global table column settings once.
     # Best-effort only; visual theme must never break a page.
     try:
