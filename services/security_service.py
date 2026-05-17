@@ -740,12 +740,264 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:
 
 
 def render_login_form() -> None:
-    st.markdown("### 登入系統 / Login")
-    st.caption("請使用個人帳號登入。預設管理員：admin / Admin@1234，上線後請立即改密碼。")
+    """Render a premium welcome login page without changing authentication logic."""
+    st.markdown(
+        """
+<style>
+/* ===== V2.23 Premium Welcome Login Page ===== */
+[data-testid="stSidebar"] { display: none !important; }
+[data-testid="collapsedControl"] { display: none !important; }
+.block-container {
+  max-width: 1180px !important;
+  padding-top: 3.1rem !important;
+}
+.spt-welcome-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 30px;
+  padding: 1px;
+  background:
+    linear-gradient(135deg, rgba(96, 239, 255, .95), rgba(60, 100, 255, .42), rgba(255, 255, 255, .12));
+  box-shadow:
+    0 0 42px rgba(0, 213, 255, .28),
+    0 24px 80px rgba(0, 0, 0, .42);
+  margin-bottom: 1.1rem;
+}
+.spt-welcome-panel {
+  position: relative;
+  border-radius: 29px;
+  padding: 34px 36px;
+  background:
+    radial-gradient(circle at 14% 14%, rgba(73, 231, 255, .30), transparent 34%),
+    radial-gradient(circle at 92% 18%, rgba(111, 95, 255, .24), transparent 32%),
+    linear-gradient(145deg, rgba(6, 18, 36, .96), rgba(9, 29, 56, .92));
+  border: 1px solid rgba(157, 236, 255, .25);
+}
+.spt-welcome-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(132, 232, 255, .055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(132, 232, 255, .055) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(90deg, rgba(0,0,0,.85), rgba(0,0,0,.18));
+  pointer-events: none;
+}
+.spt-welcome-panel::after {
+  content: "";
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  right: -80px;
+  top: -80px;
+  border: 1px solid rgba(148, 238, 255, .22);
+  border-radius: 999px;
+  box-shadow: inset 0 0 32px rgba(0, 218, 255, .16), 0 0 48px rgba(0, 218, 255, .15);
+  animation: spt_login_orbit 5.6s ease-in-out infinite alternate;
+}
+@keyframes spt_login_orbit {
+  from { transform: translate(0,0) scale(.96); opacity: .52; }
+  to { transform: translate(-18px,18px) scale(1.04); opacity: .92; }
+}
+.spt-login-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(330px, .78fr);
+  gap: 28px;
+  align-items: stretch;
+}
+.spt-brand-kicker {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 13px;
+  border: 1px solid rgba(148, 238, 255, .38);
+  border-radius: 999px;
+  color: #bff7ff;
+  background: rgba(5, 25, 47, .64);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  box-shadow: 0 0 24px rgba(0, 217, 255, .18);
+}
+.spt-brand-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: #6ff3ff;
+  box-shadow: 0 0 16px #6ff3ff, 0 0 30px rgba(111,243,255,.58);
+  animation: spt_login_pulse 1.8s ease-in-out infinite;
+}
+@keyframes spt_login_pulse {
+  0%,100% { transform: scale(.78); opacity:.55; }
+  50% { transform: scale(1.2); opacity:1; }
+}
+.spt-login-title {
+  margin: 22px 0 6px 0;
+  color: #f4fdff;
+  font-size: clamp(36px, 5.1vw, 64px);
+  line-height: 1.02;
+  font-weight: 950;
+  letter-spacing: -.04em;
+  text-shadow: 0 0 28px rgba(95, 229, 255, .28);
+}
+.spt-login-subtitle {
+  margin-top: 14px;
+  max-width: 680px;
+  color: rgba(220, 249, 255, .88);
+  font-size: 18px;
+  line-height: 1.7;
+  font-weight: 650;
+}
+.spt-login-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 28px;
+}
+.spt-login-metric {
+  border: 1px solid rgba(147, 231, 255, .24);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.035));
+  box-shadow: inset 0 0 18px rgba(124, 230, 255, .07);
+}
+.spt-login-metric b {
+  display: block;
+  color: #ffffff;
+  font-size: 22px;
+  line-height: 1;
+}
+.spt-login-metric span {
+  display: block;
+  margin-top: 8px;
+  color: rgba(209, 246, 255, .72);
+  font-size: 12px;
+  letter-spacing: .08em;
+}
+.spt-form-card {
+  border-radius: 24px;
+  padding: 24px 24px 22px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.065));
+  border: 1px solid rgba(181, 242, 255, .32);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.18),
+    0 18px 44px rgba(0,0,0,.30),
+    0 0 30px rgba(0, 221, 255, .10);
+  backdrop-filter: blur(14px);
+}
+.spt-form-title {
+  color: #f7feff;
+  font-size: 27px;
+  font-weight: 950;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.spt-form-caption {
+  color: rgba(219, 249, 255, .72);
+  font-size: 13px;
+  line-height: 1.55;
+  margin-bottom: 16px;
+}
+.spt-login-note {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  color: rgba(233, 252, 255, .76);
+  background: rgba(4, 19, 36, .52);
+  border: 1px solid rgba(155, 233, 255, .16);
+  font-size: 12px;
+  line-height: 1.6;
+}
+/* Login-only Streamlit widgets */
+div[data-testid="stForm"] {
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+div[data-testid="stForm"] label p {
+  color: #dffbff !important;
+  font-weight: 850 !important;
+  letter-spacing: .06em !important;
+}
+div[data-testid="stForm"] input {
+  background: rgba(246, 252, 255, .96) !important;
+  color: #071827 !important;
+  border: 1px solid rgba(123, 220, 255, .78) !important;
+  border-radius: 14px !important;
+  min-height: 46px !important;
+  font-size: 16px !important;
+  font-weight: 750 !important;
+  box-shadow: 0 0 0 1px rgba(111, 236, 255, .08), 0 8px 24px rgba(0,0,0,.16) !important;
+}
+div[data-testid="stForm"] input:focus {
+  border-color: #54ecff !important;
+  box-shadow: 0 0 0 3px rgba(84, 236, 255, .24), 0 0 30px rgba(84,236,255,.28) !important;
+}
+div[data-testid="stForm"] button[kind="primary"],
+div[data-testid="stForm"] button {
+  min-height: 48px !important;
+  border-radius: 15px !important;
+  border: 1px solid rgba(150, 245, 255, .8) !important;
+  background: linear-gradient(135deg, #eaffff, #88efff 45%, #b7c7ff) !important;
+  color: #031523 !important;
+  font-weight: 950 !important;
+  letter-spacing: .08em !important;
+  box-shadow: 0 0 24px rgba(75, 235, 255, .32), 0 12px 32px rgba(0,0,0,.24) !important;
+  transition: transform .16s ease, box-shadow .16s ease !important;
+}
+div[data-testid="stForm"] button:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 0 34px rgba(75, 235, 255, .48), 0 16px 38px rgba(0,0,0,.28) !important;
+}
+@media (max-width: 900px) {
+  .spt-login-grid { grid-template-columns: 1fr; }
+  .spt-login-metrics { grid-template-columns: 1fr; }
+  .spt-welcome-panel { padding: 24px 18px; }
+}
+</style>
+<div class="spt-welcome-shell">
+  <div class="spt-welcome-panel">
+    <div class="spt-login-grid">
+      <div>
+        <div class="spt-brand-kicker"><span class="spt-brand-dot"></span>SPT Manufacturing Intelligence</div>
+        <div class="spt-login-title">歡迎回到<br>智慧工時紀錄中樞</div>
+        <div class="spt-login-subtitle">
+          以權限控管、即時工時、歷史追溯與永久備份為核心，打造製造現場可稽核、可分析、可持續升級的工時管理平台。
+        </div>
+        <div class="spt-login-metrics">
+          <div class="spt-login-metric"><b>13</b><span>CORE MODULES</span></div>
+          <div class="spt-login-metric"><b>24H</b><span>TIME TRACE</span></div>
+          <div class="spt-login-metric"><b>∞</b><span>PERSISTENCE</span></div>
+        </div>
+      </div>
+      <div class="spt-form-card">
+        <div class="spt-form-title">⛨ 安全登入</div>
+        <div class="spt-form-caption">請輸入個人帳號密碼。系統將依帳號權限載入可操作模組。</div>
+""",
+        unsafe_allow_html=True,
+    )
     with st.form("login_form", clear_on_submit=False):
-        username = st.text_input("帳號 / Username")
-        password = st.text_input("密碼 / Password", type="password")
-        submitted = st.form_submit_button("登入 / Login", use_container_width=True)
+        username = st.text_input("帳號 / Username", placeholder="請輸入帳號")
+        password = st.text_input("密碼 / Password", type="password", placeholder="請輸入密碼")
+        submitted = st.form_submit_button("⛨ 進入系統 / Secure Login", use_container_width=True)
+    st.markdown(
+        """
+        <div class="spt-login-note">
+          ▣ 登入後會自動套用模組權限與閒置登出設定。<br>
+          ⧉ 所有重要異動將保留操作紀錄，便於後續稽核與追蹤。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
     if submitted:
         ok, msg = authenticate(username, password)
         if ok:
