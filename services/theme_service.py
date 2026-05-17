@@ -3021,3 +3021,88 @@ try:
 except Exception:
     pass
 # ===== V2.69 USER CONFIGURABLE DROPDOWN SIZE END =====
+
+
+# ===== V2.70 MAIN PAGE DROPDOWN SIZE PANEL FALLBACK START =====
+def render_dropdown_size_settings_panel_main_fallback():
+    """
+    V2.70:
+    Some Streamlit deployments do not show widgets rendered in st.sidebar from imported theme modules.
+    This fallback renders a collapsed panel in the main page so the setting is always visible.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    # One panel per page render.
+    if st.session_state.get("_spt_v270_dropdown_main_panel_rendered"):
+        return
+    st.session_state["_spt_v270_dropdown_main_panel_rendered"] = True
+
+    cfg = _spt_load_dropdown_settings()
+
+    with st.expander("⚙ 下拉選單尺寸設定 / Dropdown Size Settings（收合）", expanded=False):
+        st.caption("此設定會永久保存，所有模組共用。若下拉文字被切掉，先把外框高度與內層容器調大。")
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            enabled = st.checkbox("啟用自訂尺寸", value=bool(cfg.get("enabled", True)), key="spt_v270_dd_enabled")
+            outer = st.number_input("外框高度 px", min_value=48, max_value=140, value=int(cfg.get("outer_height", 70)), step=1, key="spt_v270_dd_outer")
+            inner = st.number_input("內層容器 px", min_value=42, max_value=136, value=int(cfg.get("inner_height", 66)), step=1, key="spt_v270_dd_inner")
+        with c2:
+            line = st.number_input("文字行高 px", min_value=24, max_value=90, value=int(cfg.get("text_line_height", 36)), step=1, key="spt_v270_dd_line")
+            font = st.number_input("字體大小 px", min_value=12, max_value=32, value=int(cfg.get("font_size", 16)), step=1, key="spt_v270_dd_font")
+            option = st.number_input("展開選項高度 px", min_value=32, max_value=110, value=int(cfg.get("option_height", 46)), step=1, key="spt_v270_dd_option")
+        with c3:
+            tag = st.number_input("多選標籤高度 px", min_value=28, max_value=90, value=int(cfg.get("tag_height", 40)), step=1, key="spt_v270_dd_tag")
+            st.markdown(
+                f"""
+                <div style="margin-top:8px;padding:12px;border-radius:12px;background:#edf8ff;color:#03121f;font-weight:900;">
+                    預覽高度：外框 {int(outer)}px｜內層 {int(inner)}px｜文字 {int(line)}px
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        b1, b2, b3 = st.columns(3)
+        with b1:
+            if st.button("▣ 永久套用下拉尺寸", key="spt_v270_dd_save", use_container_width=True):
+                new_cfg = {
+                    "enabled": bool(enabled),
+                    "outer_height": int(outer),
+                    "inner_height": int(inner),
+                    "text_line_height": int(line),
+                    "font_size": int(font),
+                    "option_height": int(option),
+                    "tag_height": int(tag),
+                    "panel_bg": "#eaf8ff",
+                    "field_bg": "#edf8ff",
+                    "text_color": "#03121f",
+                }
+                _spt_save_dropdown_settings(new_cfg)
+                st.success("下拉選單尺寸已永久保存。請按重新整理或切換頁面後生效。")
+        with b2:
+            if st.button("↺ 恢復建議值", key="spt_v270_dd_recommended", use_container_width=True):
+                new_cfg = dict(_SPT_UI_DROPDOWN_DEFAULTS)
+                new_cfg.update({
+                    "outer_height": 80,
+                    "inner_height": 76,
+                    "text_line_height": 40,
+                    "font_size": 17,
+                    "option_height": 50,
+                    "tag_height": 42,
+                })
+                _spt_save_dropdown_settings(new_cfg)
+                st.success("已套用建議值：外框80、內層76、文字40、字體17。請重新整理或切換頁面後生效。")
+        with b3:
+            if st.button("↺ 恢復預設值", key="spt_v270_dd_reset", use_container_width=True):
+                _spt_save_dropdown_settings(dict(_SPT_UI_DROPDOWN_DEFAULTS))
+                st.success("已恢復預設值。請重新整理或切換頁面後生效。")
+
+# Render the main-page fallback after CSS is applied.
+try:
+    render_dropdown_size_settings_panel_main_fallback()
+except Exception:
+    pass
+# ===== V2.70 MAIN PAGE DROPDOWN SIZE PANEL FALLBACK END =====
