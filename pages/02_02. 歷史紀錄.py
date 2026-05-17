@@ -130,10 +130,21 @@ def _row_looks_like_header(row: list[str]) -> bool:
 
 
 def _pick_series(source: pd.DataFrame, target: str, default=""):
+    """Return a column-sized Series.
+
+    Pandas cannot build a DataFrame from an all-scalar dict.
+    Paste/Excel imports often have no recognizable headers, so most
+    fields fall back to defaults. Always returning a Series keeps the
+    parser stable and lets the later positional parser handle no-header
+    paste data.
+    """
     col = _find_col(source, HISTORY_ALIAS_GROUPS[target])
     if col is None:
-        return default
-    return source[col]
+        return pd.Series([default] * len(source), index=source.index)
+    picked = source[col]
+    if not isinstance(picked, pd.Series):
+        return pd.Series([default] * len(source), index=source.index)
+    return picked.reset_index(drop=True)
 
 
 def _ensure_history_cols(df: pd.DataFrame) -> pd.DataFrame:
@@ -153,7 +164,7 @@ def parse_history_dataframe(source: pd.DataFrame) -> tuple[pd.DataFrame, list[st
 
     source = source.copy()
     # Some Excel exports have completely blank rows/columns.
-    source = source.dropna(how="all").dropna(axis=1, how="all")
+    source = source.dropna(how="all").dropna(axis=1, how="all").reset_index(drop=True)
     if source.empty:
         return _ensure_history_cols(pd.DataFrame()), ["來源資料沒有有效列。"]
 
