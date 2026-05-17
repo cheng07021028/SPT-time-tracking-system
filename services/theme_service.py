@@ -3987,3 +3987,353 @@ for _spt_v281_name in (
             return _spt_v281_wrapper
         globals()[_spt_v281_name] = _spt_v281_make_wrapper(_spt_v281_func)
 # ===== V2.81 STABLE SPACING GUARD - DO NOT REMOVE END =====
+
+
+# ===== V2.82 SELECT TEXT VISIBILITY GUARD START =====
+def apply_v282_select_text_visibility_guard():
+    """Final guard: keep V2.80/V2.81 cyber style, but force visible selected/placeholder text.
+    This patch prevents dark text being restored on dark glass fields and prevents vertical clipping.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.82｜下拉欄位文字可視性防回退：DO NOT REMOVE
+           保留深色科技感欄位，強制欄位內文字使用淺色，且不被裁切。 */
+
+        :root {
+            --spt-v282-field-text: #eafcff;
+            --spt-v282-field-text-strong: #f7feff;
+            --spt-v282-field-text-dim: #aeeeff;
+            --spt-v282-field-text-muted: #8dccdf;
+            --spt-v282-selected-text-dark: #03121f;
+        }
+
+        /* Selectbox / Multiselect 顯示框本體維持深色科技感，不回到慘白 */
+        div[data-baseweb="select"] > div {
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.014) 17%, rgba(255,255,255,0.00) 18%),
+                linear-gradient(135deg, rgba(8, 20, 44, 0.94) 0%, rgba(16, 34, 69, 0.90) 54%, rgba(7, 16, 36, 0.96) 100%) !important;
+            border: 1px solid rgba(104, 232, 255, 0.82) !important;
+            color: var(--spt-v282-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
+            overflow: visible !important;
+        }
+
+        /* 關鍵：BaseWeb value/placeholder 容器不要繼承黑字，也不要被裁切 */
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[class*="valueContainer"],
+        div[data-baseweb="select"] div[class*="ValueContainer"],
+        div[data-baseweb="select"] div[class*="singleValue"],
+        div[data-baseweb="select"] div[class*="SingleValue"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Placeholder"] {
+            color: var(--spt-v282-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
+            opacity: 1 !important;
+            text-shadow: 0 0 8px rgba(107, 232, 255, 0.10) !important;
+            background: transparent !important;
+            overflow: visible !important;
+            line-height: 1.35 !important;
+            display: flex !important;
+            align-items: center !important;
+            min-height: 40px !important;
+            height: auto !important;
+        }
+
+        /* 關鍵：顯示文字、placeholder、No options to select 都改淺色 */
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p,
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete="list"] {
+            color: var(--spt-v282-field-text-strong) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text-strong) !important;
+            opacity: 1 !important;
+            font-weight: 850 !important;
+            line-height: 1.35 !important;
+            min-height: 28px !important;
+            height: auto !important;
+            background: transparent !important;
+            text-shadow: 0 0 8px rgba(107, 232, 255, 0.08) !important;
+            overflow: visible !important;
+            transform: none !important;
+            filter: none !important;
+        }
+
+        div[data-baseweb="select"] input::placeholder {
+            color: var(--spt-v282-field-text-dim) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text-dim) !important;
+            opacity: 1 !important;
+        }
+
+        /* disabled / 無選項狀態仍要看得到 */
+        div[data-baseweb="select"] [aria-disabled="true"],
+        div[data-baseweb="select"] [disabled],
+        div[data-baseweb="select"] [aria-disabled="true"] *,
+        div[data-baseweb="select"] [disabled] * {
+            color: var(--spt-v282-field-text-muted) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text-muted) !important;
+            opacity: 0.86 !important;
+        }
+
+        /* 下拉展開清單：深底淺字，預設即清楚，不靠 hover */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.012) 15%, rgba(255,255,255,0.00) 16%),
+                linear-gradient(135deg, rgba(6, 18, 40, 0.97) 0%, rgba(12, 30, 59, 0.98) 100%) !important;
+            color: var(--spt-v282-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
+            overflow: hidden !important;
+        }
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li,
+        div[data-baseweb="menu"] div {
+            color: var(--spt-v282-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            overflow: visible !important;
+        }
+
+        div[data-baseweb="popover"] *,
+        div[data-baseweb="menu"] *,
+        ul[role="listbox"] * {
+            color: var(--spt-v282-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
+            opacity: 1 !important;
+        }
+
+        /* hover 保持淺字，不再切回黑字 */
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[data-baseweb="menu"] div:hover {
+            background: linear-gradient(90deg, rgba(68, 232, 255, 0.18), rgba(102, 135, 255, 0.24)) !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+        }
+
+        /* 已選取項目用亮底，所以改深色字 */
+        div[aria-selected="true"],
+        li[aria-selected="true"],
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"] {
+            background: linear-gradient(90deg, rgba(104, 235, 255, 0.96), rgba(140, 174, 255, 0.96)) !important;
+            color: var(--spt-v282-selected-text-dark) !important;
+            -webkit-text-fill-color: var(--spt-v282-selected-text-dark) !important;
+            font-weight: 950 !important;
+        }
+        div[aria-selected="true"] *,
+        li[aria-selected="true"] *,
+        div[role="option"][aria-selected="true"] *,
+        li[role="option"][aria-selected="true"] * {
+            color: var(--spt-v282-selected-text-dark) !important;
+            -webkit-text-fill-color: var(--spt-v282-selected-text-dark) !important;
+        }
+
+        /* 多選標籤維持亮底深字，避免標籤文字失真 */
+        div[data-baseweb="tag"],
+        div[data-baseweb="tag"] *,
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div {
+            color: #061427 !important;
+            -webkit-text-fill-color: #061427 !important;
+            opacity: 1 !important;
+        }
+
+        /* 文字輸入 / 日期 / 數字 / 備註也強制淺字，避免被深色欄位吃掉 */
+        .stTextInput input,
+        .stDateInput input,
+        .stNumberInput input,
+        .stTextArea textarea,
+        div[data-testid="stTextInputRootElement"] input,
+        div[data-testid="stNumberInputRootElement"] input,
+        div[data-testid="stDateInputField"] input {
+            color: var(--spt-v282-field-text-strong) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text-strong) !important;
+            opacity: 1 !important;
+            text-shadow: 0 0 8px rgba(107, 232, 255, 0.08) !important;
+            overflow: visible !important;
+        }
+        .stTextInput input::placeholder,
+        .stDateInput input::placeholder,
+        .stNumberInput input::placeholder,
+        .stTextArea textarea::placeholder {
+            color: var(--spt-v282-field-text-dim) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text-dim) !important;
+            opacity: 1 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v282_select_text_visibility_guard()
+except Exception:
+    pass
+
+for _spt_v282_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v282_func = globals().get(_spt_v282_name)
+    if callable(_spt_v282_func) and not getattr(_spt_v282_func, "_spt_v282_wrapped", False):
+        def _spt_v282_make_wrapper(_original):
+            def _spt_v282_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v282_select_text_visibility_guard()
+                except Exception:
+                    pass
+                return result
+            _spt_v282_wrapper._spt_v282_wrapped = True
+            return _spt_v282_wrapper
+        globals()[_spt_v282_name] = _spt_v282_make_wrapper(_spt_v282_func)
+# ===== V2.82 SELECT TEXT VISIBILITY GUARD END =====
+
+
+# ===== V2.83 COLLAPSED SELECT DARK TEXT GUARD START =====
+def apply_v283_collapsed_select_dark_text_guard():
+    """Keep collapsed select/multiselect field text dark and readable on light glass fields.
+    This intentionally targets only the visible field, not the opened dropdown popover.
+    DO NOT REMOVE: prevents selected/placeholder text from being washed out by later HUD effects.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.83｜下拉欄位起始文字深色防回退
+           目標：欄位收合狀態的已選文字 / placeholder / No options 必須清楚可見。
+           注意：只鎖定欄位本體，不覆蓋展開選單面板。 */
+
+        :root {
+            --spt-v283-collapsed-select-text: #071523;
+            --spt-v283-collapsed-select-muted: #19324a;
+        }
+
+        /* 收合狀態欄位本體：維持淺玻璃底時，文字必須是深色 */
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="select"] > div:hover,
+        div[data-baseweb="select"] > div:focus-within {
+            color: var(--spt-v283-collapsed-select-text) !important;
+            -webkit-text-fill-color: var(--spt-v283-collapsed-select-text) !important;
+        }
+
+        /* 選取值、placeholder、No options to select、value container */
+        div[data-baseweb="select"] > div span,
+        div[data-baseweb="select"] > div p,
+        div[data-baseweb="select"] > div div[role="combobox"],
+        div[data-baseweb="select"] > div div[aria-expanded],
+        div[data-baseweb="select"] > div div[class*="placeholder"],
+        div[data-baseweb="select"] > div div[class*="Placeholder"],
+        div[data-baseweb="select"] > div div[class*="singleValue"],
+        div[data-baseweb="select"] > div div[class*="SingleValue"],
+        div[data-baseweb="select"] > div div[class*="valueContainer"],
+        div[data-baseweb="select"] > div div[class*="ValueContainer"],
+        div[data-baseweb="select"] > div div[class*="inputContainer"],
+        div[data-baseweb="select"] > div div[class*="InputContainer"] {
+            color: var(--spt-v283-collapsed-select-text) !important;
+            -webkit-text-fill-color: var(--spt-v283-collapsed-select-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            filter: none !important;
+            mix-blend-mode: normal !important;
+        }
+
+        /* BaseWeb 內部搜尋 input / placeholder，避免被 HUD 淺色字覆蓋 */
+        div[data-baseweb="select"] > div input,
+        div[data-baseweb="select"] > div input[type="text"],
+        div[data-baseweb="select"] > div input[aria-autocomplete="list"] {
+            color: var(--spt-v283-collapsed-select-text) !important;
+            -webkit-text-fill-color: var(--spt-v283-collapsed-select-text) !important;
+            caret-color: var(--spt-v283-collapsed-select-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            background: transparent !important;
+        }
+
+        div[data-baseweb="select"] > div input::placeholder {
+            color: var(--spt-v283-collapsed-select-muted) !important;
+            -webkit-text-fill-color: var(--spt-v283-collapsed-select-muted) !important;
+            opacity: 1 !important;
+        }
+
+        /* 下拉箭頭仍維持科技感藍色，不跟著文字變黑 */
+        div[data-baseweb="select"] > div svg {
+            color: #8df7ff !important;
+            fill: #8df7ff !important;
+            opacity: 1 !important;
+            filter: drop-shadow(0 0 6px rgba(0, 225, 255, 0.35)) !important;
+        }
+
+        /* 已選 multiselect tag 維持亮底深字 */
+        div[data-baseweb="select"] div[data-baseweb="tag"],
+        div[data-baseweb="select"] div[data-baseweb="tag"] * {
+            color: #061427 !important;
+            -webkit-text-fill-color: #061427 !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        /* 展開選單仍由 V2.82/V2.80 控制；這裡只補強選單內字不透明 */
+        div[data-baseweb="popover"] *,
+        div[data-baseweb="menu"] *,
+        ul[role="listbox"] * {
+            opacity: 1 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v283_collapsed_select_dark_text_guard()
+except Exception:
+    pass
+
+for _spt_v283_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v283_func = globals().get(_spt_v283_name)
+    if callable(_spt_v283_func) and not getattr(_spt_v283_func, "_spt_v283_wrapped", False):
+        def _spt_v283_make_wrapper(_original):
+            def _spt_v283_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v283_collapsed_select_dark_text_guard()
+                except Exception:
+                    pass
+                return result
+            _spt_v283_wrapper._spt_v283_wrapped = True
+            return _spt_v283_wrapper
+        globals()[_spt_v283_name] = _spt_v283_make_wrapper(_spt_v283_func)
+# ===== V2.83 COLLAPSED SELECT DARK TEXT GUARD END =====
