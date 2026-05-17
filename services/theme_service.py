@@ -2123,3 +2123,278 @@ try:
 except Exception:
     pass
 # ===== V2.66 STATUS HEIGHT UNIFY ALL FILTER FIELDS END =====
+
+
+# ===== V2.67 SELECT HEIGHT 70 MENU TEXT VISIBLE FINAL START =====
+def apply_v267_select_height_70_menu_text_visible_final():
+    """
+    Final override requested:
+    - Outer select/multiselect frame height: 70px
+    - Inner container height: 66px
+    - Text line-height: 36px
+    - Placeholder text layer brought to front
+    - Dropdown option panel forced to light background + dark readable text
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /*
+          V2.67｜下拉框尺寸指定版
+          製令、P/N、機型、組立地點、工段、工號、姓名等篩選欄位統一：
+          外框高度 70px｜內層容器 66px｜文字行高 36px
+        */
+        :root {
+            --spt-select-outer-h: 70px;
+            --spt-select-inner-h: 66px;
+            --spt-select-line-h: 36px;
+        }
+
+        /* 元件外層：避免 labels 與欄位互相壓縮 */
+        .stSelectbox,
+        .stMultiSelect,
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"] {
+            min-height: 96px !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        /* select / multiselect 根容器 */
+        div[data-baseweb="select"] {
+            min-height: var(--spt-select-outer-h) !important;
+            height: var(--spt-select-outer-h) !important;
+            overflow: visible !important;
+            display: flex !important;
+            align-items: center !important;
+            position: relative !important;
+            z-index: 2 !important;
+        }
+
+        /* select / multiselect 可視外框 */
+        div[data-baseweb="select"] > div {
+            min-height: var(--spt-select-outer-h) !important;
+            height: var(--spt-select-outer-h) !important;
+            padding-top: 2px !important;
+            padding-bottom: 2px !important;
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+            border-radius: 13px !important;
+            background: #edf8ff !important;
+            color: #03121f !important;
+            position: relative !important;
+            z-index: 2 !important;
+        }
+
+        /* BaseWeb 內層容器：使用 66px，讓文字不再凹陷或被切 */
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[class*="valueContainer"],
+        div[data-baseweb="select"] div[class*="ValueContainer"],
+        div[data-baseweb="select"] div[class*="singleValue"],
+        div[data-baseweb="select"] div[class*="SingleValue"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Placeholder"] {
+            min-height: var(--spt-select-inner-h) !important;
+            height: var(--spt-select-inner-h) !important;
+            line-height: var(--spt-select-inner-h) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+            position: relative !important;
+            z-index: 5 !important;
+        }
+
+        /* 預設文字 Choose options / No options to select：提高圖層，避免被蓋住 */
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p,
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Placeholder"],
+        div[data-baseweb="select"] div[class*="singleValue"],
+        div[data-baseweb="select"] div[class*="SingleValue"] {
+            min-height: var(--spt-select-line-h) !important;
+            height: var(--spt-select-line-h) !important;
+            line-height: var(--spt-select-line-h) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            position: relative !important;
+            z-index: 20 !important;
+            opacity: 1 !important;
+        }
+
+        /* input 搜尋層：透明但保留高度，不擋住文字 */
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete="list"] {
+            min-height: var(--spt-select-line-h) !important;
+            height: var(--spt-select-line-h) !important;
+            line-height: var(--spt-select-line-h) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            caret-color: transparent !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+            font-weight: 900 !important;
+            position: relative !important;
+            z-index: 10 !important;
+        }
+
+        /* 下拉箭頭置中 */
+        div[data-baseweb="select"] svg {
+            color: #03121f !important;
+            fill: #03121f !important;
+            flex-shrink: 0 !important;
+            position: relative !important;
+            z-index: 25 !important;
+        }
+
+        /* multiselect 已選標籤 */
+        div[data-baseweb="tag"] {
+            min-height: 40px !important;
+            height: 40px !important;
+            padding: 0 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            line-height: 40px !important;
+            overflow: visible !important;
+            background: linear-gradient(135deg, #c9fbff 0%, #83edff 100%) !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+            border-radius: 10px !important;
+            color: #03121f !important;
+            font-weight: 900 !important;
+            position: relative !important;
+            z-index: 18 !important;
+        }
+
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div {
+            min-height: 24px !important;
+            line-height: 24px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+        }
+
+        /*
+          展開後的下拉清單：
+          你截圖裡選項文字看不到，是因為 popover/menu 內部仍吃到深色或透明樣式。
+          這裡強制所有選項與子元素為淺底深字。
+        */
+        div[data-baseweb="popover"],
+        div[data-baseweb="popover"] > div,
+        div[data-baseweb="menu"],
+        div[data-baseweb="menu"] > div,
+        ul[role="listbox"],
+        ul[role="listbox"] > div {
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            border-color: rgba(102, 232, 249, .95) !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+            z-index: 999999 !important;
+        }
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li,
+        div[data-baseweb="menu"] div[role="option"] {
+            min-height: 46px !important;
+            height: 46px !important;
+            line-height: 46px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+            display: flex !important;
+            align-items: center !important;
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+        }
+
+        div[role="option"] *,
+        li[role="option"] *,
+        ul[role="listbox"] li *,
+        div[data-baseweb="menu"] *,
+        div[data-baseweb="popover"] * {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            fill: #03121f !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+        }
+
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"],
+        ul[role="listbox"] li[aria-selected="true"] {
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            font-weight: 950 !important;
+        }
+
+        div[role="option"]:hover *,
+        li[role="option"]:hover *,
+        ul[role="listbox"] li:hover *,
+        div[role="option"][aria-selected="true"] *,
+        li[role="option"][aria-selected="true"] *,
+        ul[role="listbox"] li[aria-selected="true"] * {
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            fill: #020817 !important;
+            font-weight: 950 !important;
+            opacity: 1 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v267_select_height_70_menu_text_visible_final()
+except Exception:
+    pass
+# ===== V2.67 SELECT HEIGHT 70 MENU TEXT VISIBLE FINAL END =====
