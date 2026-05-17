@@ -837,6 +837,12 @@ def apply_theme() -> None:
         apply_v276_dropdown_professional_cyber_breathing_glow()
     except Exception:
         pass
+    # V2.77: form input spacing / no-clipping patch for login and all text/password fields.
+    # Inject last so outer glow and vertical gaps are not cut by older rules.
+    try:
+        apply_v277_form_input_spacing_no_clip()
+    except Exception:
+        pass
 
 
 def app_theme() -> None:
@@ -4507,3 +4513,153 @@ try:
 except Exception:
     pass
 # ===== V2.76 PROFESSIONAL CYBER DROPDOWN BREATHING GLOW END =====
+
+def apply_v277_form_input_spacing_no_clip():
+    """V2.77: increase vertical spacing and prevent glowing input borders from being clipped."""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+    st.markdown(
+        """
+        <style id="spt-v277-form-input-spacing-no-clip">
+        /*
+          V2.77｜表單輸入框間距與外框不裁切修正
+          目標：帳號/密碼/一般文字框保留科技藍框光暈，同時上下留空，避免看起來被切掉。
+        */
+
+        div[data-testid="stTextInput"],
+        div[data-testid="stPasswordInput"],
+        div[data-testid="stNumberInput"],
+        div[data-testid="stDateInput"],
+        div[data-testid="stTimeInput"],
+        div[data-testid="stTextArea"] {
+            margin-top: 6px !important;
+            margin-bottom: 18px !important;
+            padding-top: 3px !important;
+            padding-bottom: 6px !important;
+            overflow: visible !important;
+        }
+
+        div[data-testid="stTextInput"] label,
+        div[data-testid="stPasswordInput"] label,
+        div[data-testid="stNumberInput"] label,
+        div[data-testid="stDateInput"] label,
+        div[data-testid="stTimeInput"] label,
+        div[data-testid="stTextArea"] label {
+            margin-bottom: 8px !important;
+            padding-bottom: 2px !important;
+            overflow: visible !important;
+            color: #f2fbff !important;
+            -webkit-text-fill-color: #f2fbff !important;
+            font-weight: 950 !important;
+            text-shadow: 0 0 8px rgba(91, 241, 255, .22) !important;
+        }
+
+        div[data-baseweb="input"],
+        div[data-baseweb="base-input"],
+        div[data-baseweb="textarea"],
+        div[data-testid="stTextInput"] div[data-baseweb="input"],
+        div[data-testid="stPasswordInput"] div[data-baseweb="input"],
+        div[data-testid="stNumberInput"] div[data-baseweb="input"],
+        div[data-testid="stDateInput"] div[data-baseweb="input"],
+        div[data-testid="stTimeInput"] div[data-baseweb="input"] {
+            min-height: 58px !important;
+            height: auto !important;
+            overflow: visible !important;
+            border-radius: 15px !important;
+            border: 1px solid rgba(105, 231, 255, .86) !important;
+            background: linear-gradient(180deg, rgba(248,253,255,.98), rgba(230,244,252,.98)) !important;
+            box-shadow:
+                0 0 0 1px rgba(105, 231, 255, .20),
+                0 0 16px rgba(72, 227, 255, .16),
+                inset 0 1px 0 rgba(255,255,255,.84) !important;
+            box-sizing: border-box !important;
+        }
+
+        div[data-baseweb="input"]:focus-within,
+        div[data-baseweb="base-input"]:focus-within,
+        div[data-baseweb="textarea"]:focus-within {
+            border-color: rgba(93, 238, 255, 1) !important;
+            box-shadow:
+                0 0 0 1px rgba(93, 238, 255, .55),
+                0 0 22px rgba(93, 238, 255, .34),
+                0 0 42px rgba(122, 118, 255, .16),
+                inset 0 1px 0 rgba(255,255,255,.90) !important;
+        }
+
+        div[data-baseweb="input"] input,
+        div[data-baseweb="base-input"] input,
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stPasswordInput"] input,
+        div[data-testid="stNumberInput"] input,
+        div[data-testid="stDateInput"] input,
+        div[data-testid="stTimeInput"] input {
+            min-height: 56px !important;
+            height: 56px !important;
+            line-height: 28px !important;
+            padding-top: 13px !important;
+            padding-bottom: 13px !important;
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+            background: transparent !important;
+            color: #061423 !important;
+            -webkit-text-fill-color: #061423 !important;
+            caret-color: #061423 !important;
+            font-weight: 900 !important;
+            box-sizing: border-box !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+        }
+
+        div[data-baseweb="input"] input::placeholder,
+        div[data-baseweb="base-input"] input::placeholder,
+        div[data-testid="stTextInput"] input::placeholder,
+        div[data-testid="stPasswordInput"] input::placeholder {
+            color: rgba(25, 54, 76, .68) !important;
+            -webkit-text-fill-color: rgba(25, 54, 76, .68) !important;
+            opacity: 1 !important;
+            font-weight: 900 !important;
+        }
+
+        div[data-testid="stPasswordInput"] button,
+        div[data-baseweb="input"] button {
+            min-height: 56px !important;
+            height: 56px !important;
+            border-radius: 0 14px 14px 0 !important;
+            background: linear-gradient(135deg, rgba(138,238,255,.95), rgba(167,188,255,.95)) !important;
+            color: #061423 !important;
+            border-left: 1px solid rgba(67, 209, 255, .60) !important;
+            box-shadow: inset 1px 0 0 rgba(255,255,255,.55) !important;
+        }
+        div[data-testid="stPasswordInput"] button svg,
+        div[data-baseweb="input"] button svg {
+            color: #061423 !important;
+            fill: #061423 !important;
+        }
+
+        div[data-baseweb="textarea"] textarea,
+        div[data-testid="stTextArea"] textarea {
+            min-height: 140px !important;
+            padding: 16px !important;
+            line-height: 1.55 !important;
+            background: transparent !important;
+            color: #061423 !important;
+            -webkit-text-fill-color: #061423 !important;
+            font-weight: 850 !important;
+            border: 0 !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stVerticalBlock"] > div:has(> div[data-testid="stTextInput"]),
+        [data-testid="stVerticalBlock"] > div:has(> div[data-testid="stPasswordInput"]),
+        [data-testid="stVerticalBlock"] > div:has(> div[data-testid="stTextArea"]) {
+            margin-bottom: 4px !important;
+            overflow: visible !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
