@@ -3867,3 +3867,274 @@ try:
 except Exception:
     pass
 # ===== V2.74 DROPDOWN VISIBLE TEXT EVERY STATE END =====
+
+
+# ===== V2.75 DROPDOWN CYBER UI + READABILITY FINAL START =====
+def apply_v275_dropdown_cyber_ui_readability_final():
+    """
+    V2.75:
+    Unified cyber/professional dropdown appearance for all modules.
+
+    Non-negotiable readability rule:
+    - Light/white/cyan backgrounds use dark text.
+    - Dark page/card labels use light text.
+    - Closed fields, expanded menus, un-hovered options, hovered options,
+      selected options, disabled/no-options rows must all remain readable.
+
+    This patch is intentionally injected after V2.74 so it wins the cascade.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+    try:
+        cfg = _spt_load_dropdown_settings()
+    except Exception:
+        cfg = {}
+
+    field_bg = str(cfg.get("field_bg", "#eefaff"))
+    panel_bg = str(cfg.get("panel_bg", "#f2fbff"))
+    dark_text = str(cfg.get("text_color", "#03121f"))
+    muted_text = "#28445c"
+    label_text = "#f7fcff"
+    border = "#66e8ff"
+    border_soft = "rgba(102, 232, 255, .42)"
+    glow = "rgba(103, 232, 249, .36)"
+    hover_bg = "#bdf8ff"
+    selected_bg = "#8fecff"
+    option_divider = "rgba(6, 37, 58, .10)"
+
+    st.markdown(
+        f"""
+        <style id="spt-v275-dropdown-cyber-ui-readability-final">
+        :root {{
+            --spt-v275-dd-field-bg: {field_bg};
+            --spt-v275-dd-panel-bg: {panel_bg};
+            --spt-v275-dd-dark-text: {dark_text};
+            --spt-v275-dd-muted-text: {muted_text};
+            --spt-v275-dd-label-text: {label_text};
+            --spt-v275-dd-border: {border};
+            --spt-v275-dd-border-soft: {border_soft};
+            --spt-v275-dd-glow: {glow};
+            --spt-v275-dd-hover-bg: {hover_bg};
+            --spt-v275-dd-selected-bg: {selected_bg};
+            --spt-v275-dd-option-divider: {option_divider};
+        }}
+
+        /* Labels remain bright because the surrounding filter panels are dark. */
+        [data-testid="stSelectbox"] label,
+        [data-testid="stMultiSelect"] label,
+        [data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
+        [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"],
+        [data-testid="stSelectbox"] [data-testid="stWidgetLabel"] *,
+        [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"] * {{
+            color: var(--spt-v275-dd-label-text) !important;
+            -webkit-text-fill-color: var(--spt-v275-dd-label-text) !important;
+            opacity: 1 !important;
+            font-weight: 950 !important;
+            letter-spacing: .01em !important;
+            text-shadow: 0 0 10px rgba(125,249,255,.22) !important;
+        }}
+
+        /* Closed select/multiselect: cyber glass field, but still light background + dark text. */
+        [data-baseweb="select"],
+        [data-baseweb="select"] > div,
+        [data-baseweb="select"] [role="combobox"],
+        [data-baseweb="select"] [aria-haspopup="listbox"],
+        [data-baseweb="select"] [aria-expanded],
+        [data-baseweb="select"] div[class*="control" i],
+        [data-baseweb="select"] div[class*="value" i],
+        [data-baseweb="select"] div[class*="placeholder" i],
+        [data-baseweb="select"] div[class*="input" i] {{
+            background: linear-gradient(180deg, #f8fdff 0%, var(--spt-v275-dd-field-bg) 100%) !important;
+            color: var(--spt-v275-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
+            border-color: var(--spt-v275-dd-border-soft) !important;
+            border-radius: 12px !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            box-shadow:
+                inset 0 0 0 1px rgba(255,255,255,.72),
+                0 0 0 1px var(--spt-v275-dd-border-soft),
+                0 10px 22px rgba(0, 12, 28, .18),
+                0 0 18px rgba(103,232,249,.18) !important;
+        }}
+
+        [data-baseweb="select"]:hover,
+        [data-baseweb="select"]:focus-within,
+        [data-baseweb="select"] > div:hover,
+        [data-baseweb="select"] > div:focus-within {{
+            border-color: var(--spt-v275-dd-border) !important;
+            box-shadow:
+                inset 0 0 0 1px rgba(255,255,255,.82),
+                0 0 0 1px var(--spt-v275-dd-border),
+                0 12px 26px rgba(0, 12, 28, .22),
+                0 0 24px var(--spt-v275-dd-glow) !important;
+        }}
+
+        [data-baseweb="select"] *,
+        [data-baseweb="select"] span,
+        [data-baseweb="select"] p,
+        [data-baseweb="select"] input,
+        [data-baseweb="select"] input::placeholder {{
+            color: var(--spt-v275-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            font-weight: 900 !important;
+            filter: none !important;
+        }}
+
+        [data-baseweb="select"] div[class*="placeholder" i],
+        [data-baseweb="select"] input::placeholder {{
+            color: var(--spt-v275-dd-muted-text) !important;
+            -webkit-text-fill-color: var(--spt-v275-dd-muted-text) !important;
+        }}
+
+        [data-baseweb="select"] svg,
+        [data-baseweb="select"] svg *,
+        [data-baseweb="select"] [role="button"],
+        [data-baseweb="select"] [role="button"] * {{
+            fill: var(--spt-v275-dd-dark-text) !important;
+            color: var(--spt-v275-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
+            opacity: 1 !important;
+        }}
+
+        /* Multiselect tags/chips: visible dark text on pale neon chips. */
+        [data-baseweb="tag"],
+        [data-baseweb="tag"] *,
+        [data-baseweb="select"] [data-baseweb="tag"],
+        [data-baseweb="select"] [data-baseweb="tag"] * {{
+            background: linear-gradient(90deg, #d7fbff, #eefaff) !important;
+            color: var(--spt-v275-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
+            border-radius: 999px !important;
+            border-color: rgba(37, 190, 215, .48) !important;
+            opacity: 1 !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+        }}
+
+        /* Expanded portal/menu: mounted on body, so target globally. */
+        body div[data-baseweb="popover"],
+        body div[data-baseweb="popover"] > div,
+        body div[data-baseweb="popover"] [data-baseweb="menu"],
+        body div[data-baseweb="menu"],
+        body ul[role="listbox"],
+        body div[role="listbox"] {{
+            background: linear-gradient(180deg, #fbfeff 0%, var(--spt-v275-dd-panel-bg) 100%) !important;
+            color: var(--spt-v275-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
+            border: 1px solid var(--spt-v275-dd-border) !important;
+            border-radius: 14px !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            box-shadow:
+                0 20px 45px rgba(0, 8, 24, .38),
+                0 0 0 1px rgba(255,255,255,.72) inset,
+                0 0 30px rgba(103,232,249,.28) !important;
+            overflow: hidden !important;
+        }}
+
+        /* Every option row: readable before hover, not only on hover. */
+        body div[data-baseweb="popover"] [role="option"],
+        body div[data-baseweb="popover"] li,
+        body div[data-baseweb="popover"] ul li,
+        body div[data-baseweb="menu"] [role="option"],
+        body div[data-baseweb="menu"] li,
+        body ul[role="listbox"] li,
+        body div[role="option"],
+        body li[role="option"] {{
+            background: transparent !important;
+            color: var(--spt-v275-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
+            border-bottom: 1px solid var(--spt-v275-dd-option-divider) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            font-weight: 900 !important;
+            filter: none !important;
+        }}
+
+        body div[data-baseweb="popover"] [role="option"] *,
+        body div[data-baseweb="popover"] li *,
+        body div[data-baseweb="popover"] ul li *,
+        body div[data-baseweb="menu"] [role="option"] *,
+        body div[data-baseweb="menu"] li *,
+        body ul[role="listbox"] li *,
+        body div[role="option"] *,
+        body li[role="option"] * {{
+            color: var(--spt-v275-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
+            fill: var(--spt-v275-dd-dark-text) !important;
+            background: transparent !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            font-weight: 900 !important;
+            filter: none !important;
+        }}
+
+        /* Hover/keyboard/selected: light cyan tech highlight, dark text remains. */
+        body div[data-baseweb="popover"] [role="option"]:hover,
+        body div[data-baseweb="popover"] li:hover,
+        body div[data-baseweb="menu"] [role="option"]:hover,
+        body div[data-baseweb="menu"] li:hover,
+        body ul[role="listbox"] li:hover,
+        body div[role="option"]:hover,
+        body li[role="option"]:hover,
+        body div[role="option"][aria-selected="true"],
+        body li[role="option"][aria-selected="true"],
+        body div[role="option"][aria-current="true"],
+        body li[role="option"][aria-current="true"],
+        body div[role="option"][data-highlighted="true"],
+        body li[role="option"][data-highlighted="true"],
+        body [aria-selected="true"],
+        body [data-highlighted="true"] {{
+            background: linear-gradient(90deg, var(--spt-v275-dd-selected-bg), var(--spt-v275-dd-hover-bg)) !important;
+            color: var(--spt-v275-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
+            border-left: 4px solid var(--spt-v275-dd-border) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            box-shadow: inset 0 0 18px rgba(103,232,249,.22) !important;
+        }}
+
+        body div[data-baseweb="popover"] [role="option"]:hover *,
+        body div[data-baseweb="popover"] li:hover *,
+        body div[data-baseweb="menu"] [role="option"]:hover *,
+        body div[data-baseweb="menu"] li:hover *,
+        body ul[role="listbox"] li:hover *,
+        body div[role="option"]:hover *,
+        body li[role="option"]:hover *,
+        body [aria-selected="true"] *,
+        body [data-highlighted="true"] * {{
+            color: var(--spt-v275-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v275-dd-dark-text) !important;
+            fill: var(--spt-v275-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }}
+
+        /* Disabled / no options rows: still readable, muted dark text. */
+        body div[data-baseweb="popover"] [aria-disabled="true"],
+        body div[data-baseweb="popover"] [aria-disabled="true"] *,
+        body div[data-baseweb="menu"] [aria-disabled="true"],
+        body div[data-baseweb="menu"] [aria-disabled="true"] *,
+        body [role="option"][aria-disabled="true"],
+        body [role="option"][aria-disabled="true"] * {{
+            color: var(--spt-v275-dd-muted-text) !important;
+            -webkit-text-fill-color: var(--spt-v275-dd-muted-text) !important;
+            opacity: 1 !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v275_dropdown_cyber_ui_readability_final()
+except Exception:
+    pass
+# ===== V2.75 DROPDOWN CYBER UI + READABILITY FINAL END =====
