@@ -26,7 +26,7 @@ require_module_access("10_permissions", "can_manage")
 render_header("10 | 權限管理", "帳號密碼總表、帳號匯入、帳號貼上、帳號級模組權限 / Account & Permission Management")
 init_permission_tables()
 
-st.caption("V1.78 loaded｜權限管理頁已受 can_manage 管制；帳號、權限、安全設定會永久保存到 GitHub 設定檔。")
+st.caption("V1.79 loaded｜帳號清單儲存後會同步套用到帳號模組權限；帳號、權限、安全設定會永久保存到 GitHub 設定檔。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
@@ -290,9 +290,49 @@ def _merge_users_editor(base_df: pd.DataFrame, new_rows: pd.DataFrame) -> pd.Dat
     return base.reset_index(drop=True)
 
 
+def _apply_account_master_to_permission_matrix(usernames: list[str], reason: str = "account_master_saved") -> int:
+    """Apply saved account roles to Account Module Permissions immediately.
+
+    Keeps the permission matrix aligned after editing Account Master.
+    This function is intentionally called only after the user presses save, so
+    normal page reruns do not repeatedly rewrite permission data.
+    """
+    clean_users = sorted({str(u or "").strip() for u in usernames if str(u or "").strip()})
+    if not clean_users:
+        return 0
+    synced = 0
+    try:
+        from services.permission_service import (
+            sync_user_permissions_from_roles,
+            reconcile_permission_matrix_for_current_modules,
+            clear_permission_runtime_cache,
+            export_permission_settings_permanently,
+        )
+        try:
+            reconcile_permission_matrix_for_current_modules(force=True)
+        except TypeError:
+            reconcile_permission_matrix_for_current_modules()
+        synced = int(sync_user_permissions_from_roles(clean_users, reason=reason) or 0)
+        try:
+            clear_permission_runtime_cache()
+        except Exception:
+            pass
+        try:
+            export_permission_settings_permanently(f"{reason}_permission_matrix_synced")
+        except Exception:
+            pass
+    except Exception as ex:
+        st.warning(f"帳號已儲存，但同步帳號模組權限時發生提醒：{ex}")
+    st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
+    return synced
+
+
 def _save_imported_accounts(import_df: pd.DataFrame) -> dict:
     editor_rows = _account_import_to_editor_rows(import_df)
-    return save_users(_users_to_service_rows(editor_rows))
+    result = save_users(_users_to_service_rows(editor_rows))
+    usernames = editor_rows.get("帳號 / Username", pd.Series(dtype=str)).dropna().astype(str).str.strip().tolist()
+    result["permission_matrix_synced"] = _apply_account_master_to_permission_matrix(usernames, "account_import_saved")
+    return result
 
 
 def _permission_summary(df: pd.DataFrame) -> pd.DataFrame:
@@ -439,7 +479,7 @@ with tab_accounts:
                 st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 st.rerun()
 
-        st.warning("V1.76：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。")
+        st.warning("V1.79：密碼欄可直接輸入。按『套用並儲存』後，帳號角色會立即同步套用到『帳號模組權限』分頁。")
 
         # V1.71：帳號總表使用 st.form 包住 data_editor。
         # 原因：Streamlit 一般 data_editor 每次切換儲存格、勾選、下拉或其他元件互動都可能 rerun，
@@ -490,13 +530,19 @@ with tab_accounts:
             df = edited_users.copy()
             to_delete = df.loc[_to_bool_series(df, "刪除 / Delete"), "帳號 / Username"].dropna().astype(str).str.strip().tolist()
             save_df = df.loc[~_to_bool_series(df, "刪除 / Delete")].copy()
+            saved_usernames = save_df.get("帳號 / Username", pd.Series(dtype=str)).dropna().astype(str).str.strip().tolist()
             result = save_users(_users_to_service_rows(save_df))
             deleted = delete_users(to_delete)
-            st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
+            synced_count = _apply_account_master_to_permission_matrix(saved_usernames, "account_master_editor_saved")
+            st.success(
+                f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆；"
+                f"帳號模組權限已同步：{synced_count} 筆 / Accounts and permissions saved"
+            )
             if result.get("skipped"):
                 st.warning("；".join(result["skipped"]))
             st.session_state.pop("v133_users_df", None)
             st.session_state["v166_account_edit_enabled"] = False
+            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
             st.rerun()
 
     with account_tab_excel:
@@ -522,7 +568,7 @@ with tab_accounts:
                 with e2:
                     if st.button("▣ 直接儲存 Excel 帳號 / Save Imported Accounts", type="primary", use_container_width=True, key="v136_excel_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         result = _save_imported_accounts(import_df)
-                        st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
+                        st.success(f"帳號已儲存：{result['saved']} 筆；帳號模組權限已同步：{result.get('permission_matrix_synced', 0)} 筆 / Accounts and permissions saved")
                         if result.get("skipped"):
                             st.warning("；".join(result["skipped"]))
                         st.session_state.pop("v133_users_df", None)
@@ -554,7 +600,7 @@ with tab_accounts:
                 with p2:
                     if st.button("▣ 直接儲存貼上帳號 / Save Pasted Accounts", type="primary", use_container_width=True, key="v136_paste_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         result = _save_imported_accounts(import_df)
-                        st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
+                        st.success(f"帳號已儲存：{result['saved']} 筆；帳號模組權限已同步：{result.get('permission_matrix_synced', 0)} 筆 / Accounts and permissions saved")
                         if result.get("skipped"):
                             st.warning("；".join(result["skipped"]))
                         st.session_state.pop("v133_users_df", None)
