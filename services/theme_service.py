@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-SPT Time Tracking System - Unified Theme Service V1.59
+SPT Time Tracking System - Unified Theme Service V1.59 / V2.55 patch
 Purpose:
 - Restore unified Super Plus Tech logo header style.
 - Force sidebar/page/menu font size larger and consistent.
@@ -677,43 +677,38 @@ def _install_persistent_message_patch() -> None:
 
 
 def _render_persistent_operation_messages() -> None:
+    """Re-show retained Streamlit status messages using native st.* boxes.
+
+    V2.56 change:
+    - Do NOT render the separate "執行結果 / Operation Results" panel.
+    - Do NOT render a separate clear button.
+    - Keep the original green/blue/yellow/red Streamlit message style so the
+      message looks like the normal result banner that appeared after the action.
+    """
     try:
         page_id = _current_page_id_for_messages()
         key = _message_store_key(page_id)
         messages = list(st.session_state.get(key, []))
         if not messages:
             return
-        icon_map = {
-            "success": "▣",
-            "info": "⌕",
-            "warning": "⟁",
-            "error": "⛔",
-        }
-        rows = []
-        for msg in messages[-12:]:
+
+        # Use original Streamlit functions so replaying messages does not store
+        # duplicates through the monkey patch.
+        funcs = _ORIGINAL_STATUS_FUNCS or {}
+        for msg in messages[-8:]:
             level = str(msg.get("level") or "info").lower()
-            if level not in icon_map:
-                level = "info"
-            rows.append(
-                f'<div class="spt-opmsg-item spt-opmsg-{level}">'
-                f'<div class="spt-opmsg-time">{_safe_html(msg.get("time", ""))}</div>'
-                f'<div class="spt-opmsg-text">{icon_map[level]} {_safe_html(msg.get("text", ""))}</div>'
-                f'</div>'
-            )
-        st.markdown(
-            '<div class="spt-opmsg-wrap">'
-            '<div class="spt-opmsg-title">▣ 執行結果 / Operation Results（保留到手動清除）</div>'
-            + ''.join(rows) +
-            '<div class="spt-opmsg-caption">成功、失敗、警告與匯入/刪除/儲存結果會停留在本頁；按下方按鈕才會清除。</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        if st.button("◌ 清除本頁執行結果訊息 / Clear Operation Messages", key=f"clear_{key}"):
-            st.session_state.pop(key, None)
+            text = str(msg.get("text") or "").strip()
+            when = str(msg.get("time") or "").strip()
+            if not text:
+                continue
+            body = f"{when}｜{text}" if when else text
+            fn = funcs.get(level)
+            if fn is None:
+                fn = getattr(st, level, None) or getattr(st, "info")
             try:
-                st.rerun()
+                fn(body)
             except Exception:
-                pass
+                st.markdown(f"<div>{_safe_html(body)}</div>", unsafe_allow_html=True)
     except Exception:
         pass
 
@@ -816,9 +811,41 @@ def _inject_multiselect_tag_height_fix() -> None:
                 overflow: visible !important;
             }
 
-            .stMultiSelect div,
-            .stSelectbox div {
-                overflow: visible;
+            /* V2.55: 不再把 selectbox / multiselect 內所有 div 強制 overflow:visible，
+               否則 BaseWeb 內部隱藏 input 會露出白色方塊。 */
+            .stMultiSelect [data-baseweb="select"],
+            .stSelectbox [data-baseweb="select"] {
+                overflow: visible !important;
+            }
+
+            /* 修正 select / multiselect 內部隱藏輸入游標被全域 input 淺色樣式變成白色方塊 */
+            div[data-baseweb="select"] input,
+            div[data-baseweb="select"] input[type="text"],
+            div[data-baseweb="select"] input[aria-autocomplete="list"] {
+                background: transparent !important;
+                background-color: transparent !important;
+                border: 0 !important;
+                outline: 0 !important;
+                box-shadow: none !important;
+                min-height: 20px !important;
+                height: 20px !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                color: #03121f !important;
+                -webkit-text-fill-color: #03121f !important;
+                caret-color: #03121f !important;
+            }
+
+            div[data-baseweb="select"] input::placeholder {
+                color: rgba(3,18,31,.72) !important;
+                -webkit-text-fill-color: rgba(3,18,31,.72) !important;
+            }
+
+            /* BaseWeb clear / dropdown 圖示維持深色，不要變成浮出的白點 */
+            div[data-baseweb="select"] svg,
+            div[data-baseweb="select"] [role="button"] svg {
+                color: #03121f !important;
+                fill: #03121f !important;
             }
             </style>
             """,
@@ -827,6 +854,22 @@ def _inject_multiselect_tag_height_fix() -> None:
     except Exception:
         pass
 
+
+
+def render_operation_results() -> None:
+    """Public helper: render the persistent operation-result center on any page.
+
+    Pages that do not use render_header can call this after apply_theme().
+    Existing pages using render_header already get the same message center.
+    """
+    _install_persistent_message_patch()
+    _render_persistent_operation_messages()
+
+def clear_operation_results() -> None:
+    try:
+        st.session_state.pop(_message_store_key(_current_page_id_for_messages()), None)
+    except Exception:
+        pass
 
 def apply_theme() -> None:
     _inject_css()
