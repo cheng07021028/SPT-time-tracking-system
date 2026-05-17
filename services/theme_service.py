@@ -826,6 +826,11 @@ def apply_theme() -> None:
         install_column_settings_patch()
     except Exception:
         pass
+    # V2.74: final dropdown contrast patch must run on every rerun, after older theme CSS.
+    try:
+        apply_v274_dropdown_visible_text_every_state()
+    except Exception:
+        pass
 
 
 def app_theme() -> None:
@@ -3650,3 +3655,215 @@ try:
 except Exception:
     pass
 # ===== V2.73 DROPDOWN CONTRAST STANDARD FINAL END =====
+
+
+# ===== V2.74 DROPDOWN VISIBLE TEXT EVERY STATE START =====
+def apply_v274_dropdown_visible_text_every_state():
+    """
+    Final high-specificity dropdown readability patch.
+
+    Problem fixed:
+    BaseWeb/Streamlit dropdown menus are rendered in a body portal and older CSS can
+    make non-hover option text light/white while the menu background is light. This
+    patch is injected from apply_theme() on every rerun, after legacy theme CSS.
+
+    Rule:
+    - Dropdown field/menu/option light background = dark text.
+    - Hover/selected cyan background = dark text.
+    - Page labels on dark cards remain light text.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+    try:
+        cfg = _spt_load_dropdown_settings()
+    except Exception:
+        cfg = {}
+    field_bg = str(cfg.get("field_bg", "#edf8ff"))
+    panel_bg = str(cfg.get("panel_bg", "#eaf8ff"))
+    dark_text = str(cfg.get("text_color", "#03121f"))
+    placeholder_text = "#20364a"
+    disabled_text = "#385066"
+    hover_bg = "#67e8f9"
+    selected_bg = "#bff7ff"
+
+    st.markdown(
+        f"""
+        <style id="spt-v274-dropdown-visible-text-every-state">
+        :root {{
+            --spt-v274-dd-field-bg: {field_bg};
+            --spt-v274-dd-panel-bg: {panel_bg};
+            --spt-v274-dd-dark-text: {dark_text};
+            --spt-v274-dd-placeholder-text: {placeholder_text};
+            --spt-v274-dd-disabled-text: {disabled_text};
+            --spt-v274-dd-hover-bg: {hover_bg};
+            --spt-v274-dd-selected-bg: {selected_bg};
+        }}
+
+        /* Labels sit on the dark professional filter card, so they stay light. */
+        [data-testid="stSelectbox"] label,
+        [data-testid="stMultiSelect"] label,
+        [data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
+        [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"],
+        [data-testid="stSelectbox"] [data-testid="stWidgetLabel"] *,
+        [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"] * {{
+            color: #f7fcff !important;
+            -webkit-text-fill-color: #f7fcff !important;
+            opacity: 1 !important;
+        }}
+
+        /* Closed select/multiselect field: always light background, dark readable text. */
+        [data-baseweb="select"],
+        [data-baseweb="select"] > div,
+        [data-baseweb="select"] [role="combobox"],
+        [data-baseweb="select"] [aria-haspopup="listbox"],
+        [data-baseweb="select"] [aria-expanded],
+        [data-baseweb="select"] div[class*="control" i],
+        [data-baseweb="select"] div[class*="value" i],
+        [data-baseweb="select"] div[class*="placeholder" i],
+        [data-baseweb="select"] div[class*="input" i] {{
+            background-color: var(--spt-v274-dd-field-bg) !important;
+            color: var(--spt-v274-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }}
+        [data-baseweb="select"] *,
+        [data-baseweb="select"] span,
+        [data-baseweb="select"] p,
+        [data-baseweb="select"] input,
+        [data-baseweb="select"] input::placeholder {{
+            color: var(--spt-v274-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            font-weight: 900 !important;
+        }}
+        [data-baseweb="select"] svg,
+        [data-baseweb="select"] svg * {{
+            fill: var(--spt-v274-dd-dark-text) !important;
+            color: var(--spt-v274-dd-dark-text) !important;
+            opacity: 1 !important;
+        }}
+
+        /* BaseWeb popover/menu/listbox is mounted outside the widget. Target broadly. */
+        body div[data-baseweb="popover"],
+        body div[data-baseweb="popover"] > div,
+        body div[data-baseweb="popover"] [data-baseweb="menu"],
+        body div[data-baseweb="menu"],
+        body ul[role="listbox"],
+        body div[role="listbox"] {{
+            background: var(--spt-v274-dd-panel-bg) !important;
+            background-color: var(--spt-v274-dd-panel-bg) !important;
+            color: var(--spt-v274-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }}
+
+        /* All option rows, including BaseWeb rows without role=option. */
+        body div[data-baseweb="popover"] [role="option"],
+        body div[data-baseweb="popover"] li,
+        body div[data-baseweb="popover"] ul li,
+        body div[data-baseweb="popover"] [id],
+        body div[data-baseweb="menu"] [role="option"],
+        body div[data-baseweb="menu"] li,
+        body div[data-baseweb="menu"] [id],
+        body ul[role="listbox"] li,
+        body ul[role="listbox"] div,
+        body div[role="listbox"] div,
+        body div[role="option"],
+        body li[role="option"] {{
+            background-color: var(--spt-v274-dd-panel-bg) !important;
+            color: var(--spt-v274-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            font-weight: 900 !important;
+            filter: none !important;
+        }}
+
+        /* Text nodes inside option rows. This is the key fix for non-hover invisible text. */
+        body div[data-baseweb="popover"] [role="option"] *,
+        body div[data-baseweb="popover"] li *,
+        body div[data-baseweb="popover"] ul li *,
+        body div[data-baseweb="popover"] [id] *,
+        body div[data-baseweb="menu"] [role="option"] *,
+        body div[data-baseweb="menu"] li *,
+        body div[data-baseweb="menu"] [id] *,
+        body ul[role="listbox"] li *,
+        body ul[role="listbox"] div *,
+        body div[role="listbox"] div *,
+        body div[role="option"] *,
+        body li[role="option"] * {{
+            color: var(--spt-v274-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
+            fill: var(--spt-v274-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            font-weight: 900 !important;
+            filter: none !important;
+        }}
+
+        /* Hover/focus/selected/current/highlighted states: cyan is still light, so text stays dark. */
+        body div[data-baseweb="popover"] [role="option"]:hover,
+        body div[data-baseweb="popover"] li:hover,
+        body div[data-baseweb="menu"] [role="option"]:hover,
+        body div[data-baseweb="menu"] li:hover,
+        body ul[role="listbox"] li:hover,
+        body div[role="option"]:hover,
+        body li[role="option"]:hover,
+        body div[role="option"][aria-selected="true"],
+        body li[role="option"][aria-selected="true"],
+        body div[role="option"][aria-current="true"],
+        body li[role="option"][aria-current="true"],
+        body div[role="option"][data-highlighted="true"],
+        body li[role="option"][data-highlighted="true"],
+        body [aria-selected="true"],
+        body [data-highlighted="true"] {{
+            background: linear-gradient(90deg, var(--spt-v274-dd-hover-bg), var(--spt-v274-dd-selected-bg)) !important;
+            background-color: var(--spt-v274-dd-selected-bg) !important;
+            color: var(--spt-v274-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }}
+        body div[data-baseweb="popover"] [role="option"]:hover *,
+        body div[data-baseweb="popover"] li:hover *,
+        body div[data-baseweb="menu"] [role="option"]:hover *,
+        body div[data-baseweb="menu"] li:hover *,
+        body ul[role="listbox"] li:hover *,
+        body div[role="option"]:hover *,
+        body li[role="option"]:hover *,
+        body [aria-selected="true"] *,
+        body [data-highlighted="true"] * {{
+            color: var(--spt-v274-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v274-dd-dark-text) !important;
+            fill: var(--spt-v274-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }}
+
+        /* Disabled/no-options rows: visible muted dark text on light background. */
+        body div[data-baseweb="popover"] [aria-disabled="true"],
+        body div[data-baseweb="popover"] [aria-disabled="true"] *,
+        body div[data-baseweb="menu"] [aria-disabled="true"],
+        body div[data-baseweb="menu"] [aria-disabled="true"] *,
+        body [role="option"][aria-disabled="true"],
+        body [role="option"][aria-disabled="true"] * {{
+            color: var(--spt-v274-dd-disabled-text) !important;
+            -webkit-text-fill-color: var(--spt-v274-dd-disabled-text) !important;
+            opacity: 1 !important;
+            font-weight: 900 !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v274_dropdown_visible_text_every_state()
+except Exception:
+    pass
+# ===== V2.74 DROPDOWN VISIBLE TEXT EVERY STATE END =====
