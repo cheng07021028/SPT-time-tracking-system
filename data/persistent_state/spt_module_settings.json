@@ -1,6 +1,6 @@
 {
   "schema_version": "v1.30",
-  "export_time": "2026-05-17 09:16:58",
+  "export_time": "2026-05-17 09:19:42",
   "tables": {
     "system_settings": [
       {
@@ -41,6 +41,46 @@
       }
     ],
     "rest_periods": [
+      {
+        "id": 1,
+        "name": "上午休息",
+        "start_time": "10:30",
+        "end_time": "10:45",
+        "is_active": 1,
+        "sort_order": 1
+      },
+      {
+        "id": 2,
+        "name": "午休",
+        "start_time": "12:00",
+        "end_time": "13:00",
+        "is_active": 1,
+        "sort_order": 2
+      },
+      {
+        "id": 3,
+        "name": "下午休息",
+        "start_time": "15:00",
+        "end_time": "15:15",
+        "is_active": 1,
+        "sort_order": 3
+      },
+      {
+        "id": 4,
+        "name": "晚餐休息",
+        "start_time": "18:00",
+        "end_time": "18:30",
+        "is_active": 1,
+        "sort_order": 4
+      },
+      {
+        "id": 5,
+        "name": "晚上休息",
+        "start_time": "20:00",
+        "end_time": "20:15",
+        "is_active": 1,
+        "sort_order": 5
+      },
       {
         "id": 26,
         "name": "上午休息",
@@ -2381,19 +2421,19 @@
         "setting_key": "idle_timeout_minutes",
         "setting_value": "1",
         "note": "閒置多久自動登出，單位分鐘",
-        "updated_at": "2026-05-17 00:29:51"
+        "updated_at": "2026-05-17 09:19:34"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
         "note": "V1.99 synchronized permanent security setting",
-        "updated_at": "2026-05-17 00:29:51"
+        "updated_at": "2026-05-17 09:19:33"
       }
     ]
   },
   "table_counts": {
     "system_settings": 6,
-    "rest_periods": 5,
+    "rest_periods": 10,
     "process_options": 17,
     "table_column_settings": 0,
     "table_sort_settings": 0,
