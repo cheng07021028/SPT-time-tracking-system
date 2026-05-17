@@ -1,6 +1,6 @@
 {
   "schema_version": "v1.30",
-  "export_time": "2026-05-17 21:42:23",
+  "export_time": "2026-05-18 00:04:55",
   "database_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
   "tables": {
     "app_settings": [
@@ -8,7 +8,7 @@
         "setting_key": "live_page_reset_time",
         "setting_value": "02:00",
         "note": "01 工時紀錄每日重新整理時間；只影響 01 顯示，不刪除 02 歷史紀錄",
-        "updated_at": "2026-05-17 21:40:38"
+        "updated_at": "2026-05-18 00:02:07"
       }
     ],
     "auth_account_permissions": [
@@ -2029,10 +2029,10 @@
         "role_code": "admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-17 21:41:58",
+        "last_login_at": "2026-05-18 00:03:59",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-17 21:41:58"
+        "updated_at": "2026-05-18 00:03:59"
       },
       {
         "id": 2,
@@ -3244,23 +3244,6 @@
         "updated_at": "2026-05-17 21:42:17"
       }
     ],
-    "login_logs": [
-      {
-        "id": 1,
-        "username": "admin",
-        "display_name": "系統管理員",
-        "event_type": "LOGIN",
-        "result": "SUCCESS",
-        "message": "roles=admin",
-        "module_code": "11_login_logs",
-        "login_time": "2026-05-17 21:40:33",
-        "logout_time": null,
-        "idle_minutes": null,
-        "ip_address": "",
-        "user_agent": "",
-        "created_at": "2026-05-17 21:40:33"
-      }
-    ],
     "process_options": [
       {
         "id": 1,
@@ -3528,6 +3511,48 @@
         "idle_seconds": null,
         "user_agent": "streamlit",
         "created_at": "2026-05-17 21:41:58"
+      },
+      {
+        "id": 7,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置超過 1 分鐘，自動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-18 00:03:53",
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-18 00:03:53"
+      },
+      {
+        "id": 8,
+        "username": "",
+        "display_name": "",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置自動登出",
+        "module_code": "",
+        "login_time": null,
+        "logout_time": "2026-05-18 00:03:53",
+        "idle_seconds": 66,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-18 00:03:53"
+      },
+      {
+        "id": 9,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "",
+        "login_time": "2026-05-18 00:03:59",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-18 00:03:59"
       }
     ],
     "security_module_permissions": [
@@ -5084,9 +5109,9 @@
         "email": "Admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-17 21:41:58",
+        "last_login_at": "2026-05-18 00:03:59",
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-17 21:41:58"
+        "updated_at": "2026-05-18 00:03:59"
       },
       {
         "id": 2,
@@ -12626,10 +12651,9 @@
     "auth_security_settings": 2,
     "auth_users": 9,
     "employees": 83,
-    "login_logs": 1,
     "process_options": 17,
     "rest_periods": 5,
-    "security_login_logs": 5,
+    "security_login_logs": 8,
     "security_module_permissions": 78,
     "security_roles": 6,
     "security_settings": 2,
