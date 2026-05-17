@@ -45,7 +45,18 @@ require_module_access("03_work_orders")
 render_header("03｜製令管理", "Excel 匯入、貼上資料、手動新增、頁面編輯、刪除、全選與存檔")
 
 STATE_KEY = "v138_work_orders_editor"
+EDITOR_VERSION_KEY = "v253_work_orders_editor_version"
 COLS = ["_delete", "id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
+
+
+def _editor_key() -> str:
+    if EDITOR_VERSION_KEY not in st.session_state:
+        st.session_state[EDITOR_VERSION_KEY] = 0
+    return f"work_orders_data_editor_v253_{st.session_state[EDITOR_VERSION_KEY]}"
+
+
+def _refresh_editor_widget() -> None:
+    st.session_state[EDITOR_VERSION_KEY] = int(st.session_state.get(EDITOR_VERSION_KEY, 0)) + 1
 
 
 def rerun():
@@ -568,21 +579,27 @@ with tab1:
             "created_at": "", "updated_at": ""
         }])
         st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
+        _refresh_editor_widget()
         rerun()
     if c2.button("◈ 啟用全選", use_container_width=True):
         st.session_state[STATE_KEY]["is_active"] = True
+        _refresh_editor_widget()
         rerun()
     if c3.button("◌ 啟用全取消", use_container_width=True):
         st.session_state[STATE_KEY]["is_active"] = False
+        _refresh_editor_widget()
         rerun()
     if c4.button("⊖ 刪除欄全選", use_container_width=True):
         st.session_state[STATE_KEY]["_delete"] = True
+        _refresh_editor_widget()
         rerun()
     if c5.button("◌ 刪除欄取消", use_container_width=True):
         st.session_state[STATE_KEY]["_delete"] = False
+        _refresh_editor_widget()
         rerun()
     if c6.button("⟳ 重新載入", use_container_width=True):
         reload_data()
+        _refresh_editor_widget()
         rerun()
 
     st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。製令 / Work Order 為必填。")
@@ -592,7 +609,7 @@ with tab1:
     tpl = pd.DataFrame(columns=["製令", "P/N", "機型", "組立地點", "客戶", "備註", "啟用"])
     dl2.download_button("⟰ 下載製令匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_製令匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-    st.info("V1.89：製令清單已改成確認後才儲存。表格內輸入、勾選、換格不會立即觸發存檔或整頁重算。")
+    st.info("V2.53：批次按鈕會即時刷新編輯表格；表格內輸入、勾選、換格不會立即觸發存檔或整頁重算。")
     with st.form("work_orders_commit_form", clear_on_submit=False):
         edited = st.data_editor(
             st.session_state[STATE_KEY],
@@ -614,7 +631,7 @@ with tab1:
                 "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
                 "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
             },
-            key="work_orders_data_editor_v189",
+            key=_editor_key(),
         )
         submitted_work_orders = st.form_submit_button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True)
 
@@ -622,6 +639,7 @@ with tab1:
         st.session_state[STATE_KEY] = ensure_cols(edited)
         result = save_work_orders(st.session_state[STATE_KEY])
         reload_data()
+        _refresh_editor_widget()
         st.success(f"儲存完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
         rerun()
 
