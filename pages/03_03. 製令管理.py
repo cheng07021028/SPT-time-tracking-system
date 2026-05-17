@@ -208,9 +208,35 @@ def _excel_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:
             df.to_excel(writer, index=False, sheet_name=safe)
     return bio.getvalue()
 
+
+def _make_unique_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize Excel column names to unique strings for Streamlit and mapping."""
+    if df is None:
+        return pd.DataFrame()
+    out = df.copy()
+    seen: dict[str, int] = {}
+    cols: list[str] = []
+    for idx, col in enumerate(out.columns):
+        name = "" if pd.isna(col) else str(col)
+        name = name.replace("\u3000", " ").replace("\xa0", " ").strip()
+        if not name or name.lower().startswith("unnamed"):
+            name = f"欄位{idx + 1}"
+        count = seen.get(name, 0)
+        seen[name] = count + 1
+        if count:
+            name = f"{name}__{count + 1}"
+        cols.append(name)
+    out.columns = cols
+    return out
+
+
+def _normalize_excel_sheets(sheets: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    return {str(k): _make_unique_columns(v) for k, v in (sheets or {}).items()}
+
+
 def _read_excel_source(uploaded=None, path_text: str = "") -> dict[str, pd.DataFrame]:
     if uploaded is not None:
-        return pd.read_excel(uploaded, sheet_name=None)
+        return _normalize_excel_sheets(pd.read_excel(uploaded, sheet_name=None))
     path_text = str(path_text or "").strip().strip('"')
     if not path_text:
         return {}
@@ -222,7 +248,7 @@ def _read_excel_source(uploaded=None, path_text: str = "") -> dict[str, pd.DataF
         path = files[0]
     if not path.exists():
         return {}
-    return pd.read_excel(path, sheet_name=None)
+    return _normalize_excel_sheets(pd.read_excel(path, sheet_name=None))
 
 def _map_excel_work_orders(df_raw: pd.DataFrame, mapping: dict[str, str]) -> pd.DataFrame:
     if df_raw is None or df_raw.empty:
@@ -395,8 +421,14 @@ with tab4:
     sheets = st.session_state.get("wo_onedrive_sheets_v243", {})
     if sheets:
         sheet = st.selectbox("選擇活頁 / Select Sheet", list(sheets.keys()), key="wo_onedrive_sheet_select_v243")
-        src = sheets[sheet]
-        st.dataframe(src.head(30), use_container_width=True, height=260)
+        src = _make_unique_columns(sheets[sheet])
+        st.dataframe(
+            src.head(30),
+            use_container_width=True,
+            height=260,
+            key=f"wo_onedrive_source_preview_v244_{sheet}",
+            column_order=list(src.columns.astype(str)),
+        )
         cols = [""] + list(src.columns.astype(str))
         st.markdown("### 欄位對應 / Column Mapping")
         m1, m2, m3 = st.columns(3)
