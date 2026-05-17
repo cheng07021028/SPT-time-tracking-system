@@ -805,6 +805,13 @@ def apply_theme() -> None:
     _inject_multiselect_tag_height_fix()
     _clear_all_persistent_message_state()
     _clear_transient_selection_on_page_change()
+    # V2.71: dropdown CSS is applied on every Streamlit rerun.
+    # The visible settings panel is rendered explicitly from streamlit_app.py and 13_system_settings
+    # to avoid duplicate widget keys when apply_theme()/render_header() are both called.
+    try:
+        apply_v269_configurable_dropdown_css()
+    except Exception:
+        pass
     # V2.18: apply global font scale to every module page.
     # Best-effort only; visual theme must never break a page.
     try:
@@ -2972,14 +2979,11 @@ def render_dropdown_size_settings_panel():
     except Exception:
         return
 
-    # 避免同一頁多次 render。
-    if st.session_state.get("_spt_v269_dropdown_panel_rendered"):
-        return
-    st.session_state["_spt_v269_dropdown_panel_rendered"] = True
-
+    # V2.71: do not use persistent session_state render guards here.
+    # Streamlit keeps session_state across reruns, which made this panel disappear.
     cfg = _spt_load_dropdown_settings()
-    with st.sidebar.expander("▾ 下拉選單尺寸設定", expanded=False):
-        st.caption("隱藏設定區｜調整後按永久套用，所有模組共用。")
+    with st.sidebar.expander("▾ 下拉選單尺寸設定（已強制展開）", expanded=True):
+        st.caption("此設定區已改為強制顯示；調整後按永久套用，所有模組共用。")
         enabled = st.checkbox("啟用自訂下拉尺寸", value=bool(cfg.get("enabled", True)), key="spt_dd_enabled")
         outer = st.slider("外框高度 px", 48, 120, int(cfg["outer_height"]), 1, key="spt_dd_outer")
         inner = st.slider("內層容器 px", 42, 116, int(cfg["inner_height"]), 1, key="spt_dd_inner")
@@ -3004,11 +3008,13 @@ def render_dropdown_size_settings_panel():
                     "text_color": "#03121f",
                 }
                 _spt_save_dropdown_settings(new_cfg)
-                st.success("下拉選單尺寸已永久記錄。請重新整理或切換頁面後套用。")
+                st.success("下拉選單尺寸已永久記錄，畫面立即重新整理套用。")
+                st.rerun()
         with col2:
             if st.button("↺ 預設值", key="spt_dd_reset", use_container_width=True):
                 _spt_save_dropdown_settings(dict(_SPT_UI_DROPDOWN_DEFAULTS))
-                st.success("已恢復下拉選單預設尺寸。請重新整理或切換頁面後套用。")
+                st.success("已恢復下拉選單預設尺寸，畫面立即重新整理套用。")
+                st.rerun()
 
 # Apply CSS and render hidden panel on import.
 try:
@@ -3016,10 +3022,8 @@ try:
 except Exception:
     pass
 
-try:
-    render_dropdown_size_settings_panel()
-except Exception:
-    pass
+# V2.71: do not render widgets at import time. apply_theme() renders the panel every rerun.
+# Import-time widgets can disappear after Streamlit reruns or page switches.
 # ===== V2.69 USER CONFIGURABLE DROPDOWN SIZE END =====
 
 
@@ -3028,21 +3032,19 @@ def render_dropdown_size_settings_panel_main_fallback():
     """
     V2.70:
     Some Streamlit deployments do not show widgets rendered in st.sidebar from imported theme modules.
-    This fallback renders a collapsed panel in the main page so the setting is always visible.
+    This fallback renders an expanded panel in the main page so the setting is always visible.
     """
     try:
         import streamlit as st
     except Exception:
         return
 
-    # One panel per page render.
-    if st.session_state.get("_spt_v270_dropdown_main_panel_rendered"):
-        return
-    st.session_state["_spt_v270_dropdown_main_panel_rendered"] = True
-
+    # V2.71: never hide this with persistent session_state.
+    # apply_theme may run more than once, so use a per-run lightweight marker on Streamlit's script context is not reliable;
+    # instead render this panel near the top through apply_theme and keep it expanded/visible.
     cfg = _spt_load_dropdown_settings()
 
-    with st.expander("⚙ 下拉選單尺寸設定 / Dropdown Size Settings（收合）", expanded=False):
+    with st.expander("⚙ 下拉選單尺寸設定 / Dropdown Size Settings（已展開顯示）", expanded=True):
         st.caption("此設定會永久保存，所有模組共用。若下拉文字被切掉，先把外框高度與內層容器調大。")
 
         c1, c2, c3 = st.columns(3)
@@ -3081,7 +3083,8 @@ def render_dropdown_size_settings_panel_main_fallback():
                     "text_color": "#03121f",
                 }
                 _spt_save_dropdown_settings(new_cfg)
-                st.success("下拉選單尺寸已永久保存。請按重新整理或切換頁面後生效。")
+                st.success("下拉選單尺寸已永久保存，畫面立即重新整理套用。")
+                st.rerun()
         with b2:
             if st.button("↺ 恢復建議值", key="spt_v270_dd_recommended", use_container_width=True):
                 new_cfg = dict(_SPT_UI_DROPDOWN_DEFAULTS)
@@ -3094,15 +3097,318 @@ def render_dropdown_size_settings_panel_main_fallback():
                     "tag_height": 42,
                 })
                 _spt_save_dropdown_settings(new_cfg)
-                st.success("已套用建議值：外框80、內層76、文字40、字體17。請重新整理或切換頁面後生效。")
+                st.success("已套用建議值：外框80、內層76、文字40、字體17，畫面立即重新整理套用。")
+                st.rerun()
         with b3:
             if st.button("↺ 恢復預設值", key="spt_v270_dd_reset", use_container_width=True):
                 _spt_save_dropdown_settings(dict(_SPT_UI_DROPDOWN_DEFAULTS))
-                st.success("已恢復預設值。請重新整理或切換頁面後生效。")
+                st.success("已恢復預設值，畫面立即重新整理套用。")
+                st.rerun()
 
-# Render the main-page fallback after CSS is applied.
+# V2.71: main-page fallback is called from apply_theme(), not at import time.
+# ===== V2.70 MAIN PAGE DROPDOWN SIZE PANEL FALLBACK END =====
+
+
+# ===== V2.72 MULTISELECT PLACEHOLDER CENTER / TEXT CLIP FINAL FIX START =====
+def apply_v272_multiselect_placeholder_center_text_clip_fix():
+    """
+    V2.72:
+    Fix the issue shown in 02｜歷史紀錄 filters where multiselect/select placeholder text
+    such as "Choose options" or "No options to select" is clipped at the top.
+
+    Root cause:
+    Earlier V2.67~V2.69 CSS enlarged outer/inner select containers, but kept the actual
+    BaseWeb input/placeholder text layer at a smaller 36px line-height and forced several
+    value/input containers to fixed heights. In Streamlit/BaseWeb multiselect, the placeholder
+    is rendered inside the input layer, so it stayed top-aligned inside a taller 66~70px box.
+
+    This final override keeps the user-configurable sizes but centers the real text/input layer
+    vertically and prevents parent rows from clipping it.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    cfg = _spt_load_dropdown_settings()
+    if not cfg.get("enabled", True):
+        return
+
+    outer = int(cfg.get("outer_height", 70))
+    inner = int(cfg.get("inner_height", 66))
+    line = int(cfg.get("text_line_height", 36))
+    font = int(cfg.get("font_size", 16))
+    option = int(cfg.get("option_height", 46))
+    tag = int(cfg.get("tag_height", 40))
+    field_bg = str(cfg.get("field_bg", "#edf8ff"))
+    panel_bg = str(cfg.get("panel_bg", "#eaf8ff"))
+    text_color = str(cfg.get("text_color", "#03121f"))
+
+    # The visual text line can remain 36px, but the actual input placeholder layer must use
+    # the inner height as its CSS line-height to be vertically centered in BaseWeb.
+    st.markdown(
+        f"""
+        <style id="spt-v272-multiselect-placeholder-center-text-clip-fix">
+        :root {{
+            --spt-dd-outer-h: {outer}px;
+            --spt-dd-inner-h: {inner}px;
+            --spt-dd-text-line-h: {line}px;
+            --spt-dd-font-size: {font}px;
+            --spt-dd-option-h: {option}px;
+            --spt-dd-tag-h: {tag}px;
+            --spt-dd-field-bg: {field_bg};
+            --spt-dd-panel-bg: {panel_bg};
+            --spt-dd-text-color: {text_color};
+        }}
+
+        /* Keep enough vertical room for label + field. */
+        .stSelectbox,
+        .stMultiSelect,
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"] {{
+            min-height: calc(var(--spt-dd-outer-h) + 30px) !important;
+            height: auto !important;
+            overflow: visible !important;
+        }}
+        .stSelectbox > div,
+        .stMultiSelect > div,
+        div[data-testid="stSelectbox"] > div,
+        div[data-testid="stMultiSelect"] > div {{
+            overflow: visible !important;
+        }}
+
+        /* Real clickable select frame. */
+        div[data-baseweb="select"] {{
+            min-height: var(--spt-dd-outer-h) !important;
+            height: var(--spt-dd-outer-h) !important;
+            max-height: none !important;
+            display: flex !important;
+            align-items: center !important;
+            box-sizing: border-box !important;
+            overflow: visible !important;
+            background: var(--spt-dd-field-bg) !important;
+            border-radius: 14px !important;
+        }}
+        div[data-baseweb="select"] > div {{
+            min-height: var(--spt-dd-outer-h) !important;
+            height: var(--spt-dd-outer-h) !important;
+            max-height: none !important;
+            display: flex !important;
+            align-items: center !important;
+            box-sizing: border-box !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            padding-left: 16px !important;
+            padding-right: 14px !important;
+            overflow: visible !important;
+            background: var(--spt-dd-field-bg) !important;
+            color: var(--spt-dd-text-color) !important;
+            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
+            border-radius: 14px !important;
+        }}
+
+        /* BaseWeb inner layers: center, but do not create a clipped top-aligned text layer. */
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] > div > div > div,
+        div[data-baseweb="select"] div[aria-haspopup="listbox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[class*="ValueContainer"],
+        div[data-baseweb="select"] div[class*="valueContainer"],
+        div[data-baseweb="select"] div[class*="InputContainer"],
+        div[data-baseweb="select"] div[class*="inputContainer"] {{
+            min-height: var(--spt-dd-inner-h) !important;
+            height: var(--spt-dd-inner-h) !important;
+            max-height: none !important;
+            line-height: var(--spt-dd-inner-h) !important;
+            display: flex !important;
+            align-items: center !important;
+            align-content: center !important;
+            box-sizing: border-box !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            overflow: visible !important;
+            background: transparent !important;
+            color: var(--spt-dd-text-color) !important;
+            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
+        }}
+
+        /* Placeholder / selected value text. */
+        div[data-baseweb="select"] div[class*="Placeholder"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="SingleValue"],
+        div[data-baseweb="select"] div[class*="singleValue"],
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p {{
+            min-height: var(--spt-dd-text-line-h) !important;
+            height: auto !important;
+            line-height: var(--spt-dd-text-line-h) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            box-sizing: border-box !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            text-overflow: ellipsis !important;
+            color: var(--spt-dd-text-color) !important;
+            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
+            font-size: var(--spt-dd-font-size) !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+            position: relative !important;
+            top: 0 !important;
+            z-index: 50 !important;
+        }}
+
+        /* Critical fix: BaseWeb multiselect placeholder is often the input placeholder.
+           Use inner-height line-height here, not 36px, otherwise it hugs the top of the box. */
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete],
+        div[data-baseweb="select"] input[role="combobox"] {{
+            min-height: var(--spt-dd-inner-h) !important;
+            height: var(--spt-dd-inner-h) !important;
+            max-height: none !important;
+            line-height: var(--spt-dd-inner-h) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            box-sizing: border-box !important;
+            display: block !important;
+            align-self: center !important;
+            overflow: visible !important;
+            color: var(--spt-dd-text-color) !important;
+            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
+            font-size: var(--spt-dd-font-size) !important;
+            font-weight: 900 !important;
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            outline: none !important;
+            opacity: 1 !important;
+            caret-color: transparent !important;
+            transform: none !important;
+            position: relative !important;
+            top: 0 !important;
+            z-index: 60 !important;
+        }}
+        div[data-baseweb="select"] input::placeholder {{
+            color: var(--spt-dd-text-color) !important;
+            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
+            font-size: var(--spt-dd-font-size) !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+        }}
+
+        /* Arrow layer should not cover text. */
+        div[data-baseweb="select"] svg,
+        div[data-baseweb="select"] [role="button"] svg {{
+            color: var(--spt-dd-text-color) !important;
+            fill: var(--spt-dd-text-color) !important;
+            flex-shrink: 0 !important;
+            position: relative !important;
+            z-index: 80 !important;
+        }}
+
+        /* Multiselect selected tags. */
+        div[data-baseweb="tag"] {{
+            min-height: var(--spt-dd-tag-h) !important;
+            height: var(--spt-dd-tag-h) !important;
+            line-height: var(--spt-dd-tag-h) !important;
+            padding: 0 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            color: var(--spt-dd-text-color) !important;
+            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
+            font-weight: 900 !important;
+            border-radius: 10px !important;
+            background: linear-gradient(135deg, #c9fbff, #83edff) !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+        }}
+        div[data-baseweb="tag"] * {{
+            color: var(--spt-dd-text-color) !important;
+            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
+            fill: var(--spt-dd-text-color) !important;
+            font-weight: 900 !important;
+            background: transparent !important;
+            opacity: 1 !important;
+        }}
+
+        /* Dropdown popup/options: keep readable. */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {{
+            background: var(--spt-dd-panel-bg) !important;
+            color: var(--spt-dd-text-color) !important;
+            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
+            border: 1px solid rgba(102, 232, 249, .95) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 0 0 1px rgba(102,232,249,.35), 0 12px 32px rgba(0,255,255,.22) !important;
+            z-index: 999999 !important;
+            overflow-y: auto !important;
+        }}
+        div[data-baseweb="popover"] *,
+        div[data-baseweb="menu"] *,
+        ul[role="listbox"] * {{
+            color: var(--spt-dd-text-color) !important;
+            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+        }}
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li {{
+            min-height: var(--spt-dd-option-h) !important;
+            height: var(--spt-dd-option-h) !important;
+            line-height: var(--spt-dd-option-h) !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 0 14px !important;
+            background: var(--spt-dd-panel-bg) !important;
+            color: var(--spt-dd-text-color) !important;
+            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
+            font-size: var(--spt-dd-font-size) !important;
+            font-weight: 900 !important;
+        }}
+        div[role="option"] *,
+        li[role="option"] * {{
+            color: var(--spt-dd-text-color) !important;
+            -webkit-text-fill-color: var(--spt-dd-text-color) !important;
+            fill: var(--spt-dd-text-color) !important;
+            font-size: var(--spt-dd-font-size) !important;
+            font-weight: 900 !important;
+            background: transparent !important;
+        }}
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"] {{
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+        }}
+        div[role="option"]:hover *,
+        li[role="option"]:hover *,
+        div[role="option"][aria-selected="true"] *,
+        li[role="option"][aria-selected="true"] * {{
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            fill: #020817 !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 try:
-    render_dropdown_size_settings_panel_main_fallback()
+    apply_v272_multiselect_placeholder_center_text_clip_fix()
 except Exception:
     pass
-# ===== V2.70 MAIN PAGE DROPDOWN SIZE PANEL FALLBACK END =====
+# ===== V2.72 MULTISELECT PLACEHOLDER CENTER / TEXT CLIP FINAL FIX END =====
