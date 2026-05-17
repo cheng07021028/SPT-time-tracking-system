@@ -167,7 +167,18 @@ if is_admin:
             st.info("今日目前沒有可維護的工時紀錄。")
         else:
             admin_df = df.copy()
-            admin_df.insert(0, "刪除", False)
+            admin_select_key = "_spt_select_today_records_admin_delete_ids"
+            _all_admin_ids = [int(x) for x in admin_df["id"].dropna().tolist()] if "id" in admin_df.columns else []
+            _selected_admin_ids = set(int(x) for x in st.session_state.get(admin_select_key, []) if int(x) in set(_all_admin_ids))
+            sc1, sc2, sc3 = st.columns([1, 1, 3])
+            if sc1.button("◈ 勾選全部紀錄 / Select All", use_container_width=True, key="today_admin_select_all_rows"):
+                st.session_state[admin_select_key] = _all_admin_ids
+                st.rerun()
+            if sc2.button("◌ 取消全部勾選 / Clear All", use_container_width=True, key="today_admin_clear_all_rows"):
+                st.session_state[admin_select_key] = []
+                st.rerun()
+            sc3.caption("勾選會保留到你手動取消、刪除成功或離開本頁；不會因重新計算後自動清空。")
+            admin_df.insert(0, "刪除", admin_df["id"].map(lambda x: int(x) in _selected_admin_ids if str(x).strip() not in {"", "nan", "None"} else False) if "id" in admin_df.columns else False)
             # V2.28：data_editor 會保留前一次 widget 暫存；儲存/重算/刪除後需換新 key，
             # 才會重新載入資料庫最新內容，避免畫面仍顯示舊工時/舊日期時間。
             editor_version_key = "today_records_admin_editor_version"
@@ -199,6 +210,8 @@ if is_admin:
                     delete_ids = [int(x) for x in delete_rows["id"].dropna().tolist()]
                 except Exception:
                     delete_ids = []
+                # V2.32：保留目前勾選狀態，直到使用者取消、刪除成功或離開頁面。
+                st.session_state[admin_select_key] = delete_ids
 
                 if admin_action == "僅儲存修改":
                     save_df = edited_admin.drop(columns=["刪除"], errors="ignore")
@@ -222,6 +235,8 @@ if is_admin:
                         st.warning("請先在『刪除』勾選欄勾選要刪除的紀錄，再按確認執行。")
                     else:
                         count = delete_time_records(delete_ids, reason="01 工時紀錄管理員維護區刪除")
+                        remaining = [x for x in st.session_state.get(admin_select_key, []) if int(x) not in set(delete_ids)]
+                        st.session_state[admin_select_key] = remaining
                         st.success(f"已由管理員刪除 {count} 筆今日工時紀錄。")
                         st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                         st.rerun()

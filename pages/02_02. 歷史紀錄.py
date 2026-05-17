@@ -830,8 +830,21 @@ with tab1:
 
         if st.session_state[edit_key]:
             edit_df = df.copy()
+            history_select_key = "_spt_select_history_records_delete_ids"
+            _all_history_ids = [int(x) for x in edit_df["id"].dropna().tolist()] if "id" in edit_df.columns else []
+            _selected_history_ids = set(int(x) for x in st.session_state.get(history_select_key, []) if int(x) in set(_all_history_ids))
+            hc1, hc2, hc3 = st.columns([1, 1, 3])
+            if hc1.button("◈ 勾選全部紀錄 / Select All", use_container_width=True, key="history_select_all_rows"):
+                st.session_state[history_select_key] = _all_history_ids
+                rerun()
+            if hc2.button("◌ 取消全部勾選 / Clear All", use_container_width=True, key="history_clear_all_rows"):
+                st.session_state[history_select_key] = []
+                rerun()
+            hc3.caption("勾選會保留到你手動取消、刪除成功或離開本頁；不會因重新計算後自動清空。")
             if "刪除" not in edit_df.columns:
-                edit_df.insert(0, "刪除", False)
+                edit_df.insert(0, "刪除", edit_df["id"].map(lambda x: int(x) in _selected_history_ids if str(x).strip() not in {"", "nan", "None"} else False) if "id" in edit_df.columns else False)
+            else:
+                edit_df["刪除"] = edit_df["id"].map(lambda x: int(x) in _selected_history_ids if str(x).strip() not in {"", "nan", "None"} else False) if "id" in edit_df.columns else False
             # V2.28：確認執行後換用新的 data_editor key，強制表格重新讀取最新 DB 資料。
             editor_version_key = "history_editor_version"
             if editor_version_key not in st.session_state:
@@ -854,6 +867,8 @@ with tab1:
                     delete_ids = [int(x) for x in delete_rows["id"].dropna().tolist()]
                 except Exception:
                     delete_ids = []
+                # V2.32：保留目前勾選狀態，直到使用者取消、刪除成功或離開頁面。
+                st.session_state[history_select_key] = delete_ids
 
                 if history_action == "儲存編輯":
                     save_df = edited.drop(columns=["刪除"], errors="ignore")
@@ -879,6 +894,8 @@ with tab1:
                         st.warning("請先在『刪除』勾選欄勾選要刪除的紀錄，再按確認執行。")
                     else:
                         count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
+                        remaining = [x for x in st.session_state.get(history_select_key, []) if int(x) not in set(delete_ids)]
+                        st.session_state[history_select_key] = remaining
                         st.success(f"已刪除 {count} 筆歷史紀錄。")
                         st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                         rerun()

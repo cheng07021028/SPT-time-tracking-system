@@ -10,6 +10,7 @@ from services.table_ui_service import render_table
 from services.system_settings_service import (
     delete_process_options,
     delete_rest_periods,
+    dedupe_rest_periods,
     load_process_options_df,
     load_rest_periods_df,
     save_process_options_df,
@@ -115,6 +116,16 @@ if can_manage:
 
 if can_manage and st.session_state.get(proc_edit_key, False):
     st.info("目前為工段編輯模式：可新增、修改、勾選刪除。完成後請選擇動作並按『確認套用』，才會永久保存與套用到 01 工時紀錄。")
+    pc1, pc2, pc3 = st.columns([1, 1, 3])
+    if pc1.button("◈ 刪除欄全選 / Select All", key="system_process_delete_all_v232", use_container_width=True):
+        proc_view["刪除"] = True
+        st.session_state["system_process_options_editor_v192"] = proc_view
+        st.rerun()
+    if pc2.button("◌ 取消全部勾選 / Clear All", key="system_process_delete_clear_v232", use_container_width=True):
+        proc_view["刪除"] = False
+        st.session_state["system_process_options_editor_v192"] = proc_view
+        st.rerun()
+    pc3.caption("勾選會保留到你手動取消、刪除成功或離開本頁；不會因確認套用後自動取消。")
     with st.form("system_process_options_apply_form", clear_on_submit=False):
         edited_proc = render_table(
             proc_view,
@@ -178,6 +189,20 @@ if can_manage:
 
 if can_manage and st.session_state.get(rest_edit_key, False):
     st.info("目前為休息時間編輯模式：可新增、修改、勾選刪除。完成後請按『確認套用』，才會永久保存並套用到工時計算。")
+    rc1, rc2, rc3, rc4 = st.columns([1, 1, 1.2, 2.8])
+    if rc1.button("◈ 刪除欄全選 / Select All", key="system_rest_delete_all_v232", use_container_width=True):
+        rest_view["刪除"] = True
+        st.session_state["system_rest_periods_editor_v192"] = rest_view
+        st.rerun()
+    if rc2.button("◌ 取消全部勾選 / Clear All", key="system_rest_delete_clear_v232", use_container_width=True):
+        rest_view["刪除"] = False
+        st.session_state["system_rest_periods_editor_v192"] = rest_view
+        st.rerun()
+    if rc3.button("⌁ 合併重複休息時間", key="system_rest_dedupe_v232", use_container_width=True):
+        n = dedupe_rest_periods()
+        _export_permanent_settings(f"已合併重複休息時間設定 {n} 筆")
+        _refresh_after_apply(f"已合併重複休息時間設定 {n} 筆，畫面已重新整理。", rest_edit_key)
+    rc4.caption("若休息時間出現相同設定兩次，請按『合併重複休息時間』；勾選保留到手動取消或刪除成功。")
     with st.form("system_rest_periods_apply_form", clear_on_submit=False):
         edited_rest = render_table(
             rest_view,
