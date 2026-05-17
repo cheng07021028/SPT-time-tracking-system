@@ -8,20 +8,16 @@ from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access, check_permission
 from services.table_ui_service import render_table
 from services.system_settings_service import (
-    SYSTEM_SETTINGS_FILES,
     delete_process_options,
     delete_rest_periods,
-    export_system_settings_permanent,
-    get_live_page_reset_time,
     load_process_options_df,
     load_rest_periods_df,
-    restore_system_settings_from_permanent,
-    save_live_page_reset_time,
     save_process_options_df,
     save_rest_periods_df,
 )
+from services.db_service import flush_pending_permanent_state
 
-st.set_page_config(page_title="13. 系統設定", page_icon="⚙️", layout="wide")
+st.set_page_config(page_title="13. 系統設定", page_icon="⌬️", layout="wide")
 apply_theme()
 require_module_access("13_system_settings", "can_view")
 render_header("13｜系統設定", "工段名稱下拉選單、休息時間扣除規則｜新增、刪除、修改、套用後永久保存")
@@ -31,23 +27,10 @@ if not can_manage:
     st.warning("你目前只有查看權限，設定修改需由管理員或具備 13 系統設定 can_manage / can_edit 權限的人員操作。")
 
 st.info(
-    "設定套用後會立即寫入資料庫，並同步建立 13｜系統設定專用永久設定檔。"
-    "Streamlit / GitHub 更新後，會優先從永久設定檔還原，不會再恢復系統預設。"
+    "設定套用後會立即寫入資料庫，並建立永久設定檔。"
     "01｜工時紀錄的工段下拉選單會讀取這裡的啟用工段；"
     "工時計算會依這裡啟用的休息時間扣除。"
 )
-with st.expander("📌 13｜系統設定永久檔案位置", expanded=False):
-    for _p in SYSTEM_SETTINGS_FILES:
-        st.code(str(_p.relative_to(_p.parents[2]) if len(_p.parents) > 2 else _p), language="text")
-    if can_manage:
-        c_restore, c_export = st.columns(2)
-        if c_restore.button("↩️ 從永久設定檔還原到目前資料庫", key="restore_13_system_settings", use_container_width=True):
-            res = restore_system_settings_from_permanent(force=True)
-            st.success(f"已從永久設定檔還原：{res.get('restored', {})}") if res.get("ok") else st.warning(str(res))
-            st.rerun()
-        if c_export.button("💾 立即重建 13 系統設定永久檔", key="export_13_system_settings", use_container_width=True):
-            res = export_system_settings_permanent("manual_export_from_page13", write_history=True)
-            st.success(f"已重建永久設定檔：{res.get('table_counts', {})}") if res.get("ok") else st.warning(str(res))
 
 _pending_message = st.session_state.pop("_spt_13_pending_apply_message", "")
 if _pending_message:
@@ -64,19 +47,20 @@ def _normalize_delete_column(df: pd.DataFrame, delete_col: str = "刪除") -> pd
 
 
 def _export_permanent_settings(message: str) -> None:
-    """Create 13｜系統設定 dedicated permanent JSON immediately.
+    """Create local permanent JSON immediately, but do not push GitHub here.
 
-    GitHub push remains on 09｜資料永久保存與備份, but this local JSON must be
-    created immediately so future code updates do not restore default settings.
+    GitHub push is intentionally kept on 09｜資料永久保存與備份 to avoid the
+    10~20 second delay after every settings change.  The local permanent JSON is
+    enough to survive normal project reload/update flows when committed or backed up.
     """
     try:
-        res = export_system_settings_permanent("page13_apply", write_history=True)
+        res = flush_pending_permanent_state(upload_github=False)
         if res.get("ok"):
-            st.success(message + "，已建立 13 系統設定永久檔。")
+            st.success(message + "，已建立永久設定檔。")
         else:
-            st.warning(message + "，但 13 系統設定永久檔建立結果需確認。")
+            st.warning(message + "，但永久設定檔建立結果需到 09｜資料永久保存與備份確認。")
     except Exception as exc:
-        st.warning(f"{message}，但 13 系統設定永久檔建立失敗：{exc}")
+        st.warning(f"{message}，但永久設定檔建立失敗：{exc}")
 
 
 def _set_edit_mode(key: str, enabled: bool) -> None:
@@ -122,10 +106,10 @@ proc_edit_key = "_spt_13_process_edit_mode"
 if can_manage:
     c1, c2, c3 = st.columns([1, 1, 4])
     if not st.session_state.get(proc_edit_key, False):
-        if c1.button("✏️ 啟動編輯工段", key="enable_process_edit", use_container_width=True):
+        if c1.button("◇ 啟動編輯工段", key="enable_process_edit", use_container_width=True):
             _set_edit_mode(proc_edit_key, True)
     else:
-        if c1.button("🔒 停止編輯工段", key="disable_process_edit", use_container_width=True):
+        if c1.button("◌ 停止編輯工段", key="disable_process_edit", use_container_width=True):
             _set_edit_mode(proc_edit_key, False)
     c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
 
@@ -147,7 +131,7 @@ if can_manage and st.session_state.get(proc_edit_key, False):
             horizontal=True,
             key="system_process_apply_action_v192",
         )
-        submitted = st.form_submit_button("✅ 確認套用 / Apply", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("▣ 確認套用 / Apply", type="primary", use_container_width=True)
 
     if submitted and edited_proc is not None:
         if action == "套用並永久儲存工段名稱設定":
@@ -156,21 +140,16 @@ if can_manage and st.session_state.get(proc_edit_key, False):
             _export_permanent_settings(f"已套用工段名稱設定 {count} 筆")
             _refresh_after_apply(f"已套用工段名稱設定 {count} 筆，畫面已重新整理。", proc_edit_key)
         else:
-            selected_df = edited_proc[edited_proc["刪除"].astype(bool)].copy() if "刪除" in edited_proc.columns else pd.DataFrame()
             try:
-                ids = [int(float(x)) for x in selected_df["id"].dropna().tolist() if str(x).strip().lower() not in {"", "nan", "none"}]
+                ids = [int(float(x)) for x in edited_proc[edited_proc["刪除"].astype(bool)]["id"].dropna().tolist()]
             except Exception:
                 ids = []
-            transient_count = 0
-            if not selected_df.empty and "id" in selected_df.columns:
-                transient_count = int(selected_df["id"].isna().sum())
-            if not ids and transient_count <= 0:
-                st.warning("請先勾選要刪除的工段，再按確認套用。")
+            if not ids:
+                st.warning("請先勾選要刪除的既有工段，再按確認套用。新增尚未儲存的空白列不需要刪除，直接清空即可。")
             else:
-                count = delete_process_options(ids) if ids else 0
+                count = delete_process_options(ids)
                 _export_permanent_settings(f"已刪除工段名稱設定 {count} 筆")
-                extra = f"；另已清除未儲存新增列 {transient_count} 筆" if transient_count else ""
-                _refresh_after_apply(f"已刪除工段名稱設定 {count} 筆{extra}，畫面已重新整理。", proc_edit_key)
+                _refresh_after_apply(f"已刪除工段名稱設定 {count} 筆，畫面已重新整理。", proc_edit_key)
 else:
     render_table(proc_view.drop(columns=["刪除"], errors="ignore"), "system_process_options", editable=False, height=420)
 
@@ -190,10 +169,10 @@ rest_edit_key = "_spt_13_rest_edit_mode"
 if can_manage:
     c1, c2, c3 = st.columns([1, 1, 4])
     if not st.session_state.get(rest_edit_key, False):
-        if c1.button("✏️ 啟動編輯休息時間", key="enable_rest_edit", use_container_width=True):
+        if c1.button("◇ 啟動編輯休息時間", key="enable_rest_edit", use_container_width=True):
             _set_edit_mode(rest_edit_key, True)
     else:
-        if c1.button("🔒 停止編輯休息時間", key="disable_rest_edit", use_container_width=True):
+        if c1.button("◌ 停止編輯休息時間", key="disable_rest_edit", use_container_width=True):
             _set_edit_mode(rest_edit_key, False)
     c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
 
@@ -215,7 +194,7 @@ if can_manage and st.session_state.get(rest_edit_key, False):
             horizontal=True,
             key="system_rest_apply_action_v192",
         )
-        submitted = st.form_submit_button("✅ 確認套用 / Apply", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("▣ 確認套用 / Apply", type="primary", use_container_width=True)
 
     if submitted and edited_rest is not None:
         if action == "套用並永久儲存休息時間設定":
@@ -224,49 +203,18 @@ if can_manage and st.session_state.get(rest_edit_key, False):
             _export_permanent_settings(f"已套用休息時間設定 {count} 筆")
             _refresh_after_apply(f"已套用休息時間設定 {count} 筆，畫面已重新整理。", rest_edit_key)
         else:
-            selected_df = edited_rest[edited_rest["刪除"].astype(bool)].copy() if "刪除" in edited_rest.columns else pd.DataFrame()
             try:
-                ids = [int(float(x)) for x in selected_df["id"].dropna().tolist() if str(x).strip().lower() not in {"", "nan", "none"}]
+                ids = [int(float(x)) for x in edited_rest[edited_rest["刪除"].astype(bool)]["id"].dropna().tolist()]
             except Exception:
                 ids = []
-            transient_count = 0
-            if not selected_df.empty and "id" in selected_df.columns:
-                transient_count = int(selected_df["id"].isna().sum())
-            if not ids and transient_count <= 0:
-                st.warning("請先勾選要刪除的休息時間，再按確認套用。")
+            if not ids:
+                st.warning("請先勾選要刪除的既有休息時間，再按確認套用。新增尚未儲存的空白列不需要刪除，直接清空即可。")
             else:
-                count = delete_rest_periods(ids) if ids else 0
+                count = delete_rest_periods(ids)
                 _export_permanent_settings(f"已刪除休息時間設定 {count} 筆")
-                extra = f"；另已清除未儲存新增列 {transient_count} 筆" if transient_count else ""
-                _refresh_after_apply(f"已刪除休息時間設定 {count} 筆{extra}，畫面已重新整理。", rest_edit_key)
+                _refresh_after_apply(f"已刪除休息時間設定 {count} 筆，畫面已重新整理。", rest_edit_key)
 else:
     render_table(rest_view.drop(columns=["刪除"], errors="ignore"), "system_rest_periods", editable=False, height=360)
 
-
 st.divider()
-# -----------------------------------------------------------------------------
-# 3) Live page reset time
-# -----------------------------------------------------------------------------
-st.subheader("三、01 工時紀錄每日重新整理時間 / Live Page Reset Time")
-st.caption("控制 01｜工時紀錄何時自動隱藏舊週期已完成紀錄。只影響 01 頁面顯示，不刪除 02｜歷史紀錄。格式 HH:MM，例如 02:00。")
-try:
-    current_reset = get_live_page_reset_time()
-except Exception:
-    current_reset = "02:00"
-if can_manage:
-    with st.form("system_live_reset_time_form", clear_on_submit=False):
-        new_reset_time = st.text_input("每日重新整理時間 / Daily reset time", value=current_reset, key="system_live_reset_time_value")
-        submit_reset_time = st.form_submit_button("✅ 套用 01 顯示重新整理時間 / Apply Reset Time", type="primary", use_container_width=True)
-    if submit_reset_time:
-        try:
-            saved_time = save_live_page_reset_time(new_reset_time)
-            _export_permanent_settings(f"已套用 01 工時紀錄每日重新整理時間：{saved_time}")
-            st.session_state["_spt_13_pending_apply_message"] = f"已套用 01 工時紀錄每日重新整理時間：{saved_time}，畫面已重新整理。"
-            st.rerun()
-        except Exception as exc:
-            st.error(str(exc))
-else:
-    st.info(f"目前設定：{current_reset}")
-
-st.divider()
-st.success("設定套用後的串接：01｜工時紀錄工段下拉選單立即讀取啟用工段；工時計算與 02｜歷史紀錄重新計算會使用啟用中的休息時間；01 顯示重新整理時間會套用到今日工時紀錄顯示。")
+st.success("設定套用後的串接：01｜工時紀錄工段下拉選單立即讀取啟用工段；工時計算與 02｜歷史紀錄重新計算會使用啟用中的休息時間。")

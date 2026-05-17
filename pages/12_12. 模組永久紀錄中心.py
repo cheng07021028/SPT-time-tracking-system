@@ -17,7 +17,7 @@ from services.module_persistence_service import (
 from services.security_service import require_module_access
 from services.table_ui_service import render_table
 
-st.set_page_config(page_title="12. 模組永久紀錄中心", page_icon="🗂️", layout="wide")
+st.set_page_config(page_title="12. 模組永久紀錄中心", page_icon="⧠️", layout="wide")
 apply_theme()
 require_module_access("12_module_persistence", "can_view")
 render_header("12｜模組永久紀錄中心", "每個模組獨立 records、settings、audit 與 history 時間戳備份")
@@ -35,20 +35,20 @@ st.info("每個模組都有獨立 records.json、settings.json、audit.jsonl 與
 c1, c2, c3 = st.columns(3)
 username = st.session_state.get("auth_username", st.session_state.get("username", "SYSTEM"))
 with c1:
-    if st.button("建立 / 補齊永久資料夾 / Bootstrap", use_container_width=True):
+    if st.button("⧉ 建立 / 補齊永久資料夾 / Bootstrap", use_container_width=True):
         protect_gitignore_rules()
         result = bootstrap_module_persistence(username=username)
         st.success("已建立或補齊模組永久資料夾與設定索引")
         st.json(result)
         st.rerun()
 with c2:
-    if st.button("匯出全部模組紀錄 / Export All", use_container_width=True):
+    if st.button("⟰ 匯出全部模組紀錄 / Export All", use_container_width=True):
         result = export_all_modules(username=username)
         st.success("全部模組紀錄已匯出到 data/persistent_modules")
         st.json({k: v.get("counts", {}) for k, v in result.items()})
         st.rerun()
 with c3:
-    if st.button("重建全域索引 / Rebuild Index", use_container_width=True):
+    if st.button("⟳ 重建全域索引 / Rebuild Index", use_container_width=True):
         result = rebuild_global_index()
         st.success("全域索引已重建")
         st.json(result)
@@ -70,7 +70,7 @@ st.divider()
 st.markdown("### 單一模組匯出 / Export Single Module")
 module_options = {f'{v["name_zh"]} / {v["name_en"]} ({k})': k for k, v in MODULE_TABLE_MAP.items()}
 selected_label = st.selectbox("選擇模組 / Select Module", list(module_options.keys()))
-if st.button("匯出選定模組 / Export Selected Module", use_container_width=True):
+if st.button("⟰ 匯出選定模組 / Export Selected Module", use_container_width=True):
     module_code = module_options[selected_label]
     result = export_module_records(module_code, username=username)
     st.success("已匯出模組永久紀錄")

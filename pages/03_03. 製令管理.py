@@ -23,14 +23,12 @@ except Exception:
     def require_module_access(module_code: str):
         return True
 
-st.set_page_config(page_title="03. 製令管理", page_icon="📋", layout="wide")
+st.set_page_config(page_title="03. 製令管理", page_icon="⧠", layout="wide")
 apply_theme()
 require_module_access("03_work_orders")
 render_header("03｜製令管理", "Excel 匯入、貼上資料、手動新增、頁面編輯、刪除、全選與存檔")
 
 STATE_KEY = "v138_work_orders_editor"
-EDIT_MODE_KEY = "v191_work_orders_edit_mode"
-EDITOR_REV_KEY = "v195_work_orders_editor_rev"
 COLS = ["_delete", "id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
 
 
@@ -199,64 +197,8 @@ def reload_data():
     st.session_state[STATE_KEY] = ensure_cols(df)
 
 
-def _touch_editor_widget():
-    """Force st.data_editor to rebuild after toolbar actions.
-
-    Streamlit keeps data_editor widget state by key. If we only modify the
-    backing DataFrame, the grid can continue showing the old widget state,
-    which makes toolbar buttons look like they have no effect.
-    """
-    st.session_state[EDITOR_REV_KEY] = int(st.session_state.get(EDITOR_REV_KEY, 0)) + 1
-
-
-def _current_editor_key() -> str:
-    return f"work_orders_data_editor_v195_{st.session_state.get(EDITOR_REV_KEY, 0)}"
-
-
-def _start_edit():
-    st.session_state[EDIT_MODE_KEY] = True
-    _touch_editor_widget()
-
-
-def _stop_edit():
-    reload_data()
-    st.session_state[EDIT_MODE_KEY] = False
-    _touch_editor_widget()
-
-
-def _reload_editor():
-    reload_data()
-    _touch_editor_widget()
-
-
-def _add_blank_row():
-    blank = pd.DataFrame([{
-        "_delete": False, "id": "", "work_order": "", "part_no": "", "type_name": "",
-        "assembly_location": "", "customer": "", "note": "", "is_active": True,
-        "created_at": "", "updated_at": ""
-    }])
-    st.session_state[STATE_KEY] = pd.concat([blank, ensure_cols(st.session_state[STATE_KEY])], ignore_index=True)
-    _touch_editor_widget()
-
-
-def _set_all_active(value: bool):
-    df = ensure_cols(st.session_state[STATE_KEY]).copy()
-    df["is_active"] = bool(value)
-    st.session_state[STATE_KEY] = df
-    _touch_editor_widget()
-
-
-def _set_all_delete(value: bool):
-    df = ensure_cols(st.session_state[STATE_KEY]).copy()
-    df["_delete"] = bool(value)
-    st.session_state[STATE_KEY] = df
-    _touch_editor_widget()
-
-
 if STATE_KEY not in st.session_state:
     reload_data()
-if EDITOR_REV_KEY not in st.session_state:
-    st.session_state[EDITOR_REV_KEY] = 0
 
 
 tab1, tab2, tab3 = st.tabs(["製令清單編輯", "Excel 匯入", "貼上資料"])
@@ -264,76 +206,65 @@ tab1, tab2, tab3 = st.tabs(["製令清單編輯", "Excel 匯入", "貼上資料"
 with tab1:
     st.subheader("製令清單編輯 / Editable Work Orders")
 
-    # V1.91：恢復「標題欄點擊排序」的正確使用方式。
-    # Streamlit 的 st.data_editor 在表單/編輯模式中不保證支援標題欄排序，
-    # 所以平常先用 st.dataframe 顯示清單；此模式可直接點擊欄位標題排序。
-    # 需要新增、修改、刪除時，才切換到編輯模式，避免每次點表格都重新運算。
-    edit_mode = bool(st.session_state.get(EDIT_MODE_KEY, False))
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    if c1.button("⊕ 新增空白列", use_container_width=True):
+        blank = pd.DataFrame([{
+            "_delete": False, "id": "", "work_order": "", "part_no": "", "type_name": "",
+            "assembly_location": "", "customer": "", "note": "", "is_active": True,
+            "created_at": "", "updated_at": ""
+        }])
+        st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
+        rerun()
+    if c2.button("◈ 啟用全選", use_container_width=True):
+        st.session_state[STATE_KEY]["is_active"] = True
+        rerun()
+    if c3.button("◌ 啟用全取消", use_container_width=True):
+        st.session_state[STATE_KEY]["is_active"] = False
+        rerun()
+    if c4.button("⊖ 刪除欄全選", use_container_width=True):
+        st.session_state[STATE_KEY]["_delete"] = True
+        rerun()
+    if c5.button("◌ 刪除欄取消", use_container_width=True):
+        st.session_state[STATE_KEY]["_delete"] = False
+        rerun()
+    if c6.button("⟳ 重新載入", use_container_width=True):
+        reload_data()
+        rerun()
 
-    work_order_column_config = {
-        "_delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small"),
-        "id": st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
-        "work_order": st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
-        "part_no": st.column_config.TextColumn("P/N / Part No.", width="medium"),
-        "type_name": st.column_config.TextColumn("機型 / Type", width="large"),
-        "assembly_location": st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
-        "customer": st.column_config.TextColumn("客戶 / Customer", width="medium"),
-        "note": st.column_config.TextColumn("備註 / Note", width="large"),
-        "is_active": st.column_config.CheckboxColumn("啟用 / Active", width="small"),
-        "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
-        "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
-    }
+    st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。製令 / Work Order 為必填。")
 
-    if not edit_mode:
-        c1, c2 = st.columns(2)
-        c1.button("✏️ 啟動編輯 / Start Edit", use_container_width=True, type="primary", key="wo_start_edit_v195", on_click=_start_edit)
-        c2.button("🔄 重新載入 / Reload", use_container_width=True, key="wo_reload_view_v195", on_click=_reload_editor)
-
-        st.info("目前為檢視 / 排序模式：可直接點擊表格標題欄排序。需要新增、修改、刪除時，請先按『啟動編輯』。")
-        view_cols = [c for c in COLS if c != "_delete"]
-        view_df = ensure_cols(st.session_state[STATE_KEY]).copy()
-        st.dataframe(
-            view_df,
+    st.info("V1.89：製令清單已改成確認後才儲存。表格內輸入、勾選、換格不會立即觸發存檔或整頁重算。")
+    with st.form("work_orders_commit_form", clear_on_submit=False):
+        edited = st.data_editor(
+            st.session_state[STATE_KEY],
             hide_index=True,
             use_container_width=True,
+            num_rows="dynamic",
             height=560,
-            column_order=view_cols,
-            column_config={k: v for k, v in work_order_column_config.items() if k != "_delete"},
+            column_order=COLS,
+            column_config={
+                "_delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small"),
+                "id": st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
+                "work_order": st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
+                "part_no": st.column_config.TextColumn("P/N / Part No.", width="medium"),
+                "type_name": st.column_config.TextColumn("機型 / Type", width="large"),
+                "assembly_location": st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
+                "customer": st.column_config.TextColumn("客戶 / Customer", width="medium"),
+                "note": st.column_config.TextColumn("備註 / Note", width="large"),
+                "is_active": st.column_config.CheckboxColumn("啟用 / Active", width="small"),
+                "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
+                "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
+            },
+            key="work_orders_data_editor_v189",
         )
-    else:
-        c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-        c1.button("➕ 新增空白列", use_container_width=True, key="wo_add_blank_v195", on_click=_add_blank_row)
-        c2.button("✅ 啟用全選", use_container_width=True, key="wo_active_all_v195", on_click=_set_all_active, args=(True,))
-        c3.button("⬜ 啟用全取消", use_container_width=True, key="wo_active_none_v195", on_click=_set_all_active, args=(False,))
-        c4.button("🗑️ 刪除欄全選", use_container_width=True, key="wo_delete_all_v195", on_click=_set_all_delete, args=(True,))
-        c5.button("↩️ 刪除欄取消", use_container_width=True, key="wo_delete_none_v195", on_click=_set_all_delete, args=(False,))
-        c6.button("🔄 重新載入", use_container_width=True, key="wo_reload_edit_v195", on_click=_reload_editor)
-        c7.button("🔒 停止編輯", use_container_width=True, key="wo_stop_edit_v195", on_click=_stop_edit)
+        submitted_work_orders = st.form_submit_button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True)
 
-        st.warning("目前為編輯模式。勾選『刪除 / Delete』後按下儲存，才會真正刪除資料。製令 / Work Order 為必填。")
-        st.caption("提示：若要使用標題欄點擊排序，請先停止編輯，回到檢視 / 排序模式。")
-
-        with st.form("work_orders_commit_form", clear_on_submit=False):
-            edited = st.data_editor(
-                st.session_state[STATE_KEY],
-                hide_index=True,
-                use_container_width=True,
-                num_rows="dynamic",
-                height=560,
-                column_order=COLS,
-                column_config=work_order_column_config,
-                key=_current_editor_key(),
-            )
-            submitted_work_orders = st.form_submit_button("💾 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True)
-
-        if submitted_work_orders:
-            st.session_state[STATE_KEY] = ensure_cols(edited)
-            result = save_work_orders(st.session_state[STATE_KEY])
-            reload_data()
-            st.session_state[EDIT_MODE_KEY] = False
-            _touch_editor_widget()
-            st.success(f"儲存完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
-            rerun()
+    if submitted_work_orders:
+        st.session_state[STATE_KEY] = ensure_cols(edited)
+        result = save_work_orders(st.session_state[STATE_KEY])
+        reload_data()
+        st.success(f"儲存完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
+        rerun()
 
 with tab2:
     st.subheader("Excel 匯入 / Excel Import")
@@ -362,13 +293,11 @@ with tab3:
                 st.warning(msg)
 
             a1, a2 = st.columns(2)
-            if a1.button("➕ 加入清單編輯 / Add to Editor", type="secondary", use_container_width=True, key="add_pasted_work_orders_to_editor_v138"):
-                st.session_state[STATE_KEY] = pd.concat([parsed, ensure_cols(st.session_state[STATE_KEY])], ignore_index=True)
-                st.session_state[EDIT_MODE_KEY] = True
-                _touch_editor_widget()
+            if a1.button("⊕ 加入清單編輯 / Add to Editor", type="secondary", use_container_width=True, key="add_pasted_work_orders_to_editor_v138"):
+                st.session_state[STATE_KEY] = pd.concat([parsed, st.session_state[STATE_KEY]], ignore_index=True)
                 st.success("已加入『製令清單編輯』頁，請切回第一個頁籤確認後按儲存。")
 
-            if a2.button("💾 直接儲存貼上資料 / Save Pasted Work Orders", type="primary", use_container_width=True, key="save_pasted_work_orders_v138"):
+            if a2.button("▣ 直接儲存貼上資料 / Save Pasted Work Orders", type="primary", use_container_width=True, key="save_pasted_work_orders_v138"):
                 result = save_work_orders(parsed)
                 reload_data()
                 st.success(f"貼上資料已儲存：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")

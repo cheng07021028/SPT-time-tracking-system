@@ -55,7 +55,7 @@ ACCOUNT_DISPLAY_COLUMNS = {
     "note": "備註 / Note",
 }
 
-with st.expander("📘 權限設定使用說明 / User Guide", expanded=False):
+with st.expander("⧠ 權限設定使用說明 / User Guide", expanded=False):
     st.markdown("""
 ### 密碼欄位說明 / Password Field Design
 - **密碼 / Password** 欄可直接輸入新密碼；既有帳號顯示 `********` 代表維持原密碼。
@@ -71,7 +71,7 @@ with st.expander("📘 權限設定使用說明 / User Guide", expanded=False):
 角色可填：`admin / manager / leader / operator / viewer / auditor`，也可填中文：系統管理員、製造主管、現場幹部、作業人員、查詢者、稽核。
 """)
 
-with st.expander("🧭 角色權限說明 / Role Permission Description", expanded=False):
+with st.expander("⌖ 角色權限說明 / Role Permission Description", expanded=False):
     st.dataframe(pd.DataFrame([
         {
             "角色代碼 / Role Code": role_code,
@@ -333,11 +333,11 @@ with tab_accounts:
     _edit_on = bool(st.session_state.get("v166_account_edit_enabled", False))
     c_edit1, c_edit2, c_edit3 = st.columns([1.2, 1.2, 3])
     with c_edit1:
-        if st.button("🔓 啟動編輯 / Enable Edit", use_container_width=True, disabled=_edit_on, key="v169_enable_account_edit_top"):
+        if st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=_edit_on, key="v169_enable_account_edit_top"):
             st.session_state["v166_account_edit_enabled"] = True
             st.rerun()
     with c_edit2:
-        if st.button("🔒 停止編輯 / Lock Edit", use_container_width=True, disabled=not _edit_on, key="v169_disable_account_edit_top"):
+        if st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not _edit_on, key="v169_disable_account_edit_top"):
             st.session_state["v166_account_edit_enabled"] = False
             st.session_state["v133_users_df"] = _users_for_editor()
             st.rerun()
@@ -368,7 +368,7 @@ with tab_accounts:
                 new_active = st.checkbox("啟用 / Active", value=True, key="v175_new_active", disabled=not _edit_on)
                 new_force_change = st.checkbox("強制改密碼 / Force Change", value=False, key="v175_new_force_change", disabled=not _edit_on)
             new_note = st.text_input("備註 / Note", key="v175_new_note", disabled=not _edit_on)
-            submit_new_user = st.form_submit_button("✅ 建立帳號 / Create User", type="primary", use_container_width=True, disabled=not _edit_on)
+            submit_new_user = st.form_submit_button("⊕ 建立帳號 / Create User", type="primary", use_container_width=True, disabled=not _edit_on)
 
         if submit_new_user:
             username = str(new_username or "").strip()
@@ -412,9 +412,7 @@ with tab_accounts:
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            if st.button("➕ 新增帳號 / Add User", use_container_width=True, disabled=not account_edit_enabled, key="v205_add_user_row_once"):
-                # 只更新帳號編輯暫存，不額外 st.rerun；Streamlit 點擊按鈕本身會重跑一次，
-                # 避免雙重 rerun 造成看起來像無限運算。
+            if st.button("⊕ 新增帳號 / Add User", use_container_width=True, disabled=not account_edit_enabled, key="v204_add_user_row_once"):
                 st.session_state["v133_users_df"] = pd.concat([st.session_state["v133_users_df"], pd.DataFrame([_blank_user_row()])], ignore_index=True)
                 try:
                     from services.column_settings_service import clear_editor_draft
@@ -422,16 +420,17 @@ with tab_accounts:
                     clear_editor_draft("account")
                 except Exception:
                     pass
+                st.rerun()
         with c2:
-            if st.button("🗑️ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_select_delete"):
+            if st.button("⊖ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_select_delete"):
                 st.session_state["v133_users_df"]["刪除 / Delete"] = True
                 st.rerun()
         with c3:
-            if st.button("↩️ 刪除欄取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_clear_delete"):
+            if st.button("◌ 刪除欄取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_clear_delete"):
                 st.session_state["v133_users_df"]["刪除 / Delete"] = False
                 st.rerun()
         with c4:
-            if st.button("🔄 重新載入 / Reload", use_container_width=True):
+            if st.button("⟳ 重新載入 / Reload", use_container_width=True):
                 st.session_state["v133_users_df"] = _users_for_editor()
                 st.rerun()
 
@@ -472,7 +471,7 @@ with tab_accounts:
             m2.metric("待刪除 / Pending Delete", delete_count)
             m3.metric("密碼異動 / Password Changes", new_password_count)
             submitted_accounts = st.form_submit_button(
-                "💾 套用並儲存帳號密碼總表 / Apply and Save Account Master",
+                "▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master",
                 type="primary",
                 use_container_width=True,
                 disabled=not account_edit_enabled,
@@ -488,7 +487,7 @@ with tab_accounts:
             save_df = df.loc[~_to_bool_series(df, "刪除 / Delete")].copy()
             result = save_users(_users_to_service_rows(save_df))
             deleted = delete_users(to_delete)
-            st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆；角色同步權限：{len(result.get('role_synced_users', []))} 個帳號 / Accounts saved, deleted and role permissions synced")
+            st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
             if result.get("skipped"):
                 st.warning("；".join(result["skipped"]))
             st.session_state.pop("v133_users_df", None)
@@ -511,14 +510,14 @@ with tab_accounts:
                 st.dataframe(import_df, use_container_width=True, hide_index=True)
                 e1, e2 = st.columns(2)
                 with e1:
-                    if st.button("➕ 加入帳號總表編輯 / Add to Account Editor", use_container_width=True, key="v136_excel_add_editor", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
+                    if st.button("⊕ 加入帳號總表編輯 / Add to Account Editor", use_container_width=True, key="v136_excel_add_editor", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         new_rows = _account_import_to_editor_rows(import_df)
                         st.session_state["v133_users_df"] = _merge_users_editor(st.session_state.get("v133_users_df", _users_for_editor()), new_rows)
                         st.success("已加入帳號總表編輯頁，請到『帳號清單編輯』確認後儲存。")
                 with e2:
-                    if st.button("💾 直接儲存 Excel 帳號 / Save Imported Accounts", type="primary", use_container_width=True, key="v136_excel_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
+                    if st.button("▣ 直接儲存 Excel 帳號 / Save Imported Accounts", type="primary", use_container_width=True, key="v136_excel_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         result = _save_imported_accounts(import_df)
-                        st.success(f"帳號已儲存：{result['saved']} 筆；角色同步權限：{len(result.get('role_synced_users', []))} 個帳號 / Accounts saved and role permissions synced")
+                        st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
                         if result.get("skipped"):
                             st.warning("；".join(result["skipped"]))
                         st.session_state.pop("v133_users_df", None)
@@ -543,14 +542,14 @@ with tab_accounts:
                 st.dataframe(import_df, use_container_width=True, hide_index=True)
                 p1, p2 = st.columns(2)
                 with p1:
-                    if st.button("➕ 加入帳號總表編輯 / Add to Account Editor", use_container_width=True, key="v136_paste_add_editor", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
+                    if st.button("⊕ 加入帳號總表編輯 / Add to Account Editor", use_container_width=True, key="v136_paste_add_editor", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         new_rows = _account_import_to_editor_rows(import_df)
                         st.session_state["v133_users_df"] = _merge_users_editor(st.session_state.get("v133_users_df", _users_for_editor()), new_rows)
                         st.success("已加入帳號總表編輯頁，請到『帳號清單編輯』確認後儲存。")
                 with p2:
-                    if st.button("💾 直接儲存貼上帳號 / Save Pasted Accounts", type="primary", use_container_width=True, key="v136_paste_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
+                    if st.button("▣ 直接儲存貼上帳號 / Save Pasted Accounts", type="primary", use_container_width=True, key="v136_paste_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         result = _save_imported_accounts(import_df)
-                        st.success(f"帳號已儲存：{result['saved']} 筆；角色同步權限：{len(result.get('role_synced_users', []))} 個帳號 / Accounts saved and role permissions synced")
+                        st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
                         if result.get("skipped"):
                             st.warning("；".join(result["skipped"]))
                         st.session_state.pop("v133_users_df", None)
@@ -583,19 +582,19 @@ with tab_perm:
     st.markdown("#### 快速勾選 / Quick Toggle")
     b1, b2, b3, b4, b5 = st.columns(5)
     with b1:
-        if st.button("✅ 可進入全選 / Select View", use_container_width=True):
+        if st.button("◈ 可進入全選 / Select View", use_container_width=True):
             view_df["can_view"] = True
     with b2:
-        if st.button("⬜ 可進入取消 / Clear View", use_container_width=True):
+        if st.button("◌ 可進入取消 / Clear View", use_container_width=True):
             view_df["can_view"] = False
     with b3:
-        if st.button("✏️ 編輯全選 / Select Edit", use_container_width=True):
+        if st.button("◈ 編輯全選 / Select Edit", use_container_width=True):
             view_df["can_edit"] = True
     with b4:
-        if st.button("📤 匯出全選 / Select Export", use_container_width=True):
+        if st.button("⟰ 匯出全選 / Select Export", use_container_width=True):
             view_df["can_export"] = True
     with b5:
-        if st.button("🛡️ 管理全選 / Select Manage", use_container_width=True):
+        if st.button("⛨ 管理全選 / Select Manage", use_container_width=True):
             view_df["can_manage"] = True
     base_cols = ["username", "display_name", "role_code", "module_code", "module_name_zh", "module_name_en"]
     col_cfg = {
@@ -611,7 +610,7 @@ with tab_perm:
     st.info("V1.89：權限表已改成確認後才套用。勾選權限時不會每一下都觸發整頁運算。")
     with st.form("permission_editor_commit_form", clear_on_submit=False):
         edited_perm = st.data_editor(view_df[base_cols + ACTION_COLS], key="v189_permission_editor", use_container_width=True, hide_index=True, column_config=col_cfg)
-        submitted_perm = st.form_submit_button("✅ 確認套用並儲存權限 / Apply and Save Permissions", type="primary", use_container_width=True)
+        submitted_perm = st.form_submit_button("▣ 確認套用並儲存權限 / Apply and Save Permissions", type="primary", use_container_width=True)
     st.markdown("#### 權限摘要預覽 / Permission Summary Preview")
     st.dataframe(_permission_summary(edited_perm), use_container_width=True, hide_index=True)
     if submitted_perm:
@@ -626,7 +625,7 @@ with tab_sec:
     with st.form("security_settings_commit_form", clear_on_submit=False):
         new_idle = st.number_input("閒置自動登出分鐘數 / Idle Auto Logout Minutes", min_value=1, max_value=240, value=idle, step=1)
         confirm_after_record = st.checkbox("工時完成後詢問是否繼續記錄 / Ask continue after time record", value=settings.get("ask_continue_after_record", "1") != "0")
-        submitted_security = st.form_submit_button("✅ 確認套用安全設定 / Apply Security Settings", type="primary", use_container_width=True)
+        submitted_security = st.form_submit_button("⛨ 確認套用安全設定 / Apply Security Settings", type="primary", use_container_width=True)
     if submitted_security:
         save_security_settings({"idle_timeout_minutes": str(int(new_idle)), "ask_continue_after_record": "1" if confirm_after_record else "0"})
         try:

@@ -14,7 +14,6 @@ from services.security_service import (
 from services.master_data_service import load_employees, load_work_orders
 from services.time_record_service import (
     clear_today_finished_from_work_page,
-    restore_today_hidden_records,
     delete_time_records,
     recalculate_time_records,
     finish_work,
@@ -30,7 +29,7 @@ from services.db_service import query_one
 from services.table_ui_service import render_table
 from services.system_settings_service import get_process_options, get_live_page_reset_time
 
-st.set_page_config(page_title="01. 工時紀錄", page_icon="▶️", layout="wide")
+st.set_page_config(page_title="01. 工時紀錄", page_icon="⏱", layout="wide")
 apply_theme()
 require_module_access("01_time_record")
 render_header("01｜工時紀錄", "快速開始、同步作業、暫停、下班、完工｜自動記錄時間與扣除休息")
@@ -77,7 +76,7 @@ with left:
         render_table(conflicts, "start_conflicting_active_records", editable=False, height=180)
         confirm_pause = st.checkbox("我確認先暫停前一個不同工段紀錄，再開始新紀錄", value=False, key="confirm_pause_before_start")
 
-    if st.button("▶ 開始作業 / Start", use_container_width=True, disabled=bool(duplicate) or (not confirm_pause)):
+    if st.button("⏱ 開始作業 / Start", use_container_width=True, disabled=bool(duplicate) or (not confirm_pause)):
         if not check_permission("01_time_record", "can_create"):
             st.error("權限不足：你沒有新增工時紀錄權限。")
         else:
@@ -121,14 +120,14 @@ with right:
                 n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=True)
                 trigger_post_record_continue_prompt(f"已同步暫停 {n} 筆並平均計算工時。", title="工時已暫停")
                 st.rerun()
-        if c2.button("🏁 完工 / Complete", use_container_width=True):
+        if c2.button("⟡ 完工 / Complete", use_container_width=True):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
                 n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=True)
                 trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。", title="工時已完工")
                 st.rerun()
-        if c3.button("🌙 下班 / Off Duty", use_container_width=True):
+        if c3.button("◐ 下班 / Off Duty", use_container_width=True):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
@@ -142,23 +141,18 @@ try:
     _reset_time = get_live_page_reset_time()
 except Exception:
     _reset_time = "02:00"
-st.caption(f"顯示規則：在系統設定時間 {_reset_time} 前，今日作業明細不論是否已結束都會顯示；按下『立即重新整理 01 顯示』後，只隱藏設定時間前已結束且已有工時小計/結束紀錄的資料。按下『恢復已隱藏紀錄』可還原 01 顯示；02｜歷史紀錄不受影響。")
+st.caption(f"顯示規則：重新整理前會顯示當日作業明細；每日 {_reset_time} 後會自動隱藏已結束紀錄。按下立即重新整理後，會立刻隱藏目前所有已結束紀錄，只保留未結束作業；02｜歷史紀錄不受影響。")
 user = get_current_user() or {}
 is_admin = "admin" in [str(x).lower() for x in user.get("roles", [])]
 show_unfinished_only = False
 if is_admin:
-    c_filter1, c_filter2, c_filter3 = st.columns([1.15, 2.1, 1.55])
+    c_filter1, c_filter2 = st.columns([1.3, 2.7])
     with c_filter1:
         show_unfinished_only = st.checkbox("只顯示未結束目前作業 / Unfinished only", value=False, key="today_unfinished_only")
     with c_filter2:
-        if st.button("🧹 立即重新整理 01 顯示（依系統設定時間隱藏已結束，不影響 02 歷史紀錄）", use_container_width=True, key="clear_today_finished_view"):
+        if st.button("⚡ 立即重新整理 01 顯示（隱藏舊週期已完工，不影響 02 歷史紀錄）", use_container_width=True, key="clear_today_finished_view"):
             n = clear_today_finished_from_work_page()
-            st.success(f"已重新整理 01 頁顯示；02 歷史紀錄不受影響。已隱藏設定時間前已結束筆數：{n}")
-            st.rerun()
-    with c_filter3:
-        if st.button("↩️ 恢復已隱藏紀錄", use_container_width=True, key="restore_today_hidden_view"):
-            restore_today_hidden_records()
-            st.success("已恢復 01 頁已隱藏紀錄；02 歷史紀錄不受影響。")
+            st.success(f"已重新整理 01 頁顯示；02 歷史紀錄不受影響。已隱藏目前已結束筆數：{n}")
             st.rerun()
 df = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
 render_table(df, "today_records", editable=False, height=420)
@@ -167,7 +161,7 @@ render_table(df, "today_records", editable=False, height=420)
 # 一般作業人員只能開始/暫停/下班/完工，不顯示人工維護工具，避免冒用或誤刪資料。
 if is_admin:
     st.divider()
-    with st.expander("🔐 管理員工時紀錄維護｜修改、刪除、存檔", expanded=False):
+    with st.expander("▤ 管理員工時紀錄維護｜修改、刪除、存檔", expanded=False):
         st.warning("此區僅管理員可見。修改或刪除會直接影響正式工時紀錄，請確認後再存檔。")
         if df.empty:
             st.info("今日目前沒有可維護的工時紀錄。")
@@ -190,7 +184,7 @@ if is_admin:
                     horizontal=True,
                     key="today_records_admin_action",
                 )
-                submitted_admin = st.form_submit_button("✅ 確認執行 / Confirm", type="primary", use_container_width=True)
+                submitted_admin = st.form_submit_button("⚡ 確認執行 / Confirm", type="primary", use_container_width=True)
 
             if submitted_admin and edited_admin is not None:
                 delete_ids = []

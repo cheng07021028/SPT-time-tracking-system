@@ -23,7 +23,7 @@ except Exception:
     def require_module_access(module_code: str):
         return True
 
-st.set_page_config(page_title="04. 人員名單", page_icon="👥", layout="wide")
+st.set_page_config(page_title="04. 人員名單", page_icon="⧉", layout="wide")
 apply_theme()
 require_module_access("04_employees")
 render_header("04｜人員名單", "人員主檔、在廠狀態、今日出勤勾選、清單編輯、刪除與儲存")
@@ -217,7 +217,7 @@ with tab1:
     st.subheader("人員清單編輯 / Editable Employees")
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    if c1.button("➕ 新增空白列", use_container_width=True):
+    if c1.button("⊕ 新增空白列", use_container_width=True):
         blank = pd.DataFrame([{
             "_delete": False, "id": "", "employee_id": "", "employee_name": "",
             "department": "", "title": "", "is_active": True, "is_in_factory": True,
@@ -225,33 +225,33 @@ with tab1:
         }])
         st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
         rerun()
-    if c2.button("🗑️ 刪除欄全選", use_container_width=True):
+    if c2.button("⊖ 刪除欄全選", use_container_width=True):
         st.session_state[STATE_KEY]["_delete"] = True
         rerun()
-    if c3.button("↩️ 刪除欄取消", use_container_width=True):
+    if c3.button("◌ 刪除欄取消", use_container_width=True):
         st.session_state[STATE_KEY]["_delete"] = False
         rerun()
-    if c4.button("✅ 啟用全選", use_container_width=True):
+    if c4.button("◈ 啟用全選", use_container_width=True):
         st.session_state[STATE_KEY]["is_active"] = True
         rerun()
-    if c5.button("⬜ 啟用全取消", use_container_width=True):
+    if c5.button("◌ 啟用全取消", use_container_width=True):
         st.session_state[STATE_KEY]["is_active"] = False
         rerun()
-    if c6.button("🔄 重新載入", use_container_width=True):
+    if c6.button("⟳ 重新載入", use_container_width=True):
         reload_data()
         rerun()
 
     b1, b2, b3, b4 = st.columns(4)
-    if b1.button("🏭 在廠全選", use_container_width=True):
+    if b1.button("⬡ 在廠全選", use_container_width=True):
         st.session_state[STATE_KEY]["is_in_factory"] = True
         rerun()
-    if b2.button("🏭 在廠全取消", use_container_width=True):
+    if b2.button("⬡ 在廠全取消", use_container_width=True):
         st.session_state[STATE_KEY]["is_in_factory"] = False
         rerun()
-    if b3.button("📅 今日出勤全選", use_container_width=True):
+    if b3.button("⧖ 今日出勤全選", use_container_width=True):
         st.session_state[STATE_KEY]["is_today_attendance"] = True
         rerun()
-    if b4.button("📅 今日出勤全取消", use_container_width=True):
+    if b4.button("⧖ 今日出勤全取消", use_container_width=True):
         st.session_state[STATE_KEY]["is_today_attendance"] = False
         rerun()
 
@@ -282,7 +282,7 @@ with tab1:
             },
             key="employees_data_editor_v189",
         )
-        submitted_employees = st.form_submit_button("💾 確認儲存人員清單 / Save Employees", type="primary", use_container_width=True)
+        submitted_employees = st.form_submit_button("▣ 確認儲存人員清單 / Save Employees", type="primary", use_container_width=True)
 
     if submitted_employees:
         st.session_state[STATE_KEY] = ensure_cols(edited)
@@ -318,11 +318,11 @@ with tab3:
                 st.warning(msg)
 
             a1, a2 = st.columns(2)
-            if a1.button("➕ 加入清單編輯 / Add to Editor", type="secondary", use_container_width=True, key="add_pasted_employees_to_editor_v138"):
+            if a1.button("⊕ 加入清單編輯 / Add to Editor", type="secondary", use_container_width=True, key="add_pasted_employees_to_editor_v138"):
                 st.session_state[STATE_KEY] = pd.concat([parsed, st.session_state[STATE_KEY]], ignore_index=True)
                 st.success("已加入『人員清單編輯』頁，請切回第一個頁籤確認後按儲存。")
 
-            if a2.button("💾 直接儲存貼上資料 / Save Pasted Employees", type="primary", use_container_width=True, key="save_pasted_employees_v138"):
+            if a2.button("▣ 直接儲存貼上資料 / Save Pasted Employees", type="primary", use_container_width=True, key="save_pasted_employees_v138"):
                 result = save_employees(parsed)
                 reload_data()
                 st.success(f"貼上資料已儲存：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")

@@ -11,7 +11,7 @@ from services import log_service
 from services.table_ui_service import render_table
 from services.timezone_service import today_date
 
-st.set_page_config(page_title="06. LOG 查詢", page_icon="🧾", layout="wide")
+st.set_page_config(page_title="06. LOG 查詢", page_icon="⧉", layout="wide")
 apply_theme()
 require_module_access("06_logs")
 render_header("06｜LOG 查詢", "系統操作、異常與資料異動紀錄查詢｜支援日期篩選與區間刪除")
@@ -77,8 +77,8 @@ with st.form("log_query_filter_form", clear_on_submit=False):
     keyword = c6.text_input("關鍵字 / Keyword", value=str(f.get("keyword", "")))
 
     c7, c8 = st.columns([1, 1])
-    apply_filter = c7.form_submit_button("🔎 套用查詢 / Apply Query", use_container_width=True)
-    clear_filter = c8.form_submit_button("🧹 清除條件 / Clear", use_container_width=True)
+    apply_filter = c7.form_submit_button("⌕ 套用查詢 / Apply Query", use_container_width=True)
+    clear_filter = c8.form_submit_button("↺ 清除條件 / Clear", use_container_width=True)
 
 if clear_filter:
     st.session_state["log_query_filters"] = _default_filters()
@@ -128,7 +128,7 @@ if check_permission("06_logs", "can_delete") or check_permission("06_logs", "can
         "我確認要刪除上述日期區間的 LOG 紀錄 / I confirm deleting logs in this date range",
         key=confirm_key,
     )
-    if st.button("🗑️ 刪除指定日期區間 LOG / Delete Range", use_container_width=True, disabled=not confirm_delete):
+    if st.button("⊖ 刪除指定日期區間 LOG / Delete Range", use_container_width=True, disabled=not confirm_delete):
         if delete_start > delete_end:
             st.error("刪除開始日期不可大於結束日期。")
         else:

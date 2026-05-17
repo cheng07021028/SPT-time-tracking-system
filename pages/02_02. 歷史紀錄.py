@@ -21,7 +21,7 @@ from services.table_ui_service import render_table
 from services.duration_service import hours_to_hms
 from services.history_filter_service import load_history_filters, save_history_filters, reset_history_filters
 
-st.set_page_config(page_title="02. 歷史紀錄", page_icon="📚", layout="wide")
+st.set_page_config(page_title="02. 歷史紀錄", page_icon="⧠", layout="wide")
 apply_theme()
 require_module_access("02_history")
 render_header("02｜歷史紀錄", "完整工時明細查詢、資料編輯、刪除、重新計算、Excel 匯入、貼上資料與 Excel 匯出")
@@ -575,7 +575,7 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
         applied.get("end_date"),
     )
 
-    with st.expander("🔎 專業篩選 / Professional Filters", expanded=True):
+    with st.expander("⌕ 專業篩選 / Professional Filters", expanded=True):
         with st.form("history_professional_filter_form", clear_on_submit=False):
             r1c1, r1c2, r1c3, r1c4 = st.columns([1, 1, 1, 1])
             date_preset = r1c1.selectbox(
@@ -623,8 +623,8 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
 
             keyword = st.text_input("關鍵字搜尋：製令 / 料號 / 機型 / 工段 / 工號 / 姓名 / 備註", value=applied.get("keyword", ""))
             b1, b2, b3 = st.columns([1.3, 1, 2])
-            apply_clicked = b1.form_submit_button("🔎 套用篩選並永久記錄", type="primary", use_container_width=True)
-            reset_clicked = b2.form_submit_button("♻️ 恢復預設篩選", use_container_width=True)
+            apply_clicked = b1.form_submit_button("⌕ 套用篩選並永久記錄", type="primary", use_container_width=True)
+            reset_clicked = b2.form_submit_button("↺ 恢復預設篩選", use_container_width=True)
 
         if reset_clicked:
             new_filters = reset_history_filters()
@@ -712,10 +712,10 @@ with tab1:
         if edit_key not in st.session_state:
             st.session_state[edit_key] = False
         ec1, ec2, ec3 = st.columns([1, 1, 2])
-        if ec1.button("✏️ 啟動編輯 / Enable Edit", use_container_width=True, key="history_enable_edit"):
+        if ec1.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, key="history_enable_edit"):
             st.session_state[edit_key] = True
             rerun()
-        if ec2.button("🔒 停止編輯 / Stop Edit", use_container_width=True, key="history_stop_edit"):
+        if ec2.button("◌ 停止編輯 / Stop Edit", use_container_width=True, key="history_stop_edit"):
             st.session_state[edit_key] = False
             rerun()
         ec3.info("編輯啟動後可修改資料；勾選『刪除』後可整列刪除。刪除需具備 can_delete 權限。")
@@ -733,7 +733,7 @@ with tab1:
                     horizontal=True,
                     key="history_action",
                 )
-                submitted_history = st.form_submit_button("✅ 確認執行 / Confirm", type="primary", use_container_width=True)
+                submitted_history = st.form_submit_button("⚡ 確認執行 / Confirm", type="primary", use_container_width=True)
 
             if submitted_history and edited is not None:
                 try:
@@ -799,7 +799,7 @@ with tab2:
                 else:
                     st.success(f"已解析 {len(parsed)} 筆歷史工時資料。")
                     st.dataframe(parsed, use_container_width=True, height=360)
-                    if st.button("💾 確認匯入 Excel 歷史紀錄 / Import Excel History", type="primary", use_container_width=True, key="history_excel_import_save_v197"):
+                    if st.button("⟟ 確認匯入 Excel 歷史紀錄 / Import Excel History", type="primary", use_container_width=True, key="history_excel_import_save_v197"):
                         result = import_time_records(parsed, recalc=recalc_excel, source="history_excel_import")
                         st.success(f"匯入完成：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}。")
                         for msg in result.get("errors", [])[:10]:
@@ -827,7 +827,7 @@ with tab3:
             else:
                 st.success(f"已解析 {len(parsed)} 筆歷史工時資料。")
                 st.dataframe(parsed, use_container_width=True, height=360)
-                if st.button("💾 直接儲存貼上歷史紀錄 / Save Pasted History", type="primary", use_container_width=True, key="history_paste_save_v197"):
+                if st.button("▣ 直接儲存貼上歷史紀錄 / Save Pasted History", type="primary", use_container_width=True, key="history_paste_save_v197"):
                     result = import_time_records(parsed, recalc=recalc_paste, source="history_paste_import")
                     st.success(f"貼上資料已匯入：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}。")
                     for msg in result.get("errors", [])[:10]:

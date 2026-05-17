@@ -39,7 +39,7 @@ except Exception:
     pass
 
 bootstrap_audit_log_service()
-with st.expander("📘 使用說明 / User Guide", expanded=False):
+with st.expander("⧠ 使用說明 / User Guide", expanded=False):
     st.markdown("""
 - 本頁讀取兩種登入紀錄來源：新版 `login_logs` 與舊版 `security_login_logs`。
 - 若更新版本後紀錄顯示 0，請先按「同步舊登入紀錄」。
@@ -56,17 +56,17 @@ c3.metric("永久檔筆數 / Saved Logs", status.get("count", 0))
 
 b1, b2, b3, b4 = st.columns(4)
 with b1:
-    if st.button("同步舊登入紀錄 / Sync Legacy Logs", use_container_width=True):
+    if st.button("⟳ 同步舊登入紀錄 / Sync Legacy Logs", use_container_width=True):
         n = migrate_security_login_logs_to_login_logs()
         st.success(f"已同步 {n} 筆舊登入紀錄 / Synced {n} legacy logs")
         st.rerun()
 with b2:
-    if st.button("建立登入紀錄永久檔 / Create Audit Permanent File", use_container_width=True):
+    if st.button("⧉ 建立登入紀錄永久檔 / Create Audit Permanent File", use_container_width=True):
         res = export_audit_logs_to_permanent_file(create_history=True)
         st.success(res.get("message", "完成"))
         st.json(res)
 with b3:
-    if st.button("從永久檔還原登入紀錄 / Restore Audit Logs", use_container_width=True):
+    if st.button("⟲ 從永久檔還原登入紀錄 / Restore Audit Logs", use_container_width=True):
         res = restore_audit_logs_from_permanent_file()
         if res.get("ok"):
             st.success(res.get("message"))
@@ -74,7 +74,7 @@ with b3:
         else:
             st.error(res.get("message"))
 with b4:
-    if st.button("上傳登入紀錄到 GitHub / Upload Audit Logs", use_container_width=True):
+    if st.button("⟰ 上傳登入紀錄到 GitHub / Upload Audit Logs", use_container_width=True):
         res = upload_audit_logs_to_github()
         if res.get("ok"):
             st.success(res.get("message"))
@@ -144,7 +144,7 @@ confirm_delete_logs = st.checkbox(
     value=False,
     key="v199_confirm_delete_login_logs",
 )
-if st.button("🗑️ 確認清除日期區間內登入紀錄 / Delete Logs in Date Range", type="secondary", use_container_width=True):
+if st.button("⊖ 確認清除日期區間內登入紀錄 / Delete Logs in Date Range", type="secondary", use_container_width=True):
     if not confirm_delete_logs:
         st.error("請先勾選確認刪除，系統不會使用文字輸入 DELETE。")
     else:

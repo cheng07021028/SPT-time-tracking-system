@@ -12,7 +12,7 @@ from services.crud_table_service import load_employees, save_employees
 from services.db_service import query_df
 from services.table_ui_service import render_table
 
-st.set_page_config(page_title="07. 今日未紀錄名單", page_icon="⚠️", layout="wide")
+st.set_page_config(page_title="07. 今日未紀錄名單", page_icon="⟁️", layout="wide")
 apply_theme()
 require_module_access("07_missing")
 render_header(
@@ -68,33 +68,33 @@ if not can_edit:
     render_table(view_df, "today_attendance_readonly_v202", editable=False, height=460)
 else:
     c1, c2, c3, c4 = st.columns(4)
-    if c1.button("🏭 全選在廠", use_container_width=True, key="v202_today_factory_all_on"):
+    if c1.button("⬡ 全選在廠", use_container_width=True, key="v202_today_factory_all_on"):
         st.session_state[STATE_KEY]["is_in_factory"] = True
         touch_editor()
         rerun()
-    if c2.button("🏭 取消全選在廠", use_container_width=True, key="v202_today_factory_all_off"):
+    if c2.button("⬡ 取消全選在廠", use_container_width=True, key="v202_today_factory_all_off"):
         st.session_state[STATE_KEY]["is_in_factory"] = False
         touch_editor()
         rerun()
-    if c3.button("📅 全選今日出勤", use_container_width=True, key="v202_today_attendance_all_on"):
+    if c3.button("⧖ 全選今日出勤", use_container_width=True, key="v202_today_attendance_all_on"):
         st.session_state[STATE_KEY]["is_today_attendance"] = True
         touch_editor()
         rerun()
-    if c4.button("📅 取消全選今日出勤", use_container_width=True, key="v202_today_attendance_all_off"):
+    if c4.button("⧖ 取消全選今日出勤", use_container_width=True, key="v202_today_attendance_all_off"):
         st.session_state[STATE_KEY]["is_today_attendance"] = False
         touch_editor()
         rerun()
 
     c5, c6, c7, c8 = st.columns(4)
-    if c5.button("✅ 啟用全選", use_container_width=True, key="v202_today_active_all_on"):
+    if c5.button("◈ 啟用全選", use_container_width=True, key="v202_today_active_all_on"):
         st.session_state[STATE_KEY]["is_active"] = True
         touch_editor()
         rerun()
-    if c6.button("⬜ 啟用全取消", use_container_width=True, key="v202_today_active_all_off"):
+    if c6.button("◌ 啟用全取消", use_container_width=True, key="v202_today_active_all_off"):
         st.session_state[STATE_KEY]["is_active"] = False
         touch_editor()
         rerun()
-    if c7.button("🔄 重新載入", use_container_width=True, key="v202_today_reload"):
+    if c7.button("⟳ 重新載入", use_container_width=True, key="v202_today_reload"):
         reload_employees()
         rerun()
     c8.caption("批次按鈕只改畫面暫存，按儲存後才寫入。")
@@ -124,7 +124,7 @@ else:
     )
 
     st.session_state[STATE_KEY] = ensure_cols(edited)
-    if st.button("💾 確認儲存今日出勤設定 / Save Today Attendance", type="primary", use_container_width=True, key="save_today_attendance_v202"):
+    if st.button("▣ 確認儲存今日出勤設定 / Save Today Attendance", type="primary", use_container_width=True, key="save_today_attendance_v202"):
         save_df = st.session_state[STATE_KEY].copy()
         save_df.insert(0, "_delete", False)
         result = save_employees(save_df)
