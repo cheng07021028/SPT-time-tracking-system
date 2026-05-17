@@ -42,7 +42,7 @@ IDLE_TIMEOUT_FILES = [
 ]
 
 PBKDF2_ITERATIONS = 180_000
-DEFAULT_IDLE_MINUTES = 15
+DEFAULT_IDLE_MINUTES = 1
 _PERMISSION_CACHE_TTL_SECONDS = 300
 _SECURITY_SCHEMA_READY = False
 
@@ -741,6 +741,15 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:
 
 def render_login_form() -> None:
     """Render a premium welcome login page without changing authentication logic."""
+    logo_b64 = ""
+    for _p in [PROJECT_ROOT / "data" / "logo" / "super_plus_logo.png", PROJECT_ROOT / "data" / "logo" / "logococo(黑字).png"]:
+        try:
+            if _p.exists():
+                logo_b64 = base64.b64encode(_p.read_bytes()).decode("utf-8")
+                break
+        except Exception:
+            pass
+    logo_html = f'<div class="spt-login-logo"><img src="data:image/png;base64,{logo_b64}" /></div>' if logo_b64 else '<div class="spt-login-logo spt-login-logo-text">SUPER PLUS TECH</div>'
     st.markdown(
         """
 <style>
@@ -823,6 +832,17 @@ def render_login_form() -> None:
   text-transform: uppercase;
   box-shadow: 0 0 24px rgba(0, 217, 255, .18);
 }
+.spt-login-logo {
+  width: 260px;
+  max-width: 70%;
+  padding: 10px 18px;
+  margin: 18px 0 10px 0;
+  border-radius: 18px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 0 24px rgba(93,238,255,.34), 0 18px 42px rgba(0,0,0,.30);
+}
+.spt-login-logo img { width: 100%; display: block; height: auto; }
+.spt-login-logo-text { color: #061423; font-weight: 1000; letter-spacing: .14em; }
 .spt-brand-dot {
   width: 9px;
   height: 9px;
@@ -1048,6 +1068,7 @@ html body div[data-testid="stForm"] label * {
     <div class="spt-login-grid">
       <div>
         <div class="spt-brand-kicker"><span class="spt-brand-dot"></span>SPT Manufacturing Intelligence</div>
+        {logo_html}
         <div class="spt-login-title">歡迎來到<br>超慧科技製造部<br>工時紀錄系統</div>
         <div class="spt-login-subtitle">
           以權限控管、即時工時、歷史追溯與永久備份為核心，打造製造現場可稽核、可分析、可持續升級的智慧工時管理平台。
@@ -1061,7 +1082,7 @@ html body div[data-testid="stForm"] label * {
       <div class="spt-form-card">
         <div class="spt-form-title">⛨ 安全登入</div>
         <div class="spt-form-caption">請輸入個人帳號密碼。系統將依帳號權限載入可操作模組。</div>
-""",
+""".replace("{logo_html}", logo_html),
         unsafe_allow_html=True,
     )
     with st.form("login_form", clear_on_submit=False):
@@ -1770,3 +1791,20 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:  # typ
     except Exception:
         pass
     return _old_check_permission_v199(module_code, action)
+
+
+# ===== V2.43 default idle timeout policy =====
+# Company requirement: the built-in default idle logout is 1 minute.  Existing
+# permanent files are preserved unless they contain the old unmodified default 15.
+def _v243_seed_idle_timeout_one_minute() -> None:
+    try:
+        minutes = _v208_read_idle_timeout_from_files()
+        if minutes in (None, 15):
+            set_idle_timeout_minutes(1)
+    except Exception:
+        pass
+
+try:
+    _v243_seed_idle_timeout_one_minute()
+except Exception:
+    pass

@@ -969,6 +969,18 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
             if not end_ts:
                 end_ts = _combine_date_time(r.get("end_date"), r.get("end_time"))
 
+            # V2.43: normalize timestamp text before duplicate-key comparison.
+            # This prevents the same record being inserted twice when Excel uses
+            # 2026/2/2 09:19 or Timestamp values while existing records use
+            # 2026-02-02 09:19:00.
+            try:
+                if start_ts:
+                    start_ts = pd.to_datetime(start_ts).strftime("%Y-%m-%d %H:%M:%S")
+                if end_ts:
+                    end_ts = pd.to_datetime(end_ts).strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+
             if not (employee_id and work_order and process_name and start_ts):
                 result["skipped"] += 1
                 errors.append(f"第 {idx + 1} 筆缺少必要欄位：工號、製令、工段或開始時間。")
@@ -1062,13 +1074,40 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
             )
             result["updated"] += 1
         for record in rows_to_insert:
-            vals = [record[c] for c in insert_cols]
-            placeholders = ",".join(["?"] * len(insert_cols))
-            conn.execute(
-                f"INSERT OR REPLACE INTO time_records ({', '.join(insert_cols)}) VALUES ({placeholders})",
-                vals,
-            )
-            result["inserted"] += 1
+            # V2.43: stronger duplicate protection.  Prefer record_key, then
+            # composite business key: 工號 + 姓名 + 製令 + 工段 + 開始時間戳.
+            existing = conn.execute("SELECT id FROM time_records WHERE record_key=?", (record.get("record_key"),)).fetchone()
+            if not existing:
+                existing = conn.execute(
+                    """
+                    SELECT id FROM time_records
+                    WHERE COALESCE(employee_id,'')=?
+                      AND COALESCE(employee_name,'')=?
+                      AND COALESCE(work_order,'')=?
+                      AND COALESCE(process_name,'')=?
+                      AND COALESCE(start_timestamp,'')=?
+                    LIMIT 1
+                    """,
+                    (str(record.get("employee_id") or ""), str(record.get("employee_name") or ""),
+                     str(record.get("work_order") or ""), str(record.get("process_name") or ""),
+                     str(record.get("start_timestamp") or "")),
+                ).fetchone()
+            if existing:
+                rid = int(existing[0])
+                vals = [record[c] for c in update_cols] + [rid]
+                conn.execute(
+                    f"UPDATE time_records SET {', '.join([c + '=?' for c in update_cols])} WHERE id=?",
+                    vals,
+                )
+                result["updated"] += 1
+            else:
+                vals = [record[c] for c in insert_cols]
+                placeholders = ",".join(["?"] * len(insert_cols))
+                conn.execute(
+                    f"INSERT INTO time_records ({', '.join(insert_cols)}) VALUES ({placeholders})",
+                    vals,
+                )
+                result["inserted"] += 1
         conn.execute(
             """
             INSERT INTO system_logs
