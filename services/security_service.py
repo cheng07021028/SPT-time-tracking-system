@@ -744,7 +744,7 @@ def render_login_form() -> None:
     st.markdown(
         """
 <style>
-/* ===== V2.23 Premium Welcome Login Page ===== */
+/* ===== V2.25 Premium Welcome Login Page - Larger Bright Typography ===== */
 [data-testid="stSidebar"] { display: none !important; }
 [data-testid="collapsedControl"] { display: none !important; }
 .block-container {
@@ -838,19 +838,19 @@ def render_login_form() -> None:
 .spt-login-title {
   margin: 22px 0 6px 0;
   color: #f4fdff;
-  font-size: clamp(36px, 5.1vw, 64px);
+  font-size: clamp(42px, 5.8vw, 74px);
   line-height: 1.02;
   font-weight: 950;
-  letter-spacing: -.04em;
-  text-shadow: 0 0 28px rgba(95, 229, 255, .28);
+  letter-spacing: -.035em;
+  text-shadow: 0 0 18px rgba(255,255,255,.42), 0 0 34px rgba(95, 229, 255, .48);
 }
 .spt-login-subtitle {
   margin-top: 14px;
   max-width: 680px;
   color: rgba(220, 249, 255, .88);
-  font-size: 18px;
-  line-height: 1.7;
-  font-weight: 650;
+  font-size: 21px;
+  line-height: 1.72;
+  font-weight: 780;
 }
 .spt-login-metrics {
   display: grid;
@@ -892,15 +892,15 @@ def render_login_form() -> None:
 }
 .spt-form-title {
   color: #f7feff;
-  font-size: 27px;
+  font-size: 33px;
   font-weight: 950;
   line-height: 1.2;
   margin-bottom: 4px;
 }
 .spt-form-caption {
   color: rgba(219, 249, 255, .72);
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.65;
   margin-bottom: 16px;
 }
 .spt-login-note {
@@ -910,8 +910,8 @@ def render_login_form() -> None:
   color: rgba(233, 252, 255, .76);
   background: rgba(4, 19, 36, .52);
   border: 1px solid rgba(155, 233, 255, .16);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 15px;
+  line-height: 1.7;
 }
 /* Login-only Streamlit widgets */
 div[data-testid="stForm"] {
@@ -919,35 +919,53 @@ div[data-testid="stForm"] {
   background: transparent !important;
   padding: 0 !important;
 }
-div[data-testid="stForm"] label p {
-  color: #dffbff !important;
-  font-weight: 850 !important;
-  letter-spacing: .06em !important;
+div[data-testid="stForm"] label p,
+div[data-testid="stTextInput"] label p {
+  color: #effdff !important;
+  font-weight: 950 !important;
+  letter-spacing: .065em !important;
+  font-size: 17px !important;
+  text-shadow: 0 0 14px rgba(90, 235, 255, .36) !important;
 }
-div[data-testid="stForm"] input {
-  background: rgba(246, 252, 255, .96) !important;
-  color: #071827 !important;
-  border: 1px solid rgba(123, 220, 255, .78) !important;
-  border-radius: 14px !important;
-  min-height: 46px !important;
-  font-size: 16px !important;
-  font-weight: 750 !important;
-  box-shadow: 0 0 0 1px rgba(111, 236, 255, .08), 0 8px 24px rgba(0,0,0,.16) !important;
+div[data-testid="stForm"] input,
+div[data-testid="stTextInput"] input,
+div[data-baseweb="input"] input {
+  background: linear-gradient(180deg, rgba(16, 29, 63, .98), rgba(7, 18, 42, .98)) !important;
+  color: #f3feff !important;
+  -webkit-text-fill-color: #f3feff !important;
+  caret-color: #66f6ff !important;
+  border: 1px solid rgba(125, 238, 255, .92) !important;
+  border-radius: 15px !important;
+  min-height: 54px !important;
+  font-size: 20px !important;
+  font-weight: 900 !important;
+  letter-spacing: .035em !important;
+  text-shadow: 0 0 10px rgba(105, 236, 255, .25) !important;
+  box-shadow: inset 0 0 18px rgba(90, 238, 255, .10), 0 0 0 1px rgba(111, 236, 255, .12), 0 10px 28px rgba(0,0,0,.22) !important;
 }
-div[data-testid="stForm"] input:focus {
-  border-color: #54ecff !important;
-  box-shadow: 0 0 0 3px rgba(84, 236, 255, .24), 0 0 30px rgba(84,236,255,.28) !important;
+div[data-testid="stForm"] input::placeholder,
+div[data-testid="stTextInput"] input::placeholder,
+div[data-baseweb="input"] input::placeholder {
+  color: rgba(225, 250, 255, .62) !important;
+  -webkit-text-fill-color: rgba(225, 250, 255, .62) !important;
+}
+div[data-testid="stForm"] input:focus,
+div[data-testid="stTextInput"] input:focus,
+div[data-baseweb="input"] input:focus {
+  border-color: #62f5ff !important;
+  box-shadow: inset 0 0 20px rgba(90, 238, 255, .16), 0 0 0 3px rgba(84, 236, 255, .26), 0 0 34px rgba(84,236,255,.34) !important;
 }
 div[data-testid="stForm"] button[kind="primary"],
 div[data-testid="stForm"] button {
-  min-height: 48px !important;
-  border-radius: 15px !important;
-  border: 1px solid rgba(150, 245, 255, .8) !important;
+  min-height: 56px !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(150, 245, 255, .88) !important;
   background: linear-gradient(135deg, #eaffff, #88efff 45%, #b7c7ff) !important;
   color: #031523 !important;
+  font-size: 18px !important;
   font-weight: 950 !important;
   letter-spacing: .08em !important;
-  box-shadow: 0 0 24px rgba(75, 235, 255, .32), 0 12px 32px rgba(0,0,0,.24) !important;
+  box-shadow: 0 0 28px rgba(75, 235, 255, .36), 0 12px 32px rgba(0,0,0,.24) !important;
   transition: transform .16s ease, box-shadow .16s ease !important;
 }
 div[data-testid="stForm"] button:hover {
@@ -965,9 +983,9 @@ div[data-testid="stForm"] button:hover {
     <div class="spt-login-grid">
       <div>
         <div class="spt-brand-kicker"><span class="spt-brand-dot"></span>SPT Manufacturing Intelligence</div>
-        <div class="spt-login-title">歡迎回到<br>智慧工時紀錄中樞</div>
+        <div class="spt-login-title">歡迎來到<br>超慧科技製造部<br>工時紀錄系統</div>
         <div class="spt-login-subtitle">
-          以權限控管、即時工時、歷史追溯與永久備份為核心，打造製造現場可稽核、可分析、可持續升級的工時管理平台。
+          以權限控管、即時工時、歷史追溯與永久備份為核心，打造製造現場可稽核、可分析、可持續升級的智慧工時管理平台。
         </div>
         <div class="spt-login-metrics">
           <div class="spt-login-metric"><b>13</b><span>CORE MODULES</span></div>
