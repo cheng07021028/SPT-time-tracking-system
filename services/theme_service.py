@@ -1323,3 +1323,116 @@ for _spt_v262_name in (
         globals()[_spt_v262_name] = _spt_v262_make_wrapper(_spt_v262_func)
 # === End V2.62 dropdown menu light readable patch ===
 
+
+
+# ===== V2.63 SELECT / MULTISELECT BOX HEIGHT ALIGN PATCH START =====
+def apply_v263_select_box_left_size_fix():
+    """Match the larger readable dropdown box height so text is no longer clipped."""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.63｜讓所有下拉式選單本體高度比照左側較大的樣式，避免文字被上下裁切 */
+        .stSelectbox,
+        .stMultiSelect {
+            overflow: visible !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"],
+        .stMultiSelect div[data-baseweb="select"] {
+            min-height: 72px !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] > div,
+        .stMultiSelect div[data-baseweb="select"] > div {
+            min-height: 72px !important;
+            height: auto !important;
+            padding-top: 14px !important;
+            padding-bottom: 14px !important;
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            border-radius: 14px !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] div[role="combobox"],
+        .stMultiSelect div[data-baseweb="select"] div[role="combobox"],
+        .stSelectbox div[data-baseweb="select"] div[aria-expanded],
+        .stMultiSelect div[data-baseweb="select"] div[aria-expanded] {
+            min-height: 42px !important;
+            height: auto !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            line-height: 42px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] span,
+        .stMultiSelect div[data-baseweb="select"] span,
+        .stSelectbox div[data-baseweb="select"] p,
+        .stMultiSelect div[data-baseweb="select"] p,
+        .stSelectbox div[data-baseweb="select"] div,
+        .stMultiSelect div[data-baseweb="select"] div {
+            min-height: 42px !important;
+            line-height: 42px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 800 !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] input,
+        .stMultiSelect div[data-baseweb="select"] input,
+        .stSelectbox div[data-baseweb="select"] input[type="text"],
+        .stMultiSelect div[data-baseweb="select"] input[type="text"] {
+            min-height: 42px !important;
+            height: 42px !important;
+            line-height: 42px !important;
+            margin: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .stMultiSelect div[data-baseweb="tag"] {
+            min-height: 38px !important;
+            padding-top: 7px !important;
+            padding-bottom: 7px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+        }
+
+        .stMultiSelect div[data-baseweb="tag"] span,
+        .stMultiSelect div[data-baseweb="tag"] div {
+            min-height: 24px !important;
+            line-height: 24px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v263_select_box_left_size_fix()
+except Exception:
+    pass
+# ===== V2.63 SELECT / MULTISELECT BOX HEIGHT ALIGN PATCH END =====
