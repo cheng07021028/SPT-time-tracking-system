@@ -1,6 +1,6 @@
 {
   "schema_version": "v1.30",
-  "export_time": "2026-05-17 00:30:07",
+  "export_time": "2026-05-17 09:16:58",
   "tables": {
     "system_settings": [
       {
@@ -42,7 +42,7 @@
     ],
     "rest_periods": [
       {
-        "id": 11,
+        "id": 26,
         "name": "上午休息",
         "start_time": "10:30",
         "end_time": "10:45",
@@ -50,15 +50,7 @@
         "sort_order": 1
       },
       {
-        "id": 12,
-        "name": "上午休息",
-        "start_time": "10:30",
-        "end_time": "10:45",
-        "is_active": 1,
-        "sort_order": 1
-      },
-      {
-        "id": 13,
+        "id": 27,
         "name": "午休",
         "start_time": "12:00",
         "end_time": "13:00",
@@ -66,15 +58,7 @@
         "sort_order": 2
       },
       {
-        "id": 14,
-        "name": "午休",
-        "start_time": "12:00",
-        "end_time": "13:00",
-        "is_active": 1,
-        "sort_order": 2
-      },
-      {
-        "id": 15,
+        "id": 28,
         "name": "下午休息",
         "start_time": "15:00",
         "end_time": "15:15",
@@ -82,15 +66,7 @@
         "sort_order": 3
       },
       {
-        "id": 16,
-        "name": "下午休息",
-        "start_time": "15:00",
-        "end_time": "15:15",
-        "is_active": 1,
-        "sort_order": 3
-      },
-      {
-        "id": 17,
+        "id": 29,
         "name": "晚餐休息",
         "start_time": "18:00",
         "end_time": "18:30",
@@ -98,23 +74,7 @@
         "sort_order": 4
       },
       {
-        "id": 18,
-        "name": "晚餐休息",
-        "start_time": "18:00",
-        "end_time": "18:30",
-        "is_active": 1,
-        "sort_order": 4
-      },
-      {
-        "id": 19,
-        "name": "晚上休息",
-        "start_time": "20:00",
-        "end_time": "20:15",
-        "is_active": 1,
-        "sort_order": 5
-      },
-      {
-        "id": 20,
+        "id": 30,
         "name": "晚上休息",
         "start_time": "20:00",
         "end_time": "20:15",
@@ -124,7 +84,7 @@
     ],
     "process_options": [
       {
-        "id": 52,
+        "id": 86,
         "process_name": "前置鈑金",
         "is_active": 1,
         "sort_order": 1,
@@ -133,7 +93,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 53,
+        "id": 87,
         "process_name": "LP改造",
         "is_active": 1,
         "sort_order": 2,
@@ -142,7 +102,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 54,
+        "id": 88,
         "process_name": "骨架組立",
         "is_active": 1,
         "sort_order": 3,
@@ -151,7 +111,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 55,
+        "id": 89,
         "process_name": "配電",
         "is_active": 1,
         "sort_order": 4,
@@ -160,7 +120,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 56,
+        "id": 90,
         "process_name": "模組",
         "is_active": 1,
         "sort_order": 5,
@@ -169,7 +129,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 57,
+        "id": 91,
         "process_name": "水平",
         "is_active": 1,
         "sort_order": 6,
@@ -178,7 +138,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 58,
+        "id": 92,
         "process_name": "S.T.",
         "is_active": 1,
         "sort_order": 7,
@@ -187,7 +147,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 59,
+        "id": 93,
         "process_name": "清潔",
         "is_active": 1,
         "sort_order": 8,
@@ -196,7 +156,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 60,
+        "id": 94,
         "process_name": "收機",
         "is_active": 1,
         "sort_order": 9,
@@ -205,7 +165,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 61,
+        "id": 95,
         "process_name": "包機",
         "is_active": 1,
         "sort_order": 10,
@@ -214,7 +174,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 62,
+        "id": 96,
         "process_name": "Packing",
         "is_active": 1,
         "sort_order": 11,
@@ -223,7 +183,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 63,
+        "id": 97,
         "process_name": "異常",
         "is_active": 1,
         "sort_order": 12,
@@ -232,7 +192,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 64,
+        "id": 98,
         "process_name": "設變",
         "is_active": 1,
         "sort_order": 13,
@@ -241,7 +201,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 65,
+        "id": 99,
         "process_name": "重工",
         "is_active": 1,
         "sort_order": 14,
@@ -250,7 +210,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 66,
+        "id": 100,
         "process_name": "教育訓練",
         "is_active": 1,
         "sort_order": 15,
@@ -259,7 +219,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 67,
+        "id": 101,
         "process_name": "IPQC",
         "is_active": 1,
         "sort_order": 16,
@@ -268,7 +228,7 @@
         "updated_at": "2026-05-15 11:47:14"
       },
       {
-        "id": 68,
+        "id": 102,
         "process_name": "其他",
         "is_active": 1,
         "sort_order": 17,
@@ -2433,7 +2393,7 @@
   },
   "table_counts": {
     "system_settings": 6,
-    "rest_periods": 10,
+    "rest_periods": 5,
     "process_options": 17,
     "table_column_settings": 0,
     "table_sort_settings": 0,
