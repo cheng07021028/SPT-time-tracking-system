@@ -831,6 +831,12 @@ def apply_theme() -> None:
         apply_v274_dropdown_visible_text_every_state()
     except Exception:
         pass
+    # V2.76: professional cyber dropdown skin must also run on every rerun.
+    # Keep this after all older dropdown CSS so readability and breathing-glow styling win.
+    try:
+        apply_v276_dropdown_professional_cyber_breathing_glow()
+    except Exception:
+        pass
 
 
 def app_theme() -> None:
@@ -4138,3 +4144,366 @@ try:
 except Exception:
     pass
 # ===== V2.75 DROPDOWN CYBER UI + READABILITY FINAL END =====
+
+
+# ===== V2.76 PROFESSIONAL CYBER DROPDOWN BREATHING GLOW START =====
+def apply_v276_dropdown_professional_cyber_breathing_glow():
+    """
+    V2.76:
+    Professional high-tech dropdown/select skin for all modules.
+
+    Design rules requested by user:
+    - Light field / light menu background must always use dark text.
+    - Dark page/panel labels must always use light text.
+    - Expanded menu options must be readable before hover; hover is only a highlight, not required for visibility.
+    - Add blue breathing glow and cyber border without sacrificing readability.
+    - Apply every Streamlit rerun after all older CSS patches.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+    try:
+        cfg = _spt_load_dropdown_settings()
+    except Exception:
+        cfg = {}
+
+    outer = int(cfg.get("outer_height", 70))
+    inner = int(cfg.get("inner_height", 66))
+    font = int(cfg.get("font_size", 16))
+    option = int(cfg.get("option_height", 46))
+    dark_text = str(cfg.get("text_color", "#03121f"))
+
+    st.markdown(
+        f"""
+        <style id="spt-v276-dropdown-professional-cyber-breathing-glow">
+        :root {{
+            --spt-dd-v276-outer: {outer}px;
+            --spt-dd-v276-inner: {inner}px;
+            --spt-dd-v276-font: {font}px;
+            --spt-dd-v276-option: {option}px;
+            --spt-dd-v276-dark: {dark_text};
+            --spt-dd-v276-muted: #26445d;
+            --spt-dd-v276-light-label: #f5fdff;
+            --spt-dd-v276-field-top: #fbfeff;
+            --spt-dd-v276-field-mid: #edfaff;
+            --spt-dd-v276-field-bottom: #dff4ff;
+            --spt-dd-v276-menu-top: #ffffff;
+            --spt-dd-v276-menu-bottom: #eaf9ff;
+            --spt-dd-v276-neon: #67e8f9;
+            --spt-dd-v276-neon-2: #38bdf8;
+            --spt-dd-v276-neon-3: #a5f3fc;
+            --spt-dd-v276-line: rgba(8, 46, 72, .12);
+        }}
+
+        @keyframes sptDropdownBreathingGlowV276 {{
+            0%, 100% {{
+                box-shadow:
+                    inset 0 0 0 1px rgba(255,255,255,.86),
+                    inset 0 0 18px rgba(103,232,249,.08),
+                    0 0 0 1px rgba(103,232,249,.45),
+                    0 10px 24px rgba(0, 12, 28, .20),
+                    0 0 12px rgba(103,232,249,.24) !important;
+            }}
+            50% {{
+                box-shadow:
+                    inset 0 0 0 1px rgba(255,255,255,.95),
+                    inset 0 0 22px rgba(103,232,249,.14),
+                    0 0 0 1px rgba(103,232,249,.82),
+                    0 12px 28px rgba(0, 12, 28, .24),
+                    0 0 28px rgba(103,232,249,.48) !important;
+            }}
+        }}
+
+        @keyframes sptDropdownMenuPulseV276 {{
+            0%, 100% {{ box-shadow: 0 18px 44px rgba(0,8,24,.38), 0 0 22px rgba(103,232,249,.22) !important; }}
+            50% {{ box-shadow: 0 20px 48px rgba(0,8,24,.42), 0 0 38px rgba(103,232,249,.36) !important; }}
+        }}
+
+        /* Widget labels are on dark panels: keep them bright and crisp. */
+        [data-testid="stSelectbox"] label,
+        [data-testid="stMultiSelect"] label,
+        [data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
+        [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"],
+        [data-testid="stSelectbox"] [data-testid="stWidgetLabel"] *,
+        [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"] * {{
+            color: var(--spt-dd-v276-light-label) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-light-label) !important;
+            font-weight: 950 !important;
+            opacity: 1 !important;
+            letter-spacing: .02em !important;
+            text-shadow: 0 0 12px rgba(103,232,249,.30) !important;
+        }}
+
+        .stSelectbox,
+        .stMultiSelect,
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"] {{
+            overflow: visible !important;
+        }}
+
+        /* Closed select frame: light professional surface + blue breathing border. */
+        [data-baseweb="select"] {{
+            position: relative !important;
+            min-height: var(--spt-dd-v276-outer) !important;
+            height: var(--spt-dd-v276-outer) !important;
+            max-height: none !important;
+            display: flex !important;
+            align-items: center !important;
+            border-radius: 16px !important;
+            border: 1px solid rgba(103,232,249,.68) !important;
+            background:
+                linear-gradient(135deg, rgba(103,232,249,.18) 0%, rgba(255,255,255,0) 28%),
+                linear-gradient(180deg, var(--spt-dd-v276-field-top) 0%, var(--spt-dd-v276-field-mid) 56%, var(--spt-dd-v276-field-bottom) 100%) !important;
+            color: var(--spt-dd-v276-dark) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
+            overflow: visible !important;
+            animation: sptDropdownBreathingGlowV276 3.2s ease-in-out infinite !important;
+            transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease !important;
+        }}
+
+        [data-baseweb="select"]::before {{
+            content: "" !important;
+            position: absolute !important;
+            inset: 2px !important;
+            border-radius: 14px !important;
+            pointer-events: none !important;
+            background:
+                linear-gradient(90deg, rgba(103,232,249,.38), rgba(255,255,255,0) 24%, rgba(255,255,255,0) 76%, rgba(103,232,249,.26)),
+                radial-gradient(circle at 12% 15%, rgba(103,232,249,.32), rgba(255,255,255,0) 26%) !important;
+            opacity: .85 !important;
+        }}
+
+        [data-baseweb="select"]::after {{
+            content: "" !important;
+            position: absolute !important;
+            left: 14px !important;
+            right: 14px !important;
+            bottom: 6px !important;
+            height: 1px !important;
+            border-radius: 999px !important;
+            background: linear-gradient(90deg, rgba(103,232,249,0), rgba(56,189,248,.76), rgba(103,232,249,0)) !important;
+            pointer-events: none !important;
+        }}
+
+        [data-baseweb="select"]:hover,
+        [data-baseweb="select"]:focus-within {{
+            border-color: rgba(103,232,249,.98) !important;
+            transform: translateY(-1px) !important;
+        }}
+
+        [data-baseweb="select"] > div,
+        [data-baseweb="select"] > div > div,
+        [data-baseweb="select"] > div > div > div,
+        [data-baseweb="select"] [role="combobox"],
+        [data-baseweb="select"] [aria-haspopup="listbox"],
+        [data-baseweb="select"] [aria-expanded],
+        [data-baseweb="select"] div[class*="value" i],
+        [data-baseweb="select"] div[class*="placeholder" i],
+        [data-baseweb="select"] div[class*="input" i] {{
+            min-height: var(--spt-dd-v276-inner) !important;
+            height: var(--spt-dd-v276-inner) !important;
+            max-height: none !important;
+            display: flex !important;
+            align-items: center !important;
+            background: transparent !important;
+            color: var(--spt-dd-v276-dark) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            overflow: visible !important;
+            z-index: 2 !important;
+            box-shadow: none !important;
+        }}
+
+        [data-baseweb="select"] *,
+        [data-baseweb="select"] span,
+        [data-baseweb="select"] p,
+        [data-baseweb="select"] input,
+        [data-baseweb="select"] input::placeholder {{
+            color: var(--spt-dd-v276-dark) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
+            opacity: 1 !important;
+            font-size: var(--spt-dd-v276-font) !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+            filter: none !important;
+        }}
+
+        [data-baseweb="select"] div[class*="placeholder" i],
+        [data-baseweb="select"] input::placeholder {{
+            color: var(--spt-dd-v276-muted) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-muted) !important;
+        }}
+
+        [data-baseweb="select"] svg,
+        [data-baseweb="select"] svg *,
+        [data-baseweb="select"] [role="button"],
+        [data-baseweb="select"] [role="button"] * {{
+            color: var(--spt-dd-v276-dark) !important;
+            fill: var(--spt-dd-v276-dark) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
+            opacity: 1 !important;
+            z-index: 3 !important;
+        }}
+
+        /* Multiselect chips: pale cyan, dark readable text. */
+        [data-baseweb="tag"],
+        [data-baseweb="tag"] * {{
+            background: linear-gradient(90deg, #d9fbff, #f4fdff) !important;
+            color: var(--spt-dd-v276-dark) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
+            fill: var(--spt-dd-v276-dark) !important;
+            border: 1px solid rgba(56,189,248,.58) !important;
+            border-radius: 999px !important;
+            opacity: 1 !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+        }}
+
+        /* Expanded dropdown portal: mounted outside the widget tree, so target body globally. */
+        body div[data-baseweb="popover"],
+        body div[data-baseweb="popover"] > div,
+        body div[data-baseweb="menu"],
+        body ul[role="listbox"],
+        body div[role="listbox"] {{
+            background:
+                linear-gradient(135deg, rgba(103,232,249,.16), rgba(255,255,255,0) 32%),
+                linear-gradient(180deg, var(--spt-dd-v276-menu-top) 0%, var(--spt-dd-v276-menu-bottom) 100%) !important;
+            color: var(--spt-dd-v276-dark) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
+            border: 1px solid rgba(103,232,249,.92) !important;
+            border-radius: 16px !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            overflow: hidden !important;
+            animation: sptDropdownMenuPulseV276 3.4s ease-in-out infinite !important;
+            backdrop-filter: blur(10px) saturate(1.12) !important;
+        }}
+
+        body div[data-baseweb="popover"] *,
+        body div[data-baseweb="menu"] *,
+        body ul[role="listbox"] *,
+        body div[role="listbox"] * {{
+            color: var(--spt-dd-v276-dark) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
+            fill: var(--spt-dd-v276-dark) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            filter: none !important;
+        }}
+
+        body div[data-baseweb="popover"] [role="option"],
+        body div[data-baseweb="popover"] li,
+        body div[data-baseweb="menu"] [role="option"],
+        body div[data-baseweb="menu"] li,
+        body ul[role="listbox"] li,
+        body div[role="option"],
+        body li[role="option"] {{
+            min-height: var(--spt-dd-v276-option) !important;
+            height: auto !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 0 18px !important;
+            background: rgba(255,255,255,.28) !important;
+            color: var(--spt-dd-v276-dark) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
+            border-bottom: 1px solid var(--spt-dd-v276-line) !important;
+            font-size: var(--spt-dd-v276-font) !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            filter: none !important;
+            transition: background .14s ease, border-left-color .14s ease, transform .14s ease !important;
+        }}
+
+        body div[data-baseweb="popover"] [role="option"] *,
+        body div[data-baseweb="popover"] li *,
+        body div[data-baseweb="menu"] [role="option"] *,
+        body div[data-baseweb="menu"] li *,
+        body ul[role="listbox"] li *,
+        body div[role="option"] *,
+        body li[role="option"] * {{
+            color: var(--spt-dd-v276-dark) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
+            fill: var(--spt-dd-v276-dark) !important;
+            background: transparent !important;
+            opacity: 1 !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+            filter: none !important;
+        }}
+
+        body div[data-baseweb="popover"] [role="option"]:hover,
+        body div[data-baseweb="popover"] li:hover,
+        body div[data-baseweb="menu"] [role="option"]:hover,
+        body div[data-baseweb="menu"] li:hover,
+        body ul[role="listbox"] li:hover,
+        body div[role="option"]:hover,
+        body li[role="option"]:hover,
+        body div[role="option"][aria-selected="true"],
+        body li[role="option"][aria-selected="true"],
+        body div[role="option"][aria-current="true"],
+        body li[role="option"][aria-current="true"],
+        body div[role="option"][data-highlighted="true"],
+        body li[role="option"][data-highlighted="true"],
+        body [aria-selected="true"],
+        body [data-highlighted="true"] {{
+            background:
+                linear-gradient(90deg, rgba(56,189,248,.95), rgba(165,243,252,.72)) !important;
+            color: var(--spt-dd-v276-dark) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
+            border-left: 5px solid var(--spt-dd-v276-neon-2) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            box-shadow: inset 0 0 18px rgba(103,232,249,.26) !important;
+        }}
+
+        body div[data-baseweb="popover"] [role="option"]:hover *,
+        body div[data-baseweb="popover"] li:hover *,
+        body div[data-baseweb="menu"] [role="option"]:hover *,
+        body div[data-baseweb="menu"] li:hover *,
+        body ul[role="listbox"] li:hover *,
+        body div[role="option"]:hover *,
+        body li[role="option"]:hover *,
+        body [aria-selected="true"] *,
+        body [data-highlighted="true"] * {{
+            color: var(--spt-dd-v276-dark) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-dark) !important;
+            fill: var(--spt-dd-v276-dark) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }}
+
+        body [role="option"][aria-disabled="true"],
+        body [role="option"][aria-disabled="true"] *,
+        body div[data-baseweb="popover"] [aria-disabled="true"],
+        body div[data-baseweb="popover"] [aria-disabled="true"] *,
+        body div[data-baseweb="menu"] [aria-disabled="true"],
+        body div[data-baseweb="menu"] [aria-disabled="true"] * {{
+            color: var(--spt-dd-v276-muted) !important;
+            -webkit-text-fill-color: var(--spt-dd-v276-muted) !important;
+            opacity: 1 !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+        }}
+
+        @media (prefers-reduced-motion: reduce) {{
+            [data-baseweb="select"],
+            body div[data-baseweb="popover"],
+            body div[data-baseweb="menu"],
+            body ul[role="listbox"],
+            body div[role="listbox"] {{
+                animation: none !important;
+            }}
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v276_dropdown_professional_cyber_breathing_glow()
+except Exception:
+    pass
+# ===== V2.76 PROFESSIONAL CYBER DROPDOWN BREATHING GLOW END =====
