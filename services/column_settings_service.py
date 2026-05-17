@@ -521,6 +521,43 @@ def _render_editor_lock_controls(table_id: str) -> bool:
             st.info("目前狀態：唯讀保護。請先按『啟動編輯』再修改表格資料。")
     return bool(st.session_state.get(state_key))
 
+
+
+def _safe_streamlit_column_order(df: pd.DataFrame, order: Any) -> list[str] | None:
+    """Return a Streamlit-safe column_order list.
+
+    Streamlit may raise TypeError when a persisted column order contains
+    non-string values, missing columns, pandas Index objects, or values from
+    another table.  This sanitizer keeps only existing columns and converts
+    everything to plain strings.
+    """
+    if df is None or order is None:
+        return None
+    try:
+        existing = [str(c) for c in list(df.columns)]
+    except Exception:
+        return None
+    if not existing:
+        return None
+    if isinstance(order, str):
+        raw = [order]
+    else:
+        try:
+            raw = list(order)
+        except Exception:
+            return None
+    clean: list[str] = []
+    seen: set[str] = set()
+    existing_set = set(existing)
+    for item in raw:
+        if item is None:
+            continue
+        col = str(item)
+        if col in existing_set and col not in seen:
+            clean.append(col)
+            seen.add(col)
+    return clean or None
+
 def install_column_settings_patch() -> None:
     """全域安裝表格欄位設定包裝，不需要逐頁改程式。"""
     if getattr(st, "_spt_column_settings_installed", False):
@@ -540,8 +577,18 @@ def install_column_settings_patch() -> None:
             table_setting, _ = _settings_editor(table_id, df, editable=False)
             kwargs.setdefault("use_container_width", True)
             kwargs["column_config"] = {**_build_column_config(df, table_setting), **kwargs.get("column_config", {})}
-            kwargs["column_order"] = kwargs.get("column_order") or _visible_order(df, table_setting, editable=False)
-        return original_dataframe(data, *args, **kwargs)
+            raw_order = kwargs.get("column_order") or _visible_order(df, table_setting, editable=False)
+            safe_order = _safe_streamlit_column_order(df, raw_order)
+            if safe_order:
+                kwargs["column_order"] = safe_order
+            else:
+                kwargs.pop("column_order", None)
+        try:
+            return original_dataframe(data, *args, **kwargs)
+        except TypeError:
+            # Fallback for old/corrupt persisted column order settings.
+            kwargs.pop("column_order", None)
+            return original_dataframe(data, *args, **kwargs)
 
     def data_editor_wrapper(data=None, *args, **kwargs):
         df = _normalize_df(data)
@@ -554,9 +601,18 @@ def install_column_settings_patch() -> None:
             kwargs.setdefault("use_container_width", True)
             kwargs.setdefault("key", f"spt_data_editor::{_safe_widget_suffix(table_id)}")
             kwargs["column_config"] = {**_build_column_config(df, table_setting), **kwargs.get("column_config", {})}
-            kwargs["column_order"] = kwargs.get("column_order") or _visible_order(df, table_setting, editable=True)
+            raw_order = kwargs.get("column_order") or _visible_order(df, table_setting, editable=True)
+            safe_order = _safe_streamlit_column_order(df, raw_order)
+            if safe_order:
+                kwargs["column_order"] = safe_order
+            else:
+                kwargs.pop("column_order", None)
             draft_df = _get_editor_draft(table_id, df)
-            edited = original_data_editor(draft_df, *args, **kwargs)
+            try:
+                edited = original_data_editor(draft_df, *args, **kwargs)
+            except TypeError:
+                kwargs.pop("column_order", None)
+                edited = original_data_editor(draft_df, *args, **kwargs)
             merged = _merge_hidden_back(draft_df, edited)
             _set_editor_draft(table_id, merged)
             return merged
