@@ -1191,3 +1191,135 @@ try:
 except Exception:
     pass
 # ===== V2.61 SELECT / MULTISELECT HEIGHT FINAL OVERRIDE END =====
+
+# === V2.62 dropdown menu light readable patch ===
+def _spt_v262_dropdown_menu_light_css():
+    """Force Streamlit/BaseWeb dropdown option panels to light background + dark text."""
+    try:
+        import streamlit as st
+        st.markdown(
+            """
+            <style>
+            /* V2.62｜權限管理與全系統下拉選單清晰化
+               修正：下拉展開選單背景太深、字太暗看不到。
+               範圍：selectbox / multiselect / data_editor 內 select 下拉清單。 */
+
+            /* 下拉選單彈出層 */
+            div[data-baseweb="popover"],
+            div[data-baseweb="menu"],
+            ul[role="listbox"] {
+                background: #eaf8ff !important;
+                color: #03121f !important;
+                border: 1px solid rgba(102, 232, 249, .95) !important;
+                box-shadow: 0 0 0 1px rgba(102, 232, 249, .35), 0 12px 32px rgba(0, 255, 255, .22) !important;
+                border-radius: 12px !important;
+                overflow: hidden !important;
+                z-index: 999999 !important;
+            }
+
+            /* 下拉選項 */
+            div[role="option"],
+            li[role="option"],
+            ul[role="listbox"] li,
+            div[data-baseweb="menu"] div {
+                background: #eaf8ff !important;
+                color: #03121f !important;
+                font-weight: 800 !important;
+                min-height: 38px !important;
+                line-height: 1.45 !important;
+                padding-top: 8px !important;
+                padding-bottom: 8px !important;
+                text-shadow: none !important;
+            }
+
+            /* hover / focus */
+            div[role="option"]:hover,
+            li[role="option"]:hover,
+            ul[role="listbox"] li:hover,
+            div[data-baseweb="menu"] div:hover {
+                background: linear-gradient(90deg, #99f6ff, #d9fbff) !important;
+                color: #03121f !important;
+            }
+
+            /* selected option */
+            div[aria-selected="true"],
+            li[aria-selected="true"],
+            div[role="option"][aria-selected="true"],
+            li[role="option"][aria-selected="true"] {
+                background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+                color: #020817 !important;
+                font-weight: 900 !important;
+            }
+
+            /* 選項內所有文字與 icon 強制深色 */
+            div[data-baseweb="popover"] *,
+            div[data-baseweb="menu"] *,
+            ul[role="listbox"] *,
+            div[role="option"] * {
+                color: #03121f !important;
+                fill: #03121f !important;
+                text-shadow: none !important;
+            }
+
+            /* 關閉 disabled 選項過暗問題 */
+            div[aria-disabled="true"],
+            li[aria-disabled="true"] {
+                color: #475569 !important;
+                opacity: .75 !important;
+            }
+
+            /* 保留輸入框本體淺底深字，不影響高度修正 */
+            div[data-baseweb="select"] > div {
+                background: #edf8ff !important;
+                color: #03121f !important;
+                min-height: 52px !important;
+                height: auto !important;
+                align-items: center !important;
+                overflow: hidden !important;
+            }
+            div[data-baseweb="select"] input,
+            div[data-baseweb="select"] span,
+            div[data-baseweb="select"] div {
+                color: #03121f !important;
+                font-weight: 800 !important;
+                line-height: 1.55 !important;
+            }
+
+            /* data_editor 下拉選單也套用 */
+            [data-testid="stDataFrame"] div[role="listbox"],
+            [data-testid="stDataFrame"] div[role="option"] {
+                background: #eaf8ff !important;
+                color: #03121f !important;
+                font-weight: 800 !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        pass
+
+# Execute once at import; also wrap common theme functions if present.
+_spt_v262_dropdown_menu_light_css()
+for _spt_v262_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v262_func = globals().get(_spt_v262_name)
+    if callable(_spt_v262_func) and not getattr(_spt_v262_func, "_spt_v262_wrapped", False):
+        def _spt_v262_make_wrapper(_original):
+            def _spt_v262_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                _spt_v262_dropdown_menu_light_css()
+                return result
+            _spt_v262_wrapper._spt_v262_wrapped = True
+            return _spt_v262_wrapper
+        globals()[_spt_v262_name] = _spt_v262_make_wrapper(_spt_v262_func)
+# === End V2.62 dropdown menu light readable patch ===
+
