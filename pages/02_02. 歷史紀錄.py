@@ -171,14 +171,36 @@ def _postprocess_import_rows(parsed: pd.DataFrame) -> pd.DataFrame:
 
 
 def _find_col(source: pd.DataFrame, aliases: list[str]):
+    """Find a source column by bilingual header aliases without false short matches.
+
+    修正 V2.37：Excel 匯入範本的標題可能是
+    「工號 / Employee ID 工號 / Employee ID」這種合併/重複標題。
+    舊版用 alias in norm_col，會把 employee_id 內的短字串 id 誤判成 ID 欄，
+    導致 ID 欄變成 B002、SPT193，正式匯入時欄位錯位。
+    """
     norm_to_col = {_normalize_header_name(c): c for c in source.columns}
-    norm_aliases = [_normalize_header_name(a) for a in aliases]
+    norm_aliases = [_normalize_header_name(a) for a in aliases if _normalize_header_name(a)]
+
+    # 1) Exact match is always safest.
     for alias in norm_aliases:
         if alias in norm_to_col:
             return norm_to_col[alias]
+
+    # 2) Token-aware matching. Avoid very short aliases such as id/pn/wo/name
+    #    unless they are an exact match above.
+    unsafe_short_aliases = {"id", "pn", "wo", "mo", "key", "name"}
+    for alias in norm_aliases:
+        if alias in unsafe_short_aliases or len(alias) < 3:
+            continue
+        for norm_col, real_col in norm_to_col.items():
+            if alias in norm_col:
+                return real_col
+
+    # 3) Fallback: allow source header inside a long alias only when the source
+    #    header itself is meaningful enough.
     for alias in norm_aliases:
         for norm_col, real_col in norm_to_col.items():
-            if alias and (alias in norm_col or norm_col in alias):
+            if len(norm_col) >= 3 and norm_col not in unsafe_short_aliases and norm_col in alias:
                 return real_col
     return None
 
@@ -1019,13 +1041,14 @@ with tab2:
                     st.error("解析後沒有可匯入資料。請確認至少包含：工號、製令、工段、開始時間。")
                 else:
                     st.success(f"已解析 {len(parsed)} 筆歷史工時資料。")
-                    st.dataframe(parsed, use_container_width=True, height=360)
-                    if st.button("⟟ 確認匯入 Excel 歷史紀錄 / Import Excel History", type="primary", use_container_width=True, key="history_excel_import_save_v197"):
+                    st.info("請先確認下方解析結果，確認無誤後按『確認匯入 Excel 歷史紀錄』。按鈕已放在預覽表格上方，避免資料多時看不到。")
+                    if st.button("⟟ 確認匯入 Excel 歷史紀錄 / Import Excel History", type="primary", use_container_width=True, key="history_excel_import_save_v237_top"):
                         result = import_time_records(parsed, recalc=recalc_excel, source="history_excel_import")
                         st.success(f"匯入完成：新增 {result['inserted']}，更新 {result['updated']}，略過 {result['skipped']}。")
                         for msg in result.get("errors", [])[:10]:
                             st.warning(msg)
                         rerun()
+                    st.dataframe(parsed, use_container_width=True, height=360)
             except Exception as exc:
                 st.error(f"Excel 匯入失敗：{exc}")
 
