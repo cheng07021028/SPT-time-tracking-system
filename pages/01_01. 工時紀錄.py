@@ -212,7 +212,7 @@ if is_admin:
                     else:
                         # V2.26：若管理員剛修改開始/結束時間戳，先儲存並同步日期/時間欄位，再重新計算。
                         save_df = edited_admin.drop(columns=["刪除"], errors="ignore")
-                        save_time_records(save_df, recalc_edited_timestamps=False)
+                        save_time_records(save_df, recalc_edited_timestamps=True)
                         count = recalculate_time_records(delete_ids)
                         st.success(f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時，同步更新到 02 歷史紀錄。")
                         st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1

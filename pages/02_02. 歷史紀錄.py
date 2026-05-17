@@ -17,7 +17,7 @@ from services.time_record_service import (
     import_time_records,
 )
 from services.master_data_service import load_employees, load_work_orders
-from services.table_ui_service import render_table
+from services.table_ui_service import render_table, label_for
 from services.duration_service import hours_to_hms
 from services.history_filter_service import load_history_filters, save_history_filters, reset_history_filters
 
@@ -529,7 +529,18 @@ def _render_history_view_table(view_df: pd.DataFrame, table_key: str = "history_
         st.info("目前沒有資料 / No data")
         return
     display_df = _add_cross_day_end_marker(view_df)
-    cross_mask = display_df["跨日結束"].astype(str).eq("跨日結束")
+
+    # V2.30：跨日結束需要用 Styler 上色；Styler 不支援共用 column_config，
+    # 所以這裡手動套用雙語欄名與工時格式，避免標題只剩 raw 欄位名稱，
+    # 也避免 work_hours 顯示為 0.030000 這類小數時數。
+    if "work_hours" in display_df.columns:
+        display_df["work_hours"] = display_df["work_hours"].map(hours_to_hms)
+    if "total_hours" in display_df.columns:
+        display_df["total_hours"] = display_df["total_hours"].map(hours_to_hms)
+    if "avg_hours" in display_df.columns:
+        display_df["avg_hours"] = display_df["avg_hours"].map(hours_to_hms)
+
+    cross_mask = display_df["跨日結束"].astype(str).eq("跨日結束") if "跨日結束" in display_df.columns else pd.Series(False, index=display_df.index)
 
     def highlight_rows(row):
         if bool(cross_mask.loc[row.name]):
@@ -538,6 +549,9 @@ def _render_history_view_table(view_df: pd.DataFrame, table_key: str = "history_
                 for _ in row
             ]
         return ["" for _ in row]
+
+    label_map = {col: ("跨日結束 / Cross Day End" if str(col) == "跨日結束" else label_for(str(col))) for col in display_df.columns}
+    display_df = display_df.rename(columns=label_map)
 
     st.caption("淺黃色列代表『跨日結束』：開始日期與結束日期不同，且已完成結束。")
     st.dataframe(
@@ -853,7 +867,7 @@ with tab1:
                     else:
                         # V2.26：若管理員剛修改開始/結束時間戳，先儲存並同步日期/時間欄位，再重新計算。
                         save_df = edited.drop(columns=["刪除"], errors="ignore")
-                        save_time_records(save_df, recalc_edited_timestamps=False)
+                        save_time_records(save_df, recalc_edited_timestamps=True)
                         count = recalculate_time_records(delete_ids)
                         st.success(f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時。")
                         st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
