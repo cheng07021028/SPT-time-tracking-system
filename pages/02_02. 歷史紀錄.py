@@ -32,47 +32,17 @@ HISTORY_RESULT_MESSAGES_KEY = "v238_history_result_messages"
 
 
 def _add_history_result(level: str, message: str, *, append: bool = True) -> None:
-    """Keep action result messages visible after rerun.
+    """V2.85: operation-result message panel disabled by request.
 
-    Streamlit's st.success/st.error messages disappear after rerun.
-    This page writes operation results into session_state so import / save / delete
-    results remain visible until the user clears them manually.
+    Keep the function name for backward compatibility so existing save/import/delete
+    workflows continue to run, but do not persist or render operation-result cards.
     """
-    item = {"level": str(level or "info"), "message": str(message or "").strip()}
-    if not item["message"]:
-        return
-    if append:
-        msgs = list(st.session_state.get(HISTORY_RESULT_MESSAGES_KEY, []))
-        msgs.append(item)
-        st.session_state[HISTORY_RESULT_MESSAGES_KEY] = msgs[-10:]
-    else:
-        st.session_state[HISTORY_RESULT_MESSAGES_KEY] = [item]
+    return
 
 
 def _show_history_results() -> None:
-    msgs = st.session_state.get(HISTORY_RESULT_MESSAGES_KEY, [])
-    if not msgs:
-        return
-    with st.container():
-        st.markdown("""
-        <div style="margin:10px 0 8px 0;padding:10px 14px;border:1px solid rgba(108,240,255,.45);border-radius:14px;background:rgba(10,35,65,.72);box-shadow:0 0 20px rgba(55,220,255,.18);font-weight:800;color:#dffbff;">
-        ▣ 執行結果 / Operation Results（會保留到手動清除）
-        </div>
-        """, unsafe_allow_html=True)
-        for msg in msgs:
-            level = msg.get("level", "info")
-            text = msg.get("message", "")
-            if level == "success":
-                st.success(text)
-            elif level == "error":
-                st.error(text)
-            elif level == "warning":
-                st.warning(text)
-            else:
-                st.info(text)
-        if st.button("◌ 清除執行結果訊息 / Clear Operation Messages", key="history_clear_result_messages", use_container_width=True):
-            st.session_state[HISTORY_RESULT_MESSAGES_KEY] = []
-            rerun()
+    """V2.85: removed Operation Results panel from the page UI."""
+    return
 
 
 def rerun():
@@ -82,7 +52,7 @@ def rerun():
         st.experimental_rerun()
 
 
-_show_history_results()
+# V2.85: Operation Results panel removed; keep workflow logic unchanged.
 
 
 def _normalize_text(v) -> str:
