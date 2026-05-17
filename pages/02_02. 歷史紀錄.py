@@ -19,6 +19,7 @@ from services.time_record_service import (
 from services.master_data_service import load_employees, load_work_orders
 from services.table_ui_service import render_table
 from services.duration_service import hours_to_hms
+from services.history_filter_service import load_history_filters, save_history_filters, reset_history_filters
 
 st.set_page_config(page_title="02. 歷史紀錄", page_icon="📚", layout="wide")
 apply_theme()
@@ -241,24 +242,312 @@ def _download_history_template():
     return bio.getvalue()
 
 
+
+def _safe_unique(df: pd.DataFrame, col: str) -> list[str]:
+    if df is None or df.empty or col not in df.columns:
+        return []
+    vals = df[col].dropna().astype(str).map(str.strip)
+    vals = vals[(vals != "") & (vals.str.lower() != "none")]
+    return sorted(vals.unique().tolist())
+
+
+def _merge_options(*groups: list[str]) -> list[str]:
+    merged: list[str] = []
+    seen = set()
+    for group in groups:
+        for item in group or []:
+            text = str(item).strip()
+            if text and text not in seen:
+                seen.add(text)
+                merged.append(text)
+    return merged
+
+
+def _month_range(offset: int = 0) -> tuple[date, date]:
+    today = today_date()
+    year = today.year
+    month = today.month + offset
+    while month <= 0:
+        month += 12
+        year -= 1
+    while month > 12:
+        month -= 12
+        year += 1
+    start_day = date(year, month, 1)
+    if month == 12:
+        next_month = date(year + 1, 1, 1)
+    else:
+        next_month = date(year, month + 1, 1)
+    return start_day, next_month - timedelta(days=1)
+
+
+def _date_range_from_preset(preset: str, fallback_start: str, fallback_end: str) -> tuple[date, date]:
+    today = today_date()
+    if preset == "今日":
+        return today, today
+    if preset == "近7天":
+        return today - timedelta(days=7), today
+    if preset == "近30天":
+        return today - timedelta(days=30), today
+    if preset == "近90天":
+        return today - timedelta(days=90), today
+    if preset == "本月":
+        return _month_range(0)
+    if preset == "上月":
+        return _month_range(-1)
+    try:
+        return date.fromisoformat(str(fallback_start)), date.fromisoformat(str(fallback_end))
+    except Exception:
+        return today - timedelta(days=30), today
+
+
+def _normalize_end_blank(s: pd.Series) -> pd.Series:
+    text = s.fillna("").astype(str).str.strip().str.lower()
+    return text.isin(["", "none", "nan", "nat"])
+
+
+def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame() if df is None else df
+    out = df.copy()
+
+    def in_list(col: str, values: list[str]):
+        nonlocal out
+        if values and col in out.columns:
+            allowed = {str(x).strip() for x in values if str(x).strip()}
+            out = out[out[col].fillna("").astype(str).str.strip().isin(allowed)]
+
+    in_list("work_order", filters.get("work_orders", []))
+    in_list("part_no", filters.get("part_nos", []))
+    in_list("type_name", filters.get("type_names", []))
+    in_list("assembly_location", filters.get("assembly_locations", []))
+    in_list("process_name", filters.get("process_names", []))
+    in_list("employee_id", filters.get("employee_ids", []))
+    in_list("employee_name", filters.get("employee_names", []))
+    in_list("status", filters.get("statuses", []))
+
+    end_state = str(filters.get("end_state") or "全部")
+    if "end_timestamp" in out.columns:
+        end_blank = _normalize_end_blank(out["end_timestamp"])
+        if end_state == "未結束":
+            out = out[end_blank]
+        elif end_state == "已結束":
+            out = out[~end_blank]
+
+    keyword = str(filters.get("keyword") or "").strip()
+    if keyword:
+        search_cols = [c for c in ["work_order", "part_no", "type_name", "process_name", "employee_id", "employee_name", "remark", "assembly_location", "status"] if c in out.columns]
+        if search_cols:
+            mask = pd.Series(False, index=out.index)
+            for c in search_cols:
+                mask = mask | out[c].fillna("").astype(str).str.contains(keyword, case=False, na=False)
+            out = out[mask]
+
+    # Join employee master fields for department/title filtering when available.
+    try:
+        emp_df = load_employees(active_only=False)
+        if not emp_df.empty and "employee_id" in out.columns and "employee_id" in emp_df.columns:
+            add_cols = [c for c in ["employee_id", "department", "title"] if c in emp_df.columns]
+            if len(add_cols) > 1:
+                out = out.merge(emp_df[add_cols].drop_duplicates("employee_id"), on="employee_id", how="left", suffixes=("", "_emp"))
+    except Exception:
+        pass
+    in_list("department", filters.get("departments", []))
+    in_list("title", filters.get("titles", []))
+
+    anomaly = str(filters.get("anomaly_filter") or "全部")
+    hours = pd.to_numeric(out["work_hours"], errors="coerce") if "work_hours" in out.columns else pd.Series(0, index=out.index)
+    if anomaly == "工時 = 0":
+        out = out[hours.fillna(0).eq(0)]
+    elif anomaly == "工時小於5分鐘":
+        out = out[(hours.fillna(0) > 0) & (hours.fillna(0) < (5 / 60))]
+    elif anomaly == "工時大於8小時":
+        out = out[hours.fillna(0) > 8]
+    elif anomaly == "工時大於12小時":
+        out = out[hours.fillna(0) > 12]
+    elif anomaly == "未按結束":
+        if "end_timestamp" in out.columns:
+            out = out[_normalize_end_blank(out["end_timestamp"])]
+    elif anomaly == "跨日紀錄":
+        if "start_date" in out.columns and "end_date" in out.columns:
+            out = out[out["start_date"].fillna("").astype(str) != out["end_date"].fillna("").astype(str)]
+    elif anomaly == "有開始無結束":
+        if "start_timestamp" in out.columns and "end_timestamp" in out.columns:
+            out = out[~_normalize_end_blank(out["start_timestamp"]) & _normalize_end_blank(out["end_timestamp"])]
+    elif anomaly == "有結束無開始":
+        if "start_timestamp" in out.columns and "end_timestamp" in out.columns:
+            out = out[_normalize_end_blank(out["start_timestamp"]) & ~_normalize_end_blank(out["end_timestamp"])]
+
+    sort_by = str(filters.get("sort_by") or "ID由新到舊")
+    try:
+        if sort_by == "ID由新到舊" and "id" in out.columns:
+            out = out.sort_values("id", ascending=False)
+        elif sort_by == "ID由舊到新" and "id" in out.columns:
+            out = out.sort_values("id", ascending=True)
+        elif sort_by == "開始時間由新到舊" and "start_timestamp" in out.columns:
+            out = out.sort_values("start_timestamp", ascending=False)
+        elif sort_by == "開始時間由舊到新" and "start_timestamp" in out.columns:
+            out = out.sort_values("start_timestamp", ascending=True)
+        elif sort_by == "工時由大到小" and "work_hours" in out.columns:
+            out = out.assign(_wh=pd.to_numeric(out["work_hours"], errors="coerce")).sort_values("_wh", ascending=False).drop(columns=["_wh"])
+        elif sort_by == "工時由小到大" and "work_hours" in out.columns:
+            out = out.assign(_wh=pd.to_numeric(out["work_hours"], errors="coerce")).sort_values("_wh", ascending=True).drop(columns=["_wh"])
+        elif sort_by == "製令排序" and "work_order" in out.columns:
+            out = out.sort_values(["work_order", "process_name", "employee_id"], ascending=True)
+        elif sort_by == "人員排序" and "employee_id" in out.columns:
+            out = out.sort_values(["employee_id", "start_timestamp"], ascending=[True, False])
+    except Exception:
+        pass
+
+    top_n = str(filters.get("top_n") or "全部")
+    if top_n.startswith("Top"):
+        try:
+            n = int(top_n.replace("Top", "").strip())
+            out = out.head(n)
+        except Exception:
+            pass
+    try:
+        limit = int(filters.get("detail_limit") or 0)
+        if limit > 0:
+            out = out.head(limit)
+    except Exception:
+        pass
+    return out
+
+
+def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame, work_orders: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    stored = load_history_filters()
+    if "history_filters_applied_v216" not in st.session_state:
+        st.session_state["history_filters_applied_v216"] = stored
+    applied = st.session_state["history_filters_applied_v216"]
+
+    start_default, end_default = _date_range_from_preset(
+        applied.get("date_preset", "近30天"),
+        applied.get("start_date"),
+        applied.get("end_date"),
+    )
+
+    with st.expander("🔎 專業篩選 / Professional Filters", expanded=True):
+        with st.form("history_professional_filter_form", clear_on_submit=False):
+            r1c1, r1c2, r1c3, r1c4 = st.columns([1, 1, 1, 1])
+            date_preset = r1c1.selectbox(
+                "快速日期",
+                ["今日", "近7天", "近30天", "近90天", "本月", "上月", "自訂區間"],
+                index=["今日", "近7天", "近30天", "近90天", "本月", "上月", "自訂區間"].index(applied.get("date_preset", "近30天")) if applied.get("date_preset", "近30天") in ["今日", "近7天", "近30天", "近90天", "本月", "上月", "自訂區間"] else 2,
+            )
+            start_input = r1c2.date_input("開始日期", value=start_default)
+            end_input = r1c3.date_input("結束日期", value=end_default)
+            detail_limit = r1c4.number_input("明細讀取上限", min_value=50, max_value=50000, value=int(applied.get("detail_limit") or 1000), step=50)
+
+            # Build options from current broad query + master data.
+            wo_options = _merge_options(_safe_unique(work_orders, "work_order"), _safe_unique(base_df, "work_order"))
+            pn_options = _merge_options(_safe_unique(work_orders, "part_no"), _safe_unique(base_df, "part_no"))
+            type_options = _merge_options(_safe_unique(work_orders, "type_name"), _safe_unique(base_df, "type_name"))
+            loc_options = _merge_options(_safe_unique(work_orders, "assembly_location"), _safe_unique(base_df, "assembly_location"))
+            process_options = _safe_unique(base_df, "process_name")
+            emp_id_options = _merge_options(_safe_unique(employees, "employee_id"), _safe_unique(base_df, "employee_id"))
+            emp_name_options = _merge_options(_safe_unique(employees, "employee_name"), _safe_unique(base_df, "employee_name"))
+            dept_options = _safe_unique(employees, "department")
+            title_options = _safe_unique(employees, "title")
+            status_options = _safe_unique(base_df, "status")
+
+            r2c1, r2c2, r2c3 = st.columns(3)
+            work_orders_selected = r2c1.multiselect("製令", wo_options, default=[x for x in applied.get("work_orders", []) if x in wo_options])
+            part_nos = r2c2.multiselect("P/N / 料號", pn_options, default=[x for x in applied.get("part_nos", []) if x in pn_options])
+            type_names = r2c3.multiselect("機型", type_options, default=[x for x in applied.get("type_names", []) if x in type_options])
+
+            r3c1, r3c2, r3c3 = st.columns(3)
+            assembly_locations = r3c1.multiselect("組立地點", loc_options, default=[x for x in applied.get("assembly_locations", []) if x in loc_options])
+            process_names = r3c2.multiselect("工段名稱", process_options, default=[x for x in applied.get("process_names", []) if x in process_options])
+            statuses = r3c3.multiselect("狀態", status_options, default=[x for x in applied.get("statuses", []) if x in status_options])
+
+            r4c1, r4c2, r4c3, r4c4 = st.columns(4)
+            employee_ids = r4c1.multiselect("工號", emp_id_options, default=[x for x in applied.get("employee_ids", []) if x in emp_id_options])
+            employee_names = r4c2.multiselect("姓名", emp_name_options, default=[x for x in applied.get("employee_names", []) if x in emp_name_options])
+            departments = r4c3.multiselect("單位", dept_options, default=[x for x in applied.get("departments", []) if x in dept_options])
+            titles = r4c4.multiselect("職稱", title_options, default=[x for x in applied.get("titles", []) if x in title_options])
+
+            r5c1, r5c2, r5c3, r5c4 = st.columns(4)
+            end_state = r5c1.selectbox("結束狀態", ["全部", "未結束", "已結束"], index=["全部", "未結束", "已結束"].index(applied.get("end_state", "全部")) if applied.get("end_state", "全部") in ["全部", "未結束", "已結束"] else 0)
+            anomaly_filter = r5c2.selectbox("異常篩選", ["全部", "工時 = 0", "工時小於5分鐘", "工時大於8小時", "工時大於12小時", "未按結束", "跨日紀錄", "有開始無結束", "有結束無開始"], index=["全部", "工時 = 0", "工時小於5分鐘", "工時大於8小時", "工時大於12小時", "未按結束", "跨日紀錄", "有開始無結束", "有結束無開始"].index(applied.get("anomaly_filter", "全部")) if applied.get("anomaly_filter", "全部") in ["全部", "工時 = 0", "工時小於5分鐘", "工時大於8小時", "工時大於12小時", "未按結束", "跨日紀錄", "有開始無結束", "有結束無開始"] else 0)
+            top_n = r5c3.selectbox("Top N", ["全部", "Top 50", "Top 100", "Top 200", "Top 500"], index=["全部", "Top 50", "Top 100", "Top 200", "Top 500"].index(applied.get("top_n", "全部")) if applied.get("top_n", "全部") in ["全部", "Top 50", "Top 100", "Top 200", "Top 500"] else 0)
+            sort_by = r5c4.selectbox("排序方式", ["ID由新到舊", "ID由舊到新", "開始時間由新到舊", "開始時間由舊到新", "工時由大到小", "工時由小到大", "製令排序", "人員排序"], index=["ID由新到舊", "ID由舊到新", "開始時間由新到舊", "開始時間由舊到新", "工時由大到小", "工時由小到大", "製令排序", "人員排序"].index(applied.get("sort_by", "ID由新到舊")) if applied.get("sort_by", "ID由新到舊") in ["ID由新到舊", "ID由舊到新", "開始時間由新到舊", "開始時間由舊到新", "工時由大到小", "工時由小到大", "製令排序", "人員排序"] else 0)
+
+            keyword = st.text_input("關鍵字搜尋：製令 / 料號 / 機型 / 工段 / 工號 / 姓名 / 備註", value=applied.get("keyword", ""))
+            b1, b2, b3 = st.columns([1.3, 1, 2])
+            apply_clicked = b1.form_submit_button("🔎 套用篩選並永久記錄", type="primary", use_container_width=True)
+            reset_clicked = b2.form_submit_button("♻️ 恢復預設篩選", use_container_width=True)
+
+        if reset_clicked:
+            new_filters = reset_history_filters()
+            st.session_state["history_filters_applied_v216"] = new_filters
+            st.success("已恢復 02｜歷史紀錄預設篩選。")
+            rerun()
+
+        if apply_clicked:
+            actual_start, actual_end = _date_range_from_preset(date_preset, str(start_input), str(end_input))
+            if date_preset == "自訂區間":
+                actual_start, actual_end = start_input, end_input
+            new_filters = {
+                "date_preset": date_preset,
+                "start_date": str(actual_start),
+                "end_date": str(actual_end),
+                "work_orders": work_orders_selected,
+                "part_nos": part_nos,
+                "type_names": type_names,
+                "assembly_locations": assembly_locations,
+                "process_names": process_names,
+                "employee_ids": employee_ids,
+                "employee_names": employee_names,
+                "departments": departments,
+                "titles": titles,
+                "statuses": statuses,
+                "end_state": end_state,
+                "anomaly_filter": anomaly_filter,
+                "keyword": keyword,
+                "top_n": top_n,
+                "sort_by": sort_by,
+                "detail_limit": int(detail_limit),
+            }
+            saved = save_history_filters(new_filters)
+            st.session_state["history_filters_applied_v216"] = saved
+            st.success("已套用並永久記錄 02｜歷史紀錄篩選條件。")
+            rerun()
+
+    applied = st.session_state["history_filters_applied_v216"]
+    filtered = _apply_history_filters(base_df, applied)
+    return filtered, applied
+
+
 employees = load_employees(active_only=False)
 work_orders = load_work_orders(active_only=False)
 
-c1, c2, c3, c4 = st.columns(4)
-start = c1.date_input("開始日期 / Start Date", value=today_date() - timedelta(days=7))
-end = c2.date_input("結束日期 / End Date", value=today_date())
-emp_opts = [""] + ([] if employees.empty else employees["employee_id"].astype(str).tolist())
-wo_opts = [""] + ([] if work_orders.empty else work_orders["work_order"].astype(str).tolist())
-emp = c3.selectbox("工號 / Employee ID", emp_opts)
-wo = c4.selectbox("製令 / Work Order", wo_opts)
+# V2.16：02 歷史紀錄改為專業篩選。先依日期範圍載入，再在畫面層套用多條件篩選；
+# 篩選條件只有按「套用篩選並永久記錄」才寫入永久檔。
+_history_filter_seed = load_history_filters()
+_seed_start, _seed_end = _date_range_from_preset(
+    _history_filter_seed.get("date_preset", "近30天"),
+    _history_filter_seed.get("start_date"),
+    _history_filter_seed.get("end_date"),
+)
+base_df = load_records(str(_seed_start), str(_seed_end), None, None)
+df, history_filters = _render_history_filter_panel(base_df, employees, work_orders)
 
-df = load_records(str(start), str(end), emp or None, wo or None)
+start = history_filters.get("start_date", str(_seed_start))
+end = history_filters.get("end_date", str(_seed_end))
 
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("筆數 / Records", f"{len(df):,}")
-m2.metric("總工時 / Total Time", hours_to_hms(df['work_hours'].sum()) if not df.empty else "00:00:00")
-m3.metric("作業中 / Active", f"{(df['end_timestamp'].isna()).sum():,}" if not df.empty else "0")
-m4.metric("人員數 / Employees", f"{df['employee_id'].nunique():,}" if not df.empty else "0")
+m1, m2, m3, m4, m5, m6 = st.columns(6)
+m1.metric("篩選筆數 / Records", f"{len(df):,}")
+m2.metric("總工時 / Total Time", hours_to_hms(df['work_hours'].sum()) if not df.empty and 'work_hours' in df.columns else "00:00:00")
+if not df.empty and 'end_timestamp' in df.columns:
+    _end_blank = _normalize_end_blank(df['end_timestamp'])
+    m3.metric("未結束 / Open", f"{_end_blank.sum():,}")
+    m4.metric("已結束 / Closed", f"{(~_end_blank).sum():,}")
+else:
+    m3.metric("未結束 / Open", "0")
+    m4.metric("已結束 / Closed", "0")
+m5.metric("人員數 / Employees", f"{df['employee_id'].nunique():,}" if not df.empty and 'employee_id' in df.columns else "0")
+m6.metric("製令數 / W/O", f"{df['work_order'].nunique():,}" if not df.empty and 'work_order' in df.columns else "0")
 
 can_edit = check_permission("02_history", "can_edit")
 can_delete = check_permission("02_history", "can_delete")
