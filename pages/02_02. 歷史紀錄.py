@@ -306,6 +306,73 @@ def _normalize_end_blank(s: pd.Series) -> pd.Series:
     return text.isin(["", "none", "nan", "nat"])
 
 
+def _is_cross_day_end_df(df: pd.DataFrame) -> pd.Series:
+    """Return True for records that start on one date and finish on another date.
+
+    判斷條件：已結束 + 開始日期與結束日期不同。
+    優先使用 start_date/end_date，若欄位缺漏則從時間戳前 10 碼取日期。
+    """
+    if df is None or df.empty:
+        return pd.Series(False, index=getattr(df, "index", None))
+    index = df.index
+    start_date = pd.Series("", index=index)
+    end_date = pd.Series("", index=index)
+    if "start_date" in df.columns:
+        start_date = df["start_date"].fillna("").astype(str).str.strip()
+    if "end_date" in df.columns:
+        end_date = df["end_date"].fillna("").astype(str).str.strip()
+    if "start_timestamp" in df.columns:
+        ts_start = df["start_timestamp"].fillna("").astype(str).str.strip().str[:10]
+        start_date = start_date.where(start_date.ne(""), ts_start)
+    if "end_timestamp" in df.columns:
+        ts_end = df["end_timestamp"].fillna("").astype(str).str.strip().str[:10]
+        end_date = end_date.where(end_date.ne(""), ts_end)
+
+    if "end_timestamp" in df.columns:
+        ended = ~_normalize_end_blank(df["end_timestamp"])
+    else:
+        ended = end_date.ne("")
+    return ended & start_date.ne("") & end_date.ne("") & start_date.ne(end_date)
+
+
+def _add_cross_day_end_marker(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    if out.empty:
+        return out
+    marker = _is_cross_day_end_df(out)
+    out.insert(0, "跨日結束", marker.map(lambda x: "跨日結束" if bool(x) else ""))
+    return out
+
+
+def _render_history_view_table(view_df: pd.DataFrame, table_key: str = "history_records_view", height: int = 520) -> None:
+    """Read-only history table with light cross-day-end highlighting.
+
+    編輯模式仍使用共用 render_table，避免把『跨日結束』標示欄寫回資料庫。
+    """
+    if view_df is None or view_df.empty:
+        st.info("目前沒有資料 / No data")
+        return
+    display_df = _add_cross_day_end_marker(view_df)
+    cross_mask = display_df["跨日結束"].astype(str).eq("跨日結束")
+
+    def highlight_rows(row):
+        if bool(cross_mask.loc[row.name]):
+            return [
+                "background-color: #fff7d6; color: #1f2937; font-weight: 700; border-top: 1px solid #f6c85f; border-bottom: 1px solid #f6c85f;"
+                for _ in row
+            ]
+        return ["" for _ in row]
+
+    st.caption("淺黃色列代表『跨日結束』：開始日期與結束日期不同，且已完成結束。")
+    st.dataframe(
+        display_df.style.apply(highlight_rows, axis=1),
+        use_container_width=True,
+        hide_index=True,
+        height=height,
+        key=f"frame_{table_key}",
+    )
+
+
 def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame() if df is None else df
@@ -370,7 +437,11 @@ def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
             out = out[_normalize_end_blank(out["end_timestamp"])]
     elif anomaly == "跨日紀錄":
         if "start_date" in out.columns and "end_date" in out.columns:
-            out = out[out["start_date"].fillna("").astype(str) != out["end_date"].fillna("").astype(str)]
+            start_text = out["start_date"].fillna("").astype(str).str.strip()
+            end_text = out["end_date"].fillna("").astype(str).str.strip()
+            out = out[start_text.ne("") & end_text.ne("") & start_text.ne(end_text)]
+    elif anomaly == "跨日結束":
+        out = out[_is_cross_day_end_df(out)]
     elif anomaly == "有開始無結束":
         if "start_timestamp" in out.columns and "end_timestamp" in out.columns:
             out = out[~_normalize_end_blank(out["start_timestamp"]) & _normalize_end_blank(out["end_timestamp"])]
@@ -469,7 +540,7 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
 
             r5c1, r5c2, r5c3, r5c4 = st.columns(4)
             end_state = r5c1.selectbox("結束狀態", ["全部", "未結束", "已結束"], index=["全部", "未結束", "已結束"].index(applied.get("end_state", "全部")) if applied.get("end_state", "全部") in ["全部", "未結束", "已結束"] else 0)
-            anomaly_filter = r5c2.selectbox("異常篩選", ["全部", "工時 = 0", "工時小於5分鐘", "工時大於8小時", "工時大於12小時", "未按結束", "跨日紀錄", "有開始無結束", "有結束無開始"], index=["全部", "工時 = 0", "工時小於5分鐘", "工時大於8小時", "工時大於12小時", "未按結束", "跨日紀錄", "有開始無結束", "有結束無開始"].index(applied.get("anomaly_filter", "全部")) if applied.get("anomaly_filter", "全部") in ["全部", "工時 = 0", "工時小於5分鐘", "工時大於8小時", "工時大於12小時", "未按結束", "跨日紀錄", "有開始無結束", "有結束無開始"] else 0)
+            anomaly_filter = r5c2.selectbox("異常篩選", ["全部", "工時 = 0", "工時小於5分鐘", "工時大於8小時", "工時大於12小時", "未按結束", "跨日紀錄", "跨日結束", "有開始無結束", "有結束無開始"], index=["全部", "工時 = 0", "工時小於5分鐘", "工時大於8小時", "工時大於12小時", "未按結束", "跨日紀錄", "跨日結束", "有開始無結束", "有結束無開始"].index(applied.get("anomaly_filter", "全部")) if applied.get("anomaly_filter", "全部") in ["全部", "工時 = 0", "工時小於5分鐘", "工時大於8小時", "工時大於12小時", "未按結束", "跨日紀錄", "跨日結束", "有開始無結束", "有結束無開始"] else 0)
             top_n = r5c3.selectbox("Top N", ["全部", "Top 50", "Top 100", "Top 200", "Top 500"], index=["全部", "Top 50", "Top 100", "Top 200", "Top 500"].index(applied.get("top_n", "全部")) if applied.get("top_n", "全部") in ["全部", "Top 50", "Top 100", "Top 200", "Top 500"] else 0)
             sort_by = r5c4.selectbox("排序方式", ["ID由新到舊", "ID由舊到新", "開始時間由新到舊", "開始時間由舊到新", "工時由大到小", "工時由小到大", "製令排序", "人員排序"], index=["ID由新到舊", "ID由舊到新", "開始時間由新到舊", "開始時間由舊到新", "工時由大到小", "工時由小到大", "製令排序", "人員排序"].index(applied.get("sort_by", "ID由新到舊")) if applied.get("sort_by", "ID由新到舊") in ["ID由新到舊", "ID由舊到新", "開始時間由新到舊", "開始時間由舊到新", "工時由大到小", "工時由小到大", "製令排序", "人員排序"] else 0)
 
@@ -558,7 +629,7 @@ with tab1:
     st.subheader("歷史明細編輯 / Editable History")
     if not can_edit:
         st.info("目前帳號只有查詢權限；若需修改或刪除歷史紀錄，請由管理員在權限管理開放 02 歷史紀錄的編輯/刪除權限。")
-        render_table(df, "history_records", editable=False, height=520)
+        _render_history_view_table(df, "history_records", height=520)
     else:
         edit_key = "history_edit_enabled"
         if edit_key not in st.session_state:
@@ -616,7 +687,7 @@ with tab1:
                         st.success(f"已刪除 {count} 筆歷史紀錄。")
                         rerun()
         else:
-            render_table(df, "history_records", editable=False, height=520)
+            _render_history_view_table(df, "history_records", height=520)
 
     if not df.empty:
         bio = BytesIO()
