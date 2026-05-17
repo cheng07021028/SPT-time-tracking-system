@@ -3412,3 +3412,241 @@ try:
 except Exception:
     pass
 # ===== V2.72 MULTISELECT PLACEHOLDER CENTER / TEXT CLIP FINAL FIX END =====
+
+# ===== V2.73 DROPDOWN CONTRAST STANDARD FINAL START =====
+def apply_v273_dropdown_contrast_standard_final():
+    """
+    V2.73:
+    Unified dropdown/readability contrast standard.
+
+    Rule:
+    - Light/white/cyan dropdown fields and option panels must use dark text.
+    - Dark panels/labels outside the dropdown must use light text.
+    - Override BaseWeb hover/active/selected states that can turn text white on a light option.
+
+    This is intentionally injected after V2.72 so it wins CSS cascade order.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    cfg = _spt_load_dropdown_settings()
+    field_bg = str(cfg.get("field_bg", "#edf8ff"))
+    panel_bg = str(cfg.get("panel_bg", "#eaf8ff"))
+    dark_text = str(cfg.get("text_color", "#03121f"))
+    light_text = "#f8fdff"
+    hover_bg = "#67e8f9"
+    selected_bg = "#c4f7ff"
+
+    st.markdown(
+        f"""
+        <style id="spt-v273-dropdown-contrast-standard-final">
+        /*
+        V2.73｜下拉式選單顏色規範最終覆蓋
+        規範：白底/淺色底 = 深色字；深色底 = 淺色字。
+        目的：避免 Choose options、No options to select、選項文字、hover/selected 狀態變成看不到。
+        */
+
+        :root {{
+            --spt-dd-light-bg: {field_bg};
+            --spt-dd-panel-bg: {panel_bg};
+            --spt-dd-dark-text: {dark_text};
+            --spt-dd-light-text: {light_text};
+            --spt-dd-hover-bg: {hover_bg};
+            --spt-dd-selected-bg: {selected_bg};
+        }}
+
+        /* 深色頁面/篩選框標籤：使用淺色字，避免標籤灰掉。 */
+        .stSelectbox label,
+        .stMultiSelect label,
+        div[data-testid="stSelectbox"] label,
+        div[data-testid="stMultiSelect"] label,
+        div[data-testid="stSelectbox"] [data-testid="stWidgetLabel"],
+        div[data-testid="stMultiSelect"] [data-testid="stWidgetLabel"],
+        div[data-testid="stSelectbox"] [data-testid="stWidgetLabel"] *,
+        div[data-testid="stMultiSelect"] [data-testid="stWidgetLabel"] * {{
+            color: var(--spt-dd-light-text) !important;
+            -webkit-text-fill-color: var(--spt-dd-light-text) !important;
+            opacity: 1 !important;
+            font-weight: 900 !important;
+            text-shadow: 0 0 8px rgba(125, 249, 255, .18) !important;
+        }}
+
+        /* 可視下拉欄位：一律淺底深字。 */
+        div[data-baseweb="select"],
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] > div > div > div,
+        div[data-baseweb="select"] div[aria-haspopup="listbox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[class*="Value"],
+        div[data-baseweb="select"] div[class*="value"],
+        div[data-baseweb="select"] div[class*="Placeholder"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Input"],
+        div[data-baseweb="select"] div[class*="input"] {{
+            background-color: var(--spt-dd-light-bg) !important;
+            color: var(--spt-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }}
+
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p,
+        div[data-baseweb="select"] label,
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete],
+        div[data-baseweb="select"] input[role="combobox"],
+        div[data-baseweb="select"] input::placeholder {{
+            color: var(--spt-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            font-weight: 900 !important;
+        }}
+
+        div[data-baseweb="select"] svg,
+        div[data-baseweb="select"] [role="button"],
+        div[data-baseweb="select"] [role="button"] *,
+        div[data-baseweb="select"] [role="button"] svg {{
+            color: var(--spt-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
+            fill: var(--spt-dd-dark-text) !important;
+            opacity: 1 !important;
+        }}
+
+        /* 展開清單容器：一律淺底深字。BaseWeb 會掛在 body portal，所以不能只抓父層。 */
+        div[data-baseweb="popover"],
+        div[data-baseweb="popover"] > div,
+        div[data-baseweb="popover"] div[data-baseweb="menu"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {{
+            background-color: var(--spt-dd-panel-bg) !important;
+            color: var(--spt-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }}
+
+        div[data-baseweb="popover"] *,
+        div[data-baseweb="menu"] *,
+        ul[role="listbox"] * {{
+            color: var(--spt-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
+            fill: var(--spt-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }}
+
+        /* 每一列選項：白/淺色底一定深色字。 */
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li,
+        div[data-baseweb="menu"] div[role="option"],
+        div[data-baseweb="popover"] div[role="option"] {{
+            background: var(--spt-dd-panel-bg) !important;
+            background-color: var(--spt-dd-panel-bg) !important;
+            color: var(--spt-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            font-weight: 900 !important;
+        }}
+
+        div[role="option"] *,
+        li[role="option"] *,
+        ul[role="listbox"] li *,
+        div[data-baseweb="menu"] div[role="option"] *,
+        div[data-baseweb="popover"] div[role="option"] * {{
+            background: transparent !important;
+            color: var(--spt-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
+            fill: var(--spt-dd-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            font-weight: 900 !important;
+        }}
+
+        /* hover / active / selected 狀態也屬淺色底，所以仍用深色字。 */
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[data-baseweb="menu"] div[role="option"]:hover,
+        div[data-baseweb="popover"] div[role="option"]:hover {{
+            background: linear-gradient(90deg, var(--spt-dd-hover-bg), var(--spt-dd-selected-bg)) !important;
+            background-color: var(--spt-dd-hover-bg) !important;
+            color: var(--spt-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
+        }}
+
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"],
+        div[role="option"][aria-current="true"],
+        li[role="option"][aria-current="true"],
+        div[role="option"][data-highlighted="true"],
+        li[role="option"][data-highlighted="true"] {{
+            background: linear-gradient(90deg, var(--spt-dd-hover-bg), var(--spt-dd-selected-bg)) !important;
+            background-color: var(--spt-dd-selected-bg) !important;
+            color: var(--spt-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
+        }}
+
+        div[role="option"]:hover *,
+        li[role="option"]:hover *,
+        ul[role="listbox"] li:hover *,
+        div[role="option"][aria-selected="true"] *,
+        li[role="option"][aria-selected="true"] *,
+        div[role="option"][aria-current="true"] *,
+        li[role="option"][aria-current="true"] *,
+        div[role="option"][data-highlighted="true"] *,
+        li[role="option"][data-highlighted="true"] * {{
+            background: transparent !important;
+            color: var(--spt-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
+            fill: var(--spt-dd-dark-text) !important;
+            opacity: 1 !important;
+        }}
+
+        /* disabled / no option 狀態：仍然必須看得到。 */
+        div[aria-disabled="true"],
+        li[aria-disabled="true"],
+        div[data-baseweb="menu"] div[aria-disabled="true"],
+        div[data-baseweb="popover"] div[aria-disabled="true"] {{
+            background: var(--spt-dd-panel-bg) !important;
+            color: #26394c !important;
+            -webkit-text-fill-color: #26394c !important;
+            opacity: 1 !important;
+            font-weight: 900 !important;
+        }}
+        div[aria-disabled="true"] *,
+        li[aria-disabled="true"] * {{
+            color: #26394c !important;
+            -webkit-text-fill-color: #26394c !important;
+            fill: #26394c !important;
+            opacity: 1 !important;
+        }}
+
+        /* Streamlit data_editor/select editor popup compatibility. */
+        [data-baseweb="popover"] [role="listbox"],
+        [data-baseweb="popover"] [role="listbox"] *,
+        [data-baseweb="menu"] [role="option"],
+        [data-baseweb="menu"] [role="option"] * {{
+            color: var(--spt-dd-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-dd-dark-text) !important;
+            fill: var(--spt-dd-dark-text) !important;
+            opacity: 1 !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v273_dropdown_contrast_standard_final()
+except Exception:
+    pass
+# ===== V2.73 DROPDOWN CONTRAST STANDARD FINAL END =====
