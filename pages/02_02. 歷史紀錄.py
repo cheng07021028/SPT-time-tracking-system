@@ -842,24 +842,27 @@ with tab1:
         if st.session_state[edit_key]:
             edit_df = df.copy()
             history_select_key = "_spt_select_history_records_delete_ids"
+            editor_version_key = "history_editor_version"
+            if editor_version_key not in st.session_state:
+                st.session_state[editor_version_key] = 0
             _all_history_ids = [int(x) for x in edit_df["id"].dropna().tolist()] if "id" in edit_df.columns else []
             _selected_history_ids = set(int(x) for x in st.session_state.get(history_select_key, []) if int(x) in set(_all_history_ids))
             hc1, hc2, hc3 = st.columns([1, 1, 3])
             if hc1.button("◈ 勾選全部紀錄 / Select All", use_container_width=True, key="history_select_all_rows"):
                 st.session_state[history_select_key] = _all_history_ids
+                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                 rerun()
             if hc2.button("◌ 取消全部勾選 / Clear All", use_container_width=True, key="history_clear_all_rows"):
                 st.session_state[history_select_key] = []
+                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                 rerun()
             hc3.caption("勾選會保留到你手動取消、刪除成功或離開本頁；不會因重新計算後自動清空。")
+            _selected_history_ids = set(int(x) for x in st.session_state.get(history_select_key, []) if int(x) in set(_all_history_ids))
             if "刪除" not in edit_df.columns:
                 edit_df.insert(0, "刪除", edit_df["id"].map(lambda x: int(x) in _selected_history_ids if str(x).strip() not in {"", "nan", "None"} else False) if "id" in edit_df.columns else False)
             else:
                 edit_df["刪除"] = edit_df["id"].map(lambda x: int(x) in _selected_history_ids if str(x).strip() not in {"", "nan", "None"} else False) if "id" in edit_df.columns else False
-            # V2.28：確認執行後換用新的 data_editor key，強制表格重新讀取最新 DB 資料。
-            editor_version_key = "history_editor_version"
-            if editor_version_key not in st.session_state:
-                st.session_state[editor_version_key] = 0
+            # V2.34：全選/取消全選後必須換新 data_editor key，否則 Streamlit 會沿用舊 widget 暫存，看起來按鈕無作用。
             editor_key = f"history_editor_{st.session_state[editor_version_key]}"
             st.info("V2.28：表格內輸入或勾選不會立即重算；確認執行後會重新載入表格，顯示最新日期、時間與工時小計。")
             with st.form("history_records_commit_form", clear_on_submit=False):

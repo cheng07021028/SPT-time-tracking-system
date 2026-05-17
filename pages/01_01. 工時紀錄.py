@@ -168,22 +168,24 @@ if is_admin:
         else:
             admin_df = df.copy()
             admin_select_key = "_spt_select_today_records_admin_delete_ids"
+            editor_version_key = "today_records_admin_editor_version"
+            if editor_version_key not in st.session_state:
+                st.session_state[editor_version_key] = 0
             _all_admin_ids = [int(x) for x in admin_df["id"].dropna().tolist()] if "id" in admin_df.columns else []
             _selected_admin_ids = set(int(x) for x in st.session_state.get(admin_select_key, []) if int(x) in set(_all_admin_ids))
             sc1, sc2, sc3 = st.columns([1, 1, 3])
             if sc1.button("◈ 勾選全部紀錄 / Select All", use_container_width=True, key="today_admin_select_all_rows"):
                 st.session_state[admin_select_key] = _all_admin_ids
+                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                 st.rerun()
             if sc2.button("◌ 取消全部勾選 / Clear All", use_container_width=True, key="today_admin_clear_all_rows"):
                 st.session_state[admin_select_key] = []
+                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                 st.rerun()
             sc3.caption("勾選會保留到你手動取消、刪除成功或離開本頁；不會因重新計算後自動清空。")
+            _selected_admin_ids = set(int(x) for x in st.session_state.get(admin_select_key, []) if int(x) in set(_all_admin_ids))
             admin_df.insert(0, "刪除", admin_df["id"].map(lambda x: int(x) in _selected_admin_ids if str(x).strip() not in {"", "nan", "None"} else False) if "id" in admin_df.columns else False)
-            # V2.28：data_editor 會保留前一次 widget 暫存；儲存/重算/刪除後需換新 key，
-            # 才會重新載入資料庫最新內容，避免畫面仍顯示舊工時/舊日期時間。
-            editor_version_key = "today_records_admin_editor_version"
-            if editor_version_key not in st.session_state:
-                st.session_state[editor_version_key] = 0
+            # V2.34：全選/取消全選後必須換新 data_editor key，否則 Streamlit 會沿用舊 widget 暫存，看起來按鈕無作用。
             editor_key = f"today_records_admin_editor_{st.session_state[editor_version_key]}"
             st.info("V2.28：確認執行後會重新載入表格，畫面會同步顯示最新日期、時間與工時小計。")
             with st.form("today_records_admin_commit_form", clear_on_submit=False):

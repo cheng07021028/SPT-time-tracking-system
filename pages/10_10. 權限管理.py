@@ -409,11 +409,13 @@ with tab_accounts:
         if "v166_account_edit_enabled" not in st.session_state:
             st.session_state["v166_account_edit_enabled"] = False
         account_edit_enabled = bool(st.session_state.get("v166_account_edit_enabled", False))
+        st.session_state.setdefault("v235_account_editor_rev", 0)
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
             if st.button("⊕ 新增帳號 / Add User", use_container_width=True, disabled=not account_edit_enabled, key="v204_add_user_row_once"):
                 st.session_state["v133_users_df"] = pd.concat([st.session_state["v133_users_df"], pd.DataFrame([_blank_user_row()])], ignore_index=True)
+                st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 try:
                     from services.column_settings_service import clear_editor_draft
                     clear_editor_draft("v171_account_password_editor")
@@ -424,14 +426,17 @@ with tab_accounts:
         with c2:
             if st.button("⊖ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_select_delete"):
                 st.session_state["v133_users_df"]["刪除 / Delete"] = True
+                st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 st.rerun()
         with c3:
             if st.button("◌ 刪除欄取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_clear_delete"):
                 st.session_state["v133_users_df"]["刪除 / Delete"] = False
+                st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 st.rerun()
         with c4:
             if st.button("⟳ 重新載入 / Reload", use_container_width=True):
                 st.session_state["v133_users_df"] = _users_for_editor()
+                st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 st.rerun()
 
         st.warning("V1.76：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。")
@@ -442,7 +447,7 @@ with tab_accounts:
         # 放入 form 後，編輯期間不 rerun，只有按下 form_submit_button 才送出整張表。
         with st.form("v171_account_master_edit_form", clear_on_submit=False):
             edited_users = st.data_editor(
-                st.session_state["v133_users_df"], key="v171_account_password_editor", use_container_width=True,
+                st.session_state["v133_users_df"], key=f"v171_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}", use_container_width=True,
                 num_rows="fixed", hide_index=True,
                 disabled=not account_edit_enabled,
                 height=360,
@@ -573,6 +578,7 @@ with tab_perm:
         role_opts = ["全部 / All"] + ROLE_OPTIONS
         selected_role = st.selectbox("角色篩選 / Filter Role", role_opts)
     view_df = perm_df.copy()
+    st.session_state.setdefault("v235_permission_editor_rev", 0)
     if selected_user != "全部 / All":
         view_df = view_df[view_df["username"] == selected_user]
     if selected_module != "全部 / All":
@@ -584,18 +590,23 @@ with tab_perm:
     with b1:
         if st.button("◈ 可進入全選 / Select View", use_container_width=True):
             view_df["can_view"] = True
+            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b2:
         if st.button("◌ 可進入取消 / Clear View", use_container_width=True):
             view_df["can_view"] = False
+            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b3:
         if st.button("◈ 編輯全選 / Select Edit", use_container_width=True):
             view_df["can_edit"] = True
+            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b4:
         if st.button("⟰ 匯出全選 / Select Export", use_container_width=True):
             view_df["can_export"] = True
+            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b5:
         if st.button("⛨ 管理全選 / Select Manage", use_container_width=True):
             view_df["can_manage"] = True
+            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     base_cols = ["username", "display_name", "role_code", "module_code", "module_name_zh", "module_name_en"]
     col_cfg = {
         "username": st.column_config.TextColumn("帳號 / Username", disabled=True),
@@ -609,7 +620,7 @@ with tab_perm:
         col_cfg[key] = st.column_config.CheckboxColumn(f"{zh} / {en}")
     st.info("V1.89：權限表已改成確認後才套用。勾選權限時不會每一下都觸發整頁運算。")
     with st.form("permission_editor_commit_form", clear_on_submit=False):
-        edited_perm = st.data_editor(view_df[base_cols + ACTION_COLS], key="v189_permission_editor", use_container_width=True, hide_index=True, column_config=col_cfg)
+        edited_perm = st.data_editor(view_df[base_cols + ACTION_COLS], key=f"v189_permission_editor_{st.session_state.get('v235_permission_editor_rev', 0)}", use_container_width=True, hide_index=True, column_config=col_cfg)
         submitted_perm = st.form_submit_button("▣ 確認套用並儲存權限 / Apply and Save Permissions", type="primary", use_container_width=True)
     st.markdown("#### 權限摘要預覽 / Permission Summary Preview")
     st.dataframe(_permission_summary(edited_perm), use_container_width=True, hide_index=True)

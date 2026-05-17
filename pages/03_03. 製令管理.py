@@ -29,6 +29,7 @@ require_module_access("03_work_orders")
 render_header("03｜製令管理", "Excel 匯入、貼上資料、手動新增、頁面編輯、刪除、全選與存檔")
 
 STATE_KEY = "v138_work_orders_editor"
+EDITOR_REV_KEY = f"{STATE_KEY}_rev"
 COLS = ["_delete", "id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
 
 
@@ -195,10 +196,17 @@ def reload_data():
     df = load_work_orders()
     df.insert(0, "_delete", False)
     st.session_state[STATE_KEY] = ensure_cols(df)
+    st.session_state[EDITOR_REV_KEY] = int(st.session_state.get(EDITOR_REV_KEY, 0)) + 1
+
+
+def touch_editor():
+    st.session_state[EDITOR_REV_KEY] = int(st.session_state.get(EDITOR_REV_KEY, 0)) + 1
 
 
 if STATE_KEY not in st.session_state:
     reload_data()
+if EDITOR_REV_KEY not in st.session_state:
+    st.session_state[EDITOR_REV_KEY] = 0
 
 
 tab1, tab2, tab3 = st.tabs(["製令清單編輯", "Excel 匯入", "貼上資料"])
@@ -214,18 +222,23 @@ with tab1:
             "created_at": "", "updated_at": ""
         }])
         st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
+        touch_editor()
         rerun()
     if c2.button("◈ 啟用全選", use_container_width=True):
         st.session_state[STATE_KEY]["is_active"] = True
+        touch_editor()
         rerun()
     if c3.button("◌ 啟用全取消", use_container_width=True):
         st.session_state[STATE_KEY]["is_active"] = False
+        touch_editor()
         rerun()
     if c4.button("⊖ 刪除欄全選", use_container_width=True):
         st.session_state[STATE_KEY]["_delete"] = True
+        touch_editor()
         rerun()
     if c5.button("◌ 刪除欄取消", use_container_width=True):
         st.session_state[STATE_KEY]["_delete"] = False
+        touch_editor()
         rerun()
     if c6.button("⟳ 重新載入", use_container_width=True):
         reload_data()
@@ -255,12 +268,13 @@ with tab1:
                 "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
                 "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
             },
-            key="work_orders_data_editor_v189",
+            key=f"work_orders_data_editor_v189_{st.session_state.get(EDITOR_REV_KEY, 0)}",
         )
         submitted_work_orders = st.form_submit_button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True)
 
     if submitted_work_orders:
         st.session_state[STATE_KEY] = ensure_cols(edited)
+        touch_editor()
         result = save_work_orders(st.session_state[STATE_KEY])
         reload_data()
         st.success(f"儲存完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
@@ -295,6 +309,7 @@ with tab3:
             a1, a2 = st.columns(2)
             if a1.button("⊕ 加入清單編輯 / Add to Editor", type="secondary", use_container_width=True, key="add_pasted_work_orders_to_editor_v138"):
                 st.session_state[STATE_KEY] = pd.concat([parsed, st.session_state[STATE_KEY]], ignore_index=True)
+                touch_editor()
                 st.success("已加入『製令清單編輯』頁，請切回第一個頁籤確認後按儲存。")
 
             if a2.button("▣ 直接儲存貼上資料 / Save Pasted Work Orders", type="primary", use_container_width=True, key="save_pasted_work_orders_v138"):

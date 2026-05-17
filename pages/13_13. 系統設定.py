@@ -85,9 +85,13 @@ def _refresh_after_apply(message: str, *edit_mode_keys: str) -> None:
             st.session_state[k] = False
     _clear_editor_state(
         "system_process_options_editor_v192",
+        "system_process_options_editor_v234",
         "system_process_apply_action_v192",
         "system_rest_periods_editor_v192",
+        "system_rest_periods_editor_v234",
         "system_rest_apply_action_v192",
+        "_spt_13_process_delete_ids",
+        "_spt_13_rest_delete_ids",
     )
     st.session_state["_spt_13_pending_apply_message"] = message
     st.rerun()
@@ -102,6 +106,17 @@ proc_df = load_process_options_df(active_only=False)
 if proc_df.empty:
     proc_df = pd.DataFrame(columns=["id", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
 proc_view = _normalize_delete_column(proc_df)
+# V2.34：系統設定的刪除勾選狀態獨立保存；按全選/取消全選時換 data_editor key，避免 Streamlit 沿用舊暫存。
+proc_select_key = "_spt_13_process_delete_ids"
+proc_editor_version_key = "system_process_options_editor_version_v234"
+if proc_editor_version_key not in st.session_state:
+    st.session_state[proc_editor_version_key] = 0
+_proc_existing_ids = [int(float(x)) for x in proc_view["id"].dropna().tolist()] if "id" in proc_view.columns else []
+_proc_selected_ids = set(int(x) for x in st.session_state.get(proc_select_key, []) if int(x) in set(_proc_existing_ids))
+if "id" in proc_view.columns:
+    proc_view["刪除"] = proc_view["id"].map(lambda x: int(float(x)) in _proc_selected_ids if str(x).strip() not in {"", "nan", "None"} else False)
+else:
+    proc_view["刪除"] = False
 
 proc_edit_key = "_spt_13_process_edit_mode"
 if can_manage:
@@ -118,13 +133,16 @@ if can_manage and st.session_state.get(proc_edit_key, False):
     st.info("目前為工段編輯模式：可新增、修改、勾選刪除。完成後請選擇動作並按『確認套用』，才會永久保存與套用到 01 工時紀錄。")
     pc1, pc2, pc3 = st.columns([1, 1, 3])
     if pc1.button("◈ 刪除欄全選 / Select All", key="system_process_delete_all_v232", use_container_width=True):
-        proc_view["刪除"] = True
-        st.session_state["system_process_options_editor_v192"] = proc_view
+        st.session_state[proc_select_key] = _proc_existing_ids
+        st.session_state[proc_editor_version_key] = int(st.session_state.get(proc_editor_version_key, 0)) + 1
         st.rerun()
     if pc2.button("◌ 取消全部勾選 / Clear All", key="system_process_delete_clear_v232", use_container_width=True):
-        proc_view["刪除"] = False
-        st.session_state["system_process_options_editor_v192"] = proc_view
+        st.session_state[proc_select_key] = []
+        st.session_state[proc_editor_version_key] = int(st.session_state.get(proc_editor_version_key, 0)) + 1
         st.rerun()
+    _proc_selected_ids = set(int(x) for x in st.session_state.get(proc_select_key, []) if int(x) in set(_proc_existing_ids))
+    if "id" in proc_view.columns:
+        proc_view["刪除"] = proc_view["id"].map(lambda x: int(float(x)) in _proc_selected_ids if str(x).strip() not in {"", "nan", "None"} else False)
     pc3.caption("勾選會保留到你手動取消、刪除成功或離開本頁；不會因確認套用後自動取消。")
     with st.form("system_process_options_apply_form", clear_on_submit=False):
         edited_proc = render_table(
@@ -132,7 +150,7 @@ if can_manage and st.session_state.get(proc_edit_key, False):
             "system_process_options",
             editable=True,
             disabled=["id", "created_at", "updated_at"],
-            key="system_process_options_editor_v192",
+            key=f"system_process_options_editor_v234_{st.session_state[proc_editor_version_key]}",
             height=430,
             num_rows="dynamic",
         )
@@ -145,6 +163,11 @@ if can_manage and st.session_state.get(proc_edit_key, False):
         submitted = st.form_submit_button("▣ 確認套用 / Apply", type="primary", use_container_width=True)
 
     if submitted and edited_proc is not None:
+        try:
+            _checked_proc_ids = [int(float(x)) for x in edited_proc[edited_proc["刪除"].astype(bool)]["id"].dropna().tolist()]
+            st.session_state[proc_select_key] = _checked_proc_ids
+        except Exception:
+            pass
         if action == "套用並永久儲存工段名稱設定":
             save_df = edited_proc.drop(columns=["刪除"], errors="ignore")
             count = save_process_options_df(save_df)
@@ -175,6 +198,17 @@ rest_df = load_rest_periods_df(active_only=False)
 if rest_df.empty:
     rest_df = pd.DataFrame(columns=["id", "name", "start_time", "end_time", "is_active", "sort_order"])
 rest_view = _normalize_delete_column(rest_df)
+# V2.34：休息時間刪除勾選狀態獨立保存；按全選/取消全選時換 data_editor key。
+rest_select_key = "_spt_13_rest_delete_ids"
+rest_editor_version_key = "system_rest_periods_editor_version_v234"
+if rest_editor_version_key not in st.session_state:
+    st.session_state[rest_editor_version_key] = 0
+_rest_existing_ids = [int(float(x)) for x in rest_view["id"].dropna().tolist()] if "id" in rest_view.columns else []
+_rest_selected_ids = set(int(x) for x in st.session_state.get(rest_select_key, []) if int(x) in set(_rest_existing_ids))
+if "id" in rest_view.columns:
+    rest_view["刪除"] = rest_view["id"].map(lambda x: int(float(x)) in _rest_selected_ids if str(x).strip() not in {"", "nan", "None"} else False)
+else:
+    rest_view["刪除"] = False
 
 rest_edit_key = "_spt_13_rest_edit_mode"
 if can_manage:
@@ -191,13 +225,16 @@ if can_manage and st.session_state.get(rest_edit_key, False):
     st.info("目前為休息時間編輯模式：可新增、修改、勾選刪除。完成後請按『確認套用』，才會永久保存並套用到工時計算。")
     rc1, rc2, rc3, rc4 = st.columns([1, 1, 1.2, 2.8])
     if rc1.button("◈ 刪除欄全選 / Select All", key="system_rest_delete_all_v232", use_container_width=True):
-        rest_view["刪除"] = True
-        st.session_state["system_rest_periods_editor_v192"] = rest_view
+        st.session_state[rest_select_key] = _rest_existing_ids
+        st.session_state[rest_editor_version_key] = int(st.session_state.get(rest_editor_version_key, 0)) + 1
         st.rerun()
     if rc2.button("◌ 取消全部勾選 / Clear All", key="system_rest_delete_clear_v232", use_container_width=True):
-        rest_view["刪除"] = False
-        st.session_state["system_rest_periods_editor_v192"] = rest_view
+        st.session_state[rest_select_key] = []
+        st.session_state[rest_editor_version_key] = int(st.session_state.get(rest_editor_version_key, 0)) + 1
         st.rerun()
+    _rest_selected_ids = set(int(x) for x in st.session_state.get(rest_select_key, []) if int(x) in set(_rest_existing_ids))
+    if "id" in rest_view.columns:
+        rest_view["刪除"] = rest_view["id"].map(lambda x: int(float(x)) in _rest_selected_ids if str(x).strip() not in {"", "nan", "None"} else False)
     if rc3.button("⌁ 合併重複休息時間", key="system_rest_dedupe_v232", use_container_width=True):
         n = dedupe_rest_periods()
         _export_permanent_settings(f"已合併重複休息時間設定 {n} 筆")
@@ -209,7 +246,7 @@ if can_manage and st.session_state.get(rest_edit_key, False):
             "system_rest_periods",
             editable=True,
             disabled=["id"],
-            key="system_rest_periods_editor_v192",
+            key=f"system_rest_periods_editor_v234_{st.session_state[rest_editor_version_key]}",
             height=360,
             num_rows="dynamic",
         )
@@ -222,6 +259,11 @@ if can_manage and st.session_state.get(rest_edit_key, False):
         submitted = st.form_submit_button("▣ 確認套用 / Apply", type="primary", use_container_width=True)
 
     if submitted and edited_rest is not None:
+        try:
+            _checked_rest_ids = [int(float(x)) for x in edited_rest[edited_rest["刪除"].astype(bool)]["id"].dropna().tolist()]
+            st.session_state[rest_select_key] = _checked_rest_ids
+        except Exception:
+            pass
         if action == "套用並永久儲存休息時間設定":
             save_df = edited_rest.drop(columns=["刪除"], errors="ignore")
             count = save_rest_periods_df(save_df)
