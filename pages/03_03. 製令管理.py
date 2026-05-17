@@ -235,8 +235,15 @@ def _normalize_excel_sheets(sheets: dict[str, pd.DataFrame]) -> dict[str, pd.Dat
 
 
 def _read_excel_source(uploaded=None, path_text: str = "") -> dict[str, pd.DataFrame]:
+    """Read Excel source as raw rows so user can choose which row is the header.
+
+    V2.45: OneDrive / exported schedules often have titles, notes, or blank rows
+    before the real header. Reading with header=None preserves the original row
+    numbers and lets the user select 「標題欄是第幾列」 safely.
+    """
+    read_kwargs = {"sheet_name": None, "header": None, "dtype": object}
     if uploaded is not None:
-        return _normalize_excel_sheets(pd.read_excel(uploaded, sheet_name=None))
+        return {str(k): v for k, v in pd.read_excel(uploaded, **read_kwargs).items()}
     path_text = str(path_text or "").strip().strip('"')
     if not path_text:
         return {}
@@ -248,7 +255,37 @@ def _read_excel_source(uploaded=None, path_text: str = "") -> dict[str, pd.DataF
         path = files[0]
     if not path.exists():
         return {}
-    return _normalize_excel_sheets(pd.read_excel(path, sheet_name=None))
+    return {str(k): v for k, v in pd.read_excel(path, **read_kwargs).items()}
+
+def _guess_header_row(df_raw: pd.DataFrame, max_scan_rows: int = 80) -> int:
+    """Guess 1-based header row for messy Excel exports."""
+    if df_raw is None or df_raw.empty:
+        return 1
+    tokens = ["製令", "work order", "p/n", "料號", "part", "機型", "type", "組立", "assembly", "客戶", "customer", "備註", "note", "啟用", "active"]
+    best_row = 1
+    best_score = -1
+    limit = min(len(df_raw), max_scan_rows)
+    for i in range(limit):
+        vals = [str(v).replace("\u3000", " ").replace("\xa0", " ").strip().lower() for v in df_raw.iloc[i].tolist() if str(v).strip() and str(v).lower() != "nan"]
+        joined = " | ".join(vals)
+        score = sum(1 for t in tokens if t in joined)
+        # Prefer rows with several non-empty cells when score ties.
+        score = score * 10 + min(len(vals), 9)
+        if score > best_score:
+            best_score = score
+            best_row = i + 1
+    return max(1, best_row)
+
+def _apply_header_row(df_raw: pd.DataFrame, header_row_1based: int) -> pd.DataFrame:
+    """Build a dataframe using the selected Excel row as column header."""
+    if df_raw is None or df_raw.empty:
+        return pd.DataFrame()
+    idx = max(0, min(int(header_row_1based or 1) - 1, len(df_raw) - 1))
+    headers = df_raw.iloc[idx].tolist()
+    data = df_raw.iloc[idx + 1:].copy()
+    data.columns = headers
+    data = data.dropna(how="all").reset_index(drop=True)
+    return _make_unique_columns(data)
 
 def _map_excel_work_orders(df_raw: pd.DataFrame, mapping: dict[str, str]) -> pd.DataFrame:
     if df_raw is None or df_raw.empty:
@@ -421,12 +458,27 @@ with tab4:
     sheets = st.session_state.get("wo_onedrive_sheets_v243", {})
     if sheets:
         sheet = st.selectbox("選擇活頁 / Select Sheet", list(sheets.keys()), key="wo_onedrive_sheet_select_v243")
-        src = _make_unique_columns(sheets[sheet])
+        raw_src = sheets[sheet]
+        guess_row = _guess_header_row(raw_src)
+        max_header_row = max(1, min(len(raw_src), 300))
+        h1, h2 = st.columns([1, 2])
+        header_row = h1.number_input(
+            "標題欄是第幾列 / Header row number",
+            min_value=1,
+            max_value=max_header_row,
+            value=min(max(guess_row, 1), max_header_row),
+            step=1,
+            key=f"wo_onedrive_header_row_v245_{sheet}",
+            help="請輸入來源 Excel 真正欄位標題所在列數。若前面有標題、說明、空白列，請改成實際標題列。",
+        )
+        h2.info("系統會用你指定的那一列當欄位標題，下一列開始才視為製令資料；這可避免排程表前方說明列造成欄位對應錯誤。")
+        src = _apply_header_row(raw_src, int(header_row))
+        st.caption(f"目前使用第 {int(header_row)} 列作為標題欄；已取得 {len(src)} 筆資料列。")
         st.dataframe(
             src.head(30),
             use_container_width=True,
             height=260,
-            key=f"wo_onedrive_source_preview_v244_{sheet}",
+            key=f"wo_onedrive_source_preview_v245_{sheet}_{int(header_row)}",
             column_order=list(src.columns.astype(str)),
         )
         cols = [""] + list(src.columns.astype(str))
