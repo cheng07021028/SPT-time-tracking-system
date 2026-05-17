@@ -203,8 +203,11 @@ if is_admin:
                     if not delete_ids:
                         st.warning("請先在『刪除』勾選欄勾選要重新計算的紀錄，再按確認執行。")
                     else:
+                        # V2.26：若管理員剛修改開始/結束時間戳，先儲存並同步日期/時間欄位，再重新計算。
+                        save_df = edited_admin.drop(columns=["刪除"], errors="ignore")
+                        save_time_records(save_df, recalc_edited_timestamps=False)
                         count = recalculate_time_records(delete_ids)
-                        st.success(f"已重新計算 {count} 筆工時，並同步更新到 02 歷史紀錄。")
+                        st.success(f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時，同步更新到 02 歷史紀錄。")
                         st.rerun()
                 else:
                     if not delete_ids:
