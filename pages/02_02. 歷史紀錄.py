@@ -384,6 +384,117 @@ def _is_cross_day_record_df(df: pd.DataFrame) -> pd.Series:
     return start_date.ne("") & end_date.ne("") & start_date.ne(end_date)
 
 
+
+def _duration_series_to_hours(series: pd.Series, index=None) -> pd.Series:
+    """Convert work_hours values to decimal hours.
+
+    支援資料格式：
+    - 1.5 / "1.5"：視為小時
+    - "00:03:36"、"12:30:00"：HH:MM:SS
+    - "1:30"：HH:MM
+    - "0 days 01:02:03" / pandas timedelta 字串
+    - "1時2分3秒"、"90分"
+    
+    修正異常篩選原本用 pd.to_numeric，導致 00:03:36 全部變 NaN/0 的問題。
+    """
+    if index is None:
+        index = getattr(series, "index", None)
+    if series is None:
+        return pd.Series(0.0, index=index)
+    raw = series.reindex(index) if index is not None else series
+    out = pd.Series(0.0, index=raw.index, dtype="float64")
+
+    # Numeric values already represent hours in this project.
+    numeric = pd.to_numeric(raw, errors="coerce")
+    numeric_mask = numeric.notna()
+    out.loc[numeric_mask] = numeric.loc[numeric_mask].astype(float)
+
+    text = raw.fillna("").astype(str).str.strip()
+    blank = text.str.lower().isin(["", "none", "nan", "nat", "null"])
+
+    def parse_one(s: str) -> float:
+        s = str(s).strip()
+        if not s or s.lower() in ["none", "nan", "nat", "null"]:
+            return 0.0
+        # Pure numeric string means hours.
+        try:
+            return float(s)
+        except Exception:
+            pass
+
+        # Chinese duration text.
+        try:
+            h = re.search(r"(\d+(?:\.\d+)?)\s*(?:時|小時|hr|hrs|hour|hours)", s, flags=re.I)
+            m = re.search(r"(\d+(?:\.\d+)?)\s*(?:分|分鐘|min|mins|minute|minutes)", s, flags=re.I)
+            sec = re.search(r"(\d+(?:\.\d+)?)\s*(?:秒|sec|secs|second|seconds)", s, flags=re.I)
+            if h or m or sec:
+                return (float(h.group(1)) if h else 0.0) + (float(m.group(1)) / 60 if m else 0.0) + (float(sec.group(1)) / 3600 if sec else 0.0)
+        except Exception:
+            pass
+
+        # HH:MM:SS or HH:MM.
+        if ":" in s:
+            try:
+                # Strip optional day prefix like "0 days 01:02:03".
+                day_hours = 0.0
+                dm = re.search(r"(\d+)\s+days?\s+", s, flags=re.I)
+                if dm:
+                    day_hours = int(dm.group(1)) * 24.0
+                    s2 = re.sub(r"\d+\s+days?\s+", "", s, flags=re.I).strip()
+                else:
+                    s2 = s
+                parts = [float(x) for x in s2.split(":") if str(x).strip() != ""]
+                if len(parts) == 3:
+                    return day_hours + parts[0] + parts[1] / 60 + parts[2] / 3600
+                if len(parts) == 2:
+                    return day_hours + parts[0] + parts[1] / 60
+            except Exception:
+                pass
+
+        try:
+            td = pd.to_timedelta(s, errors="coerce")
+            if pd.notna(td):
+                return float(td.total_seconds()) / 3600
+        except Exception:
+            pass
+        return 0.0
+
+    text_mask = ~blank & ~numeric_mask
+    if text_mask.any():
+        out.loc[text_mask] = text.loc[text_mask].map(parse_one).astype(float)
+    return out.fillna(0.0)
+
+
+def _has_end_info_df(df: pd.DataFrame) -> pd.Series:
+    """Robust ended-record detection for filters.
+
+    過去只看 end_timestamp，若歷史資料只有 end_date/end_time/status/work_hours，
+    『已結束』『未按結束』『有開始無結束』會判斷錯。
+    """
+    if df is None or df.empty:
+        return pd.Series(False, index=getattr(df, "index", None))
+    ended = pd.Series(False, index=df.index)
+    for col in ["end_timestamp", "end_date", "end_time"]:
+        if col in df.columns:
+            ended = ended | (~_normalize_end_blank(df[col]))
+    if "status" in df.columns:
+        status_text = df["status"].fillna("").astype(str).str.strip().str.lower()
+        running_words = {"", "作業中", "進行中", "running", "active", "in progress", "open"}
+        ended = ended | (~status_text.isin({x.lower() for x in running_words}))
+    if "work_hours" in df.columns:
+        ended = ended | _duration_series_to_hours(df["work_hours"], df.index).gt(0)
+    return ended.fillna(False)
+
+
+def _has_start_info_df(df: pd.DataFrame) -> pd.Series:
+    if df is None or df.empty:
+        return pd.Series(False, index=getattr(df, "index", None))
+    started = pd.Series(False, index=df.index)
+    for col in ["start_timestamp", "start_date", "start_time"]:
+        if col in df.columns:
+            started = started | (~_normalize_end_blank(df[col]))
+    return started.fillna(False)
+
 def _is_cross_day_end_df(df: pd.DataFrame) -> pd.Series:
     """Return True for records that start on one date and finish on another date.
 
@@ -396,22 +507,7 @@ def _is_cross_day_end_df(df: pd.DataFrame) -> pd.Series:
     if df is None or df.empty:
         return pd.Series(False, index=getattr(df, "index", None))
     cross_day = _is_cross_day_record_df(df)
-    if "end_timestamp" in df.columns:
-        ended_by_ts = ~_normalize_end_blank(df["end_timestamp"])
-    else:
-        ended_by_ts = pd.Series(False, index=df.index)
-    _, end_date = _history_start_end_dates(df)
-    ended_by_date = end_date.ne("")
-    if "status" in df.columns:
-        status_text = df["status"].fillna("").astype(str).str.strip()
-        ended_by_status = status_text.ne("") & ~status_text.isin(["作業中", "進行中", "running", "active"])
-    else:
-        ended_by_status = pd.Series(False, index=df.index)
-    if "work_hours" in df.columns:
-        ended_by_hours = pd.to_numeric(df["work_hours"], errors="coerce").fillna(0).gt(0)
-    else:
-        ended_by_hours = pd.Series(False, index=df.index)
-    ended = ended_by_ts | ended_by_date | ended_by_status | ended_by_hours
+    ended = _has_end_info_df(df)
     return cross_day & ended
 
 
@@ -474,12 +570,11 @@ def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     in_list("status", filters.get("statuses", []))
 
     end_state = str(filters.get("end_state") or "全部")
-    if "end_timestamp" in out.columns:
-        end_blank = _normalize_end_blank(out["end_timestamp"])
-        if end_state == "未結束":
-            out = out[end_blank]
-        elif end_state == "已結束":
-            out = out[~end_blank]
+    ended_mask = _has_end_info_df(out)
+    if end_state == "未結束":
+        out = out[~ended_mask]
+    elif end_state == "已結束":
+        out = out[ended_mask]
 
     keyword = str(filters.get("keyword") or "").strip()
     if keyword:
@@ -503,28 +598,27 @@ def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     in_list("title", filters.get("titles", []))
 
     anomaly = str(filters.get("anomaly_filter") or "全部")
-    hours = pd.to_numeric(out["work_hours"], errors="coerce") if "work_hours" in out.columns else pd.Series(0, index=out.index)
+    hours = _duration_series_to_hours(out["work_hours"], out.index) if "work_hours" in out.columns else pd.Series(0.0, index=out.index)
+    ended_mask = _has_end_info_df(out)
+    started_mask = _has_start_info_df(out)
     if anomaly == "工時 = 0":
-        out = out[hours.fillna(0).eq(0)]
+        out = out[hours.eq(0)]
     elif anomaly == "工時小於5分鐘":
-        out = out[(hours.fillna(0) > 0) & (hours.fillna(0) < (5 / 60))]
+        out = out[hours.gt(0) & hours.lt(5 / 60)]
     elif anomaly == "工時大於8小時":
-        out = out[hours.fillna(0) > 8]
+        out = out[hours.gt(8)]
     elif anomaly == "工時大於12小時":
-        out = out[hours.fillna(0) > 12]
+        out = out[hours.gt(12)]
     elif anomaly == "未按結束":
-        if "end_timestamp" in out.columns:
-            out = out[_normalize_end_blank(out["end_timestamp"])]
+        out = out[~ended_mask]
     elif anomaly == "跨日紀錄":
         out = out[_is_cross_day_record_df(out)]
     elif anomaly == "跨日結束":
         out = out[_is_cross_day_end_df(out)]
     elif anomaly == "有開始無結束":
-        if "start_timestamp" in out.columns and "end_timestamp" in out.columns:
-            out = out[~_normalize_end_blank(out["start_timestamp"]) & _normalize_end_blank(out["end_timestamp"])]
+        out = out[started_mask & ~ended_mask]
     elif anomaly == "有結束無開始":
-        if "start_timestamp" in out.columns and "end_timestamp" in out.columns:
-            out = out[_normalize_end_blank(out["start_timestamp"]) & ~_normalize_end_blank(out["end_timestamp"])]
+        out = out[~started_mask & ended_mask]
 
     sort_by = str(filters.get("sort_by") or "ID由新到舊")
     try:
@@ -537,9 +631,9 @@ def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
         elif sort_by == "開始時間由舊到新" and "start_timestamp" in out.columns:
             out = out.sort_values("start_timestamp", ascending=True)
         elif sort_by == "工時由大到小" and "work_hours" in out.columns:
-            out = out.assign(_wh=pd.to_numeric(out["work_hours"], errors="coerce")).sort_values("_wh", ascending=False).drop(columns=["_wh"])
+            out = out.assign(_wh=_duration_series_to_hours(out["work_hours"], out.index)).sort_values("_wh", ascending=False).drop(columns=["_wh"])
         elif sort_by == "工時由小到大" and "work_hours" in out.columns:
-            out = out.assign(_wh=pd.to_numeric(out["work_hours"], errors="coerce")).sort_values("_wh", ascending=True).drop(columns=["_wh"])
+            out = out.assign(_wh=_duration_series_to_hours(out["work_hours"], out.index)).sort_values("_wh", ascending=True).drop(columns=["_wh"])
         elif sort_by == "製令排序" and "work_order" in out.columns:
             out = out.sort_values(["work_order", "process_name", "employee_id"], ascending=True)
         elif sort_by == "人員排序" and "employee_id" in out.columns:
@@ -687,10 +781,10 @@ end = history_filters.get("end_date", str(_seed_end))
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("篩選筆數 / Records", f"{len(df):,}")
 m2.metric("總工時 / Total Time", hours_to_hms(df['work_hours'].sum()) if not df.empty and 'work_hours' in df.columns else "00:00:00")
-if not df.empty and 'end_timestamp' in df.columns:
-    _end_blank = _normalize_end_blank(df['end_timestamp'])
-    m3.metric("未結束 / Open", f"{_end_blank.sum():,}")
-    m4.metric("已結束 / Closed", f"{(~_end_blank).sum():,}")
+if not df.empty:
+    _ended_metric = _has_end_info_df(df)
+    m3.metric("未結束 / Open", f"{(~_ended_metric).sum():,}")
+    m4.metric("已結束 / Closed", f"{_ended_metric.sum():,}")
 else:
     m3.metric("未結束 / Open", "0")
     m4.metric("已結束 / Closed", "0")
