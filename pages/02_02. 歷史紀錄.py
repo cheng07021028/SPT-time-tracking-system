@@ -818,9 +818,14 @@ with tab1:
             edit_df = df.copy()
             if "刪除" not in edit_df.columns:
                 edit_df.insert(0, "刪除", False)
-            st.info("V1.97：表格內輸入或勾選不會立即重算；選擇動作後按確認執行才會儲存、重算或刪除。")
+            # V2.28：確認執行後換用新的 data_editor key，強制表格重新讀取最新 DB 資料。
+            editor_version_key = "history_editor_version"
+            if editor_version_key not in st.session_state:
+                st.session_state[editor_version_key] = 0
+            editor_key = f"history_editor_{st.session_state[editor_version_key]}"
+            st.info("V2.28：表格內輸入或勾選不會立即重算；確認執行後會重新載入表格，顯示最新日期、時間與工時小計。")
             with st.form("history_records_commit_form", clear_on_submit=False):
-                edited = render_table(edit_df, "history_records", editable=True, disabled=["id", "record_key", "created_at", "updated_at"], key="history_editor", height=560)
+                edited = render_table(edit_df, "history_records", editable=True, disabled=["id", "record_key", "created_at", "updated_at"], key=editor_key, height=560)
                 history_action = st.radio(
                     "確認後執行動作",
                     ["儲存編輯", "重新計算勾選紀錄工時", "刪除勾選整列紀錄"],
@@ -840,6 +845,7 @@ with tab1:
                     save_df = edited.drop(columns=["刪除"], errors="ignore")
                     count = save_time_records(save_df)
                     st.success(f"已儲存 {count} 筆歷史紀錄。")
+                    st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                     rerun()
                 elif history_action == "重新計算勾選紀錄工時":
                     if not delete_ids:
@@ -850,6 +856,7 @@ with tab1:
                         save_time_records(save_df, recalc_edited_timestamps=False)
                         count = recalculate_time_records(delete_ids)
                         st.success(f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時。")
+                        st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                         rerun()
                 else:
                     if not can_delete:
@@ -859,6 +866,7 @@ with tab1:
                     else:
                         count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
                         st.success(f"已刪除 {count} 筆歷史紀錄。")
+                        st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                         rerun()
         else:
             _render_history_view_table(df, "history_records", height=520)

@@ -168,14 +168,20 @@ if is_admin:
         else:
             admin_df = df.copy()
             admin_df.insert(0, "刪除", False)
-            st.info("V1.89：此維護表格已改成『確認後才執行』。在表格內輸入、勾選、切換欄位時不會立即存檔、刪除或重新計算；按下下方確認執行才會處理。")
+            # V2.28：data_editor 會保留前一次 widget 暫存；儲存/重算/刪除後需換新 key，
+            # 才會重新載入資料庫最新內容，避免畫面仍顯示舊工時/舊日期時間。
+            editor_version_key = "today_records_admin_editor_version"
+            if editor_version_key not in st.session_state:
+                st.session_state[editor_version_key] = 0
+            editor_key = f"today_records_admin_editor_{st.session_state[editor_version_key]}"
+            st.info("V2.28：確認執行後會重新載入表格，畫面會同步顯示最新日期、時間與工時小計。")
             with st.form("today_records_admin_commit_form", clear_on_submit=False):
                 edited_admin = render_table(
                     admin_df,
                     "today_records_admin_maintenance",
                     editable=True,
                     disabled=["id", "record_key", "created_at", "updated_at"],
-                    key="today_records_admin_editor",
+                    key=editor_key,
                     height=460,
                 )
                 admin_action = st.radio(
@@ -198,6 +204,7 @@ if is_admin:
                     save_df = edited_admin.drop(columns=["刪除"], errors="ignore")
                     count = save_time_records(save_df)
                     st.success(f"已由管理員存檔修改 {count} 筆今日工時紀錄。")
+                    st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                     st.rerun()
                 elif admin_action == "重新計算勾選紀錄工時並同步 02 歷史紀錄":
                     if not delete_ids:
@@ -208,6 +215,7 @@ if is_admin:
                         save_time_records(save_df, recalc_edited_timestamps=False)
                         count = recalculate_time_records(delete_ids)
                         st.success(f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時，同步更新到 02 歷史紀錄。")
+                        st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                         st.rerun()
                 else:
                     if not delete_ids:
@@ -215,4 +223,5 @@ if is_admin:
                     else:
                         count = delete_time_records(delete_ids, reason="01 工時紀錄管理員維護區刪除")
                         st.success(f"已由管理員刪除 {count} 筆今日工時紀錄。")
+                        st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                         st.rerun()
