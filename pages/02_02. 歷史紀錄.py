@@ -1110,7 +1110,9 @@ with tab3:
         st.warning("目前帳號沒有 02 歷史紀錄編輯權限，不能貼上匯入歷史資料。")
     else:
         st.caption("支援從 Excel 複製整批資料貼上。建議包含標題列：狀態、製令、P/N、機型、工段名稱、工號、姓名、開始時間戳、結束時間戳、備註、組立地點。")
-        raw = st.text_area("貼上 Excel 複製的歷史紀錄資料", height=260, key=HISTORY_PASTE_RAW_KEY)
+        paste_raw_version_key = "v239_history_paste_raw_version"
+        paste_raw_widget_key = f"{HISTORY_PASTE_RAW_KEY}_{int(st.session_state.get(paste_raw_version_key, 0))}"
+        raw = st.text_area("貼上 Excel 複製的歷史紀錄資料", height=260, key=paste_raw_widget_key)
         recalc_paste = st.checkbox("貼上匯入時依 13｜系統設定休息時間重新計算工時", value=True, key="history_paste_recalc_v197")
         if raw.strip():
             parsed, has_header, warnings = parse_pasted_history(raw)
@@ -1130,7 +1132,10 @@ with tab3:
                     if result.get("inserted", 0) == 0 and result.get("updated", 0) == 0:
                         _add_history_result("warning", "這次沒有寫入任何資料。請確認解析預覽中的工號、製令、工段名稱、開始時間戳是否正確。")
                     else:
-                        st.session_state[HISTORY_PASTE_RAW_KEY] = ""
+                        # 不可在 text_area 建立後直接改同一個 session_state key，
+                        # 否則 Streamlit 會拋 StreamlitAPIException。
+                        # 改用 key version 方式，成功匯入後下一次 rerun 產生新輸入框，達到清空效果。
+                        st.session_state[paste_raw_version_key] = int(st.session_state.get(paste_raw_version_key, 0)) + 1
                     rerun()
                 st.caption("匯入前預覽 / Parsed Preview")
                 st.dataframe(parsed, use_container_width=True, height=360)
