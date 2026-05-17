@@ -18,12 +18,16 @@ def clear_rest_periods_cache() -> None:
 def parse_dt(value: str | datetime) -> datetime:
     if isinstance(value, datetime):
         return value
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+    if isinstance(value, date):
+        return datetime.combine(value, time(0, 0, 0))
+    text = str(value).strip().replace("/", "-").replace("T", " ")
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
         try:
-            return datetime.strptime(str(value), fmt)
+            return datetime.strptime(text[:19] if len(text) >= 19 else text, fmt)
         except ValueError:
             pass
-    return datetime.fromisoformat(str(value))
+    # Last fallback for pandas Timestamp-like / ISO values.
+    return datetime.fromisoformat(text)
 
 
 def _combine(d: date, hhmm: str) -> datetime:

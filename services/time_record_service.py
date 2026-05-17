@@ -18,6 +18,157 @@ def _now() -> str:
     return now_text()
 
 
+
+def _is_blank_value(value) -> bool:
+    """Return True for empty / None / NaN / textual None values from Streamlit data_editor."""
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    if value is None:
+        return True
+    text = str(value).strip()
+    return text == "" or text.lower() in {"none", "nan", "nat", "null"}
+
+
+def _clean_text_value(value):
+    if _is_blank_value(value):
+        return None
+    if isinstance(value, (datetime, date)):
+        if isinstance(value, datetime):
+            return value.strftime("%Y-%m-%d %H:%M:%S")
+        return value.strftime("%Y-%m-%d")
+    return str(value).strip()
+
+
+def _normalize_time_text(value) -> str | None:
+    if _is_blank_value(value):
+        return None
+    if isinstance(value, datetime):
+        return value.strftime("%H:%M:%S")
+    try:
+        # pandas/Excel may provide datetime.time-like objects.
+        if hasattr(value, "hour") and hasattr(value, "minute"):
+            sec = int(getattr(value, "second", 0) or 0)
+            return f"{int(value.hour):02d}:{int(value.minute):02d}:{sec:02d}"
+    except Exception:
+        pass
+    text = str(value).strip().replace("：", ":")
+    if " " in text and any(sep in text for sep in ("-", "/")):
+        text = text.split(" ")[-1]
+    if "T" in text:
+        text = text.split("T")[-1]
+    parts = text.split(":")
+    try:
+        h = int(float(parts[0]))
+        m = int(float(parts[1])) if len(parts) > 1 else 0
+        sec = int(float(parts[2])) if len(parts) > 2 else 0
+        if 0 <= h <= 23 and 0 <= m <= 59 and 0 <= sec <= 59:
+            return f"{h:02d}:{m:02d}:{sec:02d}"
+    except Exception:
+        return text[:8] if text else None
+    return None
+
+
+def _normalize_date_text(value) -> str | None:
+    if _is_blank_value(value):
+        return None
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
+    text = str(value).strip()
+    try:
+        dt = pd.to_datetime(text, errors="coerce")
+        if not pd.isna(dt):
+            return dt.strftime("%Y-%m-%d")
+    except Exception:
+        pass
+    text = text.replace("/", "-")
+    return text[:10]
+
+
+def _normalize_timestamp_value(timestamp_value=None, date_value=None, time_value=None) -> str | None:
+    """Normalize timestamp/date/time edits into 'YYYY-MM-DD HH:MM:SS'.
+
+    Priority:
+    1. If timestamp contains a date/time, use it.
+    2. If timestamp is date-only and time field exists, combine them.
+    3. If timestamp is empty, combine date + time.
+
+    This is used after manual edits in 01/02 so changing Start Timestamp or End
+    Timestamp also refreshes Start Date/Time and End Date/Time consistently.
+    """
+    ts = None if _is_blank_value(timestamp_value) else timestamp_value
+    d = _normalize_date_text(date_value)
+    t = _normalize_time_text(time_value)
+
+    if ts is not None:
+        if isinstance(ts, datetime):
+            return ts.strftime("%Y-%m-%d %H:%M:%S")
+        if isinstance(ts, date):
+            return f"{ts.strftime('%Y-%m-%d')} {t or '00:00:00'}"
+        text = str(ts).strip().replace("/", "-").replace("T", " ")
+        # Try pandas first to support 2026/5/7 8:03, Timestamp, Excel-like strings.
+        try:
+            dt = pd.to_datetime(text, errors="coerce")
+            if not pd.isna(dt):
+                # If user typed date-only timestamp and provided a time field, keep that time.
+                if (":" not in text) and t:
+                    return f"{dt.strftime('%Y-%m-%d')} {t}"
+                return dt.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+        # Fallback: split manually.
+        if " " in text:
+            date_part, time_part = text.split(" ", 1)
+            nd = _normalize_date_text(date_part)
+            nt = _normalize_time_text(time_part)
+            if nd:
+                return f"{nd} {nt or t or '00:00:00'}"
+        nd = _normalize_date_text(text)
+        if nd:
+            return f"{nd} {t or '00:00:00'}"
+
+    if d:
+        return f"{d} {t or '00:00:00'}"
+    return None
+
+
+def normalize_record_datetime_fields(row: dict | pd.Series, recalc_work_hours: bool = False) -> dict:
+    """Return normalized time/date fields for an edited time-record row.
+
+    If Start/End Timestamp is edited manually, this function confirms and rewrites:
+    - start_date / start_time
+    - end_date / end_time
+    - work_hours when recalc_work_hours=True and both timestamps exist
+    """
+    get = row.get if hasattr(row, "get") else lambda k, default=None: default
+    start_ts = _normalize_timestamp_value(get("start_timestamp"), get("start_date"), get("start_time"))
+    end_ts = _normalize_timestamp_value(get("end_timestamp"), get("end_date"), get("end_time"))
+
+    out: dict = {}
+    if start_ts:
+        out["start_timestamp"] = start_ts
+        out["start_date"], out["start_time"] = split_timestamp(start_ts)
+    else:
+        out["start_timestamp"] = None
+        out["start_date"] = _normalize_date_text(get("start_date"))
+        out["start_time"] = _normalize_time_text(get("start_time"))
+
+    if end_ts:
+        out["end_timestamp"] = end_ts
+        out["end_date"], out["end_time"] = split_timestamp(end_ts)
+    else:
+        out["end_timestamp"] = None
+        out["end_date"] = None
+        out["end_time"] = None
+
+    if recalc_work_hours and start_ts and end_ts:
+        out["work_hours"] = calculate_work_hours(start_ts, end_ts)
+    return out
+
 def make_record_key(employee_id: str, work_order: str, process_name: str, start_ts: str) -> str:
     return f"{employee_id}|{work_order}|{process_name}|{start_ts}|{uuid.uuid4().hex[:8]}"
 
@@ -518,7 +669,16 @@ def restore_today_hidden_records() -> int:
     )
     return 1
 
-def save_time_records(df: pd.DataFrame) -> int:
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:
+    """Save administrator edits from 01/02 tables.
+
+    Important V2.26 behavior:
+    - If Start Timestamp or End Timestamp was edited, confirm/sync the related
+      date/time columns again.
+    - When recalc_edited_timestamps=True, also recalculate work_hours from the
+      edited timestamps.
+    - Keeps normal save behavior for all other columns.
+    """
     if df is None or df.empty:
         return 0
     update_cols = [
@@ -531,14 +691,26 @@ def save_time_records(df: pd.DataFrame) -> int:
     for _, r in df.iterrows():
         if pd.isna(r.get("id")):
             continue
+
+        # Normalize timestamp/date/time consistency before saving.
+        normalized_dt = normalize_record_datetime_fields(r, recalc_work_hours=recalc_edited_timestamps)
+        row_values = dict(r)
+        row_values.update(normalized_dt)
+
         vals = []
         for c in update_cols:
-            v = r.get(c, "")
-            if pd.isna(v):
+            v = row_values.get(c, "")
+            if pd.isna(v) if not isinstance(v, (list, tuple, dict)) else False:
                 v = None
             if c == "work_hours" and v is not None:
-                # UI displays 00:00:00, database keeps decimal hours for calculation.
-                v = hms_to_hours(v)
+                # If recalculated, v is already decimal hours; otherwise UI may display HH:MM:SS.
+                try:
+                    if isinstance(v, (int, float)) and not isinstance(v, bool):
+                        v = float(v)
+                    else:
+                        v = hms_to_hours(v)
+                except Exception:
+                    v = hms_to_hours(v)
             if c == "is_group_work" and v is not None:
                 v = int(bool(v))
             vals.append(v)
@@ -552,7 +724,7 @@ def save_time_records(df: pd.DataFrame) -> int:
             vals,
         )
         count += 1
-    write_log("SAVE_TIME_RECORDS", f"人工編輯並儲存工時紀錄 {count} 筆", "time_records")
+    write_log("SAVE_TIME_RECORDS", f"人工編輯並儲存工時紀錄 {count} 筆；已同步確認日期/時間欄位", "time_records")
     return count
 
 
@@ -668,13 +840,20 @@ def recalculate_time_records(record_ids: list[int] | None = None) -> int:
         if not start_ts or not end_ts or pd.isna(start_ts) or pd.isna(end_ts):
             continue
         try:
-            hours = calculate_work_hours(str(start_ts), str(end_ts))
-            start_date, start_time = split_timestamp(str(start_ts))
-            end_date, end_time = split_timestamp(str(end_ts))
+            normalized = normalize_record_datetime_fields(r, recalc_work_hours=True)
+            start_ts2 = normalized.get("start_timestamp")
+            end_ts2 = normalized.get("end_timestamp")
+            if not start_ts2 or not end_ts2:
+                continue
+            hours = normalized.get("work_hours")
+            start_date = normalized.get("start_date")
+            start_time = normalized.get("start_time")
+            end_date = normalized.get("end_date")
+            end_time = normalized.get("end_time")
             status = r.get("status") or "已結束"
             if str(status) == "作業中":
                 status = r.get("end_action") or "已結束"
-            updates.append((hours, start_date, start_time, end_date, end_time, status, now, int(r["id"])))
+            updates.append((hours, start_ts2, end_ts2, start_date, start_time, end_date, end_time, status, now, int(r["id"])))
         except Exception as exc:
             errors.append(f"重新計算工時失敗 #{r.get('id')}: {exc}")
 
@@ -691,7 +870,7 @@ def recalculate_time_records(record_ids: list[int] | None = None) -> int:
             conn.executemany(
                 """
                 UPDATE time_records
-                SET work_hours=?, start_date=?, start_time=?, end_date=?, end_time=?, status=?, updated_at=?
+                SET work_hours=?, start_timestamp=?, end_timestamp=?, start_date=?, start_time=?, end_date=?, end_time=?, status=?, updated_at=?
                 WHERE id=?
                 """,
                 updates,
