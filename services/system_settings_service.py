@@ -201,6 +201,83 @@ def _table_count(table_name: str) -> int:
         return 0
 
 
+
+def _norm_time_key(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        if ":" in text:
+            parts = text.split(":")
+            h = int(float(parts[0]))
+            m = int(float(parts[1]))
+            return f"{h:02d}:{m:02d}"
+    except Exception:
+        pass
+    return text
+
+
+def _dedupe_rest_periods() -> int:
+    """Merge duplicate rest-period rows.
+
+    V2.32: 13｜系統設定曾因預設值、永久檔還原、手動套用重複導致
+    「二、休息時間設定」出現相同資料兩次。這裡以
+    name + start_time + end_time 為唯一邏輯鍵，只保留最早 id，並把啟用與排序資訊合併。
+    """
+    try:
+        df = query_df("SELECT id, name, start_time, end_time, is_active, sort_order FROM rest_periods ORDER BY sort_order, id")
+    except Exception:
+        return 0
+    if df is None or df.empty or "id" not in df.columns:
+        return 0
+    keep: dict[tuple[str, str, str], dict[str, Any]] = {}
+    remove_ids: list[int] = []
+    for _, r in df.iterrows():
+        try:
+            rid = int(float(r.get("id")))
+        except Exception:
+            continue
+        name = str(r.get("name") or "").strip()
+        start = _norm_time_key(r.get("start_time"))
+        end = _norm_time_key(r.get("end_time"))
+        if not start or not end:
+            continue
+        key = (name, start, end)
+        active = 1 if str(r.get("is_active", 1)).strip().lower() not in {"0", "false", "no", "n", "off", "停用", "否"} else 0
+        try:
+            sort_order = int(float(r.get("sort_order") or rid))
+        except Exception:
+            sort_order = rid
+        if key not in keep:
+            keep[key] = {"id": rid, "is_active": active, "sort_order": sort_order}
+        else:
+            target = keep[key]
+            remove_ids.append(rid)
+            target["is_active"] = max(int(target.get("is_active", 0)), active)
+            target["sort_order"] = min(int(target.get("sort_order", sort_order)), sort_order)
+    for key, info in keep.items():
+        try:
+            execute(
+                "UPDATE rest_periods SET is_active=?, sort_order=? WHERE id=?",
+                (int(info["is_active"]), int(info["sort_order"]), int(info["id"])),
+            )
+        except Exception:
+            pass
+    deleted = 0
+    for rid in remove_ids:
+        try:
+            execute("DELETE FROM rest_periods WHERE id=?", (rid,))
+            deleted += 1
+        except Exception:
+            pass
+    if deleted:
+        _clear_settings_cache()
+        try:
+            write_log("DEDUP_REST_PERIODS", f"自動合併重複休息時間設定 {deleted} 筆", "rest_periods", level="WARN")
+        except Exception:
+            pass
+    return deleted
+
 def _has_live_page_reset_setting() -> bool:
     try:
         row = query_one("SELECT setting_value FROM app_settings WHERE setting_key='live_page_reset_time'")
@@ -259,13 +336,23 @@ def _insert_rest_rows(rows: list[dict[str, Any]]) -> int:
             sort_order = int(float(r.get("sort_order") or idx))
         except Exception:
             sort_order = idx
-        execute(
-            """
-            INSERT INTO rest_periods(name, start_time, end_time, is_active, sort_order)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (name, start_time, end_time, is_active, sort_order),
+        existing = query_one(
+            "SELECT id FROM rest_periods WHERE name=? AND start_time=? AND end_time=? LIMIT 1",
+            (name, start_time, end_time),
         )
+        if existing and existing.get("id"):
+            execute(
+                "UPDATE rest_periods SET is_active=?, sort_order=? WHERE id=?",
+                (is_active, sort_order, int(existing.get("id"))),
+            )
+        else:
+            execute(
+                """
+                INSERT INTO rest_periods(name, start_time, end_time, is_active, sort_order)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (name, start_time, end_time, is_active, sort_order),
+            )
         count += 1
     return count
 
@@ -436,6 +523,11 @@ def ensure_system_settings_schema() -> None:
     except Exception:
         pass
 
+    try:
+        _dedupe_rest_periods()
+    except Exception:
+        pass
+
     _SYSTEM_SETTINGS_SCHEMA_READY = True
 
 
@@ -532,6 +624,10 @@ def delete_process_options(ids: Iterable[int]) -> int:
 
 def load_rest_periods_df(active_only: bool = False) -> pd.DataFrame:
     ensure_system_settings_schema()
+    try:
+        _dedupe_rest_periods()
+    except Exception:
+        pass
     sql = "SELECT id, name, start_time, end_time, is_active, sort_order FROM rest_periods WHERE 1=1"
     params: list = []
     if active_only:
@@ -545,13 +641,18 @@ def save_rest_periods_df(df: pd.DataFrame) -> int:
     if df is None:
         return 0
     count = 0
+    seen_keys: set[tuple[str, str, str]] = set()
     work = df.copy().drop(columns=["刪除", "delete", "selected"], errors="ignore").fillna("")
     for idx, (_, r) in enumerate(work.iterrows(), start=1):
         name = str(r.get("name", "")).strip() or f"休息{idx}"
-        start_time = str(r.get("start_time", "")).strip()
-        end_time = str(r.get("end_time", "")).strip()
+        start_time = _norm_time_key(r.get("start_time"))
+        end_time = _norm_time_key(r.get("end_time"))
         if not start_time or not end_time:
             continue
+        row_key = (name, start_time, end_time)
+        if row_key in seen_keys:
+            continue
+        seen_keys.add(row_key)
         active_raw = str(r.get("is_active", True)).strip().lower()
         is_active = 0 if active_raw in {"0", "false", "no", "n", "off", "停用", "否"} else 1
         try:
@@ -569,14 +670,28 @@ def save_rest_periods_df(df: pd.DataFrame) -> int:
                 (name, start_time, end_time, is_active, sort_order, int(float(rid))),
             )
         else:
-            execute(
-                """
-                INSERT INTO rest_periods(name, start_time, end_time, is_active, sort_order)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (name, start_time, end_time, is_active, sort_order),
+            existing = query_one(
+                "SELECT id FROM rest_periods WHERE name=? AND start_time=? AND end_time=? LIMIT 1",
+                (name, start_time, end_time),
             )
+            if existing and existing.get("id"):
+                execute(
+                    "UPDATE rest_periods SET is_active=?, sort_order=? WHERE id=?",
+                    (is_active, sort_order, int(existing.get("id"))),
+                )
+            else:
+                execute(
+                    """
+                    INSERT INTO rest_periods(name, start_time, end_time, is_active, sort_order)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (name, start_time, end_time, is_active, sort_order),
+                )
         count += 1
+    try:
+        _dedupe_rest_periods()
+    except Exception:
+        pass
     _clear_settings_cache()
     export_system_settings_permanent("save_rest_periods", write_history=True)
     write_log("SAVE_REST_PERIODS", f"儲存休息時間設定 {count} 筆，已寫入 13 系統設定永久檔", "rest_periods")
@@ -638,3 +753,12 @@ def save_live_page_reset_time(value: str) -> str:
     export_system_settings_permanent("save_live_page_reset_time", write_history=True)
     write_log("SAVE_LIVE_PAGE_RESET_TIME", f"儲存 01 工時紀錄每日重新整理時間：{value}，已寫入 13 系統設定永久檔", "app_settings")
     return value
+
+
+def dedupe_rest_periods() -> int:
+    """Public wrapper for 13｜系統設定：合併重複休息時間設定。"""
+    ensure_system_settings_schema()
+    n = _dedupe_rest_periods()
+    if n:
+        export_system_settings_permanent("dedupe_rest_periods", write_history=True)
+    return n

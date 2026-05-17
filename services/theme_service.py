@@ -605,8 +605,36 @@ div[data-testid="stExpander"] summary * {
     )
 
 
+def _clear_transient_selection_on_page_change() -> None:
+    """Clear batch-selection checkboxes when the user leaves a module page.
+
+    Selection checkboxes are operational state, not persistent settings.  Keep them
+    while the editor stays on the same page, but clear them automatically when the
+    page changes so the next module never inherits stale selected rows.
+    """
+    try:
+        import inspect
+        current = ""
+        for frame in inspect.stack():
+            fn = str(getattr(frame, "filename", "") or "")
+            if "/pages/" in fn.replace("\\", "/"):
+                current = fn.rsplit("/", 1)[-1]
+                break
+        if not current:
+            current = "streamlit_app.py"
+        prev = st.session_state.get("_spt_current_page_for_selection")
+        if prev and prev != current:
+            for k in list(st.session_state.keys()):
+                if str(k).startswith("_spt_select_"):
+                    st.session_state.pop(k, None)
+        st.session_state["_spt_current_page_for_selection"] = current
+    except Exception:
+        pass
+
+
 def apply_theme() -> None:
     _inject_css()
+    _clear_transient_selection_on_page_change()
     # V2.18: apply global font scale to every module page.
     # Best-effort only; visual theme must never break a page.
     try:
