@@ -673,49 +673,72 @@ def _clear_transient_selection_on_page_change() -> None:
 
 
 def _inject_multiselect_tag_height_fix() -> None:
-    """V2.57: keep select/multiselect text readable without white-dot artifacts."""
+    """V2.58: readable select/multiselect controls without clipping or white artifacts.
+
+    Streamlit/BaseWeb select controls have nested containers whose default height clips text
+    after global font scaling. This CSS keeps the field tall enough while hiding only the
+    invisible cursor/input artifacts that appeared as white blocks.
+    """
     try:
         st.markdown(
             """
             <style>
-            /* V2.57｜修正下拉/多選文字被切掉，同時去除白點 */
+            /* V2.58｜修正 selectbox / multiselect 文字被切掉，並移除白點/白方塊 */
             .stSelectbox,
             .stMultiSelect {
                 overflow: visible !important;
             }
 
+            /* Main select shell */
             .stSelectbox div[data-baseweb="select"],
             .stMultiSelect div[data-baseweb="select"] {
-                min-height: 48px !important;
+                min-height: 60px !important;
                 height: auto !important;
-                border-radius: 10px !important;
+                border-radius: 12px !important;
                 background: #eef7fb !important;
-                overflow: visible !important;
+                overflow: hidden !important;
+                display: flex !important;
+                align-items: center !important;
             }
 
+            /* Inner value container */
             .stSelectbox div[data-baseweb="select"] > div,
             .stMultiSelect div[data-baseweb="select"] > div {
-                min-height: 48px !important;
+                min-height: 58px !important;
                 height: auto !important;
-                padding-top: 6px !important;
-                padding-bottom: 6px !important;
+                padding-top: 10px !important;
+                padding-bottom: 10px !important;
                 align-items: center !important;
                 overflow: visible !important;
+                box-sizing: border-box !important;
             }
 
-            /* Selectbox / multiselect display text and placeholder */
+            /* BaseWeb nested containers: prevent vertical clipping under large font scale */
+            div[data-baseweb="select"] [class*="valueContainer"],
+            div[data-baseweb="select"] [class*="ValueContainer"],
+            div[data-baseweb="select"] [class*="singleValue"],
+            div[data-baseweb="select"] [class*="SingleValue"],
+            div[data-baseweb="select"] [class*="placeholder"],
+            div[data-baseweb="select"] [class*="Placeholder"] {
+                min-height: 34px !important;
+                height: auto !important;
+                line-height: 1.35 !important;
+                overflow: visible !important;
+                display: flex !important;
+                align-items: center !important;
+            }
+
+            /* Display text and placeholder */
             div[data-baseweb="select"] span,
-            div[data-baseweb="select"] div,
-            div[data-baseweb="select"] input,
-            div[data-baseweb="select"] input[type="text"] {
+            div[data-baseweb="select"] div {
                 color: #03121f !important;
                 -webkit-text-fill-color: #03121f !important;
                 font-weight: 850 !important;
-                font-size: inherit !important;
-                line-height: 1.45 !important;
+                line-height: 1.35 !important;
                 text-shadow: none !important;
             }
 
+            /* Search input inside select: keep usable, but no white block */
             div[data-baseweb="select"] input,
             div[data-baseweb="select"] input[type="text"],
             div[data-baseweb="select"] input[aria-autocomplete="list"] {
@@ -724,37 +747,48 @@ def _inject_multiselect_tag_height_fix() -> None:
                 border: 0 !important;
                 outline: 0 !important;
                 box-shadow: none !important;
-                min-height: 28px !important;
-                height: 28px !important;
-                line-height: 28px !important;
+                min-height: 34px !important;
+                height: 34px !important;
+                line-height: 34px !important;
                 padding: 0 !important;
                 margin: 0 !important;
+                color: #03121f !important;
+                -webkit-text-fill-color: #03121f !important;
                 caret-color: #03121f !important;
+                font-weight: 850 !important;
             }
 
             div[data-baseweb="select"] input::placeholder {
-                color: rgba(3,18,31,.78) !important;
-                -webkit-text-fill-color: rgba(3,18,31,.78) !important;
+                color: rgba(3,18,31,.88) !important;
+                -webkit-text-fill-color: rgba(3,18,31,.88) !important;
                 opacity: 1 !important;
+                line-height: 1.35 !important;
+            }
+
+            /* Hide empty search-input visual artifact only when it is visually empty */
+            div[data-baseweb="select"] input[value=""] {
+                background: transparent !important;
+                box-shadow: none !important;
             }
 
             /* Multiselect selected tags */
             div[data-baseweb="tag"] {
-                min-height: 32px !important;
+                min-height: 36px !important;
                 height: auto !important;
-                padding: 6px 10px !important;
-                border-radius: 9px !important;
+                padding: 7px 12px !important;
+                border-radius: 10px !important;
                 line-height: 1.35 !important;
                 display: inline-flex !important;
                 align-items: center !important;
-                background: linear-gradient(135deg, #bff7ff, #7ee8ff) !important;
+                background: linear-gradient(135deg, #c8fbff, #7ee8ff) !important;
                 color: #03121f !important;
                 -webkit-text-fill-color: #03121f !important;
                 font-weight: 900 !important;
                 overflow: visible !important;
                 white-space: nowrap !important;
-                margin-top: 2px !important;
-                margin-bottom: 2px !important;
+                margin-top: 3px !important;
+                margin-bottom: 3px !important;
+                box-shadow: 0 0 0 1px rgba(3,18,31,.10) inset !important;
             }
 
             div[data-baseweb="tag"] span,
@@ -774,15 +808,30 @@ def _inject_multiselect_tag_height_fix() -> None:
             }
 
             /* Dropdown list options */
+            div[data-baseweb="popover"] ul[role="listbox"],
+            div[data-baseweb="popover"] div[role="listbox"] {
+                background: #061423 !important;
+                border: 1px solid rgba(35,230,255,.42) !important;
+                border-radius: 12px !important;
+            }
+
             ul[role="listbox"] li,
             div[role="option"] {
-                min-height: 38px !important;
+                min-height: 42px !important;
+                height: auto !important;
                 line-height: 1.45 !important;
-                padding-top: 8px !important;
-                padding-bottom: 8px !important;
-                color: #03121f !important;
-                -webkit-text-fill-color: #03121f !important;
+                padding-top: 9px !important;
+                padding-bottom: 9px !important;
+                color: #ecfbff !important;
+                -webkit-text-fill-color: #ecfbff !important;
                 font-weight: 800 !important;
+                overflow: visible !important;
+            }
+
+            ul[role="listbox"] li *,
+            div[role="option"] * {
+                line-height: 1.45 !important;
+                overflow: visible !important;
             }
             </style>
             """,
@@ -790,7 +839,6 @@ def _inject_multiselect_tag_height_fix() -> None:
         )
     except Exception:
         pass
-
 
 def render_operation_results() -> None:
     """V2.57: legacy helper kept for compatibility; intentionally renders nothing."""
