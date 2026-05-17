@@ -30,6 +30,18 @@ require_module_access("04_employees")
 render_header("04｜人員名單", "人員主檔、在廠狀態、今日出勤勾選、清單編輯、刪除與儲存")
 
 STATE_KEY = "v138_employees_editor"
+EDITOR_VERSION_KEY = "v253_employees_editor_version"
+
+
+def _editor_key() -> str:
+    if EDITOR_VERSION_KEY not in st.session_state:
+        st.session_state[EDITOR_VERSION_KEY] = 0
+    return f"employees_data_editor_v253_{st.session_state[EDITOR_VERSION_KEY]}"
+
+
+def _refresh_editor_widget() -> None:
+    st.session_state[EDITOR_VERSION_KEY] = int(st.session_state.get(EDITOR_VERSION_KEY, 0)) + 1
+
 COLS = [
     "_delete", "id", "employee_id", "employee_name", "department", "title",
     "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at",
@@ -168,6 +180,8 @@ def parse_pasted_employees(raw: str) -> tuple[pd.DataFrame, bool, list[str]]:
             warnings.append("找不到『工號』欄位，資料將無法儲存。請確認標題列包含：工號 / 員工編號 / Employee ID。")
         if isinstance(employee_name, str):
             warnings.append("找不到『姓名』欄位，資料將無法儲存。請確認標題列包含：姓名 / 員工姓名 / Name。")
+        if isinstance(employee_id, str) or isinstance(employee_name, str):
+            return ensure_cols(pd.DataFrame()), has_header, warnings
 
         df = pd.DataFrame({
             "_delete": False,
@@ -225,43 +239,74 @@ tab1, tab2, tab3 = st.tabs(["人員清單編輯", "Excel 匯入", "貼上資料"
 with tab1:
     st.subheader("人員清單編輯 / Editable Employees")
 
+    if "v253_employee_edit_enabled" not in st.session_state:
+        st.session_state["v253_employee_edit_enabled"] = False
+    employee_edit_enabled = bool(st.session_state.get("v253_employee_edit_enabled", False))
+    ec1, ec2, ec3 = st.columns([1.2, 1.2, 3])
+    with ec1:
+        if st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=employee_edit_enabled, key="v253_enable_employee_edit"):
+            st.session_state["v253_employee_edit_enabled"] = True
+            _refresh_editor_widget()
+            rerun()
+    with ec2:
+        if st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not employee_edit_enabled, key="v253_disable_employee_edit"):
+            st.session_state["v253_employee_edit_enabled"] = False
+            reload_data()
+            _refresh_editor_widget()
+            rerun()
+    with ec3:
+        if employee_edit_enabled:
+            st.success("目前：已啟動編輯。修改後請按儲存才會正式寫入。")
+        else:
+            st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上人員名單。")
+
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    if c1.button("⊕ 新增空白列", use_container_width=True):
+    if c1.button("⊕ 新增空白列", use_container_width=True, disabled=not employee_edit_enabled):
         blank = pd.DataFrame([{
             "_delete": False, "id": "", "employee_id": "", "employee_name": "",
             "department": "", "title": "", "is_active": True, "is_in_factory": True,
             "is_today_attendance": True, "note": "", "created_at": "", "updated_at": ""
         }])
         st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
+        _refresh_editor_widget()
         rerun()
-    if c2.button("⊖ 刪除欄全選", use_container_width=True):
+    if c2.button("⊖ 刪除欄全選", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["_delete"] = True
+        _refresh_editor_widget()
         rerun()
-    if c3.button("◌ 刪除欄取消", use_container_width=True):
+    if c3.button("◌ 刪除欄取消", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["_delete"] = False
+        _refresh_editor_widget()
         rerun()
-    if c4.button("◈ 啟用全選", use_container_width=True):
+    if c4.button("◈ 啟用全選", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_active"] = True
+        _refresh_editor_widget()
         rerun()
-    if c5.button("◌ 啟用全取消", use_container_width=True):
+    if c5.button("◌ 啟用全取消", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_active"] = False
+        _refresh_editor_widget()
         rerun()
     if c6.button("⟳ 重新載入", use_container_width=True):
         reload_data()
+        _refresh_editor_widget()
         rerun()
 
     b1, b2, b3, b4 = st.columns(4)
-    if b1.button("⬡ 在廠全選", use_container_width=True):
+    if b1.button("⬡ 在廠全選", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_in_factory"] = True
+        _refresh_editor_widget()
         rerun()
-    if b2.button("⬡ 在廠全取消", use_container_width=True):
+    if b2.button("⬡ 在廠全取消", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_in_factory"] = False
+        _refresh_editor_widget()
         rerun()
-    if b3.button("⧖ 今日出勤全選", use_container_width=True):
+    if b3.button("⧖ 今日出勤全選", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_today_attendance"] = True
+        _refresh_editor_widget()
         rerun()
-    if b4.button("⧖ 今日出勤全取消", use_container_width=True):
+    if b4.button("⧖ 今日出勤全取消", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_today_attendance"] = False
+        _refresh_editor_widget()
         rerun()
 
     st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。工號 / Employee ID、姓名 / Name 為必填。")
@@ -293,14 +338,17 @@ with tab1:
                 "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
                 "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
             },
-            key="employees_data_editor_v189",
+            key=_editor_key(),
+            disabled=not employee_edit_enabled,
         )
-        submitted_employees = st.form_submit_button("▣ 確認儲存人員清單 / Save Employees", type="primary", use_container_width=True)
+        submitted_employees = st.form_submit_button("▣ 確認儲存人員清單 / Save Employees", type="primary", use_container_width=True, disabled=not employee_edit_enabled)
 
     if submitted_employees:
         st.session_state[STATE_KEY] = ensure_cols(edited)
         result = save_employees(st.session_state[STATE_KEY])
         reload_data()
+        _refresh_editor_widget()
+        st.session_state["v253_employee_edit_enabled"] = False
         st.success(f"儲存完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
         rerun()
 
@@ -331,11 +379,11 @@ with tab3:
                 st.warning(msg)
 
             a1, a2 = st.columns(2)
-            if a1.button("⊕ 加入清單編輯 / Add to Editor", type="secondary", use_container_width=True, key="add_pasted_employees_to_editor_v138"):
+            if a1.button("⊕ 加入清單編輯 / Add to Editor", type="secondary", use_container_width=True, key="add_pasted_employees_to_editor_v138", disabled=not st.session_state.get("v253_employee_edit_enabled", False)):
                 st.session_state[STATE_KEY] = pd.concat([parsed, st.session_state[STATE_KEY]], ignore_index=True)
                 st.success("已加入『人員清單編輯』頁，請切回第一個頁籤確認後按儲存。")
 
-            if a2.button("▣ 直接儲存貼上資料 / Save Pasted Employees", type="primary", use_container_width=True, key="save_pasted_employees_v138"):
+            if a2.button("▣ 直接儲存貼上資料 / Save Pasted Employees", type="primary", use_container_width=True, key="save_pasted_employees_v138", disabled=not st.session_state.get("v253_employee_edit_enabled", False)):
                 result = save_employees(parsed)
                 reload_data()
                 st.success(f"貼上資料已儲存：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")

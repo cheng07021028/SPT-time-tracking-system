@@ -178,6 +178,7 @@ def parse_pasted_work_orders(raw: str) -> tuple[pd.DataFrame, bool, list[str]]:
 
         if isinstance(work_order, str):
             warnings.append("找不到『製令』欄位，資料將無法儲存。請確認標題列包含：製令 / 工單 / WO / MO。")
+            return ensure_cols(pd.DataFrame()), has_header, warnings
 
         df = pd.DataFrame({
             "_delete": False,
@@ -571,8 +572,29 @@ with tab1:
     st.subheader("製令清單編輯 / Editable Work Orders")
     render_work_order_summary(st.session_state.get(STATE_KEY, pd.DataFrame()))
 
+    if "v253_work_order_edit_enabled" not in st.session_state:
+        st.session_state["v253_work_order_edit_enabled"] = False
+    work_order_edit_enabled = bool(st.session_state.get("v253_work_order_edit_enabled", False))
+    ec1, ec2, ec3 = st.columns([1.2, 1.2, 3])
+    with ec1:
+        if st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=work_order_edit_enabled, key="v253_enable_work_order_edit"):
+            st.session_state["v253_work_order_edit_enabled"] = True
+            _refresh_editor_widget()
+            rerun()
+    with ec2:
+        if st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not work_order_edit_enabled, key="v253_disable_work_order_edit"):
+            st.session_state["v253_work_order_edit_enabled"] = False
+            reload_data()
+            _refresh_editor_widget()
+            rerun()
+    with ec3:
+        if work_order_edit_enabled:
+            st.success("目前：已啟動編輯。修改後請按儲存才會正式寫入。")
+        else:
+            st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上製令。")
+
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    if c1.button("⊕ 新增空白列", use_container_width=True):
+    if c1.button("⊕ 新增空白列", use_container_width=True, disabled=not work_order_edit_enabled):
         blank = pd.DataFrame([{
             "_delete": False, "id": "", "work_order": "", "part_no": "", "type_name": "",
             "assembly_location": "", "customer": "", "note": "", "is_active": True,
@@ -581,19 +603,19 @@ with tab1:
         st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
         _refresh_editor_widget()
         rerun()
-    if c2.button("◈ 啟用全選", use_container_width=True):
+    if c2.button("◈ 啟用全選", use_container_width=True, disabled=not work_order_edit_enabled):
         st.session_state[STATE_KEY]["is_active"] = True
         _refresh_editor_widget()
         rerun()
-    if c3.button("◌ 啟用全取消", use_container_width=True):
+    if c3.button("◌ 啟用全取消", use_container_width=True, disabled=not work_order_edit_enabled):
         st.session_state[STATE_KEY]["is_active"] = False
         _refresh_editor_widget()
         rerun()
-    if c4.button("⊖ 刪除欄全選", use_container_width=True):
+    if c4.button("⊖ 刪除欄全選", use_container_width=True, disabled=not work_order_edit_enabled):
         st.session_state[STATE_KEY]["_delete"] = True
         _refresh_editor_widget()
         rerun()
-    if c5.button("◌ 刪除欄取消", use_container_width=True):
+    if c5.button("◌ 刪除欄取消", use_container_width=True, disabled=not work_order_edit_enabled):
         st.session_state[STATE_KEY]["_delete"] = False
         _refresh_editor_widget()
         rerun()
@@ -632,14 +654,16 @@ with tab1:
                 "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
             },
             key=_editor_key(),
+            disabled=not work_order_edit_enabled,
         )
-        submitted_work_orders = st.form_submit_button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True)
+        submitted_work_orders = st.form_submit_button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True, disabled=not work_order_edit_enabled)
 
     if submitted_work_orders:
         st.session_state[STATE_KEY] = ensure_cols(edited)
         result = save_work_orders(st.session_state[STATE_KEY])
         reload_data()
         _refresh_editor_widget()
+        st.session_state["v253_work_order_edit_enabled"] = False
         st.success(f"儲存完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
         rerun()
 
@@ -654,7 +678,7 @@ with tab2:
         parsed = parse_pasted_work_orders(source_df.to_csv(sep="\t", index=False))[0] if not source_df.empty else ensure_cols(pd.DataFrame())
         st.success(f"已解析 {len(parsed)} 筆製令資料。")
         st.dataframe(parsed[["work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active"]], use_container_width=True, height=300)
-        if st.button("▣ 確認匯入 Excel 製令 / Import Excel Work Orders", type="primary", use_container_width=True, key="wo_excel_import_confirm_v243"):
+        if st.button("▣ 確認匯入 Excel 製令 / Import Excel Work Orders", type="primary", use_container_width=True, key="wo_excel_import_confirm_v243", disabled=not st.session_state.get("v253_work_order_edit_enabled", False)):
             result = save_work_orders(parsed)
             reload_data()
             st.success(f"Excel 匯入完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
@@ -679,11 +703,11 @@ with tab3:
                 st.warning(msg)
 
             a1, a2 = st.columns(2)
-            if a1.button("⊕ 加入清單編輯 / Add to Editor", type="secondary", use_container_width=True, key="add_pasted_work_orders_to_editor_v138"):
+            if a1.button("⊕ 加入清單編輯 / Add to Editor", type="secondary", use_container_width=True, key="add_pasted_work_orders_to_editor_v138", disabled=not st.session_state.get("v253_work_order_edit_enabled", False)):
                 st.session_state[STATE_KEY] = pd.concat([parsed, st.session_state[STATE_KEY]], ignore_index=True)
                 st.success("已加入『製令清單編輯』頁，請切回第一個頁籤確認後按儲存。")
 
-            if a2.button("▣ 直接儲存貼上資料 / Save Pasted Work Orders", type="primary", use_container_width=True, key="save_pasted_work_orders_v138"):
+            if a2.button("▣ 直接儲存貼上資料 / Save Pasted Work Orders", type="primary", use_container_width=True, key="save_pasted_work_orders_v138", disabled=not st.session_state.get("v253_work_order_edit_enabled", False)):
                 result = save_work_orders(parsed)
                 reload_data()
                 st.success(f"貼上資料已儲存：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
