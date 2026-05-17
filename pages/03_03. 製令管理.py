@@ -20,6 +20,20 @@ except Exception:
 from services.crud_table_service import load_work_orders, save_work_orders
 
 try:
+    from services.work_order_sync_settings_service import (
+        get_sheet_setting,
+        save_sheet_setting,
+        clear_work_order_sync_settings,
+    )
+except Exception:
+    def get_sheet_setting(sheet_name: str):
+        return {"header_row": 1, "mapping": {}, "delete_missing": False}
+    def save_sheet_setting(sheet_name: str, header_row: int, mapping: dict, delete_missing: bool = False):
+        return {}
+    def clear_work_order_sync_settings():
+        return None
+
+try:
     from services.security_service import require_module_access
 except Exception:
     def require_module_access(module_code: str):
@@ -459,39 +473,53 @@ with tab4:
     if sheets:
         sheet = st.selectbox("選擇活頁 / Select Sheet", list(sheets.keys()), key="wo_onedrive_sheet_select_v243")
         raw_src = sheets[sheet]
+        saved_cfg = get_sheet_setting(sheet)
+        saved_mapping = saved_cfg.get("mapping", {}) if isinstance(saved_cfg.get("mapping"), dict) else {}
         guess_row = _guess_header_row(raw_src)
+        try:
+            saved_header_row = int(saved_cfg.get("header_row") or guess_row or 1)
+        except Exception:
+            saved_header_row = guess_row
         max_header_row = max(1, min(len(raw_src), 300))
         h1, h2 = st.columns([1, 2])
         header_row = h1.number_input(
             "標題欄是第幾列 / Header row number",
             min_value=1,
             max_value=max_header_row,
-            value=min(max(guess_row, 1), max_header_row),
+            value=min(max(saved_header_row, 1), max_header_row),
             step=1,
-            key=f"wo_onedrive_header_row_v245_{sheet}",
-            help="請輸入來源 Excel 真正欄位標題所在列數。若前面有標題、說明、空白列，請改成實際標題列。",
+            key=f"wo_onedrive_header_row_v246_{sheet}",
+            help="請輸入來源 Excel 真正欄位標題所在列數。若前面有標題、說明、空白列，請改成實際標題列。此設定會永久記錄。",
         )
-        h2.info("系統會用你指定的那一列當欄位標題，下一列開始才視為製令資料；這可避免排程表前方說明列造成欄位對應錯誤。")
+        h2.info("系統會用你指定的那一列當欄位標題，下一列開始才視為製令資料；標題列與欄位對應在確認套用後會永久記錄，下次不用重新設定。")
         src = _apply_header_row(raw_src, int(header_row))
         st.caption(f"目前使用第 {int(header_row)} 列作為標題欄；已取得 {len(src)} 筆資料列。")
         st.dataframe(
             src.head(30),
             use_container_width=True,
             height=260,
-            key=f"wo_onedrive_source_preview_v245_{sheet}_{int(header_row)}",
+            key=f"wo_onedrive_source_preview_v246_{sheet}_{int(header_row)}",
             column_order=list(src.columns.astype(str)),
         )
         cols = [""] + list(src.columns.astype(str))
-        st.markdown("### 欄位對應 / Column Mapping")
+
+        def _mapping_index(target: str, predicate):
+            saved_col = str(saved_mapping.get(target, "") or "")
+            if saved_col in cols:
+                return cols.index(saved_col)
+            return next((i for i, c in enumerate(cols) if predicate(str(c))), 0)
+
+        st.markdown("### 欄位對應 / Column Mapping（確認套用後永久記錄）")
+        st.caption("若來源活頁格式固定，只要設定一次；之後讀取相同活頁會自動帶入標題欄列號與所有欄位對應。")
         m1, m2, m3 = st.columns(3)
         mapping = {
-            "work_order": m1.selectbox("製令 / Work Order", cols, index=next((i for i,c in enumerate(cols) if '製令' in c or 'work order' in c.lower()), 0)),
-            "part_no": m2.selectbox("P/N / Part No.", cols, index=next((i for i,c in enumerate(cols) if 'p/n' in c.lower() or '料號' in c), 0)),
-            "type_name": m3.selectbox("機型 / Type", cols, index=next((i for i,c in enumerate(cols) if '機型' in c or 'type' in c.lower()), 0)),
-            "assembly_location": m1.selectbox("組立地點 / Assembly Location", cols, index=next((i for i,c in enumerate(cols) if '組立' in c or 'assembly' in c.lower()), 0)),
-            "customer": m2.selectbox("客戶 / Customer", cols, index=next((i for i,c in enumerate(cols) if '客戶' in c or 'customer' in c.lower()), 0)),
-            "note": m3.selectbox("備註 / Note", cols, index=next((i for i,c in enumerate(cols) if '備註' in c or 'note' in c.lower()), 0)),
-            "is_active": m1.selectbox("啟用 / Active", cols, index=next((i for i,c in enumerate(cols) if '啟用' in c or 'active' in c.lower()), 0)),
+            "work_order": m1.selectbox("製令 / Work Order", cols, index=_mapping_index("work_order", lambda c: '製令' in c or 'work order' in c.lower()), key=f"wo_map_work_order_v246_{sheet}"),
+            "part_no": m2.selectbox("P/N / Part No.", cols, index=_mapping_index("part_no", lambda c: 'p/n' in c.lower() or '料號' in c), key=f"wo_map_part_no_v246_{sheet}"),
+            "type_name": m3.selectbox("機型 / Type", cols, index=_mapping_index("type_name", lambda c: '機型' in c or 'type' in c.lower()), key=f"wo_map_type_name_v246_{sheet}"),
+            "assembly_location": m1.selectbox("組立地點 / Assembly Location", cols, index=_mapping_index("assembly_location", lambda c: '組立' in c or 'assembly' in c.lower()), key=f"wo_map_assembly_location_v246_{sheet}"),
+            "customer": m2.selectbox("客戶 / Customer", cols, index=_mapping_index("customer", lambda c: '客戶' in c or 'customer' in c.lower()), key=f"wo_map_customer_v246_{sheet}"),
+            "note": m3.selectbox("備註 / Note", cols, index=_mapping_index("note", lambda c: '備註' in c or 'note' in c.lower()), key=f"wo_map_note_v246_{sheet}"),
+            "is_active": m1.selectbox("啟用 / Active", cols, index=_mapping_index("is_active", lambda c: '啟用' in c or 'active' in c.lower()), key=f"wo_map_is_active_v246_{sheet}"),
         }
         incoming = _map_excel_work_orders(src, mapping)
         current = load_work_orders()
@@ -506,8 +534,22 @@ with tab4:
             st.dataframe(upd_df, use_container_width=True, height=220)
         with st.expander("可刪除製令預覽 / Delete Candidates", expanded=False):
             st.dataframe(del_df, use_container_width=True, height=220)
-        do_delete = st.checkbox("同步刪除來源不存在的舊製令 / Delete old work orders not in source", value=False, key="wo_sync_delete_missing_v243")
-        if st.button("▣ 確認套用對應更新 / Apply Mapped Sync", type="primary", use_container_width=True, key="wo_onedrive_apply_v243"):
+        do_delete = st.checkbox(
+            "同步刪除來源不存在的舊製令 / Delete old work orders not in source",
+            value=bool(saved_cfg.get("delete_missing", False)),
+            key=f"wo_sync_delete_missing_v246_{sheet}",
+        )
+        sc1, sc2 = st.columns(2)
+        if sc1.button("▣ 永久記錄目前欄位對應 / Save Mapping Only", use_container_width=True, key=f"wo_save_mapping_only_v246_{sheet}"):
+            save_sheet_setting(sheet, int(header_row), mapping, bool(do_delete))
+            st.success("已永久記錄目前 OneDrive 製令欄位對應設定。下次進入此活頁會自動帶入。")
+        if sc2.button("◌ 清除本頁欄位對應設定 / Clear Mapping", use_container_width=True, key=f"wo_clear_mapping_v246_{sheet}"):
+            clear_work_order_sync_settings()
+            st.warning("已清除 OneDrive 製令欄位對應永久設定；重新讀取後會回到自動判斷。")
+            rerun()
+
+        if st.button("▣ 確認套用對應更新 / Apply Mapped Sync", type="primary", use_container_width=True, key="wo_onedrive_apply_v246"):
+            save_sheet_setting(sheet, int(header_row), mapping, bool(do_delete))
             save_df = incoming.copy()
             if do_delete and not del_df.empty:
                 del_mark = del_df.copy()
@@ -515,5 +557,5 @@ with tab4:
                 save_df = pd.concat([save_df, del_mark], ignore_index=True)
             result = save_work_orders(save_df)
             reload_data()
-            st.success(f"製令同步完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}。新增：{', '.join(add_df['work_order'].head(20).astype(str).tolist()) or '無'}；刪除：{', '.join(del_df['work_order'].head(20).astype(str).tolist()) if do_delete else '未執行刪除'}")
+            st.success(f"製令同步完成，且已永久記錄欄位對應：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}。新增：{', '.join(add_df['work_order'].head(20).astype(str).tolist()) or '無'}；刪除：{', '.join(del_df['work_order'].head(20).astype(str).tolist()) if do_delete else '未執行刪除'}")
             rerun()
