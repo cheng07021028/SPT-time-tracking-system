@@ -266,7 +266,7 @@ def render_width_settings(table_key: str, df: pd.DataFrame, title: str = "欄寬
     if df is None or df.empty:
         return
     show_key = f"show_widths_{table_key}"
-    show = st.toggle(f"⚙️ 顯示{title}", value=False, key=show_key)
+    show = st.toggle(f"⌬️ 顯示{title}", value=False, key=show_key)
     if not show:
         return
     widths = load_widths(table_key)
