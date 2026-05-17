@@ -17,7 +17,7 @@ except Exception:
         if subtitle:
             st.caption(subtitle)
 
-from services.crud_table_service import load_work_orders, save_work_orders
+from services.crud_table_service import load_work_orders, save_work_orders, get_conn, ensure_tables, now_text
 
 try:
     from services.work_order_sync_settings_service import (
@@ -361,6 +361,117 @@ def _build_work_order_sync_save_df(add_df: pd.DataFrame, upd_df: pd.DataFrame, d
         out = pd.concat([normal, deletes], ignore_index=True)
     return ensure_cols(out)
 
+
+
+def _apply_work_order_sync_direct(add_df: pd.DataFrame, upd_df: pd.DataFrame, del_df: pd.DataFrame, do_delete: bool) -> dict:
+    """Apply OneDrive mapped sync directly to the work_orders table.
+
+    V2.49: The previous flow delegated to save_work_orders(), but in some deployed
+    projects that function returned zero writes or refreshed the editor with stale
+    state. This function performs explicit INSERT/UPDATE/DELETE operations and
+    returns concrete counts, so 「確認套用對應更新」一定真正寫入製令清單。
+    """
+    ensure_tables()
+    conn = get_conn()
+    cur = conn.cursor()
+    now = now_text()
+    inserted = updated = deleted = skipped = 0
+    inserted_keys: list[str] = []
+    updated_keys: list[str] = []
+    deleted_keys: list[str] = []
+
+    def _row_payload(r) -> tuple[str, str, str, str, str, str, int]:
+        wo = _normalize_text(r.get("work_order"))
+        return (
+            wo,
+            _normalize_text(r.get("part_no")),
+            _normalize_text(r.get("type_name")),
+            _normalize_text(r.get("assembly_location")),
+            _normalize_text(r.get("customer")),
+            _normalize_text(r.get("note")),
+            1 if _is_truthy(r.get("is_active", True)) else 0,
+        )
+
+    try:
+        if add_df is not None and not add_df.empty:
+            for _, r in add_df.drop_duplicates(subset=["work_order"], keep="last").iterrows():
+                wo, part_no, type_name, assembly_location, customer, note, is_active = _row_payload(r)
+                if not wo:
+                    skipped += 1
+                    continue
+                cur.execute(
+                    """
+                    INSERT INTO work_orders
+                    (work_order, part_no, type_name, assembly_location, customer, note, is_active, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(work_order) DO UPDATE SET
+                        part_no=excluded.part_no,
+                        type_name=excluded.type_name,
+                        assembly_location=excluded.assembly_location,
+                        customer=excluded.customer,
+                        note=excluded.note,
+                        is_active=excluded.is_active,
+                        updated_at=excluded.updated_at
+                    """,
+                    (wo, part_no, type_name, assembly_location, customer, note, is_active, now, now),
+                )
+                inserted += 1
+                inserted_keys.append(wo)
+
+        if upd_df is not None and not upd_df.empty:
+            for _, r in upd_df.drop_duplicates(subset=["work_order"], keep="last").iterrows():
+                wo, part_no, type_name, assembly_location, customer, note, is_active = _row_payload(r)
+                if not wo:
+                    skipped += 1
+                    continue
+                cur.execute(
+                    """
+                    UPDATE work_orders
+                    SET part_no=?, type_name=?, assembly_location=?, customer=?, note=?, is_active=?, updated_at=?
+                    WHERE work_order=?
+                    """,
+                    (part_no, type_name, assembly_location, customer, note, is_active, now, wo),
+                )
+                if cur.rowcount:
+                    updated += cur.rowcount
+                    updated_keys.append(wo)
+                else:
+                    # If the record disappeared between preview and apply, insert it safely.
+                    cur.execute(
+                        """
+                        INSERT INTO work_orders
+                        (work_order, part_no, type_name, assembly_location, customer, note, is_active, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (wo, part_no, type_name, assembly_location, customer, note, is_active, now, now),
+                    )
+                    inserted += 1
+                    inserted_keys.append(wo)
+
+        if do_delete and del_df is not None and not del_df.empty:
+            for wo in del_df.get("work_order", pd.Series(dtype=str)).map(_normalize_text).drop_duplicates().tolist():
+                if not wo:
+                    skipped += 1
+                    continue
+                cur.execute("DELETE FROM work_orders WHERE work_order=?", (wo,))
+                if cur.rowcount:
+                    deleted += cur.rowcount
+                    deleted_keys.append(wo)
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "inserted": inserted,
+        "updated": updated,
+        "deleted": deleted,
+        "skipped": skipped,
+        "inserted_keys": inserted_keys,
+        "updated_keys": updated_keys,
+        "deleted_keys": deleted_keys,
+    }
+
 if STATE_KEY not in st.session_state:
     reload_data()
 
@@ -587,31 +698,38 @@ with tab4:
             st.success(last_msg)
 
         st.info("按下確認後才會正式新增、更新或刪除製令；只按『永久記錄目前欄位對應』不會寫入製令清單。")
-        if st.button("▣ 確認套用對應更新 / Apply Mapped Sync", type="primary", use_container_width=True, key=f"wo_onedrive_apply_v248_{sheet}"):
+        if st.button("▣ 確認套用對應更新 / Apply Mapped Sync", type="primary", use_container_width=True, key=f"wo_onedrive_apply_v249_{sheet}"):
             if not mapping.get("work_order"):
                 st.error("請先對應『製令 / Work Order』欄位，否則無法新增或更新製令。")
             elif incoming.empty:
                 st.error("來源資料沒有可寫入的製令。請確認標題列號與製令欄位對應。")
             else:
                 save_sheet_setting(sheet, int(header_row), mapping, bool(do_delete))
-                save_df = _build_work_order_sync_save_df(add_df, upd_df, del_df, bool(do_delete))
-                if save_df.empty:
+                planned_count = len(add_df) + len(upd_df) + (len(del_df) if do_delete else 0)
+                if planned_count <= 0:
                     msg = "製令同步完成：沒有需要新增、更新或刪除的製令。欄位對應已永久記錄。"
                     st.session_state["wo_onedrive_sync_last_message_v248"] = msg
                     st.info(msg)
                 else:
-                    result = save_work_orders(save_df)
+                    result = _apply_work_order_sync_direct(add_df, upd_df, del_df, bool(do_delete))
                     reload_data()
                     msg = (
                         f"製令同步完成，且已永久記錄欄位對應："
                         f"應新增 {len(add_df)}、應更新 {len(upd_df)}、"
                         f"應刪除 {len(del_df) if do_delete else 0}；"
-                        f"實際寫入/覆寫 {result.get('inserted', 0)}、"
-                        f"刪除 {result.get('deleted', 0)}、略過 {result.get('skipped', 0)}。"
-                        f"新增：{_safe_join(add_df['work_order'] if not add_df.empty else [])}；"
-                        f"更新：{_safe_join(upd_df['work_order'] if not upd_df.empty else [])}；"
-                        f"刪除：{_safe_join(del_df['work_order'] if (do_delete and not del_df.empty) else [])}"
+                        f"實際新增 {result.get('inserted', 0)}、"
+                        f"實際更新 {result.get('updated', 0)}、"
+                        f"實際刪除 {result.get('deleted', 0)}、"
+                        f"略過 {result.get('skipped', 0)}。"
+                        f"新增：{_safe_join(result.get('inserted_keys', []))}；"
+                        f"更新：{_safe_join(result.get('updated_keys', []))}；"
+                        f"刪除：{_safe_join(result.get('deleted_keys', []))}"
                     )
                     st.session_state["wo_onedrive_sync_last_message_v248"] = msg
                     st.success(msg)
+                    # 清掉編輯頁舊暫存，回到製令清單可直接看到最新資料。
+                    try:
+                        st.session_state[STATE_KEY] = ensure_cols(load_work_orders().assign(_delete=False))
+                    except Exception:
+                        reload_data()
                     rerun()
