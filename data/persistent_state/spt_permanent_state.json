@@ -1,20 +1,39 @@
 {
-  "schema_version": "v1.30",
-  "export_time": "2026-05-17 09:19:42",
-  "database_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
+  "version": "V1.48",
+  "exported_at": "2026-05-17 11:21:28",
+  "source": "auth_users_saved",
+  "db_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
+  "business_row_count": 681,
+  "table_counts": {
+    "app_settings": 1,
+    "auth_account_permissions": 117,
+    "auth_login_logs": 0,
+    "auth_security_settings": 2,
+    "auth_users": 9,
+    "employees": 74,
+    "process_options": 17,
+    "rest_periods": 5,
+    "security_login_logs": 83,
+    "security_module_permissions": 78,
+    "security_roles": 6,
+    "security_settings": 2,
+    "security_user_roles": 10,
+    "security_users": 9,
+    "system_logs": 89,
+    "system_settings": 6,
+    "table_column_settings": 0,
+    "table_sort_settings": 0,
+    "table_ui_settings": 0,
+    "time_records": 3,
+    "work_orders": 604
+  },
   "tables": {
     "app_settings": [
       {
-        "setting_key": "live_page_manual_refresh_timestamp",
-        "setting_value": "20260517_002852",
-        "note": "01 工時紀錄手動重新整理顯示截止時間；只影響 01 顯示，不刪除 02 歷史紀錄",
-        "updated_at": "2026-05-17 00:28:52"
-      },
-      {
         "setting_key": "live_page_reset_time",
-        "setting_value": "23:00",
+        "setting_value": "02:00",
         "note": "01 工時紀錄每日重新整理時間；只影響 01 顯示，不刪除 02 歷史紀錄",
-        "updated_at": "2026-05-17 09:16:47"
+        "updated_at": "2026-05-17 11:16:15"
       }
     ],
     "auth_account_permissions": [
@@ -2038,7 +2057,7 @@
         "last_login_at": "2026-05-16 23:54:25",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 23:54:25"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 2,
@@ -2054,7 +2073,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 3,
@@ -2070,7 +2089,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 4,
@@ -2086,7 +2105,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 5,
@@ -2102,7 +2121,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 6,
@@ -2118,7 +2137,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 8,
@@ -2134,7 +2153,7 @@
         "last_login_at": "2026-05-15 11:18:26",
         "note": "",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 9,
@@ -2142,7 +2161,7 @@
         "password_hash": "pbkdf2_sha256$80bd0fbcd7f99be462a491ef162f8803$fb7e693d3fb4e38b3738297e723e7026fe406e31ea35a42f207fab1ce914f09c",
         "password_hint": "由權限管理頁建立",
         "employee_id": "",
-        "display_name": "B211",
+        "display_name": "張瑀榛",
         "email": "",
         "role_code": "operator",
         "is_active": 1,
@@ -2150,7 +2169,7 @@
         "last_login_at": "2026-05-16 11:50:11",
         "note": "",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 19193,
@@ -2166,7 +2185,7 @@
         "last_login_at": null,
         "note": "",
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-16 23:03:59"
+        "updated_at": "2026-05-17 11:21:28"
       }
     ],
     "employees": [
@@ -3323,46 +3342,6 @@
       },
       {
         "id": 5,
-        "name": "晚上休息",
-        "start_time": "20:00",
-        "end_time": "20:15",
-        "is_active": 1,
-        "sort_order": 5
-      },
-      {
-        "id": 26,
-        "name": "上午休息",
-        "start_time": "10:30",
-        "end_time": "10:45",
-        "is_active": 1,
-        "sort_order": 1
-      },
-      {
-        "id": 27,
-        "name": "午休",
-        "start_time": "12:00",
-        "end_time": "13:00",
-        "is_active": 1,
-        "sort_order": 2
-      },
-      {
-        "id": 28,
-        "name": "下午休息",
-        "start_time": "15:00",
-        "end_time": "15:15",
-        "is_active": 1,
-        "sort_order": 3
-      },
-      {
-        "id": 29,
-        "name": "晚餐休息",
-        "start_time": "18:00",
-        "end_time": "18:30",
-        "is_active": 1,
-        "sort_order": 4
-      },
-      {
-        "id": 30,
         "name": "晚上休息",
         "start_time": "20:00",
         "end_time": "20:15",
@@ -6090,7 +6069,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-16 23:54:25",
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-17 09:18:31"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 2,
@@ -6103,7 +6082,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-17 09:18:31"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 3,
@@ -6116,7 +6095,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-17 09:18:31"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 4,
@@ -6129,7 +6108,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-17 09:18:31"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 5,
@@ -6142,7 +6121,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-17 09:18:31"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 6,
@@ -6155,7 +6134,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-17 09:18:31"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 6425,
@@ -6168,20 +6147,20 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:18:26",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-17 09:18:31"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 6430,
         "username": "B211",
         "password_hash": "pbkdf2_sha256$80bd0fbcd7f99be462a491ef162f8803$fb7e693d3fb4e38b3738297e723e7026fe406e31ea35a42f207fab1ce914f09c",
         "employee_id": "",
-        "display_name": "B211",
+        "display_name": "張瑀榛",
         "email": "",
         "is_active": 1,
         "force_password_change": 0,
         "last_login_at": "2026-05-16 11:50:11",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-17 09:18:31"
+        "updated_at": "2026-05-17 11:21:28"
       },
       {
         "id": 38031,
@@ -6194,7 +6173,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-17 09:18:31"
+        "updated_at": "2026-05-17 11:21:28"
       }
     ],
     "system_logs": [
@@ -7099,6 +7078,83 @@
         "message": "儲存 01 工時紀錄每日重新整理時間：23:00，已寫入 13 系統設定永久檔",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 83,
+        "log_time": "2026-05-17 11:16:05",
+        "user_name": "appuser",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "人工編輯並儲存工時紀錄 3 筆；已同步確認日期/時間欄位",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 84,
+        "log_time": "2026-05-17 11:16:15",
+        "user_name": "appuser",
+        "action_type": "DEDUP_REST_PERIODS",
+        "target_table": "rest_periods",
+        "target_id": "",
+        "message": "自動合併重複休息時間設定 5 筆",
+        "detail": "",
+        "level": "WARN"
+      },
+      {
+        "id": 85,
+        "log_time": "2026-05-17 11:17:33",
+        "user_name": "appuser",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "人工編輯並儲存工時紀錄 1 筆；已同步確認日期/時間欄位",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 86,
+        "log_time": "2026-05-17 11:17:38",
+        "user_name": "appuser",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "人工編輯並儲存工時紀錄 1 筆；已同步確認日期/時間欄位",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 87,
+        "log_time": "2026-05-17 11:19:43",
+        "user_name": "appuser",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "人工編輯並儲存工時紀錄 3 筆；已同步確認日期/時間欄位",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 88,
+        "log_time": "2026-05-17 11:19:46",
+        "user_name": "appuser",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "人工編輯並儲存工時紀錄 3 筆；已同步確認日期/時間欄位",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 89,
+        "log_time": "2026-05-17 11:19:46",
+        "user_name": "system",
+        "action_type": "RECALC_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "管理員重新計算工時 1 筆，已同步反映至 02 歷史紀錄",
+        "detail": "",
+        "level": "INFO"
       }
     ],
     "system_settings": [
@@ -7168,7 +7224,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-16 14:01:47",
-        "updated_at": "2026-05-16 14:22:39"
+        "updated_at": "2026-05-17 11:19:46"
       },
       {
         "id": 24,
@@ -7189,13 +7245,13 @@
         "start_time": "22:52:52",
         "end_date": "2026-05-16",
         "end_time": "22:55:49",
-        "work_hours": 0.03,
+        "work_hours": 0.049167,
         "assembly_location": "竹東",
         "group_key": "B030|前置鈑金|2026-05-16",
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-16 22:52:52",
-        "updated_at": "2026-05-16 22:55:49"
+        "updated_at": "2026-05-17 11:19:46"
       },
       {
         "id": 25,
@@ -7208,21 +7264,21 @@
         "employee_id": "B030",
         "employee_name": "沈啟頤",
         "start_action": "開始",
-        "start_timestamp": "2026-05-16 22:53:54",
+        "start_timestamp": "2026-05-16 09:00:00",
         "end_action": "暫停",
-        "end_timestamp": "2026-05-16 22:55:49",
+        "end_timestamp": "2026-05-16 12:00:00",
         "remark": "同步作業平均分配：2筆，群組總工時=0.05，平均=0.03",
         "start_date": "2026-05-16",
-        "start_time": "22:53:54",
+        "start_time": "09:00:00",
         "end_date": "2026-05-16",
-        "end_time": "22:55:49",
-        "work_hours": 0.03,
+        "end_time": "12:00:00",
+        "work_hours": 2.75,
         "assembly_location": "竹東",
         "group_key": "B030|前置鈑金|2026-05-16",
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-16 22:53:54",
-        "updated_at": "2026-05-16 22:55:49"
+        "updated_at": "2026-05-17 11:19:46"
       }
     ],
     "work_orders": [
@@ -14475,29 +14531,5 @@
         "updated_at": "2026-05-16 11:40:33"
       }
     ]
-  },
-  "table_counts": {
-    "app_settings": 2,
-    "auth_account_permissions": 117,
-    "auth_login_logs": 0,
-    "auth_security_settings": 2,
-    "auth_users": 9,
-    "employees": 74,
-    "process_options": 17,
-    "rest_periods": 10,
-    "security_login_logs": 83,
-    "security_module_permissions": 78,
-    "security_roles": 6,
-    "security_settings": 2,
-    "security_user_roles": 10,
-    "security_users": 9,
-    "system_logs": 82,
-    "system_settings": 6,
-    "table_column_settings": 0,
-    "table_sort_settings": 0,
-    "table_ui_settings": 0,
-    "time_records": 3,
-    "work_orders": 604
-  },
-  "business_row_count": 681
+  }
 }
