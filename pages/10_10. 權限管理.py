@@ -19,6 +19,7 @@ from services.permission_service import (
     save_account_permissions,
     save_security_settings,
     save_users,
+    reconcile_account_master_permissions_authoritative,
 )
 
 apply_theme()
@@ -26,7 +27,7 @@ require_module_access("10_permissions", "can_manage")
 render_header("10 | 權限管理", "帳號密碼總表、帳號匯入、帳號貼上、帳號級模組權限 / Account & Permission Management")
 init_permission_tables()
 
-st.caption("V1.80 loaded｜帳號清單儲存後會同步套用到帳號模組權限，並清除舊角色殘留；帳號、權限、安全設定會永久保存到 GitHub 設定檔。")
+st.caption("V1.81 loaded｜帳號清單儲存後以帳號主檔角色為唯一來源，重建帳號模組權限並清除舊角色殘留；不再保留兩套混亂權限。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
@@ -370,7 +371,10 @@ def _apply_account_master_to_permission_matrix(usernames: list[str], reason: str
             reconcile_permission_matrix_for_current_modules(force=True)
         except TypeError:
             reconcile_permission_matrix_for_current_modules()
-        synced = int(sync_user_permissions_from_roles(clean_users, reason=reason) or 0)
+        try:
+            synced = int(reconcile_account_master_permissions_authoritative(clean_users, reason=reason) or 0)
+        except Exception:
+            synced = int(sync_user_permissions_from_roles(clean_users, reason=reason) or 0)
         try:
             clear_permission_runtime_cache()
         except Exception:
@@ -383,6 +387,7 @@ def _apply_account_master_to_permission_matrix(usernames: list[str], reason: str
         st.warning(f"帳號已儲存，但同步帳號模組權限時發生提醒：{ex}")
     _clear_old_runtime_roles_and_refresh_current_user(clean_users, reason)
     st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
+    st.session_state["v292_force_permission_matrix_reload"] = True
     return synced
 
 
@@ -670,6 +675,12 @@ with tab_accounts:
 with tab_perm:
     st.subheader("帳號模組權限 / Account × Module Permission Matrix")
     st.info("每個帳號可針對每個模組獨立勾選權限。畫面編輯會即時計算預覽，但只有按『套用並儲存權限』才會生效。")
+    # V2.92：如果剛從帳號主檔儲存過，進入權限矩陣前先重建一次，避免舊角色/舊矩陣殘留。
+    if st.session_state.pop("v292_force_permission_matrix_reload", False):
+        try:
+            reconcile_account_master_permissions_authoritative(None, reason="permission_tab_reload_after_account_master_save")
+        except Exception:
+            pass
     perm_df = pd.DataFrame(get_account_permissions())
     if perm_df.empty:
         perm_df = pd.DataFrame(columns=["username", "display_name", "role_code", "module_code", "module_name_zh", "module_name_en"] + ACTION_COLS)
