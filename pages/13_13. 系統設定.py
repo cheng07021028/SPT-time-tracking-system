@@ -27,14 +27,16 @@ from services.persistence_guard_service import (
     list_persistent_backups,
 )
 from services.auto_backup_service import (
-    create_external_full_backup,
+    create_backup_by_mode,
+    get_available_backup_modes,
     get_runtime_environment,
     get_schedule_status,
     load_backup_schedule,
+    normalize_backup_mode,
     run_due_backup_if_needed,
     save_backup_schedule,
     start_auto_backup_scheduler_once,
-    validate_target_folder,
+    validate_backup_destination,
 )
 
 from services.db_service import flush_pending_permanent_state
@@ -158,16 +160,17 @@ def _format_bytes_v296(n) -> str:
 
 
 def _render_external_auto_backup_center() -> None:
-    """Daily scheduled external full backup settings in 13｜系統設定.
+    """Daily backup settings with three professional modes.
 
-    Browser-based Streamlit cannot open a native folder picker.  The professional
-    and stable approach is to enter/paste an absolute folder path and validate it.
+    V3.05 rules:
+    - Local Windows backup: only when Streamlit is truly running on Windows.
+    - Cloud project backup: usable on Streamlit Cloud/Linux, writes under data/_external_backup.
+    - GitHub cloud backup: uses existing GitHub cloud persistence service.
     """
-    st.subheader("每日自動備份設定 / Daily External Backup Schedule")
+    st.subheader("每日自動備份設定 / Daily Backup Schedule")
     st.caption(
-        "設定每日固定時間，自動把所有專案設定檔與正式資料備份到指定資料夾。"
-        "備份包含 data 內正式資料、權限、歷史、工時紀錄、表格紀錄、系統設定；.streamlit 設定會鏡像到 data/config/_project_config_mirror 後一起備份；"
-        "會排除內部備份資料夾，避免遞迴備份越來越大。"
+        "備份模式分為三種，避免 Windows 本機路徑與 Streamlit Cloud/Linux 雲端環境混淆。"
+        "系統會依目前執行環境自動停用不適用的模式。"
     )
 
     try:
@@ -181,11 +184,12 @@ def _render_external_auto_backup_center() -> None:
 
     env_info = get_runtime_environment()
     runtime_label = status.get("runtime_label") or ("Windows 本機" if env_info.get("is_windows") else ("Streamlit Cloud / Linux 雲端" if env_info.get("is_streamlit_cloud_like") else str(env_info.get("system") or "Unknown")))
+    current_mode = normalize_backup_mode(cfg.get("backup_mode"))
 
     s1, s2, s3, s4 = st.columns(4)
     s1.metric("排程狀態", "啟用" if cfg.get("enabled") else "停用")
     s2.metric("每日時間", str(cfg.get("daily_time") or "未設定"))
-    s3.metric("目標資料夾", "可寫入" if status.get("target_ok") else "未通過")
+    s3.metric("備份模式", {"local_windows": "本機 Windows", "cloud_project": "雲端專案內", "github_cloud": "GitHub 雲端"}.get(current_mode, current_mode))
     s4.metric("執行環境", runtime_label)
     st.caption(f"下次執行：{status.get('next_run') or '-'}｜專案根目錄：{env_info.get('project_root')}")
 
@@ -193,6 +197,7 @@ def _render_external_auto_backup_center() -> None:
     if state.get("last_backup_at"):
         st.info(
             f"最近備份：{state.get('last_backup_at')}｜"
+            f"模式：{state.get('last_backup_mode') or status.get('backup_mode') or '-'}｜"
             f"檔案數：{state.get('last_file_count', 0)}｜"
             f"大小：{_format_bytes_v296(state.get('last_total_bytes'))}｜"
             f"路徑：{state.get('last_backup_dir', '')}"
@@ -206,13 +211,33 @@ def _render_external_auto_backup_center() -> None:
         return
 
     with st.expander("設定每日自動備份 / Configure Daily Backup", expanded=True):
-        enabled = st.checkbox("啟用每日自動備份", value=bool(cfg.get("enabled")), key="spt_v296_ext_backup_enabled")
+        enabled = st.checkbox("啟用每日自動備份", value=bool(cfg.get("enabled")), key="spt_v305_backup_enabled")
+        modes = get_available_backup_modes()
+        mode_labels = {m["mode"]: m["label"] for m in modes}
+        mode_desc = {m["mode"]: m["description"] for m in modes}
+        available = {m["mode"]: bool(m.get("available")) for m in modes}
+        mode_options = [m["mode"] for m in modes]
+        if current_mode not in mode_options:
+            current_mode = mode_options[0]
+        selected_mode = st.radio(
+            "備份模式 / Backup Mode",
+            options=mode_options,
+            index=mode_options.index(current_mode),
+            format_func=lambda x: mode_labels.get(x, x),
+            horizontal=True,
+            key="spt_v305_backup_mode",
+        )
+        st.caption(mode_desc.get(selected_mode, ""))
+
+        if not available.get(selected_mode, True):
+            st.warning("目前執行環境不支援這個備份模式。系統已停用相關路徑操作，請改用雲端專案內備份或 GitHub 雲端備份。")
+
         col_a, col_b = st.columns([1, 2])
         with col_a:
             daily_time = st.time_input(
                 "每日備份時間",
                 value=pd.to_datetime(str(cfg.get("daily_time") or "17:30")).time(),
-                key="spt_v296_ext_backup_daily_time",
+                key="spt_v305_backup_daily_time",
             )
             keep_days = st.number_input(
                 "保留天數",
@@ -220,64 +245,74 @@ def _render_external_auto_backup_center() -> None:
                 max_value=3650,
                 value=int(cfg.get("keep_days") or 30),
                 step=1,
-                key="spt_v296_ext_backup_keep_days",
+                key="spt_v305_backup_keep_days",
             )
         with col_b:
-            target_folder = st.text_input(
-                "備份目標資料夾完整路徑",
-                value=str(cfg.get("target_folder") or ""),
-                placeholder="例如：D:\\SPT_Backup\\TimeTracking 或 E:\\Backup\\SPT",
-                key="spt_v296_ext_backup_target_folder",
-            )
-            st.caption("請複製/貼上完整資料夾路徑；系統會依目前執行環境判斷可否寫入。若 App 在 Streamlit Cloud/Linux 上執行，無法直接寫入你電腦的 D:\ 或 E:\。")
-
-        validation = validate_target_folder(target_folder, create=False)
-        if target_folder:
-            if validation.get("ok"):
-                st.success(f"目標資料夾可寫入：{validation.get('path')}")
+            if selected_mode == "local_windows":
+                target_folder = st.text_input(
+                    "本機 Windows 備份資料夾完整路徑",
+                    value=str(cfg.get("target_folder") or ""),
+                    placeholder="例如：D:/SPT_Backup/TimeTracking 或 E:\\Backup\\SPT",
+                    key="spt_v305_backup_target_folder",
+                    disabled=not available.get(selected_mode, True),
+                )
+                st.caption("只有公司電腦本機執行 streamlit run 時，才能寫入 D:/、E:/ 或 OneDrive 本機資料夾。")
+            elif selected_mode == "cloud_project":
+                target_folder = "data/_external_backup"
+                st.text_input("雲端專案內備份位置", value=target_folder, disabled=True, key="spt_v305_cloud_project_path")
+                st.caption("適合 Streamlit Cloud/Linux。備份會放在專案 data/_external_backup；建議再搭配 GitHub 或下載保存。")
             else:
-                st.warning(validation.get("message", "目標資料夾尚未通過檢查。"))
-                if validation.get("runtime_label"):
-                    st.caption(f"目前執行環境：{validation.get('runtime_label')}｜路徑類型：{validation.get('path_kind', '-')}")
+                target_folder = ""
+                st.text_input("GitHub 備份目標", value="GitHub Contents API：data/persistent_state / data/persistent_modules", disabled=True, key="spt_v305_github_target")
+                st.caption("需在 Secrets 設定 GITHUB_TOKEN、GITHUB_REPOSITORY、GITHUB_BRANCH。")
+
+        validation = validate_backup_destination(selected_mode, target_folder, create=False)
+        if validation.get("ok"):
+            st.success(validation.get("message", "備份目的地可用。"))
+        else:
+            st.warning(validation.get("message", "備份目的地尚未通過檢查。"))
+        if validation.get("runtime_label"):
+            st.caption(f"目前執行環境：{validation.get('runtime_label')}｜備份模式：{mode_labels.get(selected_mode, selected_mode)}")
 
         b1, b2, b3 = st.columns(3)
         with b1:
-            if st.button("▣ 儲存自動備份設定", key="spt_v296_save_ext_backup_schedule", use_container_width=True):
+            if st.button("▣ 儲存自動備份設定", key="spt_v305_save_backup_schedule", use_container_width=True):
                 try:
                     saved = save_backup_schedule({
                         "enabled": bool(enabled),
                         "daily_time": daily_time.strftime("%H:%M"),
+                        "backup_mode": selected_mode,
                         "target_folder": str(target_folder or "").strip(),
                         "keep_days": int(keep_days),
                         "include_project_configs": True,
                         "include_streamlit_config": True,
                     })
                     start_auto_backup_scheduler_once()
-                    st.success(f"已儲存自動備份設定：每日 {saved.get('daily_time')}。")
+                    st.success(f"已儲存自動備份設定：{mode_labels.get(saved.get('backup_mode'), saved.get('backup_mode'))}｜每日 {saved.get('daily_time')}。")
                 except Exception as exc:
                     st.error(f"儲存自動備份設定失敗：{exc}")
         with b2:
-            if st.button("◇ 建立/測試目標資料夾", key="spt_v296_test_ext_backup_folder", use_container_width=True):
-                res = validate_target_folder(target_folder, create=True)
+            if st.button("◇ 建立/測試備份目的地", key="spt_v305_test_backup_destination", use_container_width=True):
+                res = validate_backup_destination(selected_mode, target_folder, create=True)
                 if res.get("ok"):
-                    st.success(f"目標資料夾建立/測試成功：{res.get('path')}")
+                    st.success(res.get("message", f"備份目的地測試成功：{res.get('path', '')}"))
                 else:
                     st.error(res.get("message", res))
         with b3:
-            if st.button("▣ 立即完整備份到指定資料夾", key="spt_v296_run_ext_backup_now", use_container_width=True):
+            if st.button("▣ 立即依目前模式完整備份", key="spt_v305_run_backup_now", use_container_width=True):
                 try:
-                    # Save current setting first so scheduler and manual backup are consistent.
                     save_backup_schedule({
                         "enabled": bool(enabled),
                         "daily_time": daily_time.strftime("%H:%M"),
+                        "backup_mode": selected_mode,
                         "target_folder": str(target_folder or "").strip(),
                         "keep_days": int(keep_days),
                     })
-                    result = create_external_full_backup(target_folder, reason="ui_manual_external_full_backup_from_13", create_target=True)
+                    result = create_backup_by_mode(selected_mode, target_folder, reason="ui_manual_backup_from_13_v305", create_target=True)
                     if result.get("ok"):
                         st.success(
-                            f"完整備份完成：{result.get('backup_dir')}｜"
-                            f"檔案數：{result.get('file_count')}｜"
+                            f"備份完成：{result.get('backup_dir', result.get('mode', ''))}｜"
+                            f"檔案數：{result.get('file_count', 0)}｜"
                             f"大小：{_format_bytes_v296(result.get('total_bytes'))}"
                         )
                     else:
@@ -285,41 +320,33 @@ def _render_external_auto_backup_center() -> None:
                 except Exception as exc:
                     st.error(f"備份失敗：{exc}")
 
-    with st.expander("備份內容說明 / Backup Coverage", expanded=False):
+    with st.expander("三種備份模式說明 / Backup Mode Guide", expanded=False):
         st.markdown(
             """
-            **會備份：**
-            - `data/persistent_modules/`：各模組表格紀錄、歷史紀錄、工時紀錄、製令、人員等 JSON 資料
-            - `data/persistent_state/`：永久狀態、欄位設定、權限狀態、保護狀態
-            - `data/database/`：SQLite 資料庫，包含權限、工時、歷史、系統設定等資料表
-            - `data/config/` 與 `data` 內其他正式設定檔
-            - `data/config/_project_config_mirror/`：`.streamlit/config.toml`、`.streamlit/secrets.toml` 與部署設定鏡像檔
-            - `requirements.txt`、`README.md` 等部署參考設定
+            **本機 Windows 備份**  
+            適合公司電腦本機執行 `streamlit run streamlit_app.py`，可寫入 `D:/`、`E:/`、OneDrive 本機資料夾。  
 
-            **會排除：**
-            - `data/_persistent_backup/`
-            - `data/_persistent_corrupt/`
-            - `data/_persistent_restore_replaced/`
-            - `__pycache__/`
+            **雲端專案內備份**  
+            適合 Streamlit Cloud / Linux。備份到 `data/_external_backup`，不會要求 Windows 路徑。  
 
-            目標資料夾建議放在專案外，例如 `D:\\SPT_Backup\\TimeTracking`，避免被 GitHub 或專案更新流程誤處理。
+            **GitHub 雲端備份**  
+            使用既有 GitHub Contents API，把永久 JSON 與資料狀態上傳到 GitHub。需設定 `GITHUB_TOKEN`。  
             """
         )
 
-    if st.button("◇ 檢查今日排程是否到期並補跑", key="spt_v296_run_due_backup_check", use_container_width=True):
+    if st.button("◇ 檢查今日排程是否到期並補跑", key="spt_v305_run_due_backup_check", use_container_width=True):
         try:
             result = run_due_backup_if_needed(force=False)
             if result.get("skipped"):
                 st.info(f"目前不用補跑：{result.get('reason')}")
             elif result.get("ok"):
-                st.success(f"排程備份已完成：{result.get('backup_dir')}")
+                st.success(f"排程備份已完成：{result.get('backup_dir', result.get('mode', ''))}")
             else:
                 st.error(f"排程備份失敗：{result}")
         except Exception as exc:
             st.error(f"排程檢查失敗：{exc}")
 
     st.divider()
-
 def _render_persistence_guard_center() -> None:
     """Render data/settings protection tools inside 13｜系統設定.
 
