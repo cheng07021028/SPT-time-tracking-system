@@ -168,6 +168,7 @@ def _render_external_auto_backup_center() -> None:
     - GitHub cloud backup: uses existing GitHub cloud persistence service.
     """
     st.subheader("每日自動備份設定 / Daily Backup Schedule")
+    st.caption("V3.06：13 是唯一每日自動備份設定入口；09 只查備份紀錄，12 只查模組永久資料健康狀態。")
     st.caption(
         "備份模式分為三種，避免 Windows 本機路徑與 Streamlit Cloud/Linux 雲端環境混淆。"
         "系統會依目前執行環境自動停用不適用的模式。"

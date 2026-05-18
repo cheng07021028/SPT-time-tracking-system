@@ -33,6 +33,7 @@ require_module_access("09_persistence", "can_view")
 render_header("09｜資料永久保存與備份", "GitHub 雲端永久保存｜啟動自動還原｜防止空資料覆蓋")
 
 st.subheader("資料防消失中心 / Data Guard Center")
+st.caption("V3.06：本頁只做備份紀錄、GitHub 備份狀態、手動雲端備份/還原查詢；每日自動備份排程統一在 13｜系統設定。")
 st.info(
     "V1.30 已加入啟動自動還原：Streamlit Cloud 更新模組或重新部署後，如果 SQLite 不存在或主資料為 0，"
     "系統會先從 GitHub 的 data/persistent_state/spt_permanent_state.json 下載並還原。"
