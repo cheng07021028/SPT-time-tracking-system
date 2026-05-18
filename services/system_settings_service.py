@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-SPT Time Tracking System - System Settings Service V2.09
+SPT Time Tracking System - System Settings Service V3.14
 
 集中管理：
 1. 工段名稱下拉選單（供 01 工時紀錄使用）
 2. 休息時間設定（供工時計算扣除休息使用）
 3. 01 工時紀錄每日重新整理時間
 
-V2.09 修正重點：
+V3.14 修正重點：
 - 13｜系統設定不再只依賴 SQLite。
 - 每次套用工段、休息時間、01 顯示重新整理時間時，都會立即寫入獨立永久設定檔。
 - Streamlit / GitHub 更新後，如果 SQLite 被重建，會優先從永久設定檔還原，再決定是否建立系統預設值。
@@ -114,11 +114,40 @@ def _load_json_file(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     try:
-        from services.persistence_guard_service import safe_load_json
-        data = safe_load_json(path, None, allow_default_when_missing=True)
+        data = json.loads(path.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else None
-    except Exception as exc:
-        raise RuntimeError(f"13 系統設定永久檔讀取失敗，已阻止回到預設：{path} | {exc}") from exc
+    except Exception:
+        # Do not silently overwrite a broken settings file with defaults.  Keep it
+        # available for manual inspection and let another mirror/history file win.
+        try:
+            corrupt_dir = PROJECT_ROOT / "data" / "_persistent_corrupt" / "13_system_settings"
+            corrupt_dir.mkdir(parents=True, exist_ok=True)
+            backup = corrupt_dir / f"{path.name}.{now_stamp()}.corrupt"
+            shutil.copy2(path, backup)
+        except Exception:
+            pass
+        return None
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    """Write JSON safely: tmp -> validate -> replace.
+
+    This prevents half-written/empty JSON from causing the next module update to
+    fall back to default system settings.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _table_has_rows(payload: dict[str, Any] | None, table_name: str) -> bool:
+    try:
+        rows = ((payload or {}).get("tables") or {}).get(table_name, [])
+        return isinstance(rows, list) and len(rows) > 0
+    except Exception:
+        return False
 
 
 def _load_latest_persistent_payload() -> dict[str, Any] | None:
@@ -418,41 +447,17 @@ def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any
     return {"ok": bool(restored), "restored": restored, "source": "system_settings_json"}
 
 
-def _system_settings_payload_count(payload: dict[str, Any] | None) -> int:
-    if not isinstance(payload, dict):
-        return 0
-    total = 0
-    counts = payload.get("table_counts")
-    if isinstance(counts, dict):
-        for v in counts.values():
-            try:
-                total += max(0, int(v or 0))
-            except Exception:
-                pass
-    tables = payload.get("tables")
-    if isinstance(tables, dict):
-        for v in tables.values():
-            if isinstance(v, list):
-                total += len(v)
-    return total
-
-
-def _atomic_save_system_settings_json(path: Path, payload: dict[str, Any]) -> None:
-    try:
-        from services.persistence_guard_service import atomic_save_json
-        atomic_save_json(path, payload, backup_existing=True)
-    except Exception:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        json.loads(tmp.read_text(encoding="utf-8"))
-        tmp.replace(path)
-
-
 def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:
-    """Write a dedicated permanent file for 13｜系統設定 immediately."""
+    """Write dedicated permanent files for 13｜系統設定 immediately.
+
+    V3.14 guard:
+    - Never let an empty/failed DB read overwrite an existing non-empty settings JSON.
+    - Use atomic JSON write for all mirrors and history.
+    """
     ensure_system_settings_schema()
     _ensure_permanent_dirs()
+    latest_payload = _load_latest_persistent_payload()
+
     try:
         proc = query_df("SELECT id, process_name, is_active, sort_order, note, created_at, updated_at FROM process_options ORDER BY sort_order, id")
     except Exception:
@@ -466,8 +471,17 @@ def export_system_settings_permanent(reason: str = "system_settings_changed", wr
     except Exception:
         app = pd.DataFrame()
 
+    # If DB/table read is empty but an older permanent file has data, keep the
+    # permanent data instead of publishing defaults/empty tables.
+    if (proc is None or proc.empty) and _table_has_rows(latest_payload, "process_options"):
+        proc = pd.DataFrame(((latest_payload or {}).get("tables") or {}).get("process_options", []))
+    if (rest is None or rest.empty) and _table_has_rows(latest_payload, "rest_periods"):
+        rest = pd.DataFrame(((latest_payload or {}).get("tables") or {}).get("rest_periods", []))
+    if (app is None or app.empty) and _table_has_rows(latest_payload, "app_settings"):
+        app = pd.DataFrame(((latest_payload or {}).get("tables") or {}).get("app_settings", []))
+
     payload: dict[str, Any] = {
-        "version": "V2.09",
+        "version": "V3.14",
         "exported_at": _now(),
         "reason": reason,
         "description": "13｜系統設定永久紀錄：工段名稱、休息時間、01 工時紀錄每日重新整理時間。",
@@ -482,21 +496,21 @@ def export_system_settings_permanent(reason: str = "system_settings_changed", wr
             "app_settings": 0 if app is None else len(app),
         },
     }
-    if _system_settings_payload_count(payload) == 0:
-        existing_payloads = [_load_json_file(p) for p in SYSTEM_SETTINGS_FILES if p.exists()]
-        if any(_system_settings_payload_count(p) > 0 for p in existing_payloads):
-            return {"ok": False, "skipped": True, "reason": "empty system settings export blocked to protect existing permanent settings"}
-    for p in SYSTEM_SETTINGS_FILES:
-        _atomic_save_system_settings_json(p, payload)
+
+    for table_name in ("process_options", "rest_periods", "app_settings"):
+        if not payload["tables"].get(table_name) and _table_has_rows(latest_payload, table_name):
+            return {"ok": False, "blocked": True, "message": f"阻止空白 {table_name} 覆蓋既有 13 系統設定永久檔"}
+
+    for file_path in SYSTEM_SETTINGS_FILES:
+        _atomic_write_json(file_path, payload)
     if write_history:
         hist = SYSTEM_SETTINGS_HISTORY_DIR / f"system_settings_{now_stamp()}.json"
-        _atomic_save_system_settings_json(hist, payload)
+        _atomic_write_json(hist, payload)
     try:
         mark_data_changed("13｜系統設定已變更，永久設定檔已建立；如需上傳 GitHub 請到 09｜資料永久保存與備份。", "system_settings_permanent_json")
     except Exception:
         pass
     return {"ok": True, "files": [str(p) for p in SYSTEM_SETTINGS_FILES], "table_counts": payload["table_counts"]}
-
 
 def ensure_system_settings_schema() -> None:
     """Prepare setting tables once without causing repeated backup sync."""
@@ -582,6 +596,12 @@ def get_process_options() -> list[str]:
         return list(_PROCESS_OPTIONS_CACHE)
     try:
         df = load_process_options_df(active_only=True)
+        if df.empty:
+            try:
+                restore_system_settings_from_permanent(force=False)
+                df = load_process_options_df(active_only=True)
+            except Exception:
+                pass
         if df.empty:
             _PROCESS_OPTIONS_CACHE = DEFAULT_PROCESS_OPTIONS.copy()
         else:
@@ -758,7 +778,14 @@ def get_live_page_reset_time() -> str:
     try:
         ensure_system_settings_schema()
         row = query_one("SELECT setting_value FROM app_settings WHERE setting_key='live_page_reset_time'")
-        value = str((row or {}).get("setting_value") or DEFAULT_LIVE_PAGE_RESET_TIME).strip()
+        value = str((row or {}).get("setting_value") or "").strip()
+        if not value:
+            try:
+                restore_system_settings_from_permanent(force=False)
+                row = query_one("SELECT setting_value FROM app_settings WHERE setting_key='live_page_reset_time'")
+                value = str((row or {}).get("setting_value") or "").strip()
+            except Exception:
+                value = ""
         if not _valid_hhmm(value):
             value = DEFAULT_LIVE_PAGE_RESET_TIME
     except Exception:
