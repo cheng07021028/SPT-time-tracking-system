@@ -28,6 +28,7 @@ from services.persistence_guard_service import (
 )
 from services.auto_backup_service import (
     create_external_full_backup,
+    get_runtime_environment,
     get_schedule_status,
     load_backup_schedule,
     run_due_backup_if_needed,
@@ -178,11 +179,15 @@ def _render_external_auto_backup_center() -> None:
         st.divider()
         return
 
+    env_info = get_runtime_environment()
+    runtime_label = status.get("runtime_label") or ("Windows 本機" if env_info.get("is_windows") else ("Streamlit Cloud / Linux 雲端" if env_info.get("is_streamlit_cloud_like") else str(env_info.get("system") or "Unknown")))
+
     s1, s2, s3, s4 = st.columns(4)
     s1.metric("排程狀態", "啟用" if cfg.get("enabled") else "停用")
     s2.metric("每日時間", str(cfg.get("daily_time") or "未設定"))
     s3.metric("目標資料夾", "可寫入" if status.get("target_ok") else "未通過")
-    s4.metric("下次執行", str(status.get("next_run") or "-"))
+    s4.metric("執行環境", runtime_label)
+    st.caption(f"下次執行：{status.get('next_run') or '-'}｜專案根目錄：{env_info.get('project_root')}")
 
     state = status.get("state", {}) or {}
     if state.get("last_backup_at"):
@@ -224,7 +229,7 @@ def _render_external_auto_backup_center() -> None:
                 placeholder="例如：D:\\SPT_Backup\\TimeTracking 或 E:\\Backup\\SPT",
                 key="spt_v296_ext_backup_target_folder",
             )
-            st.caption("Streamlit 網頁無法開啟 Windows 原生資料夾挑選器；請複製/貼上完整資料夾路徑，系統會檢查是否可寫入。")
+            st.caption("請複製/貼上完整資料夾路徑；系統會依目前執行環境判斷可否寫入。若 App 在 Streamlit Cloud/Linux 上執行，無法直接寫入你電腦的 D:\ 或 E:\。")
 
         validation = validate_target_folder(target_folder, create=False)
         if target_folder:
@@ -232,6 +237,8 @@ def _render_external_auto_backup_center() -> None:
                 st.success(f"目標資料夾可寫入：{validation.get('path')}")
             else:
                 st.warning(validation.get("message", "目標資料夾尚未通過檢查。"))
+                if validation.get("runtime_label"):
+                    st.caption(f"目前執行環境：{validation.get('runtime_label')}｜路徑類型：{validation.get('path_kind', '-')}")
 
         b1, b2, b3 = st.columns(3)
         with b1:
