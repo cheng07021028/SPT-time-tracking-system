@@ -26,6 +26,15 @@ from services.persistence_guard_service import (
     is_initialized,
     list_persistent_backups,
 )
+from services.auto_backup_service import (
+    create_external_full_backup,
+    get_schedule_status,
+    load_backup_schedule,
+    run_due_backup_if_needed,
+    save_backup_schedule,
+    start_auto_backup_scheduler_once,
+    validate_target_folder,
+)
 
 from services.db_service import flush_pending_permanent_state
 
@@ -133,6 +142,176 @@ def _short_path(path) -> str:
     except Exception:
         return str(path)
 
+
+
+
+def _format_bytes_v296(n) -> str:
+    try:
+        n = float(n or 0)
+        for unit in ["B", "KB", "MB", "GB", "TB"]:
+            if n < 1024 or unit == "TB":
+                return f"{n:,.1f} {unit}" if unit != "B" else f"{int(n):,} {unit}"
+            n /= 1024
+    except Exception:
+        return "0 B"
+
+
+def _render_external_auto_backup_center() -> None:
+    """Daily scheduled external full backup settings in 13｜系統設定.
+
+    Browser-based Streamlit cannot open a native folder picker.  The professional
+    and stable approach is to enter/paste an absolute folder path and validate it.
+    """
+    st.subheader("每日自動備份設定 / Daily External Backup Schedule")
+    st.caption(
+        "設定每日固定時間，自動把所有專案設定檔與正式資料備份到指定資料夾。"
+        "備份包含 data 內正式資料、權限、歷史、工時紀錄、表格紀錄、系統設定與 .streamlit 設定檔；"
+        "會排除內部備份資料夾，避免遞迴備份越來越大。"
+    )
+
+    try:
+        start_auto_backup_scheduler_once()
+        cfg = load_backup_schedule()
+        status = get_schedule_status()
+    except Exception as exc:
+        st.error(f"自動備份服務載入失敗：{exc}")
+        st.divider()
+        return
+
+    s1, s2, s3, s4 = st.columns(4)
+    s1.metric("排程狀態", "啟用" if cfg.get("enabled") else "停用")
+    s2.metric("每日時間", str(cfg.get("daily_time") or "未設定"))
+    s3.metric("目標資料夾", "可寫入" if status.get("target_ok") else "未通過")
+    s4.metric("下次執行", str(status.get("next_run") or "-"))
+
+    state = status.get("state", {}) or {}
+    if state.get("last_backup_at"):
+        st.info(
+            f"最近備份：{state.get('last_backup_at')}｜"
+            f"檔案數：{state.get('last_file_count', 0)}｜"
+            f"大小：{_format_bytes_v296(state.get('last_total_bytes'))}｜"
+            f"路徑：{state.get('last_backup_dir', '')}"
+        )
+    if state.get("last_scheduler_error"):
+        st.warning(f"最近排程錯誤：{state.get('last_scheduler_error')}")
+
+    if not can_manage:
+        st.info("你目前只有查看權限。自動備份設定與還原需 can_manage / can_edit 權限。")
+        st.divider()
+        return
+
+    with st.expander("設定每日自動備份 / Configure Daily Backup", expanded=True):
+        enabled = st.checkbox("啟用每日自動備份", value=bool(cfg.get("enabled")), key="spt_v296_ext_backup_enabled")
+        col_a, col_b = st.columns([1, 2])
+        with col_a:
+            daily_time = st.time_input(
+                "每日備份時間",
+                value=pd.to_datetime(str(cfg.get("daily_time") or "17:30")).time(),
+                key="spt_v296_ext_backup_daily_time",
+            )
+            keep_days = st.number_input(
+                "保留天數",
+                min_value=1,
+                max_value=3650,
+                value=int(cfg.get("keep_days") or 30),
+                step=1,
+                key="spt_v296_ext_backup_keep_days",
+            )
+        with col_b:
+            target_folder = st.text_input(
+                "備份目標資料夾完整路徑",
+                value=str(cfg.get("target_folder") or ""),
+                placeholder="例如：D:\\SPT_Backup\\TimeTracking 或 E:\\Backup\\SPT",
+                key="spt_v296_ext_backup_target_folder",
+            )
+            st.caption("Streamlit 網頁無法開啟 Windows 原生資料夾挑選器；請複製/貼上完整資料夾路徑，系統會檢查是否可寫入。")
+
+        validation = validate_target_folder(target_folder, create=False)
+        if target_folder:
+            if validation.get("ok"):
+                st.success(f"目標資料夾可寫入：{validation.get('path')}")
+            else:
+                st.warning(validation.get("message", "目標資料夾尚未通過檢查。"))
+
+        b1, b2, b3 = st.columns(3)
+        with b1:
+            if st.button("▣ 儲存自動備份設定", key="spt_v296_save_ext_backup_schedule", use_container_width=True):
+                try:
+                    saved = save_backup_schedule({
+                        "enabled": bool(enabled),
+                        "daily_time": daily_time.strftime("%H:%M"),
+                        "target_folder": str(target_folder or "").strip(),
+                        "keep_days": int(keep_days),
+                        "include_project_configs": True,
+                        "include_streamlit_config": True,
+                    })
+                    start_auto_backup_scheduler_once()
+                    st.success(f"已儲存自動備份設定：每日 {saved.get('daily_time')}。")
+                except Exception as exc:
+                    st.error(f"儲存自動備份設定失敗：{exc}")
+        with b2:
+            if st.button("◇ 建立/測試目標資料夾", key="spt_v296_test_ext_backup_folder", use_container_width=True):
+                res = validate_target_folder(target_folder, create=True)
+                if res.get("ok"):
+                    st.success(f"目標資料夾建立/測試成功：{res.get('path')}")
+                else:
+                    st.error(res.get("message", res))
+        with b3:
+            if st.button("▣ 立即完整備份到指定資料夾", key="spt_v296_run_ext_backup_now", use_container_width=True):
+                try:
+                    # Save current setting first so scheduler and manual backup are consistent.
+                    save_backup_schedule({
+                        "enabled": bool(enabled),
+                        "daily_time": daily_time.strftime("%H:%M"),
+                        "target_folder": str(target_folder or "").strip(),
+                        "keep_days": int(keep_days),
+                    })
+                    result = create_external_full_backup(target_folder, reason="ui_manual_external_full_backup_from_13", create_target=True)
+                    if result.get("ok"):
+                        st.success(
+                            f"完整備份完成：{result.get('backup_dir')}｜"
+                            f"檔案數：{result.get('file_count')}｜"
+                            f"大小：{_format_bytes_v296(result.get('total_bytes'))}"
+                        )
+                    else:
+                        st.error(f"備份失敗：{result.get('message', result.get('errors', result))}")
+                except Exception as exc:
+                    st.error(f"備份失敗：{exc}")
+
+    with st.expander("備份內容說明 / Backup Coverage", expanded=False):
+        st.markdown(
+            """
+            **會備份：**
+            - `data/persistent_modules/`：各模組表格紀錄、歷史紀錄、工時紀錄、製令、人員等 JSON 資料
+            - `data/persistent_state/`：永久狀態、欄位設定、權限狀態、保護狀態
+            - `data/database/`：SQLite 資料庫，包含權限、工時、歷史、系統設定等資料表
+            - `data/config/` 與 `data` 內其他正式設定檔
+            - `.streamlit/config.toml`、`.streamlit/secrets.toml`
+            - `requirements.txt`、`README.md` 等部署參考設定
+
+            **會排除：**
+            - `data/_persistent_backup/`
+            - `data/_persistent_corrupt/`
+            - `data/_persistent_restore_replaced/`
+            - `__pycache__/`
+
+            目標資料夾建議放在專案外，例如 `D:\\SPT_Backup\\TimeTracking`，避免被 GitHub 或專案更新流程誤處理。
+            """
+        )
+
+    if st.button("◇ 檢查今日排程是否到期並補跑", key="spt_v296_run_due_backup_check", use_container_width=True):
+        try:
+            result = run_due_backup_if_needed(force=False)
+            if result.get("skipped"):
+                st.info(f"目前不用補跑：{result.get('reason')}")
+            elif result.get("ok"):
+                st.success(f"排程備份已完成：{result.get('backup_dir')}")
+            else:
+                st.error(f"排程備份失敗：{result}")
+        except Exception as exc:
+            st.error(f"排程檢查失敗：{exc}")
+
+    st.divider()
 
 def _render_persistence_guard_center() -> None:
     """Render data/settings protection tools inside 13｜系統設定.
