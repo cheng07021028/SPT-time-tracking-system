@@ -522,9 +522,28 @@ div[data-baseweb="radio"] [aria-checked="true"] {
 /* Data editor checkbox cells: keep clickable checkbox visible on dark table. */
 [data-testid="stDataEditor"] input[type="checkbox"],
 [data-testid="stDataEditor"] [role="checkbox"] {
-    accent-color: #dffaff !important;
-    outline: 1px solid rgba(223,250,255,.70) !important;
-    box-shadow: 0 0 8px rgba(35,230,255,.22) !important;
+    accent-color: #18d7f0 !important;
+    background: linear-gradient(180deg, rgba(245,251,255,.98) 0%, rgba(223,247,255,.96) 100%) !important;
+    border: 1.6px solid rgba(103,245,255,.95) !important;
+    border-radius: 4px !important;
+    outline: 1px solid rgba(223,250,255,.82) !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.65) inset, 0 0 10px rgba(35,230,255,.28) !important;
+    color: #04101d !important;
+}
+[data-testid="stDataEditor"] [role="checkbox"][aria-checked="true"],
+[data-testid="stDataEditor"] input[type="checkbox"]:checked {
+    background: linear-gradient(180deg, #dffaff 0%, #bdf6ff 100%) !important;
+    border-color: #67f5ff !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.75) inset, 0 0 12px rgba(35,230,255,.40) !important;
+    color: #04101d !important;
+}
+[data-testid="stDataEditor"] [role="checkbox"] svg,
+[data-testid="stDataEditor"] [role="checkbox"] path,
+[data-testid="stDataEditor"] input[type="checkbox"] + div svg,
+[data-testid="stDataEditor"] input[type="checkbox"] + div path {
+    fill: #04101d !important;
+    stroke: #04101d !important;
+    opacity: 1 !important;
 }
 
 /* V2.03: checkbox/radio/toggle rows use light background so confirmations are clearly visible. */
@@ -914,110 +933,10 @@ def render_section_title(title: str, subtitle: str | None = None) -> None:
     apply_theme()
     st.markdown(f"### {_safe_html(title)}" + (f"\n{_safe_html(subtitle)}" if subtitle else ""))
 
-
-# ===== V2.59 SELECT / MULTISELECT TEXT CLIP FIX REMOVED IN V2.88 FAST BOOT =====
-
-
-
-# ===== V2.61 SELECT / MULTISELECT HEIGHT FINAL OVERRIDE REMOVED IN V2.88 FAST BOOT =====
-
-
-
-# ===== V2.62 dropdown menu light readable patch REMOVED IN V2.88 FAST BOOT =====
-
-
-
-
-
-# ===== V2.63 SELECT / MULTISELECT BOX HEIGHT ALIGN PATCH REMOVED IN V2.88 FAST BOOT =====
-
-
-
-
-# ===== V2.64 GLOBAL SELECTBOX / MULTISELECT UNIFIED FINAL CSS REMOVED IN V2.88 FAST BOOT =====
-
-
-
-
-# ===== V2.65 SELECT DISPLAY ABSOLUTE HEIGHT OVERRIDE REMOVED IN V2.88 FAST BOOT =====
-
-
-
-
-# ===== V2.66 STATUS HEIGHT UNIFY ALL FILTER FIELDS REMOVED IN V2.88 FAST BOOT =====
-
-
-
-
-# ===== V2.67 SELECT HEIGHT 70 MENU TEXT VISIBLE FINAL REMOVED IN V2.88 FAST BOOT =====
-
-
-
-
-# ===== V2.68 FORCE DROPDOWN REAL DOM FIX REMOVED IN V2.88 FAST BOOT =====
-
-
-
-
-# ===== V2.69 USER CONFIGURABLE DROPDOWN SIZE REMOVED IN V2.88 FAST BOOT =====
-
-
-
-
-# ===== V2.70 MAIN PAGE DROPDOWN SIZE PANEL FALLBACK REMOVED IN V2.88 FAST BOOT =====
-
-
-
-
-# ===== V2.79 FUTURE CYBER FIELD UI REMOVED IN V2.88 FAST BOOT =====
-
-
-
-
-
-# ===== V2.88 FAST BOOT LEGACY COMPAT NO-OPS START =====
+# ===== V2.59 SELECT / MULTISELECT TEXT CLIP FIX START =====
 def apply_v259_select_multiselect_text_fix():
-    return
-
-def apply_v261_select_multiselect_height_final_fix():
-    return
-
-def _spt_v262_dropdown_menu_light_css():
-    return
-
-def apply_v263_select_box_left_size_fix():
-    return
-
-def apply_v264_global_select_unified_final_css():
-    return
-
-def apply_v265_select_display_absolute_height_fix():
-    return
-
-def apply_v266_status_height_unify_all_filter_fields():
-    return
-
-def apply_v267_select_height_70_menu_text_visible_final():
-    return
-
-def apply_v268_force_dropdown_real_dom_fix():
-    return
-
-def apply_v269_configurable_dropdown_css():
-    return
-
-def render_dropdown_size_settings_panel():
-    return
-
-def render_dropdown_size_settings_panel_main_fallback():
-    return
-# ===== V2.88 FAST BOOT LEGACY COMPAT NO-OPS END =====
-
-# ===== V2.80 WAR-ROOM FUTURE FORM HUD UI START =====
-def apply_v280_warroom_future_form_hud_ui():
-    """War-room level future HUD styling for Streamlit form widgets.
-    Keeps readability as first priority, then adds refined scanline, glow, active focus layer,
-    and a less-flat professional panel feel. Pure CSS only; no data / permission logic touched.
+    """Fix clipped text in Streamlit selectbox / multiselect after global font scaling.
+    Safe to call multiple times. Does not change data, filters, permissions, or calculations.
     """
     try:
         import streamlit as st
@@ -1027,425 +946,1021 @@ def apply_v280_warroom_future_form_hud_ui():
     st.markdown(
         """
         <style>
-        /* V2.80｜戰情中心級未來科技表單 HUD */
+        /* V2.59: BaseWeb select / multiselect text clipping final fix */
+        .stSelectbox,
+        .stMultiSelect {
+            overflow: visible !important;
+        }
+
+        /* Outer select shell: keep enough height for larger global font scale */
+        div[data-baseweb="select"] {
+            min-height: 52px !important;
+            height: auto !important;
+            overflow: visible !important;
+            line-height: 1.45 !important;
+        }
+
+        div[data-baseweb="select"] > div {
+            min-height: 52px !important;
+            height: auto !important;
+            padding-top: 7px !important;
+            padding-bottom: 7px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            line-height: 1.45 !important;
+        }
+
+        /* Selected value / placeholder area */
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[class*="valueContainer"] {
+            min-height: 38px !important;
+            height: auto !important;
+            display: flex !important;
+            align-items: center !important;
+            flex-wrap: wrap !important;
+            overflow: visible !important;
+            line-height: 1.45 !important;
+        }
+
+        /* Selectbox visible text and placeholder */
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p,
+        div[data-baseweb="select"] div {
+            line-height: 1.45 !important;
+            white-space: nowrap !important;
+            text-overflow: ellipsis !important;
+            color: #061427 !important;
+            font-weight: 800 !important;
+        }
+
+        /* Internal search input used by BaseWeb select; avoid cropped cursor / white block */
+        div[data-baseweb="select"] input {
+            min-height: 32px !important;
+            height: 32px !important;
+            line-height: 1.45 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            color: #061427 !important;
+            caret-color: #061427 !important;
+            font-weight: 800 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+        }
+
+        /* Multiselect selected tags */
+        div[data-baseweb="tag"] {
+            min-height: 32px !important;
+            height: auto !important;
+            padding: 5px 10px !important;
+            margin: 3px 4px 3px 0 !important;
+            border-radius: 9px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            line-height: 1.45 !important;
+            background: linear-gradient(135deg, #bff7ff 0%, #82e9ff 100%) !important;
+            border: 1px solid rgba(36, 226, 255, 0.75) !important;
+            color: #061427 !important;
+            font-weight: 900 !important;
+        }
+
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div {
+            color: #061427 !important;
+            font-weight: 900 !important;
+            line-height: 1.45 !important;
+            overflow: visible !important;
+        }
+
+        div[data-baseweb="tag"] svg {
+            color: #061427 !important;
+            fill: #061427 !important;
+            stroke: #061427 !important;
+        }
+
+        /* Dropdown list options */
+        ul[role="listbox"],
+        div[role="listbox"] {
+            overflow: auto !important;
+        }
+
+        ul[role="listbox"] li,
+        div[role="option"] {
+            min-height: 40px !important;
+            height: auto !important;
+            padding-top: 9px !important;
+            padding-bottom: 9px !important;
+            display: flex !important;
+            align-items: center !important;
+            line-height: 1.45 !important;
+            font-weight: 800 !important;
+        }
+
+        /* Number input plus/minus should not inherit select fixes */
+        div[data-testid="stNumberInput"] input {
+            line-height: 1.35 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# Apply on import so every module that imports theme_service receives the fix.
+try:
+    apply_v259_select_multiselect_text_fix()
+except Exception:
+    pass
+# ===== V2.59 SELECT / MULTISELECT TEXT CLIP FIX END =====
+
+# ===== V2.61 SELECT / MULTISELECT HEIGHT FINAL OVERRIDE START =====
+def apply_v261_select_multiselect_height_final_fix():
+    """Final override: increase select/multiselect vertical space to prevent clipped text."""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.61: 下拉式選單高度加大，避免 Choose options / No options to select 被上下切掉 */
+        .stSelectbox,
+        .stMultiSelect {
+            overflow: visible !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"],
+        .stMultiSelect div[data-baseweb="select"] {
+            min-height: 62px !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] > div,
+        .stMultiSelect div[data-baseweb="select"] > div {
+            min-height: 62px !important;
+            height: auto !important;
+            padding-top: 12px !important;
+            padding-bottom: 12px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+        }
+
+        /* BaseWeb 內層文字容器：給足高度與行高 */
+        .stSelectbox div[data-baseweb="select"] div[role="combobox"],
+        .stMultiSelect div[data-baseweb="select"] div[role="combobox"],
+        .stSelectbox div[data-baseweb="select"] div[aria-expanded],
+        .stMultiSelect div[data-baseweb="select"] div[aria-expanded] {
+            min-height: 38px !important;
+            height: auto !important;
+            line-height: 38px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+        }
+
+        /* 顯示文字本體：不要被裁切 */
+        .stSelectbox div[data-baseweb="select"] span,
+        .stMultiSelect div[data-baseweb="select"] span,
+        .stSelectbox div[data-baseweb="select"] p,
+        .stMultiSelect div[data-baseweb="select"] p {
+            line-height: 34px !important;
+            min-height: 34px !important;
+            height: auto !important;
+            overflow: visible !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            color: #061427 !important;
+            font-weight: 850 !important;
+            white-space: nowrap !important;
+        }
+
+        /* 隱藏搜尋 input 不要露出白點，但保留足夠高度 */
+        .stSelectbox div[data-baseweb="select"] input,
+        .stMultiSelect div[data-baseweb="select"] input {
+            min-height: 34px !important;
+            height: 34px !important;
+            line-height: 34px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            color: #061427 !important;
+            caret-color: transparent !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            border: none !important;
+            outline: none !important;
+            overflow: hidden !important;
+        }
+
+        /* 多選已選標籤高度加大 */
+        .stMultiSelect div[data-baseweb="tag"] {
+            min-height: 36px !important;
+            height: auto !important;
+            padding: 7px 12px !important;
+            margin: 4px 5px 4px 0 !important;
+            border-radius: 10px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            line-height: 1.55 !important;
+            background: linear-gradient(135deg, #c9fbff 0%, #86eeff 100%) !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+            color: #061427 !important;
+            font-weight: 900 !important;
+        }
+
+        .stMultiSelect div[data-baseweb="tag"] span,
+        .stMultiSelect div[data-baseweb="tag"] div {
+            line-height: 1.55 !important;
+            min-height: 24px !important;
+            overflow: visible !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            color: #061427 !important;
+            font-weight: 900 !important;
+        }
+
+        /* 下拉選單展開後的選項高度 */
+        ul[role="listbox"] li,
+        div[role="option"] {
+            min-height: 44px !important;
+            height: auto !important;
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
+            line-height: 1.55 !important;
+            display: flex !important;
+            align-items: center !important;
+            font-weight: 800 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v261_select_multiselect_height_final_fix()
+except Exception:
+    pass
+# ===== V2.61 SELECT / MULTISELECT HEIGHT FINAL OVERRIDE END =====
+
+# === V2.62 dropdown menu light readable patch ===
+def _spt_v262_dropdown_menu_light_css():
+    """Force Streamlit/BaseWeb dropdown option panels to light background + dark text."""
+    try:
+        import streamlit as st
+        st.markdown(
+            """
+            <style>
+            /* V2.62｜權限管理與全系統下拉選單清晰化
+               修正：下拉展開選單背景太深、字太暗看不到。
+               範圍：selectbox / multiselect / data_editor 內 select 下拉清單。 */
+
+            /* 下拉選單彈出層 */
+            div[data-baseweb="popover"],
+            div[data-baseweb="menu"],
+            ul[role="listbox"] {
+                background: #eaf8ff !important;
+                color: #03121f !important;
+                border: 1px solid rgba(102, 232, 249, .95) !important;
+                box-shadow: 0 0 0 1px rgba(102, 232, 249, .35), 0 12px 32px rgba(0, 255, 255, .22) !important;
+                border-radius: 12px !important;
+                overflow: hidden !important;
+                z-index: 999999 !important;
+            }
+
+            /* 下拉選項 */
+            div[role="option"],
+            li[role="option"],
+            ul[role="listbox"] li,
+            div[data-baseweb="menu"] div {
+                background: #eaf8ff !important;
+                color: #03121f !important;
+                font-weight: 800 !important;
+                min-height: 38px !important;
+                line-height: 1.45 !important;
+                padding-top: 8px !important;
+                padding-bottom: 8px !important;
+                text-shadow: none !important;
+            }
+
+            /* hover / focus */
+            div[role="option"]:hover,
+            li[role="option"]:hover,
+            ul[role="listbox"] li:hover,
+            div[data-baseweb="menu"] div:hover {
+                background: linear-gradient(90deg, #99f6ff, #d9fbff) !important;
+                color: #03121f !important;
+            }
+
+            /* selected option */
+            div[aria-selected="true"],
+            li[aria-selected="true"],
+            div[role="option"][aria-selected="true"],
+            li[role="option"][aria-selected="true"] {
+                background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+                color: #020817 !important;
+                font-weight: 900 !important;
+            }
+
+            /* 選項內所有文字與 icon 強制深色 */
+            div[data-baseweb="popover"] *,
+            div[data-baseweb="menu"] *,
+            ul[role="listbox"] *,
+            div[role="option"] * {
+                color: #03121f !important;
+                fill: #03121f !important;
+                text-shadow: none !important;
+            }
+
+            /* 關閉 disabled 選項過暗問題 */
+            div[aria-disabled="true"],
+            li[aria-disabled="true"] {
+                color: #475569 !important;
+                opacity: .75 !important;
+            }
+
+            /* 保留輸入框本體淺底深字，不影響高度修正 */
+            div[data-baseweb="select"] > div {
+                background: #edf8ff !important;
+                color: #03121f !important;
+                min-height: 52px !important;
+                height: auto !important;
+                align-items: center !important;
+                overflow: hidden !important;
+            }
+            div[data-baseweb="select"] input,
+            div[data-baseweb="select"] span,
+            div[data-baseweb="select"] div {
+                color: #03121f !important;
+                font-weight: 800 !important;
+                line-height: 1.55 !important;
+            }
+
+            /* data_editor 下拉選單也套用 */
+            [data-testid="stDataFrame"] div[role="listbox"],
+            [data-testid="stDataFrame"] div[role="option"] {
+                background: #eaf8ff !important;
+                color: #03121f !important;
+                font-weight: 800 !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        pass
+
+# Execute once at import; also wrap common theme functions if present.
+_spt_v262_dropdown_menu_light_css()
+for _spt_v262_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v262_func = globals().get(_spt_v262_name)
+    if callable(_spt_v262_func) and not getattr(_spt_v262_func, "_spt_v262_wrapped", False):
+        def _spt_v262_make_wrapper(_original):
+            def _spt_v262_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                _spt_v262_dropdown_menu_light_css()
+                return result
+            _spt_v262_wrapper._spt_v262_wrapped = True
+            return _spt_v262_wrapper
+        globals()[_spt_v262_name] = _spt_v262_make_wrapper(_spt_v262_func)
+# === End V2.62 dropdown menu light readable patch ===
+
+
+
+# ===== V2.63 SELECT / MULTISELECT BOX HEIGHT ALIGN PATCH START =====
+def apply_v263_select_box_left_size_fix():
+    """Match the larger readable dropdown box height so text is no longer clipped."""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.63｜讓所有下拉式選單本體高度比照左側較大的樣式，避免文字被上下裁切 */
+        .stSelectbox,
+        .stMultiSelect {
+            overflow: visible !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"],
+        .stMultiSelect div[data-baseweb="select"] {
+            min-height: 72px !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] > div,
+        .stMultiSelect div[data-baseweb="select"] > div {
+            min-height: 72px !important;
+            height: auto !important;
+            padding-top: 14px !important;
+            padding-bottom: 14px !important;
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            border-radius: 14px !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] div[role="combobox"],
+        .stMultiSelect div[data-baseweb="select"] div[role="combobox"],
+        .stSelectbox div[data-baseweb="select"] div[aria-expanded],
+        .stMultiSelect div[data-baseweb="select"] div[aria-expanded] {
+            min-height: 42px !important;
+            height: auto !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            line-height: 42px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] span,
+        .stMultiSelect div[data-baseweb="select"] span,
+        .stSelectbox div[data-baseweb="select"] p,
+        .stMultiSelect div[data-baseweb="select"] p,
+        .stSelectbox div[data-baseweb="select"] div,
+        .stMultiSelect div[data-baseweb="select"] div {
+            min-height: 42px !important;
+            line-height: 42px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 800 !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] input,
+        .stMultiSelect div[data-baseweb="select"] input,
+        .stSelectbox div[data-baseweb="select"] input[type="text"],
+        .stMultiSelect div[data-baseweb="select"] input[type="text"] {
+            min-height: 42px !important;
+            height: 42px !important;
+            line-height: 42px !important;
+            margin: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .stMultiSelect div[data-baseweb="tag"] {
+            min-height: 38px !important;
+            padding-top: 7px !important;
+            padding-bottom: 7px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+        }
+
+        .stMultiSelect div[data-baseweb="tag"] span,
+        .stMultiSelect div[data-baseweb="tag"] div {
+            min-height: 24px !important;
+            line-height: 24px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v263_select_box_left_size_fix()
+except Exception:
+    pass
+# ===== V2.63 SELECT / MULTISELECT BOX HEIGHT ALIGN PATCH END =====
+
+
+# ===== V2.64 GLOBAL SELECTBOX / MULTISELECT UNIFIED FINAL CSS START =====
+def apply_v264_global_select_unified_final_css():
+    """V2.64: 全系統下拉框統一高度、淺色背景、深色清楚字體，不裁切文字。"""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.64｜所有模組 selectbox / multiselect 統一高度 + 統一淺色字體完整版 */
+        .stSelectbox,
+        .stMultiSelect {
+            overflow: visible !important;
+            min-height: 78px !important;
+        }
+
+        .stSelectbox > div,
+        .stMultiSelect > div {
+            overflow: visible !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"],
+        .stMultiSelect div[data-baseweb="select"] {
+            min-height: 74px !important;
+            height: auto !important;
+            overflow: visible !important;
+            background: transparent !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] > div,
+        .stMultiSelect div[data-baseweb="select"] > div {
+            min-height: 74px !important;
+            height: auto !important;
+            padding: 15px 18px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            border-radius: 14px !important;
+            background: #edf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            border: 1px solid rgba(98, 232, 249, .65) !important;
+            box-shadow: 0 0 0 1px rgba(98,232,249,.12), 0 0 12px rgba(35,230,255,.12) !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] div[role="combobox"],
+        .stMultiSelect div[data-baseweb="select"] div[role="combobox"],
+        .stSelectbox div[data-baseweb="select"] div[aria-expanded],
+        .stMultiSelect div[data-baseweb="select"] div[aria-expanded],
+        .stSelectbox div[data-baseweb="select"] div[class*="control"],
+        .stMultiSelect div[data-baseweb="select"] div[class*="control"],
+        .stSelectbox div[data-baseweb="select"] div[class*="valueContainer"],
+        .stMultiSelect div[data-baseweb="select"] div[class*="valueContainer"] {
+            min-height: 44px !important;
+            height: auto !important;
+            line-height: 44px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] span,
+        .stMultiSelect div[data-baseweb="select"] span,
+        .stSelectbox div[data-baseweb="select"] p,
+        .stMultiSelect div[data-baseweb="select"] p,
+        .stSelectbox div[data-baseweb="select"] div,
+        .stMultiSelect div[data-baseweb="select"] div {
+            min-height: 44px !important;
+            line-height: 44px !important;
+            height: auto !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-size: 17px !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] input,
+        .stMultiSelect div[data-baseweb="select"] input,
+        .stSelectbox div[data-baseweb="select"] input[type="text"],
+        .stMultiSelect div[data-baseweb="select"] input[type="text"] {
+            min-height: 44px !important;
+            height: 44px !important;
+            line-height: 44px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-size: 17px !important;
+            font-weight: 850 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+            caret-color: transparent !important;
+        }
+
+        .stSelectbox div[data-baseweb="select"] svg,
+        .stMultiSelect div[data-baseweb="select"] svg {
+            color: #03121f !important;
+            fill: #03121f !important;
+            width: 20px !important;
+            height: 20px !important;
+        }
+
+        .stMultiSelect div[data-baseweb="tag"] {
+            min-height: 40px !important;
+            height: auto !important;
+            padding: 8px 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            border-radius: 10px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            line-height: 24px !important;
+            background: linear-gradient(135deg, #c9fbff 0%, #7ee8ff 100%) !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+            border: 1px solid rgba(36,226,255,.90) !important;
+        }
+
+        .stMultiSelect div[data-baseweb="tag"] span,
+        .stMultiSelect div[data-baseweb="tag"] div {
+            min-height: 24px !important;
+            height: auto !important;
+            line-height: 24px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+        }
+
+        /* 展開下拉選單：淺色底、深色字、足夠高度 */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            border: 1px solid rgba(102,232,249,.95) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 12px 32px rgba(0,255,255,.22) !important;
+            overflow: hidden !important;
+            z-index: 999999 !important;
+        }
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li,
+        div[data-baseweb="menu"] div {
+            min-height: 44px !important;
+            height: auto !important;
+            padding: 10px 14px !important;
+            line-height: 24px !important;
+            display: flex !important;
+            align-items: center !important;
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-size: 16px !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+        }
+
+        div[role="option"] *,
+        li[role="option"] *,
+        ul[role="listbox"] li *,
+        div[data-baseweb="menu"] div * {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            fill: #03121f !important;
+            text-shadow: none !important;
+        }
+
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[data-baseweb="menu"] div:hover {
+            background: linear-gradient(90deg, #99f6ff, #d9fbff) !important;
+            color: #03121f !important;
+        }
+
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"],
+        ul[role="listbox"] li[aria-selected="true"] {
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            font-weight: 950 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v264_global_select_unified_final_css()
+except Exception:
+    pass
+# ===== V2.64 GLOBAL SELECTBOX / MULTISELECT UNIFIED FINAL CSS END =====
+
+
+# ===== V2.65 SELECT DISPLAY ABSOLUTE HEIGHT OVERRIDE START =====
+def apply_v265_select_display_absolute_height_fix():
+    """Force selectbox/multiselect visible field height so text is centered and never clipped."""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /*
+          V2.65｜下拉選單顯示框高度最終覆蓋
+          目的：
+          1. 讓所有 selectbox / multiselect 顯示框高度一致放大
+          2. 修正 Choose options / No options to select 被上下裁切
+          3. 保留展開選單淺色背景與深色文字
+          4. 不恢復訊息重播面板，不影響任何資料邏輯
+        */
+
+        /* 外層元件保留可見空間 */
+        .stSelectbox,
+        .stMultiSelect,
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"] {
+            min-height: 92px !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        /* BaseWeb select 根容器 */
+        div[data-baseweb="select"] {
+            min-height: 66px !important;
+            height: 66px !important;
+            overflow: visible !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+
+        /* BaseWeb select 可視輸入框 */
+        div[data-baseweb="select"] > div {
+            min-height: 66px !important;
+            height: 66px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            padding-left: 16px !important;
+            padding-right: 14px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+            border-radius: 13px !important;
+            background: #edf8ff !important;
+            color: #03121f !important;
+        }
+
+        /* 內層所有 flex / combobox / value container 強制置中 */
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[class*="valueContainer"],
+        div[data-baseweb="select"] div[class*="ValueContainer"],
+        div[data-baseweb="select"] div[class*="singleValue"],
+        div[data-baseweb="select"] div[class*="SingleValue"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Placeholder"] {
+            min-height: 64px !important;
+            height: 64px !important;
+            line-height: 64px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+        }
+
+        /* 顯示文字本體：不要被裁切 */
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p {
+            min-height: 32px !important;
+            height: auto !important;
+            line-height: 32px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        /* input 搜尋文字與 placeholder */
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete="list"] {
+            min-height: 36px !important;
+            height: 36px !important;
+            line-height: 36px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            caret-color: transparent !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+            font-weight: 850 !important;
+        }
+
+        /* 下拉箭頭置中 */
+        div[data-baseweb="select"] svg {
+            color: #03121f !important;
+            fill: #03121f !important;
+            flex-shrink: 0 !important;
+        }
+
+        /* multiselect tag 置中顯示 */
+        div[data-baseweb="tag"] {
+            min-height: 38px !important;
+            height: 38px !important;
+            padding: 0 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            line-height: 38px !important;
+            overflow: visible !important;
+            background: linear-gradient(135deg, #c9fbff 0%, #83edff 100%) !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+            border-radius: 10px !important;
+            color: #03121f !important;
+            font-weight: 900 !important;
+        }
+
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div {
+            min-height: 24px !important;
+            line-height: 24px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+        }
+
+        /* 展開選單保持淺色，文字清楚 */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            border: 1px solid rgba(102, 232, 249, .95) !important;
+            box-shadow: 0 0 0 1px rgba(102, 232, 249, .35), 0 12px 32px rgba(0, 255, 255, .22) !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            z-index: 999999 !important;
+        }
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li {
+            min-height: 44px !important;
+            height: 44px !important;
+            line-height: 44px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+        }
+
+        div[role="option"] *,
+        li[role="option"] *,
+        ul[role="listbox"] li * {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            fill: #03121f !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+        }
+
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"],
+        ul[role="listbox"] li[aria-selected="true"] {
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            font-weight: 950 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v265_select_display_absolute_height_fix()
+except Exception:
+    pass
+# ===== V2.65 SELECT DISPLAY ABSOLUTE HEIGHT OVERRIDE END =====
+
+
+# ===== V2.66 STATUS HEIGHT UNIFY ALL FILTER FIELDS START =====
+def apply_v266_status_height_unify_all_filter_fields():
+    """
+    Use the readable Status / 狀態 field height as the system standard.
+    Target: selectbox, multiselect, date input, text input, number input visible fields.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /*
+          V2.66｜以「狀態 / Status」欄位高度為基準，統一所有篩選格高度
+          狀態欄目前可讀高度基準：
+          - 外框高度：66px
+          - 內層容器：64px
+          - 文字行高：32px~36px
+        */
         :root {
-            --spt-v280-bg-a: rgba(5, 17, 38, 0.96);
-            --spt-v280-bg-b: rgba(10, 30, 62, 0.92);
-            --spt-v280-bg-c: rgba(13, 23, 54, 0.96);
-            --spt-v280-cyan: rgba(79, 229, 255, 0.90);
-            --spt-v280-cyan-soft: rgba(79, 229, 255, 0.34);
-            --spt-v280-blue: rgba(87, 120, 255, 0.28);
-            --spt-v280-text: #f1fcff;
-            --spt-v280-soft: #c7f5ff;
-            --spt-v280-muted: #8fb8cf;
-            --spt-v280-dark-text: #04131f;
+            --spt-filter-field-height: 66px;
+            --spt-filter-inner-height: 64px;
+            --spt-filter-text-line: 36px;
         }
 
-        @keyframes sptV280FieldBreath {
-            0%, 100% {
-                box-shadow:
-                    inset 0 1px 0 rgba(255,255,255,0.10),
-                    inset 0 -1px 0 rgba(79,229,255,0.08),
-                    0 0 0 1px rgba(79,229,255,0.18),
-                    0 0 12px rgba(79,229,255,0.08),
-                    0 0 24px rgba(87,120,255,0.08),
-                    0 12px 26px rgba(0,0,0,0.34);
-            }
-            50% {
-                box-shadow:
-                    inset 0 1px 0 rgba(255,255,255,0.15),
-                    inset 0 -1px 0 rgba(79,229,255,0.14),
-                    0 0 0 1px rgba(79,229,255,0.30),
-                    0 0 18px rgba(79,229,255,0.16),
-                    0 0 36px rgba(87,120,255,0.14),
-                    0 15px 30px rgba(0,0,0,0.38);
-            }
-        }
-
-        @keyframes sptV280Sweep {
-            0% { background-position: -180% 0, 0 0, 0 0; }
-            100% { background-position: 180% 0, 0 0, 0 0; }
-        }
-
+        /* Streamlit 欄位外層：給足垂直空間 */
         .stSelectbox,
         .stMultiSelect,
         .stTextInput,
         .stDateInput,
         .stNumberInput,
-        .stTextArea,
         div[data-testid="stSelectbox"],
         div[data-testid="stMultiSelect"],
         div[data-testid="stTextInput"],
         div[data-testid="stDateInput"],
-        div[data-testid="stNumberInput"],
-        div[data-testid="stTextArea"] {
+        div[data-testid="stNumberInput"] {
+            min-height: 94px !important;
+            height: auto !important;
             overflow: visible !important;
         }
 
-        /* 欄位容器加一點間距，避免光暈被上下切掉 */
-        div[data-testid="stVerticalBlock"] > div:has(.stSelectbox),
-        div[data-testid="stVerticalBlock"] > div:has(.stMultiSelect),
-        div[data-testid="stVerticalBlock"] > div:has(.stTextInput),
-        div[data-testid="stVerticalBlock"] > div:has(.stDateInput),
-        div[data-testid="stVerticalBlock"] > div:has(.stNumberInput),
-        div[data-testid="stVerticalBlock"] > div:has(.stTextArea) {
-            overflow: visible !important;
-        }
-
-        /* SELECT / MULTISELECT 主體：暗色玻璃、細光條、掃描感 */
-        div[data-baseweb="select"] > div {
-            position: relative !important;
-            isolation: isolate !important;
-            background:
-                linear-gradient(100deg, transparent 0%, rgba(133, 245, 255, 0.12) 45%, transparent 70%) -180% 0 / 180% 100% no-repeat,
-                linear-gradient(180deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0.018) 17%, rgba(255,255,255,0.00) 18%),
-                linear-gradient(135deg, var(--spt-v280-bg-a) 0%, var(--spt-v280-bg-b) 52%, var(--spt-v280-bg-c) 100%) !important;
-            border: 1px solid var(--spt-v280-cyan) !important;
-            border-radius: 16px !important;
-            color: var(--spt-v280-text) !important;
-            animation: sptV280FieldBreath 3.4s ease-in-out infinite, sptV280Sweep 6.5s linear infinite !important;
-            backdrop-filter: blur(12px) saturate(140%) !important;
-            -webkit-backdrop-filter: blur(12px) saturate(140%) !important;
-            outline: 1px solid rgba(255,255,255,0.035) !important;
-        }
-
-        div[data-baseweb="select"] > div::before {
-            content: "";
-            position: absolute;
-            left: 12px;
-            right: 12px;
-            top: 5px;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(161,247,255,0.74), transparent);
-            z-index: 0;
-            pointer-events: none;
-            opacity: 0.82;
-        }
-
-        div[data-baseweb="select"] > div::after {
-            content: "";
-            position: absolute;
-            left: 10px;
-            bottom: 5px;
-            width: 34%;
-            height: 1px;
-            background: linear-gradient(90deg, rgba(80,229,255,0.66), transparent);
-            z-index: 0;
-            pointer-events: none;
-            opacity: 0.72;
-        }
-
-        div[data-baseweb="select"] > div:hover,
-        div[data-baseweb="select"] > div:focus-within {
-            border-color: rgba(141, 247, 255, 0.98) !important;
-            transform: translateY(-1px) !important;
-            box-shadow:
-                inset 0 1px 0 rgba(255,255,255,0.16),
-                inset 0 -1px 0 rgba(79,229,255,0.16),
-                0 0 0 1px rgba(141,247,255,0.32),
-                0 0 20px rgba(79,229,255,0.19),
-                0 0 40px rgba(87,120,255,0.18),
-                0 16px 34px rgba(0,0,0,0.42) !important;
-        }
-
-        /* select 文字：全部淺色，解決深色框可讀性 */
-        div[data-baseweb="select"] span,
-        div[data-baseweb="select"] p,
-        div[data-baseweb="select"] input,
-        div[data-baseweb="select"] div,
-        div[data-baseweb="select"] div[role="combobox"],
-        div[data-baseweb="select"] div[aria-expanded] {
-            color: var(--spt-v280-text) !important;
-            -webkit-text-fill-color: var(--spt-v280-text) !important;
-            text-shadow: 0 0 10px rgba(121, 237, 255, 0.12) !important;
-            background: transparent !important;
-            z-index: 1 !important;
-        }
-
-        div[data-baseweb="select"] input::placeholder {
-            color: var(--spt-v280-muted) !important;
-            -webkit-text-fill-color: var(--spt-v280-muted) !important;
-            opacity: 1 !important;
-        }
-
-        div[data-baseweb="select"] svg {
-            fill: #a9f7ff !important;
-            color: #a9f7ff !important;
-            filter: drop-shadow(0 0 7px rgba(79,229,255,0.35));
-        }
-
-        /* 文字、日期、數字、備註欄同樣科技化 */
-        .stTextInput input,
-        .stDateInput input,
-        .stNumberInput input,
-        .stTextArea textarea,
-        div[data-testid="stTextInputRootElement"] input,
-        div[data-testid="stNumberInputRootElement"] input,
-        div[data-testid="stDateInputField"] input {
-            background:
-                linear-gradient(100deg, transparent 0%, rgba(133, 245, 255, 0.10) 45%, transparent 70%) -180% 0 / 180% 100% no-repeat,
-                linear-gradient(180deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0.018) 17%, rgba(255,255,255,0.00) 18%),
-                linear-gradient(135deg, var(--spt-v280-bg-a) 0%, var(--spt-v280-bg-b) 52%, var(--spt-v280-bg-c) 100%) !important;
-            color: var(--spt-v280-text) !important;
-            -webkit-text-fill-color: var(--spt-v280-text) !important;
-            border: 1px solid var(--spt-v280-cyan) !important;
-            border-radius: 16px !important;
-            animation: sptV280FieldBreath 3.4s ease-in-out infinite, sptV280Sweep 6.5s linear infinite !important;
-            caret-color: #b9fbff !important;
-            text-shadow: 0 0 10px rgba(121,237,255,0.10) !important;
-        }
-
-        .stTextInput input::placeholder,
-        .stDateInput input::placeholder,
-        .stNumberInput input::placeholder,
-        .stTextArea textarea::placeholder {
-            color: var(--spt-v280-muted) !important;
-            -webkit-text-fill-color: var(--spt-v280-muted) !important;
-            opacity: 1 !important;
-        }
-
-        .stTextInput input:focus,
-        .stDateInput input:focus,
-        .stNumberInput input:focus,
-        .stTextArea textarea:focus {
-            border-color: rgba(141,247,255,0.98) !important;
-            box-shadow:
-                inset 0 1px 0 rgba(255,255,255,0.16),
-                0 0 0 1px rgba(141,247,255,0.28),
-                0 0 20px rgba(79,229,255,0.20),
-                0 0 42px rgba(87,120,255,0.18),
-                0 16px 34px rgba(0,0,0,0.42) !important;
-        }
-
-        /* 數字輸入 +/- 按鈕 */
-        .stNumberInput button,
-        div[data-testid="stNumberInputStepUp"],
-        div[data-testid="stNumberInputStepDown"] {
-            background: linear-gradient(135deg, rgba(5,17,38,0.98), rgba(17,42,79,0.96)) !important;
-            color: #dffcff !important;
-            border-color: rgba(79,229,255,0.42) !important;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 12px rgba(79,229,255,0.14) !important;
-        }
-        .stNumberInput button *,
-        div[data-testid="stNumberInputStepUp"] *,
-        div[data-testid="stNumberInputStepDown"] * {
-            color: #dffcff !important;
-            fill: #dffcff !important;
-        }
-
-        /* multiselect tag */
-        div[data-baseweb="tag"] {
-            background: linear-gradient(135deg, rgba(80,236,255,0.92), rgba(141,177,255,0.94)) !important;
-            border: 1px solid rgba(210, 251, 255, 0.98) !important;
-            border-radius: 11px !important;
-            color: var(--spt-v280-dark-text) !important;
-            box-shadow: 0 0 12px rgba(79,229,255,0.20) !important;
-        }
-        div[data-baseweb="tag"] *,
-        div[data-baseweb="tag"] span,
-        div[data-baseweb="tag"] div {
-            color: var(--spt-v280-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v280-dark-text) !important;
-            font-weight: 950 !important;
-        }
-
-        /* 下拉展開面板 */
-        div[data-baseweb="popover"],
-        div[data-baseweb="menu"],
-        ul[role="listbox"] {
-            background:
-                linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.012) 18%, rgba(255,255,255,0.00) 19%),
-                linear-gradient(135deg, rgba(4,15,34,0.98), rgba(11,31,65,0.98)) !important;
-            border: 1px solid rgba(93,233,255,0.66) !important;
-            border-radius: 16px !important;
-            box-shadow:
-                inset 0 1px 0 rgba(255,255,255,0.10),
-                0 0 0 1px rgba(79,229,255,0.20),
-                0 0 20px rgba(79,229,255,0.18),
-                0 0 42px rgba(87,120,255,0.16),
-                0 18px 46px rgba(0,0,0,0.50) !important;
-            backdrop-filter: blur(16px) saturate(145%) !important;
-            -webkit-backdrop-filter: blur(16px) saturate(145%) !important;
-            overflow: hidden !important;
-        }
-
-        div[role="option"],
-        li[role="option"],
-        ul[role="listbox"] li,
-        div[data-baseweb="menu"] div {
-            background: transparent !important;
-            color: var(--spt-v280-text) !important;
-            -webkit-text-fill-color: var(--spt-v280-text) !important;
-            font-weight: 850 !important;
-            text-shadow: none !important;
-            border-radius: 10px !important;
-            margin: 4px 7px !important;
-            padding-top: 10px !important;
-            padding-bottom: 10px !important;
-        }
-        div[data-baseweb="popover"] *,
-        div[data-baseweb="menu"] *,
-        ul[role="listbox"] * {
-            color: var(--spt-v280-text) !important;
-            -webkit-text-fill-color: var(--spt-v280-text) !important;
-        }
-
-        div[role="option"]:hover,
-        li[role="option"]:hover,
-        ul[role="listbox"] li:hover,
-        div[data-baseweb="menu"] div:hover {
-            background: linear-gradient(90deg, rgba(79,229,255,0.18), rgba(108,137,255,0.24)) !important;
-            color: #ffffff !important;
-            -webkit-text-fill-color: #ffffff !important;
-            box-shadow: inset 0 0 0 1px rgba(130,241,255,0.20), 0 0 12px rgba(79,229,255,0.10) !important;
-        }
-
-        div[aria-selected="true"],
-        li[aria-selected="true"],
-        div[role="option"][aria-selected="true"],
-        li[role="option"][aria-selected="true"] {
-            background: linear-gradient(90deg, rgba(80,236,255,0.94), rgba(139,176,255,0.94)) !important;
-            color: var(--spt-v280-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v280-dark-text) !important;
-            font-weight: 950 !important;
-            box-shadow: inset 0 0 0 1px rgba(236,253,255,0.35), 0 0 16px rgba(79,229,255,0.18) !important;
-        }
-        div[aria-selected="true"] *,
-        li[aria-selected="true"] * {
-            color: var(--spt-v280-dark-text) !important;
-            -webkit-text-fill-color: var(--spt-v280-dark-text) !important;
-        }
-
-        div[aria-disabled="true"],
-        li[aria-disabled="true"] {
-            color: #8db2c7 !important;
-            -webkit-text-fill-color: #8db2c7 !important;
-            opacity: 0.82 !important;
-        }
-
-        .stSelectbox label,
-        .stMultiSelect label,
-        .stTextInput label,
-        .stDateInput label,
-        .stNumberInput label,
-        .stTextArea label,
-        div[data-testid="stWidgetLabel"] label {
-            color: #f0fcff !important;
-            text-shadow: 0 0 12px rgba(79,229,255,0.20) !important;
-            letter-spacing: 0.35px !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-try:
-    apply_v280_warroom_future_form_hud_ui()
-except Exception:
-    pass
-
-for _spt_v280_name in (
-    "apply_theme",
-    "apply_global_theme",
-    "apply_warroom_theme",
-    "inject_theme",
-    "inject_global_css",
-    "inject_common_css",
-    "render_global_css",
-    "apply_app_theme",
-):
-    _spt_v280_func = globals().get(_spt_v280_name)
-    if callable(_spt_v280_func) and not getattr(_spt_v280_func, "_spt_v280_wrapped", False):
-        def _spt_v280_make_wrapper(_original):
-            def _spt_v280_wrapper(*args, **kwargs):
-                result = _original(*args, **kwargs)
-                try:
-                    apply_v280_warroom_future_form_hud_ui()
-                except Exception:
-                    pass
-                return result
-            _spt_v280_wrapper._spt_v280_wrapped = True
-            return _spt_v280_wrapper
-        globals()[_spt_v280_name] = _spt_v280_make_wrapper(_spt_v280_func)
-# ===== V2.80 WAR-ROOM FUTURE FORM HUD UI END =====
-
-
-# ===== V2.81 STABLE SPACING GUARD - DO NOT REMOVE START =====
-def apply_v281_stable_spacing_guard():
-    """Restore and lock form field spacing after V2.80 HUD styling.
-    This patch deliberately preserves V2.80 cyber/HUD colors and only fixes layout gaps,
-    glow clipping, and textarea/button contrast. Do not remove in later visual upgrades.
-    """
-    try:
-        import streamlit as st
-    except Exception:
-        return
-
-    st.markdown(
-        """
-        <style>
-        /* V2.81｜穩定欄位間距防回退補丁
-           原則：只修間距與裁切，不覆蓋 V2.80 深色 HUD 主視覺。 */
-
-        :root {
-            --spt-v281-widget-gap-y: 18px;
-            --spt-v281-label-gap: 8px;
-            --spt-v281-field-min-h: 58px;
-            --spt-v281-field-pad-x: 16px;
-        }
-
-        /* 每個 Streamlit 表單元件都保留足夠外距，避免光暈與下一個欄位互相貼住 */
-        div[data-testid="stSelectbox"],
-        div[data-testid="stMultiSelect"],
-        div[data-testid="stTextInput"],
-        div[data-testid="stTextArea"],
-        div[data-testid="stDateInput"],
-        div[data-testid="stNumberInput"],
-        .stSelectbox,
-        .stMultiSelect,
-        .stTextInput,
-        .stTextArea,
-        .stDateInput,
-        .stNumberInput {
-            margin-top: 4px !important;
-            margin-bottom: var(--spt-v281-widget-gap-y) !important;
-            padding-top: 2px !important;
-            padding-bottom: 4px !important;
-            overflow: visible !important;
-        }
-
-        /* 欄位 label 與輸入框之間固定留距，不可被後續版本吃掉 */
-        div[data-testid="stWidgetLabel"],
-        div[data-testid="stWidgetLabel"] > label,
-        .stSelectbox label,
-        .stMultiSelect label,
-        .stTextInput label,
-        .stTextArea label,
-        .stDateInput label,
-        .stNumberInput label {
-            margin-bottom: var(--spt-v281-label-gap) !important;
-            padding-bottom: 0 !important;
-            line-height: 1.35 !important;
-        }
-
-        /* Select / multiselect 外層需要額外空間，避免藍框光暈被切掉 */
+        /* Select / Multiselect 可視欄位：全部比照 Status 欄位高度 */
         div[data-baseweb="select"] {
-            margin-top: 2px !important;
-            margin-bottom: 6px !important;
-            min-height: var(--spt-v281-field-min-h) !important;
+            min-height: var(--spt-filter-field-height) !important;
+            height: var(--spt-filter-field-height) !important;
             overflow: visible !important;
+            display: flex !important;
+            align-items: center !important;
         }
 
         div[data-baseweb="select"] > div {
-            min-height: var(--spt-v281-field-min-h) !important;
-            height: var(--spt-v281-field-min-h) !important;
-            padding-left: var(--spt-v281-field-pad-x) !important;
-            padding-right: var(--spt-v281-field-pad-x) !important;
+            min-height: var(--spt-filter-field-height) !important;
+            height: var(--spt-filter-field-height) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+            display: flex !important;
+            align-items: center !important;
             overflow: visible !important;
             box-sizing: border-box !important;
+            border-radius: 13px !important;
+            background: #edf8ff !important;
+            color: #03121f !important;
         }
 
-        /* 內層文字容器置中；只修高度，不改 V2.80 顏色 */
+        /* BaseWeb 內層容器：修正文字像凹進去、被裁切 */
         div[data-baseweb="select"] > div > div,
         div[data-baseweb="select"] div[role="combobox"],
         div[data-baseweb="select"] div[aria-expanded],
@@ -1455,79 +1970,167 @@ def apply_v281_stable_spacing_guard():
         div[data-baseweb="select"] div[class*="SingleValue"],
         div[data-baseweb="select"] div[class*="placeholder"],
         div[data-baseweb="select"] div[class*="Placeholder"] {
-            min-height: calc(var(--spt-v281-field-min-h) - 4px) !important;
-            height: calc(var(--spt-v281-field-min-h) - 4px) !important;
+            min-height: var(--spt-filter-inner-height) !important;
+            height: var(--spt-filter-inner-height) !important;
+            line-height: var(--spt-filter-inner-height) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
             display: flex !important;
             align-items: center !important;
             overflow: visible !important;
-            line-height: 1.45 !important;
+            box-sizing: border-box !important;
         }
 
+        /* Select / Multiselect 顯示文字 */
         div[data-baseweb="select"] span,
-        div[data-baseweb="select"] p,
-        div[data-baseweb="select"] input {
-            line-height: 1.45 !important;
-            min-height: 28px !important;
+        div[data-baseweb="select"] p {
+            min-height: var(--spt-filter-text-line) !important;
+            line-height: var(--spt-filter-text-line) !important;
             display: inline-flex !important;
             align-items: center !important;
             overflow: visible !important;
+            white-space: nowrap !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
         }
 
-        /* Text / date / number / textarea：恢復上下間距與光暈外露 */
+        /* Select / Multiselect 內部搜尋 input */
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete="list"] {
+            min-height: var(--spt-filter-text-line) !important;
+            height: var(--spt-filter-text-line) !important;
+            line-height: var(--spt-filter-text-line) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            caret-color: transparent !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+            font-weight: 850 !important;
+        }
+
+        /* Text / Date / Number input 也統一高度 */
+        div[data-baseweb="input"],
+        div[data-baseweb="base-input"] {
+            min-height: var(--spt-filter-field-height) !important;
+            height: var(--spt-filter-field-height) !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            border-radius: 13px !important;
+            background: #edf8ff !important;
+        }
+
+        div[data-baseweb="input"] input,
+        div[data-baseweb="base-input"] input,
         .stTextInput input,
         .stDateInput input,
-        .stNumberInput input,
-        div[data-testid="stTextInputRootElement"] input,
-        div[data-testid="stNumberInputRootElement"] input,
-        div[data-testid="stDateInputField"] input {
-            min-height: var(--spt-v281-field-min-h) !important;
-            height: var(--spt-v281-field-min-h) !important;
-            padding-left: var(--spt-v281-field-pad-x) !important;
-            padding-right: var(--spt-v281-field-pad-x) !important;
-            box-sizing: border-box !important;
+        .stNumberInput input {
+            min-height: var(--spt-filter-text-line) !important;
+            height: var(--spt-filter-text-line) !important;
+            line-height: var(--spt-filter-text-line) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 850 !important;
+        }
+
+        /* Multiselect 已選標籤高度 */
+        div[data-baseweb="tag"] {
+            min-height: 40px !important;
+            height: 40px !important;
+            padding: 0 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            line-height: 40px !important;
             overflow: visible !important;
+            background: linear-gradient(135deg, #c9fbff 0%, #83edff 100%) !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+            border-radius: 10px !important;
+            color: #03121f !important;
+            font-weight: 900 !important;
         }
 
-        /* TextArea 不要被前版白底規則吃回去，也不要貼上下元件 */
-        .stTextArea textarea,
-        div[data-testid="stTextArea"] textarea {
-            min-height: 138px !important;
-            padding: 14px 16px !important;
-            box-sizing: border-box !important;
-            overflow: auto !important;
-        }
-
-        /* Checkbox 與按鈕和上一個大欄位分開，不再貼住 */
-        .stCheckbox,
-        div[data-testid="stCheckbox"] {
-            margin-top: 8px !important;
-            margin-bottom: 18px !important;
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div {
+            min-height: 24px !important;
+            line-height: 24px !important;
+            display: inline-flex !important;
+            align-items: center !important;
             overflow: visible !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
         }
 
-        .stButton,
-        div[data-testid="stButton"] {
-            margin-top: 8px !important;
-            margin-bottom: 18px !important;
-            overflow: visible !important;
+        /* 下拉展開選單：淺色背景，字清楚 */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            border: 1px solid rgba(102, 232, 249, .95) !important;
+            box-shadow: 0 0 0 1px rgba(102, 232, 249, .35), 0 12px 32px rgba(0, 255, 255, .22) !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            z-index: 999999 !important;
         }
 
-        .stButton > button,
-        div[data-testid="stButton"] button {
-            min-height: 46px !important;
-            border-radius: 14px !important;
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li {
+            min-height: 44px !important;
+            height: 44px !important;
+            line-height: 44px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
         }
 
-        /* 欄位分組在 columns 內時，保留一致行距 */
-        div[data-testid="column"] > div {
-            overflow: visible !important;
+        div[role="option"] *,
+        li[role="option"] *,
+        ul[role="listbox"] li * {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            fill: #03121f !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
         }
 
-        /* 防止最底部分隔線或下一區塊壓到光暈 */
-        hr,
-        [data-testid="stMarkdownContainer"] hr {
-            margin-top: 22px !important;
-            margin-bottom: 20px !important;
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"],
+        ul[role="listbox"] li[aria-selected="true"] {
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            font-weight: 950 !important;
         }
         </style>
         """,
@@ -1535,40 +2138,21 @@ def apply_v281_stable_spacing_guard():
     )
 
 try:
-    apply_v281_stable_spacing_guard()
+    apply_v266_status_height_unify_all_filter_fields()
 except Exception:
     pass
-
-for _spt_v281_name in (
-    "apply_theme",
-    "apply_global_theme",
-    "apply_warroom_theme",
-    "inject_theme",
-    "inject_global_css",
-    "inject_common_css",
-    "render_global_css",
-    "apply_app_theme",
-):
-    _spt_v281_func = globals().get(_spt_v281_name)
-    if callable(_spt_v281_func) and not getattr(_spt_v281_func, "_spt_v281_wrapped", False):
-        def _spt_v281_make_wrapper(_original):
-            def _spt_v281_wrapper(*args, **kwargs):
-                result = _original(*args, **kwargs)
-                try:
-                    apply_v281_stable_spacing_guard()
-                except Exception:
-                    pass
-                return result
-            _spt_v281_wrapper._spt_v281_wrapped = True
-            return _spt_v281_wrapper
-        globals()[_spt_v281_name] = _spt_v281_make_wrapper(_spt_v281_func)
-# ===== V2.81 STABLE SPACING GUARD - DO NOT REMOVE END =====
+# ===== V2.66 STATUS HEIGHT UNIFY ALL FILTER FIELDS END =====
 
 
-# ===== V2.82 SELECT TEXT VISIBILITY GUARD START =====
-def apply_v282_select_text_visibility_guard():
-    """Final guard: keep V2.80/V2.81 cyber style, but force visible selected/placeholder text.
-    This patch prevents dark text being restored on dark glass fields and prevents vertical clipping.
+# ===== V2.67 SELECT HEIGHT 70 MENU TEXT VISIBLE FINAL START =====
+def apply_v267_select_height_70_menu_text_visible_final():
+    """
+    Final override requested:
+    - Outer select/multiselect frame height: 70px
+    - Inner container height: 66px
+    - Text line-height: 36px
+    - Placeholder text layer brought to front
+    - Dropdown option panel forced to light background + dark readable text
     """
     try:
         import streamlit as st
@@ -1578,29 +2162,58 @@ def apply_v282_select_text_visibility_guard():
     st.markdown(
         """
         <style>
-        /* V2.82｜下拉欄位文字可視性防回退：DO NOT REMOVE
-           保留深色科技感欄位，強制欄位內文字使用淺色，且不被裁切。 */
-
+        /*
+          V2.67｜下拉框尺寸指定版
+          製令、P/N、機型、組立地點、工段、工號、姓名等篩選欄位統一：
+          外框高度 70px｜內層容器 66px｜文字行高 36px
+        */
         :root {
-            --spt-v282-field-text: #eafcff;
-            --spt-v282-field-text-strong: #f7feff;
-            --spt-v282-field-text-dim: #aeeeff;
-            --spt-v282-field-text-muted: #8dccdf;
-            --spt-v282-selected-text-dark: #03121f;
+            --spt-select-outer-h: 70px;
+            --spt-select-inner-h: 66px;
+            --spt-select-line-h: 36px;
         }
 
-        /* Selectbox / Multiselect 顯示框本體維持深色科技感，不回到慘白 */
-        div[data-baseweb="select"] > div {
-            background:
-                linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.014) 17%, rgba(255,255,255,0.00) 18%),
-                linear-gradient(135deg, rgba(8, 20, 44, 0.94) 0%, rgba(16, 34, 69, 0.90) 54%, rgba(7, 16, 36, 0.96) 100%) !important;
-            border: 1px solid rgba(104, 232, 255, 0.82) !important;
-            color: var(--spt-v282-field-text) !important;
-            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
+        /* 元件外層：避免 labels 與欄位互相壓縮 */
+        .stSelectbox,
+        .stMultiSelect,
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"] {
+            min-height: 96px !important;
+            height: auto !important;
             overflow: visible !important;
         }
 
-        /* 關鍵：BaseWeb value/placeholder 容器不要繼承黑字，也不要被裁切 */
+        /* select / multiselect 根容器 */
+        div[data-baseweb="select"] {
+            min-height: var(--spt-select-outer-h) !important;
+            height: var(--spt-select-outer-h) !important;
+            overflow: visible !important;
+            display: flex !important;
+            align-items: center !important;
+            position: relative !important;
+            z-index: 2 !important;
+        }
+
+        /* select / multiselect 可視外框 */
+        div[data-baseweb="select"] > div {
+            min-height: var(--spt-select-outer-h) !important;
+            height: var(--spt-select-outer-h) !important;
+            padding-top: 2px !important;
+            padding-bottom: 2px !important;
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+            border-radius: 13px !important;
+            background: #edf8ff !important;
+            color: #03121f !important;
+            position: relative !important;
+            z-index: 2 !important;
+        }
+
+        /* BaseWeb 內層容器：使用 66px，讓文字不再凹陷或被切 */
         div[data-baseweb="select"] > div > div,
         div[data-baseweb="select"] div[role="combobox"],
         div[data-baseweb="select"] div[aria-expanded],
@@ -1610,144 +2223,188 @@ def apply_v282_select_text_visibility_guard():
         div[data-baseweb="select"] div[class*="SingleValue"],
         div[data-baseweb="select"] div[class*="placeholder"],
         div[data-baseweb="select"] div[class*="Placeholder"] {
-            color: var(--spt-v282-field-text) !important;
-            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
-            opacity: 1 !important;
-            text-shadow: 0 0 8px rgba(107, 232, 255, 0.10) !important;
-            background: transparent !important;
-            overflow: visible !important;
-            line-height: 1.35 !important;
+            min-height: var(--spt-select-inner-h) !important;
+            height: var(--spt-select-inner-h) !important;
+            line-height: var(--spt-select-inner-h) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
             display: flex !important;
             align-items: center !important;
-            min-height: 40px !important;
-            height: auto !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+            position: relative !important;
+            z-index: 5 !important;
         }
 
-        /* 關鍵：顯示文字、placeholder、No options to select 都改淺色 */
+        /* 預設文字 Choose options / No options to select：提高圖層，避免被蓋住 */
         div[data-baseweb="select"] span,
         div[data-baseweb="select"] p,
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Placeholder"],
+        div[data-baseweb="select"] div[class*="singleValue"],
+        div[data-baseweb="select"] div[class*="SingleValue"] {
+            min-height: var(--spt-select-line-h) !important;
+            height: var(--spt-select-line-h) !important;
+            line-height: var(--spt-select-line-h) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            position: relative !important;
+            z-index: 20 !important;
+            opacity: 1 !important;
+        }
+
+        /* input 搜尋層：透明但保留高度，不擋住文字 */
         div[data-baseweb="select"] input,
         div[data-baseweb="select"] input[type="text"],
         div[data-baseweb="select"] input[aria-autocomplete="list"] {
-            color: var(--spt-v282-field-text-strong) !important;
-            -webkit-text-fill-color: var(--spt-v282-field-text-strong) !important;
-            opacity: 1 !important;
-            font-weight: 850 !important;
-            line-height: 1.35 !important;
-            min-height: 28px !important;
-            height: auto !important;
+            min-height: var(--spt-select-line-h) !important;
+            height: var(--spt-select-line-h) !important;
+            line-height: var(--spt-select-line-h) !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            caret-color: transparent !important;
             background: transparent !important;
-            text-shadow: 0 0 8px rgba(107, 232, 255, 0.08) !important;
-            overflow: visible !important;
-            transform: none !important;
-            filter: none !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+            font-weight: 900 !important;
+            position: relative !important;
+            z-index: 10 !important;
         }
 
-        div[data-baseweb="select"] input::placeholder {
-            color: var(--spt-v282-field-text-dim) !important;
-            -webkit-text-fill-color: var(--spt-v282-field-text-dim) !important;
+        /* 下拉箭頭置中 */
+        div[data-baseweb="select"] svg {
+            color: #03121f !important;
+            fill: #03121f !important;
+            flex-shrink: 0 !important;
+            position: relative !important;
+            z-index: 25 !important;
+        }
+
+        /* multiselect 已選標籤 */
+        div[data-baseweb="tag"] {
+            min-height: 40px !important;
+            height: 40px !important;
+            padding: 0 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            line-height: 40px !important;
+            overflow: visible !important;
+            background: linear-gradient(135deg, #c9fbff 0%, #83edff 100%) !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+            border-radius: 10px !important;
+            color: #03121f !important;
+            font-weight: 900 !important;
+            position: relative !important;
+            z-index: 18 !important;
+        }
+
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div {
+            min-height: 24px !important;
+            line-height: 24px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
             opacity: 1 !important;
         }
 
-        /* disabled / 無選項狀態仍要看得到 */
-        div[data-baseweb="select"] [aria-disabled="true"],
-        div[data-baseweb="select"] [disabled],
-        div[data-baseweb="select"] [aria-disabled="true"] *,
-        div[data-baseweb="select"] [disabled] * {
-            color: var(--spt-v282-field-text-muted) !important;
-            -webkit-text-fill-color: var(--spt-v282-field-text-muted) !important;
-            opacity: 0.86 !important;
-        }
-
-        /* 下拉展開清單：深底淺字，預設即清楚，不靠 hover */
+        /*
+          展開後的下拉清單：
+          你截圖裡選項文字看不到，是因為 popover/menu 內部仍吃到深色或透明樣式。
+          這裡強制所有選項與子元素為淺底深字。
+        */
         div[data-baseweb="popover"],
+        div[data-baseweb="popover"] > div,
         div[data-baseweb="menu"],
-        ul[role="listbox"] {
-            background:
-                linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.012) 15%, rgba(255,255,255,0.00) 16%),
-                linear-gradient(135deg, rgba(6, 18, 40, 0.97) 0%, rgba(12, 30, 59, 0.98) 100%) !important;
-            color: var(--spt-v282-field-text) !important;
-            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
-            overflow: hidden !important;
+        div[data-baseweb="menu"] > div,
+        ul[role="listbox"],
+        ul[role="listbox"] > div {
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            border-color: rgba(102, 232, 249, .95) !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+            z-index: 999999 !important;
         }
 
         div[role="option"],
         li[role="option"],
         ul[role="listbox"] li,
-        div[data-baseweb="menu"] div {
-            color: var(--spt-v282-field-text) !important;
-            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
-            opacity: 1 !important;
+        div[data-baseweb="menu"] div[role="option"] {
+            min-height: 46px !important;
+            height: 46px !important;
+            line-height: 46px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+            display: flex !important;
+            align-items: center !important;
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
             text-shadow: none !important;
-            overflow: visible !important;
-        }
-
-        div[data-baseweb="popover"] *,
-        div[data-baseweb="menu"] *,
-        ul[role="listbox"] * {
-            color: var(--spt-v282-field-text) !important;
-            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
             opacity: 1 !important;
         }
 
-        /* hover 保持淺字，不再切回黑字 */
+        div[role="option"] *,
+        li[role="option"] *,
+        ul[role="listbox"] li *,
+        div[data-baseweb="menu"] *,
+        div[data-baseweb="popover"] * {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            fill: #03121f !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+        }
+
         div[role="option"]:hover,
         li[role="option"]:hover,
         ul[role="listbox"] li:hover,
-        div[data-baseweb="menu"] div:hover {
-            background: linear-gradient(90deg, rgba(68, 232, 255, 0.18), rgba(102, 135, 255, 0.24)) !important;
-            color: #ffffff !important;
-            -webkit-text-fill-color: #ffffff !important;
-        }
-
-        /* 已選取項目用亮底，所以改深色字 */
-        div[aria-selected="true"],
-        li[aria-selected="true"],
         div[role="option"][aria-selected="true"],
-        li[role="option"][aria-selected="true"] {
-            background: linear-gradient(90deg, rgba(104, 235, 255, 0.96), rgba(140, 174, 255, 0.96)) !important;
-            color: var(--spt-v282-selected-text-dark) !important;
-            -webkit-text-fill-color: var(--spt-v282-selected-text-dark) !important;
+        li[role="option"][aria-selected="true"],
+        ul[role="listbox"] li[aria-selected="true"] {
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
             font-weight: 950 !important;
         }
-        div[aria-selected="true"] *,
-        li[aria-selected="true"] *,
+
+        div[role="option"]:hover *,
+        li[role="option"]:hover *,
+        ul[role="listbox"] li:hover *,
         div[role="option"][aria-selected="true"] *,
-        li[role="option"][aria-selected="true"] * {
-            color: var(--spt-v282-selected-text-dark) !important;
-            -webkit-text-fill-color: var(--spt-v282-selected-text-dark) !important;
-        }
-
-        /* 多選標籤維持亮底深字，避免標籤文字失真 */
-        div[data-baseweb="tag"],
-        div[data-baseweb="tag"] *,
-        div[data-baseweb="tag"] span,
-        div[data-baseweb="tag"] div {
-            color: #061427 !important;
-            -webkit-text-fill-color: #061427 !important;
-            opacity: 1 !important;
-        }
-
-        /* 文字輸入 / 日期 / 數字 / 備註也強制淺字，避免被深色欄位吃掉 */
-        .stTextInput input,
-        .stDateInput input,
-        .stNumberInput input,
-        .stTextArea textarea,
-        div[data-testid="stTextInputRootElement"] input,
-        div[data-testid="stNumberInputRootElement"] input,
-        div[data-testid="stDateInputField"] input {
-            color: var(--spt-v282-field-text-strong) !important;
-            -webkit-text-fill-color: var(--spt-v282-field-text-strong) !important;
-            opacity: 1 !important;
-            text-shadow: 0 0 8px rgba(107, 232, 255, 0.08) !important;
-            overflow: visible !important;
-        }
-        .stTextInput input::placeholder,
-        .stDateInput input::placeholder,
-        .stNumberInput input::placeholder,
-        .stTextArea textarea::placeholder {
-            color: var(--spt-v282-field-text-dim) !important;
-            -webkit-text-fill-color: var(--spt-v282-field-text-dim) !important;
+        li[role="option"][aria-selected="true"] *,
+        ul[role="listbox"] li[aria-selected="true"] * {
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            fill: #020817 !important;
+            font-weight: 950 !important;
             opacity: 1 !important;
         }
         </style>
@@ -1756,41 +2413,22 @@ def apply_v282_select_text_visibility_guard():
     )
 
 try:
-    apply_v282_select_text_visibility_guard()
+    apply_v267_select_height_70_menu_text_visible_final()
 except Exception:
     pass
-
-for _spt_v282_name in (
-    "apply_theme",
-    "apply_global_theme",
-    "apply_warroom_theme",
-    "inject_theme",
-    "inject_global_css",
-    "inject_common_css",
-    "render_global_css",
-    "apply_app_theme",
-):
-    _spt_v282_func = globals().get(_spt_v282_name)
-    if callable(_spt_v282_func) and not getattr(_spt_v282_func, "_spt_v282_wrapped", False):
-        def _spt_v282_make_wrapper(_original):
-            def _spt_v282_wrapper(*args, **kwargs):
-                result = _original(*args, **kwargs)
-                try:
-                    apply_v282_select_text_visibility_guard()
-                except Exception:
-                    pass
-                return result
-            _spt_v282_wrapper._spt_v282_wrapped = True
-            return _spt_v282_wrapper
-        globals()[_spt_v282_name] = _spt_v282_make_wrapper(_spt_v282_func)
-# ===== V2.82 SELECT TEXT VISIBILITY GUARD END =====
+# ===== V2.67 SELECT HEIGHT 70 MENU TEXT VISIBLE FINAL END =====
 
 
-# ===== V2.83 COLLAPSED SELECT DARK TEXT GUARD START =====
-def apply_v283_collapsed_select_dark_text_guard():
-    """Keep collapsed select/multiselect field text dark and readable on light glass fields.
-    This intentionally targets only the visible field, not the opened dropdown popover.
-    DO NOT REMOVE: prevents selected/placeholder text from being washed out by later HUD effects.
+# ===== V2.68 FORCE DROPDOWN REAL DOM FIX START =====
+def apply_v268_force_dropdown_real_dom_fix():
+    """
+    V2.68 hard override for Streamlit/BaseWeb dropdowns.
+    This version targets the real nested BaseWeb structure more aggressively:
+    - div[data-baseweb="select"] and every direct child layer
+    - role="combobox"
+    - aria-haspopup="listbox"
+    - input and placeholder layers
+    - popover/listbox/option text layers
     """
     try:
         import streamlit as st
@@ -1799,206 +2437,250 @@ def apply_v283_collapsed_select_dark_text_guard():
 
     st.markdown(
         """
-        <style>
-        /* V2.83｜下拉欄位起始文字深色防回退
-           目標：欄位收合狀態的已選文字 / placeholder / No options 必須清楚可見。
-           注意：只鎖定欄位本體，不覆蓋展開選單面板。 */
+        <style id="spt-v268-force-dropdown-real-dom-fix">
+        /*
+        V2.68｜真正強制下拉框高度與文字可見
+        原因：前版只改部分層級，BaseWeb 內層 valueContainer/inputContainer 仍維持原高度，
+        所以外觀看起來沒變，文字仍被裁切。這版直接鎖定所有 real DOM 層級。
+        */
 
-        :root {
-            --spt-v283-collapsed-select-text: #071523;
-            --spt-v283-collapsed-select-muted: #19324a;
-        }
-
-        /* 收合狀態欄位本體：維持淺玻璃底時，文字必須是深色 */
-        div[data-baseweb="select"] > div,
-        div[data-baseweb="select"] > div:hover,
-        div[data-baseweb="select"] > div:focus-within {
-            color: var(--spt-v283-collapsed-select-text) !important;
-            -webkit-text-fill-color: var(--spt-v283-collapsed-select-text) !important;
-        }
-
-        /* 選取值、placeholder、No options to select、value container */
-        div[data-baseweb="select"] > div span,
-        div[data-baseweb="select"] > div p,
-        div[data-baseweb="select"] > div div[role="combobox"],
-        div[data-baseweb="select"] > div div[aria-expanded],
-        div[data-baseweb="select"] > div div[class*="placeholder"],
-        div[data-baseweb="select"] > div div[class*="Placeholder"],
-        div[data-baseweb="select"] > div div[class*="singleValue"],
-        div[data-baseweb="select"] > div div[class*="SingleValue"],
-        div[data-baseweb="select"] > div div[class*="valueContainer"],
-        div[data-baseweb="select"] > div div[class*="ValueContainer"],
-        div[data-baseweb="select"] > div div[class*="inputContainer"],
-        div[data-baseweb="select"] > div div[class*="InputContainer"] {
-            color: var(--spt-v283-collapsed-select-text) !important;
-            -webkit-text-fill-color: var(--spt-v283-collapsed-select-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            filter: none !important;
-            mix-blend-mode: normal !important;
-        }
-
-        /* BaseWeb 內部搜尋 input / placeholder，避免被 HUD 淺色字覆蓋 */
-        div[data-baseweb="select"] > div input,
-        div[data-baseweb="select"] > div input[type="text"],
-        div[data-baseweb="select"] > div input[aria-autocomplete="list"] {
-            color: var(--spt-v283-collapsed-select-text) !important;
-            -webkit-text-fill-color: var(--spt-v283-collapsed-select-text) !important;
-            caret-color: var(--spt-v283-collapsed-select-text) !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-            background: transparent !important;
-        }
-
-        div[data-baseweb="select"] > div input::placeholder {
-            color: var(--spt-v283-collapsed-select-muted) !important;
-            -webkit-text-fill-color: var(--spt-v283-collapsed-select-muted) !important;
-            opacity: 1 !important;
-        }
-
-        /* 下拉箭頭仍維持科技感藍色，不跟著文字變黑 */
-        div[data-baseweb="select"] > div svg {
-            color: #8df7ff !important;
-            fill: #8df7ff !important;
-            opacity: 1 !important;
-            filter: drop-shadow(0 0 6px rgba(0, 225, 255, 0.35)) !important;
-        }
-
-        /* 已選 multiselect tag 維持亮底深字 */
-        div[data-baseweb="select"] div[data-baseweb="tag"],
-        div[data-baseweb="select"] div[data-baseweb="tag"] * {
-            color: #061427 !important;
-            -webkit-text-fill-color: #061427 !important;
-            opacity: 1 !important;
-            text-shadow: none !important;
-        }
-
-        /* 展開選單仍由 V2.82/V2.80 控制；這裡只補強選單內字不透明 */
-        div[data-baseweb="popover"] *,
-        div[data-baseweb="menu"] *,
-        ul[role="listbox"] * {
-            opacity: 1 !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-try:
-    apply_v283_collapsed_select_dark_text_guard()
-except Exception:
-    pass
-
-for _spt_v283_name in (
-    "apply_theme",
-    "apply_global_theme",
-    "apply_warroom_theme",
-    "inject_theme",
-    "inject_global_css",
-    "inject_common_css",
-    "render_global_css",
-    "apply_app_theme",
-):
-    _spt_v283_func = globals().get(_spt_v283_name)
-    if callable(_spt_v283_func) and not getattr(_spt_v283_func, "_spt_v283_wrapped", False):
-        def _spt_v283_make_wrapper(_original):
-            def _spt_v283_wrapper(*args, **kwargs):
-                result = _original(*args, **kwargs)
-                try:
-                    apply_v283_collapsed_select_dark_text_guard()
-                except Exception:
-                    pass
-                return result
-            _spt_v283_wrapper._spt_v283_wrapped = True
-            return _spt_v283_wrapper
-        globals()[_spt_v283_name] = _spt_v283_make_wrapper(_spt_v283_func)
-# ===== V2.83 COLLAPSED SELECT DARK TEXT GUARD END =====
-
-
-# ===== V2.84 INPUT FRAME CLIP GUARD START =====
-def apply_v284_input_frame_clip_guard():
-    """Fix clipped outer frame on text/password inputs.
-    Preserve current cyber style while ensuring the full rounded border/glow is visible.
-    """
-    try:
-        import streamlit as st
-    except Exception:
-        return
-
-    st.markdown(
-        """
-        <style>
-        :root {
-            --spt-v284-login-frame-gap-top: 8px;
-            --spt-v284-login-frame-gap-side: 4px;
-            --spt-v284-login-frame-gap-bottom: 8px;
-        }
-
-        /* 讓文字/密碼輸入元件外層不要裁切光暈與圓角 */
-        .stTextInput,
-        .stTextInput > div,
-        .stTextInput > div > div,
-        div[data-testid="stTextInput"],
-        div[data-testid="stTextInput"] > div,
-        div[data-testid="stTextInputRootElement"],
-        div[data-testid="stTextInputRootElement"] > div,
-        div[data-testid="stPasswordInput"],
-        div[data-testid="stPasswordInput"] > div {
+        /* 先避免舊版 CSS 的 overflow:hidden 繼續裁切 */
+        .stSelectbox, .stMultiSelect,
+        div[data-testid="stSelectbox"], div[data-testid="stMultiSelect"],
+        div[data-testid="stSelectbox"] *, div[data-testid="stMultiSelect"] * {
             overflow: visible !important;
+        }
+
+        /* Streamlit widget wrapper 給足高度 */
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"] {
+            min-height: 104px !important;
+            height: auto !important;
+        }
+
+        /* Select 根元件與可點擊框：真正設定 70px */
+        div[data-baseweb="select"],
+        div[data-testid="stSelectbox"] div[data-baseweb="select"],
+        div[data-testid="stMultiSelect"] div[data-baseweb="select"] {
+            min-height: 70px !important;
+            height: 70px !important;
+            max-height: none !important;
+            display: flex !important;
+            align-items: center !important;
+            background: #edf8ff !important;
+            border-radius: 14px !important;
             box-sizing: border-box !important;
-        }
-
-        /* 給足上/下/左右緩衝，避免外框被容器邊界切掉 */
-        .stTextInput,
-        div[data-testid="stTextInput"],
-        div[data-testid="stPasswordInput"] {
-            padding-top: var(--spt-v284-login-frame-gap-top) !important;
-            padding-right: var(--spt-v284-login-frame-gap-side) !important;
-            padding-bottom: var(--spt-v284-login-frame-gap-bottom) !important;
-            padding-left: var(--spt-v284-login-frame-gap-side) !important;
-            margin-top: 0 !important;
-            margin-bottom: 10px !important;
-        }
-
-        /* 實際輸入框根容器：不再貼邊，也不裁切圓角與光暈 */
-        div[data-testid="stTextInputRootElement"] {
-            padding: 2px !important;
-            border-radius: 18px !important;
             overflow: visible !important;
-            background: transparent !important;
         }
 
-        div[data-testid="stTextInputRootElement"] > div {
-            border-radius: 18px !important;
-            overflow: visible !important;
-            background: transparent !important;
-        }
-
-        /* 眼睛按鈕容器也不要把右上圓角切掉 */
-        div[data-testid="stTextInputRootElement"] button,
-        div[data-testid="stPasswordInput"] button,
-        .stTextInput button {
-            overflow: visible !important;
-            border-top-right-radius: 16px !important;
-            border-bottom-right-radius: 16px !important;
-        }
-
-        /* 輸入框本體：移除任何會把外框推到裁切區的負位移感 */
-        .stTextInput input,
-        div[data-testid="stTextInputRootElement"] input,
-        div[data-testid="stPasswordInput"] input {
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] > div > div > div,
+        div[data-baseweb="select"] div[aria-haspopup="listbox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[role="combobox"] {
+            min-height: 66px !important;
+            height: 66px !important;
+            max-height: none !important;
+            line-height: 66px !important;
+            display: flex !important;
+            align-items: center !important;
+            align-content: center !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
             margin-top: 0 !important;
             margin-bottom: 0 !important;
-            position: relative !important;
-            top: 0 !important;
-            left: 0 !important;
             box-sizing: border-box !important;
+            background: #edf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            overflow: visible !important;
         }
 
-        /* label 與欄位之間多一點距離，避免看起來外框被標籤壓住 */
-        .stTextInput label,
-        div[data-testid="stWidgetLabel"] label {
-            margin-bottom: 8px !important;
+        /* BaseWeb 常用 class 名會變動，用 class* 抓 value / placeholder / input container */
+        div[data-baseweb="select"] div[class*="Value"],
+        div[data-baseweb="select"] div[class*="value"],
+        div[data-baseweb="select"] div[class*="Placeholder"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Input"],
+        div[data-baseweb="select"] div[class*="input"] {
+            min-height: 66px !important;
+            height: 66px !important;
+            max-height: none !important;
+            line-height: 66px !important;
+            display: flex !important;
+            align-items: center !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            overflow: visible !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            background: transparent !important;
+        }
+
+        /* 顯示文字：36px 行高，深色粗體 */
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p,
+        div[data-baseweb="select"] label {
+            min-height: 36px !important;
+            height: 36px !important;
+            line-height: 36px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-size: 16px !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+            position: relative !important;
+            top: 0 !important;
+            z-index: 50 !important;
+            overflow: visible !important;
+        }
+
+        /* 搜尋 input 不得把 placeholder 蓋黑或裁切 */
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete],
+        div[data-baseweb="select"] input[role="combobox"] {
+            min-height: 36px !important;
+            height: 36px !important;
+            line-height: 36px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-size: 16px !important;
+            font-weight: 900 !important;
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            outline: none !important;
+            opacity: 1 !important;
+            caret-color: transparent !important;
+            z-index: 40 !important;
+            overflow: visible !important;
+        }
+
+        div[data-baseweb="select"] input::placeholder {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            opacity: 1 !important;
+            font-size: 16px !important;
+            font-weight: 900 !important;
+        }
+
+        /* 箭頭 */
+        div[data-baseweb="select"] svg,
+        div[data-baseweb="select"] [role="button"] svg {
+            color: #03121f !important;
+            fill: #03121f !important;
+            z-index: 80 !important;
+        }
+
+        /* MultiSelect tag */
+        div[data-baseweb="tag"] {
+            min-height: 42px !important;
+            height: 42px !important;
+            line-height: 42px !important;
+            padding: 0 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            background: linear-gradient(135deg, #c9fbff, #83edff) !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-weight: 900 !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+            border-radius: 10px !important;
+            opacity: 1 !important;
+            overflow: visible !important;
+        }
+
+        div[data-baseweb="tag"] * {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            fill: #03121f !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+        }
+
+        /* 展開後的下拉選單：強制淺底深字 */
+        div[data-baseweb="popover"],
+        div[data-baseweb="popover"] *,
+        div[data-baseweb="menu"],
+        div[data-baseweb="menu"] *,
+        ul[role="listbox"],
+        ul[role="listbox"] * {
+            background-color: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+        }
+
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            border: 1px solid rgba(102, 232, 249, .95) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 0 0 1px rgba(102,232,249,.35), 0 12px 32px rgba(0,255,255,.22) !important;
+            z-index: 999999 !important;
+            overflow-y: auto !important;
+        }
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li {
+            min-height: 46px !important;
+            height: 46px !important;
+            line-height: 46px !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 0 14px !important;
+            background: #eaf8ff !important;
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            font-size: 16px !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        div[role="option"] *,
+        li[role="option"] * {
+            color: #03121f !important;
+            -webkit-text-fill-color: #03121f !important;
+            fill: #03121f !important;
+            font-size: 16px !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+        }
+
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"] {
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+        }
+
+        div[role="option"]:hover *,
+        li[role="option"]:hover *,
+        div[role="option"][aria-selected="true"] *,
+        li[role="option"][aria-selected="true"] * {
+            background: transparent !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            fill: #020817 !important;
         }
         </style>
         """,
@@ -2006,64 +2688,440 @@ def apply_v284_input_frame_clip_guard():
     )
 
 try:
-    apply_v284_input_frame_clip_guard()
+    apply_v268_force_dropdown_real_dom_fix()
+except Exception:
+    pass
+# ===== V2.68 FORCE DROPDOWN REAL DOM FIX END =====
+
+
+# ===== V2.69 USER CONFIGURABLE DROPDOWN SIZE START =====
+from pathlib import Path as _SPTPath
+import json as _spt_json
+
+_SPT_UI_DROPDOWN_DEFAULTS = {
+    "enabled": True,
+    "outer_height": 70,
+    "inner_height": 66,
+    "text_line_height": 36,
+    "font_size": 16,
+    "option_height": 46,
+    "tag_height": 40,
+    "panel_bg": "#eaf8ff",
+    "field_bg": "#edf8ff",
+    "text_color": "#03121f",
+}
+
+def _spt_dropdown_settings_paths():
+    try:
+        root = PROJECT_ROOT
+    except Exception:
+        root = _SPTPath(__file__).resolve().parents[1]
+    return [
+        root / "data" / "config" / "ui_dropdown_settings.json",
+        root / "data" / "persistent_state" / "ui_dropdown_settings.json",
+        root / "data" / "persistent_modules" / "13_system_settings" / "ui_dropdown_settings.json",
+    ]
+
+def _spt_load_dropdown_settings():
+    cfg = dict(_SPT_UI_DROPDOWN_DEFAULTS)
+    for p in _spt_dropdown_settings_paths():
+        try:
+            if p.exists():
+                raw = _spt_json.loads(p.read_text(encoding="utf-8"))
+                if isinstance(raw, dict):
+                    cfg.update(raw)
+                    break
+        except Exception:
+            pass
+    # Clamp values to safe ranges.
+    def _int(name, lo, hi):
+        try:
+            v = int(cfg.get(name, _SPT_UI_DROPDOWN_DEFAULTS[name]))
+        except Exception:
+            v = _SPT_UI_DROPDOWN_DEFAULTS[name]
+        return max(lo, min(hi, v))
+    cfg["outer_height"] = _int("outer_height", 48, 120)
+    cfg["inner_height"] = _int("inner_height", 42, 116)
+    cfg["text_line_height"] = _int("text_line_height", 24, 72)
+    cfg["font_size"] = _int("font_size", 12, 28)
+    cfg["option_height"] = _int("option_height", 32, 90)
+    cfg["tag_height"] = _int("tag_height", 28, 72)
+    cfg["enabled"] = bool(cfg.get("enabled", True))
+    return cfg
+
+def _spt_save_dropdown_settings(cfg):
+    for p in _spt_dropdown_settings_paths():
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(_spt_json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+def apply_v269_configurable_dropdown_css():
+    """Apply dropdown size CSS from persistent settings."""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+    cfg = _spt_load_dropdown_settings()
+    if not cfg.get("enabled", True):
+        return
+    outer = int(cfg["outer_height"])
+    inner = int(cfg["inner_height"])
+    line = int(cfg["text_line_height"])
+    font = int(cfg["font_size"])
+    option = int(cfg["option_height"])
+    tag = int(cfg["tag_height"])
+    field_bg = str(cfg.get("field_bg", "#edf8ff"))
+    panel_bg = str(cfg.get("panel_bg", "#eaf8ff"))
+    text_color = str(cfg.get("text_color", "#03121f"))
+
+    st.markdown(
+        f"""
+        <style id="spt-v269-configurable-dropdown-css">
+        /*
+          V2.69｜可自行設定下拉選單尺寸
+          目前設定：外框 {outer}px｜內層 {inner}px｜文字行高 {line}px｜字體 {font}px
+        */
+        .stSelectbox,
+        .stMultiSelect,
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"] {{
+            min-height: {outer + 28}px !important;
+            height: auto !important;
+            overflow: visible !important;
+        }}
+
+        div[data-baseweb="select"],
+        div[data-testid="stSelectbox"] div[data-baseweb="select"],
+        div[data-testid="stMultiSelect"] div[data-baseweb="select"] {{
+            min-height: {outer}px !important;
+            height: {outer}px !important;
+            max-height: none !important;
+            display: flex !important;
+            align-items: center !important;
+            background: {field_bg} !important;
+            border-radius: 14px !important;
+            box-sizing: border-box !important;
+            overflow: visible !important;
+        }}
+
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] > div > div > div,
+        div[data-baseweb="select"] div[aria-haspopup="listbox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[class*="Value"],
+        div[data-baseweb="select"] div[class*="value"],
+        div[data-baseweb="select"] div[class*="Placeholder"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Input"],
+        div[data-baseweb="select"] div[class*="input"] {{
+            min-height: {inner}px !important;
+            height: {inner}px !important;
+            max-height: none !important;
+            line-height: {inner}px !important;
+            display: flex !important;
+            align-items: center !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            background: {field_bg} !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+        }}
+
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p,
+        div[data-baseweb="select"] label,
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete],
+        div[data-baseweb="select"] input[role="combobox"] {{
+            min-height: {line}px !important;
+            height: {line}px !important;
+            line-height: {line}px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            font-size: {font}px !important;
+            font-weight: 900 !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            outline: none !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            position: relative !important;
+            z-index: 80 !important;
+        }}
+
+        div[data-baseweb="select"] input::placeholder {{
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            opacity: 1 !important;
+            font-size: {font}px !important;
+            font-weight: 900 !important;
+        }}
+
+        div[data-baseweb="select"] svg,
+        div[data-baseweb="select"] [role="button"] svg {{
+            color: {text_color} !important;
+            fill: {text_color} !important;
+            z-index: 90 !important;
+        }}
+
+        div[data-baseweb="tag"] {{
+            min-height: {tag}px !important;
+            height: {tag}px !important;
+            line-height: {tag}px !important;
+            padding: 0 12px !important;
+            margin: 4px 6px 4px 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            background: linear-gradient(135deg, #c9fbff, #83edff) !important;
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            font-weight: 900 !important;
+            border: 1px solid rgba(36, 226, 255, 0.85) !important;
+            border-radius: 10px !important;
+            opacity: 1 !important;
+            overflow: visible !important;
+        }}
+
+        div[data-baseweb="tag"] * {{
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            fill: {text_color} !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+            background: transparent !important;
+        }}
+
+        div[data-baseweb="popover"],
+        div[data-baseweb="popover"] *,
+        div[data-baseweb="menu"],
+        div[data-baseweb="menu"] *,
+        ul[role="listbox"],
+        ul[role="listbox"] * {{
+            background-color: {panel_bg} !important;
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+        }}
+
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {{
+            border: 1px solid rgba(102, 232, 249, .95) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 0 0 1px rgba(102,232,249,.35), 0 12px 32px rgba(0,255,255,.22) !important;
+            z-index: 999999 !important;
+            overflow-y: auto !important;
+        }}
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li {{
+            min-height: {option}px !important;
+            height: {option}px !important;
+            line-height: {option}px !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 0 14px !important;
+            background: {panel_bg} !important;
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            font-size: {font}px !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }}
+
+        div[role="option"] *,
+        li[role="option"] * {{
+            color: {text_color} !important;
+            -webkit-text-fill-color: {text_color} !important;
+            fill: {text_color} !important;
+            font-size: {font}px !important;
+            font-weight: 900 !important;
+            opacity: 1 !important;
+            background: transparent !important;
+        }}
+
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"] {{
+            background: linear-gradient(90deg, #67e8f9, #c4f7ff) !important;
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+        }}
+
+        div[role="option"]:hover *,
+        li[role="option"]:hover *,
+        div[role="option"][aria-selected="true"] *,
+        li[role="option"][aria-selected="true"] * {{
+            color: #020817 !important;
+            -webkit-text-fill-color: #020817 !important;
+            fill: #020817 !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+def render_dropdown_size_settings_panel():
+    """Hidden admin-style panel for tuning dropdown sizes. Safe to call on every page."""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    # 避免同一頁多次 render。
+    if st.session_state.get("_spt_v269_dropdown_panel_rendered"):
+        return
+    st.session_state["_spt_v269_dropdown_panel_rendered"] = True
+
+    cfg = _spt_load_dropdown_settings()
+    with st.sidebar.expander("▾ 下拉選單尺寸設定", expanded=False):
+        st.caption("隱藏設定區｜調整後按永久套用，所有模組共用。")
+        enabled = st.checkbox("啟用自訂下拉尺寸", value=bool(cfg.get("enabled", True)), key="spt_dd_enabled")
+        outer = st.slider("外框高度 px", 48, 120, int(cfg["outer_height"]), 1, key="spt_dd_outer")
+        inner = st.slider("內層容器 px", 42, 116, int(cfg["inner_height"]), 1, key="spt_dd_inner")
+        line = st.slider("文字行高 px", 24, 72, int(cfg["text_line_height"]), 1, key="spt_dd_line")
+        font = st.slider("字體大小 px", 12, 28, int(cfg["font_size"]), 1, key="spt_dd_font")
+        option = st.slider("展開選項高度 px", 32, 90, int(cfg["option_height"]), 1, key="spt_dd_option")
+        tag = st.slider("多選標籤高度 px", 28, 72, int(cfg["tag_height"]), 1, key="spt_dd_tag")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("▣ 永久套用", key="spt_dd_save", use_container_width=True):
+                new_cfg = {
+                    "enabled": enabled,
+                    "outer_height": int(outer),
+                    "inner_height": int(inner),
+                    "text_line_height": int(line),
+                    "font_size": int(font),
+                    "option_height": int(option),
+                    "tag_height": int(tag),
+                    "panel_bg": "#eaf8ff",
+                    "field_bg": "#edf8ff",
+                    "text_color": "#03121f",
+                }
+                _spt_save_dropdown_settings(new_cfg)
+                st.success("下拉選單尺寸已永久記錄。請重新整理或切換頁面後套用。")
+        with col2:
+            if st.button("↺ 預設值", key="spt_dd_reset", use_container_width=True):
+                _spt_save_dropdown_settings(dict(_SPT_UI_DROPDOWN_DEFAULTS))
+                st.success("已恢復下拉選單預設尺寸。請重新整理或切換頁面後套用。")
+
+# Apply CSS and render hidden panel on import.
+try:
+    apply_v269_configurable_dropdown_css()
 except Exception:
     pass
 
-for _spt_v284_name in (
-    "apply_theme",
-    "apply_global_theme",
-    "apply_warroom_theme",
-    "inject_theme",
-    "inject_global_css",
-    "inject_common_css",
-    "render_global_css",
-    "apply_app_theme",
-):
-    _spt_v284_func = globals().get(_spt_v284_name)
-    if callable(_spt_v284_func) and not getattr(_spt_v284_func, "_spt_v284_wrapped", False):
-        def _spt_v284_make_wrapper(_original):
-            def _spt_v284_wrapper(*args, **kwargs):
-                result = _original(*args, **kwargs)
-                try:
-                    apply_v284_input_frame_clip_guard()
-                except Exception:
-                    pass
-                return result
-            _spt_v284_wrapper._spt_v284_wrapped = True
-            return _spt_v284_wrapper
-        globals()[_spt_v284_name] = _spt_v284_make_wrapper(_spt_v284_func)
-# ===== V2.84 INPUT FRAME CLIP GUARD END =====
+try:
+    render_dropdown_size_settings_panel()
+except Exception:
+    pass
+# ===== V2.69 USER CONFIGURABLE DROPDOWN SIZE END =====
 
 
-# ===== V2.87 REMOVE DROPDOWN SIZE SETTINGS PANEL START =====
-# The visual panel 「下拉選單尺寸設定 / Dropdown Size Settings」 is intentionally hidden.
-# Keep configuration loader/saver and CSS functions for compatibility, but do not render the UI.
-def render_dropdown_size_settings_panel():
-    return
-
+# ===== V2.70 MAIN PAGE DROPDOWN SIZE PANEL FALLBACK START =====
 def render_dropdown_size_settings_panel_main_fallback():
-    return
-# ===== V2.87 REMOVE DROPDOWN SIZE SETTINGS PANEL END =====
-
-
-# ===== V2.88 FAST BOOT GUARD START =====
-def apply_v288_fast_boot_guard():
-    """Compatibility guard for faster Streamlit reboot.
-    The obsolete V2.59-V2.70 and V2.79 CSS layers were removed from this file.
-    Keep deleted visual panels hidden and preserve V2.80+V2.81+V2.82+V2.83+V2.84 UI stack.
     """
-    return
+    V2.70:
+    Some Streamlit deployments do not show widgets rendered in st.sidebar from imported theme modules.
+    This fallback renders a collapsed panel in the main page so the setting is always visible.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
 
-def render_operation_results() -> None:
-    return
+    # One panel per page render.
+    if st.session_state.get("_spt_v270_dropdown_main_panel_rendered"):
+        return
+    st.session_state["_spt_v270_dropdown_main_panel_rendered"] = True
 
-def clear_operation_results() -> None:
-    return
+    cfg = _spt_load_dropdown_settings()
 
-def render_dropdown_size_settings_panel():
-    return
+    with st.expander("⚙ 下拉選單尺寸設定 / Dropdown Size Settings（收合）", expanded=False):
+        st.caption("此設定會永久保存，所有模組共用。若下拉文字被切掉，先把外框高度與內層容器調大。")
 
-def render_dropdown_size_settings_panel_main_fallback():
-    return
-# ===== V2.88 FAST BOOT GUARD END =====
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            enabled = st.checkbox("啟用自訂尺寸", value=bool(cfg.get("enabled", True)), key="spt_v270_dd_enabled")
+            outer = st.number_input("外框高度 px", min_value=48, max_value=140, value=int(cfg.get("outer_height", 70)), step=1, key="spt_v270_dd_outer")
+            inner = st.number_input("內層容器 px", min_value=42, max_value=136, value=int(cfg.get("inner_height", 66)), step=1, key="spt_v270_dd_inner")
+        with c2:
+            line = st.number_input("文字行高 px", min_value=24, max_value=90, value=int(cfg.get("text_line_height", 36)), step=1, key="spt_v270_dd_line")
+            font = st.number_input("字體大小 px", min_value=12, max_value=32, value=int(cfg.get("font_size", 16)), step=1, key="spt_v270_dd_font")
+            option = st.number_input("展開選項高度 px", min_value=32, max_value=110, value=int(cfg.get("option_height", 46)), step=1, key="spt_v270_dd_option")
+        with c3:
+            tag = st.number_input("多選標籤高度 px", min_value=28, max_value=90, value=int(cfg.get("tag_height", 40)), step=1, key="spt_v270_dd_tag")
+            st.markdown(
+                f"""
+                <div style="margin-top:8px;padding:12px;border-radius:12px;background:#edf8ff;color:#03121f;font-weight:900;">
+                    預覽高度：外框 {int(outer)}px｜內層 {int(inner)}px｜文字 {int(line)}px
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        b1, b2, b3 = st.columns(3)
+        with b1:
+            if st.button("▣ 永久套用下拉尺寸", key="spt_v270_dd_save", use_container_width=True):
+                new_cfg = {
+                    "enabled": bool(enabled),
+                    "outer_height": int(outer),
+                    "inner_height": int(inner),
+                    "text_line_height": int(line),
+                    "font_size": int(font),
+                    "option_height": int(option),
+                    "tag_height": int(tag),
+                    "panel_bg": "#eaf8ff",
+                    "field_bg": "#edf8ff",
+                    "text_color": "#03121f",
+                }
+                _spt_save_dropdown_settings(new_cfg)
+                st.success("下拉選單尺寸已永久保存。請按重新整理或切換頁面後生效。")
+        with b2:
+            if st.button("↺ 恢復建議值", key="spt_v270_dd_recommended", use_container_width=True):
+                new_cfg = dict(_SPT_UI_DROPDOWN_DEFAULTS)
+                new_cfg.update({
+                    "outer_height": 80,
+                    "inner_height": 76,
+                    "text_line_height": 40,
+                    "font_size": 17,
+                    "option_height": 50,
+                    "tag_height": 42,
+                })
+                _spt_save_dropdown_settings(new_cfg)
+                st.success("已套用建議值：外框80、內層76、文字40、字體17。請重新整理或切換頁面後生效。")
+        with b3:
+            if st.button("↺ 恢復預設值", key="spt_v270_dd_reset", use_container_width=True):
+                _spt_save_dropdown_settings(dict(_SPT_UI_DROPDOWN_DEFAULTS))
+                st.success("已恢復預設值。請重新整理或切換頁面後生效。")
+
+# Render the main-page fallback after CSS is applied.
+try:
+    render_dropdown_size_settings_panel_main_fallback()
+except Exception:
+    pass
+# ===== V2.70 MAIN PAGE DROPDOWN SIZE PANEL FALLBACK END =====
