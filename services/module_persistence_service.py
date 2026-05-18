@@ -27,7 +27,7 @@ GLOBAL_STATE = PROJECT_ROOT / "data" / "persistent_state" / "spt_module_independ
 GLOBAL_SETTINGS = PROJECT_ROOT / "data" / "persistent_state" / "spt_module_independent_settings.json"
 
 MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
-    "01_time_record": {
+    "01_time_records": {
         "name_zh": "工時紀錄",
         "name_en": "Time Records",
         "tables": ["time_records"],
@@ -114,6 +114,18 @@ MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
     },
 }
 
+# V3.06: canonical module code map.
+# The real persistent folder for 01 must be data/persistent_modules/01_time_records.
+# Older pages/services may still pass 01_time_record; normalize it so old calls do not
+# create a second empty folder and make data look missing after module updates.
+MODULE_CODE_ALIASES = {
+    "01_time_record": "01_time_records",
+}
+
+def normalize_module_code(module_code: str) -> str:
+    code = str(module_code or "").strip()
+    return MODULE_CODE_ALIASES.get(code, code)
+
 def _now() -> str:
     return now_text()
 
@@ -136,26 +148,32 @@ def ensure_dirs() -> None:
 
 
 def module_dir(module_code: str) -> Path:
+    module_code = normalize_module_code(module_code)
     return PERSIST_ROOT / module_code
 
 
 def latest_records_path(module_code: str) -> Path:
+    module_code = normalize_module_code(module_code)
     return module_dir(module_code) / f"{module_code}_records.json"
 
 
 def latest_settings_path(module_code: str) -> Path:
+    module_code = normalize_module_code(module_code)
     return module_dir(module_code) / f"{module_code}_settings.json"
 
 
 def latest_audit_path(module_code: str) -> Path:
+    module_code = normalize_module_code(module_code)
     return module_dir(module_code) / f"{module_code}_audit.jsonl"
 
 
 def history_records_path(module_code: str) -> Path:
+    module_code = normalize_module_code(module_code)
     return module_dir(module_code) / "history" / f"{module_code}_records_{_stamp()}.json"
 
 
 def history_settings_path(module_code: str) -> Path:
+    module_code = normalize_module_code(module_code)
     return module_dir(module_code) / "history" / f"{module_code}_settings_{_stamp()}.json"
 
 
@@ -214,6 +232,7 @@ def _existing_records_have_rows(module_code: str, table: str) -> bool:
 
 
 def append_audit(module_code: str, action: str, username: str = "SYSTEM", detail: Optional[Dict[str, Any]] = None) -> None:
+    module_code = normalize_module_code(module_code)
     ensure_dirs()
     payload = {
         "time": _now(),
@@ -229,6 +248,7 @@ def append_audit(module_code: str, action: str, username: str = "SYSTEM", detail
 
 
 def export_module_records(module_code: str, username: str = "SYSTEM", write_history: bool = True) -> Dict[str, Any]:
+    module_code = normalize_module_code(module_code)
     ensure_dirs()
     info = MODULE_TABLE_MAP.get(module_code)
     if not info:
@@ -255,7 +275,7 @@ def export_module_records(module_code: str, username: str = "SYSTEM", write_hist
     # V3.04: never export an empty master-data table over an existing non-empty module JSON.
     # This prevents 03/04 data from disappearing when SQLite is temporarily empty after a module update.
     for _table_name, _count in (payload.get("counts", {}) or {}).items():
-        if module_code in ("03_work_orders", "04_employees") and int(_count or 0) == 0 and _existing_records_have_rows(module_code, _table_name):
+        if module_code in ("01_time_records", "02_history", "03_work_orders", "04_employees") and int(_count or 0) == 0 and _existing_records_have_rows(module_code, _table_name):
             payload["warning"] = f"Blocked empty export for {_table_name}; existing non-empty JSON preserved."
             append_audit(module_code, "BLOCK_EMPTY_EXPORT", username, {"table": _table_name})
             rebuild_global_index()
@@ -299,6 +319,7 @@ def get_module_status() -> List[Dict[str, Any]]:
 
 
 def save_module_settings(module_code: str, settings: Dict[str, Any], username: str = "SYSTEM", write_history: bool = True) -> Dict[str, Any]:
+    module_code = normalize_module_code(module_code)
     ensure_dirs()
     info = MODULE_TABLE_MAP.get(module_code, {"name_zh": module_code, "name_en": module_code})
     payload = {
@@ -318,6 +339,7 @@ def save_module_settings(module_code: str, settings: Dict[str, Any], username: s
 
 
 def load_module_settings(module_code: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    module_code = normalize_module_code(module_code)
     payload = load_json(latest_settings_path(module_code), {}) or {}
     if payload.get("settings") is not None:
         return payload.get("settings", {})
