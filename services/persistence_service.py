@@ -162,6 +162,18 @@ def _load_json(path: Path) -> dict[str, Any] | None:
         return None
 
 
+def _safe_write_json(path: Path, payload: Any) -> None:
+    try:
+        from services.persistence_guard_service import atomic_save_json
+        atomic_save_json(path, payload, backup_existing=True)
+    except Exception:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        json.loads(tmp.read_text(encoding="utf-8"))
+        tmp.replace(path)
+
+
 def _normalise_backup_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """支援 latest state 格式，也支援 full_backup.json 格式。"""
     if "tables" not in payload or not isinstance(payload["tables"], dict):
@@ -265,7 +277,7 @@ def export_permanent_state(include_logs: bool = True, force: bool = False) -> di
             archive_name = f"spt_permanent_state_{_stamp()}.json"
             shutil.copy2(STATE_JSON, ARCHIVE_DIR / archive_name)
             shutil.copy2(STATE_JSON, HISTORY_DIR / archive_name)
-        STATE_JSON.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        _safe_write_json(STATE_JSON, state)
 
         settings_tables: dict[str, list[dict[str, Any]]] = {}
         for table in SETTING_TABLE_CANDIDATES:
@@ -277,7 +289,7 @@ def export_permanent_state(include_logs: bool = True, force: bool = False) -> di
             "tables": settings_tables,
             "table_counts": {t: len(rows) for t, rows in settings_tables.items()},
         }
-        SETTINGS_JSON.write_text(json.dumps(settings_state, ensure_ascii=False, indent=2), encoding="utf-8")
+        _safe_write_json(SETTINGS_JSON, settings_state)
 
         if DB_PATH.exists():
             shutil.copy2(DB_PATH, DB_COPY_DIR / "spt_time_tracking_latest.db")
@@ -417,7 +429,7 @@ def export_audit_state(force: bool = True) -> dict[str, Any]:
     }
     if not DB_PATH.exists():
         state["warning"] = f"SQLite database not found: {DB_PATH}"
-        AUDIT_JSON.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        _safe_write_json(AUDIT_JSON, state)
         return state
     conn = connect_db()
     try:
@@ -426,9 +438,9 @@ def export_audit_state(force: bool = True) -> dict[str, Any]:
                 rows = export_table(conn, table)
                 state["tables"][table] = rows
                 state["table_counts"][table] = len(rows)
-        AUDIT_JSON.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        _safe_write_json(AUDIT_JSON, state)
         hist = AUDIT_HISTORY_DIR / f"spt_audit_log_state_{_stamp()}.json"
-        hist.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        _safe_write_json(hist, state)
         state["latest_audit"] = str(AUDIT_JSON)
         state["history_audit"] = str(hist)
         return state
@@ -530,7 +542,7 @@ def create_persistent_backup(include_excel: bool = True, include_csv: bool = Tru
             created_files.append(str(csv_path.relative_to(PROJECT_ROOT)))
 
     json_path = batch_dir / "full_backup.json"
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    _safe_write_json(json_path, payload)
     created_files.append(str(json_path.relative_to(PROJECT_ROOT)))
 
     if include_excel:
@@ -553,9 +565,9 @@ def create_persistent_backup(include_excel: bool = True, include_csv: bool = Tru
         "files": created_files,
     }
     manifest_path = batch_dir / "backup_manifest.json"
-    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    _safe_write_json(manifest_path, manifest)
     created_files.append(str(manifest_path.relative_to(PROJECT_ROOT)))
-    LATEST_MANIFEST.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    _safe_write_json(LATEST_MANIFEST, manifest)
     created_files.append(str(LATEST_MANIFEST.relative_to(PROJECT_ROOT)))
     export_permanent_state(include_logs=True, force=False)
     export_audit_state(force=True)

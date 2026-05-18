@@ -83,7 +83,25 @@ def _json_load(path: Path, default: Any) -> Any:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else default
-    except Exception:
+    except Exception as exc:
+        # Do not silently reset backup schedule/state to defaults when JSON is
+        # corrupted. Quarantine and try internal backup restore first.
+        try:
+            from services.persistence_guard_service import quarantine_corrupt_file
+            quarantine_corrupt_file(path, reason=str(exc))
+        except Exception:
+            pass
+        try:
+            rel = path.resolve().relative_to(PROJECT_ROOT.resolve())
+            for backup_root in sorted((DATA_DIR / "_persistent_backup").glob("backup_*"), key=lambda p: p.stat().st_mtime, reverse=True):
+                src = backup_root / rel
+                if src.exists() and src.stat().st_size > 0:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, path)
+                    data = json.loads(path.read_text(encoding="utf-8"))
+                    return data if isinstance(data, dict) else default
+        except Exception:
+            pass
         return default
 
 
@@ -227,7 +245,11 @@ def create_external_full_backup(target_folder: str, *, reason: str = "manual", c
 
     with _BACKUP_LOCK:
         target = Path(validation["path"])
-        backup_dir = target / f"{load_backup_schedule().get('backup_name_prefix', 'SPT_time_tracking_backup')}_{_stamp()}"
+        backup_name = f"{load_backup_schedule().get('backup_name_prefix', 'SPT_time_tracking_backup')}_{_stamp()}"
+        backup_dir_final = target / backup_name
+        backup_dir = target / f".{backup_name}.partial"
+        if backup_dir.exists():
+            shutil.rmtree(backup_dir)
         backup_dir.mkdir(parents=True, exist_ok=False)
 
         copied: list[dict[str, Any]] = []
@@ -260,7 +282,7 @@ def create_external_full_backup(target_folder: str, *, reason: str = "manual", c
             "backup_time": _now_text(),
             "reason": reason,
             "project_root": str(PROJECT_ROOT),
-            "backup_dir": str(backup_dir),
+            "backup_dir": str(backup_dir_final),
             "file_count": len(copied),
             "total_bytes": total_bytes,
             "errors": errors,
@@ -268,12 +290,18 @@ def create_external_full_backup(target_folder: str, *, reason: str = "manual", c
             "files": copied,
         }
         _json_dump(backup_dir / "SPT_BACKUP_MANIFEST.json", manifest)
+        # Atomic folder publish: only complete backups appear without .partial.
+        if backup_dir_final.exists():
+            backup_dir_final = target / f"{backup_name}_{os.getpid()}"
+        backup_dir.rename(backup_dir_final)
+        manifest["backup_dir"] = str(backup_dir_final)
+        _json_dump(backup_dir_final / "SPT_BACKUP_MANIFEST.json", manifest)
 
         state = load_backup_state()
         state.update({
             "last_result_ok": len(errors) == 0,
             "last_backup_at": _now_text(),
-            "last_backup_dir": str(backup_dir),
+            "last_backup_dir": str(backup_dir_final),
             "last_file_count": len(copied),
             "last_total_bytes": total_bytes,
             "last_errors": errors,
@@ -284,7 +312,7 @@ def create_external_full_backup(target_folder: str, *, reason: str = "manual", c
 
         return {
             "ok": len(errors) == 0,
-            "backup_dir": str(backup_dir),
+            "backup_dir": str(backup_dir_final),
             "file_count": len(copied),
             "total_bytes": total_bytes,
             "errors": errors,

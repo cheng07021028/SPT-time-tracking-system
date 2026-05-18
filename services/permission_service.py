@@ -198,10 +198,25 @@ def _ensure_legacy_security_tables(cur) -> None:
 def _json_load(path: Path) -> dict:
     try:
         if path.exists() and path.stat().st_size > 0:
-            return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        pass
+            from services.persistence_guard_service import safe_load_json
+            data = safe_load_json(path, {}, allow_default_when_missing=True)
+            return data if isinstance(data, dict) else {}
+    except Exception as exc:
+        if path.exists():
+            raise RuntimeError(f"Permission persistent JSON read failed; default reset blocked: {path} | {exc}") from exc
     return {}
+
+
+def _spt_safe_write_json(path: Path, payload: Any) -> None:
+    try:
+        from services.persistence_guard_service import atomic_save_json
+        atomic_save_json(path, payload, backup_existing=True)
+    except Exception:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        json.loads(tmp.read_text(encoding="utf-8"))
+        tmp.replace(path)
 
 
 def _permission_persistent_candidates() -> list[Path]:
@@ -227,6 +242,23 @@ def _permission_persistent_candidates() -> list[Path]:
         "data/persistent_modules/10_permissions/history/10_permissions_records_*.json",
     ]:
         candidates.extend(root.glob(pattern))
+    # Include external backups configured in 13｜系統設定. Without this,
+    # permission restore may say no backup exists even when external backups exist.
+    try:
+        from services.persistence_guard_service import list_all_persistent_backups
+        for backup in list_all_persistent_backups(include_external=True):
+            for rel in [
+                "data/persistent_state/spt_module_settings.json",
+                "data/persistent_state/spt_permanent_state.json",
+                "data/persistent_modules/10_permissions/10_permissions_settings.json",
+                "data/persistent_modules/10_permissions/10_permissions_records.json",
+                "data/persistent_state/spt_security_settings.json",
+            ]:
+                p = backup / rel
+                if p.exists() and p.stat().st_size > 0:
+                    candidates.append(p)
+    except Exception:
+        pass
     # newest first, remove duplicates
     uniq: dict[str, Path] = {}
     for p in candidates:
@@ -934,10 +966,10 @@ def _persist_security_settings_files(settings: Dict[str, str]) -> None:
             "updated_at": now_text(),
             "security_settings": dict(settings),
         }
-        (state_dir / "spt_security_settings.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        (mod_dir / "10_permissions_settings.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        _spt_safe_write_json(state_dir / "spt_security_settings.json", payload)
+        _spt_safe_write_json(mod_dir / "10_permissions_settings.json", payload)
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        (hist_dir / f"10_permissions_settings_{stamp}.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        _spt_safe_write_json(hist_dir / f"10_permissions_settings_{stamp}.json", payload)
     except Exception:
         pass
 
@@ -1078,7 +1110,7 @@ def _v169_load_persistent_security_settings() -> Dict[str, str]:
         try:
             if not path.exists():
                 continue
-            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload = _json_load(path)
             raw = payload.get("security_settings")
             if raw is None and isinstance(payload.get("tables"), dict):
                 rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
@@ -1177,7 +1209,7 @@ def _v199_read_security_settings_from_files() -> Dict[str, str]:
         try:
             if not path.exists():
                 continue
-            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload = _json_load(path)
             raw = payload.get("security_settings") if isinstance(payload, dict) else None
             if raw is None and isinstance(payload, dict):
                 raw = payload.get("settings")
@@ -1210,7 +1242,7 @@ def _v204_write_idle_timeout_files(minutes: int) -> None:
     for path in paths:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            _spt_safe_write_json(path, payload)
         except Exception:
             pass
 
@@ -1228,7 +1260,7 @@ def _v199_write_security_settings_to_files(settings: Dict[str, str]) -> None:
     for path in _v199_security_setting_paths():
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            _spt_safe_write_json(path, payload)
         except Exception:
             pass
 

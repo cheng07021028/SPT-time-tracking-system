@@ -45,10 +45,27 @@ def _count_table(conn: sqlite3.Connection, table: str) -> int:
 def _read_json(path: Path) -> Any | None:
     try:
         if path.exists() and path.stat().st_size > 0:
-            return json.loads(path.read_text(encoding="utf-8"))
+            try:
+                from services.persistence_guard_service import safe_load_json
+                return safe_load_json(path, None, allow_default_when_missing=True)
+            except Exception:
+                return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
     return None
+
+
+def _backup_relative_sources(rel_path: str) -> list[Path]:
+    out: list[Path] = []
+    try:
+        from services.persistence_guard_service import list_all_persistent_backups
+        for backup in list_all_persistent_backups(include_external=True):
+            p = backup / rel_path
+            if p.exists() and p.is_file() and p.stat().st_size > 0:
+                out.append(p)
+    except Exception:
+        pass
+    return out
 
 
 def _latest_file(patterns: Iterable[str]) -> Path | None:
@@ -108,6 +125,8 @@ def _employee_sources() -> list[Path]:
     ])
     if latest:
         sources.append(latest)
+    sources.extend(_backup_relative_sources("data/persistent_modules/04_employees/04_employees_records.json"))
+    sources.extend(_backup_relative_sources("data/persistent_state/spt_permanent_state.json"))
     return sources
 
 
@@ -123,6 +142,8 @@ def _work_order_sources() -> list[Path]:
     ])
     if latest:
         sources.append(latest)
+    sources.extend(_backup_relative_sources("data/persistent_modules/03_work_orders/03_work_orders_records.json"))
+    sources.extend(_backup_relative_sources("data/persistent_state/spt_permanent_state.json"))
     return sources
 
 

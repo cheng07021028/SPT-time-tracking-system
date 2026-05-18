@@ -114,10 +114,11 @@ def _load_json_file(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        from services.persistence_guard_service import safe_load_json
+        data = safe_load_json(path, None, allow_default_when_missing=True)
         return data if isinstance(data, dict) else None
-    except Exception:
-        return None
+    except Exception as exc:
+        raise RuntimeError(f"13 系統設定永久檔讀取失敗，已阻止回到預設：{path} | {exc}") from exc
 
 
 def _load_latest_persistent_payload() -> dict[str, Any] | None:
@@ -417,6 +418,37 @@ def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any
     return {"ok": bool(restored), "restored": restored, "source": "system_settings_json"}
 
 
+def _system_settings_payload_count(payload: dict[str, Any] | None) -> int:
+    if not isinstance(payload, dict):
+        return 0
+    total = 0
+    counts = payload.get("table_counts")
+    if isinstance(counts, dict):
+        for v in counts.values():
+            try:
+                total += max(0, int(v or 0))
+            except Exception:
+                pass
+    tables = payload.get("tables")
+    if isinstance(tables, dict):
+        for v in tables.values():
+            if isinstance(v, list):
+                total += len(v)
+    return total
+
+
+def _atomic_save_system_settings_json(path: Path, payload: dict[str, Any]) -> None:
+    try:
+        from services.persistence_guard_service import atomic_save_json
+        atomic_save_json(path, payload, backup_existing=True)
+    except Exception:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        json.loads(tmp.read_text(encoding="utf-8"))
+        tmp.replace(path)
+
+
 def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:
     """Write a dedicated permanent file for 13｜系統設定 immediately."""
     ensure_system_settings_schema()
@@ -450,12 +482,15 @@ def export_system_settings_permanent(reason: str = "system_settings_changed", wr
             "app_settings": 0 if app is None else len(app),
         },
     }
+    if _system_settings_payload_count(payload) == 0:
+        existing_payloads = [_load_json_file(p) for p in SYSTEM_SETTINGS_FILES if p.exists()]
+        if any(_system_settings_payload_count(p) > 0 for p in existing_payloads):
+            return {"ok": False, "skipped": True, "reason": "empty system settings export blocked to protect existing permanent settings"}
     for p in SYSTEM_SETTINGS_FILES:
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_save_system_settings_json(p, payload)
     if write_history:
         hist = SYSTEM_SETTINGS_HISTORY_DIR / f"system_settings_{now_stamp()}.json"
-        hist.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_save_system_settings_json(hist, payload)
     try:
         mark_data_changed("13｜系統設定已變更，永久設定檔已建立；如需上傳 GitHub 請到 09｜資料永久保存與備份。", "system_settings_permanent_json")
     except Exception:

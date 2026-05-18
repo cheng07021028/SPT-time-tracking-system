@@ -106,17 +106,26 @@ def _ensure_state_dir() -> None:
 
 def load_settings() -> Dict[str, Any]:
     _ensure_state_dir()
-    if SETTINGS_PATH.exists():
-        try:
-            return json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
+    try:
+        from services.persistence_guard_service import safe_load_json
+        data = safe_load_json(SETTINGS_PATH, {}, allow_default_when_missing=True)
+        return data if isinstance(data, dict) else {}
+    except Exception as exc:
+        if SETTINGS_PATH.exists():
+            raise RuntimeError(f"表格欄位設定檔讀取失敗，已阻止回到預設：{SETTINGS_PATH} | {exc}") from exc
+        return {}
 
 
 def save_settings(settings: Dict[str, Any]) -> None:
     _ensure_state_dir()
-    SETTINGS_PATH.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        from services.persistence_guard_service import atomic_save_json
+        atomic_save_json(SETTINGS_PATH, settings, backup_existing=True)
+    except Exception:
+        tmp = SETTINGS_PATH.with_suffix(SETTINGS_PATH.suffix + ".tmp")
+        tmp.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
+        json.loads(tmp.read_text(encoding="utf-8"))
+        tmp.replace(SETTINGS_PATH)
 
 
 def _normalize_df(data: Any) -> pd.DataFrame | None:

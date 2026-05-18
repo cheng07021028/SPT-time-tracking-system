@@ -43,6 +43,31 @@ IDLE_TIMEOUT_FILES = [
 
 PBKDF2_ITERATIONS = 180_000
 DEFAULT_IDLE_MINUTES = 1
+
+
+def _spt_safe_json_load(path: Path, default: Any | None = None) -> Any:
+    if default is None:
+        default = {}
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            from services.persistence_guard_service import safe_load_json
+            return safe_load_json(path, default, allow_default_when_missing=True)
+    except Exception as exc:
+        if path.exists():
+            raise RuntimeError(f"Security persistent JSON read failed; default reset blocked: {path} | {exc}") from exc
+    return default
+
+
+def _spt_safe_json_write(path: Path, payload: Any) -> None:
+    try:
+        from services.persistence_guard_service import atomic_save_json
+        atomic_save_json(path, payload, backup_existing=True)
+    except Exception:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        json.loads(tmp.read_text(encoding="utf-8"))
+        tmp.replace(path)
 _PERMISSION_CACHE_TTL_SECONDS = 300
 _SECURITY_SCHEMA_READY = False
 
@@ -423,7 +448,7 @@ def _read_idle_timeout_from_files() -> int | None:
         try:
             if not path.exists() or path.stat().st_size <= 0:
                 continue
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = _spt_safe_json_load(path, {})
             raw = data.get("idle_timeout_minutes") or data.get("setting_value")
             if raw not in (None, ""):
                 return max(1, int(float(raw)))
@@ -441,7 +466,7 @@ def _write_idle_timeout_files(minutes: int) -> None:
     for path in IDLE_TIMEOUT_FILES:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            _spt_safe_json_write(path, payload)
         except Exception:
             pass
 
@@ -1370,7 +1395,7 @@ def _v169_load_persistent_security_settings() -> dict[str, str]:
         try:
             if not path.exists():
                 continue
-            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload = _spt_safe_json_load(path, {})
             raw = payload.get("security_settings")
             if raw is None and isinstance(payload.get("tables"), dict):
                 rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
@@ -1390,7 +1415,7 @@ def _v169_write_persistent_security_settings(settings: dict[str, str]) -> None:
         payload = {"version": "V1.69", "updated_at": now, "security_settings": dict(settings)}
         for path in (_SECURITY_PERSISTENT_FILE, _SECURITY_MODULE_FILE):
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            _spt_safe_json_write(path, payload)
     except Exception:
         pass
 
@@ -1484,7 +1509,7 @@ def _v169_load_persistent_security_settings() -> dict[str, str]:  # type: ignore
         try:
             if not path.exists():
                 continue
-            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload = _spt_safe_json_load(path, {})
             raw = payload.get("security_settings") if isinstance(payload, dict) else None
             if raw is None and isinstance(payload, dict):
                 raw = payload.get("settings")
@@ -1510,7 +1535,7 @@ def _v169_write_persistent_security_settings(settings: dict[str, str]) -> None: 
     for path in _v199_security_setting_paths():
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            _spt_safe_json_write(path, payload)
         except Exception:
             pass
 
@@ -1653,7 +1678,7 @@ def _v208_read_idle_timeout_from_files() -> int | None:
         try:
             if not path.exists():
                 continue
-            minutes = _v208_extract_idle_timeout(json.loads(path.read_text(encoding="utf-8")))
+            minutes = _v208_extract_idle_timeout(_spt_safe_json_load(path, {}))
             if minutes is not None:
                 return minutes
         except Exception:
@@ -1685,14 +1710,14 @@ def _v208_write_idle_timeout_files(minutes: int) -> None:
             else:
                 # Preserve ask_continue_after_record when possible.
                 try:
-                    old = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+                    old = _spt_safe_json_load(path, {}) if path.exists() else {}
                     old_settings = old.get("security_settings") if isinstance(old, dict) else None
                     if isinstance(old_settings, dict) and old_settings.get("ask_continue_after_record") is not None:
                         security_payload["security_settings"]["ask_continue_after_record"] = str(old_settings.get("ask_continue_after_record"))
                 except Exception:
                     pass
                 payload = security_payload
-            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            _spt_safe_json_write(path, payload)
         except Exception:
             pass
 
