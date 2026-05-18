@@ -165,7 +165,7 @@ def _render_external_auto_backup_center() -> None:
     st.subheader("每日自動備份設定 / Daily External Backup Schedule")
     st.caption(
         "設定每日固定時間，自動把所有專案設定檔與正式資料備份到指定資料夾。"
-        "備份包含 data 內正式資料、權限、歷史、工時紀錄、表格紀錄、系統設定與 .streamlit 設定檔；"
+        "備份包含 data 內正式資料、權限、歷史、工時紀錄、表格紀錄、系統設定；.streamlit 設定會鏡像到 data/config/_project_config_mirror 後一起備份；"
         "會排除內部備份資料夾，避免遞迴備份越來越大。"
     )
 
@@ -286,7 +286,7 @@ def _render_external_auto_backup_center() -> None:
             - `data/persistent_state/`：永久狀態、欄位設定、權限狀態、保護狀態
             - `data/database/`：SQLite 資料庫，包含權限、工時、歷史、系統設定等資料表
             - `data/config/` 與 `data` 內其他正式設定檔
-            - `.streamlit/config.toml`、`.streamlit/secrets.toml`
+            - `data/config/_project_config_mirror/`：`.streamlit/config.toml`、`.streamlit/secrets.toml` 與部署設定鏡像檔
             - `requirements.txt`、`README.md` 等部署參考設定
 
             **會排除：**
