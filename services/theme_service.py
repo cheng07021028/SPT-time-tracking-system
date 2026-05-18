@@ -522,28 +522,9 @@ div[data-baseweb="radio"] [aria-checked="true"] {
 /* Data editor checkbox cells: keep clickable checkbox visible on dark table. */
 [data-testid="stDataEditor"] input[type="checkbox"],
 [data-testid="stDataEditor"] [role="checkbox"] {
-    accent-color: #18d7f0 !important;
-    background: linear-gradient(180deg, rgba(245,251,255,.98) 0%, rgba(223,247,255,.96) 100%) !important;
-    border: 1.6px solid rgba(103,245,255,.95) !important;
-    border-radius: 4px !important;
-    outline: 1px solid rgba(223,250,255,.82) !important;
-    box-shadow: 0 0 0 1px rgba(255,255,255,.65) inset, 0 0 10px rgba(35,230,255,.28) !important;
-    color: #04101d !important;
-}
-[data-testid="stDataEditor"] [role="checkbox"][aria-checked="true"],
-[data-testid="stDataEditor"] input[type="checkbox"]:checked {
-    background: linear-gradient(180deg, #dffaff 0%, #bdf6ff 100%) !important;
-    border-color: #67f5ff !important;
-    box-shadow: 0 0 0 1px rgba(255,255,255,.75) inset, 0 0 12px rgba(35,230,255,.40) !important;
-    color: #04101d !important;
-}
-[data-testid="stDataEditor"] [role="checkbox"] svg,
-[data-testid="stDataEditor"] [role="checkbox"] path,
-[data-testid="stDataEditor"] input[type="checkbox"] + div svg,
-[data-testid="stDataEditor"] input[type="checkbox"] + div path {
-    fill: #04101d !important;
-    stroke: #04101d !important;
-    opacity: 1 !important;
+    accent-color: #dffaff !important;
+    outline: 1px solid rgba(223,250,255,.70) !important;
+    box-shadow: 0 0 8px rgba(35,230,255,.22) !important;
 }
 
 /* V2.03: checkbox/radio/toggle rows use light background so confirmations are clearly visible. */
@@ -3125,3 +3106,57 @@ try:
 except Exception:
     pass
 # ===== V2.70 MAIN PAGE DROPDOWN SIZE PANEL FALLBACK END =====
+
+
+# ===== V3.11 UNIFIED TABLE TOOLBAR HIDE START =====
+def apply_v311_unified_table_toolbar_hide():
+    """Hide Streamlit dataframe/data_editor floating toolbar icons for unified table style."""
+    try:
+        import streamlit as st
+    except Exception:
+        return
+    st.markdown(
+        """
+        <style>
+        /* V3.11｜統一表格樣式：隱藏 Streamlit 表格右上角內建工具列。 */
+        [data-testid="stElementToolbar"],
+        [data-testid="stDataFrame"] [data-testid="stElementToolbar"],
+        [data-testid="stDataEditor"] [data-testid="stElementToolbar"],
+        div[data-testid="stDataFrame"] div[aria-label="Fullscreen"],
+        div[data-testid="stDataFrame"] button[title*="Download"],
+        div[data-testid="stDataFrame"] button[title*="下載"],
+        div[data-testid="stDataEditor"] div[aria-label="Fullscreen"],
+        div[data-testid="stDataEditor"] button[title*="Download"],
+        div[data-testid="stDataEditor"] button[title*="下載"] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v311_unified_table_toolbar_hide()
+except Exception:
+    pass
+
+for _spt_v311_name in (
+    "apply_theme", "apply_global_theme", "inject_theme", "inject_global_css", "render_global_css", "apply_app_theme"
+):
+    _spt_v311_func = globals().get(_spt_v311_name)
+    if callable(_spt_v311_func) and not getattr(_spt_v311_func, "_spt_v311_wrapped", False):
+        def _spt_v311_make_wrapper(_original):
+            def _spt_v311_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v311_unified_table_toolbar_hide()
+                except Exception:
+                    pass
+                return result
+            _spt_v311_wrapper._spt_v311_wrapped = True
+            return _spt_v311_wrapper
+        globals()[_spt_v311_name] = _spt_v311_make_wrapper(_spt_v311_func)
+# ===== V3.11 UNIFIED TABLE TOOLBAR HIDE END =====
