@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from io import StringIO, BytesIO
+from io import BytesIO, StringIO
 import pandas as pd
 import streamlit as st
 
@@ -56,27 +56,28 @@ ACCOUNT_DISPLAY_COLUMNS = {
 }
 
 
-def _df_to_xlsx_bytes(df: pd.DataFrame, sheet_name: str = "Sheet1") -> bytes:
-    """Build Excel bytes for download buttons without touching source data."""
-    bio = BytesIO()
-    export_df = pd.DataFrame() if df is None else df.copy()
-    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
-        export_df.to_excel(writer, index=False, sheet_name=sheet_name[:31] or "Sheet1")
-    bio.seek(0)
-    return bio.getvalue()
+def _account_export_bytes(df: pd.DataFrame, sheet_name: str = "帳號清單") -> bytes:
+    out = BytesIO()
+    with pd.ExcelWriter(out, engine="xlsxwriter") as writer:
+        export_df = df.copy() if df is not None else pd.DataFrame()
+        export_df.to_excel(writer, index=False, sheet_name=sheet_name)
+    return out.getvalue()
 
 
-def _render_download_current_list(df: pd.DataFrame, label: str, file_name: str, key: str, sheet_name: str = "Current List") -> None:
-    """Unified current-list download button. Does not change UI state or persisted data."""
-    safe_df = pd.DataFrame() if df is None else df.copy()
-    st.download_button(
-        label=label,
-        data=_df_to_xlsx_bytes(safe_df, sheet_name=sheet_name),
-        file_name=file_name,
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
-        key=key,
-    )
+def _account_template_df() -> pd.DataFrame:
+    return pd.DataFrame([
+        {
+            "帳號": "demo001",
+            "密碼": "Abcd1234",
+            "工號": "SPT001",
+            "姓名": "王小明",
+            "Email": "demo001@company.com",
+            "角色": "operator",
+            "啟用": True,
+            "強制改密碼": False,
+            "備註": "Excel 匯入範例",
+        }
+    ])
 
 with st.expander("⧠ 權限設定使用說明 / User Guide", expanded=False):
     st.markdown("""
@@ -462,16 +463,7 @@ with tab_accounts:
                 st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 st.rerun()
 
-        st.download_button(
-            "⇩ 下載目前帳號清單 / Download Current Account List",
-            data=_df_to_xlsx_bytes(st.session_state.get("v133_users_df", _users_for_editor()), sheet_name="Account Master"),
-            file_name="account_master_current.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-            key="v312_download_current_account_master",
-        )
-
-        st.warning("V1.76：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。設定不會因下載而改變。")
+        st.warning("V1.76：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。")
 
         # V1.71：帳號總表使用 st.form 包住 data_editor。
         # 原因：Streamlit 一般 data_editor 每次切換儲存格、勾選、下拉或其他元件互動都可能 rerun，
@@ -484,7 +476,7 @@ with tab_accounts:
                 disabled=not account_edit_enabled,
                 height=360,
                 column_config={
-                    "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small"),
+                    "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
                     "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
                     "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
                     "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
@@ -492,8 +484,8 @@ with tab_accounts:
                     "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
                     "Email": st.column_config.TextColumn("Email"),
                     "角色 / Role": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
-                    "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active", width="small"),
-                    "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change", width="small"),
+                    "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active"),
+                    "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
                     "備註 / Note": st.column_config.TextColumn("備註 / Note"),
                     "最後登入 / Last Login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
                     "更新時間 / Updated At": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
@@ -533,6 +525,25 @@ with tab_accounts:
 
     with account_tab_excel:
         st.markdown("### Excel 匯入帳號密碼設定 / Import Account Password Settings")
+        export_users_df = pd.DataFrame(get_users())
+        export_users_df = export_users_df[[c for c in ["username", "employee_id", "display_name", "email", "role_code", "is_active", "force_password_change", "note", "last_login", "updated_at"] if c in export_users_df.columns]] if not export_users_df.empty else pd.DataFrame(columns=["username", "employee_id", "display_name", "email", "role_code", "is_active", "force_password_change", "note"])
+        ax1, ax2 = st.columns(2)
+        with ax1:
+            st.download_button(
+                "下載目前清單 / Download Current List",
+                data=_account_export_bytes(export_users_df, sheet_name="帳號清單"),
+                file_name="SPT_帳號權限清單.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        with ax2:
+            st.download_button(
+                "下載匯入範本 / Download Template",
+                data=_account_export_bytes(_account_template_df(), sheet_name="匯入範本"),
+                file_name="SPT_帳號匯入範本.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
         if not st.session_state.get("v166_account_edit_enabled", False):
             st.info("請先到『帳號清單編輯』按『啟動編輯』，再執行匯入或直接儲存。")
         st.caption("若第一列有標題，系統會依標題自動對應欄位。")
@@ -617,15 +628,6 @@ with tab_perm:
         view_df = view_df[view_df["module_code"] == selected_module.split(" ", 1)[0]]
     if selected_role != "全部 / All":
         view_df = view_df[view_df["role_code"] == selected_role]
-    st.download_button(
-        "⇩ 下載目前權限清單 / Download Current Permission List",
-        data=_df_to_xlsx_bytes(view_df, sheet_name="Account Permissions"),
-        file_name="account_module_permissions_current.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
-        key="v312_download_current_permission_matrix",
-    )
-
     st.markdown("#### 快速勾選 / Quick Toggle")
     b1, b2, b3, b4, b5 = st.columns(5)
     with b1:
@@ -674,15 +676,6 @@ with tab_sec:
     st.subheader("安全設定 / Security Settings")
     settings = get_security_settings()
     idle = int(settings.get("idle_timeout_minutes", "15") or 15)
-    st.download_button(
-        "⇩ 下載目前安全設定 / Download Current Security Settings",
-        data=_df_to_xlsx_bytes(pd.DataFrame([settings]), sheet_name="Security Settings"),
-        file_name="security_settings_current.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
-        key="v312_download_current_security_settings",
-    )
-
     with st.form("security_settings_commit_form", clear_on_submit=False):
         new_idle = st.number_input("閒置自動登出分鐘數 / Idle Auto Logout Minutes", min_value=1, max_value=240, value=idle, step=1)
         confirm_after_record = st.checkbox("工時完成後詢問是否繼續記錄 / Ask continue after time record", value=settings.get("ask_continue_after_record", "1") != "0")

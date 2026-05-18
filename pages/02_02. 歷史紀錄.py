@@ -32,17 +32,47 @@ HISTORY_RESULT_MESSAGES_KEY = "v238_history_result_messages"
 
 
 def _add_history_result(level: str, message: str, *, append: bool = True) -> None:
-    """V2.85: operation-result message panel disabled by request.
+    """Keep action result messages visible after rerun.
 
-    Keep the function name for backward compatibility so existing save/import/delete
-    workflows continue to run, but do not persist or render operation-result cards.
+    Streamlit's st.success/st.error messages disappear after rerun.
+    This page writes operation results into session_state so import / save / delete
+    results remain visible until the user clears them manually.
     """
-    return
+    item = {"level": str(level or "info"), "message": str(message or "").strip()}
+    if not item["message"]:
+        return
+    if append:
+        msgs = list(st.session_state.get(HISTORY_RESULT_MESSAGES_KEY, []))
+        msgs.append(item)
+        st.session_state[HISTORY_RESULT_MESSAGES_KEY] = msgs[-10:]
+    else:
+        st.session_state[HISTORY_RESULT_MESSAGES_KEY] = [item]
 
 
 def _show_history_results() -> None:
-    """V2.85: removed Operation Results panel from the page UI."""
-    return
+    msgs = st.session_state.get(HISTORY_RESULT_MESSAGES_KEY, [])
+    if not msgs:
+        return
+    with st.container():
+        st.markdown("""
+        <div style="margin:10px 0 8px 0;padding:10px 14px;border:1px solid rgba(108,240,255,.45);border-radius:14px;background:rgba(10,35,65,.72);box-shadow:0 0 20px rgba(55,220,255,.18);font-weight:800;color:#dffbff;">
+        ▣ 執行結果 / Operation Results（會保留到手動清除）
+        </div>
+        """, unsafe_allow_html=True)
+        for msg in msgs:
+            level = msg.get("level", "info")
+            text = msg.get("message", "")
+            if level == "success":
+                st.success(text)
+            elif level == "error":
+                st.error(text)
+            elif level == "warning":
+                st.warning(text)
+            else:
+                st.info(text)
+        if st.button("◌ 清除執行結果訊息 / Clear Operation Messages", key="history_clear_result_messages", use_container_width=True):
+            st.session_state[HISTORY_RESULT_MESSAGES_KEY] = []
+            rerun()
 
 
 def rerun():
@@ -52,7 +82,7 @@ def rerun():
         st.experimental_rerun()
 
 
-# V2.85: Operation Results panel removed; keep workflow logic unchanged.
+_show_history_results()
 
 
 def _normalize_text(v) -> str:
@@ -1178,24 +1208,33 @@ with tab1:
         else:
             _render_history_view_table(df, "history_records", height=520)
 
-    if not df.empty:
-        bio = BytesIO()
-        with pd.ExcelWriter(bio, engine="xlsxwriter") as writer:
-            df.to_excel(writer, index=False, sheet_name="歷史紀錄")
-        st.download_button("下載 Excel / Export Excel", data=bio.getvalue(), file_name=f"SPT_歷史紀錄_{start}_{end}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 with tab2:
     st.subheader("Excel 匯入 / Excel Import")
     if not can_edit:
         st.warning("目前帳號沒有 02 歷史紀錄編輯權限，不能匯入歷史資料。")
     else:
-        st.download_button(
-            "下載歷史紀錄匯入範本 / Download Template",
-            data=_download_history_template(),
-            file_name="SPT_歷史紀錄匯入範本.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
+        dl1, dl2 = st.columns(2)
+        with dl1:
+            export_bio = BytesIO()
+            export_df = df.copy()
+            with pd.ExcelWriter(export_bio, engine="xlsxwriter") as writer:
+                export_df.to_excel(writer, index=False, sheet_name="歷史紀錄")
+            st.download_button(
+                "下載目前清單 / Download Current List",
+                data=export_bio.getvalue(),
+                file_name=f"SPT_歷史紀錄_{start}_{end}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        with dl2:
+            st.download_button(
+                "下載歷史紀錄匯入範本 / Download Template",
+                data=_download_history_template(),
+                file_name="SPT_歷史紀錄匯入範本.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
         uploaded = st.file_uploader("上傳歷史紀錄 Excel", type=["xlsx", "xlsm", "xls"], key="history_excel_upload_v197")
         recalc_excel = st.checkbox("匯入時依 13｜系統設定休息時間重新計算工時", value=True, key="history_excel_recalc_v197")
         if uploaded is not None:
