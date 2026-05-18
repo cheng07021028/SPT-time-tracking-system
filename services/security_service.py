@@ -43,31 +43,6 @@ IDLE_TIMEOUT_FILES = [
 
 PBKDF2_ITERATIONS = 180_000
 DEFAULT_IDLE_MINUTES = 1
-
-
-def _spt_safe_json_load(path: Path, default: Any | None = None) -> Any:
-    if default is None:
-        default = {}
-    try:
-        if path.exists() and path.stat().st_size > 0:
-            from services.persistence_guard_service import safe_load_json
-            return safe_load_json(path, default, allow_default_when_missing=True)
-    except Exception as exc:
-        if path.exists():
-            raise RuntimeError(f"Security persistent JSON read failed; default reset blocked: {path} | {exc}") from exc
-    return default
-
-
-def _spt_safe_json_write(path: Path, payload: Any) -> None:
-    try:
-        from services.persistence_guard_service import atomic_save_json
-        atomic_save_json(path, payload, backup_existing=True)
-    except Exception:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        json.loads(tmp.read_text(encoding="utf-8"))
-        tmp.replace(path)
 _PERMISSION_CACHE_TTL_SECONDS = 300
 _SECURITY_SCHEMA_READY = False
 
@@ -448,7 +423,7 @@ def _read_idle_timeout_from_files() -> int | None:
         try:
             if not path.exists() or path.stat().st_size <= 0:
                 continue
-            data = _spt_safe_json_load(path, {})
+            data = json.loads(path.read_text(encoding="utf-8"))
             raw = data.get("idle_timeout_minutes") or data.get("setting_value")
             if raw not in (None, ""):
                 return max(1, int(float(raw)))
@@ -466,7 +441,7 @@ def _write_idle_timeout_files(minutes: int) -> None:
     for path in IDLE_TIMEOUT_FILES:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            _spt_safe_json_write(path, payload)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             pass
 
@@ -553,18 +528,6 @@ def _user_roles(username: str) -> list[str]:
 def get_current_user() -> dict[str, Any] | None:
     if not st.session_state.get("auth_logged_in"):
         return None
-    # V2.93：同一 session 中若 10｜權限管理已變更目前帳號角色，
-    # 上方登入狀態列也要立即以 auth_users.role_code 更新，不顯示舊角色殘留。
-    try:
-        username = st.session_state.get("auth_username", "")
-        row = _auth_user_row(username) if username else None
-        if row:
-            role = str(row.get("role_code", "") or "").strip()
-            if role:
-                st.session_state["auth_roles"] = [role]
-            st.session_state["auth_display_name"] = row.get("display_name") or username
-    except Exception:
-        pass
     return {
         "username": st.session_state.get("auth_username", ""),
         "display_name": st.session_state.get("auth_display_name", ""),
@@ -614,12 +577,9 @@ def _sync_auth_user_to_security_runtime(auth_row: dict[str, Any]) -> None:
             now,
             now,
         ))
-        # V2.93：auth_users.role_code 是唯一角色來源。
-        # 先刪除舊 runtime 角色再重建，避免 admin/operator 同時殘留。
         role_code = str(auth_row.get("role_code", "") or "").strip()
-        execute("DELETE FROM security_user_roles WHERE username=?", (username,))
         if role_code:
-            execute("INSERT INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
+            execute("INSERT OR IGNORE INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
     except Exception:
         pass
 
@@ -646,13 +606,11 @@ def authenticate(username: str, password: str) -> tuple[bool, str]:
     if auth_row:
         _sync_auth_user_to_security_runtime(auth_row)
 
-    # V2.93：登入角色不再把舊 runtime 角色與 auth_users 角色合併。
-    # 若帳號來自 auth_users，直接以 auth_users.role_code 為唯一來源。
+    roles = _user_roles(username)
+    # 若帳號來自 auth_users，角色存在 role_code，不一定已同步到 security_user_roles。
     auth_role = str(row.get("role_code", "") or "").strip()
-    if auth_row and auth_role:
-        roles = [auth_role]
-    else:
-        roles = _user_roles(username)
+    if auth_role and auth_role not in roles:
+        roles.append(auth_role)
 
     st.session_state["auth_logged_in"] = True
     st.session_state["auth_username"] = username
@@ -1395,7 +1353,7 @@ def _v169_load_persistent_security_settings() -> dict[str, str]:
         try:
             if not path.exists():
                 continue
-            payload = _spt_safe_json_load(path, {})
+            payload = json.loads(path.read_text(encoding="utf-8"))
             raw = payload.get("security_settings")
             if raw is None and isinstance(payload.get("tables"), dict):
                 rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
@@ -1415,7 +1373,7 @@ def _v169_write_persistent_security_settings(settings: dict[str, str]) -> None:
         payload = {"version": "V1.69", "updated_at": now, "security_settings": dict(settings)}
         for path in (_SECURITY_PERSISTENT_FILE, _SECURITY_MODULE_FILE):
             path.parent.mkdir(parents=True, exist_ok=True)
-            _spt_safe_json_write(path, payload)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception:
         pass
 
@@ -1509,7 +1467,7 @@ def _v169_load_persistent_security_settings() -> dict[str, str]:  # type: ignore
         try:
             if not path.exists():
                 continue
-            payload = _spt_safe_json_load(path, {})
+            payload = json.loads(path.read_text(encoding="utf-8"))
             raw = payload.get("security_settings") if isinstance(payload, dict) else None
             if raw is None and isinstance(payload, dict):
                 raw = payload.get("settings")
@@ -1535,7 +1493,7 @@ def _v169_write_persistent_security_settings(settings: dict[str, str]) -> None: 
     for path in _v199_security_setting_paths():
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            _spt_safe_json_write(path, payload)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             pass
 
@@ -1678,7 +1636,7 @@ def _v208_read_idle_timeout_from_files() -> int | None:
         try:
             if not path.exists():
                 continue
-            minutes = _v208_extract_idle_timeout(_spt_safe_json_load(path, {}))
+            minutes = _v208_extract_idle_timeout(json.loads(path.read_text(encoding="utf-8")))
             if minutes is not None:
                 return minutes
         except Exception:
@@ -1710,14 +1668,14 @@ def _v208_write_idle_timeout_files(minutes: int) -> None:
             else:
                 # Preserve ask_continue_after_record when possible.
                 try:
-                    old = _spt_safe_json_load(path, {}) if path.exists() else {}
+                    old = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
                     old_settings = old.get("security_settings") if isinstance(old, dict) else None
                     if isinstance(old_settings, dict) and old_settings.get("ask_continue_after_record") is not None:
                         security_payload["security_settings"]["ask_continue_after_record"] = str(old_settings.get("ask_continue_after_record"))
                 except Exception:
                     pass
                 payload = security_payload
-            _spt_safe_json_write(path, payload)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             pass
 
@@ -1835,18 +1793,197 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:  # typ
     return _old_check_permission_v199(module_code, action)
 
 
-# ===== V2.43 default idle timeout policy =====
-# Company requirement: the built-in default idle logout is 1 minute.  Existing
-# permanent files are preserved unless they contain the old unmodified default 15.
+# ===== V2.43 default idle timeout policy DISABLED BY V3.01 =====
+# V3.01: do NOT auto-seed or overwrite idle timeout on import.
+# Import-time seeding caused user settings to revert after module updates.
 def _v243_seed_idle_timeout_one_minute() -> None:
+    return None
+
+# Intentionally not executed. Security settings are read from permanent JSON/DB only.
+
+
+# ===== V3.01 SECURITY SETTINGS PERMANENCE FINAL GUARD START =====
+def _v301_project_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _v301_security_paths() -> list[Path]:
+    root = _v301_project_root()
+    return [
+        root / "data" / "config" / "security_settings.json",
+        root / "data" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
+        root / "data" / "config" / "idle_timeout_settings.json",
+        root / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+    ]
+
+
+def _v301_now_text() -> str:
     try:
-        minutes = _v208_read_idle_timeout_from_files()
-        if minutes in (None, 15):
-            set_idle_timeout_minutes(1)
+        return _now()
+    except Exception:
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v301_atomic_write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    txt = json.dumps(payload, ensure_ascii=False, indent=2)
+    tmp.write_text(txt, encoding="utf-8")
+    # Verify before replacing.
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v301_extract_security_settings(payload: object) -> dict[str, str]:
+    out: dict[str, str] = {}
+    if not isinstance(payload, dict):
+        return out
+    for src in (
+        payload,
+        payload.get("security_settings"),
+        payload.get("settings"),
+    ):
+        if isinstance(src, dict):
+            if src.get("idle_timeout_minutes") not in (None, ""):
+                out["idle_timeout_minutes"] = str(src.get("idle_timeout_minutes"))
+            if src.get("ask_continue_after_record") not in (None, ""):
+                out["ask_continue_after_record"] = str(src.get("ask_continue_after_record"))
+    tables = payload.get("tables")
+    if isinstance(tables, dict):
+        for table_name in ("auth_security_settings", "security_settings"):
+            rows = tables.get(table_name) or []
+            if isinstance(rows, list):
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    k = str(row.get("setting_key") or "")
+                    v = row.get("setting_value")
+                    if k in {"idle_timeout_minutes", "ask_continue_after_record"} and v not in (None, ""):
+                        out[k] = str(v)
+    return out
+
+
+def _v301_read_security_files() -> dict[str, str]:
+    merged: dict[str, str] = {}
+    for path in _v301_security_paths():
+        try:
+            if not path.exists():
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            vals = _v301_extract_security_settings(payload)
+            # File order is source priority: first valid value wins.
+            for k, v in vals.items():
+                if k not in merged and v not in (None, ""):
+                    merged[k] = str(v)
+        except Exception:
+            # Never overwrite user settings because one file is bad.
+            continue
+    return merged
+
+
+def _v301_write_security_files(settings: dict[str, str]) -> None:
+    try:
+        idle = max(1, int(float(settings.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    ask = "1" if str(settings.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
+    security_payload = {
+        "version": "V3.01",
+        "updated_at": _v301_now_text(),
+        "security_settings": {
+            "idle_timeout_minutes": str(idle),
+            "ask_continue_after_record": ask,
+        },
+        "note": "安全設定永久檔。模組更新後以 data 內永久設定為準，不可由程式自動重建預設值覆蓋。",
+    }
+    idle_payload = {
+        "version": "V3.01",
+        "updated_at": _v301_now_text(),
+        "idle_timeout_minutes": idle,
+        "ask_continue_after_record": ask,
+        "note": "閒置自動登出永久設定。",
+    }
+    for path in _v301_security_paths():
+        try:
+            payload = idle_payload if "idle_timeout" in path.name else security_payload
+            _v301_atomic_write_json(path, payload)
+        except Exception:
+            pass
+
+
+def get_idle_timeout_minutes() -> int:  # type: ignore[override]
+    """V3.01 final reader: permanent JSON -> DB -> default. No import-time auto reset."""
+    try:
+        cache = st.session_state.get("_spt_idle_timeout_cache")
+        if cache:
+            minutes = int(float(cache.get("minutes", 0)))
+            if minutes >= 1:
+                return minutes
     except Exception:
         pass
+    file_settings = _v301_read_security_files()
+    minutes = None
+    if file_settings.get("idle_timeout_minutes") not in (None, ""):
+        try:
+            minutes = int(float(file_settings["idle_timeout_minutes"]))
+        except Exception:
+            minutes = None
+    if minutes is None:
+        try:
+            ensure_security_schema()
+            for table in ("auth_security_settings", "security_settings"):
+                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
+                if row and row.get("setting_value") not in (None, ""):
+                    minutes = int(float(row.get("setting_value")))
+                    break
+        except Exception:
+            minutes = None
+    if minutes is None:
+        minutes = DEFAULT_IDLE_MINUTES
+    minutes = max(1, int(minutes))
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+    except Exception:
+        pass
+    return minutes
 
-try:
-    _v243_seed_idle_timeout_one_minute()
-except Exception:
-    pass
+
+def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
+    """V3.01 final writer: DB + all permanent data JSON paths + session cache."""
+    minutes = max(1, int(minutes))
+    file_settings = _v301_read_security_files()
+    ask = str(file_settings.get("ask_continue_after_record", "1") or "1")
+    merged = {"idle_timeout_minutes": str(minutes), "ask_continue_after_record": ask}
+    _v301_write_security_files(merged)
+    try:
+        ensure_security_schema()
+        for table in ("auth_security_settings", "security_settings"):
+            execute(f"""
+                CREATE TABLE IF NOT EXISTS {table} (
+                    setting_key TEXT PRIMARY KEY,
+                    setting_value TEXT,
+                    note TEXT,
+                    updated_at TEXT
+                )
+            """)
+            for k, v in merged.items():
+                execute(f"""
+                    INSERT INTO {table} (setting_key, setting_value, note, updated_at)
+                    VALUES (?, ?, 'V3.01 synchronized permanent security setting', ?)
+                    ON CONFLICT(setting_key) DO UPDATE SET
+                        setting_value=excluded.setting_value,
+                        note=excluded.note,
+                        updated_at=excluded.updated_at
+                """, (k, str(v), _v301_now_text()))
+    except Exception:
+        pass
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+        st.session_state["spt_security_settings"] = dict(merged)
+    except Exception:
+        pass
+# ===== V3.01 SECURITY SETTINGS PERMANENCE FINAL GUARD END =====

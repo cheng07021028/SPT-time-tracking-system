@@ -198,25 +198,10 @@ def _ensure_legacy_security_tables(cur) -> None:
 def _json_load(path: Path) -> dict:
     try:
         if path.exists() and path.stat().st_size > 0:
-            from services.persistence_guard_service import safe_load_json
-            data = safe_load_json(path, {}, allow_default_when_missing=True)
-            return data if isinstance(data, dict) else {}
-    except Exception as exc:
-        if path.exists():
-            raise RuntimeError(f"Permission persistent JSON read failed; default reset blocked: {path} | {exc}") from exc
-    return {}
-
-
-def _spt_safe_write_json(path: Path, payload: Any) -> None:
-    try:
-        from services.persistence_guard_service import atomic_save_json
-        atomic_save_json(path, payload, backup_existing=True)
+            return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        json.loads(tmp.read_text(encoding="utf-8"))
-        tmp.replace(path)
+        pass
+    return {}
 
 
 def _permission_persistent_candidates() -> list[Path]:
@@ -242,23 +227,6 @@ def _permission_persistent_candidates() -> list[Path]:
         "data/persistent_modules/10_permissions/history/10_permissions_records_*.json",
     ]:
         candidates.extend(root.glob(pattern))
-    # Include external backups configured in 13｜系統設定. Without this,
-    # permission restore may say no backup exists even when external backups exist.
-    try:
-        from services.persistence_guard_service import list_all_persistent_backups
-        for backup in list_all_persistent_backups(include_external=True):
-            for rel in [
-                "data/persistent_state/spt_module_settings.json",
-                "data/persistent_state/spt_permanent_state.json",
-                "data/persistent_modules/10_permissions/10_permissions_settings.json",
-                "data/persistent_modules/10_permissions/10_permissions_records.json",
-                "data/persistent_state/spt_security_settings.json",
-            ]:
-                p = backup / rel
-                if p.exists() and p.stat().st_size > 0:
-                    candidates.append(p)
-    except Exception:
-        pass
     # newest first, remove duplicates
     uniq: dict[str, Path] = {}
     for p in candidates:
@@ -767,13 +735,13 @@ def save_users(rows: Iterable[dict]) -> dict:
     conn.commit()
     conn.close()
 
-    # V2.93：帳號清單編輯是角色唯一來源。
-    # 即使角色文字看似沒有變，也可能已存在舊權限矩陣/舊 runtime 角色殘留，
-    # 所以儲存的帳號一律重建權限與 runtime 角色，不再只處理 role_sync_users。
+    # First make sure missing module rows exist; then overwrite only the users
+    # whose role was changed or newly created.  This keeps other users' manual
+    # permission adjustments untouched while still making role changes effective.
     ensure_permissions_for_all_users(force=True)
     synced_permissions = 0
-    if saved_usernames:
-        synced_permissions = sync_user_permissions_from_roles(saved_usernames, reason="account_master_saved_authoritative")
+    if role_sync_users:
+        synced_permissions = sync_user_permissions_from_roles(role_sync_users, reason="account_role_changed")
     try:
         sync_auth_users_to_runtime_security(saved_usernames)
     except Exception:
@@ -966,10 +934,10 @@ def _persist_security_settings_files(settings: Dict[str, str]) -> None:
             "updated_at": now_text(),
             "security_settings": dict(settings),
         }
-        _spt_safe_write_json(state_dir / "spt_security_settings.json", payload)
-        _spt_safe_write_json(mod_dir / "10_permissions_settings.json", payload)
+        (state_dir / "spt_security_settings.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        (mod_dir / "10_permissions_settings.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        _spt_safe_write_json(hist_dir / f"10_permissions_settings_{stamp}.json", payload)
+        (hist_dir / f"10_permissions_settings_{stamp}.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception:
         pass
 
@@ -1110,7 +1078,7 @@ def _v169_load_persistent_security_settings() -> Dict[str, str]:
         try:
             if not path.exists():
                 continue
-            payload = _json_load(path)
+            payload = json.loads(path.read_text(encoding="utf-8"))
             raw = payload.get("security_settings")
             if raw is None and isinstance(payload.get("tables"), dict):
                 rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
@@ -1209,7 +1177,7 @@ def _v199_read_security_settings_from_files() -> Dict[str, str]:
         try:
             if not path.exists():
                 continue
-            payload = _json_load(path)
+            payload = json.loads(path.read_text(encoding="utf-8"))
             raw = payload.get("security_settings") if isinstance(payload, dict) else None
             if raw is None and isinstance(payload, dict):
                 raw = payload.get("settings")
@@ -1242,7 +1210,7 @@ def _v204_write_idle_timeout_files(minutes: int) -> None:
     for path in paths:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            _spt_safe_write_json(path, payload)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             pass
 
@@ -1260,7 +1228,7 @@ def _v199_write_security_settings_to_files(settings: Dict[str, str]) -> None:
     for path in _v199_security_setting_paths():
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            _spt_safe_write_json(path, payload)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             pass
 
@@ -1453,327 +1421,178 @@ def has_permission(username: str, module_code: str, action: str = "can_view") ->
 check_permission = has_permission
 
 
-# ===== V2.92 ACCOUNT MASTER AUTHORITATIVE PERMISSION SYNC START =====
-def _v292_clean_usernames(usernames: Iterable[str] | None = None) -> list[str]:
+# ===== V3.01 SECURITY SETTINGS SINGLE SOURCE GUARD START =====
+def _v301_permission_security_paths() -> list[Path]:
+    root = PROJECT_ROOT
+    return [
+        root / "data" / "config" / "security_settings.json",
+        root / "data" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
+        root / "data" / "config" / "idle_timeout_settings.json",
+        root / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+    ]
+
+
+def _v301_perm_now() -> str:
     try:
-        if usernames is None:
-            conn = connect_db()
-            rows = conn.execute("SELECT username FROM auth_users ORDER BY username").fetchall()
-            conn.close()
-            return [str(r["username"]).strip() for r in rows if str(r["username"]).strip()]
-        return sorted({str(u or "").strip() for u in usernames if str(u or "").strip()})
+        return now_text()
     except Exception:
-        return []
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _v292_clear_all_permission_caches() -> None:
+def _v301_perm_atomic_write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v301_perm_extract_security(payload: object) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    if not isinstance(payload, dict):
+        return out
+    sources = [payload, payload.get("security_settings"), payload.get("settings")]
+    for src in sources:
+        if isinstance(src, dict):
+            if src.get("idle_timeout_minutes") not in (None, ""):
+                out["idle_timeout_minutes"] = str(src.get("idle_timeout_minutes"))
+            if src.get("ask_continue_after_record") not in (None, ""):
+                out["ask_continue_after_record"] = str(src.get("ask_continue_after_record"))
+    if isinstance(payload.get("tables"), dict):
+        for table_name in ("auth_security_settings", "security_settings"):
+            rows = payload.get("tables", {}).get(table_name) or []
+            if isinstance(rows, list):
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    k = str(row.get("setting_key") or "")
+                    v = row.get("setting_value")
+                    if k in {"idle_timeout_minutes", "ask_continue_after_record"} and v not in (None, ""):
+                        out[k] = str(v)
+    return out
+
+
+def _v301_perm_read_security_files() -> Dict[str, str]:
+    merged: Dict[str, str] = {}
+    for path in _v301_permission_security_paths():
+        try:
+            if not path.exists():
+                continue
+            vals = _v301_perm_extract_security(json.loads(path.read_text(encoding="utf-8")))
+            for k, v in vals.items():
+                if k not in merged and v not in (None, ""):
+                    merged[k] = str(v)
+        except Exception:
+            continue
+    return merged
+
+
+def _v301_perm_write_security_files(settings: Dict[str, str]) -> None:
+    try:
+        idle = max(1, int(float(settings.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    ask = "1" if str(settings.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
+    security_payload = {
+        "version": "V3.01",
+        "updated_at": _v301_perm_now(),
+        "security_settings": {
+            "idle_timeout_minutes": str(idle),
+            "ask_continue_after_record": ask,
+        },
+        "note": "權限管理安全設定永久檔。更新模組後以 data 內設定為準。",
+    }
+    idle_payload = {
+        "version": "V3.01",
+        "updated_at": _v301_perm_now(),
+        "idle_timeout_minutes": idle,
+        "ask_continue_after_record": ask,
+        "note": "閒置自動登出永久設定。",
+    }
+    for path in _v301_permission_security_paths():
+        try:
+            _v301_perm_atomic_write_json(path, idle_payload if "idle_timeout" in path.name else security_payload)
+        except Exception:
+            pass
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    """V3.01: read security settings from permanent data JSON first, then DB."""
+    result: Dict[str, str] = {"idle_timeout_minutes": "15", "ask_continue_after_record": "1"}
+    file_settings = _v301_perm_read_security_files()
+    if file_settings:
+        result.update(file_settings)
+    else:
+        try:
+            init_permission_tables()
+            conn = connect_db()
+            cur = conn.cursor()
+            _ensure_security_setting_tables(cur)
+            for table in ("security_settings", "auth_security_settings"):
+                try:
+                    rows = cur.execute(f"SELECT setting_key, setting_value FROM {table}").fetchall()
+                    for r in rows:
+                        k = str(r["setting_key"])
+                        if k in result and r["setting_value"] not in (None, ""):
+                            result[k] = str(r["setting_value"])
+                except Exception:
+                    pass
+            conn.close()
+        except Exception:
+            pass
+    try:
+        idle = max(1, int(float(result.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    result["idle_timeout_minutes"] = str(idle)
+    result["ask_continue_after_record"] = "1" if str(result.get("ask_continue_after_record", "1")) not in {"0", "False", "false"} else "0"
+    return result
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    """V3.01: save security settings to DB and all permanent JSON files atomically."""
+    merged = get_security_settings()
+    merged.update({str(k): str(v) for k, v in settings.items() if v is not None})
+    try:
+        idle = max(1, int(float(merged.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    merged["idle_timeout_minutes"] = str(idle)
+    merged["ask_continue_after_record"] = "1" if str(merged.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
+    _v301_perm_write_security_files(merged)
+    try:
+        init_permission_tables()
+        conn = connect_db()
+        cur = conn.cursor()
+        _ensure_security_setting_tables(cur)
+        for table in ("auth_security_settings", "security_settings"):
+            for k, v in merged.items():
+                cur.execute(f"""
+                    INSERT INTO {table}(setting_key, setting_value, note, updated_at)
+                    VALUES (?,?,?,?)
+                    ON CONFLICT(setting_key) DO UPDATE SET
+                        setting_value=excluded.setting_value,
+                        note=excluded.note,
+                        updated_at=excluded.updated_at
+                """, (k, str(v), "V3.01 synchronized permanent security setting", _v301_perm_now()))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+    try:
+        from services.security_service import set_idle_timeout_minutes
+        set_idle_timeout_minutes(idle)
+    except Exception:
+        pass
+    if st is not None:
+        try:
+            st.session_state["_spt_idle_timeout_cache"] = {"minutes": idle, "ts": 0}
+            st.session_state["spt_security_settings"] = dict(merged)
+        except Exception:
+            pass
     clear_permission_runtime_cache()
-    if st is None:
-        return
-    try:
-        for k in list(st.session_state.keys()):
-            if (
-                k.startswith("_v132_perm_")
-                or k.startswith("_spt_perm_cache_")
-                or k in {"auth_roles", "role", "roles"}
-            ):
-                st.session_state.pop(k, None)
-    except Exception:
-        pass
-
-
-def sync_user_permissions_from_roles(usernames: Iterable[str], reason: str = "role_changed") -> int:  # type: ignore[override]
-    """V2.92 authoritative role -> Account Module Permissions sync.
-
-    Account Master is the single source of role.  When a user's role is saved,
-    remove that user's old module-permission rows and rebuild them from the
-    current auth_users.role_code.  This prevents the old mixed state such as
-    login bar showing "admin, operator" while Account Master says "operator".
-    """
-    init_permission_tables()
-    target_users = _v292_clean_usernames(usernames)
-    if not target_users:
-        return 0
-    conn = connect_db()
-    cur = conn.cursor()
-    updated = 0
-    _ensure_legacy_security_tables(cur)
-    for username in target_users:
-        u = cur.execute("SELECT username, role_code FROM auth_users WHERE username=?", (username,)).fetchone()
-        if not u:
-            cur.execute("DELETE FROM auth_account_permissions WHERE username=?", (username,))
-            cur.execute("DELETE FROM security_user_roles WHERE username=?", (username,))
-            continue
-        role = str(u["role_code"] or "operator").strip() or "operator"
-        # Remove stale module rows first so the matrix cannot keep old-role residue.
-        cur.execute("DELETE FROM auth_account_permissions WHERE username=?", (username,))
-        cur.execute("DELETE FROM security_user_roles WHERE username=?", (username,))
-        cur.execute("INSERT OR IGNORE INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
-        for m in MODULES:
-            preset = _role_preset_for_module(role, m["module_code"])
-            cur.execute("""
-                INSERT INTO auth_account_permissions
-                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, (
-                username, m["module_code"], m["module_name_zh"], m["module_name_en"],
-                preset["can_view"], preset["can_create"], preset["can_edit"], preset["can_delete"],
-                preset["can_import"], preset["can_export"], preset["can_backup"], preset["can_restore"], preset["can_manage"], now_text()
-            ))
-            updated += 1
-    conn.commit()
-    conn.close()
-    _v292_clear_all_permission_caches()
-    return updated
-
-
-def reconcile_account_master_permissions_authoritative(usernames: Iterable[str] | None = None, reason: str = "account_master_authoritative") -> int:
-    """Public helper used by 10｜權限管理 after Account Master save."""
-    target = _v292_clean_usernames(usernames)
-    if not target:
-        return 0
-    return sync_user_permissions_from_roles(target, reason=reason)
-
-
-def sync_auth_users_to_runtime_security(usernames: Iterable[str] | None = None) -> int:  # type: ignore[override]
-    """V2.92 runtime login-role sync with stale-role cleanup."""
-    init_permission_tables()
-    conn = connect_db()
-    cur = conn.cursor()
-    _ensure_legacy_security_tables(cur)
-    target = _v292_clean_usernames(usernames)
-    params: list[str] = []
-    where = ""
-    if target:
-        where = " WHERE username IN ({})".format(",".join(["?"] * len(target)))
-        params = target
-    rows = cur.execute("SELECT * FROM auth_users" + where, params).fetchall()
-    count = 0
-    for r in rows:
-        username = str(r["username"]).strip()
-        if not username:
-            continue
-        cur.execute("""
-            INSERT INTO security_users
-            (username,password_hash,employee_id,display_name,email,is_active,force_password_change,last_login_at,created_at,updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(username) DO UPDATE SET
-                password_hash=excluded.password_hash,
-                employee_id=excluded.employee_id,
-                display_name=excluded.display_name,
-                email=excluded.email,
-                is_active=excluded.is_active,
-                force_password_change=excluded.force_password_change,
-                last_login_at=excluded.last_login_at,
-                updated_at=excluded.updated_at
-        """, (
-            username, r["password_hash"], r["employee_id"], r["display_name"], r["email"],
-            int(r["is_active"] or 0), int(r["force_password_change"] or 0), r["last_login_at"],
-            r["created_at"] or now_text(), now_text(),
-        ))
-        role = str(r["role_code"] or "operator").strip() or "operator"
-        cur.execute("DELETE FROM security_user_roles WHERE username=?", (username,))
-        cur.execute("INSERT INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
-        count += 1
-    conn.commit()
-    conn.close()
-    _v292_clear_all_permission_caches()
-    return count
-
-
-def get_account_permissions() -> List[dict]:  # type: ignore[override]
-    """Always display permission matrix role from Account Master, never stale rows."""
-    reconcile_permission_matrix_for_current_modules(force=False)
-    import time
-    cache = _cache_get("_v132_perm_matrix_cache")
-    if cache and time.time() - float(cache.get("ts", 0)) < _PERMISSION_CACHE_TTL_SECONDS:
-        return cache.get("data", [])
-    conn = connect_db()
-    rows = conn.execute("""
-        SELECT p.username,
-               COALESCE(u.display_name, p.username) AS display_name,
-               COALESCE(u.role_code, 'operator') AS role_code,
-               p.module_code, p.module_name_zh, p.module_name_en,
-               p.can_view, p.can_create, p.can_edit, p.can_delete, p.can_import, p.can_export,
-               p.can_backup, p.can_restore, p.can_manage, p.updated_at
-        FROM auth_account_permissions p
-        INNER JOIN auth_users u ON u.username = p.username
-        ORDER BY p.username, CAST(p.module_code AS INTEGER)
-    """).fetchall()
-    conn.close()
-    data = [dict(r) for r in rows]
-    _cache_set("_v132_perm_matrix_cache", {"ts": time.time(), "data": data})
-    return data
-# ===== V2.92 ACCOUNT MASTER AUTHORITATIVE PERMISSION SYNC END =====
-
-
-# ===== V2.93 AUTHORITATIVE ACCOUNT ROLE CLEANUP START =====
-def _v293_clear_all_permission_caches() -> None:
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    if st is None:
-        return
-    try:
-        for k in list(st.session_state.keys()):
-            if (
-                k.startswith("_v132_perm_")
-                or k.startswith("_spt_perm_cache_")
-                or k.startswith("v235_permission_editor_")
-                or k in {"auth_roles", "role", "roles"}
-            ):
-                st.session_state.pop(k, None)
-    except Exception:
-        pass
-
-
-def _v293_clean_usernames(usernames: Iterable[str] | None = None) -> list[str]:
-    try:
-        if usernames is None:
-            conn = connect_db()
-            rows = conn.execute("SELECT username FROM auth_users ORDER BY username").fetchall()
-            conn.close()
-            return [str(r["username"]).strip() for r in rows if str(r["username"]).strip()]
-        return sorted({str(u or "").strip() for u in usernames if str(u or "").strip()})
-    except Exception:
-        return []
-
-
-def sync_user_permissions_from_roles(usernames: Iterable[str], reason: str = "role_changed") -> int:  # type: ignore[override]
-    """V2.93 Account Master is the only role source.
-
-    For every target username, remove old module-permission rows and old runtime
-    role rows, then rebuild from auth_users.role_code. This removes stale states
-    like admin/operator being shown together after Account Master says operator.
-    """
-    init_permission_tables()
-    target_users = _v293_clean_usernames(usernames)
-    if not target_users:
-        return 0
-    conn = connect_db()
-    cur = conn.cursor()
-    updated = 0
-    try:
-        _ensure_legacy_security_tables(cur)
-    except Exception:
-        pass
-    for username in target_users:
-        u = cur.execute("SELECT username, role_code FROM auth_users WHERE username=?", (username,)).fetchone()
-        cur.execute("DELETE FROM auth_account_permissions WHERE username=?", (username,))
-        try:
-            cur.execute("DELETE FROM security_user_roles WHERE username=?", (username,))
-        except Exception:
-            pass
-        if not u:
-            continue
-        role = str(u["role_code"] or "operator").strip() or "operator"
-        try:
-            cur.execute("INSERT INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
-        except Exception:
-            pass
-        for m in MODULES:
-            preset = _role_preset_for_module(role, m["module_code"])
-            cur.execute("""
-                INSERT INTO auth_account_permissions
-                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, (
-                username, m["module_code"], m["module_name_zh"], m["module_name_en"],
-                preset["can_view"], preset["can_create"], preset["can_edit"], preset["can_delete"],
-                preset["can_import"], preset["can_export"], preset["can_backup"], preset["can_restore"], preset["can_manage"], now_text()
-            ))
-            updated += 1
-    conn.commit()
-    conn.close()
-    _v293_clear_all_permission_caches()
-    return updated
-
-
-def reconcile_account_master_permissions_authoritative(usernames: Iterable[str] | None = None, reason: str = "account_master_authoritative") -> int:  # type: ignore[override]
-    target = _v293_clean_usernames(usernames)
-    if not target:
-        return 0
-    return sync_user_permissions_from_roles(target, reason=reason)
-
-
-def sync_auth_users_to_runtime_security(usernames: Iterable[str] | None = None) -> int:  # type: ignore[override]
-    """V2.93 runtime login table follows auth_users exactly; no role append residue."""
-    init_permission_tables()
-    conn = connect_db()
-    cur = conn.cursor()
-    try:
-        _ensure_legacy_security_tables(cur)
-    except Exception:
-        pass
-    target = _v293_clean_usernames(usernames)
-    params: list[str] = []
-    where = ""
-    if target:
-        where = " WHERE username IN ({})".format(",".join(["?"] * len(target)))
-        params = target
-    rows = cur.execute("SELECT * FROM auth_users" + where, params).fetchall()
-    count = 0
-    for r in rows:
-        username = str(r["username"]).strip()
-        if not username:
-            continue
-        cur.execute("""
-            INSERT INTO security_users
-            (username,password_hash,employee_id,display_name,email,is_active,force_password_change,last_login_at,created_at,updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(username) DO UPDATE SET
-                password_hash=excluded.password_hash,
-                employee_id=excluded.employee_id,
-                display_name=excluded.display_name,
-                email=excluded.email,
-                is_active=excluded.is_active,
-                force_password_change=excluded.force_password_change,
-                last_login_at=excluded.last_login_at,
-                updated_at=excluded.updated_at
-        """, (
-            username, r["password_hash"], r["employee_id"], r["display_name"], r["email"],
-            int(r["is_active"] or 0), int(r["force_password_change"] or 0), r["last_login_at"],
-            r["created_at"] or now_text(), now_text(),
-        ))
-        role = str(r["role_code"] or "operator").strip() or "operator"
-        try:
-            cur.execute("DELETE FROM security_user_roles WHERE username=?", (username,))
-            cur.execute("INSERT INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
-        except Exception:
-            pass
-        count += 1
-    conn.commit()
-    conn.close()
-    _v293_clear_all_permission_caches()
-    return count
-
-
-def get_account_permissions() -> List[dict]:  # type: ignore[override]
-    """Permission matrix display always joins role from Account Master."""
-    init_permission_tables()
-    try:
-        reconcile_permission_matrix_for_current_modules(force=False)
-    except Exception:
-        pass
-    import time
-    cache = _cache_get("_v132_perm_matrix_cache")
-    if cache and time.time() - float(cache.get("ts", 0)) < _PERMISSION_CACHE_TTL_SECONDS:
-        return cache.get("data", [])
-    conn = connect_db()
-    rows = conn.execute("""
-        SELECT p.username,
-               COALESCE(u.display_name, p.username) AS display_name,
-               COALESCE(u.role_code, 'operator') AS role_code,
-               p.module_code, p.module_name_zh, p.module_name_en,
-               p.can_view, p.can_create, p.can_edit, p.can_delete, p.can_import, p.can_export,
-               p.can_backup, p.can_restore, p.can_manage, p.updated_at
-        FROM auth_account_permissions p
-        INNER JOIN auth_users u ON u.username = p.username
-        ORDER BY p.username, CAST(p.module_code AS INTEGER)
-    """).fetchall()
-    conn.close()
-    data = [dict(r) for r in rows]
-    _cache_set("_v132_perm_matrix_cache", {"ts": time.time(), "data": data})
-    return data
-# ===== V2.93 AUTHORITATIVE ACCOUNT ROLE CLEANUP END =====
+# ===== V3.01 SECURITY SETTINGS SINGLE SOURCE GUARD END =====
