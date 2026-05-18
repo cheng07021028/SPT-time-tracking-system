@@ -27,7 +27,7 @@ GLOBAL_STATE = PROJECT_ROOT / "data" / "persistent_state" / "spt_module_independ
 GLOBAL_SETTINGS = PROJECT_ROOT / "data" / "persistent_state" / "spt_module_independent_settings.json"
 
 MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
-    "01_time_record": {
+    "01_time_records": {
         "name_zh": "工時紀錄",
         "name_en": "Time Records",
         "tables": ["time_records"],
@@ -114,6 +114,20 @@ MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
     },
 }
 
+
+# V3.02 canonical module code guard.
+# 01 and 02 share the same SQLite table: time_records.
+# The canonical permanent folder is data/persistent_modules/01_time_records.
+# Legacy code 01_time_record remains accepted, but it is redirected to 01_time_records.
+MODULE_CODE_ALIASES = {
+    "01_time_record": "01_time_records",
+}
+
+
+def normalize_module_code(module_code: str | None) -> str:
+    code = str(module_code or "").strip()
+    return MODULE_CODE_ALIASES.get(code, code)
+
 def _now() -> str:
     return now_text()
 
@@ -136,27 +150,32 @@ def ensure_dirs() -> None:
 
 
 def module_dir(module_code: str) -> Path:
-    return PERSIST_ROOT / module_code
+    return PERSIST_ROOT / normalize_module_code(module_code)
 
 
 def latest_records_path(module_code: str) -> Path:
-    return module_dir(module_code) / f"{module_code}_records.json"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / f"{code}_records.json"
 
 
 def latest_settings_path(module_code: str) -> Path:
-    return module_dir(module_code) / f"{module_code}_settings.json"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / f"{code}_settings.json"
 
 
 def latest_audit_path(module_code: str) -> Path:
-    return module_dir(module_code) / f"{module_code}_audit.jsonl"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / f"{code}_audit.jsonl"
 
 
 def history_records_path(module_code: str) -> Path:
-    return module_dir(module_code) / "history" / f"{module_code}_records_{_stamp()}.json"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / "history" / f"{code}_records_{_stamp()}.json"
 
 
 def history_settings_path(module_code: str) -> Path:
-    return module_dir(module_code) / "history" / f"{module_code}_settings_{_stamp()}.json"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / "history" / f"{code}_settings_{_stamp()}.json"
 
 
 def connect_db() -> sqlite3.Connection:
@@ -187,66 +206,23 @@ def table_count(conn: sqlite3.Connection, table: str) -> int:
 
 
 def load_json(path: Path, default: Any = None) -> Any:
+    if not path.exists():
+        return default
     try:
-        from services.persistence_guard_service import safe_load_json
-        return safe_load_json(path, default, allow_default_when_missing=True)
-    except Exception as exc:
-        # Existing corrupted JSON must never silently become defaults.
-        if path.exists():
-            raise RuntimeError(f"Persistent JSON read failed; default reset blocked: {path} | {exc}") from exc
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
         return default
 
 
-def _payload_data_count(payload: Any) -> int:
-    if isinstance(payload, list):
-        return len(payload)
-    if not isinstance(payload, dict):
-        return 0
-    total = 0
-    counts = payload.get("counts") or payload.get("table_counts")
-    if isinstance(counts, dict):
-        for v in counts.values():
-            try:
-                total += max(0, int(v or 0))
-            except Exception:
-                pass
-    tables = payload.get("tables")
-    if isinstance(tables, dict):
-        for v in tables.values():
-            if isinstance(v, list):
-                total += len(v)
-            elif isinstance(v, dict) and isinstance(v.get("records"), list):
-                total += len(v.get("records") or [])
-    for key in ("records", "data"):
-        if isinstance(payload.get(key), list):
-            total += len(payload.get(key) or [])
-    return total
-
-
 def save_json(path: Path, payload: Any) -> None:
-    # Guard against a common data-loss pattern: DB/read failure produces an empty
-    # module payload, which then overwrites an older non-empty persistent JSON.
-    if path.exists() and _payload_data_count(payload) == 0:
-        try:
-            old = load_json(path, {})
-            if _payload_data_count(old) > 0 and path.name.endswith("_records.json"):
-                raise RuntimeError(f"Blocked empty overwrite of non-empty module records: {path}")
-        except RuntimeError:
-            raise
-        except Exception:
-            pass
-    try:
-        from services.persistence_guard_service import atomic_save_json
-        atomic_save_json(path, payload, backup_existing=True)
-    except Exception:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default), encoding="utf-8")
-        json.loads(tmp.read_text(encoding="utf-8"))
-        tmp.replace(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default), encoding="utf-8")
+    tmp.replace(path)
 
 
 def append_audit(module_code: str, action: str, username: str = "SYSTEM", detail: Optional[Dict[str, Any]] = None) -> None:
+    module_code = normalize_module_code(module_code)
     ensure_dirs()
     payload = {
         "time": _now(),
@@ -262,6 +238,7 @@ def append_audit(module_code: str, action: str, username: str = "SYSTEM", detail
 
 
 def export_module_records(module_code: str, username: str = "SYSTEM", write_history: bool = True) -> Dict[str, Any]:
+    module_code = normalize_module_code(module_code)
     ensure_dirs()
     info = MODULE_TABLE_MAP.get(module_code)
     if not info:
@@ -285,13 +262,18 @@ def export_module_records(module_code: str, username: str = "SYSTEM", write_hist
     else:
         payload["warning"] = "SQLite DB not found; exported empty module state."
 
+    # V3.02: never let an empty time_records table overwrite non-empty 01/02 backups.
+    try:
+        from services.time_records_guard_service import should_block_empty_time_record_export
+        if "time_records" in info.get("tables", []) and payload.get("counts", {}).get("time_records", 0) == 0 and should_block_empty_time_record_export(module_code):
+            payload["skipped"] = True
+            payload["reason"] = "Blocked empty time_records export because non-empty backups exist."
+            append_audit(module_code, "BLOCK_EMPTY_TIME_RECORDS_EXPORT", username, {"counts": payload.get("counts", {})})
+            return payload
+    except Exception:
+        pass
+
     latest = latest_records_path(module_code)
-    # Do not create/overwrite module records with an empty export when DB is
-    # missing or all related tables are empty after an update/reboot.
-    if _payload_data_count(payload) == 0:
-        if latest.exists():
-            return {"ok": False, "skipped": True, "module_code": module_code, "reason": "empty export blocked to protect existing module records", "path": str(latest)}
-        return {"ok": False, "skipped": True, "module_code": module_code, "reason": "empty export blocked; no DB/module data available"}
     save_json(latest, payload)
     if write_history:
         save_json(history_records_path(module_code), payload)
@@ -329,6 +311,7 @@ def get_module_status() -> List[Dict[str, Any]]:
 
 
 def save_module_settings(module_code: str, settings: Dict[str, Any], username: str = "SYSTEM", write_history: bool = True) -> Dict[str, Any]:
+    module_code = normalize_module_code(module_code)
     ensure_dirs()
     info = MODULE_TABLE_MAP.get(module_code, {"name_zh": module_code, "name_en": module_code})
     payload = {
@@ -348,6 +331,7 @@ def save_module_settings(module_code: str, settings: Dict[str, Any], username: s
 
 
 def load_module_settings(module_code: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    module_code = normalize_module_code(module_code)
     payload = load_json(latest_settings_path(module_code), {}) or {}
     if payload.get("settings") is not None:
         return payload.get("settings", {})

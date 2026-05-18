@@ -14,6 +14,15 @@ from .log_service import write_log
 from .duration_service import hms_to_hours
 
 
+
+def ensure_time_records_available(trigger: str = "time_record_service") -> None:
+    """V3.02: restore 01/02 shared records if DB was recreated empty after update."""
+    try:
+        from services.time_records_guard_service import rescue_time_records_if_empty
+        rescue_time_records_if_empty(trigger=trigger)
+    except Exception:
+        pass
+
 def _now() -> str:
     return now_text()
 
@@ -382,6 +391,7 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
 
 
 def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:
+    ensure_time_records_available("load_records")
     sql = "SELECT * FROM time_records WHERE 1=1"
     params = []
     if start_date:

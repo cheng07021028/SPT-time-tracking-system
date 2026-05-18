@@ -418,37 +418,16 @@ def ensure_database() -> None:
     global _SCHEMA_READY
     if _SCHEMA_READY:
         return
-
-    # V2.94 Persistence Guard:
-    # Before SQLite schema/default initialization, try to restore existing DB from
-    # the latest protected backup when the project was already initialized.
-    # This prevents silent fallback to empty/default data after Reboot/App update.
-    try:
-        from services.persistence_guard_service import guard_before_database_init
-        guard_before_database_init()
-    except Exception:
-        pass
-
     with _open_connection() as conn:
         _init_schema(conn)
+    # V3.02: 01/02 share time_records. If DB was recreated empty after a module update,
+    # restore from canonical/legacy module JSON, local backups, or external backups.
+    try:
+        from services.time_records_guard_service import rescue_time_records_if_empty
+        rescue_time_records_if_empty(trigger="ensure_database")
+    except Exception:
+        pass
     _SCHEMA_READY = True
-
-    # Lightweight post-init health check + throttled backup. This does not alter
-    # page UI and is intentionally non-blocking.
-    try:
-        from services.persistence_guard_service import guard_after_database_init
-        guard_after_database_init()
-    except Exception:
-        pass
-
-    # V2.96 External Auto Backup Scheduler: start once per process and run due backup
-    # without requiring .bat or Windows Task Scheduler. This is best-effort and non-blocking.
-    try:
-        from services.auto_backup_service import start_auto_backup_scheduler_once, run_due_backup_if_needed
-        start_auto_backup_scheduler_once()
-        run_due_backup_if_needed(force=False)
-    except Exception:
-        pass
 
 
 def database_business_row_count() -> int:
@@ -504,6 +483,12 @@ def ensure_data_guard_restore(force: bool = False) -> dict[str, Any]:
         from services.persistence_service import auto_restore_if_database_empty
         res = auto_restore_if_database_empty(force=force)
         results.append({"step": "local_persistent_restore", **(res if isinstance(res, dict) else {"result": str(res)})})
+        try:
+            from services.time_records_guard_service import rescue_time_records_if_empty
+            rescue = rescue_time_records_if_empty(trigger="ensure_data_guard_restore")
+            results.append({"step": "time_records_guard_rescue", **(rescue if isinstance(rescue, dict) else {"result": str(rescue)})})
+        except Exception as exc:
+            results.append({"step": "time_records_guard_rescue", "ok": False, "message": str(exc)})
         _RESTORE_CHECKED = True
         return {"ok": bool(isinstance(res, dict) and res.get("ok")), "message": "自動還原檢查完成。", "results": results}
     except Exception as exc:
