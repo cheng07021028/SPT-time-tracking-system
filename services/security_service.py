@@ -42,7 +42,7 @@ IDLE_TIMEOUT_FILES = [
 ]
 
 PBKDF2_ITERATIONS = 180_000
-DEFAULT_IDLE_MINUTES = 15
+DEFAULT_IDLE_MINUTES = 1
 _PERMISSION_CACHE_TTL_SECONDS = 300
 _SECURITY_SCHEMA_READY = False
 
@@ -577,14 +577,9 @@ def _sync_auth_user_to_security_runtime(auth_row: dict[str, Any]) -> None:
             now,
             now,
         ))
-        # V3.09：帳號主檔為角色唯一來源。每次同步前先清除舊 runtime 角色，
-        # 避免更新模組後殘留 admin/operator 或角色空白。
-        execute("DELETE FROM security_user_roles WHERE username=?", (username,))
-        role_code = str(auth_row.get("role_code", "") or "").strip().lower()
-        if not role_code and username.lower() == "admin":
-            role_code = "admin"
+        role_code = str(auth_row.get("role_code", "") or "").strip()
         if role_code:
-            execute("INSERT OR REPLACE INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
+            execute("INSERT OR IGNORE INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
     except Exception:
         pass
 
@@ -622,6 +617,7 @@ def authenticate(username: str, password: str) -> tuple[bool, str]:
     st.session_state["auth_display_name"] = row.get("display_name") or username
     st.session_state["auth_employee_id"] = row.get("employee_id") or ""
     st.session_state["auth_roles"] = roles
+    st.session_state["auth_force_password_change"] = bool(int(row.get("force_password_change", 0) or 0))
     clear_permission_cache(username)
     _load_permission_cache(username, roles, force=True)
     now_ts = time.time()
@@ -743,6 +739,95 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:
         return True
     return bool(row.get(action, False))
 
+
+
+def _is_force_password_change_required(username: str | None = None) -> bool:
+    """Return True when account must change password before entering modules."""
+    ensure_security_schema()
+    username = (username or st.session_state.get("auth_username", "") or "").strip()
+    if not username:
+        return False
+    try:
+        row = query_one("SELECT force_password_change FROM auth_users WHERE username=?", (username,))
+        if row is not None:
+            return bool(int(row.get("force_password_change", 0) or 0))
+    except Exception:
+        pass
+    try:
+        row = query_one("SELECT force_password_change FROM security_users WHERE username=?", (username,))
+        if row is not None:
+            return bool(int(row.get("force_password_change", 0) or 0))
+    except Exception:
+        pass
+    return bool(st.session_state.get("auth_force_password_change", False))
+
+
+def _apply_forced_password_change(username: str, new_password: str) -> None:
+    """Update password and clear force_password_change in both account stores."""
+    ensure_security_schema()
+    username = str(username or "").strip()
+    if not username:
+        raise ValueError("登入狀態已失效，請重新登入。")
+    if not new_password or len(str(new_password)) < 6:
+        raise ValueError("新密碼至少需要 6 個字元。")
+    if str(new_password).strip().lower() == username.lower():
+        raise ValueError("新密碼不可與帳號相同。")
+    now = _now()
+    password_hash = hash_password(str(new_password))
+    updated = 0
+    try:
+        execute("""
+            UPDATE auth_users
+            SET password_hash=?, force_password_change=0, updated_at=?
+            WHERE username=?
+        """, (password_hash, now, username))
+        updated += 1
+    except Exception:
+        pass
+    try:
+        execute("""
+            UPDATE security_users
+            SET password_hash=?, force_password_change=0, updated_at=?
+            WHERE username=?
+        """, (password_hash, now, username))
+        updated += 1
+    except Exception:
+        pass
+    if updated <= 0:
+        raise ValueError("找不到帳號資料，無法更新密碼。")
+    st.session_state["auth_force_password_change"] = False
+    clear_permission_cache(username)
+    log_security_event(username, "FORCE_PASSWORD_CHANGE", "SUCCESS", "使用者完成強制改密碼")
+
+
+def render_force_password_change_form() -> None:
+    """Block module access until user changes password."""
+    username = str(st.session_state.get("auth_username", "") or "").strip()
+    display_name = str(st.session_state.get("auth_display_name", "") or username).strip()
+    st.markdown(
+        """
+<div class="spt-card spt-glow" style="max-width:920px;margin:28px auto;padding:24px;">
+  <div style="font-size:28px;font-weight:1000;letter-spacing:.06em;color:#f4fbff;">⛨ 強制修改密碼 / Password Change Required</div>
+  <div style="margin-top:8px;color:#bfefff;font-weight:800;">管理員已要求此帳號更新密碼。完成後才可進入系統模組。</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+    with st.form("force_password_change_form", clear_on_submit=False):
+        st.caption(f"目前帳號 / Current Account：{display_name} ({username})")
+        p1 = st.text_input("新密碼 / New Password", type="password", placeholder="請輸入新密碼，至少 6 個字元")
+        p2 = st.text_input("確認新密碼 / Confirm New Password", type="password", placeholder="請再次輸入新密碼")
+        submitted = st.form_submit_button("套用新密碼並進入系統 / Apply Password and Continue", type="primary", use_container_width=True)
+    if submitted:
+        if p1 != p2:
+            st.error("兩次輸入的新密碼不一致。")
+            return
+        try:
+            _apply_forced_password_change(username, p1)
+            st.success("密碼已更新，正在重新載入系統。")
+            st.rerun()
+        except Exception as exc:
+            st.error(str(exc))
 
 def render_login_form() -> None:
     """Render a premium welcome login page without changing authentication logic."""
@@ -1203,6 +1288,9 @@ def require_login(module_code: str = "") -> None:
         render_login_form()
         st.stop()
     _check_idle_timeout()
+    if _is_force_password_change_required():
+        render_force_password_change_form()
+        st.stop()
     render_user_bar(module_code)
 
 
@@ -1798,264 +1886,18 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:  # typ
     return _old_check_permission_v199(module_code, action)
 
 
-# ===== V2.43 default idle timeout policy DISABLED BY V3.10 =====
-# V3.10: Do not seed idle timeout at import/reboot.  The previous V2.43 block
-# wrote 1 minute when it could not find a permanent setting, which made module
-# updates look like settings were reset.  Security settings are now read from
-# data/ permanent files first, then SQLite, and only then fallback to 15.
+# ===== V2.43 default idle timeout policy =====
+# Company requirement: the built-in default idle logout is 1 minute.  Existing
+# permanent files are preserved unless they contain the old unmodified default 15.
 def _v243_seed_idle_timeout_one_minute() -> None:
-    return None
-
-
-
-# ===== V3.09 ADMIN ROLE SESSION / ACCESS GUARANTEE START =====
-def _v309_read_auth_role(username: str) -> str:
-    u = (username or "").strip()
-    if not u:
-        return ""
     try:
-        row = query_one("SELECT role_code FROM auth_users WHERE username=?", (u,))
-        if row and row.get("role_code"):
-            return str(row.get("role_code")).strip().lower()
-    except Exception:
-        pass
-    if u.lower() == "admin":
-        return "admin"
-    return ""
-
-
-def _v309_normalize_roles(username: str, roles: Any = None) -> list[str]:
-    out: list[str] = []
-    try:
-        if isinstance(roles, str):
-            candidates = [x.strip() for x in roles.replace("；", ",").replace("，", ",").split(",")]
-        elif isinstance(roles, (list, tuple, set)):
-            candidates = [str(x).strip() for x in roles]
-        else:
-            candidates = []
-        for r in candidates:
-            rr = r.lower()
-            if rr and rr not in out:
-                out.append(rr)
-    except Exception:
-        out = []
-    master_role = _v309_read_auth_role(username)
-    if master_role and master_role not in out:
-        out.insert(0, master_role)
-    if (username or "").strip().lower() == "admin" and "admin" not in out:
-        out.insert(0, "admin")
-    return out
-
-
-_old_get_current_user_v309 = get_current_user
-
-def get_current_user() -> dict[str, Any] | None:  # type: ignore[override]
-    user = _old_get_current_user_v309()
-    if not user:
-        return None
-    roles = _v309_normalize_roles(str(user.get("username", "")), user.get("roles", []))
-    user["roles"] = roles
-    try:
-        st.session_state["auth_roles"] = roles
-    except Exception:
-        pass
-    return user
-
-
-_old_check_permission_v309 = check_permission
-
-def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
-    user = get_current_user()
-    if not user:
-        return False
-    roles = _v309_normalize_roles(str(user.get("username", "")), user.get("roles", []))
-    if "admin" in roles:
-        return True
-    try:
-        return _old_check_permission_v309(module_code, action)
-    except Exception:
-        return False
-
-
-def clear_permission_cache(username: str | None = None) -> None:  # type: ignore[override]
-    """Keep original behavior and also clear related session role/cache fragments."""
-    try:
-        keys = list(st.session_state.keys())
-        for k in keys:
-            if k.startswith("_spt_perm_cache_") and (username is None or k.endswith(str(username))):
-                st.session_state.pop(k, None)
-            if k.startswith("_v132_perm_") or k.startswith("_spt_perm_cache_"):
-                if username is None or str(username) in k:
-                    st.session_state.pop(k, None)
+        minutes = _v208_read_idle_timeout_from_files()
+        if minutes in (None, 15):
+            set_idle_timeout_minutes(1)
     except Exception:
         pass
 
-# ===== V3.09 ADMIN ROLE SESSION / ACCESS GUARANTEE END =====
-
-
-# ===== V3.10 SECURITY SETTINGS NO-RESET GUARD START =====
-def _v310_security_paths() -> list[Path]:
-    root = Path(__file__).resolve().parents[1]
-    return [
-        root / "data" / "config" / "security_settings.json",
-        root / "data" / "persistent_state" / "spt_security_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
-        root / "data" / "config" / "idle_timeout_settings.json",
-        root / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
-    ]
-
-
-def _v310_extract_security(payload: Any) -> dict[str, str]:
-    out: dict[str, str] = {}
-    try:
-        if isinstance(payload, dict):
-            if isinstance(payload.get("security_settings"), dict):
-                payload = payload.get("security_settings")
-            elif isinstance(payload.get("tables"), dict):
-                rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
-                for r in rows:
-                    if isinstance(r, dict):
-                        k = str(r.get("setting_key", ""))
-                        v = r.get("setting_value")
-                        if k in {"idle_timeout_minutes", "ask_continue_after_record"} and v not in (None, ""):
-                            out[k] = str(v)
-                return out
-            if isinstance(payload, dict):
-                for k in ("idle_timeout_minutes", "ask_continue_after_record"):
-                    v = payload.get(k)
-                    if v not in (None, ""):
-                        out[k] = str(v)
-    except Exception:
-        pass
-    return out
-
-
-def _v310_read_security_files() -> dict[str, str]:
-    merged: dict[str, str] = {}
-    for path in _v310_security_paths():
-        try:
-            if not path.exists() or path.stat().st_size <= 0:
-                continue
-            vals = _v310_extract_security(json.loads(path.read_text(encoding="utf-8")))
-            for k, v in vals.items():
-                if v not in (None, ""):
-                    merged[k] = str(v)
-        except Exception:
-            continue
-    return merged
-
-
-def _v310_atomic_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    json.loads(tmp.read_text(encoding="utf-8"))
-    tmp.replace(path)
-
-
-def _v310_write_security_files(settings: dict[str, str]) -> None:
-    try:
-        idle = max(1, int(float(settings.get("idle_timeout_minutes", "15") or 15)))
-    except Exception:
-        idle = 15
-    ask = "1" if str(settings.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
-    sec_payload = {
-        "version": "V3.10",
-        "updated_at": now_text() if "now_text" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "security_settings": {
-            "idle_timeout_minutes": str(idle),
-            "ask_continue_after_record": ask,
-        },
-        "user_saved": True,
-        "note": "Security settings permanent source. Do not seed default values on module update.",
-    }
-    idle_payload = {
-        "version": "V3.10",
-        "updated_at": sec_payload["updated_at"],
-        "idle_timeout_minutes": idle,
-        "ask_continue_after_record": ask,
-        "user_saved": True,
-        "note": "Idle timeout permanent source. Do not seed default values on module update.",
-    }
-    for path in _v310_security_paths():
-        try:
-            _v310_atomic_json(path, idle_payload if "idle_timeout" in path.name else sec_payload)
-        except Exception:
-            pass
-
-
-def get_idle_timeout_minutes() -> int:  # type: ignore[override]
-    """V3.10: never reset to the old 1-minute import default.
-
-    Priority: data/ permanent JSON -> SQLite -> safe fallback 15.
-    Session cache is deliberately not used as the first source because it may
-    still contain a stale 1 after a previous bad import seed.
-    """
-    minutes: int | None = None
-    files = _v310_read_security_files()
-    if files.get("idle_timeout_minutes") not in (None, ""):
-        try:
-            minutes = int(float(files["idle_timeout_minutes"]))
-        except Exception:
-            minutes = None
-    if minutes is None:
-        try:
-            ensure_security_schema()
-            for table in ("auth_security_settings", "security_settings"):
-                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
-                if row and row.get("setting_value") not in (None, ""):
-                    minutes = int(float(row.get("setting_value")))
-                    break
-        except Exception:
-            minutes = None
-    if minutes is None:
-        minutes = 15
-    minutes = max(1, int(minutes))
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
-        settings = st.session_state.get("spt_security_settings", {})
-        if not isinstance(settings, dict):
-            settings = {}
-        settings["idle_timeout_minutes"] = str(minutes)
-        st.session_state["spt_security_settings"] = settings
-    except Exception:
-        pass
-    return minutes
-
-
-def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
-    """V3.10: save idle timeout to every permanent source atomically."""
-    minutes = max(1, int(minutes))
-    settings = _v310_read_security_files()
-    settings["idle_timeout_minutes"] = str(minutes)
-    settings.setdefault("ask_continue_after_record", "1")
-    _v310_write_security_files(settings)
-    try:
-        ensure_security_schema()
-        for table in ("auth_security_settings", "security_settings"):
-            execute(f"""
-                CREATE TABLE IF NOT EXISTS {table} (
-                    setting_key TEXT PRIMARY KEY,
-                    setting_value TEXT,
-                    note TEXT,
-                    updated_at TEXT
-                )
-            """)
-            execute(f"""
-                INSERT INTO {table} (setting_key, setting_value, note, updated_at)
-                VALUES ('idle_timeout_minutes', ?, 'V3.10 permanent security setting', ?)
-                ON CONFLICT(setting_key) DO UPDATE SET
-                    setting_value=excluded.setting_value,
-                    note=excluded.note,
-                    updated_at=excluded.updated_at
-            """, (str(minutes), now_text() if "now_text" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-    except Exception:
-        pass
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
-        st.session_state.setdefault("spt_security_settings", {})["idle_timeout_minutes"] = str(minutes)
-    except Exception:
-        pass
-# ===== V3.10 SECURITY SETTINGS NO-RESET GUARD END =====
+try:
+    _v243_seed_idle_timeout_one_minute()
+except Exception:
+    pass
