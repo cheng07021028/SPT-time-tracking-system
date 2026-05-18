@@ -441,6 +441,15 @@ def ensure_database() -> None:
     except Exception:
         pass
 
+    # V2.96 External Auto Backup Scheduler: start once per process and run due backup
+    # without requiring .bat or Windows Task Scheduler. This is best-effort and non-blocking.
+    try:
+        from services.auto_backup_service import start_auto_backup_scheduler_once, run_due_backup_if_needed
+        start_auto_backup_scheduler_once()
+        run_due_backup_if_needed(force=False)
+    except Exception:
+        pass
+
 
 def database_business_row_count() -> int:
     ensure_database()
