@@ -123,7 +123,7 @@ def _delete_mark(value) -> str:
 
 def _blank_user_row() -> dict:
     return {
-        "刪除 / Delete": "☐",
+        "刪除 / Delete": False,
         "帳號 / Username": "",
         "密碼狀態 / Password Status": "新帳號請輸入新密碼",
         "新密碼 / New Password": "",
@@ -144,7 +144,7 @@ def _users_for_editor() -> pd.DataFrame:
     if raw.empty:
         return pd.DataFrame([_blank_user_row()]).iloc[0:0]
     out = pd.DataFrame()
-    out["刪除 / Delete"] = "☐"
+    out["刪除 / Delete"] = False
     out["帳號 / Username"] = raw.get("username", "")
     out["密碼狀態 / Password Status"] = raw.get("password_display", "********")
     out["新密碼 / New Password"] = raw.get("new_password", "")
@@ -282,7 +282,7 @@ def _account_import_to_editor_rows(import_df: pd.DataFrame) -> pd.DataFrame:
         username = str(r.get("帳號 / Username", "")).strip()
         password = str(r.get("密碼 / Password", "")).strip()
         rows.append({
-            "刪除 / Delete": "☐",
+            "刪除 / Delete": False,
             "帳號 / Username": username,
             "密碼狀態 / Password Status": "匯入後將更新密碼" if password else "未提供密碼，維持原密碼",
             "新密碼 / New Password": password,
@@ -457,12 +457,12 @@ with tab_accounts:
                 st.rerun()
         with c2:
             if st.button("⊖ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_select_delete"):
-                st.session_state["v133_users_df"]["刪除 / Delete"] = "☑"
+                st.session_state["v133_users_df"]["刪除 / Delete"] = True
                 st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 st.rerun()
         with c3:
             if st.button("◌ 刪除欄取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_clear_delete"):
-                st.session_state["v133_users_df"]["刪除 / Delete"] = "☐"
+                st.session_state["v133_users_df"]["刪除 / Delete"] = False
                 st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 st.rerun()
         with c4:
@@ -489,14 +489,14 @@ with tab_accounts:
         with st.form("v171_account_master_edit_form", clear_on_submit=False):
             editor_source_df = st.session_state["v133_users_df"].copy()
             if "刪除 / Delete" in editor_source_df.columns:
-                editor_source_df["刪除 / Delete"] = editor_source_df["刪除 / Delete"].map(lambda x: "☑" if str(x).strip() in {"☑", "True", "true", "1", "Y", "y", "是"} or x is True else "☐")
+                editor_source_df["刪除 / Delete"] = editor_source_df["刪除 / Delete"].fillna(False).astype(bool)
             edited_users = st.data_editor(
                 editor_source_df, key=f"v171_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}", use_container_width=True,
                 num_rows="fixed", hide_index=True,
                 disabled=not account_edit_enabled,
                 height=360,
                 column_config={
-                    "刪除 / Delete": st.column_config.SelectboxColumn("刪除 / Delete", options=["☐", "☑"], width="small", help="☐ 不刪除；☑ 刪除"),
+                    "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small", help="勾選代表刪除；樣式比照右側 強制改密碼 checkbox"),
                     "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
                     "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
                     "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
