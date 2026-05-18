@@ -42,7 +42,7 @@ IDLE_TIMEOUT_FILES = [
 ]
 
 PBKDF2_ITERATIONS = 180_000
-DEFAULT_IDLE_MINUTES = 1
+DEFAULT_IDLE_MINUTES = 15
 _PERMISSION_CACHE_TTL_SECONDS = 300
 _SECURITY_SCHEMA_READY = False
 
@@ -1798,21 +1798,14 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:  # typ
     return _old_check_permission_v199(module_code, action)
 
 
-# ===== V2.43 default idle timeout policy =====
-# Company requirement: the built-in default idle logout is 1 minute.  Existing
-# permanent files are preserved unless they contain the old unmodified default 15.
+# ===== V2.43 default idle timeout policy DISABLED BY V3.10 =====
+# V3.10: Do not seed idle timeout at import/reboot.  The previous V2.43 block
+# wrote 1 minute when it could not find a permanent setting, which made module
+# updates look like settings were reset.  Security settings are now read from
+# data/ permanent files first, then SQLite, and only then fallback to 15.
 def _v243_seed_idle_timeout_one_minute() -> None:
-    try:
-        minutes = _v208_read_idle_timeout_from_files()
-        if minutes in (None, 15):
-            set_idle_timeout_minutes(1)
-    except Exception:
-        pass
+    return None
 
-try:
-    _v243_seed_idle_timeout_one_minute()
-except Exception:
-    pass
 
 
 # ===== V3.09 ADMIN ROLE SESSION / ACCESS GUARANTEE START =====
@@ -1898,3 +1891,171 @@ def clear_permission_cache(username: str | None = None) -> None:  # type: ignore
         pass
 
 # ===== V3.09 ADMIN ROLE SESSION / ACCESS GUARANTEE END =====
+
+
+# ===== V3.10 SECURITY SETTINGS NO-RESET GUARD START =====
+def _v310_security_paths() -> list[Path]:
+    root = Path(__file__).resolve().parents[1]
+    return [
+        root / "data" / "config" / "security_settings.json",
+        root / "data" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
+        root / "data" / "config" / "idle_timeout_settings.json",
+        root / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+    ]
+
+
+def _v310_extract_security(payload: Any) -> dict[str, str]:
+    out: dict[str, str] = {}
+    try:
+        if isinstance(payload, dict):
+            if isinstance(payload.get("security_settings"), dict):
+                payload = payload.get("security_settings")
+            elif isinstance(payload.get("tables"), dict):
+                rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
+                for r in rows:
+                    if isinstance(r, dict):
+                        k = str(r.get("setting_key", ""))
+                        v = r.get("setting_value")
+                        if k in {"idle_timeout_minutes", "ask_continue_after_record"} and v not in (None, ""):
+                            out[k] = str(v)
+                return out
+            if isinstance(payload, dict):
+                for k in ("idle_timeout_minutes", "ask_continue_after_record"):
+                    v = payload.get(k)
+                    if v not in (None, ""):
+                        out[k] = str(v)
+    except Exception:
+        pass
+    return out
+
+
+def _v310_read_security_files() -> dict[str, str]:
+    merged: dict[str, str] = {}
+    for path in _v310_security_paths():
+        try:
+            if not path.exists() or path.stat().st_size <= 0:
+                continue
+            vals = _v310_extract_security(json.loads(path.read_text(encoding="utf-8")))
+            for k, v in vals.items():
+                if v not in (None, ""):
+                    merged[k] = str(v)
+        except Exception:
+            continue
+    return merged
+
+
+def _v310_atomic_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v310_write_security_files(settings: dict[str, str]) -> None:
+    try:
+        idle = max(1, int(float(settings.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    ask = "1" if str(settings.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
+    sec_payload = {
+        "version": "V3.10",
+        "updated_at": now_text() if "now_text" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "security_settings": {
+            "idle_timeout_minutes": str(idle),
+            "ask_continue_after_record": ask,
+        },
+        "user_saved": True,
+        "note": "Security settings permanent source. Do not seed default values on module update.",
+    }
+    idle_payload = {
+        "version": "V3.10",
+        "updated_at": sec_payload["updated_at"],
+        "idle_timeout_minutes": idle,
+        "ask_continue_after_record": ask,
+        "user_saved": True,
+        "note": "Idle timeout permanent source. Do not seed default values on module update.",
+    }
+    for path in _v310_security_paths():
+        try:
+            _v310_atomic_json(path, idle_payload if "idle_timeout" in path.name else sec_payload)
+        except Exception:
+            pass
+
+
+def get_idle_timeout_minutes() -> int:  # type: ignore[override]
+    """V3.10: never reset to the old 1-minute import default.
+
+    Priority: data/ permanent JSON -> SQLite -> safe fallback 15.
+    Session cache is deliberately not used as the first source because it may
+    still contain a stale 1 after a previous bad import seed.
+    """
+    minutes: int | None = None
+    files = _v310_read_security_files()
+    if files.get("idle_timeout_minutes") not in (None, ""):
+        try:
+            minutes = int(float(files["idle_timeout_minutes"]))
+        except Exception:
+            minutes = None
+    if minutes is None:
+        try:
+            ensure_security_schema()
+            for table in ("auth_security_settings", "security_settings"):
+                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
+                if row and row.get("setting_value") not in (None, ""):
+                    minutes = int(float(row.get("setting_value")))
+                    break
+        except Exception:
+            minutes = None
+    if minutes is None:
+        minutes = 15
+    minutes = max(1, int(minutes))
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+        settings = st.session_state.get("spt_security_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        settings["idle_timeout_minutes"] = str(minutes)
+        st.session_state["spt_security_settings"] = settings
+    except Exception:
+        pass
+    return minutes
+
+
+def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
+    """V3.10: save idle timeout to every permanent source atomically."""
+    minutes = max(1, int(minutes))
+    settings = _v310_read_security_files()
+    settings["idle_timeout_minutes"] = str(minutes)
+    settings.setdefault("ask_continue_after_record", "1")
+    _v310_write_security_files(settings)
+    try:
+        ensure_security_schema()
+        for table in ("auth_security_settings", "security_settings"):
+            execute(f"""
+                CREATE TABLE IF NOT EXISTS {table} (
+                    setting_key TEXT PRIMARY KEY,
+                    setting_value TEXT,
+                    note TEXT,
+                    updated_at TEXT
+                )
+            """)
+            execute(f"""
+                INSERT INTO {table} (setting_key, setting_value, note, updated_at)
+                VALUES ('idle_timeout_minutes', ?, 'V3.10 permanent security setting', ?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (str(minutes), now_text() if "now_text" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    except Exception:
+        pass
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+        st.session_state.setdefault("spt_security_settings", {})["idle_timeout_minutes"] = str(minutes)
+    except Exception:
+        pass
+# ===== V3.10 SECURITY SETTINGS NO-RESET GUARD END =====

@@ -1702,3 +1702,156 @@ def has_permission(username: str, module_code: str, action: str = "can_view") ->
 
 check_permission = has_permission
 # ===== V3.09 ADMIN ACCESS GUARANTEE END =====
+
+
+# ===== V3.10 PERMISSION SECURITY SETTINGS NO-RESET GUARD START =====
+def _v310_perm_security_paths() -> list[Path]:
+    root = Path(__file__).resolve().parents[1]
+    return [
+        root / "data" / "config" / "security_settings.json",
+        root / "data" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
+        root / "data" / "config" / "idle_timeout_settings.json",
+        root / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+    ]
+
+
+def _v310_perm_extract(payload: Any) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    try:
+        if isinstance(payload, dict):
+            if isinstance(payload.get("security_settings"), dict):
+                payload = payload.get("security_settings")
+            elif isinstance(payload.get("tables"), dict):
+                rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
+                for r in rows:
+                    if isinstance(r, dict):
+                        k = str(r.get("setting_key", ""))
+                        v = r.get("setting_value")
+                        if k in {"idle_timeout_minutes", "ask_continue_after_record"} and v not in (None, ""):
+                            out[k] = str(v)
+                return out
+            for k in ("idle_timeout_minutes", "ask_continue_after_record"):
+                v = payload.get(k)
+                if v not in (None, ""):
+                    out[k] = str(v)
+    except Exception:
+        pass
+    return out
+
+
+def _v310_perm_read_files() -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for path in _v310_perm_security_paths():
+        try:
+            if path.exists() and path.stat().st_size > 0:
+                vals = _v310_perm_extract(json.loads(path.read_text(encoding="utf-8")))
+                out.update({k: str(v) for k, v in vals.items() if v not in (None, "")})
+        except Exception:
+            pass
+    return out
+
+
+def _v310_perm_atomic_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v310_perm_write_files(settings: Dict[str, str]) -> None:
+    try:
+        idle = max(1, int(float(settings.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    ask = "1" if str(settings.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
+    now = now_text() if "now_text" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sec_payload = {"version": "V3.10", "updated_at": now, "user_saved": True, "security_settings": {"idle_timeout_minutes": str(idle), "ask_continue_after_record": ask}}
+    idle_payload = {"version": "V3.10", "updated_at": now, "user_saved": True, "idle_timeout_minutes": idle, "ask_continue_after_record": ask}
+    for path in _v310_perm_security_paths():
+        try:
+            _v310_perm_atomic_json(path, idle_payload if "idle_timeout" in path.name else sec_payload)
+        except Exception:
+            pass
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    """V3.10: Security tab reads data/ permanent files first and never seeds 1 minute."""
+    result: Dict[str, str] = {"idle_timeout_minutes": "15", "ask_continue_after_record": "1"}
+    file_settings = _v310_perm_read_files()
+    if file_settings:
+        result.update(file_settings)
+    else:
+        try:
+            init_permission_tables()
+            conn = connect_db()
+            cur = conn.cursor()
+            _ensure_security_setting_tables(cur)
+            for table in ("auth_security_settings", "security_settings"):
+                try:
+                    rows = cur.execute(f"SELECT setting_key, setting_value FROM {table}").fetchall()
+                    for r in rows:
+                        k = str(r["setting_key"])
+                        if k in result and r["setting_value"] not in (None, ""):
+                            result[k] = str(r["setting_value"])
+                except Exception:
+                    pass
+            conn.close()
+        except Exception:
+            pass
+    try:
+        result["idle_timeout_minutes"] = str(max(1, int(float(result.get("idle_timeout_minutes", "15") or 15))))
+    except Exception:
+        result["idle_timeout_minutes"] = "15"
+    result["ask_continue_after_record"] = "1" if str(result.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
+    return result
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    """V3.10: Save security tab settings to every permanent source atomically."""
+    merged = get_security_settings()
+    merged.update({str(k): str(v) for k, v in settings.items() if v is not None})
+    try:
+        idle = max(1, int(float(merged.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    merged["idle_timeout_minutes"] = str(idle)
+    merged["ask_continue_after_record"] = "1" if str(merged.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
+    _v310_perm_write_files(merged)
+    try:
+        init_permission_tables()
+        conn = connect_db()
+        cur = conn.cursor()
+        _ensure_security_setting_tables(cur)
+        for table in ("auth_security_settings", "security_settings"):
+            for k, v in merged.items():
+                cur.execute(f"""
+                    INSERT INTO {table}(setting_key, setting_value, note, updated_at)
+                    VALUES (?,?,?,?)
+                    ON CONFLICT(setting_key) DO UPDATE SET
+                        setting_value=excluded.setting_value,
+                        note=excluded.note,
+                        updated_at=excluded.updated_at
+                """, (k, str(v), "V3.10 synchronized permanent security setting", now_text() if "now_text" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+    try:
+        from services.security_service import set_idle_timeout_minutes
+        set_idle_timeout_minutes(idle)
+    except Exception:
+        pass
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": idle, "ts": 0}
+        st.session_state["spt_security_settings"] = dict(merged)
+    except Exception:
+        pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+# ===== V3.10 PERMISSION SECURITY SETTINGS NO-RESET GUARD END =====
