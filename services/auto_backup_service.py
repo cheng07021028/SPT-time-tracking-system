@@ -165,7 +165,7 @@ def get_runtime_environment() -> dict[str, Any]:
     """Return filesystem/runtime details for the backup path validator.
 
     Streamlit Cloud/Linux cannot write to a Windows local path such as
-    D:\SPT_Backup\TimeTracking because that drive is on the user's PC, not on
+    D:/SPT_Backup/TimeTracking because that drive is on the user's PC, not on
     the server.  Local Windows execution can use that path normally.
     """
     system = platform.system() or os.name
@@ -582,3 +582,325 @@ def get_schedule_status() -> dict[str, Any]:
         "next_run": next_run.strftime("%Y-%m-%d %H:%M:%S"),
         "scheduler_started": _SCHEDULER_STARTED,
     }
+
+
+# ===== V3.05 BACKUP MODE SPLIT START =====
+# Backup modes are intentionally handled here instead of adding a new module, so
+# 13｜系統設定 can use one source of truth and old callers remain compatible.
+# - local_windows: write to Windows/local folder path selected by user.
+# - cloud_project: write to project-internal data/_external_backup for Streamlit Cloud/Linux.
+# - github_cloud: create permanent files and upload to GitHub via existing GitHub service.
+
+BACKUP_MODE_LOCAL_WINDOWS = "local_windows"
+BACKUP_MODE_CLOUD_PROJECT = "cloud_project"
+BACKUP_MODE_GITHUB_CLOUD = "github_cloud"
+CLOUD_PROJECT_BACKUP_DIR = DATA_DIR / "_external_backup"
+EXCLUDE_DIR_NAMES.add("_external_backup")
+
+
+def get_available_backup_modes() -> list[dict[str, Any]]:
+    env = get_runtime_environment()
+    return [
+        {
+            "mode": BACKUP_MODE_LOCAL_WINDOWS,
+            "label": "本機 Windows 備份",
+            "description": "備份到公司電腦或 OneDrive 本機資料夾，例如 D:\\SPT_Backup\\TimeTracking。只有本機 Windows 執行 Streamlit 時可用。",
+            "available": bool(env.get("is_windows")),
+        },
+        {
+            "mode": BACKUP_MODE_CLOUD_PROJECT,
+            "label": "雲端專案內備份",
+            "description": "備份到專案 data/_external_backup。適合 Streamlit Cloud/Linux；可再搭配 GitHub 或下載保存。",
+            "available": True,
+        },
+        {
+            "mode": BACKUP_MODE_GITHUB_CLOUD,
+            "label": "GitHub 雲端備份",
+            "description": "使用既有 GitHub Contents API，把永久 JSON/資料狀態上傳到 GitHub。需設定 GITHUB_TOKEN。",
+            "available": True,
+        },
+    ]
+
+
+def normalize_backup_mode(mode: str | None) -> str:
+    raw = str(mode or "").strip()
+    valid = {BACKUP_MODE_LOCAL_WINDOWS, BACKUP_MODE_CLOUD_PROJECT, BACKUP_MODE_GITHUB_CLOUD}
+    if raw in valid:
+        return raw
+    env = get_runtime_environment()
+    return BACKUP_MODE_LOCAL_WINDOWS if env.get("is_windows") else BACKUP_MODE_CLOUD_PROJECT
+
+
+def load_backup_schedule() -> dict[str, Any]:  # type: ignore[override]
+    cfg = dict(DEFAULT_SCHEDULE)
+    cfg["backup_mode"] = normalize_backup_mode(cfg.get("backup_mode"))
+    data = _json_load(SCHEDULE_CONFIG_PATH, {})
+    if isinstance(data, dict):
+        cfg.update(data)
+    cfg["backup_mode"] = normalize_backup_mode(cfg.get("backup_mode"))
+    return cfg
+
+
+def save_backup_schedule(cfg: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    out = dict(DEFAULT_SCHEDULE)
+    out["backup_mode"] = normalize_backup_mode(out.get("backup_mode"))
+    out.update(cfg or {})
+    out["backup_mode"] = normalize_backup_mode(out.get("backup_mode"))
+    out["enabled"] = bool(out.get("enabled"))
+    out["daily_time"] = _normalize_time(out.get("daily_time") or "17:30")
+    out["target_folder"] = str(out.get("target_folder") or "").strip()
+    try:
+        out["keep_days"] = max(1, int(out.get("keep_days") or 30))
+    except Exception:
+        out["keep_days"] = 30
+    out["last_updated_at"] = _now_text()
+    _json_dump(SCHEDULE_CONFIG_PATH, out)
+    return out
+
+
+def validate_backup_destination(mode: str | None, target_folder: str = "", *, create: bool = False) -> dict[str, Any]:
+    mode = normalize_backup_mode(mode)
+    env = get_runtime_environment()
+    runtime_label = _human_runtime_label()
+    if mode == BACKUP_MODE_LOCAL_WINDOWS:
+        if not env.get("is_windows"):
+            return {
+                "ok": False,
+                "mode": mode,
+                "runtime": env,
+                "runtime_label": runtime_label,
+                "message": "目前執行環境不是 Windows 本機，已停用本機 Windows 備份。請改用『雲端專案內備份』或『GitHub 雲端備份』。",
+            }
+        return {"mode": mode, **validate_target_folder(target_folder, create=create)}
+    if mode == BACKUP_MODE_CLOUD_PROJECT:
+        try:
+            CLOUD_PROJECT_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+            return {
+                "ok": True,
+                "mode": mode,
+                "path": str(CLOUD_PROJECT_BACKUP_DIR),
+                "runtime": env,
+                "runtime_label": runtime_label,
+                "message": f"雲端專案內備份可用：{CLOUD_PROJECT_BACKUP_DIR}",
+            }
+        except Exception as exc:
+            return {
+                "ok": False,
+                "mode": mode,
+                "path": str(CLOUD_PROJECT_BACKUP_DIR),
+                "runtime": env,
+                "runtime_label": runtime_label,
+                "message": f"無法建立雲端專案內備份資料夾：{exc}",
+            }
+    # GitHub mode: validate token/repo, but do not perform network call here.
+    try:
+        from services.github_cloud_storage_service import github_config
+        gh = github_config()
+        token_ok = bool(gh.get("token"))
+        repo_ok = bool(gh.get("repo"))
+        return {
+            "ok": bool(token_ok and repo_ok),
+            "mode": mode,
+            "runtime": env,
+            "runtime_label": runtime_label,
+            "repo": gh.get("repo", ""),
+            "branch": gh.get("branch", "main"),
+            "message": "GitHub 雲端備份設定完成。" if token_ok and repo_ok else "GitHub 雲端備份需要設定 GITHUB_TOKEN 與 GITHUB_REPOSITORY。",
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "mode": mode,
+            "runtime": env,
+            "runtime_label": runtime_label,
+            "message": f"GitHub 備份服務載入失敗：{exc}",
+        }
+
+
+def _copy_data_tree_to_backup_dir(backup_dir: Path) -> tuple[list[dict[str, Any]], int, list[str]]:
+    sync_project_config_mirror_to_data()
+    copied: list[dict[str, Any]] = []
+    total_bytes = 0
+    errors: list[str] = []
+    if not DATA_DIR.exists():
+        return copied, total_bytes, ["data folder not found"]
+    for p in DATA_DIR.rglob("*"):
+        if not p.is_file():
+            continue
+        if _should_exclude(p):
+            continue
+        try:
+            rel = p.relative_to(DATA_DIR)
+            info = _copy_file(p, backup_dir / "data" / rel)
+            copied.append(info)
+            total_bytes += int(info.get("bytes") or 0)
+        except Exception as exc:
+            errors.append(f"{_rel(p)}: {exc}")
+    return copied, total_bytes, errors
+
+
+def create_cloud_project_backup(*, reason: str = "manual_cloud_project_backup") -> dict[str, Any]:
+    validation = validate_backup_destination(BACKUP_MODE_CLOUD_PROJECT, create=True)
+    if not validation.get("ok"):
+        return {"ok": False, **validation}
+    with _BACKUP_LOCK:
+        target = CLOUD_PROJECT_BACKUP_DIR
+        backup_name = f"{load_backup_schedule().get('backup_name_prefix', 'SPT_time_tracking_backup')}_{_stamp()}"
+        partial = target / f".{backup_name}.partial"
+        final = target / backup_name
+        if partial.exists():
+            shutil.rmtree(partial)
+        partial.mkdir(parents=True, exist_ok=False)
+        copied, total_bytes, errors = _copy_data_tree_to_backup_dir(partial)
+        manifest = {
+            "schema_version": "3.05",
+            "backup_mode": BACKUP_MODE_CLOUD_PROJECT,
+            "backup_time": _now_text(),
+            "reason": reason,
+            "project_root": str(PROJECT_ROOT),
+            "backup_dir": str(final),
+            "file_count": len(copied),
+            "total_bytes": total_bytes,
+            "errors": errors,
+            "included": ["data/* except _persistent_backup/_persistent_corrupt/_persistent_restore_replaced/_external_backup"],
+            "files": copied,
+        }
+        _json_dump(partial / "SPT_BACKUP_MANIFEST.json", manifest)
+        if final.exists():
+            final = target / f"{backup_name}_{os.getpid()}"
+        partial.rename(final)
+        manifest["backup_dir"] = str(final)
+        _json_dump(final / "SPT_BACKUP_MANIFEST.json", manifest)
+        state = load_backup_state()
+        state.update({
+            "last_result_ok": len(errors) == 0,
+            "last_backup_at": _now_text(),
+            "last_backup_dir": str(final),
+            "last_file_count": len(copied),
+            "last_total_bytes": total_bytes,
+            "last_errors": errors,
+            "last_reason": reason,
+            "last_backup_mode": BACKUP_MODE_CLOUD_PROJECT,
+        })
+        save_backup_state(state)
+        cleanup_old_cloud_project_backups()
+        return {"ok": len(errors) == 0, "backup_dir": str(final), "file_count": len(copied), "total_bytes": total_bytes, "errors": errors, "mode": BACKUP_MODE_CLOUD_PROJECT}
+
+
+def cleanup_old_cloud_project_backups() -> dict[str, Any]:
+    cfg = load_backup_schedule()
+    try:
+        keep_days = max(1, int(cfg.get("keep_days") or 30))
+    except Exception:
+        keep_days = 30
+    cutoff = time.time() - keep_days * 86400
+    prefix = str(cfg.get("backup_name_prefix") or "SPT_time_tracking_backup")
+    deleted: list[str] = []
+    try:
+        for p in CLOUD_PROJECT_BACKUP_DIR.glob(f"{prefix}_*"):
+            if p.is_dir() and p.stat().st_mtime < cutoff:
+                shutil.rmtree(p)
+                deleted.append(str(p))
+    except Exception:
+        pass
+    return {"ok": True, "deleted": deleted, "keep_days": keep_days}
+
+
+def create_github_cloud_backup(*, reason: str = "manual_github_cloud_backup") -> dict[str, Any]:
+    validation = validate_backup_destination(BACKUP_MODE_GITHUB_CLOUD)
+    if not validation.get("ok"):
+        return {"ok": False, **validation}
+    try:
+        from services.github_cloud_storage_service import create_and_upload_permanent_files
+        result = create_and_upload_permanent_files()
+        ok = bool(result.get("ok"))
+        state = load_backup_state()
+        state.update({
+            "last_result_ok": ok,
+            "last_backup_at": _now_text(),
+            "last_backup_dir": "GitHub Contents API",
+            "last_file_count": result.get("uploaded_count") or result.get("file_count") or 0,
+            "last_total_bytes": result.get("total_bytes") or 0,
+            "last_errors": [] if ok else [str(result.get("message") or result)],
+            "last_reason": reason,
+            "last_backup_mode": BACKUP_MODE_GITHUB_CLOUD,
+            "last_github_result": result,
+        })
+        save_backup_state(state)
+        return {"ok": ok, "mode": BACKUP_MODE_GITHUB_CLOUD, "backup_dir": "GitHub", "result": result, "message": result.get("message", "")}
+    except Exception as exc:
+        return {"ok": False, "mode": BACKUP_MODE_GITHUB_CLOUD, "message": f"GitHub 備份失敗：{exc}"}
+
+
+def create_backup_by_mode(mode: str | None, target_folder: str = "", *, reason: str = "manual", create_target: bool = True) -> dict[str, Any]:
+    mode = normalize_backup_mode(mode)
+    if mode == BACKUP_MODE_LOCAL_WINDOWS:
+        return {"mode": mode, **create_external_full_backup(target_folder, reason=reason, create_target=create_target)}
+    if mode == BACKUP_MODE_CLOUD_PROJECT:
+        return create_cloud_project_backup(reason=reason)
+    return create_github_cloud_backup(reason=reason)
+
+
+def _should_run_schedule(cfg: dict[str, Any], state: dict[str, Any]) -> tuple[bool, str]:  # type: ignore[override]
+    if not cfg.get("enabled"):
+        return False, "schedule disabled"
+    mode = normalize_backup_mode(cfg.get("backup_mode"))
+    target_ok = validate_backup_destination(mode, str(cfg.get("target_folder") or ""), create=False)
+    if not target_ok.get("ok"):
+        return False, target_ok.get("message") or "invalid backup destination"
+    scheduled = _scheduled_datetime_for_today(str(cfg.get("daily_time") or "17:30"))
+    now = _now()
+    if now < scheduled:
+        return False, f"not due until {scheduled.strftime('%H:%M')}"
+    today = now.strftime("%Y-%m-%d")
+    if str(state.get("last_scheduled_run_date") or "") == today and state.get("last_scheduled_ok"):
+        return False, "already ran today"
+    return True, "due"
+
+
+def run_due_backup_if_needed(*, force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    cfg = load_backup_schedule()
+    state = load_backup_state()
+    if not force:
+        should, reason = _should_run_schedule(cfg, state)
+        if not should:
+            return {"ok": True, "skipped": True, "reason": reason}
+    mode = normalize_backup_mode(cfg.get("backup_mode"))
+    result = create_backup_by_mode(mode, str(cfg.get("target_folder") or ""), reason="scheduled_daily_backup" if not force else "forced_scheduled_backup", create_target=True)
+    today = _now().strftime("%Y-%m-%d")
+    state = load_backup_state()
+    state.update({
+        "last_checked_at": _now_text(),
+        "last_scheduled_run_date": today,
+        "last_scheduled_ok": bool(result.get("ok")),
+        "last_scheduled_message": "完成" if result.get("ok") else str(result.get("errors") or result.get("message") or result),
+        "last_scheduled_mode": mode,
+    })
+    save_backup_state(state)
+    return result
+
+
+def get_schedule_status() -> dict[str, Any]:  # type: ignore[override]
+    cfg = load_backup_schedule()
+    state = load_backup_state()
+    mode = normalize_backup_mode(cfg.get("backup_mode"))
+    target = validate_backup_destination(mode, str(cfg.get("target_folder") or ""), create=False)
+    scheduled = _scheduled_datetime_for_today(str(cfg.get("daily_time") or "17:30"))
+    now = _now()
+    next_run = scheduled
+    if now >= scheduled and str(state.get("last_scheduled_run_date") or "") == now.strftime("%Y-%m-%d") and state.get("last_scheduled_ok"):
+        next_run = scheduled + timedelta(days=1)
+    elif now >= scheduled and not state.get("last_scheduled_ok"):
+        next_run = now
+    return {
+        "config": cfg,
+        "state": state,
+        "target_ok": target.get("ok"),
+        "target_message": target.get("message", "OK" if target.get("ok") else ""),
+        "target_validation": target,
+        "backup_mode": mode,
+        "next_run": next_run.strftime("%Y-%m-%d %H:%M:%S"),
+        "scheduler_started": _SCHEDULER_STARTED,
+        "runtime_label": _human_runtime_label(),
+    }
+# ===== V3.05 BACKUP MODE SPLIT END =====
