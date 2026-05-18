@@ -26,8 +26,16 @@ apply_theme()
 require_module_access("10_permissions", "can_manage")
 render_header("10 | 權限管理", "帳號密碼總表、帳號匯入、帳號貼上、帳號級模組權限 / Account & Permission Management")
 init_permission_tables()
+# V2.93：進入權限管理時先做一次輕量權限一致性清理，
+# 避免舊版本資料仍殘留 admin/operator 雙角色。
+try:
+    if not st.session_state.get("v293_permission_authority_checked", False):
+        reconcile_account_master_permissions_authoritative(None, reason="permission_page_open_cleanup")
+        st.session_state["v293_permission_authority_checked"] = True
+except Exception:
+    pass
 
-st.caption("V1.81 loaded｜帳號清單儲存後以帳號主檔角色為唯一來源，重建帳號模組權限並清除舊角色殘留；不再保留兩套混亂權限。")
+st.caption("V2.93 loaded｜帳號清單編輯是角色唯一來源；儲存後會重建帳號模組權限並清除舊角色/runtime 殘留。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
