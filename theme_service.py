@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-SPT Time Tracking System - Unified Theme Service V1.59
+SPT Time Tracking System - Unified Theme Service V1.59 / V2.57 patch
 Purpose:
 - Restore unified Super Plus Tech logo header style.
 - Force sidebar/page/menu font size larger and consistent.
@@ -11,6 +11,7 @@ This file is self-contained and keeps backward-compatible function names used by
 from __future__ import annotations
 
 import base64
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -520,10 +521,48 @@ div[data-baseweb="radio"] [aria-checked="true"] {
 }
 /* Data editor checkbox cells: keep clickable checkbox visible on dark table. */
 [data-testid="stDataEditor"] input[type="checkbox"],
-[data-testid="stDataEditor"] [role="checkbox"] {
-    accent-color: #dffaff !important;
-    outline: 1px solid rgba(223,250,255,.70) !important;
-    box-shadow: 0 0 8px rgba(35,230,255,.22) !important;
+[data-testid="stDataEditor"] [role="checkbox"],
+[data-testid="stDataFrame"] input[type="checkbox"],
+[data-testid="stDataFrame"] [role="checkbox"] {
+    opacity: 1 !important;
+    visibility: visible !important;
+    accent-color: #18d7f0 !important;
+    background: linear-gradient(180deg, #f5fbff 0%, #dff7ff 100%) !important;
+    border: 2px solid rgba(103,245,255,.96) !important;
+    outline: 1px solid rgba(223,250,255,.90) !important;
+    border-radius: 4px !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.70) inset, 0 0 12px rgba(35,230,255,.34) !important;
+    color: #04101d !important;
+    -webkit-text-fill-color: #04101d !important;
+}
+[data-testid="stDataEditor"] input[type="checkbox"]:disabled,
+[data-testid="stDataEditor"] [role="checkbox"][aria-disabled="true"],
+[data-testid="stDataFrame"] input[type="checkbox"]:disabled,
+[data-testid="stDataFrame"] [role="checkbox"][aria-disabled="true"] {
+    opacity: 1 !important;
+    filter: none !important;
+    background: linear-gradient(180deg, #f5fbff 0%, #dff7ff 100%) !important;
+    border-color: rgba(103,245,255,.96) !important;
+}
+[data-testid="stDataEditor"] [role="checkbox"][aria-checked="true"],
+[data-testid="stDataEditor"] input[type="checkbox"]:checked,
+[data-testid="stDataFrame"] [role="checkbox"][aria-checked="true"],
+[data-testid="stDataFrame"] input[type="checkbox"]:checked {
+    opacity: 1 !important;
+    accent-color: #18d7f0 !important;
+    background: linear-gradient(180deg, #dffaff 0%, #bdf6ff 100%) !important;
+    border-color: #67f5ff !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.75) inset, 0 0 14px rgba(35,230,255,.45) !important;
+    color: #04101d !important;
+    -webkit-text-fill-color: #04101d !important;
+}
+[data-testid="stDataEditor"] [role="checkbox"] svg,
+[data-testid="stDataEditor"] [role="checkbox"] path,
+[data-testid="stDataFrame"] [role="checkbox"] svg,
+[data-testid="stDataFrame"] [role="checkbox"] path {
+    opacity: 1 !important;
+    fill: #04101d !important;
+    stroke: #04101d !important;
 }
 
 /* V2.03: checkbox/radio/toggle rows use light background so confirmations are clearly visible. */
@@ -583,15 +622,15 @@ div[data-testid="stExpander"] summary * {
 }
 .spt-login-value {
     color: #ffffff;
-    font-size: 22px;
-    line-height: 1.25;
+    font-size: 30px;
+    line-height: 1.18;
     font-weight: 1000;
     letter-spacing: .4px;
     text-shadow: 0 0 10px rgba(255,255,255,.28), 0 0 22px rgba(35,230,255,.38);
 }
 .spt-login-value span {
     color: #aef7ff;
-    font-size: 18px;
+    font-size: 22px;
     font-weight: 950;
 }
 @keyframes sptLoginBreath {
@@ -605,8 +644,212 @@ div[data-testid="stExpander"] summary * {
     )
 
 
+# ===== V2.57 operation message persistence removed =====
+# User requirement: do not replay or retain success/info/warning/error messages
+# across reruns.  Keep native Streamlit messages only for the current execution.
+def _current_page_id_for_messages() -> str:
+    try:
+        import inspect
+        for frame in inspect.stack():
+            fn = str(getattr(frame, "filename", "") or "").replace("\\", "/")
+            if "/pages/" in fn:
+                return fn.rsplit("/", 1)[-1]
+        return "streamlit_app.py"
+    except Exception:
+        return "streamlit_app.py"
+
+
+def _message_store_key(page_id: str | None = None) -> str:
+    return f"_spt_persistent_messages::{page_id or _current_page_id_for_messages()}"
+
+
+def _clear_all_persistent_message_state() -> None:
+    try:
+        for k in list(st.session_state.keys()):
+            if str(k).startswith("_spt_persistent_messages::"):
+                st.session_state.pop(k, None)
+    except Exception:
+        pass
+
+
+def _install_persistent_message_patch() -> None:
+    # No-op since V2.57. Do not monkey-patch st.success/info/warning/error.
+    _clear_all_persistent_message_state()
+
+
+def _render_persistent_operation_messages() -> None:
+    # No-op since V2.57. Prevent old replay panel / replay banners.
+    _clear_all_persistent_message_state()
+
+
+def _clear_transient_selection_on_page_change() -> None:
+    """Clear batch-selection checkboxes when the user leaves a module page.
+
+    Selection checkboxes are operational state, not persistent settings.  Keep them
+    while the editor stays on the same page, but clear them automatically when the
+    page changes so the next module never inherits stale selected rows.
+    """
+    try:
+        import inspect
+        current = ""
+        for frame in inspect.stack():
+            fn = str(getattr(frame, "filename", "") or "")
+            if "/pages/" in fn.replace("\\", "/"):
+                current = fn.rsplit("/", 1)[-1]
+                break
+        if not current:
+            current = "streamlit_app.py"
+        prev = st.session_state.get("_spt_current_page_for_selection")
+        if prev and prev != current:
+            for k in list(st.session_state.keys()):
+                if str(k).startswith("_spt_select_"):
+                    st.session_state.pop(k, None)
+        st.session_state["_spt_current_page_for_selection"] = current
+    except Exception:
+        pass
+
+
+
+def _inject_multiselect_tag_height_fix() -> None:
+    """V2.57: keep select/multiselect text readable without white-dot artifacts."""
+    try:
+        st.markdown(
+            """
+            <style>
+            /* V2.57｜修正下拉/多選文字被切掉，同時去除白點 */
+            .stSelectbox,
+            .stMultiSelect {
+                overflow: visible !important;
+            }
+
+            .stSelectbox div[data-baseweb="select"],
+            .stMultiSelect div[data-baseweb="select"] {
+                min-height: 48px !important;
+                height: auto !important;
+                border-radius: 10px !important;
+                background: #eef7fb !important;
+                overflow: visible !important;
+            }
+
+            .stSelectbox div[data-baseweb="select"] > div,
+            .stMultiSelect div[data-baseweb="select"] > div {
+                min-height: 48px !important;
+                height: auto !important;
+                padding-top: 6px !important;
+                padding-bottom: 6px !important;
+                align-items: center !important;
+                overflow: visible !important;
+            }
+
+            /* Selectbox / multiselect display text and placeholder */
+            div[data-baseweb="select"] span,
+            div[data-baseweb="select"] div,
+            div[data-baseweb="select"] input,
+            div[data-baseweb="select"] input[type="text"] {
+                color: #03121f !important;
+                -webkit-text-fill-color: #03121f !important;
+                font-weight: 850 !important;
+                font-size: inherit !important;
+                line-height: 1.45 !important;
+                text-shadow: none !important;
+            }
+
+            div[data-baseweb="select"] input,
+            div[data-baseweb="select"] input[type="text"],
+            div[data-baseweb="select"] input[aria-autocomplete="list"] {
+                background: transparent !important;
+                background-color: transparent !important;
+                border: 0 !important;
+                outline: 0 !important;
+                box-shadow: none !important;
+                min-height: 28px !important;
+                height: 28px !important;
+                line-height: 28px !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                caret-color: #03121f !important;
+            }
+
+            div[data-baseweb="select"] input::placeholder {
+                color: rgba(3,18,31,.78) !important;
+                -webkit-text-fill-color: rgba(3,18,31,.78) !important;
+                opacity: 1 !important;
+            }
+
+            /* Multiselect selected tags */
+            div[data-baseweb="tag"] {
+                min-height: 32px !important;
+                height: auto !important;
+                padding: 6px 10px !important;
+                border-radius: 9px !important;
+                line-height: 1.35 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                background: linear-gradient(135deg, #bff7ff, #7ee8ff) !important;
+                color: #03121f !important;
+                -webkit-text-fill-color: #03121f !important;
+                font-weight: 900 !important;
+                overflow: visible !important;
+                white-space: nowrap !important;
+                margin-top: 2px !important;
+                margin-bottom: 2px !important;
+            }
+
+            div[data-baseweb="tag"] span,
+            div[data-baseweb="tag"] div {
+                color: #03121f !important;
+                -webkit-text-fill-color: #03121f !important;
+                font-weight: 900 !important;
+                line-height: 1.35 !important;
+                overflow: visible !important;
+            }
+
+            div[data-baseweb="tag"] svg,
+            div[data-baseweb="select"] svg,
+            div[data-baseweb="select"] [role="button"] svg {
+                color: #03121f !important;
+                fill: #03121f !important;
+            }
+
+            /* Dropdown list options */
+            ul[role="listbox"] li,
+            div[role="option"] {
+                min-height: 38px !important;
+                line-height: 1.45 !important;
+                padding-top: 8px !important;
+                padding-bottom: 8px !important;
+                color: #03121f !important;
+                -webkit-text-fill-color: #03121f !important;
+                font-weight: 800 !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        pass
+
+
+def render_operation_results() -> None:
+    """V2.57: legacy helper kept for compatibility; intentionally renders nothing."""
+    _clear_all_persistent_message_state()
+
+
+def clear_operation_results() -> None:
+    _clear_all_persistent_message_state()
+
 def apply_theme() -> None:
     _inject_css()
+    _inject_multiselect_tag_height_fix()
+    _clear_all_persistent_message_state()
+    _clear_transient_selection_on_page_change()
+    # V2.18: apply global font scale to every module page.
+    # Best-effort only; visual theme must never break a page.
+    try:
+        from services.home_ui_settings_service import inject_global_font_scale
+        inject_global_font_scale()
+    except Exception:
+        pass
     # V1.60: install global table column settings once.
     # Best-effort only; visual theme must never break a page.
     try:
@@ -708,3 +951,1157 @@ def render_title(module_no: Any = None, title: Any = None, subtitle: Any = None)
 def render_section_title(title: str, subtitle: str | None = None) -> None:
     apply_theme()
     st.markdown(f"### {_safe_html(title)}" + (f"\n{_safe_html(subtitle)}" if subtitle else ""))
+
+
+# ===== V2.59 SELECT / MULTISELECT TEXT CLIP FIX REMOVED IN V2.88 FAST BOOT =====
+
+
+
+# ===== V2.61 SELECT / MULTISELECT HEIGHT FINAL OVERRIDE REMOVED IN V2.88 FAST BOOT =====
+
+
+
+# ===== V2.62 dropdown menu light readable patch REMOVED IN V2.88 FAST BOOT =====
+
+
+
+
+
+# ===== V2.63 SELECT / MULTISELECT BOX HEIGHT ALIGN PATCH REMOVED IN V2.88 FAST BOOT =====
+
+
+
+
+# ===== V2.64 GLOBAL SELECTBOX / MULTISELECT UNIFIED FINAL CSS REMOVED IN V2.88 FAST BOOT =====
+
+
+
+
+# ===== V2.65 SELECT DISPLAY ABSOLUTE HEIGHT OVERRIDE REMOVED IN V2.88 FAST BOOT =====
+
+
+
+
+# ===== V2.66 STATUS HEIGHT UNIFY ALL FILTER FIELDS REMOVED IN V2.88 FAST BOOT =====
+
+
+
+
+# ===== V2.67 SELECT HEIGHT 70 MENU TEXT VISIBLE FINAL REMOVED IN V2.88 FAST BOOT =====
+
+
+
+
+# ===== V2.68 FORCE DROPDOWN REAL DOM FIX REMOVED IN V2.88 FAST BOOT =====
+
+
+
+
+# ===== V2.69 USER CONFIGURABLE DROPDOWN SIZE REMOVED IN V2.88 FAST BOOT =====
+
+
+
+
+# ===== V2.70 MAIN PAGE DROPDOWN SIZE PANEL FALLBACK REMOVED IN V2.88 FAST BOOT =====
+
+
+
+
+# ===== V2.79 FUTURE CYBER FIELD UI REMOVED IN V2.88 FAST BOOT =====
+
+
+
+
+
+# ===== V2.88 FAST BOOT LEGACY COMPAT NO-OPS START =====
+def apply_v259_select_multiselect_text_fix():
+    return
+
+def apply_v261_select_multiselect_height_final_fix():
+    return
+
+def _spt_v262_dropdown_menu_light_css():
+    return
+
+def apply_v263_select_box_left_size_fix():
+    return
+
+def apply_v264_global_select_unified_final_css():
+    return
+
+def apply_v265_select_display_absolute_height_fix():
+    return
+
+def apply_v266_status_height_unify_all_filter_fields():
+    return
+
+def apply_v267_select_height_70_menu_text_visible_final():
+    return
+
+def apply_v268_force_dropdown_real_dom_fix():
+    return
+
+def apply_v269_configurable_dropdown_css():
+    return
+
+def render_dropdown_size_settings_panel():
+    return
+
+def render_dropdown_size_settings_panel_main_fallback():
+    return
+# ===== V2.88 FAST BOOT LEGACY COMPAT NO-OPS END =====
+
+# ===== V2.80 WAR-ROOM FUTURE FORM HUD UI START =====
+def apply_v280_warroom_future_form_hud_ui():
+    """War-room level future HUD styling for Streamlit form widgets.
+    Keeps readability as first priority, then adds refined scanline, glow, active focus layer,
+    and a less-flat professional panel feel. Pure CSS only; no data / permission logic touched.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.80｜戰情中心級未來科技表單 HUD */
+        :root {
+            --spt-v280-bg-a: rgba(5, 17, 38, 0.96);
+            --spt-v280-bg-b: rgba(10, 30, 62, 0.92);
+            --spt-v280-bg-c: rgba(13, 23, 54, 0.96);
+            --spt-v280-cyan: rgba(79, 229, 255, 0.90);
+            --spt-v280-cyan-soft: rgba(79, 229, 255, 0.34);
+            --spt-v280-blue: rgba(87, 120, 255, 0.28);
+            --spt-v280-text: #f1fcff;
+            --spt-v280-soft: #c7f5ff;
+            --spt-v280-muted: #8fb8cf;
+            --spt-v280-dark-text: #04131f;
+        }
+
+        @keyframes sptV280FieldBreath {
+            0%, 100% {
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.10),
+                    inset 0 -1px 0 rgba(79,229,255,0.08),
+                    0 0 0 1px rgba(79,229,255,0.18),
+                    0 0 12px rgba(79,229,255,0.08),
+                    0 0 24px rgba(87,120,255,0.08),
+                    0 12px 26px rgba(0,0,0,0.34);
+            }
+            50% {
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.15),
+                    inset 0 -1px 0 rgba(79,229,255,0.14),
+                    0 0 0 1px rgba(79,229,255,0.30),
+                    0 0 18px rgba(79,229,255,0.16),
+                    0 0 36px rgba(87,120,255,0.14),
+                    0 15px 30px rgba(0,0,0,0.38);
+            }
+        }
+
+        @keyframes sptV280Sweep {
+            0% { background-position: -180% 0, 0 0, 0 0; }
+            100% { background-position: 180% 0, 0 0, 0 0; }
+        }
+
+        .stSelectbox,
+        .stMultiSelect,
+        .stTextInput,
+        .stDateInput,
+        .stNumberInput,
+        .stTextArea,
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"],
+        div[data-testid="stTextInput"],
+        div[data-testid="stDateInput"],
+        div[data-testid="stNumberInput"],
+        div[data-testid="stTextArea"] {
+            overflow: visible !important;
+        }
+
+        /* 欄位容器加一點間距，避免光暈被上下切掉 */
+        div[data-testid="stVerticalBlock"] > div:has(.stSelectbox),
+        div[data-testid="stVerticalBlock"] > div:has(.stMultiSelect),
+        div[data-testid="stVerticalBlock"] > div:has(.stTextInput),
+        div[data-testid="stVerticalBlock"] > div:has(.stDateInput),
+        div[data-testid="stVerticalBlock"] > div:has(.stNumberInput),
+        div[data-testid="stVerticalBlock"] > div:has(.stTextArea) {
+            overflow: visible !important;
+        }
+
+        /* SELECT / MULTISELECT 主體：暗色玻璃、細光條、掃描感 */
+        div[data-baseweb="select"] > div {
+            position: relative !important;
+            isolation: isolate !important;
+            background:
+                linear-gradient(100deg, transparent 0%, rgba(133, 245, 255, 0.12) 45%, transparent 70%) -180% 0 / 180% 100% no-repeat,
+                linear-gradient(180deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0.018) 17%, rgba(255,255,255,0.00) 18%),
+                linear-gradient(135deg, var(--spt-v280-bg-a) 0%, var(--spt-v280-bg-b) 52%, var(--spt-v280-bg-c) 100%) !important;
+            border: 1px solid var(--spt-v280-cyan) !important;
+            border-radius: 16px !important;
+            color: var(--spt-v280-text) !important;
+            animation: sptV280FieldBreath 3.4s ease-in-out infinite, sptV280Sweep 6.5s linear infinite !important;
+            backdrop-filter: blur(12px) saturate(140%) !important;
+            -webkit-backdrop-filter: blur(12px) saturate(140%) !important;
+            outline: 1px solid rgba(255,255,255,0.035) !important;
+        }
+
+        div[data-baseweb="select"] > div::before {
+            content: "";
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            top: 5px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(161,247,255,0.74), transparent);
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.82;
+        }
+
+        div[data-baseweb="select"] > div::after {
+            content: "";
+            position: absolute;
+            left: 10px;
+            bottom: 5px;
+            width: 34%;
+            height: 1px;
+            background: linear-gradient(90deg, rgba(80,229,255,0.66), transparent);
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.72;
+        }
+
+        div[data-baseweb="select"] > div:hover,
+        div[data-baseweb="select"] > div:focus-within {
+            border-color: rgba(141, 247, 255, 0.98) !important;
+            transform: translateY(-1px) !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.16),
+                inset 0 -1px 0 rgba(79,229,255,0.16),
+                0 0 0 1px rgba(141,247,255,0.32),
+                0 0 20px rgba(79,229,255,0.19),
+                0 0 40px rgba(87,120,255,0.18),
+                0 16px 34px rgba(0,0,0,0.42) !important;
+        }
+
+        /* select 文字：全部淺色，解決深色框可讀性 */
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p,
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] div,
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[aria-expanded] {
+            color: var(--spt-v280-text) !important;
+            -webkit-text-fill-color: var(--spt-v280-text) !important;
+            text-shadow: 0 0 10px rgba(121, 237, 255, 0.12) !important;
+            background: transparent !important;
+            z-index: 1 !important;
+        }
+
+        div[data-baseweb="select"] input::placeholder {
+            color: var(--spt-v280-muted) !important;
+            -webkit-text-fill-color: var(--spt-v280-muted) !important;
+            opacity: 1 !important;
+        }
+
+        div[data-baseweb="select"] svg {
+            fill: #a9f7ff !important;
+            color: #a9f7ff !important;
+            filter: drop-shadow(0 0 7px rgba(79,229,255,0.35));
+        }
+
+        /* 文字、日期、數字、備註欄同樣科技化 */
+        .stTextInput input,
+        .stDateInput input,
+        .stNumberInput input,
+        .stTextArea textarea,
+        div[data-testid="stTextInputRootElement"] input,
+        div[data-testid="stNumberInputRootElement"] input,
+        div[data-testid="stDateInputField"] input {
+            background:
+                linear-gradient(100deg, transparent 0%, rgba(133, 245, 255, 0.10) 45%, transparent 70%) -180% 0 / 180% 100% no-repeat,
+                linear-gradient(180deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0.018) 17%, rgba(255,255,255,0.00) 18%),
+                linear-gradient(135deg, var(--spt-v280-bg-a) 0%, var(--spt-v280-bg-b) 52%, var(--spt-v280-bg-c) 100%) !important;
+            color: var(--spt-v280-text) !important;
+            -webkit-text-fill-color: var(--spt-v280-text) !important;
+            border: 1px solid var(--spt-v280-cyan) !important;
+            border-radius: 16px !important;
+            animation: sptV280FieldBreath 3.4s ease-in-out infinite, sptV280Sweep 6.5s linear infinite !important;
+            caret-color: #b9fbff !important;
+            text-shadow: 0 0 10px rgba(121,237,255,0.10) !important;
+        }
+
+        .stTextInput input::placeholder,
+        .stDateInput input::placeholder,
+        .stNumberInput input::placeholder,
+        .stTextArea textarea::placeholder {
+            color: var(--spt-v280-muted) !important;
+            -webkit-text-fill-color: var(--spt-v280-muted) !important;
+            opacity: 1 !important;
+        }
+
+        .stTextInput input:focus,
+        .stDateInput input:focus,
+        .stNumberInput input:focus,
+        .stTextArea textarea:focus {
+            border-color: rgba(141,247,255,0.98) !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.16),
+                0 0 0 1px rgba(141,247,255,0.28),
+                0 0 20px rgba(79,229,255,0.20),
+                0 0 42px rgba(87,120,255,0.18),
+                0 16px 34px rgba(0,0,0,0.42) !important;
+        }
+
+        /* 數字輸入 +/- 按鈕 */
+        .stNumberInput button,
+        div[data-testid="stNumberInputStepUp"],
+        div[data-testid="stNumberInputStepDown"] {
+            background: linear-gradient(135deg, rgba(5,17,38,0.98), rgba(17,42,79,0.96)) !important;
+            color: #dffcff !important;
+            border-color: rgba(79,229,255,0.42) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 12px rgba(79,229,255,0.14) !important;
+        }
+        .stNumberInput button *,
+        div[data-testid="stNumberInputStepUp"] *,
+        div[data-testid="stNumberInputStepDown"] * {
+            color: #dffcff !important;
+            fill: #dffcff !important;
+        }
+
+        /* multiselect tag */
+        div[data-baseweb="tag"] {
+            background: linear-gradient(135deg, rgba(80,236,255,0.92), rgba(141,177,255,0.94)) !important;
+            border: 1px solid rgba(210, 251, 255, 0.98) !important;
+            border-radius: 11px !important;
+            color: var(--spt-v280-dark-text) !important;
+            box-shadow: 0 0 12px rgba(79,229,255,0.20) !important;
+        }
+        div[data-baseweb="tag"] *,
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div {
+            color: var(--spt-v280-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v280-dark-text) !important;
+            font-weight: 950 !important;
+        }
+
+        /* 下拉展開面板 */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.012) 18%, rgba(255,255,255,0.00) 19%),
+                linear-gradient(135deg, rgba(4,15,34,0.98), rgba(11,31,65,0.98)) !important;
+            border: 1px solid rgba(93,233,255,0.66) !important;
+            border-radius: 16px !important;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.10),
+                0 0 0 1px rgba(79,229,255,0.20),
+                0 0 20px rgba(79,229,255,0.18),
+                0 0 42px rgba(87,120,255,0.16),
+                0 18px 46px rgba(0,0,0,0.50) !important;
+            backdrop-filter: blur(16px) saturate(145%) !important;
+            -webkit-backdrop-filter: blur(16px) saturate(145%) !important;
+            overflow: hidden !important;
+        }
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li,
+        div[data-baseweb="menu"] div {
+            background: transparent !important;
+            color: var(--spt-v280-text) !important;
+            -webkit-text-fill-color: var(--spt-v280-text) !important;
+            font-weight: 850 !important;
+            text-shadow: none !important;
+            border-radius: 10px !important;
+            margin: 4px 7px !important;
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
+        }
+        div[data-baseweb="popover"] *,
+        div[data-baseweb="menu"] *,
+        ul[role="listbox"] * {
+            color: var(--spt-v280-text) !important;
+            -webkit-text-fill-color: var(--spt-v280-text) !important;
+        }
+
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[data-baseweb="menu"] div:hover {
+            background: linear-gradient(90deg, rgba(79,229,255,0.18), rgba(108,137,255,0.24)) !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            box-shadow: inset 0 0 0 1px rgba(130,241,255,0.20), 0 0 12px rgba(79,229,255,0.10) !important;
+        }
+
+        div[aria-selected="true"],
+        li[aria-selected="true"],
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"] {
+            background: linear-gradient(90deg, rgba(80,236,255,0.94), rgba(139,176,255,0.94)) !important;
+            color: var(--spt-v280-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v280-dark-text) !important;
+            font-weight: 950 !important;
+            box-shadow: inset 0 0 0 1px rgba(236,253,255,0.35), 0 0 16px rgba(79,229,255,0.18) !important;
+        }
+        div[aria-selected="true"] *,
+        li[aria-selected="true"] * {
+            color: var(--spt-v280-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v280-dark-text) !important;
+        }
+
+        div[aria-disabled="true"],
+        li[aria-disabled="true"] {
+            color: #8db2c7 !important;
+            -webkit-text-fill-color: #8db2c7 !important;
+            opacity: 0.82 !important;
+        }
+
+        .stSelectbox label,
+        .stMultiSelect label,
+        .stTextInput label,
+        .stDateInput label,
+        .stNumberInput label,
+        .stTextArea label,
+        div[data-testid="stWidgetLabel"] label {
+            color: #f0fcff !important;
+            text-shadow: 0 0 12px rgba(79,229,255,0.20) !important;
+            letter-spacing: 0.35px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v280_warroom_future_form_hud_ui()
+except Exception:
+    pass
+
+for _spt_v280_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v280_func = globals().get(_spt_v280_name)
+    if callable(_spt_v280_func) and not getattr(_spt_v280_func, "_spt_v280_wrapped", False):
+        def _spt_v280_make_wrapper(_original):
+            def _spt_v280_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v280_warroom_future_form_hud_ui()
+                except Exception:
+                    pass
+                return result
+            _spt_v280_wrapper._spt_v280_wrapped = True
+            return _spt_v280_wrapper
+        globals()[_spt_v280_name] = _spt_v280_make_wrapper(_spt_v280_func)
+# ===== V2.80 WAR-ROOM FUTURE FORM HUD UI END =====
+
+
+# ===== V2.81 STABLE SPACING GUARD - DO NOT REMOVE START =====
+def apply_v281_stable_spacing_guard():
+    """Restore and lock form field spacing after V2.80 HUD styling.
+    This patch deliberately preserves V2.80 cyber/HUD colors and only fixes layout gaps,
+    glow clipping, and textarea/button contrast. Do not remove in later visual upgrades.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.81｜穩定欄位間距防回退補丁
+           原則：只修間距與裁切，不覆蓋 V2.80 深色 HUD 主視覺。 */
+
+        :root {
+            --spt-v281-widget-gap-y: 18px;
+            --spt-v281-label-gap: 8px;
+            --spt-v281-field-min-h: 58px;
+            --spt-v281-field-pad-x: 16px;
+        }
+
+        /* 每個 Streamlit 表單元件都保留足夠外距，避免光暈與下一個欄位互相貼住 */
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"],
+        div[data-testid="stTextInput"],
+        div[data-testid="stTextArea"],
+        div[data-testid="stDateInput"],
+        div[data-testid="stNumberInput"],
+        .stSelectbox,
+        .stMultiSelect,
+        .stTextInput,
+        .stTextArea,
+        .stDateInput,
+        .stNumberInput {
+            margin-top: 4px !important;
+            margin-bottom: var(--spt-v281-widget-gap-y) !important;
+            padding-top: 2px !important;
+            padding-bottom: 4px !important;
+            overflow: visible !important;
+        }
+
+        /* 欄位 label 與輸入框之間固定留距，不可被後續版本吃掉 */
+        div[data-testid="stWidgetLabel"],
+        div[data-testid="stWidgetLabel"] > label,
+        .stSelectbox label,
+        .stMultiSelect label,
+        .stTextInput label,
+        .stTextArea label,
+        .stDateInput label,
+        .stNumberInput label {
+            margin-bottom: var(--spt-v281-label-gap) !important;
+            padding-bottom: 0 !important;
+            line-height: 1.35 !important;
+        }
+
+        /* Select / multiselect 外層需要額外空間，避免藍框光暈被切掉 */
+        div[data-baseweb="select"] {
+            margin-top: 2px !important;
+            margin-bottom: 6px !important;
+            min-height: var(--spt-v281-field-min-h) !important;
+            overflow: visible !important;
+        }
+
+        div[data-baseweb="select"] > div {
+            min-height: var(--spt-v281-field-min-h) !important;
+            height: var(--spt-v281-field-min-h) !important;
+            padding-left: var(--spt-v281-field-pad-x) !important;
+            padding-right: var(--spt-v281-field-pad-x) !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+        }
+
+        /* 內層文字容器置中；只修高度，不改 V2.80 顏色 */
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[class*="valueContainer"],
+        div[data-baseweb="select"] div[class*="ValueContainer"],
+        div[data-baseweb="select"] div[class*="singleValue"],
+        div[data-baseweb="select"] div[class*="SingleValue"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Placeholder"] {
+            min-height: calc(var(--spt-v281-field-min-h) - 4px) !important;
+            height: calc(var(--spt-v281-field-min-h) - 4px) !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+            line-height: 1.45 !important;
+        }
+
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p,
+        div[data-baseweb="select"] input {
+            line-height: 1.45 !important;
+            min-height: 28px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            overflow: visible !important;
+        }
+
+        /* Text / date / number / textarea：恢復上下間距與光暈外露 */
+        .stTextInput input,
+        .stDateInput input,
+        .stNumberInput input,
+        div[data-testid="stTextInputRootElement"] input,
+        div[data-testid="stNumberInputRootElement"] input,
+        div[data-testid="stDateInputField"] input {
+            min-height: var(--spt-v281-field-min-h) !important;
+            height: var(--spt-v281-field-min-h) !important;
+            padding-left: var(--spt-v281-field-pad-x) !important;
+            padding-right: var(--spt-v281-field-pad-x) !important;
+            box-sizing: border-box !important;
+            overflow: visible !important;
+        }
+
+        /* TextArea 不要被前版白底規則吃回去，也不要貼上下元件 */
+        .stTextArea textarea,
+        div[data-testid="stTextArea"] textarea {
+            min-height: 138px !important;
+            padding: 14px 16px !important;
+            box-sizing: border-box !important;
+            overflow: auto !important;
+        }
+
+        /* Checkbox 與按鈕和上一個大欄位分開，不再貼住 */
+        .stCheckbox,
+        div[data-testid="stCheckbox"] {
+            margin-top: 8px !important;
+            margin-bottom: 18px !important;
+            overflow: visible !important;
+        }
+
+        .stButton,
+        div[data-testid="stButton"] {
+            margin-top: 8px !important;
+            margin-bottom: 18px !important;
+            overflow: visible !important;
+        }
+
+        .stButton > button,
+        div[data-testid="stButton"] button {
+            min-height: 46px !important;
+            border-radius: 14px !important;
+        }
+
+        /* 欄位分組在 columns 內時，保留一致行距 */
+        div[data-testid="column"] > div {
+            overflow: visible !important;
+        }
+
+        /* 防止最底部分隔線或下一區塊壓到光暈 */
+        hr,
+        [data-testid="stMarkdownContainer"] hr {
+            margin-top: 22px !important;
+            margin-bottom: 20px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v281_stable_spacing_guard()
+except Exception:
+    pass
+
+for _spt_v281_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v281_func = globals().get(_spt_v281_name)
+    if callable(_spt_v281_func) and not getattr(_spt_v281_func, "_spt_v281_wrapped", False):
+        def _spt_v281_make_wrapper(_original):
+            def _spt_v281_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v281_stable_spacing_guard()
+                except Exception:
+                    pass
+                return result
+            _spt_v281_wrapper._spt_v281_wrapped = True
+            return _spt_v281_wrapper
+        globals()[_spt_v281_name] = _spt_v281_make_wrapper(_spt_v281_func)
+# ===== V2.81 STABLE SPACING GUARD - DO NOT REMOVE END =====
+
+
+# ===== V2.82 SELECT TEXT VISIBILITY GUARD START =====
+def apply_v282_select_text_visibility_guard():
+    """Final guard: keep V2.80/V2.81 cyber style, but force visible selected/placeholder text.
+    This patch prevents dark text being restored on dark glass fields and prevents vertical clipping.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.82｜下拉欄位文字可視性防回退：DO NOT REMOVE
+           保留深色科技感欄位，強制欄位內文字使用淺色，且不被裁切。 */
+
+        :root {
+            --spt-v282-field-text: #eafcff;
+            --spt-v282-field-text-strong: #f7feff;
+            --spt-v282-field-text-dim: #aeeeff;
+            --spt-v282-field-text-muted: #8dccdf;
+            --spt-v282-selected-text-dark: #03121f;
+        }
+
+        /* Selectbox / Multiselect 顯示框本體維持深色科技感，不回到慘白 */
+        div[data-baseweb="select"] > div {
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.014) 17%, rgba(255,255,255,0.00) 18%),
+                linear-gradient(135deg, rgba(8, 20, 44, 0.94) 0%, rgba(16, 34, 69, 0.90) 54%, rgba(7, 16, 36, 0.96) 100%) !important;
+            border: 1px solid rgba(104, 232, 255, 0.82) !important;
+            color: var(--spt-v282-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
+            overflow: visible !important;
+        }
+
+        /* 關鍵：BaseWeb value/placeholder 容器不要繼承黑字，也不要被裁切 */
+        div[data-baseweb="select"] > div > div,
+        div[data-baseweb="select"] div[role="combobox"],
+        div[data-baseweb="select"] div[aria-expanded],
+        div[data-baseweb="select"] div[class*="valueContainer"],
+        div[data-baseweb="select"] div[class*="ValueContainer"],
+        div[data-baseweb="select"] div[class*="singleValue"],
+        div[data-baseweb="select"] div[class*="SingleValue"],
+        div[data-baseweb="select"] div[class*="placeholder"],
+        div[data-baseweb="select"] div[class*="Placeholder"] {
+            color: var(--spt-v282-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
+            opacity: 1 !important;
+            text-shadow: 0 0 8px rgba(107, 232, 255, 0.10) !important;
+            background: transparent !important;
+            overflow: visible !important;
+            line-height: 1.35 !important;
+            display: flex !important;
+            align-items: center !important;
+            min-height: 40px !important;
+            height: auto !important;
+        }
+
+        /* 關鍵：顯示文字、placeholder、No options to select 都改淺色 */
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] p,
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete="list"] {
+            color: var(--spt-v282-field-text-strong) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text-strong) !important;
+            opacity: 1 !important;
+            font-weight: 850 !important;
+            line-height: 1.35 !important;
+            min-height: 28px !important;
+            height: auto !important;
+            background: transparent !important;
+            text-shadow: 0 0 8px rgba(107, 232, 255, 0.08) !important;
+            overflow: visible !important;
+            transform: none !important;
+            filter: none !important;
+        }
+
+        div[data-baseweb="select"] input::placeholder {
+            color: var(--spt-v282-field-text-dim) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text-dim) !important;
+            opacity: 1 !important;
+        }
+
+        /* disabled / 無選項狀態仍要看得到 */
+        div[data-baseweb="select"] [aria-disabled="true"],
+        div[data-baseweb="select"] [disabled],
+        div[data-baseweb="select"] [aria-disabled="true"] *,
+        div[data-baseweb="select"] [disabled] * {
+            color: var(--spt-v282-field-text-muted) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text-muted) !important;
+            opacity: 0.86 !important;
+        }
+
+        /* 下拉展開清單：深底淺字，預設即清楚，不靠 hover */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.012) 15%, rgba(255,255,255,0.00) 16%),
+                linear-gradient(135deg, rgba(6, 18, 40, 0.97) 0%, rgba(12, 30, 59, 0.98) 100%) !important;
+            color: var(--spt-v282-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
+            overflow: hidden !important;
+        }
+
+        div[role="option"],
+        li[role="option"],
+        ul[role="listbox"] li,
+        div[data-baseweb="menu"] div {
+            color: var(--spt-v282-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            overflow: visible !important;
+        }
+
+        div[data-baseweb="popover"] *,
+        div[data-baseweb="menu"] *,
+        ul[role="listbox"] * {
+            color: var(--spt-v282-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text) !important;
+            opacity: 1 !important;
+        }
+
+        /* hover 保持淺字，不再切回黑字 */
+        div[role="option"]:hover,
+        li[role="option"]:hover,
+        ul[role="listbox"] li:hover,
+        div[data-baseweb="menu"] div:hover {
+            background: linear-gradient(90deg, rgba(68, 232, 255, 0.18), rgba(102, 135, 255, 0.24)) !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+        }
+
+        /* 已選取項目用亮底，所以改深色字 */
+        div[aria-selected="true"],
+        li[aria-selected="true"],
+        div[role="option"][aria-selected="true"],
+        li[role="option"][aria-selected="true"] {
+            background: linear-gradient(90deg, rgba(104, 235, 255, 0.96), rgba(140, 174, 255, 0.96)) !important;
+            color: var(--spt-v282-selected-text-dark) !important;
+            -webkit-text-fill-color: var(--spt-v282-selected-text-dark) !important;
+            font-weight: 950 !important;
+        }
+        div[aria-selected="true"] *,
+        li[aria-selected="true"] *,
+        div[role="option"][aria-selected="true"] *,
+        li[role="option"][aria-selected="true"] * {
+            color: var(--spt-v282-selected-text-dark) !important;
+            -webkit-text-fill-color: var(--spt-v282-selected-text-dark) !important;
+        }
+
+        /* 多選標籤維持亮底深字，避免標籤文字失真 */
+        div[data-baseweb="tag"],
+        div[data-baseweb="tag"] *,
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div {
+            color: #061427 !important;
+            -webkit-text-fill-color: #061427 !important;
+            opacity: 1 !important;
+        }
+
+        /* 文字輸入 / 日期 / 數字 / 備註也強制淺字，避免被深色欄位吃掉 */
+        .stTextInput input,
+        .stDateInput input,
+        .stNumberInput input,
+        .stTextArea textarea,
+        div[data-testid="stTextInputRootElement"] input,
+        div[data-testid="stNumberInputRootElement"] input,
+        div[data-testid="stDateInputField"] input {
+            color: var(--spt-v282-field-text-strong) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text-strong) !important;
+            opacity: 1 !important;
+            text-shadow: 0 0 8px rgba(107, 232, 255, 0.08) !important;
+            overflow: visible !important;
+        }
+        .stTextInput input::placeholder,
+        .stDateInput input::placeholder,
+        .stNumberInput input::placeholder,
+        .stTextArea textarea::placeholder {
+            color: var(--spt-v282-field-text-dim) !important;
+            -webkit-text-fill-color: var(--spt-v282-field-text-dim) !important;
+            opacity: 1 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v282_select_text_visibility_guard()
+except Exception:
+    pass
+
+for _spt_v282_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v282_func = globals().get(_spt_v282_name)
+    if callable(_spt_v282_func) and not getattr(_spt_v282_func, "_spt_v282_wrapped", False):
+        def _spt_v282_make_wrapper(_original):
+            def _spt_v282_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v282_select_text_visibility_guard()
+                except Exception:
+                    pass
+                return result
+            _spt_v282_wrapper._spt_v282_wrapped = True
+            return _spt_v282_wrapper
+        globals()[_spt_v282_name] = _spt_v282_make_wrapper(_spt_v282_func)
+# ===== V2.82 SELECT TEXT VISIBILITY GUARD END =====
+
+
+# ===== V2.83 COLLAPSED SELECT DARK TEXT GUARD START =====
+def apply_v283_collapsed_select_dark_text_guard():
+    """Keep collapsed select/multiselect field text dark and readable on light glass fields.
+    This intentionally targets only the visible field, not the opened dropdown popover.
+    DO NOT REMOVE: prevents selected/placeholder text from being washed out by later HUD effects.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.83｜下拉欄位起始文字深色防回退
+           目標：欄位收合狀態的已選文字 / placeholder / No options 必須清楚可見。
+           注意：只鎖定欄位本體，不覆蓋展開選單面板。 */
+
+        :root {
+            --spt-v283-collapsed-select-text: #071523;
+            --spt-v283-collapsed-select-muted: #19324a;
+        }
+
+        /* 收合狀態欄位本體：維持淺玻璃底時，文字必須是深色 */
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="select"] > div:hover,
+        div[data-baseweb="select"] > div:focus-within {
+            color: var(--spt-v283-collapsed-select-text) !important;
+            -webkit-text-fill-color: var(--spt-v283-collapsed-select-text) !important;
+        }
+
+        /* 選取值、placeholder、No options to select、value container */
+        div[data-baseweb="select"] > div span,
+        div[data-baseweb="select"] > div p,
+        div[data-baseweb="select"] > div div[role="combobox"],
+        div[data-baseweb="select"] > div div[aria-expanded],
+        div[data-baseweb="select"] > div div[class*="placeholder"],
+        div[data-baseweb="select"] > div div[class*="Placeholder"],
+        div[data-baseweb="select"] > div div[class*="singleValue"],
+        div[data-baseweb="select"] > div div[class*="SingleValue"],
+        div[data-baseweb="select"] > div div[class*="valueContainer"],
+        div[data-baseweb="select"] > div div[class*="ValueContainer"],
+        div[data-baseweb="select"] > div div[class*="inputContainer"],
+        div[data-baseweb="select"] > div div[class*="InputContainer"] {
+            color: var(--spt-v283-collapsed-select-text) !important;
+            -webkit-text-fill-color: var(--spt-v283-collapsed-select-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            filter: none !important;
+            mix-blend-mode: normal !important;
+        }
+
+        /* BaseWeb 內部搜尋 input / placeholder，避免被 HUD 淺色字覆蓋 */
+        div[data-baseweb="select"] > div input,
+        div[data-baseweb="select"] > div input[type="text"],
+        div[data-baseweb="select"] > div input[aria-autocomplete="list"] {
+            color: var(--spt-v283-collapsed-select-text) !important;
+            -webkit-text-fill-color: var(--spt-v283-collapsed-select-text) !important;
+            caret-color: var(--spt-v283-collapsed-select-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            background: transparent !important;
+        }
+
+        div[data-baseweb="select"] > div input::placeholder {
+            color: var(--spt-v283-collapsed-select-muted) !important;
+            -webkit-text-fill-color: var(--spt-v283-collapsed-select-muted) !important;
+            opacity: 1 !important;
+        }
+
+        /* 下拉箭頭仍維持科技感藍色，不跟著文字變黑 */
+        div[data-baseweb="select"] > div svg {
+            color: #8df7ff !important;
+            fill: #8df7ff !important;
+            opacity: 1 !important;
+            filter: drop-shadow(0 0 6px rgba(0, 225, 255, 0.35)) !important;
+        }
+
+        /* 已選 multiselect tag 維持亮底深字 */
+        div[data-baseweb="select"] div[data-baseweb="tag"],
+        div[data-baseweb="select"] div[data-baseweb="tag"] * {
+            color: #061427 !important;
+            -webkit-text-fill-color: #061427 !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        /* 展開選單仍由 V2.82/V2.80 控制；這裡只補強選單內字不透明 */
+        div[data-baseweb="popover"] *,
+        div[data-baseweb="menu"] *,
+        ul[role="listbox"] * {
+            opacity: 1 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v283_collapsed_select_dark_text_guard()
+except Exception:
+    pass
+
+for _spt_v283_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v283_func = globals().get(_spt_v283_name)
+    if callable(_spt_v283_func) and not getattr(_spt_v283_func, "_spt_v283_wrapped", False):
+        def _spt_v283_make_wrapper(_original):
+            def _spt_v283_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v283_collapsed_select_dark_text_guard()
+                except Exception:
+                    pass
+                return result
+            _spt_v283_wrapper._spt_v283_wrapped = True
+            return _spt_v283_wrapper
+        globals()[_spt_v283_name] = _spt_v283_make_wrapper(_spt_v283_func)
+# ===== V2.83 COLLAPSED SELECT DARK TEXT GUARD END =====
+
+
+# ===== V2.84 INPUT FRAME CLIP GUARD START =====
+def apply_v284_input_frame_clip_guard():
+    """Fix clipped outer frame on text/password inputs.
+    Preserve current cyber style while ensuring the full rounded border/glow is visible.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        :root {
+            --spt-v284-login-frame-gap-top: 8px;
+            --spt-v284-login-frame-gap-side: 4px;
+            --spt-v284-login-frame-gap-bottom: 8px;
+        }
+
+        /* 讓文字/密碼輸入元件外層不要裁切光暈與圓角 */
+        .stTextInput,
+        .stTextInput > div,
+        .stTextInput > div > div,
+        div[data-testid="stTextInput"],
+        div[data-testid="stTextInput"] > div,
+        div[data-testid="stTextInputRootElement"],
+        div[data-testid="stTextInputRootElement"] > div,
+        div[data-testid="stPasswordInput"],
+        div[data-testid="stPasswordInput"] > div {
+            overflow: visible !important;
+            box-sizing: border-box !important;
+        }
+
+        /* 給足上/下/左右緩衝，避免外框被容器邊界切掉 */
+        .stTextInput,
+        div[data-testid="stTextInput"],
+        div[data-testid="stPasswordInput"] {
+            padding-top: var(--spt-v284-login-frame-gap-top) !important;
+            padding-right: var(--spt-v284-login-frame-gap-side) !important;
+            padding-bottom: var(--spt-v284-login-frame-gap-bottom) !important;
+            padding-left: var(--spt-v284-login-frame-gap-side) !important;
+            margin-top: 0 !important;
+            margin-bottom: 10px !important;
+        }
+
+        /* 實際輸入框根容器：不再貼邊，也不裁切圓角與光暈 */
+        div[data-testid="stTextInputRootElement"] {
+            padding: 2px !important;
+            border-radius: 18px !important;
+            overflow: visible !important;
+            background: transparent !important;
+        }
+
+        div[data-testid="stTextInputRootElement"] > div {
+            border-radius: 18px !important;
+            overflow: visible !important;
+            background: transparent !important;
+        }
+
+        /* 眼睛按鈕容器也不要把右上圓角切掉 */
+        div[data-testid="stTextInputRootElement"] button,
+        div[data-testid="stPasswordInput"] button,
+        .stTextInput button {
+            overflow: visible !important;
+            border-top-right-radius: 16px !important;
+            border-bottom-right-radius: 16px !important;
+        }
+
+        /* 輸入框本體：移除任何會把外框推到裁切區的負位移感 */
+        .stTextInput input,
+        div[data-testid="stTextInputRootElement"] input,
+        div[data-testid="stPasswordInput"] input {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            position: relative !important;
+            top: 0 !important;
+            left: 0 !important;
+            box-sizing: border-box !important;
+        }
+
+        /* label 與欄位之間多一點距離，避免看起來外框被標籤壓住 */
+        .stTextInput label,
+        div[data-testid="stWidgetLabel"] label {
+            margin-bottom: 8px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v284_input_frame_clip_guard()
+except Exception:
+    pass
+
+for _spt_v284_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v284_func = globals().get(_spt_v284_name)
+    if callable(_spt_v284_func) and not getattr(_spt_v284_func, "_spt_v284_wrapped", False):
+        def _spt_v284_make_wrapper(_original):
+            def _spt_v284_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v284_input_frame_clip_guard()
+                except Exception:
+                    pass
+                return result
+            _spt_v284_wrapper._spt_v284_wrapped = True
+            return _spt_v284_wrapper
+        globals()[_spt_v284_name] = _spt_v284_make_wrapper(_spt_v284_func)
+# ===== V2.84 INPUT FRAME CLIP GUARD END =====
+
+
+# ===== V2.87 REMOVE DROPDOWN SIZE SETTINGS PANEL START =====
+# The visual panel 「下拉選單尺寸設定 / Dropdown Size Settings」 is intentionally hidden.
+# Keep configuration loader/saver and CSS functions for compatibility, but do not render the UI.
+def render_dropdown_size_settings_panel():
+    return
+
+def render_dropdown_size_settings_panel_main_fallback():
+    return
+# ===== V2.87 REMOVE DROPDOWN SIZE SETTINGS PANEL END =====
+
+
+# ===== V2.88 FAST BOOT GUARD START =====
+def apply_v288_fast_boot_guard():
+    """Compatibility guard for faster Streamlit reboot.
+    The obsolete V2.59-V2.70 and V2.79 CSS layers were removed from this file.
+    Keep deleted visual panels hidden and preserve V2.80+V2.81+V2.82+V2.83+V2.84 UI stack.
+    """
+    return
+
+def render_operation_results() -> None:
+    return
+
+def clear_operation_results() -> None:
+    return
+
+def render_dropdown_size_settings_panel():
+    return
+
+def render_dropdown_size_settings_panel_main_fallback():
+    return
+# ===== V2.88 FAST BOOT GUARD END =====
