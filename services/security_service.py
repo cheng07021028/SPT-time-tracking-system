@@ -528,6 +528,18 @@ def _user_roles(username: str) -> list[str]:
 def get_current_user() -> dict[str, Any] | None:
     if not st.session_state.get("auth_logged_in"):
         return None
+    # V2.93：同一 session 中若 10｜權限管理已變更目前帳號角色，
+    # 上方登入狀態列也要立即以 auth_users.role_code 更新，不顯示舊角色殘留。
+    try:
+        username = st.session_state.get("auth_username", "")
+        row = _auth_user_row(username) if username else None
+        if row:
+            role = str(row.get("role_code", "") or "").strip()
+            if role:
+                st.session_state["auth_roles"] = [role]
+            st.session_state["auth_display_name"] = row.get("display_name") or username
+    except Exception:
+        pass
     return {
         "username": st.session_state.get("auth_username", ""),
         "display_name": st.session_state.get("auth_display_name", ""),
@@ -577,9 +589,12 @@ def _sync_auth_user_to_security_runtime(auth_row: dict[str, Any]) -> None:
             now,
             now,
         ))
+        # V2.93：auth_users.role_code 是唯一角色來源。
+        # 先刪除舊 runtime 角色再重建，避免 admin/operator 同時殘留。
         role_code = str(auth_row.get("role_code", "") or "").strip()
+        execute("DELETE FROM security_user_roles WHERE username=?", (username,))
         if role_code:
-            execute("INSERT OR IGNORE INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
+            execute("INSERT INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
     except Exception:
         pass
 
@@ -606,11 +621,13 @@ def authenticate(username: str, password: str) -> tuple[bool, str]:
     if auth_row:
         _sync_auth_user_to_security_runtime(auth_row)
 
-    roles = _user_roles(username)
-    # 若帳號來自 auth_users，角色存在 role_code，不一定已同步到 security_user_roles。
+    # V2.93：登入角色不再把舊 runtime 角色與 auth_users 角色合併。
+    # 若帳號來自 auth_users，直接以 auth_users.role_code 為唯一來源。
     auth_role = str(row.get("role_code", "") or "").strip()
-    if auth_role and auth_role not in roles:
-        roles.append(auth_role)
+    if auth_row and auth_role:
+        roles = [auth_role]
+    else:
+        roles = _user_roles(username)
 
     st.session_state["auth_logged_in"] = True
     st.session_state["auth_username"] = username

@@ -594,6 +594,20 @@ def _inject_native_header_sort_style() -> None:
         pass
 
 
+
+
+def _apply_settings_to_df(df: pd.DataFrame, table_setting: Dict[str, Any], editable: bool) -> pd.DataFrame:
+    """V2.93 compatibility helper.
+
+    Older patch code may call this helper. Keep it intentionally conservative:
+    return the original dataframe and let Streamlit column_order/column_config
+    handle visual order/hidden columns so no data is lost.
+    """
+    try:
+        return df.copy()
+    except Exception:
+        return df
+
 # ===== V2.92 NATIVE HEADER SORT FOR LOCKED EDITORS START =====
 def _v292_is_fully_locked_editor(kwargs: dict) -> bool:
     """Return True when a data_editor is being used only as read-only display.
@@ -691,7 +705,10 @@ def install_column_settings_patch() -> None:
             # V2.92：如果 data_editor 只是鎖定檢視，改用 st.dataframe 顯示，保留原標題列左鍵排序。
             if _v292_is_fully_locked_editor(kwargs):
                 table_setting, _ = _settings_editor(table_id, df, editable=False)
-                readonly_df = _apply_settings_to_df(df, table_setting, editable=False)
+                # V2.93：V2.92 這裡誤呼叫不存在的 _apply_settings_to_df，
+                # 造成 03/04 等頁面在 st.form 內直接中斷，進而觸發 Missing Submit Button。
+                # 不改資料本體，排序/顯示順序交給 dataframe 的 column_order 與 column_config 處理。
+                readonly_df = df.copy()
                 cfg = {**_build_column_config(df, table_setting), **kwargs.get("column_config", {})}
                 local_kwargs = dict(kwargs)
                 local_kwargs["column_config"] = cfg
