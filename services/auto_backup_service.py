@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-SPT Time Tracking - V2.96 Scheduled External Backup Service
+SPT Time Tracking - V3.03 Scheduled External Backup Service
 
 用途：
 - 由 13｜系統設定 設定每日固定時間，自動備份專案所有資料與設定到指定資料夾。
@@ -19,6 +19,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
+import re
 import shutil
 import threading
 import time
@@ -159,28 +161,134 @@ def _is_relative_to(child: Path, parent: Path) -> bool:
         return False
 
 
+def get_runtime_environment() -> dict[str, Any]:
+    """Return filesystem/runtime details for the backup path validator.
+
+    Streamlit Cloud/Linux cannot write to a Windows local path such as
+    D:\SPT_Backup\TimeTracking because that drive is on the user's PC, not on
+    the server.  Local Windows execution can use that path normally.
+    """
+    system = platform.system() or os.name
+    is_windows = system.lower().startswith("win") or os.name == "nt"
+    env_keys = {k: os.environ.get(k) for k in ("STREAMLIT_SHARING", "STREAMLIT_SERVER_PORT", "HOSTNAME", "HOME") if os.environ.get(k)}
+    is_streamlit_cloud = bool(os.environ.get("STREAMLIT_SHARING")) or "/mount/src" in str(PROJECT_ROOT).replace("\\", "/")
+    return {
+        "system": system,
+        "os_name": os.name,
+        "is_windows": is_windows,
+        "is_streamlit_cloud_like": is_streamlit_cloud,
+        "project_root": str(PROJECT_ROOT),
+        "env_hint": env_keys,
+    }
+
+
+def _looks_like_windows_absolute_path(path_text: str) -> bool:
+    raw = str(path_text or "").strip().strip('"')
+    # Drive path: D:\folder or D:/folder
+    if re.match(r"^[A-Za-z]:[\\/].+", raw):
+        return True
+    # UNC path: \\server\share or //server/share
+    if raw.startswith("\\\\") or raw.startswith("//"):
+        return True
+    return False
+
+
+def _human_runtime_label() -> str:
+    env = get_runtime_environment()
+    if env.get("is_windows"):
+        return "Windows 本機"
+    if env.get("is_streamlit_cloud_like"):
+        return "Streamlit Cloud / Linux 雲端"
+    return f"{env.get('system')} 伺服器"
+
+
 def validate_target_folder(path_text: str, *, create: bool = False) -> dict[str, Any]:
     path_text = str(path_text or "").strip().strip('"')
+    env = get_runtime_environment()
+    runtime_label = _human_runtime_label()
     if not path_text:
-        return {"ok": False, "message": "尚未設定備份目標資料夾。"}
+        return {
+            "ok": False,
+            "message": "尚未設定備份目標資料夾。",
+            "runtime": env,
+            "runtime_label": runtime_label,
+        }
+
+    # Windows local drive path is valid only when the app is actually running on Windows.
+    if _looks_like_windows_absolute_path(path_text) and not env.get("is_windows"):
+        return {
+            "ok": False,
+            "message": (
+                f"目前執行環境是 {runtime_label}，無法寫入你電腦上的 Windows 路徑：{path_text}。"
+                "若要備份到 D:\\ 或 E:\\，請在公司電腦本機執行 streamlit run；"
+                "若目前是雲端部署，請改用伺服器可寫入的 Linux 絕對路徑或改走 GitHub/下載備份方式。"
+            ),
+            "path": path_text,
+            "runtime": env,
+            "runtime_label": runtime_label,
+            "path_kind": "windows_local_path_on_non_windows_runtime",
+        }
+
     target = Path(path_text).expanduser()
     if not target.is_absolute():
-        return {"ok": False, "message": "請輸入完整絕對路徑，例如 D:\\SPT_Backup 或 E:\\Backup\\TimeTracking。", "path": str(target)}
+        return {
+            "ok": False,
+            "message": "請輸入完整絕對路徑，例如 Windows 本機：D:\\SPT_Backup\\TimeTracking，或 Linux 伺服器：/mnt/backup/TimeTracking。",
+            "path": str(target),
+            "runtime": env,
+            "runtime_label": runtime_label,
+            "path_kind": "relative_path",
+        }
+
     if _is_relative_to(target, PROJECT_ROOT):
-        return {"ok": False, "message": "備份目標不可放在目前專案資料夾內，避免備份遞迴與上傳 GitHub 時變巨大。", "path": str(target)}
+        return {
+            "ok": False,
+            "message": "備份目標不可放在目前專案資料夾內，避免備份遞迴與上傳 GitHub 時變巨大。請指定專案外部資料夾。",
+            "path": str(target),
+            "runtime": env,
+            "runtime_label": runtime_label,
+            "path_kind": "inside_project_root",
+        }
     try:
         if create:
             target.mkdir(parents=True, exist_ok=True)
         if not target.exists():
-            return {"ok": False, "message": "目標資料夾不存在。可按建立/測試備份，或先手動建立資料夾。", "path": str(target)}
+            return {
+                "ok": False,
+                "message": "目標資料夾不存在。可按建立/測試目標資料夾，或先手動建立資料夾。",
+                "path": str(target),
+                "runtime": env,
+                "runtime_label": runtime_label,
+                "path_kind": "missing_folder",
+            }
         if not target.is_dir():
-            return {"ok": False, "message": "目標路徑不是資料夾。", "path": str(target)}
+            return {
+                "ok": False,
+                "message": "目標路徑不是資料夾。",
+                "path": str(target),
+                "runtime": env,
+                "runtime_label": runtime_label,
+                "path_kind": "not_directory",
+            }
         test = target / f".spt_write_test_{os.getpid()}.tmp"
         test.write_text("ok", encoding="utf-8")
         test.unlink(missing_ok=True)
-        return {"ok": True, "path": str(target.resolve())}
+        return {
+            "ok": True,
+            "path": str(target.resolve()),
+            "runtime": env,
+            "runtime_label": runtime_label,
+            "path_kind": "local_filesystem_path",
+        }
     except Exception as exc:
-        return {"ok": False, "message": f"目標資料夾無法寫入：{exc}", "path": str(target)}
+        return {
+            "ok": False,
+            "message": f"目標資料夾無法寫入：{exc}",
+            "path": str(target),
+            "runtime": env,
+            "runtime_label": runtime_label,
+            "path_kind": "write_failed",
+        }
 
 
 def _sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
@@ -315,7 +423,7 @@ def create_external_full_backup(target_folder: str, *, reason: str = "manual", c
                 errors.append(f"{_rel(src)}: {exc}")
 
         manifest = {
-            "schema_version": "2.96",
+            "schema_version": "3.03",
             "backup_time": _now_text(),
             "reason": reason,
             "project_root": str(PROJECT_ROOT),
