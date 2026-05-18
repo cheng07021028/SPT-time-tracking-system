@@ -558,6 +558,41 @@ def _safe_streamlit_column_order(df: pd.DataFrame, order: Any) -> list[str] | No
             seen.add(col)
     return clean or None
 
+
+def _inject_native_header_sort_style() -> None:
+    """Style-only helper for native Streamlit table header sorting.
+
+    It does not add sort buttons or a sort panel.  It only makes the existing
+    table header row visibly clickable across all modules, including direct
+    st.dataframe / st.data_editor calls that bypass table_ui_service.render_table.
+    """
+    try:
+        st.markdown(
+            """
+            <style>
+            /* V2.91｜全域表格標題列左鍵排序提示：維持原標題列，不新增任何位置 */
+            div[data-testid="stDataFrame"] [role="columnheader"],
+            div[data-testid="stDataEditor"] [role="columnheader"],
+            div[data-testid="stDataFrame"] [data-testid="stDataFrameResizableHeader"],
+            div[data-testid="stDataEditor"] [data-testid="stDataFrameResizableHeader"] {
+                cursor: pointer !important;
+            }
+            div[data-testid="stDataFrame"] [role="columnheader"]:hover,
+            div[data-testid="stDataEditor"] [role="columnheader"]:hover {
+                background: linear-gradient(90deg, rgba(58, 220, 255, .13), rgba(112, 119, 255, .10)) !important;
+                box-shadow: inset 0 -1px 0 rgba(110, 236, 255, .55) !important;
+            }
+            div[data-testid="stDataFrame"] [role="columnheader"] *,
+            div[data-testid="stDataEditor"] [role="columnheader"] * {
+                user-select: none !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        pass
+
 def install_column_settings_patch() -> None:
     """全域安裝表格欄位設定包裝，不需要逐頁改程式。"""
     if getattr(st, "_spt_column_settings_installed", False):
@@ -570,6 +605,7 @@ def install_column_settings_patch() -> None:
     _ORIGINAL_DATA_EDITOR = original_data_editor
 
     def dataframe_wrapper(data=None, *args, **kwargs):
+        _inject_native_header_sort_style()
         df = _normalize_df(data)
         if df is not None and len(df.columns) > 0:
             key = kwargs.get("key")
@@ -591,6 +627,7 @@ def install_column_settings_patch() -> None:
             return original_dataframe(data, *args, **kwargs)
 
     def data_editor_wrapper(data=None, *args, **kwargs):
+        _inject_native_header_sort_style()
         df = _normalize_df(data)
         if df is not None and len(df.columns) > 0:
             key = kwargs.get("key")

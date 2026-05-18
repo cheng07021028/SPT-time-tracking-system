@@ -301,56 +301,55 @@ def _format_duration_columns_for_display(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _apply_quick_header_sort(table_key: str, df: pd.DataFrame) -> pd.DataFrame:
-    """Clickable column-title sort bar.
 
-    Streamlit data_editor does not reliably provide native header sorting in every mode/theme.
-    This lightweight bar gives every table the same behavior: click a column title once for ASC,
-    click the same title again for DESC.  It is intentionally outside the table so it works for
-    both dataframe and editable data_editor without breaking cell editing.
+def _inject_native_header_sort_style() -> None:
+    """Style only: keep Streamlit's native table header sorting discoverable.
+
+    We intentionally do not render a separate sort toolbar or extra buttons.
+    Streamlit/Glide tables already sort from the original header row; this CSS only
+    makes headers look clickable and preserves the existing table header location.
     """
-    if df is None or df.empty or len(df.columns) == 0:
-        return df
-    sort_state_key = f"_spt_quick_sort_{table_key}"
-    state = st.session_state.get(sort_state_key, {"column": None, "ascending": True})
-    with st.container():
-        st.caption("點選欄位標題可快速排序；再次點同一欄會切換升冪/降冪。")
-        cols_per_row = 6
-        columns = list(df.columns)
-        for base in range(0, len(columns), cols_per_row):
-            row_cols = st.columns(min(cols_per_row, len(columns) - base))
-            for i, col in enumerate(columns[base:base + cols_per_row]):
-                active = state.get("column") == col
-                arrow = " ▲" if active and state.get("ascending", True) else (" ▼" if active else "")
-                label = f"↕ {label_for(col)}{arrow}"
-                if row_cols[i].button(label, key=f"quick_sort_{table_key}_{base}_{col}", use_container_width=True):
-                    ascending = not bool(state.get("ascending", True)) if active else True
-                    st.session_state[sort_state_key] = {"column": col, "ascending": ascending}
-                    st.rerun()
-    state = st.session_state.get(sort_state_key, {})
-    sort_col = state.get("column")
-    if sort_col in df.columns:
-        try:
-            return df.sort_values(sort_col, ascending=bool(state.get("ascending", True)), kind="mergesort", na_position="last").reset_index(drop=True)
-        except Exception:
-            return df
+    st.markdown(
+        """
+        <style>
+        /* V2.91｜全模組表格標題列原地排序提示：不新增排序按鈕 */
+        div[data-testid="stDataFrame"] [role="columnheader"],
+        div[data-testid="stDataEditor"] [role="columnheader"],
+        div[data-testid="stDataFrame"] [data-testid="stDataFrameResizableHeader"],
+        div[data-testid="stDataEditor"] [data-testid="stDataFrameResizableHeader"] {
+            cursor: pointer !important;
+        }
+        div[data-testid="stDataFrame"] [role="columnheader"]:hover,
+        div[data-testid="stDataEditor"] [role="columnheader"]:hover {
+            background: linear-gradient(90deg, rgba(58, 220, 255, .13), rgba(112, 119, 255, .10)) !important;
+            box-shadow: inset 0 -1px 0 rgba(110, 236, 255, .55) !important;
+        }
+        div[data-testid="stDataFrame"] [role="columnheader"] *,
+        div[data-testid="stDataEditor"] [role="columnheader"] * {
+            user-select: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+def _apply_quick_header_sort(table_key: str, df: pd.DataFrame) -> pd.DataFrame:
+    """Compatibility no-op.
+
+    Previous versions experimented with an extra quick-sort button bar above tables.
+    The requested standard is now: keep the original table header row and use native
+    left-click header sorting only.  Do not render any additional sort controls here.
+    """
     return df
 
 
 def _render_sort_controls(table_key: str, df: pd.DataFrame) -> pd.DataFrame:
-    """Add explicit sorting controls because Streamlit table sorting is not always obvious in edit mode."""
-    if df is None or df.empty or len(df.columns) == 0:
-        return df
-    with st.expander("排序設定 / Sort Settings", expanded=False):
-        c1, c2, c3 = st.columns([2, 1, 1])
-        sort_col = c1.selectbox("排序欄位 / Sort Column", list(df.columns), format_func=label_for, key=f"sort_col_{table_key}")
-        ascending = c2.radio("排序方向 / Direction", ["升冪 / ASC", "降冪 / DESC"], horizontal=True, key=f"sort_dir_{table_key}") == "升冪 / ASC"
-        apply_sort = c3.checkbox("套用排序 / Apply", value=False, key=f"sort_apply_{table_key}")
-        if apply_sort and sort_col in df.columns:
-            try:
-                return df.sort_values(sort_col, ascending=ascending, kind="mergesort", na_position="last").reset_index(drop=True)
-            except Exception:
-                st.warning("此欄位暫時無法排序，已維持原順序。")
+    """Compatibility no-op.
+
+    Keep this function name so older imports do not fail, but do not show the old
+    "排序設定 / Sort Settings" expander. Sorting must remain on the original
+    table header row only.
+    """
     return df
 
 
@@ -367,6 +366,7 @@ def render_table(
     if df is None or df.empty:
         st.info("目前沒有資料 / No data")
         return None
+    _inject_native_header_sort_style()
     # V1.89: Editable tables are usually placed inside st.form so edits do not rerun
     # the entire page on every cell click. Do not render width controls inside
     # editable tables because normal buttons cannot live inside st.form and the
