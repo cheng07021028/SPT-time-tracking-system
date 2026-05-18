@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from io import StringIO
+from io import StringIO, BytesIO
 import pandas as pd
 import streamlit as st
 
@@ -19,23 +19,14 @@ from services.permission_service import (
     save_account_permissions,
     save_security_settings,
     save_users,
-    reconcile_account_master_permissions_authoritative,
 )
 
 apply_theme()
 require_module_access("10_permissions", "can_manage")
 render_header("10 | 權限管理", "帳號密碼總表、帳號匯入、帳號貼上、帳號級模組權限 / Account & Permission Management")
 init_permission_tables()
-# V2.93：進入權限管理時先做一次輕量權限一致性清理，
-# 避免舊版本資料仍殘留 admin/operator 雙角色。
-try:
-    if not st.session_state.get("v293_permission_authority_checked", False):
-        reconcile_account_master_permissions_authoritative(None, reason="permission_page_open_cleanup")
-        st.session_state["v293_permission_authority_checked"] = True
-except Exception:
-    pass
 
-st.caption("V2.93 loaded｜帳號清單編輯是角色唯一來源；儲存後會重建帳號模組權限並清除舊角色/runtime 殘留。")
+st.caption("V1.78 loaded｜權限管理頁已受 can_manage 管制；帳號、權限、安全設定會永久保存到 GitHub 設定檔。")
 
 ROLE_OPTIONS = ["admin", "manager", "leader", "operator", "viewer", "auditor"]
 ACTION_COLS = [a[0] for a in ACTIONS]
@@ -63,6 +54,29 @@ ACCOUNT_DISPLAY_COLUMNS = {
     "force_password_change": "強制改密碼 / Force Change",
     "note": "備註 / Note",
 }
+
+
+def _df_to_xlsx_bytes(df: pd.DataFrame, sheet_name: str = "Sheet1") -> bytes:
+    """Build Excel bytes for download buttons without touching source data."""
+    bio = BytesIO()
+    export_df = pd.DataFrame() if df is None else df.copy()
+    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
+        export_df.to_excel(writer, index=False, sheet_name=sheet_name[:31] or "Sheet1")
+    bio.seek(0)
+    return bio.getvalue()
+
+
+def _render_download_current_list(df: pd.DataFrame, label: str, file_name: str, key: str, sheet_name: str = "Current List") -> None:
+    """Unified current-list download button. Does not change UI state or persisted data."""
+    safe_df = pd.DataFrame() if df is None else df.copy()
+    st.download_button(
+        label=label,
+        data=_df_to_xlsx_bytes(safe_df, sheet_name=sheet_name),
+        file_name=file_name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        key=key,
+    )
 
 with st.expander("⧠ 權限設定使用說明 / User Guide", expanded=False):
     st.markdown("""
@@ -299,112 +313,9 @@ def _merge_users_editor(base_df: pd.DataFrame, new_rows: pd.DataFrame) -> pd.Dat
     return base.reset_index(drop=True)
 
 
-
-def _clear_old_runtime_roles_and_refresh_current_user(usernames: list[str], reason: str = "account_master_saved") -> int:
-    """Clear stale role records after Account Master is saved.
-
-    V1.80 / V2.90：修正角色殘留。
-    以前 sync_auth_users_to_runtime_security() 只 INSERT OR IGNORE 到
-    security_user_roles，若帳號曾經是 admin、後來改成 operator，舊的 admin
-    角色仍可能留在登入列與舊權限表。這裡在「按套用儲存後」明確清掉舊角色，
-    再依 auth_users.role_code 重建，並即時刷新目前登入者 session_state。
-    """
-    clean_users = sorted({str(u or "").strip() for u in usernames if str(u or "").strip()})
-    if not clean_users:
-        return 0
-    fixed = 0
-    try:
-        from services.permission_service import (
-            connect_db,
-            sync_auth_users_to_runtime_security,
-            clear_permission_runtime_cache,
-            export_permission_settings_permanently,
-        )
-        conn = connect_db()
-        cur = conn.cursor()
-        placeholders = ",".join(["?"] * len(clean_users))
-        cur.execute(f"DELETE FROM security_user_roles WHERE username IN ({placeholders})", clean_users)
-        conn.commit()
-        conn.close()
-
-        # Rebuild legacy runtime roles from the authoritative Account Master.
-        sync_auth_users_to_runtime_security(clean_users)
-        clear_permission_runtime_cache()
-
-        # Refresh current login bar immediately, so old roles like "admin, operator"
-        # do not remain after saving the account master.
-        current_username = str(st.session_state.get("auth_username", "") or "").strip()
-        if current_username and current_username in clean_users:
-            conn = connect_db()
-            row = conn.execute(
-                "SELECT username, display_name, employee_id, role_code, is_active FROM auth_users WHERE username=?",
-                (current_username,),
-            ).fetchone()
-            conn.close()
-            if row:
-                role_code = str(row["role_code"] or "operator").strip() or "operator"
-                st.session_state["auth_display_name"] = row["display_name"] or current_username
-                st.session_state["auth_employee_id"] = row["employee_id"] or ""
-                st.session_state["auth_roles"] = [role_code]
-                st.session_state.pop(f"_spt_perm_cache_{current_username}", None)
-                st.session_state["v290_account_role_runtime_refreshed"] = True
-        try:
-            export_permission_settings_permanently(f"{reason}_stale_roles_cleared")
-        except Exception:
-            pass
-        fixed = len(clean_users)
-    except Exception as ex:
-        st.warning(f"帳號已儲存，但清除舊角色殘留時發生提醒：{ex}")
-    return fixed
-
-def _apply_account_master_to_permission_matrix(usernames: list[str], reason: str = "account_master_saved") -> int:
-    """Apply saved account roles to Account Module Permissions immediately.
-
-    Keeps the permission matrix aligned after editing Account Master.
-    This function is intentionally called only after the user presses save, so
-    normal page reruns do not repeatedly rewrite permission data.
-    """
-    clean_users = sorted({str(u or "").strip() for u in usernames if str(u or "").strip()})
-    if not clean_users:
-        return 0
-    synced = 0
-    try:
-        from services.permission_service import (
-            sync_user_permissions_from_roles,
-            reconcile_permission_matrix_for_current_modules,
-            clear_permission_runtime_cache,
-            export_permission_settings_permanently,
-        )
-        try:
-            reconcile_permission_matrix_for_current_modules(force=True)
-        except TypeError:
-            reconcile_permission_matrix_for_current_modules()
-        try:
-            synced = int(reconcile_account_master_permissions_authoritative(clean_users, reason=reason) or 0)
-        except Exception:
-            synced = int(sync_user_permissions_from_roles(clean_users, reason=reason) or 0)
-        try:
-            clear_permission_runtime_cache()
-        except Exception:
-            pass
-        try:
-            export_permission_settings_permanently(f"{reason}_permission_matrix_synced")
-        except Exception:
-            pass
-    except Exception as ex:
-        st.warning(f"帳號已儲存，但同步帳號模組權限時發生提醒：{ex}")
-    _clear_old_runtime_roles_and_refresh_current_user(clean_users, reason)
-    st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
-    st.session_state["v292_force_permission_matrix_reload"] = True
-    return synced
-
-
 def _save_imported_accounts(import_df: pd.DataFrame) -> dict:
     editor_rows = _account_import_to_editor_rows(import_df)
-    result = save_users(_users_to_service_rows(editor_rows))
-    usernames = editor_rows.get("帳號 / Username", pd.Series(dtype=str)).dropna().astype(str).str.strip().tolist()
-    result["permission_matrix_synced"] = _apply_account_master_to_permission_matrix(usernames, "account_import_saved")
-    return result
+    return save_users(_users_to_service_rows(editor_rows))
 
 
 def _permission_summary(df: pd.DataFrame) -> pd.DataFrame:
@@ -503,8 +414,7 @@ with tab_accounts:
                     "note": str(new_note or "").strip(),
                 }])
                 if result.get("saved", 0) > 0:
-                    synced_count = _apply_account_master_to_permission_matrix([username], "account_create_saved")
-                    st.success(f"帳號已建立 / Account created：{username}；帳號模組權限已同步並清除舊角色殘留：{synced_count} 筆")
+                    st.success(f"帳號已建立 / Account created：{username}")
                     st.session_state["v133_users_df"] = _users_for_editor()
                     try:
                         from services.column_settings_service import clear_editor_draft
@@ -552,7 +462,16 @@ with tab_accounts:
                 st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 st.rerun()
 
-        st.warning("V1.79：密碼欄可直接輸入。按『套用並儲存』後，帳號角色會立即同步套用到『帳號模組權限』分頁。")
+        st.download_button(
+            "⇩ 下載目前帳號清單 / Download Current Account List",
+            data=_df_to_xlsx_bytes(st.session_state.get("v133_users_df", _users_for_editor()), sheet_name="Account Master"),
+            file_name="account_master_current.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="v312_download_current_account_master",
+        )
+
+        st.warning("V1.76：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。設定不會因下載而改變。")
 
         # V1.71：帳號總表使用 st.form 包住 data_editor。
         # 原因：Streamlit 一般 data_editor 每次切換儲存格、勾選、下拉或其他元件互動都可能 rerun，
@@ -565,7 +484,7 @@ with tab_accounts:
                 disabled=not account_edit_enabled,
                 height=360,
                 column_config={
-                    "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
+                    "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small"),
                     "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
                     "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
                     "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
@@ -573,8 +492,8 @@ with tab_accounts:
                     "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
                     "Email": st.column_config.TextColumn("Email"),
                     "角色 / Role": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
-                    "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active"),
-                    "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
+                    "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active", width="small"),
+                    "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change", width="small"),
                     "備註 / Note": st.column_config.TextColumn("備註 / Note"),
                     "最後登入 / Last Login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
                     "更新時間 / Updated At": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
@@ -603,19 +522,13 @@ with tab_accounts:
             df = edited_users.copy()
             to_delete = df.loc[_to_bool_series(df, "刪除 / Delete"), "帳號 / Username"].dropna().astype(str).str.strip().tolist()
             save_df = df.loc[~_to_bool_series(df, "刪除 / Delete")].copy()
-            saved_usernames = save_df.get("帳號 / Username", pd.Series(dtype=str)).dropna().astype(str).str.strip().tolist()
             result = save_users(_users_to_service_rows(save_df))
             deleted = delete_users(to_delete)
-            synced_count = _apply_account_master_to_permission_matrix(saved_usernames, "account_master_editor_saved")
-            st.success(
-                f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆；"
-                f"帳號模組權限已同步：{synced_count} 筆；舊角色殘留已清除 / Accounts, permissions and stale roles saved"
-            )
+            st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
             if result.get("skipped"):
                 st.warning("；".join(result["skipped"]))
             st.session_state.pop("v133_users_df", None)
             st.session_state["v166_account_edit_enabled"] = False
-            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
             st.rerun()
 
     with account_tab_excel:
@@ -641,7 +554,7 @@ with tab_accounts:
                 with e2:
                     if st.button("▣ 直接儲存 Excel 帳號 / Save Imported Accounts", type="primary", use_container_width=True, key="v136_excel_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         result = _save_imported_accounts(import_df)
-                        st.success(f"帳號已儲存：{result['saved']} 筆；帳號模組權限已同步並清除舊角色殘留：{result.get('permission_matrix_synced', 0)} 筆 / Accounts, permissions and stale roles saved")
+                        st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
                         if result.get("skipped"):
                             st.warning("；".join(result["skipped"]))
                         st.session_state.pop("v133_users_df", None)
@@ -673,7 +586,7 @@ with tab_accounts:
                 with p2:
                     if st.button("▣ 直接儲存貼上帳號 / Save Pasted Accounts", type="primary", use_container_width=True, key="v136_paste_save_direct", disabled=not st.session_state.get("v166_account_edit_enabled", False)):
                         result = _save_imported_accounts(import_df)
-                        st.success(f"帳號已儲存：{result['saved']} 筆；帳號模組權限已同步並清除舊角色殘留：{result.get('permission_matrix_synced', 0)} 筆 / Accounts, permissions and stale roles saved")
+                        st.success(f"帳號已儲存：{result['saved']} 筆 / Accounts saved")
                         if result.get("skipped"):
                             st.warning("；".join(result["skipped"]))
                         st.session_state.pop("v133_users_df", None)
@@ -683,12 +596,6 @@ with tab_accounts:
 with tab_perm:
     st.subheader("帳號模組權限 / Account × Module Permission Matrix")
     st.info("每個帳號可針對每個模組獨立勾選權限。畫面編輯會即時計算預覽，但只有按『套用並儲存權限』才會生效。")
-    # V2.92：如果剛從帳號主檔儲存過，進入權限矩陣前先重建一次，避免舊角色/舊矩陣殘留。
-    if st.session_state.pop("v292_force_permission_matrix_reload", False):
-        try:
-            reconcile_account_master_permissions_authoritative(None, reason="permission_tab_reload_after_account_master_save")
-        except Exception:
-            pass
     perm_df = pd.DataFrame(get_account_permissions())
     if perm_df.empty:
         perm_df = pd.DataFrame(columns=["username", "display_name", "role_code", "module_code", "module_name_zh", "module_name_en"] + ACTION_COLS)
@@ -710,6 +617,15 @@ with tab_perm:
         view_df = view_df[view_df["module_code"] == selected_module.split(" ", 1)[0]]
     if selected_role != "全部 / All":
         view_df = view_df[view_df["role_code"] == selected_role]
+    st.download_button(
+        "⇩ 下載目前權限清單 / Download Current Permission List",
+        data=_df_to_xlsx_bytes(view_df, sheet_name="Account Permissions"),
+        file_name="account_module_permissions_current.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        key="v312_download_current_permission_matrix",
+    )
+
     st.markdown("#### 快速勾選 / Quick Toggle")
     b1, b2, b3, b4, b5 = st.columns(5)
     with b1:
@@ -758,6 +674,15 @@ with tab_sec:
     st.subheader("安全設定 / Security Settings")
     settings = get_security_settings()
     idle = int(settings.get("idle_timeout_minutes", "15") or 15)
+    st.download_button(
+        "⇩ 下載目前安全設定 / Download Current Security Settings",
+        data=_df_to_xlsx_bytes(pd.DataFrame([settings]), sheet_name="Security Settings"),
+        file_name="security_settings_current.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        key="v312_download_current_security_settings",
+    )
+
     with st.form("security_settings_commit_form", clear_on_submit=False):
         new_idle = st.number_input("閒置自動登出分鐘數 / Idle Auto Logout Minutes", min_value=1, max_value=240, value=idle, step=1)
         confirm_after_record = st.checkbox("工時完成後詢問是否繼續記錄 / Ask continue after time record", value=settings.get("ask_continue_after_record", "1") != "0")
