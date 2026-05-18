@@ -3,12 +3,62 @@ from __future__ import annotations
 
 from datetime import datetime
 import inspect
+import json
+from pathlib import Path
 import pandas as pd
 
 from services.timezone_service import now_text, now_stamp, today_text, today_date
 
 from .db_service import execute, query_df
 from .log_service import write_log
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PERSISTENT_MODULES_DIR = PROJECT_ROOT / "data" / "persistent_modules"
+
+
+def _load_persistent_module_rows(module_code: str, table_name: str) -> list[dict]:
+    """Load rows from data/persistent_modules as a non-destructive fallback.
+
+    模組更新後如果 SQLite 暫時為空，但 data/persistent_modules 仍有資料，
+    01｜工時紀錄不應誤判成 03/04 沒資料。這裡只在讀取為空時使用，
+    並回補到 SQLite，避免其他頁面/下拉選單讀不到主檔。
+    """
+    try:
+        module_dir = PERSISTENT_MODULES_DIR / module_code
+        file_path = module_dir / f"{module_code}_records.json"
+        if not file_path.exists():
+            return []
+        payload = json.loads(file_path.read_text(encoding="utf-8"))
+        tables = payload.get("tables", {}) if isinstance(payload, dict) else {}
+        rows = tables.get(table_name, [])
+        return rows if isinstance(rows, list) else []
+    except Exception:
+        return []
+
+
+def _restore_work_orders_from_persistent() -> int:
+    rows = _load_persistent_module_rows("03_work_orders", "work_orders")
+    count = 0
+    for row in rows:
+        try:
+            if upsert_work_order(dict(row or {})):
+                count += 1
+        except Exception:
+            continue
+    return count
+
+
+def _restore_employees_from_persistent() -> int:
+    rows = _load_persistent_module_rows("04_employees", "employees")
+    count = 0
+    for row in rows:
+        try:
+            if upsert_employee(dict(row or {})):
+                count += 1
+        except Exception:
+            continue
+    return count
 
 
 def _now() -> str:
@@ -145,6 +195,13 @@ def load_work_orders(active_only: bool = True) -> pd.DataFrame:
     if active_only:
         sql += " WHERE is_active=1"
     sql += " ORDER BY work_order"
+    df = query_df(sql)
+    if not df.empty:
+        return df
+
+    # Fallback: if DB is temporarily empty after module update, recover from
+    # persistent module JSON instead of showing a false "請先到 03/04 匯入資料" message.
+    _restore_work_orders_from_persistent()
     return query_df(sql)
 
 
@@ -157,6 +214,9 @@ def load_employees(active_only: bool = True, in_factory_only: bool = False) -> p
         sql += " AND is_in_factory=1"
     sql += " ORDER BY employee_id"
     df = query_df(sql, params)
+    if df.empty:
+        _restore_employees_from_persistent()
+        df = query_df(sql, params)
     return _filter_employees_for_time_record(df)
 
 
