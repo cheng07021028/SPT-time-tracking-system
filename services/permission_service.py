@@ -1658,3 +1658,47 @@ def reconcile_account_master_permissions_authoritative(usernames: Iterable[str] 
         pass
     return int(updated or 0)
 # ===== V3.07 PERMISSION IMPORT COMPATIBILITY GUARD END =====
+
+
+# ===== V3.09 ADMIN ACCESS GUARANTEE START =====
+def _v309_account_master_role(username: str) -> str:
+    """Read the authoritative role from auth_users; used only as a safe fallback."""
+    u = (username or "").strip()
+    if not u:
+        return ""
+    try:
+        init_permission_tables()
+        with connect_db() as conn:
+            row = conn.execute("SELECT role_code FROM auth_users WHERE username=?", (u,)).fetchone()
+            if row and row[0]:
+                return str(row[0]).strip().lower()
+    except Exception:
+        pass
+    return ""
+
+
+def _v309_is_admin_account(username: str) -> bool:
+    u = (username or "").strip().lower()
+    if u == "admin":
+        return True
+    role = _v309_account_master_role(username)
+    return role in {"admin", "administrator", "system_admin", "系統管理員"}
+
+
+_old_has_permission_v309 = has_permission
+
+def has_permission(username: str, module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    """V3.09: system admin must always have all-module access.
+
+    帳號主檔 role_code=admin 是最高權限來源；即使帳號模組權限表暫時讀不到、
+    runtime cache 還沒重建、或更新模組後權限矩陣尚未同步，也不得擋住 admin。
+    """
+    if _v309_is_admin_account(username):
+        return True
+    try:
+        return _old_has_permission_v309(username, module_code, action)
+    except Exception:
+        return False
+
+check_permission = has_permission
+# ===== V3.09 ADMIN ACCESS GUARANTEE END =====

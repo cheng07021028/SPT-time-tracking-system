@@ -577,9 +577,14 @@ def _sync_auth_user_to_security_runtime(auth_row: dict[str, Any]) -> None:
             now,
             now,
         ))
-        role_code = str(auth_row.get("role_code", "") or "").strip()
+        # V3.09：帳號主檔為角色唯一來源。每次同步前先清除舊 runtime 角色，
+        # 避免更新模組後殘留 admin/operator 或角色空白。
+        execute("DELETE FROM security_user_roles WHERE username=?", (username,))
+        role_code = str(auth_row.get("role_code", "") or "").strip().lower()
+        if not role_code and username.lower() == "admin":
+            role_code = "admin"
         if role_code:
-            execute("INSERT OR IGNORE INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
+            execute("INSERT OR REPLACE INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
     except Exception:
         pass
 
@@ -1793,197 +1798,103 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:  # typ
     return _old_check_permission_v199(module_code, action)
 
 
-# ===== V2.43 default idle timeout policy DISABLED BY V3.01 =====
-# V3.01: do NOT auto-seed or overwrite idle timeout on import.
-# Import-time seeding caused user settings to revert after module updates.
+# ===== V2.43 default idle timeout policy =====
+# Company requirement: the built-in default idle logout is 1 minute.  Existing
+# permanent files are preserved unless they contain the old unmodified default 15.
 def _v243_seed_idle_timeout_one_minute() -> None:
-    return None
-
-# Intentionally not executed. Security settings are read from permanent JSON/DB only.
-
-
-# ===== V3.01 SECURITY SETTINGS PERMANENCE FINAL GUARD START =====
-def _v301_project_root() -> Path:
-    return Path(__file__).resolve().parents[1]
-
-
-def _v301_security_paths() -> list[Path]:
-    root = _v301_project_root()
-    return [
-        root / "data" / "config" / "security_settings.json",
-        root / "data" / "persistent_state" / "spt_security_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
-        root / "data" / "config" / "idle_timeout_settings.json",
-        root / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
-    ]
-
-
-def _v301_now_text() -> str:
     try:
-        return _now()
+        minutes = _v208_read_idle_timeout_from_files()
+        if minutes in (None, 15):
+            set_idle_timeout_minutes(1)
     except Exception:
-        from datetime import datetime
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        pass
+
+try:
+    _v243_seed_idle_timeout_one_minute()
+except Exception:
+    pass
 
 
-def _v301_atomic_write_json(path: Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    txt = json.dumps(payload, ensure_ascii=False, indent=2)
-    tmp.write_text(txt, encoding="utf-8")
-    # Verify before replacing.
-    json.loads(tmp.read_text(encoding="utf-8"))
-    tmp.replace(path)
+# ===== V3.09 ADMIN ROLE SESSION / ACCESS GUARANTEE START =====
+def _v309_read_auth_role(username: str) -> str:
+    u = (username or "").strip()
+    if not u:
+        return ""
+    try:
+        row = query_one("SELECT role_code FROM auth_users WHERE username=?", (u,))
+        if row and row.get("role_code"):
+            return str(row.get("role_code")).strip().lower()
+    except Exception:
+        pass
+    if u.lower() == "admin":
+        return "admin"
+    return ""
 
 
-def _v301_extract_security_settings(payload: object) -> dict[str, str]:
-    out: dict[str, str] = {}
-    if not isinstance(payload, dict):
-        return out
-    for src in (
-        payload,
-        payload.get("security_settings"),
-        payload.get("settings"),
-    ):
-        if isinstance(src, dict):
-            if src.get("idle_timeout_minutes") not in (None, ""):
-                out["idle_timeout_minutes"] = str(src.get("idle_timeout_minutes"))
-            if src.get("ask_continue_after_record") not in (None, ""):
-                out["ask_continue_after_record"] = str(src.get("ask_continue_after_record"))
-    tables = payload.get("tables")
-    if isinstance(tables, dict):
-        for table_name in ("auth_security_settings", "security_settings"):
-            rows = tables.get(table_name) or []
-            if isinstance(rows, list):
-                for row in rows:
-                    if not isinstance(row, dict):
-                        continue
-                    k = str(row.get("setting_key") or "")
-                    v = row.get("setting_value")
-                    if k in {"idle_timeout_minutes", "ask_continue_after_record"} and v not in (None, ""):
-                        out[k] = str(v)
+def _v309_normalize_roles(username: str, roles: Any = None) -> list[str]:
+    out: list[str] = []
+    try:
+        if isinstance(roles, str):
+            candidates = [x.strip() for x in roles.replace("；", ",").replace("，", ",").split(",")]
+        elif isinstance(roles, (list, tuple, set)):
+            candidates = [str(x).strip() for x in roles]
+        else:
+            candidates = []
+        for r in candidates:
+            rr = r.lower()
+            if rr and rr not in out:
+                out.append(rr)
+    except Exception:
+        out = []
+    master_role = _v309_read_auth_role(username)
+    if master_role and master_role not in out:
+        out.insert(0, master_role)
+    if (username or "").strip().lower() == "admin" and "admin" not in out:
+        out.insert(0, "admin")
     return out
 
 
-def _v301_read_security_files() -> dict[str, str]:
-    merged: dict[str, str] = {}
-    for path in _v301_security_paths():
-        try:
-            if not path.exists():
-                continue
-            payload = json.loads(path.read_text(encoding="utf-8"))
-            vals = _v301_extract_security_settings(payload)
-            # File order is source priority: first valid value wins.
-            for k, v in vals.items():
-                if k not in merged and v not in (None, ""):
-                    merged[k] = str(v)
-        except Exception:
-            # Never overwrite user settings because one file is bad.
-            continue
-    return merged
+_old_get_current_user_v309 = get_current_user
 
-
-def _v301_write_security_files(settings: dict[str, str]) -> None:
+def get_current_user() -> dict[str, Any] | None:  # type: ignore[override]
+    user = _old_get_current_user_v309()
+    if not user:
+        return None
+    roles = _v309_normalize_roles(str(user.get("username", "")), user.get("roles", []))
+    user["roles"] = roles
     try:
-        idle = max(1, int(float(settings.get("idle_timeout_minutes", "15") or 15)))
-    except Exception:
-        idle = 15
-    ask = "1" if str(settings.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
-    security_payload = {
-        "version": "V3.01",
-        "updated_at": _v301_now_text(),
-        "security_settings": {
-            "idle_timeout_minutes": str(idle),
-            "ask_continue_after_record": ask,
-        },
-        "note": "安全設定永久檔。模組更新後以 data 內永久設定為準，不可由程式自動重建預設值覆蓋。",
-    }
-    idle_payload = {
-        "version": "V3.01",
-        "updated_at": _v301_now_text(),
-        "idle_timeout_minutes": idle,
-        "ask_continue_after_record": ask,
-        "note": "閒置自動登出永久設定。",
-    }
-    for path in _v301_security_paths():
-        try:
-            payload = idle_payload if "idle_timeout" in path.name else security_payload
-            _v301_atomic_write_json(path, payload)
-        except Exception:
-            pass
-
-
-def get_idle_timeout_minutes() -> int:  # type: ignore[override]
-    """V3.01 final reader: permanent JSON -> DB -> default. No import-time auto reset."""
-    try:
-        cache = st.session_state.get("_spt_idle_timeout_cache")
-        if cache:
-            minutes = int(float(cache.get("minutes", 0)))
-            if minutes >= 1:
-                return minutes
+        st.session_state["auth_roles"] = roles
     except Exception:
         pass
-    file_settings = _v301_read_security_files()
-    minutes = None
-    if file_settings.get("idle_timeout_minutes") not in (None, ""):
-        try:
-            minutes = int(float(file_settings["idle_timeout_minutes"]))
-        except Exception:
-            minutes = None
-    if minutes is None:
-        try:
-            ensure_security_schema()
-            for table in ("auth_security_settings", "security_settings"):
-                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
-                if row and row.get("setting_value") not in (None, ""):
-                    minutes = int(float(row.get("setting_value")))
-                    break
-        except Exception:
-            minutes = None
-    if minutes is None:
-        minutes = DEFAULT_IDLE_MINUTES
-    minutes = max(1, int(minutes))
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
-    except Exception:
-        pass
-    return minutes
+    return user
 
 
-def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
-    """V3.01 final writer: DB + all permanent data JSON paths + session cache."""
-    minutes = max(1, int(minutes))
-    file_settings = _v301_read_security_files()
-    ask = str(file_settings.get("ask_continue_after_record", "1") or "1")
-    merged = {"idle_timeout_minutes": str(minutes), "ask_continue_after_record": ask}
-    _v301_write_security_files(merged)
+_old_check_permission_v309 = check_permission
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    user = get_current_user()
+    if not user:
+        return False
+    roles = _v309_normalize_roles(str(user.get("username", "")), user.get("roles", []))
+    if "admin" in roles:
+        return True
     try:
-        ensure_security_schema()
-        for table in ("auth_security_settings", "security_settings"):
-            execute(f"""
-                CREATE TABLE IF NOT EXISTS {table} (
-                    setting_key TEXT PRIMARY KEY,
-                    setting_value TEXT,
-                    note TEXT,
-                    updated_at TEXT
-                )
-            """)
-            for k, v in merged.items():
-                execute(f"""
-                    INSERT INTO {table} (setting_key, setting_value, note, updated_at)
-                    VALUES (?, ?, 'V3.01 synchronized permanent security setting', ?)
-                    ON CONFLICT(setting_key) DO UPDATE SET
-                        setting_value=excluded.setting_value,
-                        note=excluded.note,
-                        updated_at=excluded.updated_at
-                """, (k, str(v), _v301_now_text()))
+        return _old_check_permission_v309(module_code, action)
+    except Exception:
+        return False
+
+
+def clear_permission_cache(username: str | None = None) -> None:  # type: ignore[override]
+    """Keep original behavior and also clear related session role/cache fragments."""
+    try:
+        keys = list(st.session_state.keys())
+        for k in keys:
+            if k.startswith("_spt_perm_cache_") and (username is None or k.endswith(str(username))):
+                st.session_state.pop(k, None)
+            if k.startswith("_v132_perm_") or k.startswith("_spt_perm_cache_"):
+                if username is None or str(username) in k:
+                    st.session_state.pop(k, None)
     except Exception:
         pass
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
-        st.session_state["spt_security_settings"] = dict(merged)
-    except Exception:
-        pass
-# ===== V3.01 SECURITY SETTINGS PERMANENCE FINAL GUARD END =====
+
+# ===== V3.09 ADMIN ROLE SESSION / ACCESS GUARANTEE END =====
