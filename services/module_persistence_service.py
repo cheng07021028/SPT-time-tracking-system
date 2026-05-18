@@ -191,8 +191,19 @@ def load_json(path: Path, default: Any = None) -> Any:
         return default
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return default
+    except Exception as exc:
+        # V2.94 Persistence Guard: if the file exists but is corrupted, do not
+        # silently return defaults. Try to restore the single file from latest
+        # backup first; if that fails, raise so the operator can restore safely.
+        try:
+            from services.persistence_guard_service import quarantine_corrupt_file, restore_single_file_from_latest_backup
+            quarantine_corrupt_file(path, reason=str(exc))
+            restored = restore_single_file_from_latest_backup(path)
+            if restored.get("ok"):
+                return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+        raise RuntimeError(f"Persistent JSON read failed; default reset blocked: {path} | {exc}")
 
 
 def save_json(path: Path, payload: Any) -> None:

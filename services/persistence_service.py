@@ -147,7 +147,18 @@ def _load_json(path: Path) -> dict[str, Any] | None:
         return None
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as exc:
+        # V2.94 Persistence Guard: corrupted existing JSON must not silently
+        # behave like missing/default data. Quarantine, try single-file restore,
+        # then return None only if no backup exists.
+        try:
+            from services.persistence_guard_service import quarantine_corrupt_file, restore_single_file_from_latest_backup
+            quarantine_corrupt_file(path, reason=str(exc))
+            restored = restore_single_file_from_latest_backup(path)
+            if restored.get("ok"):
+                return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
         return None
 
 

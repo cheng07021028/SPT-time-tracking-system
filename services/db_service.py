@@ -418,9 +418,28 @@ def ensure_database() -> None:
     global _SCHEMA_READY
     if _SCHEMA_READY:
         return
+
+    # V2.94 Persistence Guard:
+    # Before SQLite schema/default initialization, try to restore existing DB from
+    # the latest protected backup when the project was already initialized.
+    # This prevents silent fallback to empty/default data after Reboot/App update.
+    try:
+        from services.persistence_guard_service import guard_before_database_init
+        guard_before_database_init()
+    except Exception:
+        pass
+
     with _open_connection() as conn:
         _init_schema(conn)
     _SCHEMA_READY = True
+
+    # Lightweight post-init health check + throttled backup. This does not alter
+    # page UI and is intentionally non-blocking.
+    try:
+        from services.persistence_guard_service import guard_after_database_init
+        guard_after_database_init()
+    except Exception:
+        pass
 
 
 def database_business_row_count() -> int:
