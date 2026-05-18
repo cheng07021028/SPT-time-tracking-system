@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from io import BytesIO
+import json
+from pathlib import Path
 import pandas as pd
 import streamlit as st
 
@@ -77,6 +79,94 @@ def _normalize_delete_column(df: pd.DataFrame, delete_col: str = "刪除") -> pd
         out[delete_col] = out[delete_col].fillna(False).astype(bool)
     return out
 
+
+
+
+# -----------------------------------------------------------------------------
+# V3.23: System settings permanent-file health center
+# -----------------------------------------------------------------------------
+def _project_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _file_health_row(path: Path, label: str) -> dict:
+    exists = path.exists()
+    size = path.stat().st_size if exists else 0
+    mtime = ""
+    ok = False
+    detail = "檔案不存在"
+    if exists:
+        try:
+            mtime = pd.to_datetime(path.stat().st_mtime, unit="s").strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            mtime = ""
+        try:
+            with path.open("r", encoding="utf-8") as fh:
+                payload = json.load(fh)
+            ok = isinstance(payload, (dict, list))
+            if isinstance(payload, dict):
+                keys = list(payload.keys())[:8]
+                detail = "JSON 可讀；keys=" + ", ".join(map(str, keys))
+            elif isinstance(payload, list):
+                detail = f"JSON 可讀；list rows={len(payload)}"
+            else:
+                detail = "JSON 可讀"
+        except Exception as exc:
+            ok = False
+            detail = f"JSON 讀取失敗：{exc}"
+    return {
+        "項目 / Item": label,
+        "狀態 / Status": "✅ 正常" if ok else "⚠️ 異常",
+        "路徑 / Path": str(path.relative_to(_project_root())) if str(path).startswith(str(_project_root())) else str(path),
+        "存在 / Exists": exists,
+        "大小 / Size": size,
+        "最後修改 / Modified": mtime,
+        "說明 / Detail": detail,
+    }
+
+
+def _render_system_settings_health_center() -> None:
+    root = _project_root()
+    health_targets = [
+        (root / "data" / "config" / "system_settings.json", "系統設定主檔 / system_settings.json"),
+        (root / "data" / "persistent_state" / "spt_system_settings.json", "系統設定狀態檔 / spt_system_settings.json"),
+        (root / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json", "13 模組永久檔 / 13_system_settings"),
+        (root / "data" / "config" / "auto_external_backup_schedule.json", "每日自動備份設定 / backup schedule"),
+        (root / "data" / "persistent_state" / "auto_external_backup_state.json", "每日自動備份狀態 / backup state"),
+    ]
+    rows = [_file_health_row(path, label) for path, label in health_targets]
+    ok_count = sum(1 for r in rows if str(r.get("狀態 / Status", "")).startswith("✅"))
+
+    with st.expander("系統設定永久保存健康檢查 / System Settings Persistence Health", expanded=True):
+        st.caption(
+            "此區檢查 13｜系統設定與每日自動備份設定是否真的寫入 data/ 永久檔。"
+            "設定後應保持不變，直到下次再套用設定。"
+        )
+        h1, h2, h3 = st.columns(3)
+        h1.metric("永久檔正常 / Healthy Files", f"{ok_count}/{len(rows)}")
+        h2.metric("目前工時頁重置時間", get_live_page_reset_time())
+        h3.metric("備份設定檔", "已檢查")
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=230)
+
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("◇ 重新檢查永久設定檔 / Recheck", use_container_width=True, key="v323_recheck_system_settings_health"):
+                st.rerun()
+        with c2:
+            if can_manage and st.button("▣ 立即刷新永久設定檔 / Refresh Permanent Settings", use_container_width=True, key="v323_refresh_system_settings_files"):
+                try:
+                    result = export_system_settings_permanent(reason="manual_refresh_from_health_center", write_history=True)
+                    if result.get("ok"):
+                        st.success("已重新寫入系統設定永久檔。")
+                    else:
+                        st.warning(f"永久檔刷新結果：{result}")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"刷新永久設定檔失敗：{exc}")
+        if ok_count < 3:
+            st.warning("部分 13 系統設定永久檔不存在或不可讀。請按『立即刷新永久設定檔』建立/修復。")
+        else:
+            st.success("13 系統設定永久檔已存在且可讀。")
 
 def _export_permanent_settings(message: str) -> None:
     """Create the dedicated 13｜系統設定 permanent JSON only.
@@ -324,6 +414,9 @@ def _render_external_auto_backup_center() -> None:
 
     st.divider()
 
+
+# V3.23：先顯示系統設定永久保存健康檢查，再顯示自動備份設定。
+_render_system_settings_health_center()
 
 # V3.20：每日自動備份設定必須保留在 13｜系統設定，不可被系統設定修正覆蓋移除。
 _render_external_auto_backup_center()
