@@ -522,7 +522,25 @@ def _user_roles(username: str) -> list[str]:
     df = query_df("SELECT role_code FROM security_user_roles WHERE username=?", (username,))
     if df.empty:
         return []
-    return df["role_code"].dropna().astype(str).tolist()
+    return _dedupe_roles(df["role_code"].dropna().astype(str).tolist())
+
+
+def _dedupe_roles(roles: list[str] | tuple[str, ...] | str | None) -> list[str]:
+    """Normalize role list and remove stale duplicated runtime roles.
+
+    帳號主檔 auth_users.role_code 是唯一角色來源；security_user_roles 僅為舊版相容表。
+    顯示列不可再出現 admin, operator 這種殘留雙角色。
+    """
+    if roles is None:
+        return []
+    if isinstance(roles, str):
+        roles = roles.replace("，", ",").split(",")
+    out: list[str] = []
+    for role in roles:
+        r = str(role or "").strip()
+        if r and r not in out:
+            out.append(r)
+    return out
 
 
 def get_current_user() -> dict[str, Any] | None:
@@ -531,7 +549,7 @@ def get_current_user() -> dict[str, Any] | None:
     return {
         "username": st.session_state.get("auth_username", ""),
         "display_name": st.session_state.get("auth_display_name", ""),
-        "roles": st.session_state.get("auth_roles", []),
+        "roles": _dedupe_roles(st.session_state.get("auth_roles", [])),
     }
 
 
@@ -577,9 +595,11 @@ def _sync_auth_user_to_security_runtime(auth_row: dict[str, Any]) -> None:
             now,
             now,
         ))
-        role_code = str(auth_row.get("role_code", "") or "").strip()
-        if role_code:
-            execute("INSERT OR IGNORE INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
+        role_code = str(auth_row.get("role_code", "") or "").strip() or "operator"
+        # auth_users.role_code is authoritative. Remove stale legacy roles first;
+        # otherwise the login bar may show admin, operator after module updates.
+        execute("DELETE FROM security_user_roles WHERE username=?", (username,))
+        execute("INSERT OR REPLACE INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
     except Exception:
         pass
 
@@ -606,11 +626,13 @@ def authenticate(username: str, password: str) -> tuple[bool, str]:
     if auth_row:
         _sync_auth_user_to_security_runtime(auth_row)
 
-    roles = _user_roles(username)
-    # 若帳號來自 auth_users，角色存在 role_code，不一定已同步到 security_user_roles。
+    # auth_users.role_code is the single source of truth.  Do not merge with
+    # stale security_user_roles; this prevents admin, operator dual-role residue.
     auth_role = str(row.get("role_code", "") or "").strip()
-    if auth_role and auth_role not in roles:
-        roles.append(auth_role)
+    if auth_row:
+        roles = [auth_role or "operator"]
+    else:
+        roles = _dedupe_roles(_user_roles(username))
 
     st.session_state["auth_logged_in"] = True
     st.session_state["auth_username"] = username
@@ -1249,7 +1271,7 @@ def render_user_bar(module_code: str = "") -> None:
     if not user:
         return
     render_idle_watchdog()
-    roles = ", ".join(user.get("roles", [])) or "未設定角色"
+    roles = ", ".join(_dedupe_roles(user.get("roles", []))) or "未設定角色"
     display_name = escape(str(user.get("display_name") or user.get("username") or ""))
     username = escape(str(user.get("username") or ""))
     role_text = escape(str(roles))

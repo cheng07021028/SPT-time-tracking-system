@@ -372,6 +372,38 @@ def export_permission_settings_permanently(reason: str = "permission_settings_sa
     return results
 
 
+def canonicalize_runtime_roles_from_account_master(usernames: Iterable[str] | None = None) -> int:
+    """Make security_user_roles exactly match auth_users.role_code.
+
+    修正更新模組後殘留 admin, operator 這類雙角色；帳號主檔角色是唯一來源。
+    """
+    init_permission_tables()
+    conn = connect_db()
+    cur = conn.cursor()
+    _ensure_legacy_security_tables(cur)
+    params: list[str] = []
+    where = ""
+    if usernames:
+        clean = [str(u).strip() for u in usernames if str(u).strip()]
+        if clean:
+            where = " WHERE username IN ({})".format(",".join(["?"] * len(clean)))
+            params = clean
+    rows = cur.execute("SELECT username, role_code FROM auth_users" + where, params).fetchall()
+    count = 0
+    for r in rows:
+        username = str(r["username"] or "").strip()
+        role = str(r["role_code"] or "operator").strip() or "operator"
+        if not username:
+            continue
+        cur.execute("DELETE FROM security_user_roles WHERE username=?", (username,))
+        cur.execute("INSERT OR REPLACE INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
+        count += 1
+    conn.commit()
+    conn.close()
+    clear_permission_runtime_cache()
+    return count
+
+
 def sync_auth_users_to_runtime_security(usernames: Iterable[str] | None = None) -> int:
     """Synchronize auth_users into security_users/security_user_roles.
 
@@ -412,9 +444,9 @@ def sync_auth_users_to_runtime_security(usernames: Iterable[str] | None = None) 
             int(r["is_active"] or 0), int(r["force_password_change"] or 0), r["last_login_at"],
             r["created_at"] or now_text(), now_text(),
         ))
-        role = str(r["role_code"] or "").strip()
-        if role:
-            cur.execute("INSERT OR IGNORE INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
+        role = str(r["role_code"] or "operator").strip() or "operator"
+        cur.execute("DELETE FROM security_user_roles WHERE username=?", (username,))
+        cur.execute("INSERT OR REPLACE INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
         count += 1
     conn.commit()
     conn.close()
@@ -580,6 +612,7 @@ def init_permission_tables(force: bool = False) -> None:
     ensure_permissions_for_all_users(force=True)
     try:
         sync_auth_users_to_runtime_security()
+        canonicalize_runtime_roles_from_account_master()
     except Exception:
         pass
     _PERMISSION_SCHEMA_READY = True
@@ -744,6 +777,7 @@ def save_users(rows: Iterable[dict]) -> dict:
         synced_permissions = sync_user_permissions_from_roles(role_sync_users, reason="account_role_changed")
     try:
         sync_auth_users_to_runtime_security(saved_usernames)
+        canonicalize_runtime_roles_from_account_master(saved_usernames)
     except Exception:
         pass
     clear_permission_runtime_cache()
