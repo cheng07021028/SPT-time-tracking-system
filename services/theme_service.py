@@ -519,12 +519,69 @@ div[data-baseweb="radio"] [aria-checked="true"] {
     border-color: #67f5ff !important;
     color: #04101d !important;
 }
-/* Data editor checkbox cells: keep clickable checkbox visible on dark table. */
+/* Data editor checkbox cells: always visible on dark table, without hover. */
+[data-testid="stDataEditor"] [data-baseweb="checkbox"],
+[data-testid="stDataEditor"] [data-baseweb="checkbox"] *,
 [data-testid="stDataEditor"] input[type="checkbox"],
 [data-testid="stDataEditor"] [role="checkbox"] {
-    accent-color: #dffaff !important;
-    outline: 1px solid rgba(223,250,255,.70) !important;
-    box-shadow: 0 0 8px rgba(35,230,255,.22) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Native checkbox fallback used by some Streamlit/Glide cells. */
+[data-testid="stDataEditor"] input[type="checkbox"] {
+    appearance: auto !important;
+    -webkit-appearance: checkbox !important;
+    accent-color: #18d7f0 !important;
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px !important;
+    min-height: 16px !important;
+    background: #f5fbff !important;
+    border: 2px solid #67f5ff !important;
+    outline: 1px solid rgba(223,250,255,.92) !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.65) inset, 0 0 10px rgba(35,230,255,.35) !important;
+}
+
+/* BaseWeb checkbox fallback used inside st.data_editor cells. */
+[data-testid="stDataEditor"] [data-baseweb="checkbox"] > div,
+[data-testid="stDataEditor"] [data-baseweb="checkbox"] div[role="checkbox"],
+[data-testid="stDataEditor"] [role="checkbox"] {
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px !important;
+    min-height: 16px !important;
+    background: linear-gradient(180deg, #f5fbff 0%, #dff7ff 100%) !important;
+    border: 2px solid rgba(103,245,255,.98) !important;
+    border-radius: 4px !important;
+    outline: 1px solid rgba(223,250,255,.92) !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.70) inset, 0 0 10px rgba(35,230,255,.35) !important;
+    color: #04101d !important;
+}
+
+/* Checked state: keep the cyan fill and dark tick clearly visible. */
+[data-testid="stDataEditor"] input[type="checkbox"]:checked,
+[data-testid="stDataEditor"] [data-baseweb="checkbox"] [aria-checked="true"],
+[data-testid="stDataEditor"] [role="checkbox"][aria-checked="true"] {
+    background: linear-gradient(180deg, #dffaff 0%, #b9f6ff 100%) !important;
+    border-color: #18d7f0 !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.80) inset, 0 0 13px rgba(35,230,255,.48) !important;
+    color: #04101d !important;
+}
+[data-testid="stDataEditor"] [data-baseweb="checkbox"] svg,
+[data-testid="stDataEditor"] [data-baseweb="checkbox"] path,
+[data-testid="stDataEditor"] [role="checkbox"] svg,
+[data-testid="stDataEditor"] [role="checkbox"] path {
+    fill: #04101d !important;
+    stroke: #04101d !important;
+    opacity: 1 !important;
+}
+
+/* Disabled/read-only tables must not fade the checkbox into the dark cell background. */
+[data-testid="stDataEditor"] [aria-disabled="true"],
+[data-testid="stDataEditor"] [disabled],
+[data-testid="stDataEditor"] [data-disabled="true"] {
+    opacity: 1 !important;
 }
 
 /* V2.03: checkbox/radio/toggle rows use light background so confirmations are clearly visible. */
