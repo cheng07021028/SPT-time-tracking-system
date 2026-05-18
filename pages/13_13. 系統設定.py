@@ -438,6 +438,11 @@ def _render_persistence_guard_center() -> None:
 
     st.divider()
 
+# V3.00｜每日自動備份中心必須真的渲染在 13｜系統設定畫面上
+# 注意：V2.96~V2.99 已建立 _render_external_auto_backup_center()，但曾漏掉呼叫，
+# 導致功能存在於程式碼內、畫面卻看不到。這裡固定先顯示每日外部備份設定，
+# 再顯示 Persistence Guard，不影響任何表格資料、權限資料與既有設定。
+_render_external_auto_backup_center()
 _render_persistence_guard_center()
 
 # -----------------------------------------------------------------------------
