@@ -10,7 +10,7 @@ SPT Time Tracking - V2.94 Persistence Guard Service
 - 不改業務邏輯。
 - 不覆蓋 data 內既有資料。
 - App 啟動時只做輕量檢查，避免拖慢 Reboot。
-- 真正備份/還原由 tools/*.py 與 bat 手動執行；必要時 DB 遺失才自動嘗試還原 DB。
+- 備份/還原可由 13｜系統設定或 tools/*.py 執行；必要時 DB 遺失才自動嘗試還原 DB。
 """
 from __future__ import annotations
 
@@ -33,6 +33,7 @@ DB_PATH = DATABASE_DIR / "spt_time_tracking.db"
 STREAMLIT_DIR = PROJECT_ROOT / ".streamlit"
 SECRETS_PATH = STREAMLIT_DIR / "secrets.toml"
 CONFIG_PATH = STREAMLIT_DIR / "config.toml"
+PROJECT_CONFIG_MIRROR_DIR = DATA_DIR / "config" / "_project_config_mirror"
 
 BACKUP_ROOT = DATA_DIR / "_persistent_backup"
 MANIFEST_PATH = PERSISTENT_STATE_DIR / "persistent_guard_manifest.json"
@@ -44,8 +45,9 @@ PROTECTED_RELATIVE_PATHS = [
     "data/persistent_modules",
     "data/persistent_state",
     "data/database",
-    ".streamlit/secrets.toml",
-    ".streamlit/config.toml",
+    "data/config",
+    "data/config/_project_config_mirror/.streamlit/secrets.toml",
+    "data/config/_project_config_mirror/.streamlit/config.toml",
 ]
 
 CORE_TABLES = [
@@ -183,23 +185,63 @@ def _copy_path_to_backup(src: Path, backup_dir: Path) -> list[str]:
     return created
 
 
+
+def sync_project_config_mirror_to_data() -> dict[str, Any]:
+    """Mirror non-data project settings into data/config/_project_config_mirror.
+
+    This keeps backup/restore sources centralized under data/, while still
+    preserving Streamlit deployment settings when they exist.
+    """
+    mirrored: list[dict[str, Any]] = []
+    errors: list[str] = []
+    candidates: list[tuple[Path, Path]] = [
+        (CONFIG_PATH, PROJECT_CONFIG_MIRROR_DIR / ".streamlit" / "config.toml"),
+        (SECRETS_PATH, PROJECT_CONFIG_MIRROR_DIR / ".streamlit" / "secrets.toml"),
+        (PROJECT_ROOT / "requirements.txt", PROJECT_CONFIG_MIRROR_DIR / "project_files" / "requirements.txt"),
+        (PROJECT_ROOT / "README.md", PROJECT_CONFIG_MIRROR_DIR / "project_files" / "README.md"),
+        (PROJECT_ROOT / ".gitignore", PROJECT_CONFIG_MIRROR_DIR / "project_files" / ".gitignore"),
+    ]
+    for src, dest in candidates:
+        try:
+            if not src.exists() or not src.is_file():
+                continue
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+            mirrored.append({"source": _rel(src), "mirror": _rel(dest), "bytes": dest.stat().st_size})
+        except Exception as exc:
+            errors.append(f"{_rel(src)} -> {_rel(dest)}: {exc}")
+    try:
+        _json_dump(PROJECT_CONFIG_MIRROR_DIR / "PROJECT_CONFIG_MIRROR_MANIFEST.json", {
+            "schema_version": "2.99",
+            "updated_at": _now(),
+            "note": "Non-data deployment configs are mirrored here so backups keep protected settings under data/.",
+            "mirrored": mirrored,
+            "errors": errors,
+        })
+    except Exception as exc:
+        errors.append(f"mirror manifest write failed: {exc}")
+    return {"ok": len(errors) == 0, "mirrored": mirrored, "errors": errors, "mirror_dir": _rel(PROJECT_CONFIG_MIRROR_DIR)}
+
+
+def _copy_data_tree_to_backup(backup_dir: Path, *, include_database: bool = True) -> list[str]:
+    """Copy critical data subfolders into backup without recursive backup caches."""
+    created: list[str] = []
+    sources = [PERSISTENT_MODULES_DIR, PERSISTENT_STATE_DIR, DATA_DIR / "config"]
+    if include_database:
+        sources.append(DATABASE_DIR)
+    for src in sources:
+        created.extend(_copy_path_to_backup(src, backup_dir))
+    return created
+
 def create_persistent_backup(reason: str = "manual", include_database: bool = True) -> dict[str, Any]:
     """備份所有重要資料與設定；不修改正式資料。"""
     BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
     backup_dir = BACKUP_ROOT / f"backup_{_stamp()}"
     backup_dir.mkdir(parents=True, exist_ok=True)
 
-    sources = [PERSISTENT_MODULES_DIR, PERSISTENT_STATE_DIR]
-    if include_database:
-        sources.append(DATABASE_DIR)
-    if SECRETS_PATH.exists():
-        sources.append(SECRETS_PATH)
-    if CONFIG_PATH.exists():
-        sources.append(CONFIG_PATH)
+    mirror_result = sync_project_config_mirror_to_data()
 
-    created: list[str] = []
-    for src in sources:
-        created.extend(_copy_path_to_backup(src, backup_dir))
+    created: list[str] = _copy_data_tree_to_backup(backup_dir, include_database=include_database)
 
     health = check_persistent_health(write_manifest=False)
     manifest = {
@@ -208,6 +250,8 @@ def create_persistent_backup(reason: str = "manual", include_database: bool = Tr
         "reason": reason,
         "backup_dir": _rel(backup_dir),
         "protected_paths": PROTECTED_RELATIVE_PATHS,
+        "all_protected_sources_under_data": True,
+        "project_config_mirror": mirror_result,
         "file_count": len(created),
         "health": health,
     }
@@ -345,8 +389,15 @@ def restore_persistent_backup(backup_dir: Path | str, *, include_secrets: bool =
                 shutil.copy2(src, dest)
             restored.append(rel)
     if include_secrets:
-        for rel in [".streamlit/secrets.toml", ".streamlit/config.toml"]:
-            src = bdir / rel
+        # V2.99: backups keep these under data/config/_project_config_mirror.
+        # Older backups with direct .streamlit paths are still supported.
+        for rel, mirror_rel in [
+            (".streamlit/secrets.toml", "data/config/_project_config_mirror/.streamlit/secrets.toml"),
+            (".streamlit/config.toml", "data/config/_project_config_mirror/.streamlit/config.toml"),
+        ]:
+            src = bdir / mirror_rel
+            if not src.exists():
+                src = bdir / rel
             if src.exists():
                 dest = PROJECT_ROOT / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
@@ -362,12 +413,20 @@ def restore_single_file_from_latest_backup(target: Path | str) -> dict[str, Any]
         rel = target.resolve().relative_to(PROJECT_ROOT.resolve())
     except Exception:
         return {"ok": False, "message": "target outside project root"}
+    mirror_rel = None
+    if str(rel).replace("\\", "/") == ".streamlit/secrets.toml":
+        mirror_rel = Path("data/config/_project_config_mirror/.streamlit/secrets.toml")
+    elif str(rel).replace("\\", "/") == ".streamlit/config.toml":
+        mirror_rel = Path("data/config/_project_config_mirror/.streamlit/config.toml")
     for backup in list_all_persistent_backups(include_external=True):
-        src = backup / rel
-        if src.exists() and src.is_file() and src.stat().st_size > 0:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, target)
-            return {"ok": True, "source": _rel(src), "target": _rel(target)}
+        candidates = [backup / rel]
+        if mirror_rel is not None:
+            candidates.insert(0, backup / mirror_rel)
+        for src in candidates:
+            if src.exists() and src.is_file() and src.stat().st_size > 0:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, target)
+                return {"ok": True, "source": _rel(src), "target": _rel(target)}
     return {"ok": False, "message": f"找不到可還原單檔：{_rel(target)}"}
 
 

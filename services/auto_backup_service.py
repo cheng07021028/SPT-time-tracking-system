@@ -9,8 +9,9 @@ SPT Time Tracking - V2.96 Scheduled External Backup Service
 
 設計重點：
 - 不備份到專案內部，避免遞迴/誤上傳 GitHub。
+- 備份檔案在備份包內統一位於 data/ 路徑下，避免還原時來源混亂。
 - 備份整個 data 的正式資料，但排除 data/_persistent_backup、_persistent_corrupt、_persistent_restore_replaced 等備份/暫存區。
-- 備份 .streamlit/secrets.toml 與 config.toml。
+- .streamlit/config.toml、.streamlit/secrets.toml 會先鏡像到 data/config/_project_config_mirror/，再隨 data 一起備份。
 - 產生 manifest，記錄檔案數、大小、checksum、時間與排程狀態。
 """
 from __future__ import annotations
@@ -31,6 +32,7 @@ PERSISTENT_STATE_DIR = DATA_DIR / "persistent_state"
 CONFIG_DIR = DATA_DIR / "config"
 SCHEDULE_CONFIG_PATH = CONFIG_DIR / "auto_external_backup_schedule.json"
 STATE_PATH = PERSISTENT_STATE_DIR / "auto_external_backup_state.json"
+PROJECT_CONFIG_MIRROR_DIR = CONFIG_DIR / "_project_config_mirror"
 
 EXCLUDE_DIR_NAMES = {
     "_persistent_backup",
@@ -215,19 +217,52 @@ def _rel_external(path: Path) -> str:
     return str(path).replace("\\", "/")
 
 
+
+def sync_project_config_mirror_to_data() -> dict[str, Any]:
+    """Mirror non-data deployment settings into data/config/_project_config_mirror.
+
+    專案正式資料與設定備份一律以 data/ 為主；少數原本位於專案根目錄的
+    部署設定（例如 .streamlit/config.toml、.streamlit/secrets.toml）不再以
+    .streamlit/ 路徑直接放入備份包，而是先鏡像到 data/config 下，讓備份包
+    內所有可還原設定都位於 data/。
+    """
+    mirrored: list[dict[str, Any]] = []
+    errors: list[str] = []
+    candidates: list[tuple[Path, Path]] = [
+        (PROJECT_ROOT / ".streamlit" / "config.toml", PROJECT_CONFIG_MIRROR_DIR / ".streamlit" / "config.toml"),
+        (PROJECT_ROOT / ".streamlit" / "secrets.toml", PROJECT_CONFIG_MIRROR_DIR / ".streamlit" / "secrets.toml"),
+        (PROJECT_ROOT / "requirements.txt", PROJECT_CONFIG_MIRROR_DIR / "project_files" / "requirements.txt"),
+        (PROJECT_ROOT / "README.md", PROJECT_CONFIG_MIRROR_DIR / "project_files" / "README.md"),
+        (PROJECT_ROOT / ".gitignore", PROJECT_CONFIG_MIRROR_DIR / "project_files" / ".gitignore"),
+    ]
+    for src, dest in candidates:
+        try:
+            if not src.exists() or not src.is_file():
+                continue
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+            mirrored.append({"source": _rel(src), "mirror": _rel(dest), "bytes": dest.stat().st_size})
+        except Exception as exc:
+            errors.append(f"{_rel(src)} -> {_rel(dest)}: {exc}")
+    meta = {
+        "schema_version": "2.99",
+        "updated_at": _now_text(),
+        "note": "Non-data deployment configs are mirrored here so backup packages keep all protected sources under data/.",
+        "mirrored": mirrored,
+        "errors": errors,
+    }
+    try:
+        _json_dump(PROJECT_CONFIG_MIRROR_DIR / "PROJECT_CONFIG_MIRROR_MANIFEST.json", meta)
+    except Exception as exc:
+        errors.append(f"mirror manifest write failed: {exc}")
+    return {"ok": len(errors) == 0, "mirrored": mirrored, "errors": errors, "mirror_dir": _rel(PROJECT_CONFIG_MIRROR_DIR)}
+
 def _iter_backup_sources() -> list[tuple[Path, str]]:
     sources: list[tuple[Path, str]] = []
-    # 整個 data 內含表格紀錄、權限、歷史、工時、設定，但排除備份/壞檔/還原暫存。
+    # 備份包內所有正式資料/設定一律集中在 data/。
+    # .streamlit 與根目錄設定會先鏡像到 data/config/_project_config_mirror/。
     if DATA_DIR.exists():
         sources.append((DATA_DIR, "data"))
-    streamlit_dir = PROJECT_ROOT / ".streamlit"
-    if streamlit_dir.exists():
-        sources.append((streamlit_dir, ".streamlit"))
-    # 專案層級設定檔；不是主要程式碼，但有助於還原部署設定。
-    for filename in ["requirements.txt", "README.md", ".gitignore"]:
-        p = PROJECT_ROOT / filename
-        if p.exists():
-            sources.append((p, filename))
     return sources
 
 
@@ -236,12 +271,14 @@ def create_external_full_backup(target_folder: str, *, reason: str = "manual", c
 
     備份內容：
     - data/ 內所有正式資料與設定，排除內建備份/壞檔/還原暫存。
-    - .streamlit/ 設定檔。
-    - requirements / README 類部署設定。
+    - .streamlit 與根目錄部署設定會先鏡像到 data/config/_project_config_mirror/。
+    - 備份包內所有主要來源路徑維持在 data/ 底下。
     """
     validation = validate_target_folder(target_folder, create=create_target)
     if not validation.get("ok"):
         return {"ok": False, **validation}
+
+    mirror_result = sync_project_config_mirror_to_data()
 
     with _BACKUP_LOCK:
         target = Path(validation["path"])
@@ -286,7 +323,9 @@ def create_external_full_backup(target_folder: str, *, reason: str = "manual", c
             "file_count": len(copied),
             "total_bytes": total_bytes,
             "errors": errors,
-            "included": ["data/* except _persistent_backup/_persistent_corrupt/_persistent_restore_replaced", ".streamlit/*", "requirements.txt/README.md/.gitignore when present"],
+            "included": ["data/* except _persistent_backup/_persistent_corrupt/_persistent_restore_replaced"],
+            "all_protected_sources_under_data": True,
+            "project_config_mirror": mirror_result,
             "files": copied,
         }
         _json_dump(backup_dir / "SPT_BACKUP_MANIFEST.json", manifest)
@@ -316,6 +355,7 @@ def create_external_full_backup(target_folder: str, *, reason: str = "manual", c
             "file_count": len(copied),
             "total_bytes": total_bytes,
             "errors": errors,
+            "project_config_mirror": mirror_result,
         }
 
 
