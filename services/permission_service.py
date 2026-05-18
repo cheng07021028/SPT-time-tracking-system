@@ -1596,3 +1596,65 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
             pass
     clear_permission_runtime_cache()
 # ===== V3.01 SECURITY SETTINGS SINGLE SOURCE GUARD END =====
+
+
+# ===== V3.07 PERMISSION IMPORT COMPATIBILITY GUARD START =====
+def _v307_clear_all_permission_caches() -> None:
+    """Clear permission/session caches without changing any data."""
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    if st is None:
+        return
+    try:
+        for k in list(st.session_state.keys()):
+            if (
+                str(k).startswith("_v132_perm_")
+                or str(k).startswith("_spt_perm_cache_")
+                or str(k).startswith("v235_permission_editor_")
+                or str(k) in {"auth_roles", "role", "roles"}
+            ):
+                st.session_state.pop(k, None)
+    except Exception:
+        pass
+
+
+def _v307_clean_usernames(usernames: Iterable[str] | None = None) -> list[str]:
+    try:
+        if usernames is None:
+            conn = connect_db()
+            rows = conn.execute("SELECT username FROM auth_users ORDER BY username").fetchall()
+            conn.close()
+            return [str(r["username"]).strip() for r in rows if str(r["username"]).strip()]
+        return sorted({str(u or "").strip() for u in usernames if str(u or "").strip()})
+    except Exception:
+        return []
+
+
+def reconcile_account_master_permissions_authoritative(usernames: Iterable[str] | None = None, reason: str = "account_master_authoritative") -> int:
+    """Compatibility public helper used by 10｜權限管理 after Account Master save.
+
+    V3.01 once overwrote permission_service.py and removed this symbol while
+    pages/10_10. 權限管理.py still imports it.  Keep this function permanently.
+    It treats Account Master as the only role source and rebuilds permission
+    matrix/runtime roles from auth_users.role_code.
+    """
+    target = _v307_clean_usernames(usernames)
+    if not target:
+        return 0
+    updated = 0
+    try:
+        updated = sync_user_permissions_from_roles(target, reason=reason)
+    except Exception:
+        updated = 0
+    try:
+        sync_auth_users_to_runtime_security(target)
+    except Exception:
+        pass
+    try:
+        _v307_clear_all_permission_caches()
+    except Exception:
+        pass
+    return int(updated or 0)
+# ===== V3.07 PERMISSION IMPORT COMPATIBILITY GUARD END =====
