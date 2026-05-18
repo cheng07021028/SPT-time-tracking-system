@@ -522,9 +522,28 @@ div[data-baseweb="radio"] [aria-checked="true"] {
 /* Data editor checkbox cells: keep clickable checkbox visible on dark table. */
 [data-testid="stDataEditor"] input[type="checkbox"],
 [data-testid="stDataEditor"] [role="checkbox"] {
-    accent-color: #dffaff !important;
-    outline: 1px solid rgba(223,250,255,.70) !important;
-    box-shadow: 0 0 8px rgba(35,230,255,.22) !important;
+    accent-color: #18d7f0 !important;
+    background: linear-gradient(180deg, rgba(245,251,255,.98) 0%, rgba(223,247,255,.96) 100%) !important;
+    border: 1.6px solid rgba(103,245,255,.95) !important;
+    border-radius: 4px !important;
+    outline: 1px solid rgba(223,250,255,.82) !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.65) inset, 0 0 10px rgba(35,230,255,.28) !important;
+    color: #04101d !important;
+}
+[data-testid="stDataEditor"] [role="checkbox"][aria-checked="true"],
+[data-testid="stDataEditor"] input[type="checkbox"]:checked {
+    background: linear-gradient(180deg, #dffaff 0%, #bdf6ff 100%) !important;
+    border-color: #67f5ff !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.75) inset, 0 0 12px rgba(35,230,255,.40) !important;
+    color: #04101d !important;
+}
+[data-testid="stDataEditor"] [role="checkbox"] svg,
+[data-testid="stDataEditor"] [role="checkbox"] path,
+[data-testid="stDataEditor"] input[type="checkbox"] + div svg,
+[data-testid="stDataEditor"] input[type="checkbox"] + div path {
+    fill: #04101d !important;
+    stroke: #04101d !important;
+    opacity: 1 !important;
 }
 
 /* V2.03: checkbox/radio/toggle rows use light background so confirmations are clearly visible. */
@@ -2966,55 +2985,9 @@ def apply_v269_configurable_dropdown_css():
     )
 
 def render_dropdown_size_settings_panel():
-    """Hidden admin-style panel for tuning dropdown sizes. Safe to call on every page."""
-    try:
-        import streamlit as st
-    except Exception:
-        return
+    """V3.16: removed from UI. Kept as no-op for compatibility."""
+    return None
 
-    # 避免同一頁多次 render。
-    if st.session_state.get("_spt_v269_dropdown_panel_rendered"):
-        return
-    st.session_state["_spt_v269_dropdown_panel_rendered"] = True
-
-    cfg = _spt_load_dropdown_settings()
-    with st.sidebar.expander("▾ 下拉選單尺寸設定", expanded=False):
-        st.caption("隱藏設定區｜調整後按永久套用，所有模組共用。")
-        enabled = st.checkbox("啟用自訂下拉尺寸", value=bool(cfg.get("enabled", True)), key="spt_dd_enabled")
-        outer = st.slider("外框高度 px", 48, 120, int(cfg["outer_height"]), 1, key="spt_dd_outer")
-        inner = st.slider("內層容器 px", 42, 116, int(cfg["inner_height"]), 1, key="spt_dd_inner")
-        line = st.slider("文字行高 px", 24, 72, int(cfg["text_line_height"]), 1, key="spt_dd_line")
-        font = st.slider("字體大小 px", 12, 28, int(cfg["font_size"]), 1, key="spt_dd_font")
-        option = st.slider("展開選項高度 px", 32, 90, int(cfg["option_height"]), 1, key="spt_dd_option")
-        tag = st.slider("多選標籤高度 px", 28, 72, int(cfg["tag_height"]), 1, key="spt_dd_tag")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("▣ 永久套用", key="spt_dd_save", use_container_width=True):
-                new_cfg = {
-                    "enabled": enabled,
-                    "outer_height": int(outer),
-                    "inner_height": int(inner),
-                    "text_line_height": int(line),
-                    "font_size": int(font),
-                    "option_height": int(option),
-                    "tag_height": int(tag),
-                    "panel_bg": "#eaf8ff",
-                    "field_bg": "#edf8ff",
-                    "text_color": "#03121f",
-                }
-                _spt_save_dropdown_settings(new_cfg)
-                st.success("下拉選單尺寸已永久記錄。請重新整理或切換頁面後套用。")
-        with col2:
-            if st.button("↺ 預設值", key="spt_dd_reset", use_container_width=True):
-                _spt_save_dropdown_settings(dict(_SPT_UI_DROPDOWN_DEFAULTS))
-                st.success("已恢復下拉選單預設尺寸。請重新整理或切換頁面後套用。")
-
-# Apply CSS and render hidden panel on import.
-try:
-    apply_v269_configurable_dropdown_css()
-except Exception:
-    pass
 
 try:
     render_dropdown_size_settings_panel()
@@ -3025,138 +2998,16 @@ except Exception:
 
 # ===== V2.70 MAIN PAGE DROPDOWN SIZE PANEL FALLBACK START =====
 def render_dropdown_size_settings_panel_main_fallback():
+    """V3.16: Dropdown Size Settings panel is permanently removed from UI.
+
+    Keep this function name so older pages/services can call it safely, but never
+    render the deleted panel again.
     """
-    V2.70:
-    Some Streamlit deployments do not show widgets rendered in st.sidebar from imported theme modules.
-    This fallback renders a collapsed panel in the main page so the setting is always visible.
-    """
-    try:
-        import streamlit as st
-    except Exception:
-        return
+    return None
 
-    # One panel per page render.
-    if st.session_state.get("_spt_v270_dropdown_main_panel_rendered"):
-        return
-    st.session_state["_spt_v270_dropdown_main_panel_rendered"] = True
 
-    cfg = _spt_load_dropdown_settings()
-
-    with st.expander("⚙ 下拉選單尺寸設定 / Dropdown Size Settings（收合）", expanded=False):
-        st.caption("此設定會永久保存，所有模組共用。若下拉文字被切掉，先把外框高度與內層容器調大。")
-
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            enabled = st.checkbox("啟用自訂尺寸", value=bool(cfg.get("enabled", True)), key="spt_v270_dd_enabled")
-            outer = st.number_input("外框高度 px", min_value=48, max_value=140, value=int(cfg.get("outer_height", 70)), step=1, key="spt_v270_dd_outer")
-            inner = st.number_input("內層容器 px", min_value=42, max_value=136, value=int(cfg.get("inner_height", 66)), step=1, key="spt_v270_dd_inner")
-        with c2:
-            line = st.number_input("文字行高 px", min_value=24, max_value=90, value=int(cfg.get("text_line_height", 36)), step=1, key="spt_v270_dd_line")
-            font = st.number_input("字體大小 px", min_value=12, max_value=32, value=int(cfg.get("font_size", 16)), step=1, key="spt_v270_dd_font")
-            option = st.number_input("展開選項高度 px", min_value=32, max_value=110, value=int(cfg.get("option_height", 46)), step=1, key="spt_v270_dd_option")
-        with c3:
-            tag = st.number_input("多選標籤高度 px", min_value=28, max_value=90, value=int(cfg.get("tag_height", 40)), step=1, key="spt_v270_dd_tag")
-            st.markdown(
-                f"""
-                <div style="margin-top:8px;padding:12px;border-radius:12px;background:#edf8ff;color:#03121f;font-weight:900;">
-                    預覽高度：外框 {int(outer)}px｜內層 {int(inner)}px｜文字 {int(line)}px
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        b1, b2, b3 = st.columns(3)
-        with b1:
-            if st.button("▣ 永久套用下拉尺寸", key="spt_v270_dd_save", use_container_width=True):
-                new_cfg = {
-                    "enabled": bool(enabled),
-                    "outer_height": int(outer),
-                    "inner_height": int(inner),
-                    "text_line_height": int(line),
-                    "font_size": int(font),
-                    "option_height": int(option),
-                    "tag_height": int(tag),
-                    "panel_bg": "#eaf8ff",
-                    "field_bg": "#edf8ff",
-                    "text_color": "#03121f",
-                }
-                _spt_save_dropdown_settings(new_cfg)
-                st.success("下拉選單尺寸已永久保存。請按重新整理或切換頁面後生效。")
-        with b2:
-            if st.button("↺ 恢復建議值", key="spt_v270_dd_recommended", use_container_width=True):
-                new_cfg = dict(_SPT_UI_DROPDOWN_DEFAULTS)
-                new_cfg.update({
-                    "outer_height": 80,
-                    "inner_height": 76,
-                    "text_line_height": 40,
-                    "font_size": 17,
-                    "option_height": 50,
-                    "tag_height": 42,
-                })
-                _spt_save_dropdown_settings(new_cfg)
-                st.success("已套用建議值：外框80、內層76、文字40、字體17。請重新整理或切換頁面後生效。")
-        with b3:
-            if st.button("↺ 恢復預設值", key="spt_v270_dd_reset", use_container_width=True):
-                _spt_save_dropdown_settings(dict(_SPT_UI_DROPDOWN_DEFAULTS))
-                st.success("已恢復預設值。請重新整理或切換頁面後生效。")
-
-# Render the main-page fallback after CSS is applied.
 try:
     render_dropdown_size_settings_panel_main_fallback()
 except Exception:
     pass
 # ===== V2.70 MAIN PAGE DROPDOWN SIZE PANEL FALLBACK END =====
-
-
-# ===== V3.11 UNIFIED TABLE TOOLBAR HIDE START =====
-def apply_v311_unified_table_toolbar_hide():
-    """Hide Streamlit dataframe/data_editor floating toolbar icons for unified table style."""
-    try:
-        import streamlit as st
-    except Exception:
-        return
-    st.markdown(
-        """
-        <style>
-        /* V3.11｜統一表格樣式：隱藏 Streamlit 表格右上角內建工具列。 */
-        [data-testid="stElementToolbar"],
-        [data-testid="stDataFrame"] [data-testid="stElementToolbar"],
-        [data-testid="stDataEditor"] [data-testid="stElementToolbar"],
-        div[data-testid="stDataFrame"] div[aria-label="Fullscreen"],
-        div[data-testid="stDataFrame"] button[title*="Download"],
-        div[data-testid="stDataFrame"] button[title*="下載"],
-        div[data-testid="stDataEditor"] div[aria-label="Fullscreen"],
-        div[data-testid="stDataEditor"] button[title*="Download"],
-        div[data-testid="stDataEditor"] button[title*="下載"] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-try:
-    apply_v311_unified_table_toolbar_hide()
-except Exception:
-    pass
-
-for _spt_v311_name in (
-    "apply_theme", "apply_global_theme", "inject_theme", "inject_global_css", "render_global_css", "apply_app_theme"
-):
-    _spt_v311_func = globals().get(_spt_v311_name)
-    if callable(_spt_v311_func) and not getattr(_spt_v311_func, "_spt_v311_wrapped", False):
-        def _spt_v311_make_wrapper(_original):
-            def _spt_v311_wrapper(*args, **kwargs):
-                result = _original(*args, **kwargs)
-                try:
-                    apply_v311_unified_table_toolbar_hide()
-                except Exception:
-                    pass
-                return result
-            _spt_v311_wrapper._spt_v311_wrapped = True
-            return _spt_v311_wrapper
-        globals()[_spt_v311_name] = _spt_v311_make_wrapper(_spt_v311_func)
-# ===== V3.11 UNIFIED TABLE TOOLBAR HIDE END =====
