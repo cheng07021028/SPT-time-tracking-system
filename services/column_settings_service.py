@@ -593,6 +593,62 @@ def _inject_native_header_sort_style() -> None:
     except Exception:
         pass
 
+
+# ===== V2.92 NATIVE HEADER SORT FOR LOCKED EDITORS START =====
+def _v292_is_fully_locked_editor(kwargs: dict) -> bool:
+    """Return True when a data_editor is being used only as read-only display.
+
+    Streamlit's editable grid can make header sort unreliable when it is rendered
+    disabled inside a form.  For locked/read-only mode, render the same data via
+    st.dataframe so the original header row keeps native left-click sorting.
+    """
+    try:
+        disabled = kwargs.get("disabled", False)
+        if disabled is True:
+            return True
+        if isinstance(disabled, (list, tuple, set)) and disabled:
+            # Only treat it as fully locked if every visible column is disabled; normal partial-disabled
+            # data_editor should stay editable.
+            return False
+    except Exception:
+        pass
+    return False
+
+
+def _v292_locked_editor_as_sortable_dataframe(original_dataframe, df: pd.DataFrame, *args, **kwargs):
+    """Render locked st.data_editor as st.dataframe and return df unchanged."""
+    frame_kwargs = dict(kwargs)
+    # data_editor-only arguments that st.dataframe does not accept.
+    for k in [
+        "num_rows", "disabled", "on_change", "args", "kwargs",
+        "row_height", "column_order", "hide_index", "use_container_width",
+        "height", "width", "key", "column_config",
+    ]:
+        pass
+    dataframe_kwargs = {
+        "use_container_width": frame_kwargs.get("use_container_width", True),
+        "hide_index": frame_kwargs.get("hide_index", True),
+    }
+    if frame_kwargs.get("height") is not None:
+        dataframe_kwargs["height"] = frame_kwargs.get("height")
+    if frame_kwargs.get("width") is not None:
+        dataframe_kwargs["width"] = frame_kwargs.get("width")
+    if frame_kwargs.get("key") is not None:
+        dataframe_kwargs["key"] = f"readonly_sort::{_safe_widget_suffix(str(frame_kwargs.get('key')))}"
+    if frame_kwargs.get("column_config") is not None:
+        dataframe_kwargs["column_config"] = frame_kwargs.get("column_config")
+    if frame_kwargs.get("column_order") is not None:
+        safe_order = _safe_streamlit_column_order(df, frame_kwargs.get("column_order"))
+        if safe_order:
+            dataframe_kwargs["column_order"] = safe_order
+    try:
+        original_dataframe(df, **dataframe_kwargs)
+    except TypeError:
+        dataframe_kwargs.pop("column_order", None)
+        original_dataframe(df, **dataframe_kwargs)
+    return df.copy()
+# ===== V2.92 NATIVE HEADER SORT FOR LOCKED EDITORS END =====
+
 def install_column_settings_patch() -> None:
     """全域安裝表格欄位設定包裝，不需要逐頁改程式。"""
     if getattr(st, "_spt_column_settings_installed", False):
@@ -632,6 +688,18 @@ def install_column_settings_patch() -> None:
         if df is not None and len(df.columns) > 0:
             key = kwargs.get("key")
             table_id = _stable_table_id(df, key=key, kind="data_editor")
+            # V2.92：如果 data_editor 只是鎖定檢視，改用 st.dataframe 顯示，保留原標題列左鍵排序。
+            if _v292_is_fully_locked_editor(kwargs):
+                table_setting, _ = _settings_editor(table_id, df, editable=False)
+                readonly_df = _apply_settings_to_df(df, table_setting, editable=False)
+                cfg = {**_build_column_config(df, table_setting), **kwargs.get("column_config", {})}
+                local_kwargs = dict(kwargs)
+                local_kwargs["column_config"] = cfg
+                if "column_order" not in local_kwargs:
+                    order = _visible_order(df, table_setting, editable=False)
+                    if order:
+                        local_kwargs["column_order"] = order
+                return _v292_locked_editor_as_sortable_dataframe(original_dataframe, readonly_df, *args, **local_kwargs)
             table_setting, _ = _settings_editor(table_id, df, editable=True)
             # V1.73：不在全域 wrapper 內再產生「啟動/停止編輯」按鈕。
             # 各頁若已有自己的編輯保護按鈕，保留各頁原本的一組；避免重複顯示與 st.form 內 st.button 錯誤。

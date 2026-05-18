@@ -1419,3 +1419,157 @@ def has_permission(username: str, module_code: str, action: str = "can_view") ->
 
 
 check_permission = has_permission
+
+
+# ===== V2.92 ACCOUNT MASTER AUTHORITATIVE PERMISSION SYNC START =====
+def _v292_clean_usernames(usernames: Iterable[str] | None = None) -> list[str]:
+    try:
+        if usernames is None:
+            conn = connect_db()
+            rows = conn.execute("SELECT username FROM auth_users ORDER BY username").fetchall()
+            conn.close()
+            return [str(r["username"]).strip() for r in rows if str(r["username"]).strip()]
+        return sorted({str(u or "").strip() for u in usernames if str(u or "").strip()})
+    except Exception:
+        return []
+
+
+def _v292_clear_all_permission_caches() -> None:
+    clear_permission_runtime_cache()
+    if st is None:
+        return
+    try:
+        for k in list(st.session_state.keys()):
+            if (
+                k.startswith("_v132_perm_")
+                or k.startswith("_spt_perm_cache_")
+                or k in {"auth_roles", "role", "roles"}
+            ):
+                st.session_state.pop(k, None)
+    except Exception:
+        pass
+
+
+def sync_user_permissions_from_roles(usernames: Iterable[str], reason: str = "role_changed") -> int:  # type: ignore[override]
+    """V2.92 authoritative role -> Account Module Permissions sync.
+
+    Account Master is the single source of role.  When a user's role is saved,
+    remove that user's old module-permission rows and rebuild them from the
+    current auth_users.role_code.  This prevents the old mixed state such as
+    login bar showing "admin, operator" while Account Master says "operator".
+    """
+    init_permission_tables()
+    target_users = _v292_clean_usernames(usernames)
+    if not target_users:
+        return 0
+    conn = connect_db()
+    cur = conn.cursor()
+    updated = 0
+    _ensure_legacy_security_tables(cur)
+    for username in target_users:
+        u = cur.execute("SELECT username, role_code FROM auth_users WHERE username=?", (username,)).fetchone()
+        if not u:
+            cur.execute("DELETE FROM auth_account_permissions WHERE username=?", (username,))
+            cur.execute("DELETE FROM security_user_roles WHERE username=?", (username,))
+            continue
+        role = str(u["role_code"] or "operator").strip() or "operator"
+        # Remove stale module rows first so the matrix cannot keep old-role residue.
+        cur.execute("DELETE FROM auth_account_permissions WHERE username=?", (username,))
+        cur.execute("DELETE FROM security_user_roles WHERE username=?", (username,))
+        cur.execute("INSERT OR IGNORE INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
+        for m in MODULES:
+            preset = _role_preset_for_module(role, m["module_code"])
+            cur.execute("""
+                INSERT INTO auth_account_permissions
+                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (
+                username, m["module_code"], m["module_name_zh"], m["module_name_en"],
+                preset["can_view"], preset["can_create"], preset["can_edit"], preset["can_delete"],
+                preset["can_import"], preset["can_export"], preset["can_backup"], preset["can_restore"], preset["can_manage"], now_text()
+            ))
+            updated += 1
+    conn.commit()
+    conn.close()
+    _v292_clear_all_permission_caches()
+    return updated
+
+
+def reconcile_account_master_permissions_authoritative(usernames: Iterable[str] | None = None, reason: str = "account_master_authoritative") -> int:
+    """Public helper used by 10｜權限管理 after Account Master save."""
+    target = _v292_clean_usernames(usernames)
+    if not target:
+        return 0
+    return sync_user_permissions_from_roles(target, reason=reason)
+
+
+def sync_auth_users_to_runtime_security(usernames: Iterable[str] | None = None) -> int:  # type: ignore[override]
+    """V2.92 runtime login-role sync with stale-role cleanup."""
+    init_permission_tables()
+    conn = connect_db()
+    cur = conn.cursor()
+    _ensure_legacy_security_tables(cur)
+    target = _v292_clean_usernames(usernames)
+    params: list[str] = []
+    where = ""
+    if target:
+        where = " WHERE username IN ({})".format(",".join(["?"] * len(target)))
+        params = target
+    rows = cur.execute("SELECT * FROM auth_users" + where, params).fetchall()
+    count = 0
+    for r in rows:
+        username = str(r["username"]).strip()
+        if not username:
+            continue
+        cur.execute("""
+            INSERT INTO security_users
+            (username,password_hash,employee_id,display_name,email,is_active,force_password_change,last_login_at,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(username) DO UPDATE SET
+                password_hash=excluded.password_hash,
+                employee_id=excluded.employee_id,
+                display_name=excluded.display_name,
+                email=excluded.email,
+                is_active=excluded.is_active,
+                force_password_change=excluded.force_password_change,
+                last_login_at=excluded.last_login_at,
+                updated_at=excluded.updated_at
+        """, (
+            username, r["password_hash"], r["employee_id"], r["display_name"], r["email"],
+            int(r["is_active"] or 0), int(r["force_password_change"] or 0), r["last_login_at"],
+            r["created_at"] or now_text(), now_text(),
+        ))
+        role = str(r["role_code"] or "operator").strip() or "operator"
+        cur.execute("DELETE FROM security_user_roles WHERE username=?", (username,))
+        cur.execute("INSERT INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
+        count += 1
+    conn.commit()
+    conn.close()
+    _v292_clear_all_permission_caches()
+    return count
+
+
+def get_account_permissions() -> List[dict]:  # type: ignore[override]
+    """Always display permission matrix role from Account Master, never stale rows."""
+    reconcile_permission_matrix_for_current_modules(force=False)
+    import time
+    cache = _cache_get("_v132_perm_matrix_cache")
+    if cache and time.time() - float(cache.get("ts", 0)) < _PERMISSION_CACHE_TTL_SECONDS:
+        return cache.get("data", [])
+    conn = connect_db()
+    rows = conn.execute("""
+        SELECT p.username,
+               COALESCE(u.display_name, p.username) AS display_name,
+               COALESCE(u.role_code, 'operator') AS role_code,
+               p.module_code, p.module_name_zh, p.module_name_en,
+               p.can_view, p.can_create, p.can_edit, p.can_delete, p.can_import, p.can_export,
+               p.can_backup, p.can_restore, p.can_manage, p.updated_at
+        FROM auth_account_permissions p
+        INNER JOIN auth_users u ON u.username = p.username
+        ORDER BY p.username, CAST(p.module_code AS INTEGER)
+    """).fetchall()
+    conn.close()
+    data = [dict(r) for r in rows]
+    _cache_set("_v132_perm_matrix_cache", {"ts": time.time(), "data": data})
+    return data
+# ===== V2.92 ACCOUNT MASTER AUTHORITATIVE PERMISSION SYNC END =====
