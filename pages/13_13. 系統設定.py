@@ -18,6 +18,15 @@ from services.system_settings_service import (
     get_live_page_reset_time,
     save_live_page_reset_time,
 )
+from services.persistence_guard_service import (
+    create_persistent_backup,
+    check_persistent_health,
+    restore_latest_persistent_backup,
+    ensure_initialized_marker,
+    is_initialized,
+    list_persistent_backups,
+)
+
 from services.db_service import flush_pending_permanent_state
 
 st.set_page_config(page_title="13. 系統設定", page_icon="⌬️", layout="wide")
@@ -111,6 +120,146 @@ def _refresh_after_apply(message: str, *edit_mode_keys: str) -> None:
     st.rerun()
 
 
+
+
+
+def _short_path(path) -> str:
+    try:
+        p = str(path).replace("\\", "/")
+        marker = "/data/_persistent_backup/"
+        if marker in p:
+            return "data/_persistent_backup/" + p.split(marker, 1)[1]
+        return p
+    except Exception:
+        return str(path)
+
+
+def _render_persistence_guard_center() -> None:
+    """Render data/settings protection tools inside 13｜系統設定.
+
+    This replaces .bat execution. It only uses Streamlit buttons and Python service calls.
+    It must not restore deleted panels such as Operation Results or Dropdown Size Settings.
+    """
+    st.subheader("資料與設定保護中心 / Persistence Guard")
+    st.caption(
+        "不用執行 .bat。這裡可直接建立正式使用標記、手動備份、健康檢查與最近備份還原。"
+        "此功能只保護資料與設定，不修改工時計算、權限邏輯或畫面樣式。"
+    )
+
+    try:
+        initialized = bool(is_initialized())
+        backups = list_persistent_backups()
+    except Exception as exc:
+        st.error(f"資料保護服務載入失敗：{exc}")
+        return
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("正式使用標記", "已建立" if initialized else "未建立")
+    k2.metric("備份數量", len(backups))
+    k3.metric("最近備份", backups[0].name if backups else "無")
+    k4.metric("執行方式", "系統設定內按鈕")
+
+    if backups:
+        with st.expander("最近備份清單 / Latest Backups", expanded=False):
+            backup_rows = []
+            for p in backups[:10]:
+                try:
+                    backup_rows.append({
+                        "備份資料夾": p.name,
+                        "路徑": _short_path(p),
+                        "修改時間": pd.to_datetime(p.stat().st_mtime, unit="s").strftime("%Y-%m-%d %H:%M:%S"),
+                    })
+                except Exception:
+                    backup_rows.append({"備份資料夾": str(p), "路徑": _short_path(p), "修改時間": ""})
+            st.dataframe(pd.DataFrame(backup_rows), use_container_width=True, hide_index=True)
+
+    if not can_manage:
+        st.info("你目前只有查看權限。備份、初始化與還原需 can_manage / can_edit 權限。")
+        try:
+            health = check_persistent_health(write_manifest=False)
+            with st.expander("查看目前資料健康摘要 / Health Summary", expanded=False):
+                st.json({
+                    "initialized": health.get("initialized"),
+                    "db_exists": health.get("db_exists"),
+                    "warnings": health.get("warnings", []),
+                    "errors": health.get("errors", []),
+                    "db_counts": health.get("db_counts", {}),
+                })
+        except Exception as exc:
+            st.warning(f"健康檢查讀取失敗：{exc}")
+        st.divider()
+        return
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button("▣ 啟用資料保護並建立備份", key="spt_persistence_guard_install_ui_v295", use_container_width=True):
+            try:
+                ensure_initialized_marker()
+                result = create_persistent_backup(reason="ui_install_from_13_system_settings", include_database=True)
+                if result.get("ok"):
+                    st.success(f"資料保護已啟用，已建立備份：{result.get('backup_dir')}｜檔案數：{result.get('file_count')}")
+                else:
+                    st.error(f"資料保護啟用失敗：{result}")
+            except Exception as exc:
+                st.error(f"資料保護啟用失敗：{exc}")
+
+    with c2:
+        if st.button("▣ 立即備份資料與設定", key="spt_persistence_guard_backup_ui_v295", use_container_width=True):
+            try:
+                result = create_persistent_backup(reason="ui_manual_backup_from_13_system_settings", include_database=True)
+                if result.get("ok"):
+                    st.success(f"已完成備份：{result.get('backup_dir')}｜檔案數：{result.get('file_count')}")
+                else:
+                    st.error(f"備份失敗：{result}")
+            except Exception as exc:
+                st.error(f"備份失敗：{exc}")
+
+    with c3:
+        if st.button("◇ 執行資料健康檢查", key="spt_persistence_guard_health_ui_v295", use_container_width=True):
+            try:
+                st.session_state["_spt_13_persistence_health_v295"] = check_persistent_health(write_manifest=True)
+            except Exception as exc:
+                st.session_state["_spt_13_persistence_health_v295"] = {"errors": [str(exc)], "warnings": []}
+
+    health = st.session_state.get("_spt_13_persistence_health_v295")
+    if health:
+        errors = health.get("errors", []) or []
+        warnings = health.get("warnings", []) or []
+        if errors:
+            st.error("資料健康檢查發現錯誤，請先不要覆蓋或重啟大量資料。")
+        elif warnings:
+            st.warning("資料健康檢查有警告，建議先備份後再更新模組。")
+        else:
+            st.success("資料健康檢查通過，目前未發現資料遺失或回預設風險。")
+        with st.expander("健康檢查明細 / Health Check Detail", expanded=False):
+            st.json({
+                "initialized": health.get("initialized"),
+                "db_exists": health.get("db_exists"),
+                "db_path": health.get("db_path"),
+                "db_counts": health.get("db_counts", {}),
+                "warnings": warnings,
+                "errors": errors,
+                "json_status": health.get("json_status", []),
+            })
+
+    with st.expander("危險操作：還原最近備份 / Restore Latest Backup", expanded=False):
+        st.warning("還原會把 data/persistent_modules、data/persistent_state、data/database 回復到最近備份。請先確認目前資料已備份。")
+        confirm_restore = st.checkbox("我確認要還原最近備份", key="spt_persistence_guard_restore_confirm_v295")
+        include_secrets = st.checkbox("同時還原 .streamlit 設定檔 / secrets（一般不建議）", value=False, key="spt_persistence_guard_restore_secrets_v295")
+        if st.button("↺ 還原最近備份", key="spt_persistence_guard_restore_ui_v295", use_container_width=True, disabled=not confirm_restore):
+            try:
+                result = restore_latest_persistent_backup(include_secrets=include_secrets)
+                if result.get("ok"):
+                    st.success(f"已還原最近備份：{result.get('source')}｜還原項目：{', '.join(result.get('restored', []))}")
+                    st.info("建議現在 Reboot App，讓系統重新讀取還原後的資料。")
+                else:
+                    st.error(f"還原失敗：{result.get('message', result)}")
+            except Exception as exc:
+                st.error(f"還原失敗：{exc}")
+
+    st.divider()
+
+_render_persistence_guard_center()
 
 # -----------------------------------------------------------------------------
 # 0) Excel import/export for all system settings
