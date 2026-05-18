@@ -187,63 +187,30 @@ def table_count(conn: sqlite3.Connection, table: str) -> int:
 
 
 def load_json(path: Path, default: Any = None) -> Any:
-    try:
-        from services.persistence_guard_service import safe_load_json
-        return safe_load_json(path, default, allow_default_when_missing=True)
-    except Exception as exc:
-        # Existing corrupted JSON must never silently become defaults.
-        if path.exists():
-            raise RuntimeError(f"Persistent JSON read failed; default reset blocked: {path} | {exc}") from exc
+    if not path.exists():
         return default
-
-
-def _payload_data_count(payload: Any) -> int:
-    if isinstance(payload, list):
-        return len(payload)
-    if not isinstance(payload, dict):
-        return 0
-    total = 0
-    counts = payload.get("counts") or payload.get("table_counts")
-    if isinstance(counts, dict):
-        for v in counts.values():
-            try:
-                total += max(0, int(v or 0))
-            except Exception:
-                pass
-    tables = payload.get("tables")
-    if isinstance(tables, dict):
-        for v in tables.values():
-            if isinstance(v, list):
-                total += len(v)
-            elif isinstance(v, dict) and isinstance(v.get("records"), list):
-                total += len(v.get("records") or [])
-    for key in ("records", "data"):
-        if isinstance(payload.get(key), list):
-            total += len(payload.get(key) or [])
-    return total
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        # V2.94 Persistence Guard: if the file exists but is corrupted, do not
+        # silently return defaults. Try to restore the single file from latest
+        # backup first; if that fails, raise so the operator can restore safely.
+        try:
+            from services.persistence_guard_service import quarantine_corrupt_file, restore_single_file_from_latest_backup
+            quarantine_corrupt_file(path, reason=str(exc))
+            restored = restore_single_file_from_latest_backup(path)
+            if restored.get("ok"):
+                return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+        raise RuntimeError(f"Persistent JSON read failed; default reset blocked: {path} | {exc}")
 
 
 def save_json(path: Path, payload: Any) -> None:
-    # Guard against a common data-loss pattern: DB/read failure produces an empty
-    # module payload, which then overwrites an older non-empty persistent JSON.
-    if path.exists() and _payload_data_count(payload) == 0:
-        try:
-            old = load_json(path, {})
-            if _payload_data_count(old) > 0 and path.name.endswith("_records.json"):
-                raise RuntimeError(f"Blocked empty overwrite of non-empty module records: {path}")
-        except RuntimeError:
-            raise
-        except Exception:
-            pass
-    try:
-        from services.persistence_guard_service import atomic_save_json
-        atomic_save_json(path, payload, backup_existing=True)
-    except Exception:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default), encoding="utf-8")
-        json.loads(tmp.read_text(encoding="utf-8"))
-        tmp.replace(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default), encoding="utf-8")
+    tmp.replace(path)
 
 
 def append_audit(module_code: str, action: str, username: str = "SYSTEM", detail: Optional[Dict[str, Any]] = None) -> None:
@@ -286,12 +253,6 @@ def export_module_records(module_code: str, username: str = "SYSTEM", write_hist
         payload["warning"] = "SQLite DB not found; exported empty module state."
 
     latest = latest_records_path(module_code)
-    # Do not create/overwrite module records with an empty export when DB is
-    # missing or all related tables are empty after an update/reboot.
-    if _payload_data_count(payload) == 0:
-        if latest.exists():
-            return {"ok": False, "skipped": True, "module_code": module_code, "reason": "empty export blocked to protect existing module records", "path": str(latest)}
-        return {"ok": False, "skipped": True, "module_code": module_code, "reason": "empty export blocked; no DB/module data available"}
     save_json(latest, payload)
     if write_history:
         save_json(history_records_path(module_code), payload)

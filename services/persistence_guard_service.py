@@ -89,17 +89,8 @@ def _json_load(path: Path) -> Any:
 
 
 def _json_dump(path: Path, payload: Any) -> None:
-    """Atomic JSON dump used by guard metadata.
-
-    Even guard metadata should never be half-written, because corrupted guard
-    files can make the app believe no backup exists and then recreate defaults.
-    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-    # Validate before replace.
-    json.loads(tmp.read_text(encoding="utf-8"))
-    tmp.replace(path)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
 
 
 def atomic_save_json(path: Path | str, payload: Any, *, backup_existing: bool = True) -> dict[str, Any]:
@@ -126,13 +117,6 @@ def safe_load_json(path: Path | str, default: Any = None, *, allow_default_when_
     """
     target = Path(path)
     if not target.exists():
-        # If the project has already been initialized, a missing protected JSON
-        # is not treated as a clean install. Try to restore it from internal or
-        # external backups before allowing defaults.
-        if is_initialized():
-            restored = restore_single_file_from_latest_backup(target)
-            if restored.get("ok"):
-                return _json_load(target)
         if allow_default_when_missing:
             return default
         raise FileNotFoundError(f"Persistent JSON not found: {_rel(target)}")
@@ -229,88 +213,8 @@ def list_persistent_backups() -> list[Path]:
     return sorted(items, key=lambda p: p.stat().st_mtime, reverse=True)
 
 
-def _external_backup_root_candidates() -> list[Path]:
-    """Return possible external backup roots configured from 13｜系統設定.
-
-    This intentionally avoids importing Streamlit and never modifies settings.
-    """
-    roots: list[Path] = []
-    for p in [
-        DATA_DIR / "config" / "auto_external_backup_schedule.json",
-        PERSISTENT_STATE_DIR / "auto_external_backup_state.json",
-    ]:
-        try:
-            if not p.exists() or p.stat().st_size <= 0:
-                continue
-            payload = json.loads(p.read_text(encoding="utf-8"))
-            if not isinstance(payload, dict):
-                continue
-            for key in ("target_folder", "backup_root", "root", "folder"):
-                value = str(payload.get(key) or "").strip().strip('"')
-                if value:
-                    roots.append(Path(value).expanduser())
-            value = str(payload.get("last_backup_dir") or "").strip().strip('"')
-            if value:
-                last = Path(value).expanduser()
-                roots.append(last.parent if last.name else last)
-        except Exception:
-            continue
-    # Deduplicate preserving order.
-    seen: set[str] = set()
-    out: list[Path] = []
-    for r in roots:
-        try:
-            key = str(r.resolve())
-        except Exception:
-            key = str(r)
-        if key not in seen:
-            seen.add(key)
-            out.append(r)
-    return out
-
-
-def list_external_persistent_backups() -> list[Path]:
-    """List external full backups created from 13｜系統設定.
-
-    External backups have the same project-relative layout (data/...,
-    .streamlit/...) and contain SPT_BACKUP_MANIFEST.json. These must be included
-    in restore/search fallback, otherwise the system may say no backup exists even
-    when the user selected an external backup folder.
-    """
-    items: list[Path] = []
-    for root in _external_backup_root_candidates():
-        try:
-            if not root.exists() or not root.is_dir():
-                continue
-            for p in root.glob("SPT_time_tracking_backup_*"):
-                if p.is_dir() and ((p / "SPT_BACKUP_MANIFEST.json").exists() or (p / "data").exists()):
-                    items.append(p)
-            # Also allow custom backup name prefixes; manifest is the reliable marker.
-            for manifest in root.glob("*/SPT_BACKUP_MANIFEST.json"):
-                parent = manifest.parent
-                if parent.is_dir() and parent not in items:
-                    items.append(parent)
-        except Exception:
-            continue
-    return sorted(items, key=lambda p: p.stat().st_mtime, reverse=True)
-
-
-def list_all_persistent_backups(include_external: bool = True) -> list[Path]:
-    items = list_persistent_backups()
-    if include_external:
-        items.extend(list_external_persistent_backups())
-    seen: set[str] = set()
-    out: list[Path] = []
-    for p in sorted(items, key=lambda x: x.stat().st_mtime if x.exists() else 0, reverse=True):
-        key = str(p.resolve()) if p.exists() else str(p)
-        if key not in seen:
-            seen.add(key)
-            out.append(p)
-    return out
-
-
 def latest_backup_dir() -> Path | None:
-    items = list_all_persistent_backups(include_external=True)
+    items = list_persistent_backups()
     return items[0] if items else None
 
 
@@ -362,7 +266,7 @@ def restore_single_file_from_latest_backup(target: Path | str) -> dict[str, Any]
         rel = target.resolve().relative_to(PROJECT_ROOT.resolve())
     except Exception:
         return {"ok": False, "message": "target outside project root"}
-    for backup in list_all_persistent_backups(include_external=True):
+    for backup in list_persistent_backups():
         src = backup / rel
         if src.exists() and src.is_file() and src.stat().st_size > 0:
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -473,9 +377,6 @@ def check_persistent_health(write_manifest: bool = True) -> dict[str, Any]:
         "json_status": json_status,
         "warnings": warnings,
         "errors": errors,
-        "internal_backup_count": len(list_persistent_backups()),
-        "external_backup_count": len(list_external_persistent_backups()),
-        "latest_backup_dir": str(latest_backup_dir() or ""),
     }
     if write_manifest:
         _json_dump(MANIFEST_PATH, manifest)
@@ -485,34 +386,20 @@ def check_persistent_health(write_manifest: bool = True) -> dict[str, Any]:
 def guard_before_database_init() -> dict[str, Any]:
     """DB schema 初始化前的輕量保護。
 
-    專業防護原則：只要專案已有任何持久資料或備份跡象，就不能把 DB
-    遺失視為第一次安裝。若 DB 不見，會先從內建或外部備份還原；找不到
-    備份才允許 schema 建立，但會在 health manifest 留警告。
+    若專案已初始化但 DB 檔不見，先從最近備份還原 DB，避免直接建立空 DB。
     """
     PERSISTENT_STATE_DIR.mkdir(parents=True, exist_ok=True)
-
-    existing_evidence = any([
-        INITIALIZED_MARKER.exists(),
-        bool(list_all_persistent_backups(include_external=True)),
-        any(PERSISTENT_MODULES_DIR.rglob("*.json")) if PERSISTENT_MODULES_DIR.exists() else False,
-        any(PERSISTENT_STATE_DIR.glob("*.json")) if PERSISTENT_STATE_DIR.exists() else False,
-    ])
-
-    if not DB_PATH.exists() and existing_evidence:
-        for backup in list_all_persistent_backups(include_external=True):
+    if not is_initialized():
+        ensure_initialized_marker()
+        return {"ok": True, "first_init": True, "message": "initialized marker created"}
+    if not DB_PATH.exists():
+        for backup in list_persistent_backups():
             src = backup / "data" / "database" / DB_PATH.name
             if src.exists() and src.stat().st_size > 0:
                 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, DB_PATH)
-                ensure_initialized_marker()
-                return {"ok": True, "restored_db": _rel(src), "source_backup": str(backup)}
-        ensure_initialized_marker()
-        return {"ok": False, "warning": "DB missing; persistent evidence exists but no backup DB found. Schema creation allowed without overwriting persistent JSON."}
-
-    if not is_initialized():
-        ensure_initialized_marker()
-        return {"ok": True, "first_init": True, "message": "initialized marker created"}
-
+                return {"ok": True, "restored_db": _rel(src)}
+        return {"ok": False, "warning": "DB missing and no backup DB found"}
     return {"ok": True, "skipped": True}
 
 
