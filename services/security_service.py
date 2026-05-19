@@ -2067,3 +2067,118 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
         st.stop()
 
 require_permission = require_module_access
+
+
+# ===== V3.45 login/home acceleration final override =====
+# Keep all permissions and permanence features, but remove heavy restore/rebuild
+# work from the login/home critical path.  Users reported that V3.43 could enter
+# successfully but spent too long spinning after login.
+
+def _v345_recent_history_files(history_dir: Path, pattern: str, limit: int = 5) -> list[Path]:
+    try:
+        return sorted(history_dir.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)[:limit]
+    except Exception:
+        return []
+
+
+def _best_local_auth_tables() -> dict[str, list[dict[str, Any]]]:  # type: ignore[override]
+    """Find local 10_permissions JSON quickly, without scanning all history files."""
+    candidates: list[Path] = []
+    base = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions"
+    for name in ("10_permissions_records.json", "10_permissions_settings.json", "security_settings.json"):
+        candidates.append(base / name)
+    hist = base / "history"
+    candidates.extend(_v345_recent_history_files(hist, "10_permissions_records_*.json", limit=5))
+    candidates.extend(_v345_recent_history_files(hist, "10_permissions_settings_*.json", limit=5))
+
+    best: dict[str, list[dict[str, Any]]] = {}
+    best_score = -1
+    for path in candidates:
+        try:
+            if not path.exists() or path.stat().st_size <= 0:
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            tables = payload.get("tables", {}) if isinstance(payload, dict) else {}
+            users = tables.get("auth_users", []) if isinstance(tables, dict) else []
+            perms = tables.get("auth_account_permissions", []) if isinstance(tables, dict) else []
+            if not isinstance(users, list):
+                users = []
+            if not isinstance(perms, list):
+                perms = []
+            non_default = [u for u in users if str(u.get("note", "")).find("default account") < 0]
+            score = len(users) * 1000 + len(non_default) * 100 + len(perms)
+            if users and score > best_score:
+                best_score = score
+                best = {"auth_users": users, "auth_account_permissions": perms}
+        except Exception:
+            continue
+    return best
+
+
+def _auth_user_row(username: str) -> dict[str, Any] | None:  # type: ignore[override]
+    """Fast login read: use DB first; restore from local JSON only if account is missing."""
+    username = (username or "").strip()
+    if not username:
+        return None
+    try:
+        _ensure_auth_users_schema_lightweight()
+        row = query_one("SELECT * FROM auth_users WHERE username=?", (username,))
+        if row:
+            return row
+        _restore_auth_users_lightweight_if_needed(username)
+        return query_one("SELECT * FROM auth_users WHERE username=?", (username,))
+    except Exception:
+        return None
+
+
+def _v345_load_current_permission_row(module_code: str, action: str = "can_view") -> bool:
+    user = get_current_user()
+    if not user:
+        return False
+    username = str(user.get("username", "") or "")
+    roles = user.get("roles", []) or []
+    if _is_admin_user(username, roles):
+        return True
+    if action not in PERMISSION_COLUMNS:
+        action = "can_view"
+    perms = _load_permission_cache(username, roles)
+    row = perms.get(module_code) or perms.get(MODULE_CODE_TO_NO.get(module_code, module_code), {})
+
+    # If a newly added module has no row at all, reconcile once in this session.
+    # This preserves the safety feature without doing reconciliation on every
+    # sidebar/home permission check.
+    if not row and not st.session_state.get("_v345_permission_reconcile_tried"):
+        st.session_state["_v345_permission_reconcile_tried"] = True
+        try:
+            _v241_security_reconcile_once()
+            clear_permission_cache(username)
+            perms = _load_permission_cache(username, roles, force=True)
+            row = perms.get(module_code) or perms.get(MODULE_CODE_TO_NO.get(module_code, module_code), {})
+        except Exception:
+            row = {}
+    if row.get("can_manage"):
+        return True
+    return bool(row.get(action, False))
+
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    return _v345_load_current_permission_row(module_code, action)
+
+
+def require_login(module_code: str = "") -> None:  # type: ignore[override]
+    # Use the pre-V3.43 login flow: login check, idle check and user bar only.
+    # Do not call restore_core_modules_from_local_permanent() here; that routine
+    # can rebuild indexes and scan permanent folders, so it belongs to admin
+    # pages/manual actions rather than every login or page entry.
+    _prev_v343_require_login(module_code)
+    st.session_state["_spt_v343_restore_guard_done"] = True
+
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    require_login(module_code)
+    if not check_permission(module_code, action):
+        log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
+        st.error("權限不足，請聯絡系統管理員。")
+        st.stop()
+
+require_permission = require_module_access
