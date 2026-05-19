@@ -1520,3 +1520,105 @@ def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[D
     if applied:
         table_setting = _get_table_setting(stable_id, [str(c) for c in df.columns])
     return table_setting, applied
+
+
+# ===== V3.67 performance safe mode =====
+# 全域表格 wrapper 每個模組都會經過；這裡嚴禁 history 掃描、migrate(write=True)、GitHub、mark_data_changed。
+_V367_COLUMN_SETTINGS_CACHE = {"sig": None, "data": None}
+
+def _v367_column_file_sig() -> tuple:
+    paths = [SETTINGS_PATH, *COLUMN_SETTINGS_MIRROR_PATHS]
+    out = []
+    for path in paths:
+        try:
+            if path.exists():
+                st = path.stat()
+                out.append((str(path), int(st.st_mtime_ns), int(st.st_size)))
+            else:
+                out.append((str(path), 0, 0))
+        except Exception:
+            out.append((str(path), -1, -1))
+    return tuple(out)
+
+def _callsite_signature() -> str:  # type: ignore[override]
+    # V367: inspect.stack() 很重；改用 sys._getframe 輕量回溯。
+    try:
+        import sys
+        frame = sys._getframe(1)
+        depth = 0
+        while frame is not None and depth < 18:
+            filename = str(frame.f_code.co_filename).replace("\\", "/")
+            if "/site-packages/" not in filename and not filename.endswith("column_settings_service.py") and not filename.endswith("table_ui_service.py"):
+                if "/pages/" in filename or filename.endswith("streamlit_app.py"):
+                    return f"{Path(filename).stem}:{frame.f_lineno}"
+            frame = frame.f_back
+            depth += 1
+    except Exception:
+        pass
+    return "unknown_callsite"
+
+def load_settings() -> Dict[str, Any]:  # type: ignore[override]
+    _ensure_state_dir()
+    sig = _v367_column_file_sig()
+    try:
+        if _V367_COLUMN_SETTINGS_CACHE.get("sig") == sig and isinstance(_V367_COLUMN_SETTINGS_CACHE.get("data"), dict):
+            return dict(_V367_COLUMN_SETTINGS_CACHE["data"])
+    except Exception:
+        pass
+    merged: Dict[str, Any] = {}
+    # 直接讀固定檔，不 migrate、不掃 history。
+    for path in COLUMN_SETTINGS_MIRROR_PATHS:
+        data = _normalize_loaded_settings(_read_json_file(path))
+        for k, v in data.items():
+            merged.setdefault(_canonical_table_id(k), v)
+    try:
+        from services.table_persistence_service import load_column_settings
+        direct = load_column_settings()
+        for k, v in dict(direct or {}).items():
+            if isinstance(v, dict):
+                merged[_canonical_table_id(k)] = v
+    except Exception:
+        pass
+    try:
+        _V367_COLUMN_SETTINGS_CACHE["sig"] = sig
+        _V367_COLUMN_SETTINGS_CACHE["data"] = dict(merged)
+    except Exception:
+        pass
+    return merged
+
+def save_settings(settings: Dict[str, Any], *, upload: bool = False) -> None:  # type: ignore[override]
+    try:
+        normalized: Dict[str, Any] = {}
+        for k, v in dict(settings or {}).items():
+            ck = _canonical_table_id(str(k))
+            if isinstance(v, dict):
+                normalized[ck] = v
+        current = load_settings()
+        # 只比對本次涉及的設定，避免其他 mirror 裡的設定造成每次都重寫。
+        same = True
+        for k, v in normalized.items():
+            if current.get(k) != v:
+                same = False
+                break
+        if same and len(normalized) == len(current):
+            return
+        from services.table_persistence_service import save_column_settings
+        save_column_settings(normalized, reason="v367_column_settings_saved")
+        # 輕量主檔也保存一份，保持舊相容。
+        _ensure_state_dir()
+        tmp = SETTINGS_PATH.with_suffix(SETTINGS_PATH.suffix + ".tmp")
+        tmp.write_text(json.dumps(normalized, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        json.loads(tmp.read_text(encoding="utf-8"))
+        tmp.replace(SETTINGS_PATH)
+        _V367_COLUMN_SETTINGS_CACHE["sig"] = _v367_column_file_sig()
+        _V367_COLUMN_SETTINGS_CACHE["data"] = dict(normalized)
+    except Exception:
+        try:
+            _ensure_state_dir()
+            normalized = {(_canonical_table_id(k)): v for k, v in dict(settings or {}).items() if isinstance(v, dict)}
+            tmp = SETTINGS_PATH.with_suffix(SETTINGS_PATH.suffix + ".tmp")
+            tmp.write_text(json.dumps(normalized, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            json.loads(tmp.read_text(encoding="utf-8"))
+            tmp.replace(SETTINGS_PATH)
+        except Exception:
+            pass

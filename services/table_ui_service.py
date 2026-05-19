@@ -1255,3 +1255,26 @@ def export_table_ui_settings_permanent(reason: str = "table_ui_settings_changed"
         return {"ok": True, "mode": "v360_unified", "reason": reason, "migration": mig}
     except Exception as exc:
         return {"ok": False, "mode": "v360_unified", "error": str(exc), "reason": reason}
+
+
+# ===== V3.67 performance safe mode =====
+# 每頁進入時不做 migration/write；只在使用者按儲存欄位設定時寫入。
+
+def restore_table_ui_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    try:
+        _v346_ensure_table_ui_schema_basic()
+        return {"ok": True, "mode": "v367_no_auto_restore_write", "restored": 0, "force": force}
+    except Exception as exc:
+        return {"ok": False, "mode": "v367_no_auto_restore_write", "error": str(exc)}
+
+def ensure_table_ui_schema() -> None:  # type: ignore[override]
+    global _TABLE_UI_SCHEMA_READY, _TABLE_UI_RESTORED_ONCE
+    if _TABLE_UI_SCHEMA_READY:
+        return
+    _v346_ensure_table_ui_schema_basic()
+    _TABLE_UI_SCHEMA_READY = True
+    _TABLE_UI_RESTORED_ONCE = True
+
+def export_table_ui_settings_permanent(reason: str = "table_ui_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    # V367: 此函式可能被頁面當作「確保永久設定」呼叫；避免在進頁時寫多個 mirror。
+    return {"ok": True, "mode": "v367_direct_persistence_no_export_needed", "reason": reason}

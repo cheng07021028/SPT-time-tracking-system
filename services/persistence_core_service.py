@@ -371,3 +371,105 @@ def bootstrap_persistent_state_once() -> dict[str, Any]:  # type: ignore[overrid
         result["ok"] = False
         result["steps"].append({"step": "table_persistence_migration", "ok": False, "error": str(exc)})
     return result
+
+
+# ===== V3.67 performance safe mode =====
+# 目的：解決 V366 後每個模組進入時像一直讀寫/運算的問題。
+# 原則：載入只讀快取；啟動 bootstrap 不寫檔、不 migrate；只有使用者按儲存才寫入。
+_V367_MASTER_CACHE = {"sig": None, "data": None}
+
+def _v367_file_sig(paths):
+    sig = []
+    for path in paths:
+        try:
+            if path.exists():
+                st = path.stat()
+                sig.append((str(path), int(st.st_mtime_ns), int(st.st_size)))
+            else:
+                sig.append((str(path), 0, 0))
+        except Exception:
+            sig.append((str(path), -1, -1))
+    return tuple(sig)
+
+def _v367_load_master_uncached() -> dict[str, Any]:
+    ensure_dirs()
+    # V367: 不在一般載入時碰 GitHub。
+    merged = _blank_master()
+    ordered_paths = [p for p in MASTER_MIRROR_PATHS if p != MASTER_SETTINGS_PATH] + [MASTER_SETTINGS_PATH]
+    found = False
+    for path in ordered_paths:
+        payload = read_json(path)
+        if not payload:
+            continue
+        found = True
+        norm = _v364_normalize_master_payload(payload)
+        for section in ["table_settings", "column_settings", "system_settings", "permission_settings"]:
+            cur = merged.get(section) if isinstance(merged.get(section), dict) else {}
+            incoming = norm.get(section) if isinstance(norm.get(section), dict) else {}
+            if path == MASTER_SETTINGS_PATH:
+                raw = payload.get("v360_user_persistent_settings") if isinstance(payload.get("v360_user_persistent_settings"), dict) else payload
+                if isinstance(raw.get(section), dict):
+                    cur = dict(incoming)
+                else:
+                    cur = dict(cur or {})
+            else:
+                tmp = dict(cur or {})
+                tmp.update(dict(incoming or {}))
+                cur = tmp
+            merged[section] = cur
+        if norm.get("updated_at"):
+            merged["updated_at"] = norm.get("updated_at")
+    return merged if found else _blank_master()
+
+def load_master_settings() -> dict[str, Any]:  # type: ignore[override]
+    sig = _v367_file_sig(MASTER_MIRROR_PATHS)
+    try:
+        if _V367_MASTER_CACHE.get("sig") == sig and isinstance(_V367_MASTER_CACHE.get("data"), dict):
+            return dict(_V367_MASTER_CACHE["data"])
+    except Exception:
+        pass
+    data = _v367_load_master_uncached()
+    try:
+        _V367_MASTER_CACHE["sig"] = sig
+        _V367_MASTER_CACHE["data"] = dict(data)
+    except Exception:
+        pass
+    return data
+
+def save_master_settings(master: dict[str, Any], *, reason: str = "v367_save") -> dict[str, Any]:  # type: ignore[override]
+    ensure_dirs()
+    payload = _blank_master()
+    for section in ["table_settings", "column_settings", "system_settings", "permission_settings"]:
+        if isinstance(master.get(section), dict):
+            payload[section] = dict(master.get(section) or {})
+    payload["updated_at"] = now_text()
+    payload["version"] = "V367"
+    payload["reason"] = reason
+    written = []
+    for path in MASTER_MIRROR_PATHS:
+        if path.name == "spt_module_settings.json":
+            existing = read_json(path)
+            if not isinstance(existing, dict):
+                existing = {}
+            existing["v360_user_persistent_settings"] = payload
+            existing["updated_at"] = payload["updated_at"]
+            existing["version"] = str(existing.get("version") or "V367")
+            atomic_write_json(path, existing)
+        else:
+            atomic_write_json(path, payload)
+        written.append(str(path))
+    try:
+        _V367_MASTER_CACHE["sig"] = _v367_file_sig(MASTER_MIRROR_PATHS)
+        _V367_MASTER_CACHE["data"] = dict(payload)
+    except Exception:
+        pass
+    return {"ok": True, "files": written, "reason": reason, "github_upload": {"ok": True, "skipped": True, "mode": "v367_manual_sync_only"}}
+
+def bootstrap_persistent_state_once() -> dict[str, Any]:  # type: ignore[override]
+    # V367: 啟動/換頁只做目錄確認與一次快取讀取，不寫檔、不 migrate、不 GitHub。
+    ensure_dirs()
+    try:
+        _ = load_master_settings()
+        return {"ok": True, "mode": "v367_read_only_bootstrap", "steps": [{"step": "read_master_cache", "ok": True}]}
+    except Exception as exc:
+        return {"ok": False, "mode": "v367_read_only_bootstrap", "steps": [{"step": "read_master_cache", "ok": False, "error": str(exc)}]}

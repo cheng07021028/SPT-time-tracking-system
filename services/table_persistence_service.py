@@ -526,3 +526,99 @@ def migrate_legacy_table_settings_to_master(*, write: bool = True) -> dict[str, 
     if write and (imported["table_settings"] or imported["column_settings"]):
         _v366_write_direct(imported)
     return {"ok": True, "mode": "v366_direct_migrated_from_old_master", "table_count": len(imported["table_settings"]), "column_count": len(imported["column_settings"])}
+
+
+# ===== V3.67 performance safe mode =====
+# 直接持久化保留，但讀取加快取；載入不 migrate、不 mirror、不寫檔。
+_V367_DIRECT_CACHE = {"sig": None, "payload": None}
+
+def _v367_direct_paths() -> list[Path]:
+    return [_V366_STATE_FILE, *_V366_MODULE_FILES.values()]
+
+def _v367_sig(paths: list[Path]) -> tuple:
+    out = []
+    for path in paths:
+        try:
+            if path.exists():
+                st = path.stat()
+                out.append((str(path), int(st.st_mtime_ns), int(st.st_size)))
+            else:
+                out.append((str(path), 0, 0))
+        except Exception:
+            out.append((str(path), -1, -1))
+    return tuple(out)
+
+def _v366_load_all_direct() -> dict[str, Any]:  # type: ignore[override]
+    paths = _v367_direct_paths()
+    sig = _v367_sig(paths)
+    try:
+        if _V367_DIRECT_CACHE.get("sig") == sig and isinstance(_V367_DIRECT_CACHE.get("payload"), dict):
+            # Deep enough copy for nested dict settings without expensive copy module.
+            return json.loads(json.dumps(_V367_DIRECT_CACHE["payload"], ensure_ascii=False, default=str))
+    except Exception:
+        pass
+    out = _v366_blank_payload()
+    for path in paths:
+        data = _v366_read_payload(path)
+        if not data:
+            continue
+        ts = str(data.get("updated_at") or out.get("updated_at") or "")
+        if ts:
+            out["updated_at"] = ts
+        if isinstance(data.get("table_settings"), dict):
+            for k, v in data["table_settings"].items():
+                ck = canonical_table_key(k)
+                if isinstance(v, dict):
+                    out["table_settings"][ck] = dict(v)
+        if isinstance(data.get("column_settings"), dict):
+            for k, v in data["column_settings"].items():
+                ck = canonical_table_key(k)
+                if isinstance(v, dict):
+                    out["column_settings"][ck] = dict(v)
+    try:
+        _V367_DIRECT_CACHE["sig"] = sig
+        _V367_DIRECT_CACHE["payload"] = json.loads(json.dumps(out, ensure_ascii=False, default=str))
+    except Exception:
+        pass
+    return out
+
+def _v366_write_direct(all_payload: dict[str, Any], changed_key: str | None = None) -> None:  # type: ignore[override]
+    # V367: 寫入固定 latest JSON；舊格式鏡像改為可選停用，避免一次儲存造成大量檔案寫入。
+    all_payload = dict(all_payload or {})
+    all_payload.setdefault("table_settings", {})
+    all_payload.setdefault("column_settings", {})
+    all_payload["version"] = "V3.67-direct-module-persistence-fast"
+    all_payload["updated_at"] = _v366_now_text()
+    _v366_write_payload(_V366_STATE_FILE, all_payload)
+    for module_code, path in _V366_MODULE_FILES.items():
+        shard = _v366_blank_payload()
+        shard["version"] = "V3.67-direct-module-persistence-fast"
+        shard["updated_at"] = all_payload["updated_at"]
+        for k, v in dict(all_payload.get("table_settings") or {}).items():
+            if _v366_module_code_for_key(k) == module_code:
+                shard["table_settings"][canonical_table_key(k)] = v
+        for k, v in dict(all_payload.get("column_settings") or {}).items():
+            if _v366_module_code_for_key(k) == module_code:
+                shard["column_settings"][canonical_table_key(k)] = v
+        if module_code == "ui":
+            shard["table_settings"] = dict(all_payload.get("table_settings") or {})
+            shard["column_settings"] = dict(all_payload.get("column_settings") or {})
+        _v366_write_payload(path, shard)
+    try:
+        _V367_DIRECT_CACHE["sig"] = _v367_sig(_v367_direct_paths())
+        _V367_DIRECT_CACHE["payload"] = json.loads(json.dumps(all_payload, ensure_ascii=False, default=str))
+    except Exception:
+        pass
+    # 舊格式鏡像只在明確開啟時執行；一般點頁/儲存不再大量寫舊檔。
+    try:
+        import os
+        if os.environ.get("SPT_WRITE_LEGACY_TABLE_MIRRORS", "").strip() == "1":
+            mirror_legacy_table_ui_settings(all_payload.get("table_settings") or {})
+            mirror_legacy_column_settings(all_payload.get("column_settings") or {})
+    except Exception:
+        pass
+
+def migrate_legacy_table_settings_to_master(*, write: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    # V367: 一般載入完全不 migrate。直接檔存在就回報；不存在也不掃 history。
+    direct = _v366_load_all_direct()
+    return {"ok": True, "mode": "v367_no_load_migration", "table_count": len(direct.get("table_settings") or {}), "column_count": len(direct.get("column_settings") or {}), "write": False}
