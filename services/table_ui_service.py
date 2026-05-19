@@ -571,7 +571,12 @@ def render_table(
     height: int | None = None,
     num_rows: str = "fixed",
 ) -> pd.DataFrame | None:
-    if df is None or df.empty:
+    # V3.47：可編輯表格即使目前沒有資料，也要顯示空白表格讓使用者新增；
+    # 唯讀空表才顯示 No data。這會套用到所有既有模組，不新增新畫面功能。
+    if df is None:
+        st.info("目前沒有資料 / No data")
+        return None
+    if df.empty and not editable:
         st.info("目前沒有資料 / No data")
         return None
     # V1.89: Editable tables are usually placed inside st.form so edits do not rerun

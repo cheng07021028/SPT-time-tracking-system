@@ -2060,3 +2060,188 @@ def ensure_system_settings_schema() -> None:  # type: ignore[override]
     except Exception:
         pass
     _SYSTEM_SETTINGS_SCHEMA_READY = True
+
+
+# ===== V3.47 category/process reboot persistence hardening =====
+# 目的：
+# 1. 13｜系統設定「類別對應工段」即使永久檔是空清單，也視為有效設定，不再於 Reboot 後補回預設工段。
+# 2. 永久檔有 process_category_options 內容時，即使 SQLite 已被預設資料補滿，也會以永久檔為準還原。
+# 3. 01｜工時紀錄依類別連動工段時，確保只讀該類別工段；若該類別沒有工段，不自動混入其他類別。
+
+def _v347_payload_has_table(payload: dict[str, Any], table_name: str) -> bool:
+    try:
+        tables = payload.get("tables") if isinstance(payload, dict) else {}
+        return isinstance(tables, dict) and table_name in tables and isinstance(tables.get(table_name), list)
+    except Exception:
+        return False
+
+
+def _v347_process_table_is_default_only() -> bool:
+    """Return True when process_category_options only contains seeded common default rows."""
+    try:
+        df = query_df("SELECT category_name, process_name, note FROM process_category_options")
+        if df is None or df.empty:
+            return True
+        names = [str(x).strip() for x in df.get("process_name", []).dropna().tolist()]
+        cats = {_norm_category_name(x) for x in df.get("category_name", []).dropna().tolist()}
+        if not names:
+            return True
+        default_set = {str(x).strip() for x in DEFAULT_PROCESS_OPTIONS}
+        return cats.issubset({PROCESS_CATEGORY_ALL}) and set(names).issubset(default_set)
+    except Exception:
+        return False
+
+
+def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    _basic_create_tables()
+    _v346_ensure_category_tables_basic()
+    payload = _load_latest_persistent_payload()
+    if not payload:
+        return {"ok": False, "restored": {}, "message": "找不到 13 系統設定永久檔"}
+    tables = payload.get("tables", {}) if isinstance(payload.get("tables"), dict) else {}
+    restored: dict[str, int] = {}
+
+    cat_rows = tables.get("process_categories", []) if isinstance(tables.get("process_categories"), list) else []
+    has_cat_proc_table = _v347_payload_has_table(payload, "process_category_options") or _v347_payload_has_table(payload, "process_options")
+    cat_proc_rows = tables.get("process_category_options", []) if isinstance(tables.get("process_category_options"), list) else []
+    if not cat_proc_rows and isinstance(tables.get("process_options"), list):
+        cat_proc_rows = tables.get("process_options", []) or []
+    rest_rows = tables.get("rest_periods", []) if isinstance(tables.get("rest_periods"), list) else []
+    app_rows = tables.get("app_settings", []) if isinstance(tables.get("app_settings"), list) else []
+
+    if force or (_v346_tables_empty_or_default("process_categories") and cat_rows):
+        if force:
+            try: execute("DELETE FROM process_categories")
+            except Exception: pass
+        restored["process_categories"] = _v346_insert_category_rows(cat_rows)
+
+    # V3.47: empty permanent process table is valid. Delete default seed and keep empty.
+    should_restore_proc = force or (has_cat_proc_table and (_table_count("process_category_options") == 0 or _v347_process_table_is_default_only()))
+    if should_restore_proc:
+        try: execute("DELETE FROM process_category_options")
+        except Exception: pass
+        restored["process_category_options"] = _v346_insert_category_process_rows(cat_proc_rows) if cat_proc_rows else 0
+
+    if force or (_table_count("rest_periods") == 0 and rest_rows):
+        if force:
+            try: execute("DELETE FROM rest_periods")
+            except Exception: pass
+        restored["rest_periods"] = _insert_rest_rows(rest_rows)
+    if force or (not _has_live_page_reset_setting() and app_rows):
+        if force:
+            try: execute("DELETE FROM app_settings WHERE setting_key IN ('live_page_reset_time', 'default_process_category')")
+            except Exception: pass
+        restored["app_settings"] = _insert_app_settings_rows(app_rows)
+    if restored:
+        _clear_settings_cache()
+    return {"ok": bool(restored), "restored": restored, "source": payload.get("_source", "system_settings_json"), "score": payload.get("_score")}
+
+
+def ensure_system_settings_schema() -> None:  # type: ignore[override]
+    global _SYSTEM_SETTINGS_SCHEMA_READY, _RESTORE_FROM_FILE_DONE
+    if _SYSTEM_SETTINGS_SCHEMA_READY:
+        return
+    _basic_create_tables()
+    _v346_ensure_category_tables_basic()
+    payload = _load_latest_persistent_payload()
+    has_permanent_proc_table = _v347_payload_has_table(payload, "process_category_options") or _v347_payload_has_table(payload, "process_options") if payload else False
+    if not _RESTORE_FROM_FILE_DONE:
+        try:
+            restore_system_settings_from_permanent(force=False)
+        except Exception:
+            pass
+        _RESTORE_FROM_FILE_DONE = True
+    now = _now()
+    try:
+        if _table_count("process_categories") == 0:
+            execute(
+                """
+                INSERT OR IGNORE INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at)
+                VALUES (?,1,0,'所有類別共用工段',?,?)
+                """,
+                (PROCESS_CATEGORY_ALL, now, now),
+            )
+    except Exception:
+        pass
+    try:
+        # V3.47: 若永久檔已明確記錄 process_category_options（就算是空清單），不再補預設工段。
+        if (not has_permanent_proc_table) and _table_count("process_category_options") == 0:
+            for idx, name in enumerate(DEFAULT_PROCESS_OPTIONS, start=1):
+                execute(
+                    """
+                    INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at)
+                    VALUES (?,?,1,?,'系統預設工段，可於 13 系統設定修改',?,?)
+                    """,
+                    (PROCESS_CATEGORY_ALL, name, idx, now, now),
+                )
+    except Exception:
+        pass
+    try:
+        if _table_count("rest_periods") == 0:
+            for item in DEFAULT_REST_PERIODS:
+                execute(
+                    """
+                    INSERT INTO rest_periods(name, start_time, end_time, is_active, sort_order)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (item["name"], item["start_time"], item["end_time"], item["is_active"], item["sort_order"]),
+                )
+    except Exception:
+        pass
+    try:
+        if not _has_live_page_reset_setting():
+            execute(
+                """
+                INSERT INTO app_settings(setting_key, setting_value, note, updated_at)
+                VALUES ('live_page_reset_time', ?, '01 工時紀錄每日重新整理時間；只影響 01 顯示，不刪除 02 歷史紀錄', ?)
+                ON CONFLICT(setting_key) DO NOTHING
+                """,
+                (DEFAULT_LIVE_PAGE_RESET_TIME, now),
+            )
+    except Exception:
+        pass
+    try:
+        _dedupe_rest_periods()
+    except Exception:
+        pass
+    _SYSTEM_SETTINGS_SCHEMA_READY = True
+
+
+def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
+    _ensure_process_category_options_table()
+    category = _norm_category_name(category_name)
+
+    def _names_for(where_sql: str, params: tuple[Any, ...]) -> list[str]:
+        try:
+            df = query_df(
+                f"SELECT process_name FROM process_category_options WHERE COALESCE(is_active,1)=1 AND {where_sql} ORDER BY sort_order, id",
+                params,
+            )
+            return [str(x).strip() for x in df.get("process_name", []).dropna().tolist() if str(x).strip()] if df is not None and not df.empty else []
+        except Exception:
+            return []
+
+    if category == PROCESS_CATEGORY_ALL:
+        names = _names_for("(category_name=? OR COALESCE(category_name,'')='')", (PROCESS_CATEGORY_ALL,))
+    else:
+        names = _names_for("category_name=?", (category,))
+        if include_common:
+            common_names = _names_for("(category_name=? OR COALESCE(category_name,'')='')", (PROCESS_CATEGORY_ALL,))
+            names = common_names + [n for n in names if n not in common_names]
+    if names:
+        return names
+    # V3.47: include_common=False 代表呼叫端要求嚴格依類別，不回退到預設/全部工段。
+    if not include_common:
+        return []
+    try:
+        df = query_df("SELECT process_name FROM process_category_options WHERE COALESCE(is_active,1)=1 ORDER BY sort_order, id")
+        fallback: list[str] = []
+        for x in df.get("process_name", []).dropna().tolist() if df is not None and not df.empty else []:
+            s = str(x).strip()
+            if s and s not in fallback:
+                fallback.append(s)
+        if fallback:
+            return fallback
+    except Exception:
+        pass
+    return DEFAULT_PROCESS_OPTIONS.copy() if not _v347_payload_has_table(_load_latest_persistent_payload() or {}, "process_category_options") else []
