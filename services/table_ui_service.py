@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import inspect
+import re
+
 import json
 import time
 from typing import Iterable
@@ -256,16 +259,47 @@ def build_column_config(table_key: str, df: pd.DataFrame) -> dict:
     widths = load_widths(table_key)
     return {col: _column_config(str(col), widths.get(str(col)), df[col] if col in df.columns else None) for col in df.columns}
 
-def render_width_settings(table_key: str, df: pd.DataFrame, title: str = "欄寬設定 / Column Width Settings") -> None:
-    """Lazy width editor.
 
-    Streamlit executes widgets inside collapsed expanders, so the old version generated
-    dozens of number_input widgets on every page load. This made module switching slow.
-    V1.39 keeps the feature, but only renders the heavy controls when the user explicitly opens it.
+
+def _safe_widget_key_part(value: object) -> str:
+    """Return a Streamlit-safe compact key segment."""
+    raw = str(value or "")
+    raw = re.sub(r"[^0-9A-Za-z_\-\u4e00-\u9fff]+", "_", raw)
+    raw = raw.strip("_")
+    return raw[:96] or "x"
+
+
+def _width_settings_instance_key(table_key: str, title: str) -> str:
+    """Build a stable unique key for width controls.
+
+    Same table_key can appear more than once on a page.  Streamlit then raises
+    DuplicateElementKey if all controls use only table_key.  We include the
+    external caller's file and line number, so each table location gets a stable
+    unique key without changing saved table settings.
+    """
+    try:
+        stack = inspect.stack()
+        # stack: 0 this function, 1 render_width_settings, 2 render_table/direct caller, 3 page caller if render_table.
+        frame = stack[3] if len(stack) > 3 else (stack[2] if len(stack) > 2 else None)
+        if frame is not None:
+            caller = f"{Path(frame.filename).stem}_{frame.lineno}"
+        else:
+            caller = "unknown"
+    except Exception:
+        caller = "unknown"
+    return _safe_widget_key_part(f"{table_key}_{title}_{caller}")
+
+def render_width_settings(table_key: str, df: pd.DataFrame, title: str = "欄寬設定 / Column Width Settings") -> None:
+    """Lazy width editor with collision-free widget keys.
+
+    Width/order settings are still saved by table_key, so existing permanent
+    settings are preserved.  Widget keys include a stable instance suffix to avoid
+    DuplicateElementKey when the same table_key appears more than once on a page.
     """
     if df is None or df.empty:
         return
-    show_key = f"show_widths_{table_key}"
+    instance_key = _width_settings_instance_key(table_key, title)
+    show_key = f"show_widths_{instance_key}"
     show = st.toggle(f"⌬️ 顯示{title}", value=False, key=show_key)
     if not show:
         return
@@ -278,13 +312,28 @@ def render_width_settings(table_key: str, df: pd.DataFrame, title: str = "欄寬
         new_orders: dict[str, int] = {}
         cols = st.columns(4)
         for idx, col in enumerate(df.columns):
+            col_key = _safe_widget_key_part(col)
             default_width = int(widths.get(col, DEFAULT_WIDTHS.get(col, 140)))
             default_order = int(order_index.get(str(col), idx + 1))
             with cols[idx % 4]:
                 st.markdown(f"**{label_for(col)}**")
-                new_widths[col] = st.number_input("欄寬", min_value=60, max_value=700, value=default_width, step=10, key=f"width_{table_key}_{col}")
-                new_orders[col] = st.number_input("順序", min_value=1, max_value=max(len(df.columns), 1), value=default_order, step=1, key=f"order_{table_key}_{col}")
-        if st.button("儲存欄位設定 / Save Column Settings", key=f"save_widths_{table_key}", use_container_width=True):
+                new_widths[col] = st.number_input(
+                    "欄寬",
+                    min_value=60,
+                    max_value=700,
+                    value=default_width,
+                    step=10,
+                    key=f"width_{instance_key}_{idx}_{col_key}",
+                )
+                new_orders[col] = st.number_input(
+                    "順序",
+                    min_value=1,
+                    max_value=max(len(df.columns), 1),
+                    value=default_order,
+                    step=1,
+                    key=f"order_{instance_key}_{idx}_{col_key}",
+                )
+        if st.button("儲存欄位設定 / Save Column Settings", key=f"save_widths_{instance_key}", use_container_width=True):
             save_widths(table_key, new_widths)
             ordered_cols = [c for c, _ in sorted(new_orders.items(), key=lambda kv: (kv[1], str(kv[0])))]
             save_column_order(table_key, ordered_cols)
@@ -301,55 +350,56 @@ def _format_duration_columns_for_display(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-
-def _inject_native_header_sort_style() -> None:
-    """Style only: keep Streamlit's native table header sorting discoverable.
-
-    We intentionally do not render a separate sort toolbar or extra buttons.
-    Streamlit/Glide tables already sort from the original header row; this CSS only
-    makes headers look clickable and preserves the existing table header location.
-    """
-    st.markdown(
-        """
-        <style>
-        /* V2.91｜全模組表格標題列原地排序提示：不新增排序按鈕 */
-        div[data-testid="stDataFrame"] [role="columnheader"],
-        div[data-testid="stDataEditor"] [role="columnheader"],
-        div[data-testid="stDataFrame"] [data-testid="stDataFrameResizableHeader"],
-        div[data-testid="stDataEditor"] [data-testid="stDataFrameResizableHeader"] {
-            cursor: pointer !important;
-        }
-        div[data-testid="stDataFrame"] [role="columnheader"]:hover,
-        div[data-testid="stDataEditor"] [role="columnheader"]:hover {
-            background: linear-gradient(90deg, rgba(58, 220, 255, .13), rgba(112, 119, 255, .10)) !important;
-            box-shadow: inset 0 -1px 0 rgba(110, 236, 255, .55) !important;
-        }
-        div[data-testid="stDataFrame"] [role="columnheader"] *,
-        div[data-testid="stDataEditor"] [role="columnheader"] * {
-            user-select: none !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
 def _apply_quick_header_sort(table_key: str, df: pd.DataFrame) -> pd.DataFrame:
-    """Compatibility no-op.
+    """Clickable column-title sort bar.
 
-    Previous versions experimented with an extra quick-sort button bar above tables.
-    The requested standard is now: keep the original table header row and use native
-    left-click header sorting only.  Do not render any additional sort controls here.
+    Streamlit data_editor does not reliably provide native header sorting in every mode/theme.
+    This lightweight bar gives every table the same behavior: click a column title once for ASC,
+    click the same title again for DESC.  It is intentionally outside the table so it works for
+    both dataframe and editable data_editor without breaking cell editing.
     """
+    if df is None or df.empty or len(df.columns) == 0:
+        return df
+    sort_state_key = f"_spt_quick_sort_{table_key}"
+    state = st.session_state.get(sort_state_key, {"column": None, "ascending": True})
+    with st.container():
+        st.caption("點選欄位標題可快速排序；再次點同一欄會切換升冪/降冪。")
+        cols_per_row = 6
+        columns = list(df.columns)
+        for base in range(0, len(columns), cols_per_row):
+            row_cols = st.columns(min(cols_per_row, len(columns) - base))
+            for i, col in enumerate(columns[base:base + cols_per_row]):
+                active = state.get("column") == col
+                arrow = " ▲" if active and state.get("ascending", True) else (" ▼" if active else "")
+                label = f"↕ {label_for(col)}{arrow}"
+                if row_cols[i].button(label, key=f"quick_sort_{table_key}_{base}_{col}", use_container_width=True):
+                    ascending = not bool(state.get("ascending", True)) if active else True
+                    st.session_state[sort_state_key] = {"column": col, "ascending": ascending}
+                    st.rerun()
+    state = st.session_state.get(sort_state_key, {})
+    sort_col = state.get("column")
+    if sort_col in df.columns:
+        try:
+            return df.sort_values(sort_col, ascending=bool(state.get("ascending", True)), kind="mergesort", na_position="last").reset_index(drop=True)
+        except Exception:
+            return df
     return df
 
 
 def _render_sort_controls(table_key: str, df: pd.DataFrame) -> pd.DataFrame:
-    """Compatibility no-op.
-
-    Keep this function name so older imports do not fail, but do not show the old
-    "排序設定 / Sort Settings" expander. Sorting must remain on the original
-    table header row only.
-    """
+    """Add explicit sorting controls because Streamlit table sorting is not always obvious in edit mode."""
+    if df is None or df.empty or len(df.columns) == 0:
+        return df
+    with st.expander("排序設定 / Sort Settings", expanded=False):
+        c1, c2, c3 = st.columns([2, 1, 1])
+        sort_col = c1.selectbox("排序欄位 / Sort Column", list(df.columns), format_func=label_for, key=f"sort_col_{table_key}")
+        ascending = c2.radio("排序方向 / Direction", ["升冪 / ASC", "降冪 / DESC"], horizontal=True, key=f"sort_dir_{table_key}") == "升冪 / ASC"
+        apply_sort = c3.checkbox("套用排序 / Apply", value=False, key=f"sort_apply_{table_key}")
+        if apply_sort and sort_col in df.columns:
+            try:
+                return df.sort_values(sort_col, ascending=ascending, kind="mergesort", na_position="last").reset_index(drop=True)
+            except Exception:
+                st.warning("此欄位暫時無法排序，已維持原順序。")
     return df
 
 
@@ -366,7 +416,6 @@ def render_table(
     if df is None or df.empty:
         st.info("目前沒有資料 / No data")
         return None
-    _inject_native_header_sort_style()
     # V1.89: Editable tables are usually placed inside st.form so edits do not rerun
     # the entire page on every cell click. Do not render width controls inside
     # editable tables because normal buttons cannot live inside st.form and the
