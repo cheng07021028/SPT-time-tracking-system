@@ -2075,7 +2075,7 @@ for _spt_v284_name in (
 
 
 # ===== V2.87 REMOVE DROPDOWN SIZE SETTINGS PANEL START =====
-# The visual panel 「下拉選單尺寸設定 / Dropdown Size Settings」 is intentionally hidden.
+# The legacy dropdown tuning visual panel is intentionally hidden.
 # Keep configuration loader/saver and CSS functions for compatibility, but do not render the UI.
 def render_dropdown_size_settings_panel():
     return
