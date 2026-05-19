@@ -1453,6 +1453,17 @@ def load_process_options_df(active_only: bool = False) -> pd.DataFrame:  # type:
 
 
 def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:
+    """Return active process names for the selected category.
+
+    Important rule for 01｜工時紀錄:
+    類別｜Category 決定 工段名稱｜Process；選擇哪個類別，只能出現
+    13｜系統設定「一、類別與工段名稱設定 / Category & Process Options」
+    中該類別對應的工段。
+
+    Therefore this function no longer falls back to the default category, all
+    categories, legacy process_options, or DEFAULT_PROCESS_OPTIONS when a
+    category has no rows. An empty list is a valid saved setting.
+    """
     _ensure_process_category_options_table()
     category = _norm_category_name(category_name)
 
@@ -1462,35 +1473,35 @@ def get_process_options_by_category(category_name: str | None = None, include_co
                 f"SELECT process_name FROM process_category_options WHERE COALESCE(is_active,1)=1 AND {where_sql} ORDER BY sort_order, id",
                 params,
             )
-            return [str(x).strip() for x in df.get("process_name", []).dropna().tolist() if str(x).strip()] if df is not None and not df.empty else []
+            names: list[str] = []
+            for x in df.get("process_name", []).dropna().tolist() if df is not None and not df.empty else []:
+                s = str(x).strip()
+                if s and s not in names:
+                    names.append(s)
+            return names
         except Exception:
             return []
 
-    common_names = _names_for("(category_name=? OR COALESCE(category_name,'')='')", (PROCESS_CATEGORY_ALL,)) if include_common else []
-    category_names = [] if category == PROCESS_CATEGORY_ALL else _names_for("category_name=?", (category,))
-    names = common_names + [n for n in category_names if n not in common_names]
-    if names:
-        return names
+    # 「全部 / 通用」也是一個類別；選到它時只顯示通用工段。
+    if category == PROCESS_CATEGORY_ALL:
+        return _names_for("(category_name=? OR COALESCE(category_name,'')='')", (PROCESS_CATEGORY_ALL,))
 
-    default_category = get_default_process_category()
-    if default_category and default_category not in {PROCESS_CATEGORY_ALL, category}:
-        default_names = _names_for("category_name=?", (default_category,))
-        names = common_names + [n for n in default_names if n not in common_names]
-        if names:
-            return names
+    category_names = _names_for("category_name=?", (category,))
+    if not include_common:
+        return category_names
 
-    try:
-        df = query_df("SELECT process_name FROM process_category_options WHERE COALESCE(is_active,1)=1 ORDER BY sort_order, id")
-        names = []
-        for x in df.get("process_name", []).dropna().tolist() if df is not None and not df.empty else []:
-            s = str(x).strip()
-            if s and s not in names:
-                names.append(s)
-        if names:
-            return names
-    except Exception:
-        pass
-    return DEFAULT_PROCESS_OPTIONS.copy()
+    common_names = _names_for("(category_name=? OR COALESCE(category_name,'')='')", (PROCESS_CATEGORY_ALL,))
+    return common_names + [n for n in category_names if n not in common_names]
+
+
+def get_process_options_by_category_exact(category_name: str | None = None) -> list[str]:
+    """Strict category-to-process mapping for 01｜工時紀錄.
+
+    This helper intentionally returns only the process names under the selected
+    category in process_category_options. No default fallback is allowed, because
+    an empty mapping must remain empty and prompt the admin to maintain 13｜系統設定.
+    """
+    return get_process_options_by_category(category_name, include_common=False)
 
 
 def get_process_options() -> list[str]:  # type: ignore[override]
