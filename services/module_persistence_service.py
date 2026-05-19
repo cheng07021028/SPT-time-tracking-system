@@ -27,7 +27,7 @@ GLOBAL_STATE = PROJECT_ROOT / "data" / "persistent_state" / "spt_module_independ
 GLOBAL_SETTINGS = PROJECT_ROOT / "data" / "persistent_state" / "spt_module_independent_settings.json"
 
 MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
-    "01_time_records": {
+    "01_time_record": {
         "name_zh": "工時紀錄",
         "name_en": "Time Records",
         "tables": ["time_records"],
@@ -114,18 +114,6 @@ MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
     },
 }
 
-# V3.06: canonical module code map.
-# The real persistent folder for 01 must be data/persistent_modules/01_time_records.
-# Older pages/services may still pass 01_time_record; normalize it so old calls do not
-# create a second empty folder and make data look missing after module updates.
-MODULE_CODE_ALIASES = {
-    "01_time_record": "01_time_records",
-}
-
-def normalize_module_code(module_code: str) -> str:
-    code = str(module_code or "").strip()
-    return MODULE_CODE_ALIASES.get(code, code)
-
 def _now() -> str:
     return now_text()
 
@@ -134,8 +122,79 @@ def _stamp() -> str:
     return now_stamp()
 
 
+def normalize_module_code(module_code: str) -> str:
+    """Normalize legacy module codes to the canonical persistent folder names."""
+    code = str(module_code or "").strip()
+    if code == "01_time_record":
+        return "01_time_records"
+    return code
+
+
 def _json_default(obj: Any) -> str:
     return str(obj)
+
+
+DERIVED_RECORD_MODULES = {"07_missing_today", "07_missing", "08_daily_hours"}
+
+
+def _path_exists(*parts: str) -> bool:
+    try:
+        return (PROJECT_ROOT.joinpath(*parts)).exists()
+    except Exception:
+        return False
+
+
+def _module_sources_exist(*module_codes: str) -> bool:
+    for code in module_codes:
+        ncode = normalize_module_code(code)
+        if not latest_records_path(ncode).exists():
+            return False
+    return True
+
+
+def _health_records_exists(module_code: str) -> tuple[bool, str, str]:
+    """Return (exists, path, note) for module records health.
+
+    Some modules are derived or settings-only. They should not be flagged as broken
+    just because <module>_records.json is not the true source of truth.
+    """
+    code = normalize_module_code(module_code)
+    if code in DERIVED_RECORD_MODULES:
+        ok = _module_sources_exist("04_employees", "01_time_records") or _module_sources_exist("04_employees", "02_history")
+        return ok, "derived: 04_employees + 01_time_records/02_history", "衍生查詢模組，允許沒有獨立 records；檢查來源模組資料。"
+    if code == "13_system_settings":
+        candidates = [
+            PROJECT_ROOT / "data" / "config" / "system_settings.json",
+            PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json",
+            PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json",
+        ]
+        ok = any(p.exists() and p.stat().st_size > 0 for p in candidates)
+        path = "; ".join(str(p.relative_to(PROJECT_ROOT)) for p in candidates)
+        return ok, path, "設定型模組，records 來源為 system_settings 永久設定檔。"
+    rec = latest_records_path(code)
+    return rec.exists(), str(rec.relative_to(PROJECT_ROOT)), ""
+
+
+def _health_settings_exists(module_code: str) -> tuple[bool, str, str]:
+    code = normalize_module_code(module_code)
+    if code in DERIVED_RECORD_MODULES:
+        settings = latest_settings_path(code)
+        ok = settings.exists() or (_module_sources_exist("04_employees", "01_time_records") or _module_sources_exist("04_employees", "02_history"))
+        return ok, str(settings.relative_to(PROJECT_ROOT)), "衍生查詢模組設定檔可選；若未建立，使用來源模組與預設篩選設定。"
+    if code == "13_system_settings":
+        candidates = [
+            PROJECT_ROOT / "data" / "config" / "system_settings.json",
+            PROJECT_ROOT / "data" / "config" / "auto_backup_settings.json",
+            PROJECT_ROOT / "data" / "config" / "auto_external_backup_schedule.json",
+            PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json",
+            PROJECT_ROOT / "data" / "persistent_state" / "spt_auto_backup_settings.json",
+            PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json",
+        ]
+        ok = any(p.exists() and p.stat().st_size > 0 for p in candidates)
+        path = "; ".join(str(p.relative_to(PROJECT_ROOT)) for p in candidates)
+        return ok, path, "檢查系統設定、自動備份與 13 模組永久設定檔。"
+    settings = latest_settings_path(code)
+    return settings.exists(), str(settings.relative_to(PROJECT_ROOT)), ""
 
 
 def ensure_dirs() -> None:
@@ -148,33 +207,32 @@ def ensure_dirs() -> None:
 
 
 def module_dir(module_code: str) -> Path:
-    module_code = normalize_module_code(module_code)
-    return PERSIST_ROOT / module_code
+    return PERSIST_ROOT / normalize_module_code(module_code)
 
 
 def latest_records_path(module_code: str) -> Path:
-    module_code = normalize_module_code(module_code)
-    return module_dir(module_code) / f"{module_code}_records.json"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / f"{code}_records.json"
 
 
 def latest_settings_path(module_code: str) -> Path:
-    module_code = normalize_module_code(module_code)
-    return module_dir(module_code) / f"{module_code}_settings.json"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / f"{code}_settings.json"
 
 
 def latest_audit_path(module_code: str) -> Path:
-    module_code = normalize_module_code(module_code)
-    return module_dir(module_code) / f"{module_code}_audit.jsonl"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / f"{code}_audit.jsonl"
 
 
 def history_records_path(module_code: str) -> Path:
-    module_code = normalize_module_code(module_code)
-    return module_dir(module_code) / "history" / f"{module_code}_records_{_stamp()}.json"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / "history" / f"{code}_records_{_stamp()}.json"
 
 
 def history_settings_path(module_code: str) -> Path:
-    module_code = normalize_module_code(module_code)
-    return module_dir(module_code) / "history" / f"{module_code}_settings_{_stamp()}.json"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / "history" / f"{code}_settings_{_stamp()}.json"
 
 
 def connect_db() -> sqlite3.Connection:
@@ -217,22 +275,10 @@ def save_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default), encoding="utf-8")
-    # Verify JSON before replacing the official file.
-    json.loads(tmp.read_text(encoding="utf-8"))
     tmp.replace(path)
 
 
-# ===== V3.04 MASTER DATA EMPTY EXPORT GUARD START =====
-def _existing_records_have_rows(module_code: str, table: str) -> bool:
-    payload = load_json(latest_records_path(module_code), {}) or {}
-    tables = payload.get("tables", {}) if isinstance(payload, dict) else {}
-    rows = tables.get(table) if isinstance(tables, dict) else None
-    return isinstance(rows, list) and len(rows) > 0
-# ===== V3.04 MASTER DATA EMPTY EXPORT GUARD END =====
-
-
 def append_audit(module_code: str, action: str, username: str = "SYSTEM", detail: Optional[Dict[str, Any]] = None) -> None:
-    module_code = normalize_module_code(module_code)
     ensure_dirs()
     payload = {
         "time": _now(),
@@ -248,7 +294,6 @@ def append_audit(module_code: str, action: str, username: str = "SYSTEM", detail
 
 
 def export_module_records(module_code: str, username: str = "SYSTEM", write_history: bool = True) -> Dict[str, Any]:
-    module_code = normalize_module_code(module_code)
     ensure_dirs()
     info = MODULE_TABLE_MAP.get(module_code)
     if not info:
@@ -272,15 +317,6 @@ def export_module_records(module_code: str, username: str = "SYSTEM", write_hist
     else:
         payload["warning"] = "SQLite DB not found; exported empty module state."
 
-    # V3.04: never export an empty master-data table over an existing non-empty module JSON.
-    # This prevents 03/04 data from disappearing when SQLite is temporarily empty after a module update.
-    for _table_name, _count in (payload.get("counts", {}) or {}).items():
-        if module_code in ("01_time_records", "02_history", "03_work_orders", "04_employees") and int(_count or 0) == 0 and _existing_records_have_rows(module_code, _table_name):
-            payload["warning"] = f"Blocked empty export for {_table_name}; existing non-empty JSON preserved."
-            append_audit(module_code, "BLOCK_EMPTY_EXPORT", username, {"table": _table_name})
-            rebuild_global_index()
-            return payload
-
     latest = latest_records_path(module_code)
     save_json(latest, payload)
     if write_history:
@@ -301,25 +337,33 @@ def export_all_modules(username: str = "SYSTEM") -> Dict[str, Any]:
 def get_module_status() -> List[Dict[str, Any]]:
     ensure_dirs()
     rows: List[Dict[str, Any]] = []
-    for code, info in MODULE_TABLE_MAP.items():
+    seen: set[str] = set()
+    for raw_code, info in MODULE_TABLE_MAP.items():
+        code = normalize_module_code(raw_code)
+        if code in seen:
+            continue
+        seen.add(code)
         rec = load_json(latest_records_path(code), {}) or {}
         settings = load_json(latest_settings_path(code), {}) or {}
         counts = rec.get("counts", {})
+        rec_ok, rec_path, rec_note = _health_records_exists(code)
+        set_ok, set_path, set_note = _health_settings_exists(code)
         rows.append({
             "模組代碼 / Module Code": code,
             "模組 / Module": f'{info["name_zh"]} / {info["name_en"]}',
-            "紀錄檔 / Records Exists": latest_records_path(code).exists(),
-            "設定檔 / Settings Exists": latest_settings_path(code).exists(),
+            "紀錄檔 / Records Exists": bool(rec_ok),
+            "設定檔 / Settings Exists": bool(set_ok),
             "紀錄時間 / Exported At": rec.get("exported_at", ""),
             "設定時間 / Settings At": settings.get("saved_at", ""),
             "資料筆數 / Counts": json.dumps(counts, ensure_ascii=False),
-            "路徑 / Path": str(module_dir(code).relative_to(PROJECT_ROOT)),
+            "路徑 / Path": rec_path if rec_note else str(module_dir(code).relative_to(PROJECT_ROOT)),
+            "檢查說明 / Health Note": rec_note or set_note,
+            "設定路徑 / Settings Path": set_path,
         })
     return rows
 
 
 def save_module_settings(module_code: str, settings: Dict[str, Any], username: str = "SYSTEM", write_history: bool = True) -> Dict[str, Any]:
-    module_code = normalize_module_code(module_code)
     ensure_dirs()
     info = MODULE_TABLE_MAP.get(module_code, {"name_zh": module_code, "name_en": module_code})
     payload = {
@@ -339,7 +383,6 @@ def save_module_settings(module_code: str, settings: Dict[str, Any], username: s
 
 
 def load_module_settings(module_code: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    module_code = normalize_module_code(module_code)
     payload = load_json(latest_settings_path(module_code), {}) or {}
     if payload.get("settings") is not None:
         return payload.get("settings", {})
