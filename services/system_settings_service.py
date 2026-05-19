@@ -1139,3 +1139,348 @@ def export_system_settings_permanent(reason: str = "system_settings_changed", wr
         pass
     return {"ok": True, "files": [str(p) for p in SYSTEM_SETTINGS_FILES], "table_counts": payload["table_counts"], "github_sync": github_sync, "payload_version": "V3.30"}
 
+
+
+# =============================================================================
+# V3.33 - Category-specific process options (replaces UI use of model-specific process mapping)
+# =============================================================================
+PROCESS_CATEGORY_ALL = "全部 / 通用"
+DEFAULT_PROCESS_CATEGORY_KEY = "default_process_category"
+
+
+def _norm_category_name(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text or text.lower() in {"nan", "none", "null", "全部", "通用", "all", "common", "*"}:
+        return PROCESS_CATEGORY_ALL
+    return text
+
+
+def _ensure_process_category_options_table() -> None:
+    """Create category-specific process option table and seed without deleting old data.
+
+    V3.33 requirement:
+    - 13｜系統設定使用「類別 / Category」設定工段。
+    - 01｜工時紀錄使用「類別 / Category」下拉連動工段。
+    - 保留 V3.28 model table for compatibility, but UI and new saves use category table.
+    """
+    ensure_system_settings_schema()
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS process_category_options (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_name TEXT DEFAULT '',
+            process_name TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            UNIQUE(category_name, process_name)
+        )
+        """
+    )
+    try:
+        row = query_one("SELECT COUNT(*) AS c FROM process_category_options") or {"c": 0}
+        if int(row.get("c") or 0) != 0:
+            return
+    except Exception:
+        return
+
+    now = _now()
+    seeded = 0
+    # Prefer previous V3.28 model process mapping, reinterpreting type_name as category_name.
+    try:
+        old = query_df("SELECT type_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_model_options ORDER BY type_name, sort_order, id")
+        for _, r in old.fillna("").iterrows() if old is not None and not old.empty else []:
+            name = str(r.get("process_name") or "").strip()
+            if not name:
+                continue
+            execute(
+                """
+                INSERT OR IGNORE INTO process_category_options(category_name, process_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    _norm_category_name(r.get("type_name")),
+                    name,
+                    int(float(r.get("is_active") or 1)),
+                    int(float(r.get("sort_order") or 0)),
+                    str(r.get("note") or ""),
+                    str(r.get("created_at") or now),
+                    str(r.get("updated_at") or now),
+                ),
+            )
+            seeded += 1
+    except Exception:
+        pass
+
+    if seeded:
+        return
+
+    # Legacy fallback: process_options -> common category.
+    try:
+        legacy = query_df("SELECT process_name, is_active, sort_order, note, created_at, updated_at FROM process_options ORDER BY sort_order, id")
+        for _, r in legacy.fillna("").iterrows() if legacy is not None and not legacy.empty else []:
+            name = str(r.get("process_name") or "").strip()
+            if not name:
+                continue
+            execute(
+                """
+                INSERT OR IGNORE INTO process_category_options(category_name, process_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    PROCESS_CATEGORY_ALL,
+                    name,
+                    int(float(r.get("is_active") or 1)),
+                    int(float(r.get("sort_order") or 0)),
+                    str(r.get("note") or ""),
+                    str(r.get("created_at") or now),
+                    str(r.get("updated_at") or now),
+                ),
+            )
+    except Exception:
+        pass
+
+
+def load_process_category_choices(include_common: bool = True) -> list[str]:
+    _ensure_process_category_options_table()
+    names: set[str] = set()
+    if include_common:
+        names.add(PROCESS_CATEGORY_ALL)
+    try:
+        df = query_df("SELECT DISTINCT category_name FROM process_category_options WHERE COALESCE(category_name,'')<>'' ORDER BY category_name")
+        for x in df.get("category_name", []).dropna().tolist() if df is not None and not df.empty else []:
+            names.add(_norm_category_name(x))
+    except Exception:
+        pass
+    default = get_default_process_category()
+    if default:
+        names.add(default)
+    ordered = [PROCESS_CATEGORY_ALL] if include_common else []
+    ordered += sorted([n for n in names if n != PROCESS_CATEGORY_ALL])
+    return ordered
+
+
+def get_default_process_category() -> str:
+    _ensure_process_category_options_table()
+    try:
+        row = query_one("SELECT setting_value FROM app_settings WHERE setting_key=?", (DEFAULT_PROCESS_CATEGORY_KEY,)) or {}
+        value = str(row.get("setting_value") or "").strip()
+        return _norm_category_name(value) if value else PROCESS_CATEGORY_ALL
+    except Exception:
+        return PROCESS_CATEGORY_ALL
+
+
+def save_default_process_category(category_name: str) -> str:
+    _ensure_process_category_options_table()
+    category = _norm_category_name(category_name)
+    now = _now()
+    execute(
+        """
+        INSERT INTO app_settings(setting_key, setting_value, note, updated_at)
+        VALUES (?, ?, '01 工時紀錄：類別空白或找不到對應工段時使用的預設類別', ?)
+        ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value=excluded.setting_value,
+            note=excluded.note,
+            updated_at=excluded.updated_at
+        """,
+        (DEFAULT_PROCESS_CATEGORY_KEY, category, now),
+    )
+    _clear_settings_cache()
+    export_system_settings_permanent("save_default_process_category", write_history=True)
+    write_log("SAVE_DEFAULT_PROCESS_CATEGORY", f"儲存預設類別：{category}", "app_settings")
+    return category
+
+
+def load_process_options_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    _ensure_process_category_options_table()
+    sql = "SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options WHERE 1=1"
+    params: list[Any] = []
+    if active_only:
+        sql += " AND COALESCE(is_active, 1)=1"
+    sql += " ORDER BY CASE WHEN category_name=? THEN 0 ELSE 1 END, category_name, sort_order, id"
+    params.append(PROCESS_CATEGORY_ALL)
+    df = query_df(sql, params)
+    if df is None or df.empty:
+        legacy = query_df("SELECT id, process_name, is_active, sort_order, note, created_at, updated_at FROM process_options ORDER BY sort_order, id")
+        if legacy is not None and not legacy.empty:
+            legacy.insert(1, "category_name", PROCESS_CATEGORY_ALL)
+        return legacy
+    return df
+
+
+def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:
+    _ensure_process_category_options_table()
+    category = _norm_category_name(category_name)
+
+    def _names_for(where_sql: str, params: tuple[Any, ...]) -> list[str]:
+        try:
+            df = query_df(
+                f"SELECT process_name FROM process_category_options WHERE COALESCE(is_active,1)=1 AND {where_sql} ORDER BY sort_order, id",
+                params,
+            )
+            return [str(x).strip() for x in df.get("process_name", []).dropna().tolist() if str(x).strip()] if df is not None and not df.empty else []
+        except Exception:
+            return []
+
+    common_names = _names_for("(category_name=? OR COALESCE(category_name,'')='')", (PROCESS_CATEGORY_ALL,)) if include_common else []
+    category_names = [] if category == PROCESS_CATEGORY_ALL else _names_for("category_name=?", (category,))
+    names = common_names + [n for n in category_names if n not in common_names]
+    if names:
+        return names
+
+    default_category = get_default_process_category()
+    if default_category and default_category not in {PROCESS_CATEGORY_ALL, category}:
+        default_names = _names_for("category_name=?", (default_category,))
+        names = common_names + [n for n in default_names if n not in common_names]
+        if names:
+            return names
+
+    try:
+        df = query_df("SELECT process_name FROM process_category_options WHERE COALESCE(is_active,1)=1 ORDER BY sort_order, id")
+        names = []
+        for x in df.get("process_name", []).dropna().tolist() if df is not None and not df.empty else []:
+            s = str(x).strip()
+            if s and s not in names:
+                names.append(s)
+        if names:
+            return names
+    except Exception:
+        pass
+    return DEFAULT_PROCESS_OPTIONS.copy()
+
+
+def get_process_options() -> list[str]:  # type: ignore[override]
+    return get_process_options_by_category(get_default_process_category(), include_common=True)
+
+
+def save_process_options_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    _ensure_process_category_options_table()
+    if df is None:
+        return 0
+    now = _now()
+    count = 0
+    work = df.copy().drop(columns=["刪除", "delete", "selected"], errors="ignore").fillna("")
+    for idx, (_, r) in enumerate(work.iterrows(), start=1):
+        name = str(r.get("process_name", r.get("工段名稱", r.get("工段名稱 / Process", "")))).strip()
+        if not name:
+            continue
+        category = _norm_category_name(
+            r.get("category_name", r.get("category", r.get("類別", r.get("類別 / Category", r.get("type_name", r.get("機型", PROCESS_CATEGORY_ALL))))))
+        )
+        active_raw = str(r.get("is_active", r.get("啟用", r.get("啟用 / Active", True)))).strip().lower()
+        is_active = 0 if active_raw in {"0", "false", "no", "n", "off", "停用", "否"} else 1
+        try:
+            sort_order = int(float(r.get("sort_order", r.get("排序", r.get("sort_order / sort_order", idx))) or idx))
+        except Exception:
+            sort_order = idx
+        note = str(r.get("note", r.get("備註", r.get("備註 / Note", ""))) or "")
+        rid = str(r.get("id", r.get("ID", r.get("ID / ID", "")))).strip()
+        if rid and rid.lower() not in {"nan", "none"}:
+            execute(
+                """
+                UPDATE process_category_options
+                SET category_name=?, process_name=?, is_active=?, sort_order=?, note=?, updated_at=?
+                WHERE id=?
+                """,
+                (category, name, is_active, sort_order, note, now, int(float(rid))),
+            )
+        else:
+            execute(
+                """
+                INSERT INTO process_category_options(category_name, process_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(category_name, process_name) DO UPDATE SET
+                    is_active=excluded.is_active,
+                    sort_order=excluded.sort_order,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+                """,
+                (category, name, is_active, sort_order, note, now, now),
+            )
+        count += 1
+    _clear_settings_cache()
+    export_system_settings_permanent("save_category_process_options", write_history=True)
+    write_log("SAVE_PROCESS_OPTIONS", f"儲存類別對應工段設定 {count} 筆，已寫入 13 系統設定永久檔", "process_category_options")
+    return count
+
+
+def delete_process_options(ids: Iterable[int]) -> int:  # type: ignore[override]
+    _ensure_process_category_options_table()
+    count = 0
+    for rid in ids or []:
+        try:
+            i = int(float(rid))
+        except Exception:
+            continue
+        execute("DELETE FROM process_category_options WHERE id=?", (i,))
+        count += 1
+    if count:
+        _clear_settings_cache()
+        export_system_settings_permanent("delete_category_process_options", write_history=True)
+        write_log("DELETE_PROCESS_OPTIONS", f"刪除類別對應工段設定 {count} 筆，已寫入 13 系統設定永久檔", "process_category_options", level="WARN")
+    return count
+
+
+# Backward-compatible aliases. Old V3.28 pages can still import model names,
+# but they now use category logic so the app does not break during rolling updates.
+def load_process_model_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    return load_process_category_choices(include_common=include_common)
+
+
+def get_default_process_model() -> str:  # type: ignore[override]
+    return get_default_process_category()
+
+
+def save_default_process_model(type_name: str) -> str:  # type: ignore[override]
+    return save_default_process_category(type_name)
+
+
+def get_process_options_by_model(type_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
+    return get_process_options_by_category(type_name, include_common=include_common)
+
+
+def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    """Write 13｜系統設定 permanent files, including category-specific process mappings."""
+    ensure_system_settings_schema()
+    _ensure_process_category_options_table()
+    _ensure_permanent_dirs()
+    try:
+        proc = query_df("SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options ORDER BY category_name, sort_order, id")
+    except Exception:
+        proc = pd.DataFrame()
+    try:
+        rest = query_df("SELECT id, name, start_time, end_time, is_active, sort_order FROM rest_periods ORDER BY sort_order, id")
+    except Exception:
+        rest = pd.DataFrame()
+    try:
+        app = query_df("SELECT setting_key, setting_value, note, updated_at FROM app_settings ORDER BY setting_key")
+    except Exception:
+        app = pd.DataFrame()
+    payload: dict[str, Any] = {
+        "version": "V3.33",
+        "exported_at": _now(),
+        "reason": reason,
+        "description": "13｜系統設定永久紀錄：類別對應工段名稱、休息時間、01 工時紀錄每日重新整理時間。",
+        "tables": {
+            "process_options": _df_records(proc),
+            "rest_periods": _df_records(rest),
+            "app_settings": _df_records(app),
+        },
+        "table_counts": {
+            "process_options": 0 if proc is None else len(proc),
+            "rest_periods": 0 if rest is None else len(rest),
+            "app_settings": 0 if app is None else len(app),
+        },
+    }
+    for out_path in SYSTEM_SETTINGS_FILES:
+        _atomic_write_json(out_path, payload)
+    if write_history:
+        hist = SYSTEM_SETTINGS_HISTORY_DIR / f"system_settings_{now_stamp()}.json"
+        _atomic_write_json(hist, payload)
+    try:
+        mark_data_changed("13｜系統設定已變更，永久設定檔已建立；GitHub 同步請到 13 頁面手動執行。", "system_settings_permanent_json")
+    except Exception:
+        pass
+    return {"ok": True, "files": [str(p) for p in SYSTEM_SETTINGS_FILES], "table_counts": payload["table_counts"], "payload_version": "V3.33"}
