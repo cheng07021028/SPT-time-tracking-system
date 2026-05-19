@@ -2021,164 +2021,208 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:  # typ
 def _v243_seed_idle_timeout_one_minute() -> None:
     return
 
+# ===== V3.65 login safe no-network final override =====
+# 目的：登入後不可再卡在大量永久檔掃描、GitHub 同步、權限矩陣重建。
+# 原則：登入只讀 SQLite auth_users；只有 auth_users 完全空時，才從「直接永久檔」輕量還原一次。
 
-# ===== V3.42 final security permission hardening =====
-# System administrators must bypass every module/action check even if a stale permission matrix exists.
-_prev_v342_check_permission = check_permission
+_AUTH_LIGHT_RESTORE_DONE = False
 
-def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
-    user = get_current_user()
-    if user and _is_admin_user(user.get("username", ""), user.get("roles", [])):
-        return True
-    return _prev_v342_check_permission(module_code, action)
-
-
-def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
-    require_login(module_code)
-    if not check_permission(module_code, action):
-        log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
-        st.error("權限不足，請聯絡系統管理員。")
-        st.stop()
-
-require_permission = require_module_access
-
-# ===== V3.43 local restore guard after login =====
-# Pages can be opened directly from the Streamlit sidebar without rendering the
-# home page first.  Run the same local-only restore once after a successful login
-# so Reboot App cannot leave modules on SQLite defaults.  No GitHub/network calls.
-_prev_v343_require_login = require_login
-
-def require_login(module_code: str = "") -> None:  # type: ignore[override]
-    _prev_v343_require_login(module_code)
-    if st.session_state.get("auth_logged_in") and not st.session_state.get("_spt_v343_restore_guard_done"):
+def _v365_permission_direct_payloads() -> list[dict]:
+    payloads: list[dict] = []
+    paths = [
+        PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions' / '10_permissions_records.json',
+        PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions' / '10_permissions_settings.json',
+        PROJECT_ROOT / 'data' / 'persistent_state' / 'spt_user_persistent_settings.json',
+        PROJECT_ROOT / 'data' / 'persistent_state' / 'spt_module_settings.json',
+    ]
+    for p in paths:
         try:
-            from services.permanent_restore_guard_service import restore_core_modules_from_local_permanent
-            restore_core_modules_from_local_permanent()
-        except Exception:
-            pass
-        st.session_state["_spt_v343_restore_guard_done"] = True
-
-
-def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
-    require_login(module_code)
-    if not check_permission(module_code, action):
-        log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
-        st.error("權限不足，請聯絡系統管理員。")
-        st.stop()
-
-require_permission = require_module_access
-
-
-# ===== V3.45 login/home acceleration final override =====
-# Keep all permissions and permanence features, but remove heavy restore/rebuild
-# work from the login/home critical path.  Users reported that V3.43 could enter
-# successfully but spent too long spinning after login.
-
-def _v345_recent_history_files(history_dir: Path, pattern: str, limit: int = 5) -> list[Path]:
-    try:
-        return sorted(history_dir.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)[:limit]
-    except Exception:
-        return []
-
-
-def _best_local_auth_tables() -> dict[str, list[dict[str, Any]]]:  # type: ignore[override]
-    """Find local 10_permissions JSON quickly, without scanning all history files."""
-    candidates: list[Path] = []
-    base = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions"
-    for name in ("10_permissions_records.json", "10_permissions_settings.json", "security_settings.json"):
-        candidates.append(base / name)
-    hist = base / "history"
-    candidates.extend(_v345_recent_history_files(hist, "10_permissions_records_*.json", limit=5))
-    candidates.extend(_v345_recent_history_files(hist, "10_permissions_settings_*.json", limit=5))
-
-    best: dict[str, list[dict[str, Any]]] = {}
-    best_score = -1
-    for path in candidates:
-        try:
-            if not path.exists() or path.stat().st_size <= 0:
+            if not p.exists() or p.stat().st_size <= 0:
                 continue
-            payload = json.loads(path.read_text(encoding="utf-8"))
-            tables = payload.get("tables", {}) if isinstance(payload, dict) else {}
-            users = tables.get("auth_users", []) if isinstance(tables, dict) else []
-            perms = tables.get("auth_account_permissions", []) if isinstance(tables, dict) else []
-            if not isinstance(users, list):
-                users = []
-            if not isinstance(perms, list):
-                perms = []
-            non_default = [u for u in users if str(u.get("note", "")).find("default account") < 0]
-            score = len(users) * 1000 + len(non_default) * 100 + len(perms)
-            if users and score > best_score:
-                best_score = score
-                best = {"auth_users": users, "auth_account_permissions": perms}
+            raw = json.loads(p.read_text(encoding='utf-8'))
+            if not isinstance(raw, dict):
+                continue
+            if isinstance(raw.get('tables'), dict):
+                payloads.append(raw)
+            ps = raw.get('permission_settings')
+            if isinstance(ps, dict):
+                for v in ps.values():
+                    if isinstance(v, dict) and isinstance(v.get('tables'), dict):
+                        payloads.append(v)
         except Exception:
             continue
-    return best
+    return payloads
 
 
-def _auth_user_row(username: str) -> dict[str, Any] | None:  # type: ignore[override]
-    """Fast login read: use DB first; restore from local JSON only if account is missing."""
-    username = (username or "").strip()
-    if not username:
-        return None
+def _v365_first_auth_tables() -> dict[str, list[dict[str, Any]]]:
+    for payload in _v365_permission_direct_payloads():
+        tables = payload.get('tables', {}) if isinstance(payload, dict) else {}
+        if not isinstance(tables, dict):
+            continue
+        users = tables.get('auth_users', []) or []
+        perms = tables.get('auth_account_permissions', []) or []
+        if isinstance(users, list) and users:
+            return {
+                'auth_users': [u for u in users if isinstance(u, dict)],
+                'auth_account_permissions': [r for r in perms if isinstance(r, dict)],
+            }
+    return {'auth_users': [], 'auth_account_permissions': []}
+
+
+def _restore_auth_users_lightweight_if_needed(username: str = '') -> None:  # type: ignore[override]
+    """V3.65：登入安全版。只在 auth_users 完全空時讀直接永久檔；不掃 history、不連 GitHub。"""
+    global _AUTH_LIGHT_RESTORE_DONE
+    if _AUTH_LIGHT_RESTORE_DONE:
+        return
+    _AUTH_LIGHT_RESTORE_DONE = True
+    _ensure_auth_users_schema_lightweight()
     try:
-        _ensure_auth_users_schema_lightweight()
-        row = query_one("SELECT * FROM auth_users WHERE username=?", (username,))
-        if row:
-            return row
-        _restore_auth_users_lightweight_if_needed(username)
-        return query_one("SELECT * FROM auth_users WHERE username=?", (username,))
+        row = query_one('SELECT COUNT(*) AS c FROM auth_users') or {}
+        if int(row.get('c', 0) or 0) > 0:
+            return
     except Exception:
-        return None
+        pass
+    tables = _v365_first_auth_tables()
+    users = tables.get('auth_users', [])
+    perms = tables.get('auth_account_permissions', [])
+    if not users:
+        return
+    try:
+        for u in users:
+            name = str(u.get('username', '') or '').strip()
+            if not name:
+                continue
+            execute('''
+                INSERT OR REPLACE INTO auth_users
+                (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ''', (
+                name,
+                str(u.get('password_hash', '') or ''),
+                str(u.get('password_hint', '') or ''),
+                str(u.get('employee_id', '') or ''),
+                str(u.get('display_name', '') or name),
+                str(u.get('email', '') or ''),
+                str(u.get('role_code', 'operator') or 'operator'),
+                int(u.get('is_active', 1) or 0),
+                int(u.get('force_password_change', 0) or 0),
+                str(u.get('last_login_at', '') or ''),
+                str(u.get('note', '') or ''),
+                str(u.get('created_at', '') or _now()),
+                str(u.get('updated_at', '') or _now()),
+            ))
+        for r in perms:
+            name = str(r.get('username', '') or '').strip()
+            module = str(r.get('module_code', '') or '').strip()
+            if not name or not module:
+                continue
+            execute('''
+                INSERT OR REPLACE INTO auth_account_permissions
+                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ''', (
+                name, module,
+                str(r.get('module_name_zh', '') or ''),
+                str(r.get('module_name_en', '') or ''),
+                int(r.get('can_view', 0) or 0), int(r.get('can_create', 0) or 0),
+                int(r.get('can_edit', 0) or 0), int(r.get('can_delete', 0) or 0),
+                int(r.get('can_import', 0) or 0), int(r.get('can_export', 0) or 0),
+                int(r.get('can_backup', 0) or 0), int(r.get('can_restore', 0) or 0),
+                int(r.get('can_manage', 0) or 0), str(r.get('updated_at', '') or _now()),
+            ))
+    except Exception:
+        pass
 
 
-def _v345_load_current_permission_row(module_code: str, action: str = "can_view") -> bool:
-    user = get_current_user()
-    if not user:
+def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
+    """V3.65：登入只做必要查詢，不預載全權限、不掃 history、不做 GitHub。"""
+    ensure_security_schema()
+    username = (username or '').strip()
+    _restore_auth_users_lightweight_if_needed(username)
+    auth_row = query_one('SELECT * FROM auth_users WHERE username=?', (username,))
+    row = auth_row or query_one('SELECT * FROM security_users WHERE username=?', (username,))
+    if not row:
+        log_security_event(username, 'LOGIN', 'FAIL', '帳號不存在')
+        return False, '帳號或密碼錯誤。'
+    if not int(row.get('is_active', 0) or 0):
+        log_security_event(username, 'LOGIN', 'FAIL', '帳號停用')
+        return False, '帳號已停用。'
+    if not verify_password(password, row.get('password_hash')):
+        log_security_event(username, 'LOGIN', 'FAIL', '密碼錯誤')
+        return False, '帳號或密碼錯誤。'
+    role = str((auth_row or row).get('role_code', '') or '').strip()
+    if not role:
+        role = 'admin' if username.lower() == 'admin' else 'operator'
+    st.session_state['auth_logged_in'] = True
+    st.session_state['auth_username'] = username
+    st.session_state['auth_display_name'] = row.get('display_name') or username
+    st.session_state['auth_employee_id'] = row.get('employee_id') or ''
+    st.session_state['auth_roles'] = [role]
+    st.session_state['auth_login_ts'] = time.time()
+    st.session_state['auth_last_activity_ts'] = time.time()
+    try:
+        execute('UPDATE auth_users SET last_login_at=?, updated_at=? WHERE username=?', (_now(), _now(), username))
+    except Exception:
+        pass
+    try:
+        execute('UPDATE security_users SET last_login_at=?, updated_at=? WHERE username=?', (_now(), _now(), username))
+    except Exception:
+        pass
+    log_security_event(username, 'LOGIN', 'SUCCESS', f'role={role}')
+    return True, '登入成功。'
+
+
+def _v365_load_permission_cache(username: str) -> dict[str, dict[str, bool]]:
+    cache_key = f'_spt_perm_cache_{username}'
+    cached = st.session_state.get(cache_key)
+    now_ts = time.time()
+    if cached and now_ts - float(cached.get('ts', 0) or 0) < _PERMISSION_CACHE_TTL_SECONDS:
+        return cached.get('data', {})
+    data: dict[str, dict[str, bool]] = {}
+    roles = st.session_state.get('auth_roles', []) or []
+    if 'admin' in roles or _is_admin_user(username, roles):
+        for m in MODULES:
+            data[m['module_code']] = {c: True for c in PERMISSION_COLUMNS}
+        st.session_state[cache_key] = {'ts': now_ts, 'data': data}
+        return data
+    try:
+        df = query_df('''
+            SELECT p.* FROM auth_account_permissions p
+            JOIN auth_users u ON u.username=p.username
+            WHERE p.username=? AND COALESCE(u.is_active,0)=1
+        ''', (username,))
+        if not df.empty:
+            for _, r in df.iterrows():
+                no = str(r.get('module_code', '')).zfill(2)
+                code = MODULE_NO_TO_CODE.get(no, no)
+                row = {c: bool(int(r.get(c, 0) or 0)) for c in PERMISSION_COLUMNS}
+                if row.get('can_manage'):
+                    row = {c: True for c in PERMISSION_COLUMNS}
+                data[code] = row
+    except Exception:
+        data = {}
+    st.session_state[cache_key] = {'ts': now_ts, 'data': data}
+    return data
+
+
+def check_permission(module_code: str, action: str = 'can_view') -> bool:  # type: ignore[override]
+    """V3.65：首頁/側邊模組權限查詢不得做 reconcile 或大量寫入。"""
+    if not st.session_state.get('auth_logged_in'):
         return False
-    username = str(user.get("username", "") or "")
-    roles = user.get("roles", []) or []
-    if _is_admin_user(username, roles):
+    username = str(st.session_state.get('auth_username', '') or '')
+    roles = st.session_state.get('auth_roles', []) or []
+    if 'admin' in roles:
         return True
-    if action not in PERMISSION_COLUMNS:
-        action = "can_view"
-    perms = _load_permission_cache(username, roles)
-    row = perms.get(module_code) or perms.get(MODULE_CODE_TO_NO.get(module_code, module_code), {})
-
-    # If a newly added module has no row at all, reconcile once in this session.
-    # This preserves the safety feature without doing reconciliation on every
-    # sidebar/home permission check.
-    if not row and not st.session_state.get("_v345_permission_reconcile_tried"):
-        st.session_state["_v345_permission_reconcile_tried"] = True
-        try:
-            _v241_security_reconcile_once()
-            clear_permission_cache(username)
-            perms = _load_permission_cache(username, roles, force=True)
-            row = perms.get(module_code) or perms.get(MODULE_CODE_TO_NO.get(module_code, module_code), {})
-        except Exception:
-            row = {}
-    if row.get("can_manage"):
-        return True
+    data = _v365_load_permission_cache(username)
+    row = data.get(module_code) or data.get(MODULE_NO_TO_CODE.get(str(module_code).zfill(2), str(module_code))) or {}
     return bool(row.get(action, False))
 
 
-def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
-    return _v345_load_current_permission_row(module_code, action)
-
-
-def require_login(module_code: str = "") -> None:  # type: ignore[override]
-    # Use the pre-V3.43 login flow: login check, idle check and user bar only.
-    # Do not call restore_core_modules_from_local_permanent() here; that routine
-    # can rebuild indexes and scan permanent folders, so it belongs to admin
-    # pages/manual actions rather than every login or page entry.
-    _prev_v343_require_login(module_code)
-    st.session_state["_spt_v343_restore_guard_done"] = True
-
-
-def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+def require_module_access(module_code: str, action: str = 'can_view') -> None:  # type: ignore[override]
     require_login(module_code)
     if not check_permission(module_code, action):
-        log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
-        st.error("權限不足，請聯絡系統管理員。")
+        log_security_event(st.session_state.get('auth_username', ''), 'PERMISSION_DENIED', 'FAIL', f'{module_code}:{action}', module_code)
+        st.error('權限不足：你的帳號未被授權使用此模組或功能。')
         st.stop()
 
 require_permission = require_module_access

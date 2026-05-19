@@ -1800,3 +1800,173 @@ def restore_permission_settings_from_permanent_files(force: bool = False) -> dic
         except Exception: pass
         clear_permission_runtime_cache()
     return {"ok": bool(restored), "source": str(best_path), "restored": restored, "mode": "v363_direct_latest_authoritative"}
+
+# ===== V3.65 account delete and local-only persistence final override =====
+# 原則：10｜權限管理只讀/寫直接永久檔；不掃 history、不做 GitHub、不用帳號數判斷還原。
+
+def _v365_permission_payload_from_db(reason: str = 'permission_settings_saved') -> dict:
+    conn = connect_db(); cur = conn.cursor()
+    tables: dict[str, list[dict]] = {}
+    for table in ['auth_users', 'auth_account_permissions', 'auth_security_settings', 'security_users', 'security_settings', 'security_user_roles']:
+        try:
+            rows = cur.execute(f'SELECT * FROM "{table}"').fetchall()
+            tables[table] = [dict(r) for r in rows]
+        except Exception:
+            tables[table] = []
+    conn.close()
+    return {
+        'version': 'V3.65',
+        'exported_at': now_text(),
+        'reason': reason,
+        'module_code': '10_permissions',
+        'tables': tables,
+        'table_counts': {k: len(v) for k, v in tables.items()},
+    }
+
+
+def _v365_write_json_atomic(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + '.tmp')
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding='utf-8')
+    tmp.replace(path)
+
+
+def export_permission_settings_permanently(reason: str = 'permission_settings_saved') -> dict:  # type: ignore[override]
+    """V3.65：本機輕量匯出，不連 GitHub、不掃 history、不觸發全域同步。"""
+    init_permission_tables()
+    payload = _v365_permission_payload_from_db(reason)
+    base = PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions'
+    files = [base / '10_permissions_records.json', base / '10_permissions_settings.json']
+    for p in files:
+        _v365_write_json_atomic(p, payload)
+    try:
+        master_path = PROJECT_ROOT / 'data' / 'persistent_state' / 'spt_user_persistent_settings.json'
+        master = _json_load(master_path)
+        if not isinstance(master, dict):
+            master = {}
+        ps = master.get('permission_settings') if isinstance(master.get('permission_settings'), dict) else {}
+        ps['10.permissions'] = payload
+        master['permission_settings'] = ps
+        master['updated_at'] = now_text()
+        _v365_write_json_atomic(master_path, master)
+        files.append(master_path)
+    except Exception:
+        pass
+    clear_permission_runtime_cache()
+    return {'ok': True, 'mode': 'v365_local_only', 'files': [str(p) for p in files], 'table_counts': payload.get('table_counts', {})}
+
+
+def _v365_direct_permission_payload() -> tuple[Path | None, dict]:
+    direct = [
+        PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions' / '10_permissions_records.json',
+        PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions' / '10_permissions_settings.json',
+        PROJECT_ROOT / 'data' / 'persistent_state' / 'spt_user_persistent_settings.json',
+    ]
+    for p in direct:
+        raw = _json_load(p)
+        if not isinstance(raw, dict):
+            continue
+        if isinstance(raw.get('tables'), dict) and raw.get('tables', {}).get('auth_users'):
+            return p, raw
+        ps = raw.get('permission_settings')
+        if isinstance(ps, dict):
+            for v in ps.values():
+                if isinstance(v, dict) and isinstance(v.get('tables'), dict) and v.get('tables', {}).get('auth_users'):
+                    return p, v
+    return None, {}
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    """V3.65：只從直接永久檔還原；不讀 history，避免刪除帳號又被舊檔救回。"""
+    init_permission_tables()
+    path, payload = _v365_direct_permission_payload()
+    tables = payload.get('tables', {}) if isinstance(payload, dict) else {}
+    if not path or not tables:
+        return {'ok': False, 'source': '', 'restored': {}, 'message': '找不到直接永久檔'}
+    restored: dict[str, int] = {}
+    conn = connect_db(); cur = conn.cursor()
+    try:
+        _ensure_legacy_security_tables(cur)
+        _ensure_security_setting_tables(cur)
+        for table in ['auth_account_permissions', 'auth_users', 'security_user_roles', 'security_users']:
+            try:
+                cur.execute(f'DELETE FROM "{table}"')
+            except Exception:
+                pass
+        for table in ['auth_users', 'auth_account_permissions', 'auth_security_settings', 'security_users', 'security_settings', 'security_user_roles']:
+            rows = tables.get(table, []) or []
+            if rows:
+                restored[table] = restored.get(table, 0) + _insert_or_replace_rows(cur, table, rows)
+        if tables.get('auth_security_settings'):
+            restored['security_settings'] = restored.get('security_settings', 0) + _insert_or_replace_rows(cur, 'security_settings', tables.get('auth_security_settings', []))
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    clear_permission_runtime_cache()
+    return {'ok': bool(restored), 'source': str(path), 'restored': restored, 'mode': 'v365_direct_only'}
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    """V3.65：進入 10 頁時最多直接還原一次；不掃 history。"""
+    init_permission_tables()
+    if st is not None and not st.session_state.get('_v365_permission_direct_loaded'):
+        try:
+            restore_permission_settings_from_permanent_files(force=True)
+        except Exception:
+            pass
+        try:
+            st.session_state['_v365_permission_direct_loaded'] = True
+        except Exception:
+            pass
+    conn = connect_db()
+    rows = conn.execute('SELECT * FROM auth_users ORDER BY username').fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d['password_display'] = '********' if d.get('password_hash') else '未設定'
+        d['new_password'] = ''
+        out.append(d)
+    return out
+
+
+def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
+    """V3.65：刪除帳號後立即以目前 DB 覆蓋直接永久檔；不再被 history 還原。"""
+    init_permission_tables()
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for u in usernames:
+        name = str(u or '').strip()
+        if not name or name.lower() == 'admin' or name.lower() in seen:
+            continue
+        cleaned.append(name); seen.add(name.lower())
+    if not cleaned:
+        return 0
+    conn = connect_db(); cur = conn.cursor()
+    deleted = 0
+    try:
+        _ensure_legacy_security_tables(cur)
+        for u in cleaned:
+            cur.execute('DELETE FROM auth_account_permissions WHERE username=?', (u,))
+            cur.execute('DELETE FROM auth_users WHERE username=?', (u,))
+            deleted += max(int(cur.rowcount or 0), 0)
+            cur.execute('DELETE FROM security_user_roles WHERE username=?', (u,))
+            cur.execute('DELETE FROM security_users WHERE username=?', (u,))
+        conn.commit()
+    finally:
+        conn.close()
+    clear_permission_runtime_cache()
+    if st is not None:
+        try:
+            st.session_state['_v365_permission_direct_loaded'] = True
+        except Exception:
+            pass
+    try:
+        export_permission_settings_permanently('auth_users_deleted')
+    except Exception:
+        pass
+    return deleted
