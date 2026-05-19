@@ -496,11 +496,13 @@ def export_system_settings_permanent(reason: str = "system_settings_changed", wr
         "reason": reason,
         "description": "13｜系統設定永久紀錄：工段名稱、休息時間、01 工時紀錄每日重新整理時間。",
         "tables": {
+            "process_categories": _df_records(cats),
             "process_options": _df_records(proc),
             "rest_periods": _df_records(rest),
             "app_settings": _df_records(app),
         },
         "table_counts": {
+            "process_categories": 0 if cats is None else len(cats),
             "process_options": 0 if proc is None else len(proc),
             "rest_periods": 0 if rest is None else len(rest),
             "app_settings": 0 if app is None else len(app),
@@ -1112,11 +1114,13 @@ def export_system_settings_permanent(reason: str = "system_settings_changed", wr
         "reason": reason,
         "description": "13｜系統設定永久紀錄：機型對應工段名稱、休息時間、01 工時紀錄每日重新整理時間。",
         "tables": {
+            "process_categories": _df_records(cats),
             "process_options": _df_records(proc),
             "rest_periods": _df_records(rest),
             "app_settings": _df_records(app),
         },
         "table_counts": {
+            "process_categories": 0 if cats is None else len(cats),
             "process_options": 0 if proc is None else len(proc),
             "rest_periods": 0 if rest is None else len(rest),
             "app_settings": 0 if app is None else len(app),
@@ -1179,6 +1183,45 @@ def _ensure_process_category_options_table() -> None:
         )
         """
     )
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS process_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_name TEXT UNIQUE NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """
+    )
+
+    now = _now()
+
+    # Always keep common category available.
+    execute(
+        """
+        INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)
+        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)
+        """,
+        (PROCESS_CATEGORY_ALL, now, now),
+    )
+
+    try:
+        existing = query_df("SELECT DISTINCT category_name FROM process_category_options WHERE COALESCE(category_name,'')<>''")
+        for name in existing.get("category_name", []).dropna().tolist() if existing is not None and not existing.empty else []:
+            cat = _norm_category_name(name)
+            execute(
+                """
+                INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (?, 1, 999, '', ?, ?)
+                """,
+                (cat, now, now),
+            )
+    except Exception:
+        pass
+
     try:
         row = query_one("SELECT COUNT(*) AS c FROM process_category_options") or {"c": 0}
         if int(row.get("c") or 0) != 0:
@@ -1186,7 +1229,6 @@ def _ensure_process_category_options_table() -> None:
     except Exception:
         return
 
-    now = _now()
     seeded = 0
     # Prefer previous V3.28 model process mapping, reinterpreting type_name as category_name.
     try:
@@ -1249,6 +1291,12 @@ def load_process_category_choices(include_common: bool = True) -> list[str]:
     if include_common:
         names.add(PROCESS_CATEGORY_ALL)
     try:
+        cat_df = query_df("SELECT category_name FROM process_categories WHERE COALESCE(is_active,1)=1 ORDER BY sort_order, id")
+        for x in cat_df.get("category_name", []).dropna().tolist() if cat_df is not None and not cat_df.empty else []:
+            names.add(_norm_category_name(x))
+    except Exception:
+        pass
+    try:
         df = query_df("SELECT DISTINCT category_name FROM process_category_options WHERE COALESCE(category_name,'')<>'' ORDER BY category_name")
         for x in df.get("category_name", []).dropna().tolist() if df is not None and not df.empty else []:
             names.add(_norm_category_name(x))
@@ -1261,6 +1309,100 @@ def load_process_category_choices(include_common: bool = True) -> list[str]:
     ordered += sorted([n for n in names if n != PROCESS_CATEGORY_ALL])
     return ordered
 
+
+def load_process_categories_df(active_only: bool = False) -> pd.DataFrame:
+    _ensure_process_category_options_table()
+    sql = "SELECT id, category_name, is_active, sort_order, note, created_at, updated_at FROM process_categories WHERE 1=1"
+    if active_only:
+        sql += " AND COALESCE(is_active,1)=1"
+    sql += " ORDER BY CASE WHEN category_name=? THEN 0 ELSE 1 END, sort_order, id"
+    df = query_df(sql, (PROCESS_CATEGORY_ALL,))
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+    return df
+
+
+def save_process_categories_df(df: pd.DataFrame) -> int:
+    _ensure_process_category_options_table()
+    if df is None:
+        return 0
+    now = _now()
+    work = df.copy().drop(columns=["刪除", "delete", "selected"], errors="ignore").fillna("")
+    count = 0
+    for idx, (_, r) in enumerate(work.iterrows(), start=1):
+        name = _norm_category_name(_row_get(r, "category_name", "category", "類別", "類別 / Category", default=""))
+        if not name:
+            continue
+        raw_active = str(_row_get(r, "is_active", "啟用", "啟用 / Active", default=True)).strip().lower()
+        is_active = 0 if raw_active in {"0", "false", "no", "n", "off", "停用", "否"} else 1
+        try:
+            sort_order = int(float(_row_get(r, "sort_order", "排序", "排序 / Sort", default=idx)))
+        except Exception:
+            sort_order = idx
+        note = str(_row_get(r, "note", "備註", "備註 / Note", default="") or "").strip()
+        rid = str(_row_get(r, "id", default="") or "").strip()
+        old_name = ""
+        if rid:
+            try:
+                old_row = query_one("SELECT category_name FROM process_categories WHERE id=?", (int(float(rid)),)) or {}
+                old_name = _norm_category_name(old_row.get("category_name")) if old_row else ""
+            except Exception:
+                old_name = ""
+        if rid:
+            try:
+                execute(
+                    """
+                    UPDATE process_categories
+                    SET category_name=?, is_active=?, sort_order=?, note=?, updated_at=?
+                    WHERE id=?
+                    """,
+                    (name, is_active, sort_order, note, now, int(float(rid))),
+                )
+                if old_name and old_name != name:
+                    execute("UPDATE process_category_options SET category_name=?, updated_at=? WHERE category_name=?", (name, now, old_name))
+                count += 1
+                continue
+            except Exception:
+                pass
+        execute(
+            """
+            INSERT INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(category_name) DO UPDATE SET
+                is_active=excluded.is_active,
+                sort_order=excluded.sort_order,
+                note=excluded.note,
+                updated_at=excluded.updated_at
+            """,
+            (name, is_active, sort_order, note, now, now),
+        )
+        count += 1
+    _clear_settings_cache()
+    export_system_settings_permanent("save_process_categories", write_history=True)
+    write_log("SAVE_PROCESS_CATEGORIES", f"儲存類別設定 {count} 筆，已寫入 13 系統設定永久檔", "process_categories")
+    return count
+
+
+def delete_process_categories(ids: Iterable[int]) -> int:
+    _ensure_process_category_options_table()
+    count = 0
+    for raw in ids:
+        try:
+            i = int(raw)
+        except Exception:
+            continue
+        row = query_one("SELECT category_name FROM process_categories WHERE id=?", (i,)) or {}
+        category = _norm_category_name(row.get("category_name")) if row else ""
+        if not category or category == PROCESS_CATEGORY_ALL:
+            continue
+        execute("DELETE FROM process_categories WHERE id=?", (i,))
+        execute("DELETE FROM process_category_options WHERE category_name=?", (category,))
+        count += 1
+    if count:
+        _clear_settings_cache()
+        export_system_settings_permanent("delete_process_categories", write_history=True)
+        write_log("DELETE_PROCESS_CATEGORIES", f"刪除類別設定 {count} 筆，並移除對應工段，已寫入永久檔", "process_categories", level="WARN")
+    return count
 
 def get_default_process_category() -> str:
     _ensure_process_category_options_table()
@@ -1448,6 +1590,7 @@ def export_system_settings_permanent(reason: str = "system_settings_changed", wr
     _ensure_permanent_dirs()
     try:
         proc = query_df("SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options ORDER BY category_name, sort_order, id")
+        cats = query_df("SELECT id, category_name, is_active, sort_order, note, created_at, updated_at FROM process_categories ORDER BY sort_order, id")
     except Exception:
         proc = pd.DataFrame()
     try:
@@ -1464,11 +1607,13 @@ def export_system_settings_permanent(reason: str = "system_settings_changed", wr
         "reason": reason,
         "description": "13｜系統設定永久紀錄：類別對應工段名稱、休息時間、01 工時紀錄每日重新整理時間。",
         "tables": {
+            "process_categories": _df_records(cats),
             "process_options": _df_records(proc),
             "rest_periods": _df_records(rest),
             "app_settings": _df_records(app),
         },
         "table_counts": {
+            "process_categories": 0 if cats is None else len(cats),
             "process_options": 0 if proc is None else len(proc),
             "rest_periods": 0 if rest is None else len(rest),
             "app_settings": 0 if app is None else len(app),
