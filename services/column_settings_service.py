@@ -257,7 +257,11 @@ def _callsite_signature() -> str:
             if "/pages/" in filename or filename.endswith("streamlit_app.py"):
                 candidates.append(f"{Path(filename).stem}:{frame.lineno}")
         if candidates:
-            return candidates[-1]
+            # V361: use the nearest real page call-site, not the outer module call.
+            # candidates[-1] can be the page-level render function call, causing
+            # multiple st.dataframe/st.data_editor calls inside the same helper to
+            # share one widget key and raise StreamlitDuplicateElementKey.
+            return candidates[0]
     except Exception:
         pass
     return "unknown_callsite"
