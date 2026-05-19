@@ -993,3 +993,93 @@ def load_column_order(table_key: str) -> list[str]:  # type: ignore[override]
         return [str(x) for x in data if str(x)] if isinstance(data, list) else []
     except Exception:
         return []
+
+# ===== V3.52 deep persistence repair for table_ui_settings =====
+# 10/13/01 all need the same table width/order source after Reboot App.
+# Previous mirrors focused on UI + 01, so 13 system-setting tables could be
+# missing from module-specific restore paths.  This patch extends mirrors only;
+# it does not add any new screen function.
+
+
+def _table_ui_candidate_paths() -> list[Path]:  # type: ignore[override]
+    paths: list[Path] = []
+    paths.extend(_TABLE_UI_PERSIST_FILES)
+    paths.extend([
+        _PROJECT_ROOT / "data" / "persistent_state" / "spt_module_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "ui_table_settings_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_ui_settings.json",
+    ])
+    history_roots = [
+        _TABLE_UI_HISTORY_DIR,
+        _PROJECT_ROOT / "data" / "persistent_state" / "history",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "history",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "history",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "history",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "history",
+    ]
+    for root in history_roots:
+        if root.exists():
+            paths.extend(root.glob("*.json"))
+    seen: set[str] = set()
+    out: list[Path] = []
+    for path in paths:
+        key = str(path.resolve()) if path.exists() else str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(path)
+    return out
+
+
+def _write_table_ui_into_module_settings(rows: list[dict[str, Any]], reason: str) -> None:  # type: ignore[override]
+    if not rows:
+        return
+    targets = [
+        _PROJECT_ROOT / "data" / "persistent_state" / "spt_module_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "ui_table_settings_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_ui_settings.json",
+    ]
+    for path in targets:
+        payload = _read_json(path)
+        if not isinstance(payload, dict):
+            payload = {}
+        payload.setdefault("version", "V3.52")
+        payload["exported_at"] = _now_text()
+        payload["reason"] = reason
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        tables["table_ui_settings"] = rows
+        payload["tables"] = tables
+        counts = payload.get("table_counts") if isinstance(payload.get("table_counts"), dict) else {}
+        counts["table_ui_settings"] = len(rows)
+        payload["table_counts"] = counts
+        _atomic_json(path, payload)
+
+
+def _try_upload_table_ui_permanent_files(reason: str) -> None:  # type: ignore[override]
+    try:
+        from services.github_cloud_storage_service import github_config, upload_file_to_github
+        cfg = github_config()
+        if not cfg.get("token"):
+            return
+        stamp = _stamp_text()
+        files = [
+            (_PROJECT_ROOT / "data" / "persistent_state" / "spt_table_ui_settings.json", "data/persistent_state/spt_table_ui_settings.json"),
+            (_PROJECT_ROOT / "data" / "persistent_state" / "spt_module_settings.json", "data/persistent_state/spt_module_settings.json"),
+            (_PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_ui_settings.json", "data/persistent_modules/ui_table_settings/table_ui_settings.json"),
+            (_PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "ui_table_settings_settings.json", "data/persistent_modules/ui_table_settings/ui_table_settings_settings.json"),
+            (_PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json", "data/persistent_modules/01_time_records/01_time_records_settings.json"),
+            (_PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json", "data/persistent_modules/10_permissions/10_permissions_settings.json"),
+            (_PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_settings.json", "data/persistent_modules/13_system_settings/13_system_settings_settings.json"),
+            (_PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_ui_settings.json", "data/persistent_modules/13_system_settings/13_system_settings_table_ui_settings.json"),
+        ]
+        for local, remote in files:
+            if local.exists():
+                upload_file_to_github(local, remote, f"SPT table UI settings V352 {reason} {stamp}")
+    except Exception:
+        pass

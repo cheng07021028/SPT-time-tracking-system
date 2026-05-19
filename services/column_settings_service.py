@@ -858,3 +858,433 @@ def install_column_settings_patch() -> None:
 # 手動測試用
 if __name__ == "__main__":
     print(f"Column settings path: {SETTINGS_PATH}")
+
+# ===== V3.52 deep persistence repair for column settings =====
+# Root fixes:
+# 1) Do not render the global Column Settings panel for tables already rendered by
+#    services.table_ui_service.render_table().  Those tables have their own
+#    Column Width / Order tool, and showing two tools split the saved settings.
+# 2) Column settings are now mirrored into system_settings + spt_module_settings
+#    and small GitHub files only when the user actually changes settings.  Loading
+#    settings does not write files and does not upload, preventing infinite reruns.
+
+_COLUMN_SETTINGS_SYSTEM_KEY_V352 = "spt_table_column_settings_v2"
+_COLUMN_SETTINGS_UPLOAD_TS_V352 = 0.0
+_COLUMN_SETTINGS_UPLOAD_INTERVAL_SEC_V352 = 6.0
+
+# More permanent mirrors. Keep old paths for backward compatibility.
+COLUMN_SETTINGS_MIRROR_PATHS = list(dict.fromkeys([
+    SETTINGS_PATH,
+    PROJECT_ROOT / "data" / "persistent_state" / "spt_module_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_column_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_table_column_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_column_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_table_column_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "ui_table_settings_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json",
+]))
+
+
+def _v352_direct_db_path() -> Path:
+    return PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
+
+
+def _v352_settings_from_system_settings_rows(rows: Any) -> Dict[str, Any]:
+    if not isinstance(rows, list):
+        return {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("setting_key") or "") != _COLUMN_SETTINGS_SYSTEM_KEY_V352:
+            continue
+        raw = row.get("setting_value")
+        try:
+            parsed = json.loads(str(raw or "{}"))
+            return _normalize_loaded_settings(parsed)
+        except Exception:
+            return {}
+    return {}
+
+
+def _normalize_loaded_settings(data: Dict[str, Any]) -> Dict[str, Any]:  # type: ignore[override]
+    """V3.52: read all supported JSON shapes, including system_settings mirrors."""
+    if not isinstance(data, dict):
+        return {}
+    candidates: list[Dict[str, Any]] = []
+    if isinstance(data.get("table_column_settings_v2"), dict):
+        candidates.append(dict(data.get("table_column_settings_v2") or {}))
+    if isinstance(data.get("settings"), dict) and isinstance(data["settings"].get("table_column_settings_v2"), dict):
+        candidates.append(dict(data["settings"].get("table_column_settings_v2") or {}))
+    tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
+    if isinstance(tables, dict):
+        if isinstance(tables.get("table_column_settings_v2"), dict):
+            candidates.append(dict(tables.get("table_column_settings_v2") or {}))
+        sys_rows = tables.get("system_settings")
+        sys_settings = _v352_settings_from_system_settings_rows(sys_rows)
+        if sys_settings:
+            candidates.append(sys_settings)
+    # direct legacy format: {table_id:{columns:{...}}}
+    legacy = {k: v for k, v in data.items() if isinstance(v, dict) and isinstance(v.get("columns"), dict)}
+    if legacy:
+        candidates.append(legacy)
+
+    base: Dict[str, Any] = {}
+    for cand in candidates:
+        for k, v in cand.items():
+            if isinstance(v, dict) and isinstance(v.get("columns"), dict):
+                base.setdefault(str(k), v)
+    for k, v in list(base.items()):
+        ck = _canonical_table_id(k)
+        if ck and ck not in base and isinstance(v, dict):
+            base[ck] = v
+    return base
+
+
+def _v352_load_db_system_settings() -> Dict[str, Any]:
+    """Read column settings mirrored in SQLite system_settings without triggering guards."""
+    db_path = _v352_direct_db_path()
+    if not db_path.exists():
+        return {}
+    try:
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        try:
+            row = conn.execute(
+                "SELECT setting_value FROM system_settings WHERE setting_key=?",
+                (_COLUMN_SETTINGS_SYSTEM_KEY_V352,),
+            ).fetchone()
+            if not row:
+                return {}
+            parsed = json.loads(str(row[0] or "{}"))
+            return _normalize_loaded_settings(parsed)
+        finally:
+            conn.close()
+    except Exception:
+        return {}
+
+
+def load_settings() -> Dict[str, Any]:  # type: ignore[override]
+    """V3.52: load from local JSON + restored module settings + SQLite mirror.
+
+    Load is read-only. It never writes JSON and never uploads to GitHub.
+    """
+    _ensure_state_dir()
+    merged: Dict[str, Any] = {}
+    # DB mirror is usually restored from spt_module_settings after Reboot App.
+    for k, v in _v352_load_db_system_settings().items():
+        merged.setdefault(k, v)
+    for path in COLUMN_SETTINGS_MIRROR_PATHS:
+        data = _normalize_loaded_settings(_read_json_file(path))
+        for k, v in data.items():
+            merged.setdefault(k, v)
+    return merged
+
+
+def _v352_write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v352_write_system_settings_json(settings: Dict[str, Any]) -> None:
+    """Mirror full column settings into system_settings and table_column_settings.
+
+    Direct sqlite writes avoid db_service._after_write loops; we call GitHub upload below
+    only once, and only after a real user setting change.
+    """
+    db_path = _v352_direct_db_path()
+    try:
+        import sqlite3
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(db_path)
+        try:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS system_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT, note TEXT, updated_at TEXT)"
+            )
+            conn.execute(
+                """
+                INSERT INTO system_settings(setting_key, setting_value, note, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    _COLUMN_SETTINGS_SYSTEM_KEY_V352,
+                    json.dumps({"table_column_settings_v2": settings}, ensure_ascii=False, default=str),
+                    "全系統表格欄位設定 JSON mirror；供 Reboot App 後還原。",
+                    now,
+                ),
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS table_column_settings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    page_key TEXT,
+                    table_key TEXT,
+                    column_key TEXT,
+                    column_width INTEGER,
+                    sort_order INTEGER,
+                    updated_at TEXT,
+                    UNIQUE(page_key, table_key, column_key)
+                )
+                """
+            )
+            width_map = {"small": 90, "medium": 150, "large": 230}
+            for table_id, table_setting in settings.items():
+                if not isinstance(table_setting, dict):
+                    continue
+                cols = table_setting.get("columns") if isinstance(table_setting.get("columns"), dict) else {}
+                for col_key, meta in cols.items():
+                    if not isinstance(meta, dict):
+                        continue
+                    try:
+                        sort_order = int(meta.get("order", 999))
+                    except Exception:
+                        sort_order = 999
+                    width_val = width_map.get(str(meta.get("width") or "medium"), 150)
+                    conn.execute(
+                        """
+                        INSERT INTO table_column_settings(page_key, table_key, column_key, column_width, sort_order, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(page_key, table_key, column_key) DO UPDATE SET
+                            column_width=excluded.column_width,
+                            sort_order=excluded.sort_order,
+                            updated_at=excluded.updated_at
+                        """,
+                        ("column_settings_v2", str(table_id), str(col_key), int(width_val), int(sort_order), now),
+                    )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
+
+def _v352_write_module_settings_mirrors(settings: Dict[str, Any]) -> None:
+    payload = {
+        "version": "V3.52",
+        "description": "全系統表格欄位設定永久鏡像；10/13/01 Reboot App 後還原用。",
+        "table_column_settings_v2": settings,
+        "table_count": len(settings),
+        "exported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    for path in COLUMN_SETTINGS_MIRROR_PATHS:
+        try:
+            if path.name == "spt_module_settings.json" or path.name.endswith("_settings.json"):
+                existing = _read_json_file(path)
+                if not isinstance(existing, dict):
+                    existing = {}
+                existing.setdefault("version", "V3.52")
+                existing["exported_at"] = payload["exported_at"]
+                existing["table_column_settings_v2"] = settings
+                tables = existing.get("tables") if isinstance(existing.get("tables"), dict) else {}
+                tables["table_column_settings_v2"] = settings
+                sys_rows = [r for r in (tables.get("system_settings") if isinstance(tables.get("system_settings"), list) else []) if isinstance(r, dict) and str(r.get("setting_key") or "") != _COLUMN_SETTINGS_SYSTEM_KEY_V352]
+                sys_rows.append({
+                    "setting_key": _COLUMN_SETTINGS_SYSTEM_KEY_V352,
+                    "setting_value": json.dumps({"table_column_settings_v2": settings}, ensure_ascii=False, default=str),
+                    "note": "全系統表格欄位設定 JSON mirror；供 Reboot App 後還原。",
+                    "updated_at": payload["exported_at"],
+                })
+                tables["system_settings"] = sys_rows
+                existing["tables"] = tables
+                counts = existing.get("table_counts") if isinstance(existing.get("table_counts"), dict) else {}
+                counts["system_settings"] = len(sys_rows)
+                counts["table_column_settings_v2"] = len(settings)
+                existing["table_counts"] = counts
+                _v352_write_json_atomic(path, existing)
+            else:
+                _v352_write_json_atomic(path, payload)
+        except Exception:
+            pass
+
+
+def _v352_upload_column_settings_files() -> None:
+    """Upload only small settings files; never called from load/restore."""
+    global _COLUMN_SETTINGS_UPLOAD_TS_V352
+    try:
+        now_ts = time.time()
+        if now_ts - float(_COLUMN_SETTINGS_UPLOAD_TS_V352 or 0) < _COLUMN_SETTINGS_UPLOAD_INTERVAL_SEC_V352:
+            return
+        from services.github_cloud_storage_service import github_config, upload_file_to_github
+        if not github_config().get("token"):
+            return
+        files = [
+            (SETTINGS_PATH, "data/persistent_state/spt_table_column_settings.json"),
+            (PROJECT_ROOT / "data" / "persistent_state" / "spt_module_settings.json", "data/persistent_state/spt_module_settings.json"),
+            (PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_column_settings.json", "data/persistent_modules/ui_table_settings/table_column_settings.json"),
+            (PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_table_column_settings.json", "data/persistent_modules/01_time_records/01_time_records_table_column_settings.json"),
+            (PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_table_column_settings.json", "data/persistent_modules/10_permissions/10_permissions_table_column_settings.json"),
+            (PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_column_settings.json", "data/persistent_modules/13_system_settings/13_system_settings_table_column_settings.json"),
+        ]
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        for local, remote in files:
+            if local.exists():
+                upload_file_to_github(local, remote, f"SPT column settings V352 {stamp}")
+        _COLUMN_SETTINGS_UPLOAD_TS_V352 = now_ts
+    except Exception:
+        pass
+
+
+def save_settings(settings: Dict[str, Any], *, upload: bool = True) -> None:  # type: ignore[override]
+    _ensure_state_dir()
+    normalized = dict(settings or {})
+    for k, v in list(normalized.items()):
+        ck = _canonical_table_id(k)
+        if ck and ck not in normalized and isinstance(v, dict):
+            normalized[ck] = v
+    # No-op if content is unchanged; avoids rerun loops.
+    try:
+        current = load_settings()
+        if current == normalized:
+            return
+    except Exception:
+        pass
+    _v352_write_json_atomic(SETTINGS_PATH, normalized)
+    _v352_write_module_settings_mirrors(normalized)
+    _v352_write_system_settings_json(normalized)
+    if upload:
+        _v352_upload_column_settings_files()
+
+
+def _get_table_setting(table_id: str, columns: Iterable[str]) -> Dict[str, Any]:  # type: ignore[override]
+    """V3.52: do not persist default settings just by opening a page."""
+    all_settings = load_settings()
+    table_setting = all_settings.get(table_id) or all_settings.get(_canonical_table_id(table_id)) or {}
+    if not isinstance(table_setting, dict):
+        table_setting = {}
+    col_settings = dict(table_setting.get("columns", {}) if isinstance(table_setting.get("columns", {}), dict) else {})
+    for idx, col in enumerate(columns):
+        c = str(col)
+        if c not in col_settings:
+            meta = _default_column_setting(c)
+            meta["order"] = idx
+            col_settings[c] = meta
+    out = dict(table_setting)
+    out["columns"] = col_settings
+    return out
+
+
+def _save_table_setting(table_id: str, table_setting: Dict[str, Any]) -> None:  # type: ignore[override]
+    all_settings = load_settings()
+    all_settings[table_id] = table_setting
+    ck = _canonical_table_id(table_id)
+    if ck and ck != table_id:
+        all_settings[ck] = table_setting
+    save_settings(all_settings, upload=True)
+
+
+def _v352_called_from_table_ui_service() -> bool:
+    try:
+        for frame in inspect.stack():
+            filename = str(frame.filename).replace("\\", "/")
+            if filename.endswith("/services/table_ui_service.py") or filename.endswith("services/table_ui_service.py"):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[Dict[str, Any], bool]:  # type: ignore[override]
+    """V3.52: skip duplicate global settings for render_table() tables.
+
+    The render_table path already shows Column Width / Column Order via
+    table_ui_service.  Rendering this global panel too creates two independent
+    settings stores for the same visual table.  Direct st.data_editor tables such
+    as 10｜權限管理 remain covered by this global editor.
+    """
+    table_setting = _get_table_setting(table_id, [str(c) for c in df.columns])
+    if _v352_called_from_table_ui_service():
+        return table_setting, False
+
+    col_settings = table_setting.get("columns", {})
+    with st.expander("欄位設定 / Column Settings（永久保存）", expanded=False):
+        st.caption(
+            "可設定每個表格欄位的顯示、順序、欄寬與標題。修改後會自動保存到永久設定；"
+            "若已設定 GitHub Token，會同步保存到 GitHub，避免 Reboot App 後恢復預設。"
+        )
+        rows = []
+        for idx, col in enumerate(df.columns):
+            key = str(col)
+            meta = col_settings.get(key, _default_column_setting(key))
+            rows.append({
+                "顯示 / Visible": bool(meta.get("visible", True)),
+                "欄位 / Column": key,
+                "標題 / Header": meta.get("label") or COLUMN_LABELS.get(key, f"{key} / {key}"),
+                "順序 / Order": int(meta.get("order", idx)),
+                "欄寬 / Width": meta.get("width", "medium"),
+            })
+        cfg_df = pd.DataFrame(rows)
+        _editor_func = _ORIGINAL_DATA_EDITOR or st.data_editor
+        edited_cfg = _editor_func(
+            cfg_df,
+            key=f"column_setting_editor::{_safe_widget_suffix(table_id)}",
+            use_container_width=True,
+            hide_index=True,
+            height=360,
+            num_rows="fixed",
+            column_config={
+                "顯示 / Visible": st.column_config.CheckboxColumn("顯示 / Visible"),
+                "欄位 / Column": st.column_config.TextColumn("欄位 / Column", disabled=True),
+                "標題 / Header": st.column_config.TextColumn("標題 / Header"),
+                "順序 / Order": st.column_config.NumberColumn("順序 / Order", min_value=0, step=1),
+                "欄寬 / Width": st.column_config.SelectboxColumn("欄寬 / Width", options=list(WIDTH_OPTIONS.values())),
+            },
+        )
+        st.markdown("#### 欄位順序快速設定 / Column Order")
+        current_order = sorted(
+            [str(c) for c in df.columns],
+            key=lambda x: int(col_settings.get(x, _default_column_setting(x)).get("order", 999)),
+        )
+        order_text = st.text_area(
+            "欄位順序 / Column order（每行一個欄位；可剪下貼上調整順序，會自動永久保存）",
+            value="\n".join(current_order),
+            key=f"column_order_text::{_safe_widget_suffix(table_id)}",
+            height=420,
+            help="每行一個欄位名稱。",
+        )
+        st.caption(f"表格ID：{table_id}")
+
+    new_cols = {}
+    try:
+        for _, row in edited_cfg.iterrows():
+            key = str(row.get("欄位 / Column", "")).strip()
+            if not key:
+                continue
+            new_cols[key] = {
+                "source": key,
+                "label": str(row.get("標題 / Header") or key),
+                "visible": bool(row.get("顯示 / Visible", True)),
+                "width": str(row.get("欄寬 / Width") or "medium"),
+                "order": int(row.get("順序 / Order", 999)),
+            }
+        text_order = [x.strip() for x in str(order_text).splitlines() if x.strip()]
+        used = set()
+        order_no = 0
+        for key in text_order:
+            if key in new_cols and key not in used:
+                new_cols[key]["order"] = order_no
+                used.add(key)
+                order_no += 1
+        for key in new_cols:
+            if key not in used:
+                new_cols[key]["order"] = order_no
+                order_no += 1
+    except Exception:
+        new_cols = dict(col_settings)
+
+    applied = False
+    if new_cols and new_cols != table_setting.get("columns", {}):
+        table_setting["columns"] = new_cols
+        _save_table_setting(table_id, table_setting)
+        applied = True
+    if applied:
+        table_setting = _get_table_setting(table_id, [str(c) for c in df.columns])
+    return table_setting, applied
