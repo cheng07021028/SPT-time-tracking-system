@@ -1,9 +1,7 @@
 {
-  "schema_version": "1.43",
-  "exported_at": "2026-05-19 11:08:17",
-  "module_code": "01_time_records",
-  "module_name_zh": "工時紀錄",
-  "module_name_en": "Time Records",
+  "schema_version": "3.02",
+  "exported_at": "2026-05-19 10:39:47",
+  "reason": "rescue:ensure_database",
   "tables": {
     "time_records": [
       {
@@ -226,5 +224,8 @@
   },
   "counts": {
     "time_records": 8
-  }
+  },
+  "module_code": "01_time_records",
+  "module_name_zh": "工時紀錄",
+  "module_name_en": "Time Records"
 }
