@@ -709,12 +709,19 @@ def render_table(
         disabled_cols.append("total_hours")
     if "avg_hours" in display_df.columns and "avg_hours" not in disabled_cols:
         disabled_cols.append("avg_hours")
+    # V3.62：明確把套用後的欄位順序傳給 Streamlit。
+    # 只改 dataframe/data_editor 的 column_order 參數，不新增畫面功能。
+    # 原因：全域 column_settings_service 會再次包裝 st.dataframe / st.data_editor；
+    # 若沒有明確傳入 column_order，外層 wrapper 可能用舊的欄位設定順序蓋掉
+    # table_ui_service 已套用的順序，造成「順序設定後標題欄沒變」。
+    visual_order = [str(c) for c in display_df.columns]
     if editable:
         return st.data_editor(
             display_df,
             use_container_width=True,
             hide_index=True,
             column_config=cfg,
+            column_order=visual_order,
             disabled=disabled_cols,
             num_rows=num_rows,
             key=key or f"editor_{table_key}",
@@ -725,6 +732,7 @@ def render_table(
         use_container_width=True,
         hide_index=True,
         column_config=cfg,
+        column_order=visual_order,
         height=height,
         key=key or f"frame_{table_key}",
     )

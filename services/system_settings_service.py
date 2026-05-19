@@ -1929,3 +1929,283 @@ def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any
     if restored:
         _clear_settings_cache()
     return {"ok": bool(restored), "restored": restored, "source": payload.get("_source", "system_settings_json"), "score": payload.get("_score", None)}
+
+
+# ===== V3.66 system settings persistence: same direct-latest-file pattern as 03/04 =====
+# 原則：13｜系統設定儲存後直接寫固定 latest JSON；Reboot 直接讀固定 JSON。
+# 不再用「資料越多越好」、不掃 history、不自動 GitHub、不讓空表被預設值覆蓋。
+
+_V366_SYSTEM_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json"
+_V366_SYSTEM_MODULE_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json"
+_V366_SYSTEM_CONFIG_FILE = PROJECT_ROOT / "data" / "config" / "system_settings.json"
+_V366_SYSTEM_SCHEMA_READY = False
+_V366_SYSTEM_RESTORED_DIRECT = False
+
+
+def _v366_system_read_json(path: Path) -> dict[str, Any]:
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _v366_system_atomic_write(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v366_create_category_tables_no_seed() -> None:
+    _basic_create_tables()
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS process_category_options (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_name TEXT DEFAULT '',
+            process_name TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            UNIQUE(category_name, process_name)
+        )
+        """
+    )
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS process_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_name TEXT UNIQUE NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """
+    )
+
+
+def _v366_system_direct_payload() -> dict[str, Any]:
+    for path in [_V366_SYSTEM_MODULE_FILE, _V366_SYSTEM_STATE_FILE, _V366_SYSTEM_CONFIG_FILE]:
+        data = _v366_system_read_json(path)
+        tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
+        # Empty lists are valid, as long as the latest file explicitly has the keys.
+        if isinstance(tables, dict) and any(k in tables for k in ["process_categories", "process_options", "process_category_options", "rest_periods", "app_settings"]):
+            return data
+    return {}
+
+
+def _load_latest_persistent_payload() -> dict[str, Any] | None:  # type: ignore[override]
+    data = _v366_system_direct_payload()
+    if not data:
+        return None
+    tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
+    return {"tables": tables, "_source": "v366_direct_system_settings", "_score": "direct_latest"}
+
+
+def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    _v366_create_category_tables_no_seed()
+    payload = _v366_system_direct_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    if not tables:
+        return {"ok": False, "mode": "v366_direct", "restored": {}, "message": "no direct system settings file"}
+    restored: dict[str, int] = {}
+
+    def _active(v: Any, default: int = 1) -> int:
+        text = str(v if v is not None else default).strip().lower()
+        return 0 if text in {"0", "false", "no", "n", "off", "停用", "否"} else 1
+
+    # The keys themselves are authoritative, even when the list is empty.
+    if force or "process_categories" in tables:
+        execute("DELETE FROM process_categories")
+        count = 0
+        for idx, r in enumerate(tables.get("process_categories") or [], start=1):
+            if not isinstance(r, dict):
+                continue
+            name = _norm_category_name(r.get("category_name") or r.get("category") or r.get("類別"))
+            if not name:
+                continue
+            try:
+                sort_order = int(float(r.get("sort_order") or idx))
+            except Exception:
+                sort_order = idx
+            execute(
+                """
+                INSERT INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?)
+                ON CONFLICT(category_name) DO UPDATE SET
+                    is_active=excluded.is_active, sort_order=excluded.sort_order,
+                    note=excluded.note, updated_at=excluded.updated_at
+                """,
+                (name, _active(r.get("is_active", 1)), sort_order, str(r.get("note") or ""), str(r.get("created_at") or _now()), str(r.get("updated_at") or _now())),
+            )
+            count += 1
+        restored["process_categories"] = count
+
+    has_proc_key = "process_options" in tables or "process_category_options" in tables
+    if force or has_proc_key:
+        execute("DELETE FROM process_category_options")
+        execute("DELETE FROM process_options")
+        proc_rows = tables.get("process_category_options") if isinstance(tables.get("process_category_options"), list) else tables.get("process_options", [])
+        count = 0
+        for idx, r in enumerate(proc_rows or [], start=1):
+            if not isinstance(r, dict):
+                continue
+            category = _norm_category_name(r.get("category_name") or r.get("type_name") or PROCESS_CATEGORY_ALL)
+            proc = str(r.get("process_name") or "").strip()
+            if not proc:
+                continue
+            try:
+                sort_order = int(float(r.get("sort_order") or idx))
+            except Exception:
+                sort_order = idx
+            execute(
+                """
+                INSERT INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?)
+                ON CONFLICT(category_name, process_name) DO UPDATE SET
+                    is_active=excluded.is_active, sort_order=excluded.sort_order,
+                    note=excluded.note, updated_at=excluded.updated_at
+                """,
+                (category, proc, _active(r.get("is_active", 1)), sort_order, str(r.get("note") or ""), str(r.get("created_at") or _now()), str(r.get("updated_at") or _now())),
+            )
+            # Legacy process_options cache for older callers.
+            execute(
+                """
+                INSERT INTO process_options(process_name,is_active,sort_order,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?)
+                ON CONFLICT(process_name) DO UPDATE SET
+                    is_active=excluded.is_active, sort_order=excluded.sort_order,
+                    note=excluded.note, updated_at=excluded.updated_at
+                """,
+                (proc, _active(r.get("is_active", 1)), sort_order, str(r.get("note") or ""), str(r.get("created_at") or _now()), str(r.get("updated_at") or _now())),
+            )
+            count += 1
+        restored["process_category_options"] = count
+        restored["process_options"] = count
+
+    if force or "rest_periods" in tables:
+        execute("DELETE FROM rest_periods")
+        restored["rest_periods"] = _insert_rest_rows(tables.get("rest_periods") or [])
+
+    if force or "app_settings" in tables:
+        execute("DELETE FROM app_settings")
+        restored["app_settings"] = _insert_app_settings_rows(tables.get("app_settings") or [])
+
+    _clear_settings_cache()
+    return {"ok": True, "mode": "v366_direct", "restored": restored, "source": str(_V366_SYSTEM_MODULE_FILE)}
+
+
+def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    _v366_create_category_tables_no_seed()
+    try:
+        cats = query_df("SELECT id, category_name, is_active, sort_order, note, created_at, updated_at FROM process_categories ORDER BY sort_order, id")
+    except Exception:
+        cats = pd.DataFrame()
+    try:
+        proc = query_df("SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options ORDER BY category_name, sort_order, id")
+    except Exception:
+        proc = pd.DataFrame()
+    try:
+        rest = query_df("SELECT id, name, start_time, end_time, is_active, sort_order FROM rest_periods ORDER BY sort_order, id")
+    except Exception:
+        rest = pd.DataFrame()
+    try:
+        app = query_df("SELECT setting_key, setting_value, note, updated_at FROM app_settings ORDER BY setting_key")
+    except Exception:
+        app = pd.DataFrame()
+    payload: dict[str, Any] = {
+        "version": "V3.66-direct-system-settings-persistence",
+        "exported_at": _now(),
+        "reason": reason,
+        "module_key": "13_system_settings",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "description": "13｜系統設定固定永久檔。模式比照 03/04：儲存直接寫 latest JSON，Reboot 直接讀 latest JSON；空表也是有效設定。",
+        "tables": {
+            "process_categories": _df_records(cats),
+            "process_options": _df_records(proc),
+            "rest_periods": _df_records(rest),
+            "app_settings": _df_records(app),
+        },
+        "table_counts": {
+            "process_categories": 0 if cats is None else len(cats),
+            "process_options": 0 if proc is None else len(proc),
+            "rest_periods": 0 if rest is None else len(rest),
+            "app_settings": 0 if app is None else len(app),
+        },
+    }
+    for path in [_V366_SYSTEM_MODULE_FILE, _V366_SYSTEM_STATE_FILE, _V366_SYSTEM_CONFIG_FILE]:
+        _v366_system_atomic_write(path, payload)
+    # Compatibility with unified master, but do not let it control restore.
+    try:
+        from services.persistence_core_service import load_master_settings, save_master_settings
+        master = load_master_settings()
+        sys_section = master.get("system_settings") if isinstance(master.get("system_settings"), dict) else {}
+        sys_section["13.system_settings"] = payload
+        master["system_settings"] = sys_section
+        save_master_settings(master, reason=f"v366_system_settings_{reason}")
+    except Exception:
+        pass
+    try:
+        mark_data_changed("13｜系統設定已變更，已寫入固定永久檔；如部署於 Streamlit Cloud，請用 09 備份到 GitHub。", "13_system_settings")
+    except Exception:
+        pass
+    return {"ok": True, "mode": "v366_direct", "files": [str(_V366_SYSTEM_MODULE_FILE), str(_V366_SYSTEM_STATE_FILE), str(_V366_SYSTEM_CONFIG_FILE)], "table_counts": payload["table_counts"]}
+
+
+def ensure_system_settings_schema() -> None:  # type: ignore[override]
+    """Create schema and restore direct latest settings before any default seed."""
+    global _V366_SYSTEM_SCHEMA_READY, _SYSTEM_SETTINGS_SCHEMA_READY, _V366_SYSTEM_RESTORED_DIRECT
+    if _V366_SYSTEM_SCHEMA_READY:
+        return
+    _v366_create_category_tables_no_seed()
+    direct_payload = _v366_system_direct_payload()
+    if direct_payload:
+        restore_system_settings_from_permanent(force=True)
+        _V366_SYSTEM_RESTORED_DIRECT = True
+    now = _now()
+    # Seed defaults only when no fixed permanent file exists at all.
+    if not direct_payload:
+        try:
+            if _table_count("process_categories") == 0:
+                execute(
+                    "INSERT OR IGNORE INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at) VALUES (?,1,1,'系統預設類別',?,?)",
+                    (PROCESS_CATEGORY_ALL, now, now),
+                )
+            if _table_count("process_category_options") == 0:
+                for idx, name in enumerate(DEFAULT_PROCESS_OPTIONS, start=1):
+                    execute(
+                        """
+                        INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at)
+                        VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)
+                        """,
+                        (PROCESS_CATEGORY_ALL, name, idx, now, now),
+                    )
+                    execute(
+                        """
+                        INSERT OR IGNORE INTO process_options(process_name,is_active,sort_order,note,created_at,updated_at)
+                        VALUES (?,1,?,'系統預設工段，可於 13 系統設定修改',?,?)
+                        """,
+                        (name, idx, now, now),
+                    )
+            if _table_count("rest_periods") == 0:
+                _insert_rest_rows(DEFAULT_REST_PERIODS)
+            if not _has_live_page_reset_setting():
+                execute(
+                    "INSERT OR REPLACE INTO app_settings(setting_key,setting_value,note,updated_at) VALUES (?,?,?,?)",
+                    ("live_page_reset_time", DEFAULT_LIVE_PAGE_RESET_TIME, "01 工時紀錄每日自動重新整理時間", now),
+                )
+        except Exception:
+            pass
+    _clear_settings_cache()
+    _SYSTEM_SETTINGS_SCHEMA_READY = True
+    _V366_SYSTEM_SCHEMA_READY = True
+

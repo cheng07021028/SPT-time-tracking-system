@@ -1970,3 +1970,200 @@ def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
     except Exception:
         pass
     return deleted
+
+
+# ===== V3.66 permission persistence: same direct-latest-file pattern as 03/04 =====
+# 原則：10｜權限管理儲存帳號/權限後，直接寫入固定 latest JSON；
+# Reboot/App 啟動時，若固定 latest JSON 存在，就以它為主，不掃 history、不用筆數比較、不跑 GitHub。
+
+_V366_PERMISSION_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_settings.json"
+_V366_PERMISSION_MODULE_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json"
+_V366_PERMISSION_SETTINGS_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
+_V366_PERMISSION_RESTORE_RUNNING = False
+_V366_PERMISSION_RESTORED_ONCE = False
+
+
+def _v366_permission_read_json(path: Path) -> dict:
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _v366_permission_atomic_write(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v366_permission_tables_payload(reason: str = "permission_saved") -> dict:
+    init_permission_tables()
+    conn = connect_db()
+    try:
+        tables: dict[str, list[dict]] = {}
+        for table in [
+            "auth_users",
+            "auth_account_permissions",
+            "auth_security_settings",
+            "security_users",
+            "security_user_roles",
+            "security_settings",
+        ]:
+            try:
+                rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
+                tables[table] = [dict(r) for r in rows]
+            except Exception:
+                tables[table] = []
+        return {
+            "version": "V3.66-direct-permission-persistence",
+            "exported_at": now_text(),
+            "reason": reason,
+            "module_key": "10_permissions",
+            "module_name_zh": "權限管理",
+            "module_name_en": "Permission Management",
+            "description": "權限管理固定永久檔。模式比照 03/04：儲存直接寫 latest JSON，Reboot 直接讀 latest JSON，不掃 history、不用帳號數比較。",
+            "tables": tables,
+            "table_counts": {k: len(v) for k, v in tables.items()},
+        }
+    finally:
+        conn.close()
+
+
+def _v366_permission_direct_payload() -> dict:
+    for path in [_V366_PERMISSION_MODULE_FILE, _V366_PERMISSION_STATE_FILE, _V366_PERMISSION_SETTINGS_FILE]:
+        data = _v366_permission_read_json(path)
+        tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
+        if isinstance(tables, dict) and "auth_users" in tables:
+            return data
+    return {}
+
+
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
+    """Fast local direct export only; no GitHub, no export-all, no history scan."""
+    payload = _v366_permission_tables_payload(reason)
+    _v366_permission_atomic_write(_V366_PERMISSION_MODULE_FILE, payload)
+    _v366_permission_atomic_write(_V366_PERMISSION_STATE_FILE, payload)
+    # Keep settings file compatible with old 10 page / 09 backup center.
+    _v366_permission_atomic_write(_V366_PERMISSION_SETTINGS_FILE, payload)
+    try:
+        from services.db_service import mark_data_changed
+        mark_data_changed("10｜權限管理已變更，已寫入固定永久檔；如部署於 Streamlit Cloud，請用 09 備份到 GitHub。", "10_permissions_records")
+    except Exception:
+        pass
+    return {"ok": True, "mode": "v366_direct", "reason": reason, "files": [str(_V366_PERMISSION_MODULE_FILE), str(_V366_PERMISSION_STATE_FILE), str(_V366_PERMISSION_SETTINGS_FILE)], "table_counts": payload.get("table_counts", {})}
+
+
+def _v366_replace_table(cur, table: str, rows: list[dict]) -> int:
+    if not isinstance(rows, list):
+        rows = []
+    info = cur.execute(f'PRAGMA table_info("{table}")').fetchall()
+    cols = [str(r[1]) for r in info]
+    if not cols:
+        return 0
+    insert_cols = [c for c in cols if c != "id"]
+    cur.execute(f'DELETE FROM "{table}"')
+    count = 0
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        data = {c: r.get(c) for c in insert_cols if c in r}
+        if not data:
+            continue
+        keys = list(data.keys())
+        cur.execute(f'INSERT INTO "{table}" ({",".join(keys)}) VALUES ({",".join(["?"] * len(keys))})', [data[k] for k in keys])
+        count += 1
+    return count
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    """Direct restore from the fixed latest 10_permissions JSON only."""
+    global _V366_PERMISSION_RESTORE_RUNNING
+    if _V366_PERMISSION_RESTORE_RUNNING:
+        return {"ok": False, "message": "restore already running"}
+    payload = _v366_permission_direct_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    auth_rows = tables.get("auth_users") if isinstance(tables.get("auth_users"), list) else []
+    # Avoid locking the app if a broken file has no accounts.
+    if not auth_rows:
+        return {"ok": False, "message": "no direct permission payload"}
+    _V366_PERMISSION_RESTORE_RUNNING = True
+    conn = connect_db()
+    cur = conn.cursor()
+    try:
+        _ensure_legacy_security_tables(cur)
+        _ensure_security_setting_tables(cur)
+        restored: dict[str, int] = {}
+        for table in ["auth_users", "auth_account_permissions", "auth_security_settings", "security_users", "security_user_roles", "security_settings"]:
+            try:
+                restored[table] = _v366_replace_table(cur, table, tables.get(table, []) if isinstance(tables.get(table), list) else [])
+            except Exception as exc:
+                restored[f"{table}_error"] = str(exc)
+        # Safety: if old payload lacks runtime security tables, rebuild them from auth_users after commit.
+        conn.commit()
+    finally:
+        conn.close()
+        _V366_PERMISSION_RESTORE_RUNNING = False
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    clear_permission_runtime_cache()
+    return {"ok": True, "mode": "v366_direct", "source": str(_V366_PERMISSION_MODULE_FILE), "restored": restored}
+
+
+_prev_v366_init_permission_tables = init_permission_tables
+
+def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
+    """Initialize schema, then restore direct latest permission JSON exactly once."""
+    global _V366_PERMISSION_RESTORED_ONCE, _PERMISSION_SCHEMA_READY
+    _prev_v366_init_permission_tables(force=False)
+    if force or not _V366_PERMISSION_RESTORED_ONCE:
+        _V366_PERMISSION_RESTORED_ONCE = True
+        try:
+            restore_permission_settings_from_permanent_files(force=True)
+        except Exception:
+            pass
+        _PERMISSION_SCHEMA_READY = True
+
+
+# V3.66.1: export must not call the wrapped init_permission_tables(), otherwise a save may
+# restore the previous JSON before it writes the new one. Use the pre-wrapper schema init only.
+def _v366_permission_tables_payload(reason: str = "permission_saved") -> dict:  # type: ignore[override]
+    try:
+        _prev_v366_init_permission_tables(force=False)
+    except Exception:
+        pass
+    conn = connect_db()
+    try:
+        tables: dict[str, list[dict]] = {}
+        for table in [
+            "auth_users",
+            "auth_account_permissions",
+            "auth_security_settings",
+            "security_users",
+            "security_user_roles",
+            "security_settings",
+        ]:
+            try:
+                rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
+                tables[table] = [dict(r) for r in rows]
+            except Exception:
+                tables[table] = []
+        return {
+            "version": "V3.66.1-direct-permission-persistence",
+            "exported_at": now_text(),
+            "reason": reason,
+            "module_key": "10_permissions",
+            "module_name_zh": "權限管理",
+            "module_name_en": "Permission Management",
+            "description": "權限管理固定永久檔。模式比照 03/04：儲存直接寫 latest JSON，Reboot 直接讀 latest JSON，不掃 history、不用帳號數比較。",
+            "tables": tables,
+            "table_counts": {k: len(v) for k, v in tables.items()},
+        }
+    finally:
+        conn.close()

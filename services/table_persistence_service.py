@@ -330,3 +330,199 @@ def migrate_legacy_table_settings_to_master(*, write: bool = True) -> dict[str, 
         mirror_legacy_table_ui_settings(table_settings)
         mirror_legacy_column_settings(column_settings)
     return {"ok": True, "migrated_table_rows": migrated_tables, "migrated_column_settings": migrated_columns, "table_count": len(table_settings), "column_count": len(column_settings)}
+
+
+# ===== V3.66 direct-module persistence, same pattern as 03/04 master data =====
+# 目的：01 / 10 / 13 的表格設定不要再用「最豐富檔案 / history / GitHub / SQLite 預設」判斷。
+# 原則：使用者儲存 -> 直接寫入固定模組 JSON；Reboot -> 直接讀固定模組 JSON。
+# SQLite 僅作相容快取，不再是判斷主來源。
+
+import time as _v366_time
+
+_V366_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_table_persistence.json"
+_V366_MODULE_FILES = {
+    "01": PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "table_persistence.json",
+    "10": PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "table_persistence.json",
+    "13": PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "table_persistence.json",
+    "ui": PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_persistence.json",
+}
+
+
+def _v366_now_text() -> str:
+    try:
+        from services.timezone_service import now_text as _nt
+        return _nt()
+    except Exception:
+        return _v366_time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v366_module_code_for_key(key: str) -> str:
+    k = canonical_table_key(key)
+    if k.startswith("01."):
+        return "01"
+    if k.startswith("10."):
+        return "10"
+    if k.startswith("13."):
+        return "13"
+    return "ui"
+
+
+def _v366_blank_payload() -> dict[str, Any]:
+    return {
+        "version": "V3.66-direct-module-persistence",
+        "updated_at": _v366_now_text(),
+        "description": "表格設定固定檔。模式比照 03/04：儲存直接寫 latest JSON，Reboot 直接讀 latest JSON，不掃 history、不走 GitHub、不用資料筆數猜測。",
+        "table_settings": {},
+        "column_settings": {},
+    }
+
+
+def _v366_read_payload(path: Path) -> dict[str, Any]:
+    data = _read_json(path)
+    if not isinstance(data, dict):
+        return {}
+    # support old unified master shape
+    if isinstance(data.get("v360_user_persistent_settings"), dict):
+        data = data.get("v360_user_persistent_settings") or {}
+    return data
+
+
+def _v366_load_all_direct() -> dict[str, Any]:
+    """Read fixed latest files only; later module files override state file for their own keys."""
+    out = _v366_blank_payload()
+    for path in [_V366_STATE_FILE, *_V366_MODULE_FILES.values()]:
+        data = _v366_read_payload(path)
+        if not data:
+            continue
+        ts = str(data.get("updated_at") or out.get("updated_at") or "")
+        if ts:
+            out["updated_at"] = ts
+        if isinstance(data.get("table_settings"), dict):
+            for k, v in data["table_settings"].items():
+                ck = canonical_table_key(k)
+                if isinstance(v, dict):
+                    out["table_settings"][ck] = dict(v)
+        if isinstance(data.get("column_settings"), dict):
+            for k, v in data["column_settings"].items():
+                ck = canonical_table_key(k)
+                if isinstance(v, dict):
+                    out["column_settings"][ck] = dict(v)
+    return out
+
+
+def _v366_write_payload(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v366_write_direct(all_payload: dict[str, Any], changed_key: str | None = None) -> None:
+    all_payload = dict(all_payload or {})
+    all_payload.setdefault("table_settings", {})
+    all_payload.setdefault("column_settings", {})
+    all_payload["version"] = "V3.66-direct-module-persistence"
+    all_payload["updated_at"] = _v366_now_text()
+    _v366_write_payload(_V366_STATE_FILE, all_payload)
+
+    # Write complete shards by module, so 09/manual backup can persist the same way as 03/04.
+    for module_code, path in _V366_MODULE_FILES.items():
+        shard = _v366_blank_payload()
+        shard["updated_at"] = all_payload["updated_at"]
+        for k, v in dict(all_payload.get("table_settings") or {}).items():
+            if _v366_module_code_for_key(k) == module_code:
+                shard["table_settings"][canonical_table_key(k)] = v
+        for k, v in dict(all_payload.get("column_settings") or {}).items():
+            if _v366_module_code_for_key(k) == module_code:
+                shard["column_settings"][canonical_table_key(k)] = v
+        # keep ui shard as a complete safety mirror too
+        if module_code == "ui":
+            shard["table_settings"] = dict(all_payload.get("table_settings") or {})
+            shard["column_settings"] = dict(all_payload.get("column_settings") or {})
+        _v366_write_payload(path, shard)
+
+    # Maintain older files so existing 09/module center sees the same data.
+    try:
+        mirror_legacy_table_ui_settings(all_payload.get("table_settings") or {})
+    except Exception:
+        pass
+    try:
+        mirror_legacy_column_settings(all_payload.get("column_settings") or {})
+    except Exception:
+        pass
+
+
+def load_table_settings(table_key: Any) -> dict[str, Any]:  # type: ignore[override]
+    key = canonical_table_key(table_key)
+    payload = _v366_load_all_direct()
+    settings = payload.get("table_settings") if isinstance(payload.get("table_settings"), dict) else {}
+    data = settings.get(key) if isinstance(settings, dict) else {}
+    if not isinstance(data, dict):
+        data = {}
+    return {
+        "table_key": key,
+        "widths": _normalize_widths(data.get("widths", {})),
+        "order": _normalize_order(data.get("order", [])),
+        "sort": data.get("sort", {}) if isinstance(data.get("sort"), dict) else {},
+    }
+
+
+def save_table_settings(table_key: Any, *, widths: dict[str, int] | None = None, order: Iterable[str] | None = None, sort: dict[str, Any] | None = None, reason: str = "table_settings_saved") -> dict[str, Any]:  # type: ignore[override]
+    key = canonical_table_key(table_key)
+    payload = _v366_load_all_direct()
+    table_settings = payload.get("table_settings") if isinstance(payload.get("table_settings"), dict) else {}
+    cur = table_settings.get(key) if isinstance(table_settings.get(key), dict) else {}
+    if widths is not None:
+        cur["widths"] = _normalize_widths(widths)
+    if order is not None:
+        cur["order"] = _normalize_order(order)
+    if sort is not None:
+        cur["sort"] = dict(sort or {})
+    cur["updated_at"] = _v366_now_text()
+    cur["reason"] = reason
+    table_settings[key] = cur
+    payload["table_settings"] = table_settings
+    _v366_write_direct(payload, changed_key=key)
+    return {"ok": True, "mode": "v366_direct", "key": key, "reason": reason, "files": [str(_V366_STATE_FILE), str(_V366_MODULE_FILES[_v366_module_code_for_key(key)])]}
+
+
+def load_column_settings() -> dict[str, Any]:  # type: ignore[override]
+    payload = _v366_load_all_direct()
+    data = payload.get("column_settings") if isinstance(payload.get("column_settings"), dict) else {}
+    return {canonical_table_key(k): v for k, v in dict(data or {}).items() if isinstance(v, dict)}
+
+
+def save_column_settings(settings: dict[str, Any], *, reason: str = "column_settings_saved") -> dict[str, Any]:  # type: ignore[override]
+    payload = _v366_load_all_direct()
+    normalized: dict[str, Any] = {}
+    for k, v in dict(settings or {}).items():
+        if isinstance(v, dict):
+            item = dict(v)
+            item["updated_at"] = item.get("updated_at") or _v366_now_text()
+            item["reason"] = reason
+            normalized[canonical_table_key(k)] = item
+    payload["column_settings"] = normalized
+    _v366_write_direct(payload)
+    return {"ok": True, "mode": "v366_direct", "table_count": len(normalized), "reason": reason, "file": str(_V366_STATE_FILE)}
+
+
+def migrate_legacy_table_settings_to_master(*, write: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    """V366: one-time fallback only when the direct file is still empty; no history scanning."""
+    direct = _v366_load_all_direct()
+    if direct.get("table_settings") or direct.get("column_settings"):
+        return {"ok": True, "mode": "v366_direct_already_exists", "table_count": len(direct.get("table_settings") or {}), "column_count": len(direct.get("column_settings") or {})}
+    # Import from the old V360 master if present, once.
+    try:
+        from services.persistence_core_service import load_master_settings
+        old = load_master_settings()
+    except Exception:
+        old = {}
+    imported = _v366_blank_payload()
+    if isinstance(old.get("table_settings"), dict):
+        imported["table_settings"] = {canonical_table_key(k): v for k, v in old["table_settings"].items() if isinstance(v, dict)}
+    if isinstance(old.get("column_settings"), dict):
+        imported["column_settings"] = {canonical_table_key(k): v for k, v in old["column_settings"].items() if isinstance(v, dict)}
+    if write and (imported["table_settings"] or imported["column_settings"]):
+        _v366_write_direct(imported)
+    return {"ok": True, "mode": "v366_direct_migrated_from_old_master", "table_count": len(imported["table_settings"]), "column_count": len(imported["column_settings"])}
