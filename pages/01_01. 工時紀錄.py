@@ -27,7 +27,7 @@ from services.time_record_service import (
 )
 from services.db_service import query_one
 from services.table_ui_service import render_table
-from services.system_settings_service import get_process_options, get_live_page_reset_time
+from services.system_settings_service import get_process_options_by_model, get_default_process_model, get_live_page_reset_time
 
 st.set_page_config(page_title="01. 工時紀錄", page_icon="⏱", layout="wide")
 apply_theme()
@@ -35,7 +35,6 @@ require_module_access("01_time_record")
 render_header("01｜工時紀錄", "快速開始、同步作業、暫停、下班、完工｜自動記錄時間與扣除休息")
 render_post_record_continue_prompt()
 
-PROCESS_OPTIONS = get_process_options()
 
 employees = load_employees(active_only=True, in_factory_only=False)
 work_orders = load_work_orders(active_only=True)
@@ -58,6 +57,13 @@ with left:
     wo_no = wo_label.split("｜")[0]
     work_order = query_one("SELECT * FROM work_orders WHERE work_order=?", (wo_no,))
 
+    selected_type_name = str((work_order or {}).get("type_name") or "").strip()
+    if not selected_type_name:
+        selected_type_name = get_default_process_model()
+    PROCESS_OPTIONS = get_process_options_by_model(selected_type_name, include_common=True)
+    if not PROCESS_OPTIONS:
+        PROCESS_OPTIONS = get_process_options_by_model(get_default_process_model(), include_common=True)
+    st.caption(f"目前製令機型 / Current Model：{selected_type_name or '全部 / 通用'}")
     process = st.selectbox("工段名稱｜Process", PROCESS_OPTIONS)
     remark = st.text_area("備註｜Remark", height=90)
     auto_pause = st.checkbox("切換不同工段時，自動暫停同人員其他未結束作業｜Auto pause different process", value=True)
