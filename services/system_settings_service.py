@@ -1787,461 +1787,145 @@ def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any
         _clear_settings_cache()
     return {"ok": bool(restored), "restored": restored, "source": payload.get("_source", "system_settings_json"), "score": payload.get("_score", None)}
 
-# ===== V3.46 final system settings persistence hardening =====
-# 目的：13｜系統設定的「類別與工段名稱設定」在 Reboot App 後不再被預設資料遮蔽。
-# 不新增畫面功能；只修正既有永久檔 export/restore 與 schema 初始化順序。
 
-def _v346_ensure_category_tables_basic() -> None:
-    execute(
-        """
-        CREATE TABLE IF NOT EXISTS process_category_options (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category_name TEXT DEFAULT '',
-            process_name TEXT NOT NULL,
-            is_active INTEGER DEFAULT 1,
-            sort_order INTEGER DEFAULT 0,
-            note TEXT,
-            created_at TEXT,
-            updated_at TEXT,
-            UNIQUE(category_name, process_name)
-        )
-        """
-    )
-    execute(
-        """
-        CREATE TABLE IF NOT EXISTS process_categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category_name TEXT UNIQUE NOT NULL,
-            is_active INTEGER DEFAULT 1,
-            sort_order INTEGER DEFAULT 0,
-            note TEXT,
-            created_at TEXT,
-            updated_at TEXT
-        )
-        """
-    )
+# ===== V3.63 definitive 13-system-settings persistence =====
+# 原因：舊版用「資料越多越好」挑永久檔，會把使用者清空後的有效設定誤判為不完整，
+# Reboot 後又選到含預設資料的舊 history。V363 改為：直接最新永久檔優先，空表也是有效設定。
 
-
-def _v346_tables_empty_or_default(table_name: str) -> bool:
+def _v363_upload_system_settings_files(reason: str) -> dict[str, Any]:
     try:
-        c = _table_count(table_name)
-    except Exception:
-        c = 0
-    if c == 0:
-        return True
-    if table_name == "process_categories":
-        try:
-            row = query_one("SELECT COUNT(*) AS c FROM process_categories WHERE category_name<>?", (PROCESS_CATEGORY_ALL,)) or {"c": 0}
-            return int(row.get("c") or 0) == 0
-        except Exception:
-            return False
-    return False
+        from services.github_cloud_storage_service import github_config, upload_file_to_github
+        if not github_config().get("token"):
+            return {"ok": False, "skipped": True, "message": "GITHUB_TOKEN not configured"}
+        uploads = []
+        for local, remote in [
+            (PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json", "data/persistent_state/spt_system_settings.json"),
+            (PROJECT_ROOT / "data" / "config" / "system_settings.json", "data/config/system_settings.json"),
+            (PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json", "data/persistent_modules/13_system_settings/system_settings.json"),
+        ]:
+            if local.exists() and local.stat().st_size > 0:
+                uploads.append(upload_file_to_github(local, remote, f"SPT V363 system settings {reason} {now_text()}"))
+        return {"ok": all(bool(x.get("ok")) for x in uploads) if uploads else False, "uploads": uploads}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
-def _v346_insert_category_rows(rows: list[dict[str, Any]]) -> int:
-    count = 0
-    now = _now()
-    for idx, r in enumerate(rows or [], start=1):
-        if not isinstance(r, dict):
+def _v363_direct_system_candidate_paths() -> list[Path]:
+    # Direct/latest files first by priority.  History is fallback only.
+    direct = [
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json",
+        PROJECT_ROOT / "data" / "config" / "system_settings.json",
+    ]
+    existing = [p for p in direct if p.exists() and p.stat().st_size > 0]
+    if existing:
+        return existing
+    if SYSTEM_SETTINGS_HISTORY_DIR.exists():
+        return sorted(SYSTEM_SETTINGS_HISTORY_DIR.glob("system_settings_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return []
+
+
+def _load_latest_persistent_payload() -> dict[str, Any] | None:  # type: ignore[override]
+    for path in _v363_direct_system_candidate_paths():
+        data = _load_json_file(path)
+        if not data:
             continue
-        name = _norm_category_name(r.get("category_name") or r.get("類別") or r.get("category"))
-        if not name:
-            continue
-        active_raw = str(r.get("is_active", 1)).strip().lower()
-        active = 0 if active_raw in {"0", "false", "no", "n", "off", "停用", "否"} else 1
-        try:
-            sort_order = int(float(r.get("sort_order") or idx))
-        except Exception:
-            sort_order = idx
-        execute(
-            """
-            INSERT INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at)
-            VALUES (?,?,?,?,?,?)
-            ON CONFLICT(category_name) DO UPDATE SET
-                is_active=excluded.is_active,
-                sort_order=excluded.sort_order,
-                note=excluded.note,
-                updated_at=excluded.updated_at
-            """,
-            (name, active, sort_order, str(r.get("note") or ""), str(r.get("created_at") or now), str(r.get("updated_at") or now)),
-        )
-        count += 1
-    return count
+        tables = _v341_tables_from_system_payload(data)
+        # Key point: even empty lists are valid if the table key exists.
+        if isinstance(data.get("tables"), dict) or tables:
+            return {"tables": tables, "_source": str(path), "_score": ("v363_direct", path.stat().st_mtime if path.exists() else 0)}
+    return None
 
 
-def _v346_insert_category_process_rows(rows: list[dict[str, Any]]) -> int:
-    count = 0
-    now = _now()
-    for idx, r in enumerate(rows or [], start=1):
-        if not isinstance(r, dict):
-            continue
-        proc_name = str(r.get("process_name") or r.get("工段名稱") or r.get("工段名稱 / Process") or "").strip()
-        if not proc_name:
-            continue
-        category = _norm_category_name(r.get("category_name") or r.get("type_name") or r.get("類別") or PROCESS_CATEGORY_ALL)
-        active_raw = str(r.get("is_active", 1)).strip().lower()
-        active = 0 if active_raw in {"0", "false", "no", "n", "off", "停用", "否"} else 1
-        try:
-            sort_order = int(float(r.get("sort_order") or idx))
-        except Exception:
-            sort_order = idx
-        execute(
-            """
-            INSERT INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at)
-            VALUES (?,?,?,?,?,?,?)
-            ON CONFLICT(category_name, process_name) DO UPDATE SET
-                is_active=excluded.is_active,
-                sort_order=excluded.sort_order,
-                note=excluded.note,
-                updated_at=excluded.updated_at
-            """,
-            (category, proc_name, active, sort_order, str(r.get("note") or ""), str(r.get("created_at") or now), str(r.get("updated_at") or now)),
-        )
-        count += 1
-    return count
-
-
-def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
-    _basic_create_tables()
-    _v346_ensure_category_tables_basic()
-    payload = _load_latest_persistent_payload()
-    if not payload:
-        return {"ok": False, "restored": {}, "message": "找不到 13 系統設定永久檔"}
-    tables = payload.get("tables", {}) if isinstance(payload.get("tables"), dict) else {}
-    restored: dict[str, int] = {}
-
-    cat_rows = tables.get("process_categories", []) if isinstance(tables.get("process_categories"), list) else []
-    cat_proc_rows = tables.get("process_category_options", []) if isinstance(tables.get("process_category_options"), list) else []
-    if not cat_proc_rows and isinstance(tables.get("process_options"), list):
-        cat_proc_rows = tables.get("process_options", []) or []
-    rest_rows = tables.get("rest_periods", []) if isinstance(tables.get("rest_periods"), list) else []
-    app_rows = tables.get("app_settings", []) if isinstance(tables.get("app_settings"), list) else []
-
-    if force or (_v346_tables_empty_or_default("process_categories") and cat_rows):
-        if force:
-            try: execute("DELETE FROM process_categories")
-            except Exception: pass
-        restored["process_categories"] = _v346_insert_category_rows(cat_rows)
-    if force or (_table_count("process_category_options") == 0 and cat_proc_rows):
-        if force:
-            try: execute("DELETE FROM process_category_options")
-            except Exception: pass
-        restored["process_category_options"] = _v346_insert_category_process_rows(cat_proc_rows)
-    if force or (_table_count("rest_periods") == 0 and rest_rows):
-        if force:
-            try: execute("DELETE FROM rest_periods")
-            except Exception: pass
-        restored["rest_periods"] = _insert_rest_rows(rest_rows)
-    if force or (not _has_live_page_reset_setting() and app_rows):
-        if force:
-            try: execute("DELETE FROM app_settings WHERE setting_key IN ('live_page_reset_time', 'default_process_category')")
-            except Exception: pass
-        restored["app_settings"] = _insert_app_settings_rows(app_rows)
-    if restored:
-        _clear_settings_cache()
-    return {"ok": bool(restored), "restored": restored, "source": payload.get("_source", "system_settings_json"), "score": payload.get("_score")}
-
+_prev_export_system_settings_permanent_v363 = export_system_settings_permanent
 
 def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
-    _basic_create_tables()
-    _v346_ensure_category_tables_basic()
-    _ensure_permanent_dirs()
+    res = _prev_export_system_settings_permanent_v363(reason=reason, write_history=write_history)
     try:
-        cats = query_df("SELECT id, category_name, is_active, sort_order, note, created_at, updated_at FROM process_categories ORDER BY sort_order, id")
-    except Exception:
-        cats = pd.DataFrame()
-    try:
-        proc = query_df("SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options ORDER BY category_name, sort_order, id")
-    except Exception:
-        proc = pd.DataFrame()
-    try:
-        rest = query_df("SELECT id, name, start_time, end_time, is_active, sort_order FROM rest_periods ORDER BY sort_order, id")
-    except Exception:
-        rest = pd.DataFrame()
-    try:
-        app = query_df("SELECT setting_key, setting_value, note, updated_at FROM app_settings ORDER BY setting_key")
-    except Exception:
-        app = pd.DataFrame()
-    payload: dict[str, Any] = {
-        "version": "V3.46",
-        "exported_at": _now(),
-        "reason": reason,
-        "description": "13｜系統設定永久紀錄：類別、類別對應工段、休息時間、01 工時紀錄每日重新整理時間。",
-        "tables": {
-            "process_categories": _df_records(cats),
-            "process_category_options": _df_records(proc),
-            # Compatibility: older restore code reads process_options.
-            "process_options": _df_records(proc),
-            "rest_periods": _df_records(rest),
-            "app_settings": _df_records(app),
-        },
-        "table_counts": {
-            "process_categories": 0 if cats is None else len(cats),
-            "process_category_options": 0 if proc is None else len(proc),
-            "process_options": 0 if proc is None else len(proc),
-            "rest_periods": 0 if rest is None else len(rest),
-            "app_settings": 0 if app is None else len(app),
-        },
-    }
-    for out_path in SYSTEM_SETTINGS_FILES:
-        _atomic_write_json(out_path, payload)
-    if write_history:
-        hist = SYSTEM_SETTINGS_HISTORY_DIR / f"system_settings_{now_stamp()}.json"
-        _atomic_write_json(hist, payload)
-    try:
-        mark_data_changed("13｜系統設定已變更，永久設定檔已建立；GitHub 同步請到 13 頁面手動執行。", "system_settings_permanent_json")
-    except Exception:
-        pass
-    return {"ok": True, "files": [str(p) for p in SYSTEM_SETTINGS_FILES], "table_counts": payload["table_counts"], "payload_version": "V3.46"}
-
-
-def ensure_system_settings_schema() -> None:  # type: ignore[override]
-    global _SYSTEM_SETTINGS_SCHEMA_READY, _RESTORE_FROM_FILE_DONE
-    if _SYSTEM_SETTINGS_SCHEMA_READY:
-        return
-    _basic_create_tables()
-    _v346_ensure_category_tables_basic()
-    if not _RESTORE_FROM_FILE_DONE:
-        try:
-            restore_system_settings_from_permanent(force=False)
-        except Exception:
-            pass
-        _RESTORE_FROM_FILE_DONE = True
-    now = _now()
-    try:
-        if _table_count("process_categories") == 0:
-            execute(
-                """
-                INSERT OR IGNORE INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at)
-                VALUES (?,1,0,'所有類別共用工段',?,?)
-                """,
-                (PROCESS_CATEGORY_ALL, now, now),
-            )
+        # Mirror this module into unified master so table/system state lives in the same top-level source.
+        from services.persistence_core_service import load_master_settings, save_master_settings
+        payload = _load_json_file(PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json") or {}
+        master = load_master_settings()
+        sys_section = master.get("system_settings") if isinstance(master.get("system_settings"), dict) else {}
+        sys_section["13.system_settings"] = payload
+        master["system_settings"] = sys_section
+        save_master_settings(master, reason=f"v363_system_settings_{reason}")
     except Exception:
         pass
     try:
-        if _table_count("process_category_options") == 0:
-            for idx, name in enumerate(DEFAULT_PROCESS_OPTIONS, start=1):
-                execute(
-                    """
-                    INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at)
-                    VALUES (?,?,1,?,'系統預設工段，可於 13 系統設定修改',?,?)
-                    """,
-                    (PROCESS_CATEGORY_ALL, name, idx, now, now),
-                )
+        res["github_upload"] = _v363_upload_system_settings_files(reason)
     except Exception:
         pass
-    try:
-        if _table_count("rest_periods") == 0:
-            for item in DEFAULT_REST_PERIODS:
-                execute(
-                    """
-                    INSERT INTO rest_periods(name, start_time, end_time, is_active, sort_order)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (item["name"], item["start_time"], item["end_time"], item["is_active"], item["sort_order"]),
-                )
-    except Exception:
-        pass
-    try:
-        if not _has_live_page_reset_setting():
-            execute(
-                """
-                INSERT INTO app_settings(setting_key, setting_value, note, updated_at)
-                VALUES ('live_page_reset_time', ?, '01 工時紀錄每日重新整理時間；只影響 01 顯示，不刪除 02 歷史紀錄', ?)
-                ON CONFLICT(setting_key) DO NOTHING
-                """,
-                (DEFAULT_LIVE_PAGE_RESET_TIME, now),
-            )
-    except Exception:
-        pass
-    try:
-        _dedupe_rest_periods()
-    except Exception:
-        pass
-    _SYSTEM_SETTINGS_SCHEMA_READY = True
+    return res
 
 
-# ===== V3.47 category/process reboot persistence hardening =====
-# 目的：
-# 1. 13｜系統設定「類別對應工段」即使永久檔是空清單，也視為有效設定，不再於 Reboot 後補回預設工段。
-# 2. 永久檔有 process_category_options 內容時，即使 SQLite 已被預設資料補滿，也會以永久檔為準還原。
-# 3. 01｜工時紀錄依類別連動工段時，確保只讀該類別工段；若該類別沒有工段，不自動混入其他類別。
-
-def _v347_payload_has_table(payload: dict[str, Any], table_name: str) -> bool:
-    try:
-        tables = payload.get("tables") if isinstance(payload, dict) else {}
-        return isinstance(tables, dict) and table_name in tables and isinstance(tables.get(table_name), list)
-    except Exception:
-        return False
-
-
-def _v347_process_table_is_default_only() -> bool:
-    """Return True when process_category_options only contains seeded common default rows."""
-    try:
-        df = query_df("SELECT category_name, process_name, note FROM process_category_options")
-        if df is None or df.empty:
-            return True
-        names = [str(x).strip() for x in df.get("process_name", []).dropna().tolist()]
-        cats = {_norm_category_name(x) for x in df.get("category_name", []).dropna().tolist()}
-        if not names:
-            return True
-        default_set = {str(x).strip() for x in DEFAULT_PROCESS_OPTIONS}
-        return cats.issubset({PROCESS_CATEGORY_ALL}) and set(names).issubset(default_set)
-    except Exception:
-        return False
-
+_prev_restore_system_settings_from_permanent_v363 = restore_system_settings_from_permanent
 
 def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
     _basic_create_tables()
-    _v346_ensure_category_tables_basic()
+    try:
+        _ensure_process_category_options_table()
+    except Exception:
+        pass
     payload = _load_latest_persistent_payload()
     if not payload:
         return {"ok": False, "restored": {}, "message": "找不到 13 系統設定永久檔"}
     tables = payload.get("tables", {}) if isinstance(payload.get("tables"), dict) else {}
     restored: dict[str, int] = {}
-
+    # First restore rest/app using existing logic, but category tables below are authoritative.
+    try:
+        r0 = _old_restore_system_settings_from_permanent_v341(force=force)
+        restored.update(r0.get("restored", {}) if isinstance(r0, dict) else {})
+    except Exception:
+        pass
+    has_cat_key = "process_categories" in tables
+    has_proc_key = "process_options" in tables or "process_category_options" in tables
     cat_rows = tables.get("process_categories", []) if isinstance(tables.get("process_categories"), list) else []
-    has_cat_proc_table = _v347_payload_has_table(payload, "process_category_options") or _v347_payload_has_table(payload, "process_options")
     cat_proc_rows = tables.get("process_category_options", []) if isinstance(tables.get("process_category_options"), list) else []
     if not cat_proc_rows and isinstance(tables.get("process_options"), list):
         cat_proc_rows = tables.get("process_options", []) or []
-    rest_rows = tables.get("rest_periods", []) if isinstance(tables.get("rest_periods"), list) else []
-    app_rows = tables.get("app_settings", []) if isinstance(tables.get("app_settings"), list) else []
-
-    if force or (_v346_tables_empty_or_default("process_categories") and cat_rows):
-        if force:
-            try: execute("DELETE FROM process_categories")
-            except Exception: pass
-        restored["process_categories"] = _v346_insert_category_rows(cat_rows)
-
-    # V3.47: empty permanent process table is valid. Delete default seed and keep empty.
-    should_restore_proc = force or (has_cat_proc_table and (_table_count("process_category_options") == 0 or _v347_process_table_is_default_only()))
-    if should_restore_proc:
-        try: execute("DELETE FROM process_category_options")
-        except Exception: pass
-        restored["process_category_options"] = _v346_insert_category_process_rows(cat_proc_rows) if cat_proc_rows else 0
-
-    if force or (_table_count("rest_periods") == 0 and rest_rows):
-        if force:
-            try: execute("DELETE FROM rest_periods")
-            except Exception: pass
-        restored["rest_periods"] = _insert_rest_rows(rest_rows)
-    if force or (not _has_live_page_reset_setting() and app_rows):
-        if force:
-            try: execute("DELETE FROM app_settings WHERE setting_key IN ('live_page_reset_time', 'default_process_category')")
-            except Exception: pass
-        restored["app_settings"] = _insert_app_settings_rows(app_rows)
+    # If the latest permanent file explicitly has the table key, it is authoritative,
+    # including empty list.  This prevents reboot from refilling defaults.
+    try:
+        if force or has_cat_key:
+            execute("DELETE FROM process_categories")
+            count = 0
+            for idx, r in enumerate(cat_rows or [], start=1):
+                name = _norm_category_name(r.get("category_name") or r.get("類別") or r.get("category"))
+                if not name:
+                    continue
+                active_raw = str(r.get("is_active", 1)).strip().lower()
+                active = 0 if active_raw in {"0", "false", "no", "n", "off", "停用", "否"} else 1
+                try: sort_order = int(float(r.get("sort_order") or idx))
+                except Exception: sort_order = idx
+                execute("""
+                    INSERT INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?)
+                    ON CONFLICT(category_name) DO UPDATE SET is_active=excluded.is_active, sort_order=excluded.sort_order, note=excluded.note, updated_at=excluded.updated_at
+                """, (name, active, sort_order, str(r.get("note") or ""), str(r.get("created_at") or _now()), str(r.get("updated_at") or _now())))
+                count += 1
+            restored["process_categories"] = count
+        if force or has_proc_key:
+            execute("DELETE FROM process_category_options")
+            count = 0
+            for idx, r in enumerate(cat_proc_rows or [], start=1):
+                category = _norm_category_name(r.get("category_name") or r.get("type_name") or PROCESS_CATEGORY_ALL)
+                proc = str(r.get("process_name") or "").strip()
+                if not proc:
+                    continue
+                active_raw = str(r.get("is_active", 1)).strip().lower()
+                active = 0 if active_raw in {"0", "false", "no", "n", "off", "停用", "否"} else 1
+                try: sort_order = int(float(r.get("sort_order") or idx))
+                except Exception: sort_order = idx
+                execute("""
+                    INSERT INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?,?)
+                    ON CONFLICT(category_name, process_name) DO UPDATE SET is_active=excluded.is_active, sort_order=excluded.sort_order, note=excluded.note, updated_at=excluded.updated_at
+                """, (category, proc, active, sort_order, str(r.get("note") or ""), str(r.get("created_at") or _now()), str(r.get("updated_at") or _now())))
+                count += 1
+            restored["process_category_options"] = count
+    except Exception as exc:
+        restored["error"] = str(exc)
     if restored:
         _clear_settings_cache()
-    return {"ok": bool(restored), "restored": restored, "source": payload.get("_source", "system_settings_json"), "score": payload.get("_score")}
-
-
-def ensure_system_settings_schema() -> None:  # type: ignore[override]
-    global _SYSTEM_SETTINGS_SCHEMA_READY, _RESTORE_FROM_FILE_DONE
-    if _SYSTEM_SETTINGS_SCHEMA_READY:
-        return
-    _basic_create_tables()
-    _v346_ensure_category_tables_basic()
-    payload = _load_latest_persistent_payload()
-    has_permanent_proc_table = _v347_payload_has_table(payload, "process_category_options") or _v347_payload_has_table(payload, "process_options") if payload else False
-    if not _RESTORE_FROM_FILE_DONE:
-        try:
-            restore_system_settings_from_permanent(force=False)
-        except Exception:
-            pass
-        _RESTORE_FROM_FILE_DONE = True
-    now = _now()
-    try:
-        if _table_count("process_categories") == 0:
-            execute(
-                """
-                INSERT OR IGNORE INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at)
-                VALUES (?,1,0,'所有類別共用工段',?,?)
-                """,
-                (PROCESS_CATEGORY_ALL, now, now),
-            )
-    except Exception:
-        pass
-    try:
-        # V3.47: 若永久檔已明確記錄 process_category_options（就算是空清單），不再補預設工段。
-        if (not has_permanent_proc_table) and _table_count("process_category_options") == 0:
-            for idx, name in enumerate(DEFAULT_PROCESS_OPTIONS, start=1):
-                execute(
-                    """
-                    INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at)
-                    VALUES (?,?,1,?,'系統預設工段，可於 13 系統設定修改',?,?)
-                    """,
-                    (PROCESS_CATEGORY_ALL, name, idx, now, now),
-                )
-    except Exception:
-        pass
-    try:
-        if _table_count("rest_periods") == 0:
-            for item in DEFAULT_REST_PERIODS:
-                execute(
-                    """
-                    INSERT INTO rest_periods(name, start_time, end_time, is_active, sort_order)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (item["name"], item["start_time"], item["end_time"], item["is_active"], item["sort_order"]),
-                )
-    except Exception:
-        pass
-    try:
-        if not _has_live_page_reset_setting():
-            execute(
-                """
-                INSERT INTO app_settings(setting_key, setting_value, note, updated_at)
-                VALUES ('live_page_reset_time', ?, '01 工時紀錄每日重新整理時間；只影響 01 顯示，不刪除 02 歷史紀錄', ?)
-                ON CONFLICT(setting_key) DO NOTHING
-                """,
-                (DEFAULT_LIVE_PAGE_RESET_TIME, now),
-            )
-    except Exception:
-        pass
-    try:
-        _dedupe_rest_periods()
-    except Exception:
-        pass
-    _SYSTEM_SETTINGS_SCHEMA_READY = True
-
-
-def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
-    _ensure_process_category_options_table()
-    category = _norm_category_name(category_name)
-
-    def _names_for(where_sql: str, params: tuple[Any, ...]) -> list[str]:
-        try:
-            df = query_df(
-                f"SELECT process_name FROM process_category_options WHERE COALESCE(is_active,1)=1 AND {where_sql} ORDER BY sort_order, id",
-                params,
-            )
-            return [str(x).strip() for x in df.get("process_name", []).dropna().tolist() if str(x).strip()] if df is not None and not df.empty else []
-        except Exception:
-            return []
-
-    if category == PROCESS_CATEGORY_ALL:
-        names = _names_for("(category_name=? OR COALESCE(category_name,'')='')", (PROCESS_CATEGORY_ALL,))
-    else:
-        names = _names_for("category_name=?", (category,))
-        if include_common:
-            common_names = _names_for("(category_name=? OR COALESCE(category_name,'')='')", (PROCESS_CATEGORY_ALL,))
-            names = common_names + [n for n in names if n not in common_names]
-    if names:
-        return names
-    # V3.47: include_common=False 代表呼叫端要求嚴格依類別，不回退到預設/全部工段。
-    if not include_common:
-        return []
-    try:
-        df = query_df("SELECT process_name FROM process_category_options WHERE COALESCE(is_active,1)=1 ORDER BY sort_order, id")
-        fallback: list[str] = []
-        for x in df.get("process_name", []).dropna().tolist() if df is not None and not df.empty else []:
-            s = str(x).strip()
-            if s and s not in fallback:
-                fallback.append(s)
-        if fallback:
-            return fallback
-    except Exception:
-        pass
-    return DEFAULT_PROCESS_OPTIONS.copy() if not _v347_payload_has_table(_load_latest_persistent_payload() or {}, "process_category_options") else []
+    return {"ok": bool(restored), "restored": restored, "source": payload.get("_source", "system_settings_json"), "score": payload.get("_score", None)}

@@ -1699,3 +1699,104 @@ def has_permission(username: str, module_code: str, action: str = "can_view") ->
     return _prev_v342_has_permission(username, module_code, action)
 
 check_permission = has_permission
+
+
+# ===== V3.63 definitive 10-permission persistence =====
+# 原因：舊版用「帳號越多越好」挑永久檔，刪除帳號後會選到舊 history，把刪掉的帳號救回來。
+# V363 改為直接/latest 檔優先；使用者刪到只剩 1 個帳號也是有效設定。
+
+def _v363_permission_direct_paths() -> list[Path]:
+    direct = [
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_module_settings.json",
+    ]
+    existing = [p for p in direct if p.exists() and p.stat().st_size > 0]
+    if existing:
+        return existing
+    hist = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "history"
+    if hist.exists():
+        return sorted(hist.glob("10_permissions_records_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return []
+
+
+def _v341_best_permission_payload() -> tuple[Path | None, dict]:  # type: ignore[override]
+    for p in _v363_permission_direct_paths():
+        payload = _json_load(p)
+        tables = _v341_tables_from_payload(payload)
+        if tables:
+            return p, tables
+    return None, {}
+
+
+def _v363_upload_permission_files(reason: str) -> dict:
+    try:
+        from services.github_cloud_storage_service import github_config, upload_file_to_github
+        if not github_config().get("token"):
+            return {"ok": False, "skipped": True, "message": "GITHUB_TOKEN not configured"}
+        uploads = []
+        base = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions"
+        for local, remote in [
+            (base / "10_permissions_records.json", "data/persistent_modules/10_permissions/10_permissions_records.json"),
+            (base / "10_permissions_settings.json", "data/persistent_modules/10_permissions/10_permissions_settings.json"),
+            (PROJECT_ROOT / "data" / "persistent_state" / "spt_user_persistent_settings.json", "data/persistent_state/spt_user_persistent_settings.json"),
+        ]:
+            if local.exists() and local.stat().st_size > 0:
+                uploads.append(upload_file_to_github(local, remote, f"SPT V363 permission settings {reason} {now_text()}"))
+        return {"ok": all(bool(x.get("ok")) for x in uploads) if uploads else False, "uploads": uploads}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+_prev_export_permission_settings_permanently_v363 = export_permission_settings_permanently
+
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
+    res = _prev_export_permission_settings_permanently_v363(reason=reason)
+    try:
+        base = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json"
+        payload = _json_load(base)
+        if isinstance(payload, dict):
+            from services.persistence_core_service import load_master_settings, save_master_settings
+            master = load_master_settings()
+            sec = master.get("permission_settings") if isinstance(master.get("permission_settings"), dict) else {}
+            sec["10.permissions"] = payload
+            master["permission_settings"] = sec
+            save_master_settings(master, reason=f"v363_permission_{reason}")
+    except Exception:
+        pass
+    try:
+        res["github_upload"] = _v363_upload_permission_files(reason)
+    except Exception:
+        pass
+    return res
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    init_permission_tables()
+    best_path, tables = _v341_best_permission_payload()
+    if not best_path or not tables:
+        return {"ok": False, "source": "", "restored": {}, "message": "找不到可用的 10_permissions 永久檔"}
+    restored: dict[str, int] = {}
+    conn = connect_db(); cur = conn.cursor()
+    try:
+        _ensure_legacy_security_tables(cur)
+        _ensure_security_setting_tables(cur)
+        # Direct/latest permanent file is authoritative, including fewer users after deletion.
+        if force or "auth_users" in tables:
+            for table in ["auth_account_permissions", "auth_users", "security_users", "security_user_roles"]:
+                try: cur.execute(f'DELETE FROM "{table}"')
+                except Exception: pass
+        for table in ["auth_users", "auth_account_permissions", "auth_security_settings", "security_users", "security_settings", "security_user_roles"]:
+            rows = tables.get(table, []) or []
+            if rows:
+                restored[table] = restored.get(table, 0) + _insert_or_replace_rows(cur, table, rows)
+        if tables.get("auth_security_settings"):
+            restored["security_settings"] = restored.get("security_settings", 0) + _insert_or_replace_rows(cur, "security_settings", tables.get("auth_security_settings", []))
+        conn.commit()
+    finally:
+        conn.close()
+    if restored:
+        try: sync_auth_users_to_runtime_security()
+        except Exception: pass
+        clear_permission_runtime_cache()
+    return {"ok": bool(restored), "source": str(best_path), "restored": restored, "mode": "v363_direct_latest_authoritative"}
