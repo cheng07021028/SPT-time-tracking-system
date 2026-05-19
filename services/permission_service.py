@@ -372,38 +372,6 @@ def export_permission_settings_permanently(reason: str = "permission_settings_sa
     return results
 
 
-def canonicalize_runtime_roles_from_account_master(usernames: Iterable[str] | None = None) -> int:
-    """Make security_user_roles exactly match auth_users.role_code.
-
-    修正更新模組後殘留 admin, operator 這類雙角色；帳號主檔角色是唯一來源。
-    """
-    init_permission_tables()
-    conn = connect_db()
-    cur = conn.cursor()
-    _ensure_legacy_security_tables(cur)
-    params: list[str] = []
-    where = ""
-    if usernames:
-        clean = [str(u).strip() for u in usernames if str(u).strip()]
-        if clean:
-            where = " WHERE username IN ({})".format(",".join(["?"] * len(clean)))
-            params = clean
-    rows = cur.execute("SELECT username, role_code FROM auth_users" + where, params).fetchall()
-    count = 0
-    for r in rows:
-        username = str(r["username"] or "").strip()
-        role = str(r["role_code"] or "operator").strip() or "operator"
-        if not username:
-            continue
-        cur.execute("DELETE FROM security_user_roles WHERE username=?", (username,))
-        cur.execute("INSERT OR REPLACE INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
-        count += 1
-    conn.commit()
-    conn.close()
-    clear_permission_runtime_cache()
-    return count
-
-
 def sync_auth_users_to_runtime_security(usernames: Iterable[str] | None = None) -> int:
     """Synchronize auth_users into security_users/security_user_roles.
 
@@ -444,9 +412,9 @@ def sync_auth_users_to_runtime_security(usernames: Iterable[str] | None = None) 
             int(r["is_active"] or 0), int(r["force_password_change"] or 0), r["last_login_at"],
             r["created_at"] or now_text(), now_text(),
         ))
-        role = str(r["role_code"] or "operator").strip() or "operator"
-        cur.execute("DELETE FROM security_user_roles WHERE username=?", (username,))
-        cur.execute("INSERT OR REPLACE INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
+        role = str(r["role_code"] or "").strip()
+        if role:
+            cur.execute("INSERT OR IGNORE INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role, now_text()))
         count += 1
     conn.commit()
     conn.close()
@@ -612,7 +580,6 @@ def init_permission_tables(force: bool = False) -> None:
     ensure_permissions_for_all_users(force=True)
     try:
         sync_auth_users_to_runtime_security()
-        canonicalize_runtime_roles_from_account_master()
     except Exception:
         pass
     _PERMISSION_SCHEMA_READY = True
@@ -777,7 +744,6 @@ def save_users(rows: Iterable[dict]) -> dict:
         synced_permissions = sync_user_permissions_from_roles(role_sync_users, reason="account_role_changed")
     try:
         sync_auth_users_to_runtime_security(saved_usernames)
-        canonicalize_runtime_roles_from_account_master(saved_usernames)
     except Exception:
         pass
     clear_permission_runtime_cache()
@@ -1455,29 +1421,61 @@ def has_permission(username: str, module_code: str, action: str = "can_view") ->
 check_permission = has_permission
 
 
-# ===== V3.01 SECURITY SETTINGS SINGLE SOURCE GUARD START =====
-def _v301_permission_security_paths() -> list[Path]:
-    root = PROJECT_ROOT
+# ===== V3.32 security settings no-reset final override =====
+def _v332_security_setting_paths() -> list[Path]:
     return [
-        root / "data" / "config" / "security_settings.json",
-        root / "data" / "persistent_state" / "spt_security_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
-        root / "data" / "config" / "idle_timeout_settings.json",
-        root / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "config" / "security_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_security_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
+        PROJECT_ROOT / "data" / "config" / "idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
     ]
 
 
-def _v301_perm_now() -> str:
-    try:
-        return now_text()
-    except Exception:
-        from datetime import datetime
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def _v332_extract_security_settings(payload) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    if not isinstance(payload, dict):
+        return out
+    raw = payload.get("security_settings")
+    if raw is None:
+        raw = payload.get("settings")
+    if raw is None and payload.get("idle_timeout_minutes") is not None:
+        raw = {"idle_timeout_minutes": payload.get("idle_timeout_minutes")}
+    if raw is None and isinstance(payload.get("tables"), dict):
+        rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
+        if isinstance(rows, list):
+            raw = {str(r.get("setting_key")): str(r.get("setting_value")) for r in rows if isinstance(r, dict) and r.get("setting_key")}
+    if isinstance(raw, dict):
+        for k in ("idle_timeout_minutes", "ask_continue_after_record"):
+            if raw.get(k) not in (None, ""):
+                out[k] = str(raw.get(k))
+    return out
 
 
-def _v301_perm_atomic_write_json(path: Path, payload: dict) -> None:
+def _v332_read_security_settings_from_files() -> Dict[str, str]:
+    candidates: list[tuple[float, Dict[str, str], str]] = []
+    for path in _v332_security_setting_paths():
+        try:
+            if not path.exists():
+                continue
+            data = _v332_extract_security_settings(json.loads(path.read_text(encoding="utf-8")))
+            if data:
+                candidates.append((float(path.stat().st_mtime), data, str(path)))
+        except Exception:
+            continue
+    if not candidates:
+        return {}
+    candidates.sort(key=lambda x: x[0])
+    merged: Dict[str, str] = {}
+    # Oldest to newest; newest valid file wins per key.
+    for _, data, _path in candidates:
+        merged.update(data)
+    return merged
+
+
+def _v332_atomic_write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -1485,84 +1483,22 @@ def _v301_perm_atomic_write_json(path: Path, payload: dict) -> None:
     tmp.replace(path)
 
 
-def _v301_perm_extract_security(payload: object) -> Dict[str, str]:
-    out: Dict[str, str] = {}
-    if not isinstance(payload, dict):
-        return out
-    sources = [payload, payload.get("security_settings"), payload.get("settings")]
-    for src in sources:
-        if isinstance(src, dict):
-            if src.get("idle_timeout_minutes") not in (None, ""):
-                out["idle_timeout_minutes"] = str(src.get("idle_timeout_minutes"))
-            if src.get("ask_continue_after_record") not in (None, ""):
-                out["ask_continue_after_record"] = str(src.get("ask_continue_after_record"))
-    if isinstance(payload.get("tables"), dict):
-        for table_name in ("auth_security_settings", "security_settings"):
-            rows = payload.get("tables", {}).get(table_name) or []
-            if isinstance(rows, list):
-                for row in rows:
-                    if not isinstance(row, dict):
-                        continue
-                    k = str(row.get("setting_key") or "")
-                    v = row.get("setting_value")
-                    if k in {"idle_timeout_minutes", "ask_continue_after_record"} and v not in (None, ""):
-                        out[k] = str(v)
-    return out
-
-
-def _v301_perm_read_security_files() -> Dict[str, str]:
-    merged: Dict[str, str] = {}
-    for path in _v301_permission_security_paths():
-        try:
-            if not path.exists():
-                continue
-            vals = _v301_perm_extract_security(json.loads(path.read_text(encoding="utf-8")))
-            for k, v in vals.items():
-                if k not in merged and v not in (None, ""):
-                    merged[k] = str(v)
-        except Exception:
-            continue
-    return merged
-
-
-def _v301_perm_write_security_files(settings: Dict[str, str]) -> None:
-    try:
-        idle = max(1, int(float(settings.get("idle_timeout_minutes", "15") or 15)))
-    except Exception:
-        idle = 15
-    ask = "1" if str(settings.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
-    security_payload = {
-        "version": "V3.01",
-        "updated_at": _v301_perm_now(),
-        "security_settings": {
-            "idle_timeout_minutes": str(idle),
-            "ask_continue_after_record": ask,
-        },
-        "note": "權限管理安全設定永久檔。更新模組後以 data 內設定為準。",
-    }
-    idle_payload = {
-        "version": "V3.01",
-        "updated_at": _v301_perm_now(),
-        "idle_timeout_minutes": idle,
-        "ask_continue_after_record": ask,
-        "note": "閒置自動登出永久設定。",
-    }
-    for path in _v301_permission_security_paths():
-        try:
-            _v301_perm_atomic_write_json(path, idle_payload if "idle_timeout" in path.name else security_payload)
-        except Exception:
-            pass
-
-
 def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
-    """V3.01: read security settings from permanent data JSON first, then DB."""
-    result: Dict[str, str] = {"idle_timeout_minutes": "15", "ask_continue_after_record": "1"}
-    file_settings = _v301_perm_read_security_files()
+    """V3.32: Security settings priority = newest permanent JSON -> DB -> safe default.
+
+    This prevents the old 1-minute startup seed or stale DB values from returning
+    after Streamlit Reboot App.
+    """
+    init_permission_tables()
+    result: Dict[str, str] = {
+        "idle_timeout_minutes": "15",
+        "ask_continue_after_record": "1",
+    }
+    file_settings = _v332_read_security_settings_from_files()
     if file_settings:
         result.update(file_settings)
     else:
         try:
-            init_permission_tables()
             conn = connect_db()
             cur = conn.cursor()
             _ensure_security_setting_tables(cur)
@@ -1570,267 +1506,8 @@ def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
                 try:
                     rows = cur.execute(f"SELECT setting_key, setting_value FROM {table}").fetchall()
                     for r in rows:
-                        k = str(r["setting_key"])
-                        if k in result and r["setting_value"] not in (None, ""):
-                            result[k] = str(r["setting_value"])
-                except Exception:
-                    pass
-            conn.close()
-        except Exception:
-            pass
-    try:
-        idle = max(1, int(float(result.get("idle_timeout_minutes", "15") or 15)))
-    except Exception:
-        idle = 15
-    result["idle_timeout_minutes"] = str(idle)
-    result["ask_continue_after_record"] = "1" if str(result.get("ask_continue_after_record", "1")) not in {"0", "False", "false"} else "0"
-    return result
-
-
-def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
-    """V3.01: save security settings to DB and all permanent JSON files atomically."""
-    merged = get_security_settings()
-    merged.update({str(k): str(v) for k, v in settings.items() if v is not None})
-    try:
-        idle = max(1, int(float(merged.get("idle_timeout_minutes", "15") or 15)))
-    except Exception:
-        idle = 15
-    merged["idle_timeout_minutes"] = str(idle)
-    merged["ask_continue_after_record"] = "1" if str(merged.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
-    _v301_perm_write_security_files(merged)
-    try:
-        init_permission_tables()
-        conn = connect_db()
-        cur = conn.cursor()
-        _ensure_security_setting_tables(cur)
-        for table in ("auth_security_settings", "security_settings"):
-            for k, v in merged.items():
-                cur.execute(f"""
-                    INSERT INTO {table}(setting_key, setting_value, note, updated_at)
-                    VALUES (?,?,?,?)
-                    ON CONFLICT(setting_key) DO UPDATE SET
-                        setting_value=excluded.setting_value,
-                        note=excluded.note,
-                        updated_at=excluded.updated_at
-                """, (k, str(v), "V3.01 synchronized permanent security setting", _v301_perm_now()))
-        conn.commit()
-        conn.close()
-    except Exception:
-        pass
-    try:
-        from services.security_service import set_idle_timeout_minutes
-        set_idle_timeout_minutes(idle)
-    except Exception:
-        pass
-    if st is not None:
-        try:
-            st.session_state["_spt_idle_timeout_cache"] = {"minutes": idle, "ts": 0}
-            st.session_state["spt_security_settings"] = dict(merged)
-        except Exception:
-            pass
-    clear_permission_runtime_cache()
-# ===== V3.01 SECURITY SETTINGS SINGLE SOURCE GUARD END =====
-
-
-# ===== V3.07 PERMISSION IMPORT COMPATIBILITY GUARD START =====
-def _v307_clear_all_permission_caches() -> None:
-    """Clear permission/session caches without changing any data."""
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    if st is None:
-        return
-    try:
-        for k in list(st.session_state.keys()):
-            if (
-                str(k).startswith("_v132_perm_")
-                or str(k).startswith("_spt_perm_cache_")
-                or str(k).startswith("v235_permission_editor_")
-                or str(k) in {"auth_roles", "role", "roles"}
-            ):
-                st.session_state.pop(k, None)
-    except Exception:
-        pass
-
-
-def _v307_clean_usernames(usernames: Iterable[str] | None = None) -> list[str]:
-    try:
-        if usernames is None:
-            conn = connect_db()
-            rows = conn.execute("SELECT username FROM auth_users ORDER BY username").fetchall()
-            conn.close()
-            return [str(r["username"]).strip() for r in rows if str(r["username"]).strip()]
-        return sorted({str(u or "").strip() for u in usernames if str(u or "").strip()})
-    except Exception:
-        return []
-
-
-def reconcile_account_master_permissions_authoritative(usernames: Iterable[str] | None = None, reason: str = "account_master_authoritative") -> int:
-    """Compatibility public helper used by 10｜權限管理 after Account Master save.
-
-    V3.01 once overwrote permission_service.py and removed this symbol while
-    pages/10_10. 權限管理.py still imports it.  Keep this function permanently.
-    It treats Account Master as the only role source and rebuilds permission
-    matrix/runtime roles from auth_users.role_code.
-    """
-    target = _v307_clean_usernames(usernames)
-    if not target:
-        return 0
-    updated = 0
-    try:
-        updated = sync_user_permissions_from_roles(target, reason=reason)
-    except Exception:
-        updated = 0
-    try:
-        sync_auth_users_to_runtime_security(target)
-    except Exception:
-        pass
-    try:
-        _v307_clear_all_permission_caches()
-    except Exception:
-        pass
-    return int(updated or 0)
-# ===== V3.07 PERMISSION IMPORT COMPATIBILITY GUARD END =====
-
-
-# ===== V3.09 ADMIN ACCESS GUARANTEE START =====
-def _v309_account_master_role(username: str) -> str:
-    """Read the authoritative role from auth_users; used only as a safe fallback."""
-    u = (username or "").strip()
-    if not u:
-        return ""
-    try:
-        init_permission_tables()
-        with connect_db() as conn:
-            row = conn.execute("SELECT role_code FROM auth_users WHERE username=?", (u,)).fetchone()
-            if row and row[0]:
-                return str(row[0]).strip().lower()
-    except Exception:
-        pass
-    return ""
-
-
-def _v309_is_admin_account(username: str) -> bool:
-    u = (username or "").strip().lower()
-    if u == "admin":
-        return True
-    role = _v309_account_master_role(username)
-    return role in {"admin", "administrator", "system_admin", "系統管理員"}
-
-
-_old_has_permission_v309 = has_permission
-
-def has_permission(username: str, module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
-    """V3.09: system admin must always have all-module access.
-
-    帳號主檔 role_code=admin 是最高權限來源；即使帳號模組權限表暫時讀不到、
-    runtime cache 還沒重建、或更新模組後權限矩陣尚未同步，也不得擋住 admin。
-    """
-    if _v309_is_admin_account(username):
-        return True
-    try:
-        return _old_has_permission_v309(username, module_code, action)
-    except Exception:
-        return False
-
-check_permission = has_permission
-# ===== V3.09 ADMIN ACCESS GUARANTEE END =====
-
-
-# ===== V3.10 PERMISSION SECURITY SETTINGS NO-RESET GUARD START =====
-def _v310_perm_security_paths() -> list[Path]:
-    root = Path(__file__).resolve().parents[1]
-    return [
-        root / "data" / "config" / "security_settings.json",
-        root / "data" / "persistent_state" / "spt_security_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
-        root / "data" / "config" / "idle_timeout_settings.json",
-        root / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
-    ]
-
-
-def _v310_perm_extract(payload: Any) -> Dict[str, str]:
-    out: Dict[str, str] = {}
-    try:
-        if isinstance(payload, dict):
-            if isinstance(payload.get("security_settings"), dict):
-                payload = payload.get("security_settings")
-            elif isinstance(payload.get("tables"), dict):
-                rows = payload.get("tables", {}).get("auth_security_settings") or payload.get("tables", {}).get("security_settings") or []
-                for r in rows:
-                    if isinstance(r, dict):
-                        k = str(r.get("setting_key", ""))
-                        v = r.get("setting_value")
-                        if k in {"idle_timeout_minutes", "ask_continue_after_record"} and v not in (None, ""):
-                            out[k] = str(v)
-                return out
-            for k in ("idle_timeout_minutes", "ask_continue_after_record"):
-                v = payload.get(k)
-                if v not in (None, ""):
-                    out[k] = str(v)
-    except Exception:
-        pass
-    return out
-
-
-def _v310_perm_read_files() -> Dict[str, str]:
-    out: Dict[str, str] = {}
-    for path in _v310_perm_security_paths():
-        try:
-            if path.exists() and path.stat().st_size > 0:
-                vals = _v310_perm_extract(json.loads(path.read_text(encoding="utf-8")))
-                out.update({k: str(v) for k, v in vals.items() if v not in (None, "")})
-        except Exception:
-            pass
-    return out
-
-
-def _v310_perm_atomic_json(path: Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    json.loads(tmp.read_text(encoding="utf-8"))
-    tmp.replace(path)
-
-
-def _v310_perm_write_files(settings: Dict[str, str]) -> None:
-    try:
-        idle = max(1, int(float(settings.get("idle_timeout_minutes", "15") or 15)))
-    except Exception:
-        idle = 15
-    ask = "1" if str(settings.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
-    now = now_text() if "now_text" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    sec_payload = {"version": "V3.10", "updated_at": now, "user_saved": True, "security_settings": {"idle_timeout_minutes": str(idle), "ask_continue_after_record": ask}}
-    idle_payload = {"version": "V3.10", "updated_at": now, "user_saved": True, "idle_timeout_minutes": idle, "ask_continue_after_record": ask}
-    for path in _v310_perm_security_paths():
-        try:
-            _v310_perm_atomic_json(path, idle_payload if "idle_timeout" in path.name else sec_payload)
-        except Exception:
-            pass
-
-
-def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
-    """V3.10: Security tab reads data/ permanent files first and never seeds 1 minute."""
-    result: Dict[str, str] = {"idle_timeout_minutes": "15", "ask_continue_after_record": "1"}
-    file_settings = _v310_perm_read_files()
-    if file_settings:
-        result.update(file_settings)
-    else:
-        try:
-            init_permission_tables()
-            conn = connect_db()
-            cur = conn.cursor()
-            _ensure_security_setting_tables(cur)
-            for table in ("auth_security_settings", "security_settings"):
-                try:
-                    rows = cur.execute(f"SELECT setting_key, setting_value FROM {table}").fetchall()
-                    for r in rows:
-                        k = str(r["setting_key"])
-                        if k in result and r["setting_value"] not in (None, ""):
-                            result[k] = str(r["setting_value"])
+                        if str(r["setting_key"]) in result and r["setting_value"] is not None:
+                            result[str(r["setting_key"])] = str(r["setting_value"])
                 except Exception:
                     pass
             conn.close()
@@ -1840,52 +1517,55 @@ def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
         result["idle_timeout_minutes"] = str(max(1, int(float(result.get("idle_timeout_minutes", "15") or 15))))
     except Exception:
         result["idle_timeout_minutes"] = "15"
-    result["ask_continue_after_record"] = "1" if str(result.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
+    result["ask_continue_after_record"] = "1" if str(result.get("ask_continue_after_record", "1")) not in ("0", "False", "false") else "0"
     return result
 
 
 def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
-    """V3.10: Save security tab settings to every permanent source atomically."""
+    """V3.32: Save security settings to DB and every permanent JSON path."""
+    init_permission_tables()
     merged = get_security_settings()
-    merged.update({str(k): str(v) for k, v in settings.items() if v is not None})
+    merged.update({str(k): str(v) for k, v in settings.items()})
     try:
         idle = max(1, int(float(merged.get("idle_timeout_minutes", "15") or 15)))
     except Exception:
         idle = 15
     merged["idle_timeout_minutes"] = str(idle)
-    merged["ask_continue_after_record"] = "1" if str(merged.get("ask_continue_after_record", "1")) not in {"0", "False", "false", "no", "No"} else "0"
-    _v310_perm_write_files(merged)
-    try:
-        init_permission_tables()
-        conn = connect_db()
-        cur = conn.cursor()
-        _ensure_security_setting_tables(cur)
+    merged["ask_continue_after_record"] = "1" if str(merged.get("ask_continue_after_record", "1")) not in ("0", "False", "false") else "0"
+
+    conn = connect_db()
+    cur = conn.cursor()
+    _ensure_security_setting_tables(cur)
+    for k, v in merged.items():
         for table in ("auth_security_settings", "security_settings"):
-            for k, v in merged.items():
-                cur.execute(f"""
-                    INSERT INTO {table}(setting_key, setting_value, note, updated_at)
-                    VALUES (?,?,?,?)
-                    ON CONFLICT(setting_key) DO UPDATE SET
-                        setting_value=excluded.setting_value,
-                        note=excluded.note,
-                        updated_at=excluded.updated_at
-                """, (k, str(v), "V3.10 synchronized permanent security setting", now_text() if "now_text" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        conn.commit()
-        conn.close()
-    except Exception:
-        pass
+            cur.execute(f"""
+                INSERT INTO {table}(setting_key, setting_value, note, updated_at)
+                VALUES (?,?,?,?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (k, str(v), "V3.32 no-reset permanent security setting", now_text()))
+    conn.commit()
+    conn.close()
+
+    security_payload = {"version": "V3.32", "updated_at": now_text(), "security_settings": dict(merged)}
+    idle_payload = {"version": "V3.32", "updated_at": now_text(), "idle_timeout_minutes": idle, "note": "閒置自動登出分鐘數永久設定"}
+    for path in _v332_security_setting_paths():
+        try:
+            payload = idle_payload if "idle_timeout" in path.name else security_payload
+            _v332_atomic_write_json(path, payload)
+        except Exception:
+            pass
+    if st is not None:
+        try:
+            st.session_state["_spt_idle_timeout_cache"] = {"minutes": idle, "ts": 0}
+            st.session_state["spt_security_settings"] = dict(merged)
+        except Exception:
+            pass
+    clear_permission_runtime_cache()
     try:
-        from services.security_service import set_idle_timeout_minutes
-        set_idle_timeout_minutes(idle)
+        from services.db_service import mark_data_changed
+        mark_data_changed("安全設定已更新，請到 09｜資料永久保存與備份 上傳 GitHub。", "security_settings_saved_v332")
     except Exception:
         pass
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": idle, "ts": 0}
-        st.session_state["spt_security_settings"] = dict(merged)
-    except Exception:
-        pass
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-# ===== V3.10 PERMISSION SECURITY SETTINGS NO-RESET GUARD END =====

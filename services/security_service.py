@@ -42,7 +42,7 @@ IDLE_TIMEOUT_FILES = [
 ]
 
 PBKDF2_ITERATIONS = 180_000
-DEFAULT_IDLE_MINUTES = 1
+DEFAULT_IDLE_MINUTES = 15
 _PERMISSION_CACHE_TTL_SECONDS = 300
 _SECURITY_SCHEMA_READY = False
 
@@ -522,25 +522,7 @@ def _user_roles(username: str) -> list[str]:
     df = query_df("SELECT role_code FROM security_user_roles WHERE username=?", (username,))
     if df.empty:
         return []
-    return _dedupe_roles(df["role_code"].dropna().astype(str).tolist())
-
-
-def _dedupe_roles(roles: list[str] | tuple[str, ...] | str | None) -> list[str]:
-    """Normalize role list and remove stale duplicated runtime roles.
-
-    帳號主檔 auth_users.role_code 是唯一角色來源；security_user_roles 僅為舊版相容表。
-    顯示列不可再出現 admin, operator 這種殘留雙角色。
-    """
-    if roles is None:
-        return []
-    if isinstance(roles, str):
-        roles = roles.replace("，", ",").split(",")
-    out: list[str] = []
-    for role in roles:
-        r = str(role or "").strip()
-        if r and r not in out:
-            out.append(r)
-    return out
+    return df["role_code"].dropna().astype(str).tolist()
 
 
 def get_current_user() -> dict[str, Any] | None:
@@ -549,7 +531,7 @@ def get_current_user() -> dict[str, Any] | None:
     return {
         "username": st.session_state.get("auth_username", ""),
         "display_name": st.session_state.get("auth_display_name", ""),
-        "roles": _dedupe_roles(st.session_state.get("auth_roles", [])),
+        "roles": st.session_state.get("auth_roles", []),
     }
 
 
@@ -595,11 +577,9 @@ def _sync_auth_user_to_security_runtime(auth_row: dict[str, Any]) -> None:
             now,
             now,
         ))
-        role_code = str(auth_row.get("role_code", "") or "").strip() or "operator"
-        # auth_users.role_code is authoritative. Remove stale legacy roles first;
-        # otherwise the login bar may show admin, operator after module updates.
-        execute("DELETE FROM security_user_roles WHERE username=?", (username,))
-        execute("INSERT OR REPLACE INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
+        role_code = str(auth_row.get("role_code", "") or "").strip()
+        if role_code:
+            execute("INSERT OR IGNORE INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
     except Exception:
         pass
 
@@ -626,20 +606,17 @@ def authenticate(username: str, password: str) -> tuple[bool, str]:
     if auth_row:
         _sync_auth_user_to_security_runtime(auth_row)
 
-    # auth_users.role_code is the single source of truth.  Do not merge with
-    # stale security_user_roles; this prevents admin, operator dual-role residue.
+    roles = _user_roles(username)
+    # 若帳號來自 auth_users，角色存在 role_code，不一定已同步到 security_user_roles。
     auth_role = str(row.get("role_code", "") or "").strip()
-    if auth_row:
-        roles = [auth_role or "operator"]
-    else:
-        roles = _dedupe_roles(_user_roles(username))
+    if auth_role and auth_role not in roles:
+        roles.append(auth_role)
 
     st.session_state["auth_logged_in"] = True
     st.session_state["auth_username"] = username
     st.session_state["auth_display_name"] = row.get("display_name") or username
     st.session_state["auth_employee_id"] = row.get("employee_id") or ""
     st.session_state["auth_roles"] = roles
-    st.session_state["auth_force_password_change"] = bool(int(row.get("force_password_change", 0) or 0))
     clear_permission_cache(username)
     _load_permission_cache(username, roles, force=True)
     now_ts = time.time()
@@ -761,95 +738,6 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:
         return True
     return bool(row.get(action, False))
 
-
-
-def _is_force_password_change_required(username: str | None = None) -> bool:
-    """Return True when account must change password before entering modules."""
-    ensure_security_schema()
-    username = (username or st.session_state.get("auth_username", "") or "").strip()
-    if not username:
-        return False
-    try:
-        row = query_one("SELECT force_password_change FROM auth_users WHERE username=?", (username,))
-        if row is not None:
-            return bool(int(row.get("force_password_change", 0) or 0))
-    except Exception:
-        pass
-    try:
-        row = query_one("SELECT force_password_change FROM security_users WHERE username=?", (username,))
-        if row is not None:
-            return bool(int(row.get("force_password_change", 0) or 0))
-    except Exception:
-        pass
-    return bool(st.session_state.get("auth_force_password_change", False))
-
-
-def _apply_forced_password_change(username: str, new_password: str) -> None:
-    """Update password and clear force_password_change in both account stores."""
-    ensure_security_schema()
-    username = str(username or "").strip()
-    if not username:
-        raise ValueError("登入狀態已失效，請重新登入。")
-    if not new_password or len(str(new_password)) < 6:
-        raise ValueError("新密碼至少需要 6 個字元。")
-    if str(new_password).strip().lower() == username.lower():
-        raise ValueError("新密碼不可與帳號相同。")
-    now = _now()
-    password_hash = hash_password(str(new_password))
-    updated = 0
-    try:
-        execute("""
-            UPDATE auth_users
-            SET password_hash=?, force_password_change=0, updated_at=?
-            WHERE username=?
-        """, (password_hash, now, username))
-        updated += 1
-    except Exception:
-        pass
-    try:
-        execute("""
-            UPDATE security_users
-            SET password_hash=?, force_password_change=0, updated_at=?
-            WHERE username=?
-        """, (password_hash, now, username))
-        updated += 1
-    except Exception:
-        pass
-    if updated <= 0:
-        raise ValueError("找不到帳號資料，無法更新密碼。")
-    st.session_state["auth_force_password_change"] = False
-    clear_permission_cache(username)
-    log_security_event(username, "FORCE_PASSWORD_CHANGE", "SUCCESS", "使用者完成強制改密碼")
-
-
-def render_force_password_change_form() -> None:
-    """Block module access until user changes password."""
-    username = str(st.session_state.get("auth_username", "") or "").strip()
-    display_name = str(st.session_state.get("auth_display_name", "") or username).strip()
-    st.markdown(
-        """
-<div class="spt-card spt-glow" style="max-width:920px;margin:28px auto;padding:24px;">
-  <div style="font-size:28px;font-weight:1000;letter-spacing:.06em;color:#f4fbff;">⛨ 強制修改密碼 / Password Change Required</div>
-  <div style="margin-top:8px;color:#bfefff;font-weight:800;">管理員已要求此帳號更新密碼。完成後才可進入系統模組。</div>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-    with st.form("force_password_change_form", clear_on_submit=False):
-        st.caption(f"目前帳號 / Current Account：{display_name} ({username})")
-        p1 = st.text_input("新密碼 / New Password", type="password", placeholder="請輸入新密碼，至少 6 個字元")
-        p2 = st.text_input("確認新密碼 / Confirm New Password", type="password", placeholder="請再次輸入新密碼")
-        submitted = st.form_submit_button("套用新密碼並進入系統 / Apply Password and Continue", type="primary", use_container_width=True)
-    if submitted:
-        if p1 != p2:
-            st.error("兩次輸入的新密碼不一致。")
-            return
-        try:
-            _apply_forced_password_change(username, p1)
-            st.success("密碼已更新，正在重新載入系統。")
-            st.rerun()
-        except Exception as exc:
-            st.error(str(exc))
 
 def render_login_form() -> None:
     """Render a premium welcome login page without changing authentication logic."""
@@ -1271,7 +1159,7 @@ def render_user_bar(module_code: str = "") -> None:
     if not user:
         return
     render_idle_watchdog()
-    roles = ", ".join(_dedupe_roles(user.get("roles", []))) or "未設定角色"
+    roles = ", ".join(user.get("roles", [])) or "未設定角色"
     display_name = escape(str(user.get("display_name") or user.get("username") or ""))
     username = escape(str(user.get("username") or ""))
     role_text = escape(str(roles))
@@ -1310,9 +1198,6 @@ def require_login(module_code: str = "") -> None:
         render_login_form()
         st.stop()
     _check_idle_timeout()
-    if _is_force_password_change_required():
-        render_force_password_change_form()
-        st.stop()
     render_user_bar(module_code)
 
 
@@ -1912,14 +1797,108 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:  # typ
 # Company requirement: the built-in default idle logout is 1 minute.  Existing
 # permanent files are preserved unless they contain the old unmodified default 15.
 def _v243_seed_idle_timeout_one_minute() -> None:
+    # V3.32: Disabled.  This legacy startup seed was the real cause of
+    # 「Reboot App 後閒置自動登出又變成 1 分鐘」.
+    # It overwrote missing files and even user-saved 15-minute settings with 1.
+    # Security settings must only change when the user presses Apply in 10｜權限管理.
+    return None
+
+# V3.32: do not run any startup seed that changes user settings.
+
+
+# ===== V3.32 idle timeout no-reset final override =====
+def _v332_read_idle_timeout_from_files() -> int | None:
+    """Read the newest valid idle-timeout file without treating 15 as old default.
+
+    Earlier V2.43 logic changed 15 to 1 during import.  This final reader uses
+    all known permanent paths and picks the newest valid value, so stale files do
+    not override the latest user-applied setting.
+    """
+    candidates: list[tuple[float, int, str]] = []
+    for path in _v208_idle_timeout_paths():
+        try:
+            if not path.exists():
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            minutes = _v208_extract_idle_timeout(payload)
+            if minutes is None or int(minutes) < 1:
+                continue
+            candidates.append((float(path.stat().st_mtime), int(minutes), str(path)))
+        except Exception:
+            continue
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return int(candidates[0][1])
+
+
+def get_idle_timeout_minutes() -> int:  # type: ignore[override]
+    """V3.32: Final no-reset source-of-truth reader for idle auto logout minutes."""
     try:
-        minutes = _v208_read_idle_timeout_from_files()
-        if minutes in (None, 15):
-            set_idle_timeout_minutes(1)
+        cache = st.session_state.get("_spt_idle_timeout_cache")
+        if cache:
+            minutes = int(float(cache.get("minutes", 0)))
+            if minutes >= 1:
+                return minutes
     except Exception:
         pass
 
-try:
-    _v243_seed_idle_timeout_one_minute()
-except Exception:
-    pass
+    minutes = _v332_read_idle_timeout_from_files()
+    if minutes is None:
+        try:
+            ensure_security_schema()
+            db_candidates: list[int] = []
+            for table in ("auth_security_settings", "security_settings"):
+                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
+                if row and row.get("setting_value") not in (None, ""):
+                    val = int(float(row.get("setting_value")))
+                    if val >= 1:
+                        db_candidates.append(val)
+            if db_candidates:
+                minutes = db_candidates[0]
+        except Exception:
+            minutes = None
+    if minutes is None:
+        minutes = DEFAULT_IDLE_MINUTES
+    minutes = max(1, int(minutes))
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+    except Exception:
+        pass
+    return minutes
+
+
+def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
+    """V3.32: Save idle timeout to DB + all permanent JSON paths, without startup reset."""
+    minutes = max(1, int(minutes))
+    try:
+        ensure_security_schema()
+        for table in ("auth_security_settings", "security_settings"):
+            execute(f"""
+                CREATE TABLE IF NOT EXISTS {table} (
+                    setting_key TEXT PRIMARY KEY,
+                    setting_value TEXT,
+                    note TEXT,
+                    updated_at TEXT
+                )
+            """)
+            execute(f"""
+                INSERT INTO {table} (setting_key, setting_value, note, updated_at)
+                VALUES ('idle_timeout_minutes', ?, '閒置多久自動登出，單位分鐘', ?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (str(minutes), _now()))
+    except Exception:
+        pass
+    _v208_write_idle_timeout_files(minutes)
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+        settings = st.session_state.get("spt_security_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        settings["idle_timeout_minutes"] = str(minutes)
+        st.session_state["spt_security_settings"] = settings
+    except Exception:
+        pass
