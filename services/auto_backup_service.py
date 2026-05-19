@@ -129,6 +129,11 @@ def save_backup_schedule(cfg: dict[str, Any]) -> dict[str, Any]:
         out["keep_days"] = 30
     out["last_updated_at"] = _now_text()
     _json_dump(SCHEDULE_CONFIG_PATH, out)
+    try:
+        from services.settings_durability_service import upload_critical_settings_to_github
+        out["github_sync"] = upload_critical_settings_to_github(archive=False, source="auto_backup_schedule_saved")
+    except Exception as exc:
+        out["github_sync"] = {"ok": False, "skipped": True, "message": str(exc)}
     return out
 
 
@@ -138,6 +143,11 @@ def load_backup_state() -> dict[str, Any]:
 
 def save_backup_state(state: dict[str, Any]) -> None:
     _json_dump(STATE_PATH, state or {})
+    try:
+        from services.settings_durability_service import upload_critical_settings_to_github
+        upload_critical_settings_to_github(archive=False, source="auto_backup_state_saved")
+    except Exception:
+        pass
 
 
 def _normalize_time(value: str) -> str:
@@ -655,6 +665,11 @@ def save_backup_schedule(cfg: dict[str, Any]) -> dict[str, Any]:  # type: ignore
         out["keep_days"] = 30
     out["last_updated_at"] = _now_text()
     _json_dump(SCHEDULE_CONFIG_PATH, out)
+    try:
+        from services.settings_durability_service import upload_critical_settings_to_github
+        out["github_sync"] = upload_critical_settings_to_github(archive=False, source="auto_backup_schedule_saved")
+    except Exception as exc:
+        out["github_sync"] = {"ok": False, "skipped": True, "message": str(exc)}
     return out
 
 
