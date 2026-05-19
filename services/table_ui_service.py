@@ -1083,3 +1083,167 @@ def _try_upload_table_ui_permanent_files(reason: str) -> None:  # type: ignore[o
                 upload_file_to_github(local, remote, f"SPT table UI settings V352 {reason} {stamp}")
     except Exception:
         pass
+
+# ===== V3.60 unified table persistence core =====
+# 架構級修正：render_table / 欄寬 / 欄位順序統一使用 services.table_persistence_service。
+# 載入時只讀本機 JSON，不掃 history、不 GitHub 上傳；使用者修改設定時才寫入唯一主檔與舊格式鏡像。
+
+def _v360_key(table_key: str) -> str:
+    try:
+        from services.table_persistence_service import canonical_table_key
+        return canonical_table_key(table_key)
+    except Exception:
+        return str(table_key or "")
+
+
+def restore_table_ui_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    try:
+        from services.table_persistence_service import migrate_legacy_table_settings_to_master, load_table_settings
+        mig = migrate_legacy_table_settings_to_master(write=True)
+        _v346_ensure_table_ui_schema_basic()
+        restored = 0
+        # 同步 V360 主設定到 SQLite 快取，讓舊查詢/健康檢查仍可看到資料。
+        from services.persistence_core_service import load_master_settings
+        master = load_master_settings()
+        table_settings = master.get("table_settings") if isinstance(master.get("table_settings"), dict) else {}
+        if force:
+            try:
+                execute("DELETE FROM table_ui_settings")
+            except Exception:
+                pass
+        for raw_key in table_settings.keys():
+            key = _v360_key(raw_key)
+            data = load_table_settings(key)
+            widths = data.get("widths", {}) if isinstance(data, dict) else {}
+            order = data.get("order", []) if isinstance(data, dict) else []
+            if not widths and not order:
+                continue
+            execute(
+                """
+                INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+                VALUES (?, ?, ?, datetime('now','localtime'))
+                ON CONFLICT(table_key) DO UPDATE SET
+                    widths_json=excluded.widths_json,
+                    order_json=excluded.order_json,
+                    updated_at=excluded.updated_at
+                """,
+                (key, json.dumps(widths, ensure_ascii=False), json.dumps(order, ensure_ascii=False)),
+            )
+            try:
+                st.session_state.pop(f"_spt_width_cache_{key}", None)
+            except Exception:
+                pass
+            restored += 1
+        return {"ok": True, "mode": "v360_unified", "restored": restored, "migration": mig}
+    except Exception as exc:
+        return {"ok": False, "mode": "v360_unified", "error": str(exc)}
+
+
+def ensure_table_ui_schema() -> None:  # type: ignore[override]
+    global _TABLE_UI_SCHEMA_READY, _TABLE_UI_RESTORED_ONCE
+    if _TABLE_UI_SCHEMA_READY:
+        return
+    _v346_ensure_table_ui_schema_basic()
+    _TABLE_UI_SCHEMA_READY = True
+    if not _TABLE_UI_RESTORED_ONCE:
+        _TABLE_UI_RESTORED_ONCE = True
+        try:
+            restore_table_ui_settings_from_permanent(force=False)
+        except Exception:
+            pass
+
+
+def load_widths(table_key: str) -> dict[str, int]:  # type: ignore[override]
+    ensure_table_ui_schema()
+    key = _v360_key(table_key)
+    try:
+        from services.table_persistence_service import load_table_settings
+        return dict(load_table_settings(key).get("widths", {}) or {})
+    except Exception:
+        row = query_one("SELECT widths_json FROM table_ui_settings WHERE table_key=?", (key,))
+        try:
+            return json.loads(row.get("widths_json") or "{}") if row else {}
+        except Exception:
+            return {}
+
+
+def save_widths(table_key: str, widths: dict[str, int]) -> None:  # type: ignore[override]
+    ensure_table_ui_schema()
+    key = _v360_key(table_key)
+    try:
+        from services.table_persistence_service import save_table_settings
+        save_table_settings(key, widths=widths, reason="v360_save_widths")
+    except Exception:
+        pass
+    # SQLite 僅作快取/相容。
+    try:
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, updated_at)
+            VALUES (?, ?, datetime('now','localtime'))
+            ON CONFLICT(table_key) DO UPDATE SET widths_json=excluded.widths_json, updated_at=excluded.updated_at
+            """,
+            (key, json.dumps(widths or {}, ensure_ascii=False)),
+        )
+    except Exception:
+        pass
+
+
+def load_column_order(table_key: str) -> list[str]:  # type: ignore[override]
+    ensure_table_ui_schema()
+    key = _v360_key(table_key)
+    try:
+        from services.table_persistence_service import load_table_settings
+        data = load_table_settings(key).get("order", [])
+        return [str(x) for x in data if str(x)] if isinstance(data, list) else []
+    except Exception:
+        row = query_one("SELECT order_json FROM table_ui_settings WHERE table_key=?", (key,))
+        try:
+            data = json.loads(row.get("order_json") or "[]") if row else []
+            return [str(x) for x in data if str(x)] if isinstance(data, list) else []
+        except Exception:
+            return []
+
+
+def save_column_order(table_key: str, order: Iterable[str]) -> None:  # type: ignore[override]
+    ensure_table_ui_schema()
+    key = _v360_key(table_key)
+    cols = [str(c) for c in order if str(c)]
+    try:
+        from services.table_persistence_service import save_table_settings
+        save_table_settings(key, order=cols, reason="v360_save_column_order")
+    except Exception:
+        pass
+    try:
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, order_json, updated_at)
+            VALUES (?, ?, datetime('now','localtime'))
+            ON CONFLICT(table_key) DO UPDATE SET order_json=excluded.order_json, updated_at=excluded.updated_at
+            """,
+            (key, json.dumps(cols, ensure_ascii=False)),
+        )
+    except Exception:
+        pass
+
+
+def apply_column_order(table_key: str, df: pd.DataFrame) -> pd.DataFrame:  # type: ignore[override]
+    if df is None or df.empty:
+        return df
+    key = _v360_key(table_key)
+    order = load_column_order(key)
+    if not order:
+        return df
+    ordered = [c for c in order if c in df.columns]
+    rest = [c for c in df.columns if c not in ordered]
+    return df[ordered + rest] if ordered else df
+
+
+def export_table_ui_settings_permanent(reason: str = "table_ui_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    try:
+        from services.table_persistence_service import mirror_legacy_table_ui_settings, migrate_legacy_table_settings_to_master
+        mig = migrate_legacy_table_settings_to_master(write=True)
+        mirror_legacy_table_ui_settings()
+        return {"ok": True, "mode": "v360_unified", "reason": reason, "migration": mig}
+    except Exception as exc:
+        return {"ok": False, "mode": "v360_unified", "error": str(exc), "reason": reason}

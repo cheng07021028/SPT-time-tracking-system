@@ -1288,3 +1288,231 @@ def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[D
     if applied:
         table_setting = _get_table_setting(table_id, [str(c) for c in df.columns])
     return table_setting, applied
+
+# ===== V3.60 unified column settings persistence core =====
+# 01 使用 table_ui_service，不再重複套用全域欄位設定；10/13 直接 st.data_editor/st.dataframe 仍由本服務處理。
+# 所有設定統一保存到 V360 master JSON，並同步舊格式鏡像；載入不寫檔、不掃 history、不自動上傳 GitHub。
+
+def _canonical_table_id(table_id: str) -> str:  # type: ignore[override]
+    try:
+        from services.table_persistence_service import canonical_table_key
+        return canonical_table_key(table_id)
+    except Exception:
+        raw = str(table_id or "")
+        raw = re.sub(r"v171_account_password_editor_\d+", "v171_account_password_editor", raw)
+        raw = re.sub(r"v189_permission_editor_\d+", "v189_permission_editor", raw)
+        return raw
+
+
+def _stable_table_id(df: pd.DataFrame, key: Any = None, kind: str = "table") -> str:  # type: ignore[override]
+    try:
+        from services.table_persistence_service import canonical_table_key
+        if key:
+            return canonical_table_key(str(key), kind=kind)
+        page = _current_page_name()
+        callsite = _callsite_signature()
+        cols = "|".join([str(c) for c in df.columns])[:180]
+        return canonical_table_key(f"{page}::{callsite}::{kind}::{abs(hash(cols))}", kind=kind)
+    except Exception:
+        if key:
+            return str(key)
+        return f"{_current_page_name()}::{kind}"
+
+
+def load_settings() -> Dict[str, Any]:  # type: ignore[override]
+    try:
+        from services.table_persistence_service import load_column_settings, migrate_legacy_table_settings_to_master
+        migrate_legacy_table_settings_to_master(write=True)
+        data = load_column_settings()
+        return dict(data or {})
+    except Exception:
+        return {}
+
+
+def save_settings(settings: Dict[str, Any], *, upload: bool = False) -> None:  # type: ignore[override]
+    try:
+        from services.table_persistence_service import save_column_settings
+        normalized: Dict[str, Any] = {}
+        for k, v in dict(settings or {}).items():
+            ck = _canonical_table_id(str(k))
+            if isinstance(v, dict):
+                normalized[ck] = v
+        current = load_settings()
+        if current == normalized:
+            return
+        save_column_settings(normalized, reason="v360_column_settings_saved")
+    except Exception:
+        # Last-resort local write, no GitHub/no history.
+        try:
+            _ensure_state_dir()
+            normalized = {(_canonical_table_id(k)): v for k, v in dict(settings or {}).items() if isinstance(v, dict)}
+            tmp = SETTINGS_PATH.with_suffix(SETTINGS_PATH.suffix + ".tmp")
+            tmp.write_text(json.dumps(normalized, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            json.loads(tmp.read_text(encoding="utf-8"))
+            tmp.replace(SETTINGS_PATH)
+        except Exception:
+            pass
+
+
+def _get_table_setting(table_id: str, columns: Iterable[str]) -> Dict[str, Any]:  # type: ignore[override]
+    stable_id = _canonical_table_id(table_id)
+    all_settings = load_settings()
+    table_setting = all_settings.get(stable_id) or all_settings.get(table_id) or {}
+    if not isinstance(table_setting, dict):
+        table_setting = {}
+    col_settings = dict(table_setting.get("columns", {}) if isinstance(table_setting.get("columns", {}), dict) else {})
+    for idx, col in enumerate(columns):
+        c = str(col)
+        if c not in col_settings:
+            meta = _default_column_setting(c)
+            meta["order"] = idx
+            col_settings[c] = meta
+    # 10 帳號清單：刪除欄位必須永遠可見且排第一，避免再次消失。
+    if stable_id == "10.permissions.account_master":
+        for delete_col in ["刪除 / Delete", "delete", "刪除"]:
+            if delete_col in col_settings:
+                col_settings[delete_col]["visible"] = True
+                col_settings[delete_col]["order"] = -999
+    out = dict(table_setting)
+    out["columns"] = col_settings
+    return out
+
+
+def _save_table_setting(table_id: str, table_setting: Dict[str, Any]) -> None:  # type: ignore[override]
+    stable_id = _canonical_table_id(table_id)
+    all_settings = load_settings()
+    all_settings[stable_id] = table_setting
+    save_settings(all_settings, upload=False)
+
+
+def _visible_order(df: pd.DataFrame, table_setting: Dict[str, Any], editable: bool) -> List[str]:  # type: ignore[override]
+    col_settings = table_setting.get("columns", {}) if isinstance(table_setting.get("columns"), dict) else {}
+    rows = []
+    source_cols = [str(c) for c in df.columns]
+    for idx, col in enumerate(df.columns):
+        key = str(col)
+        meta = col_settings.get(key, _default_column_setting(key))
+        visible = bool(meta.get("visible", True))
+        # 任何刪除欄位都強制保留，避免帳號刪除方框消失。
+        if key in {"刪除 / Delete", "刪除", "delete"}:
+            visible = True
+            order = -999
+        else:
+            try:
+                order = int(meta.get("order", idx))
+            except Exception:
+                order = idx
+        rows.append((order, key, visible))
+    rows.sort(key=lambda x: (x[0], x[1]))
+    visible_cols = [key for _, key, visible in rows if visible and key in source_cols]
+    if not visible_cols:
+        visible_cols = source_cols
+    lookup = {str(c): c for c in df.columns}
+    return [lookup[c] for c in visible_cols if c in lookup]
+
+
+def _settings_editor(table_id: str, df: pd.DataFrame, editable: bool) -> Tuple[Dict[str, Any], bool]:  # type: ignore[override]
+    """V360: stable-key settings editor; skip duplicate UI for table_ui_service.render_table()."""
+    stable_id = _canonical_table_id(table_id)
+    table_setting = _get_table_setting(stable_id, [str(c) for c in df.columns])
+    if _v352_called_from_table_ui_service():
+        return table_setting, False
+
+    col_settings = table_setting.get("columns", {})
+    with st.expander("欄位設定 / Column Settings（永久保存）", expanded=False):
+        st.caption("V360：欄位顯示、順序、欄寬與標題統一保存到唯一永久設定主檔；Reboot App 後會先讀永久設定，不再讀回預設。")
+        rows = []
+        for idx, col in enumerate(df.columns):
+            key = str(col)
+            meta = col_settings.get(key, _default_column_setting(key))
+            rows.append({
+                "顯示 / Visible": True if key in {"刪除 / Delete", "刪除", "delete"} else bool(meta.get("visible", True)),
+                "欄位 / Column": key,
+                "標題 / Header": meta.get("label") or COLUMN_LABELS.get(key, f"{key} / {key}"),
+                "順序 / Order": -999 if key in {"刪除 / Delete", "刪除", "delete"} else int(meta.get("order", idx)),
+                "欄寬 / Width": meta.get("width", "medium"),
+            })
+        cfg_df = pd.DataFrame(rows)
+        _editor_func = _ORIGINAL_DATA_EDITOR or st.data_editor
+        edited_cfg = _editor_func(
+            cfg_df,
+            key=f"column_setting_editor::{_safe_widget_suffix(stable_id)}",
+            use_container_width=True,
+            hide_index=True,
+            height=360,
+            num_rows="fixed",
+            column_config={
+                "顯示 / Visible": st.column_config.CheckboxColumn("顯示 / Visible"),
+                "欄位 / Column": st.column_config.TextColumn("欄位 / Column", disabled=True),
+                "標題 / Header": st.column_config.TextColumn("標題 / Header"),
+                "順序 / Order": st.column_config.NumberColumn("順序 / Order", min_value=-999, step=1),
+                "欄寬 / Width": st.column_config.SelectboxColumn("欄寬 / Width", options=list(WIDTH_OPTIONS.values())),
+            },
+        )
+        st.markdown("#### 欄位順序快速設定 / Column Order")
+        current_order = sorted(
+            [str(c) for c in df.columns],
+            key=lambda x: int(col_settings.get(x, _default_column_setting(x)).get("order", 999)),
+        )
+        # 刪除欄永遠放第一。
+        delete_first = [x for x in current_order if x in {"刪除 / Delete", "刪除", "delete"}]
+        rest = [x for x in current_order if x not in set(delete_first)]
+        current_order = delete_first + rest
+        order_text = st.text_area(
+            "欄位順序 / Column order（每行一個欄位；可剪下貼上調整順序，會自動永久保存）",
+            value="\n".join(current_order),
+            key=f"column_order_text::{_safe_widget_suffix(stable_id)}",
+            height=420,
+            help="每行一個欄位名稱。",
+        )
+        st.caption(f"表格ID：{stable_id}")
+
+    new_cols = {}
+    try:
+        for _, row in edited_cfg.iterrows():
+            key = str(row.get("欄位 / Column", "")).strip()
+            if not key:
+                continue
+            visible = bool(row.get("顯示 / Visible", True))
+            order_val = int(row.get("順序 / Order", 999))
+            if key in {"刪除 / Delete", "刪除", "delete"}:
+                visible = True
+                order_val = -999
+            new_cols[key] = {
+                "source": key,
+                "label": str(row.get("標題 / Header") or key),
+                "visible": visible,
+                "width": str(row.get("欄寬 / Width") or "medium"),
+                "order": order_val,
+            }
+        text_order = [x.strip() for x in str(order_text).splitlines() if x.strip()]
+        used = set()
+        order_no = 0
+        for key in text_order:
+            if key in new_cols and key not in used:
+                if key in {"刪除 / Delete", "刪除", "delete"}:
+                    new_cols[key]["order"] = -999
+                    new_cols[key]["visible"] = True
+                else:
+                    new_cols[key]["order"] = order_no
+                    order_no += 1
+                used.add(key)
+        for key in new_cols:
+            if key not in used:
+                if key in {"刪除 / Delete", "刪除", "delete"}:
+                    new_cols[key]["order"] = -999
+                    new_cols[key]["visible"] = True
+                else:
+                    new_cols[key]["order"] = order_no
+                    order_no += 1
+    except Exception:
+        new_cols = dict(col_settings)
+
+    applied = False
+    if new_cols and new_cols != table_setting.get("columns", {}):
+        table_setting["columns"] = new_cols
+        _save_table_setting(stable_id, table_setting)
+        applied = True
+    if applied:
+        table_setting = _get_table_setting(stable_id, [str(c) for c in df.columns])
+    return table_setting, applied

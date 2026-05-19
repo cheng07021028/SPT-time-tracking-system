@@ -94,3 +94,16 @@ def restore_core_modules_from_local_permanent() -> dict[str, Any]:
         result["ok"] = False
         result["modules"]["12_module_persistence"] = {"ok": False, "error": str(exc)}
     return result
+
+# ===== V3.60 local persistence bootstrap extension =====
+_prev_restore_core_modules_from_local_permanent_v360 = restore_core_modules_from_local_permanent
+
+def restore_core_modules_from_local_permanent() -> dict[str, Any]:  # type: ignore[override]
+    result = _prev_restore_core_modules_from_local_permanent_v360()
+    try:
+        from services.persistence_core_service import bootstrap_persistent_state_once
+        result.setdefault("modules", {})["v360_persistence_core"] = bootstrap_persistent_state_once()
+    except Exception as exc:
+        result["ok"] = False
+        result.setdefault("modules", {})["v360_persistence_core"] = {"ok": False, "error": str(exc)}
+    return result
