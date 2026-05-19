@@ -2753,3 +2753,381 @@ def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[overr
 
 # Backward compatible alias after final override.
 check_permission = has_permission
+
+# ===== V3.73 FINAL DIRECT-LATEST PERMISSION PATCH START =====
+# Purpose: make 10｜權限管理 behave like 03｜製令管理 / 04｜人員名單.
+# Rule:
+#   1. Save/delete writes one fixed latest JSON directly.
+#   2. Reboot/page load restores from the fixed latest JSON only when DB is empty/default-only.
+#   3. No history scan, no GitHub, no previous layered save/delete wrappers.
+_V373_PERMISSION_LATEST_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json"
+_V373_PERMISSION_COMPAT_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
+_V373_PERMISSION_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_settings.json"
+_V373_PERMISSION_RESTORE_KEY = "_v373_permission_latest_restored"
+
+
+def _v373_p_read_json(path: Path) -> dict:
+    try:
+        if path.exists() and path.is_file() and path.stat().st_size > 2:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _v373_p_atomic_write(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v373_p_latest_payload() -> dict:
+    # Fixed latest is authoritative. Compat/state are only migration fallback when latest is absent.
+    for path in [_V373_PERMISSION_LATEST_FILE, _V373_PERMISSION_COMPAT_FILE, _V373_PERMISSION_STATE_FILE]:
+        data = _v373_p_read_json(path)
+        tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
+        if isinstance(tables, dict) and isinstance(tables.get("auth_users"), list):
+            return data
+    return {}
+
+
+def _v373_p_schema_only() -> None:
+    try:
+        _v372_permission_schema_only()  # type: ignore[name-defined]
+        return
+    except Exception:
+        pass
+    try:
+        if _v372_schema_init_only is not None:  # type: ignore[name-defined]
+            _v372_schema_init_only(force=False)  # type: ignore[misc]
+    except TypeError:
+        try:
+            _v372_schema_init_only()  # type: ignore[name-defined,misc]
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def _v373_bool(v: Any, default: bool = False) -> int:
+    try:
+        return int(_truthy(v, default))  # type: ignore[name-defined]
+    except Exception:
+        if isinstance(v, str):
+            s = v.strip().lower()
+            if s in {"1", "true", "yes", "y", "on", "啟用", "是", "v", "✓"}:
+                return 1
+            if s in {"0", "false", "no", "n", "off", "停用", "否", ""}:
+                return 0
+        return 1 if bool(v) else 0
+
+
+def _v373_fetch_table(conn: sqlite3.Connection, table: str) -> list[dict]:
+    try:
+        rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+
+def _v373_auth_users_state() -> tuple[int, bool]:
+    """Return (count, default_only). default_only means DB was probably just seeded by app defaults."""
+    _v373_p_schema_only()
+    conn = connect_db()
+    try:
+        rows = conn.execute("SELECT username, role_code FROM auth_users").fetchall()
+        users = [str(r["username"] or "").strip().lower() for r in rows]
+        roles = {str(r["username"] or "").strip().lower(): str(r["role_code"] or "").strip().lower() for r in rows}
+        count = len(users)
+        default_only = (count == 0) or (count == 1 and users[0] == "admin" and roles.get("admin") == "admin")
+        return count, default_only
+    except Exception:
+        return 0, True
+    finally:
+        conn.close()
+
+
+def _v373_replace_table(cur: sqlite3.Cursor, table: str, rows: list[dict]) -> int:
+    try:
+        cur.execute(f'DELETE FROM "{table}"')
+    except Exception:
+        return 0
+    count = 0
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        clean = {str(k): v for k, v in row.items() if str(k).strip()}
+        if not clean:
+            continue
+        cols = list(clean.keys())
+        placeholders = ",".join(["?"] * len(cols))
+        col_sql = ",".join([f'"{c}"' for c in cols])
+        try:
+            cur.execute(f'INSERT INTO "{table}" ({col_sql}) VALUES ({placeholders})', [clean[c] for c in cols])
+            count += 1
+        except Exception:
+            continue
+    return count
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    _v373_p_schema_only()
+    payload = _v373_p_latest_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    if not isinstance(tables, dict) or not isinstance(tables.get("auth_users"), list):
+        return {"ok": False, "mode": "v373_direct_latest_like_03_04", "message": "no fixed latest permission file"}
+    if not force:
+        _, default_only = _v373_auth_users_state()
+        if not default_only:
+            return {"ok": True, "mode": "v373_direct_latest_like_03_04", "skipped": True, "reason": "db_not_empty_like_03_04"}
+    conn = connect_db(); cur = conn.cursor()
+    restored: dict[str, int] = {}
+    try:
+        try:
+            _ensure_legacy_security_tables(cur)
+            _ensure_security_setting_tables(cur)
+        except Exception:
+            pass
+        for table in ["auth_users", "auth_account_permissions", "auth_security_settings", "security_users", "security_user_roles", "security_settings"]:
+            rows = tables.get(table, []) if isinstance(tables.get(table), list) else []
+            restored[table] = _v373_replace_table(cur, table, rows)
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    clear_permission_runtime_cache()
+    if st is not None:
+        try:
+            st.session_state[_V373_PERMISSION_RESTORE_KEY] = True
+        except Exception:
+            pass
+    return {"ok": True, "mode": "v373_direct_latest_like_03_04", "source": str(_V373_PERMISSION_LATEST_FILE), "restored": restored}
+
+
+def _v373_restore_permission_once_if_needed() -> None:
+    if st is not None:
+        try:
+            if st.session_state.get(_V373_PERMISSION_RESTORE_KEY):
+                return
+        except Exception:
+            pass
+    # Same spirit as 03/04: rescue DB only when it is empty/default-only.
+    restore_permission_settings_from_permanent_files(force=False)
+    if st is not None:
+        try:
+            st.session_state[_V373_PERMISSION_RESTORE_KEY] = True
+        except Exception:
+            pass
+
+
+def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
+    _v373_p_schema_only()
+    if force:
+        restore_permission_settings_from_permanent_files(force=True)
+
+
+init_auth_tables = init_permission_tables
+
+
+def _v373_permission_payload_from_db(reason: str = "permission_settings_saved") -> dict:
+    _v373_p_schema_only()
+    conn = connect_db()
+    try:
+        tables = {
+            "auth_users": _v373_fetch_table(conn, "auth_users"),
+            "auth_account_permissions": _v373_fetch_table(conn, "auth_account_permissions"),
+            "auth_security_settings": _v373_fetch_table(conn, "auth_security_settings"),
+            "security_users": _v373_fetch_table(conn, "security_users"),
+            "security_user_roles": _v373_fetch_table(conn, "security_user_roles"),
+            "security_settings": _v373_fetch_table(conn, "security_settings"),
+        }
+    finally:
+        conn.close()
+    return {
+        "version": "V3.73-direct-latest-like-03-04-final",
+        "exported_at": now_text(),
+        "reason": reason,
+        "module_key": "10_permissions",
+        "module_code": "10_permissions",
+        "module_name_zh": "權限管理",
+        "module_name_en": "Permission Management",
+        "source": "permission_service_v373",
+        "description": "10 權限管理：比照 03/04，儲存寫固定 latest JSON；Reboot 僅在 DB 空白/預設時讀同一 latest JSON。",
+        "tables": tables,
+        "table_counts": {k: len(v) for k, v in tables.items()},
+        "counts": {k: len(v) for k, v in tables.items()},
+    }
+
+
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
+    payload = _v373_permission_payload_from_db(reason)
+    for path in [_V373_PERMISSION_LATEST_FILE, _V373_PERMISSION_COMPAT_FILE, _V373_PERMISSION_STATE_FILE]:
+        _v373_p_atomic_write(path, payload)
+    clear_permission_runtime_cache()
+    return {"ok": True, "mode": "v373_direct_latest_like_03_04_final", "files": [str(_V373_PERMISSION_LATEST_FILE), str(_V373_PERMISSION_COMPAT_FILE), str(_V373_PERMISSION_STATE_FILE)], "table_counts": payload.get("table_counts", {})}
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    _v373_restore_permission_once_if_needed()
+    conn = connect_db()
+    try:
+        rows = conn.execute("""
+            SELECT id, username,
+                   '********' AS password_display,
+                   '' AS new_password,
+                   employee_id, display_name, email, role_code,
+                   is_active, force_password_change, last_login_at, note, created_at, updated_at
+            FROM auth_users
+            ORDER BY username
+        """).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
+    _v373_p_schema_only()
+    input_rows = list(rows or [])
+    conn = connect_db(); cur = conn.cursor()
+    saved = 0; skipped: list[str] = []; role_sync_users: list[str] = []; saved_usernames: list[str] = []
+    try:
+        for r in input_rows:
+            if not isinstance(r, dict):
+                continue
+            username = str(r.get("username", "")).strip()
+            if not username:
+                continue
+            display_name = str(r.get("display_name", "")).strip() or username
+            role_code = str(r.get("role_code", "operator")).strip() or "operator"
+            new_password = str(r.get("new_password", "")).strip()
+            exists = cur.execute("SELECT username, role_code FROM auth_users WHERE username=?", (username,)).fetchone()
+            if exists:
+                old_role = str(exists["role_code"] or "operator").strip() or "operator"
+                cur.execute("""
+                    UPDATE auth_users
+                    SET employee_id=?, display_name=?, email=?, role_code=?, is_active=?,
+                        force_password_change=?, note=?, updated_at=?
+                    WHERE username=?
+                """, (
+                    str(r.get("employee_id", "")).strip(), display_name, str(r.get("email", "")).strip(),
+                    role_code, _v373_bool(r.get("is_active", True), True), _v373_bool(r.get("force_password_change", False), False),
+                    str(r.get("note", "")).strip(), now_text(), username,
+                ))
+                if new_password:
+                    cur.execute("UPDATE auth_users SET password_hash=?, updated_at=? WHERE username=?", (hash_password(new_password), now_text(), username))
+                if old_role != role_code:
+                    role_sync_users.append(username)
+            else:
+                if not new_password:
+                    skipped.append(f"{username} 未設定新密碼 / new password required")
+                    continue
+                cur.execute("""
+                    INSERT INTO auth_users
+                    (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,note,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                """, (
+                    username, hash_password(new_password), "由權限管理頁建立", str(r.get("employee_id", "")).strip(),
+                    display_name, str(r.get("email", "")).strip(), role_code, _v373_bool(r.get("is_active", True), True),
+                    _v373_bool(r.get("force_password_change", False), False), str(r.get("note", "")).strip(), now_text(), now_text(),
+                ))
+                role_sync_users.append(username)
+            saved += 1
+            saved_usernames.append(username)
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        ensure_permissions_for_all_users(force=True)
+        if role_sync_users:
+            sync_user_permissions_from_roles(role_sync_users, reason="account_role_changed")
+        sync_auth_users_to_runtime_security(saved_usernames)
+    except Exception:
+        pass
+    clear_permission_runtime_cache()
+    export_result = export_permission_settings_permanently("auth_users_saved_v373")
+    return {"saved": saved, "skipped": skipped, "role_synced_users": sorted(set(role_sync_users)), "permanent_save": export_result}
+
+
+def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
+    _v373_p_schema_only()
+    targets = [str(u).strip() for u in (usernames or []) if str(u).strip() and str(u).strip().lower() != "admin"]
+    if not targets:
+        return 0
+    conn = connect_db(); cur = conn.cursor(); deleted = 0
+    try:
+        try:
+            _ensure_legacy_security_tables(cur)
+        except Exception:
+            pass
+        for u in targets:
+            cur.execute("DELETE FROM auth_account_permissions WHERE username=?", (u,))
+            cur.execute("DELETE FROM auth_users WHERE username=?", (u,))
+            deleted += max(int(cur.rowcount or 0), 0)
+            try:
+                cur.execute("DELETE FROM security_user_roles WHERE username=?", (u,))
+                cur.execute("DELETE FROM security_users WHERE username=?", (u,))
+            except Exception:
+                pass
+        conn.commit()
+    finally:
+        conn.close()
+    clear_permission_runtime_cache()
+    if deleted:
+        export_permission_settings_permanently("auth_users_deleted_v373")
+    return deleted
+
+
+def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
+    _v373_p_schema_only()
+    count = 0
+    conn = connect_db(); cur = conn.cursor()
+    try:
+        for r in rows or []:
+            if not isinstance(r, dict):
+                continue
+            username = str(r.get("username", "")).strip()
+            module_code = str(r.get("module_code", "")).strip()
+            if not username or not module_code:
+                continue
+            vals = {
+                "can_view": _v373_bool(r.get("can_view", False)),
+                "can_create": _v373_bool(r.get("can_create", False)),
+                "can_edit": _v373_bool(r.get("can_edit", False)),
+                "can_delete": _v373_bool(r.get("can_delete", False)),
+                "can_import": _v373_bool(r.get("can_import", False)),
+                "can_export": _v373_bool(r.get("can_export", False)),
+                "can_backup": _v373_bool(r.get("can_backup", False)),
+                "can_restore": _v373_bool(r.get("can_restore", False)),
+                "can_manage": _v373_bool(r.get("can_manage", False)),
+            }
+            cur.execute("""
+                INSERT INTO auth_account_permissions
+                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(username,module_code) DO UPDATE SET
+                    module_name_zh=excluded.module_name_zh, module_name_en=excluded.module_name_en,
+                    can_view=excluded.can_view, can_create=excluded.can_create, can_edit=excluded.can_edit,
+                    can_delete=excluded.can_delete, can_import=excluded.can_import, can_export=excluded.can_export,
+                    can_backup=excluded.can_backup, can_restore=excluded.can_restore, can_manage=excluded.can_manage,
+                    updated_at=excluded.updated_at
+            """, (
+                username, module_code, str(r.get("module_name_zh", "")).strip(), str(r.get("module_name_en", "")).strip(),
+                vals["can_view"], vals["can_create"], vals["can_edit"], vals["can_delete"], vals["can_import"], vals["can_export"],
+                vals["can_backup"], vals["can_restore"], vals["can_manage"], now_text(),
+            ))
+            count += 1
+        conn.commit()
+    finally:
+        conn.close()
+    clear_permission_runtime_cache()
+    export_permission_settings_permanently("account_permissions_saved_v373")
+    return count
+
+check_permission = has_permission
+# ===== V3.73 FINAL DIRECT-LATEST PERMISSION PATCH END =====

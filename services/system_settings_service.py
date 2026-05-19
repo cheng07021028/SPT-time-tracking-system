@@ -2434,3 +2434,448 @@ def ensure_system_settings_schema() -> None:  # type: ignore[override]
             pass
     _clear_settings_cache()
     _SYSTEM_SETTINGS_SCHEMA_READY = True
+
+# ===== V3.73 FINAL DIRECT-LATEST SYSTEM SETTINGS PATCH START =====
+# Purpose: make 13｜系統設定 behave like 03｜製令管理 / 04｜人員名單.
+# Rule:
+#   1. Save/delete writes one fixed latest JSON directly.
+#   2. Reboot/page load restores from the fixed latest JSON only when DB is empty.
+#   3. No history scan, no "larger file wins", no load-time overwrite loop.
+_V373_SYSTEM_MODULE_DIR = PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings"
+_V373_SYSTEM_LATEST_FILE = _V373_SYSTEM_MODULE_DIR / "13_system_settings_records.json"
+_V373_SYSTEM_COMPAT_FILE = _V373_SYSTEM_MODULE_DIR / "system_settings.json"
+_V373_SYSTEM_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json"
+_V373_SYSTEM_CONFIG_FILE = PROJECT_ROOT / "data" / "config" / "system_settings.json"
+_V373_SYSTEM_RESTORE_KEY = "_v373_system_latest_restored"
+
+
+def _v373_s_read_json(path: Path) -> dict[str, Any]:
+    try:
+        if path.exists() and path.is_file() and path.stat().st_size > 2:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _v373_s_atomic_write(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v373_s_latest_payload() -> dict[str, Any]:
+    # Fixed latest is authoritative. Compat/state/config are only migration fallback when latest is absent.
+    for path in [_V373_SYSTEM_LATEST_FILE, _V373_SYSTEM_COMPAT_FILE, _V373_SYSTEM_STATE_FILE, _V373_SYSTEM_CONFIG_FILE]:
+        data = _v373_s_read_json(path)
+        tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
+        if isinstance(tables, dict) and any(k in tables for k in ["process_categories", "process_category_options", "process_options", "rest_periods", "app_settings"]):
+            return data
+    return {}
+
+
+def _v373_s_schema_only() -> None:
+    try:
+        _v366_create_category_tables_no_seed()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            _ensure_process_category_options_table()  # type: ignore[name-defined]
+        except Exception:
+            pass
+
+
+def _v373_table_count(table: str) -> int:
+    try:
+        row = query_one(f'SELECT COUNT(*) AS c FROM "{table}"') or {}
+        return int(row.get("c", 0) or 0)
+    except Exception:
+        return 0
+
+
+def _v373_s_db_empty() -> bool:
+    _v373_s_schema_only()
+    # Same spirit as 03/04: only restore when current DB table has no user rows.
+    return (_v373_table_count("process_categories") == 0 and _v373_table_count("process_category_options") == 0)
+
+
+def _v373_active(v: Any, default: int = 1) -> int:
+    text = str(v if v is not None else default).strip().lower()
+    return 0 if text in {"0", "false", "no", "n", "off", "停用", "否"} else 1
+
+
+def _v373_df_records(df: pd.DataFrame) -> list[dict[str, Any]]:
+    if df is None or df.empty:
+        return []
+    return df.where(pd.notna(df), "").to_dict(orient="records")
+
+
+def _v373_insert_app_settings_rows(rows: list[dict[str, Any]]) -> int:
+    count = 0
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        key = str(r.get("setting_key") or "").strip()
+        if not key:
+            continue
+        execute(
+            "INSERT OR REPLACE INTO app_settings(setting_key,setting_value,note,updated_at) VALUES (?,?,?,?)",
+            (key, str(r.get("setting_value") or ""), str(r.get("note") or ""), str(r.get("updated_at") or _now())),
+        )
+        count += 1
+    return count
+
+
+def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    _v373_s_schema_only()
+    payload = _v373_s_latest_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    if not isinstance(tables, dict) or not any(k in tables for k in ["process_categories", "process_category_options", "process_options", "rest_periods", "app_settings"]):
+        return {"ok": False, "mode": "v373_direct_latest_like_03_04", "message": "no fixed latest system settings file"}
+    if not force and not _v373_s_db_empty():
+        return {"ok": True, "mode": "v373_direct_latest_like_03_04", "skipped": True, "reason": "db_not_empty_like_03_04"}
+    restored: dict[str, int] = {}
+    if "process_categories" in tables:
+        execute("DELETE FROM process_categories")
+        count = 0
+        for idx, r in enumerate(tables.get("process_categories") or [], start=1):
+            if not isinstance(r, dict):
+                continue
+            name = _norm_category_name(r.get("category_name") or r.get("category") or r.get("類別"))
+            if not name:
+                continue
+            try:
+                sort_order = int(float(r.get("sort_order") or idx))
+            except Exception:
+                sort_order = idx
+            execute(
+                """
+                INSERT INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?)
+                ON CONFLICT(category_name) DO UPDATE SET
+                    is_active=excluded.is_active, sort_order=excluded.sort_order,
+                    note=excluded.note, updated_at=excluded.updated_at
+                """,
+                (name, _v373_active(r.get("is_active", 1)), sort_order, str(r.get("note") or ""), str(r.get("created_at") or _now()), str(r.get("updated_at") or _now())),
+            )
+            count += 1
+        restored["process_categories"] = count
+    if "process_category_options" in tables or "process_options" in tables:
+        execute("DELETE FROM process_category_options")
+        execute("DELETE FROM process_options")
+        proc_rows = tables.get("process_category_options") if isinstance(tables.get("process_category_options"), list) else tables.get("process_options", [])
+        count = 0
+        for idx, r in enumerate(proc_rows or [], start=1):
+            if not isinstance(r, dict):
+                continue
+            category = _norm_category_name(r.get("category_name") or r.get("type_name") or PROCESS_CATEGORY_ALL)
+            proc = str(r.get("process_name") or "").strip()
+            if not proc:
+                continue
+            try:
+                sort_order = int(float(r.get("sort_order") or idx))
+            except Exception:
+                sort_order = idx
+            execute(
+                """
+                INSERT INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?)
+                ON CONFLICT(category_name, process_name) DO UPDATE SET
+                    is_active=excluded.is_active, sort_order=excluded.sort_order,
+                    note=excluded.note, updated_at=excluded.updated_at
+                """,
+                (category, proc, _v373_active(r.get("is_active", 1)), sort_order, str(r.get("note") or ""), str(r.get("created_at") or _now()), str(r.get("updated_at") or _now())),
+            )
+            execute(
+                """
+                INSERT INTO process_options(process_name,is_active,sort_order,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?)
+                ON CONFLICT(process_name) DO UPDATE SET
+                    is_active=excluded.is_active, sort_order=excluded.sort_order,
+                    note=excluded.note, updated_at=excluded.updated_at
+                """,
+                (proc, _v373_active(r.get("is_active", 1)), sort_order, str(r.get("note") or ""), str(r.get("created_at") or _now()), str(r.get("updated_at") or _now())),
+            )
+            count += 1
+        restored["process_category_options"] = count
+        restored["process_options"] = count
+    if "rest_periods" in tables:
+        execute("DELETE FROM rest_periods")
+        restored["rest_periods"] = _insert_rest_rows(tables.get("rest_periods") or [])
+    if "app_settings" in tables:
+        execute("DELETE FROM app_settings")
+        restored["app_settings"] = _v373_insert_app_settings_rows(tables.get("app_settings") or [])
+    _clear_settings_cache()
+    if st is not None:
+        try:
+            st.session_state[_V373_SYSTEM_RESTORE_KEY] = True
+        except Exception:
+            pass
+    return {"ok": True, "mode": "v373_direct_latest_like_03_04", "source": str(_V373_SYSTEM_LATEST_FILE), "restored": restored}
+
+
+def _v373_restore_system_once_if_needed() -> None:
+    if st is not None:
+        try:
+            if st.session_state.get(_V373_SYSTEM_RESTORE_KEY):
+                return
+        except Exception:
+            pass
+    restore_system_settings_from_permanent(force=False)
+    if st is not None:
+        try:
+            st.session_state[_V373_SYSTEM_RESTORE_KEY] = True
+        except Exception:
+            pass
+
+
+def ensure_system_settings_schema() -> None:  # type: ignore[override]
+    global _SYSTEM_SETTINGS_SCHEMA_READY
+    _v373_s_schema_only()
+    _v373_restore_system_once_if_needed()
+    # Seed minimal defaults only when no fixed latest exists and DB is empty.
+    if not _v373_s_latest_payload() and _v373_s_db_empty():
+        now = _now()
+        try:
+            execute("INSERT OR IGNORE INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at) VALUES (?,1,1,'系統預設類別',?,?)", (PROCESS_CATEGORY_ALL, now, now))
+            for idx, name in enumerate(DEFAULT_PROCESS_OPTIONS, start=1):
+                execute("INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)", (PROCESS_CATEGORY_ALL, name, idx, now, now))
+        except Exception:
+            pass
+    _SYSTEM_SETTINGS_SCHEMA_READY = True
+
+
+def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    _v373_s_schema_only()
+    try:
+        cats = query_df("SELECT id, category_name, is_active, sort_order, note, created_at, updated_at FROM process_categories ORDER BY sort_order, id")
+    except Exception:
+        cats = pd.DataFrame(columns=["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+    try:
+        proc = query_df("SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options ORDER BY category_name, sort_order, id")
+    except Exception:
+        proc = pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+    try:
+        rest = query_df("SELECT id, name, start_time, end_time, is_active, sort_order FROM rest_periods ORDER BY sort_order, id")
+    except Exception:
+        rest = pd.DataFrame(columns=["id", "name", "start_time", "end_time", "is_active", "sort_order"])
+    try:
+        app = query_df("SELECT setting_key, setting_value, note, updated_at FROM app_settings ORDER BY setting_key")
+    except Exception:
+        app = pd.DataFrame(columns=["setting_key", "setting_value", "note", "updated_at"])
+    proc_rows = _v373_df_records(proc)
+    payload = {
+        "version": "V3.73-direct-latest-like-03-04-final",
+        "exported_at": _now(),
+        "reason": reason,
+        "module_key": "13_system_settings",
+        "module_code": "13_system_settings",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "source": "system_settings_service_v373",
+        "description": "13 系統設定：比照 03/04，儲存寫固定 latest JSON；Reboot 僅在 DB 空白時讀同一 latest JSON。空表也是有效設定。",
+        "tables": {
+            "process_categories": _v373_df_records(cats),
+            "process_category_options": proc_rows,
+            "process_options": proc_rows,
+            "rest_periods": _v373_df_records(rest),
+            "app_settings": _v373_df_records(app),
+        },
+        "table_counts": {
+            "process_categories": 0 if cats is None else len(cats),
+            "process_category_options": 0 if proc is None else len(proc),
+            "process_options": 0 if proc is None else len(proc),
+            "rest_periods": 0 if rest is None else len(rest),
+            "app_settings": 0 if app is None else len(app),
+        },
+    }
+    for path in [_V373_SYSTEM_LATEST_FILE, _V373_SYSTEM_COMPAT_FILE, _V373_SYSTEM_STATE_FILE, _V373_SYSTEM_CONFIG_FILE]:
+        _v373_s_atomic_write(path, payload)
+    _clear_settings_cache()
+    return {"ok": True, "mode": "v373_direct_latest_like_03_04_final", "files": [str(_V373_SYSTEM_LATEST_FILE), str(_V373_SYSTEM_COMPAT_FILE), str(_V373_SYSTEM_STATE_FILE), str(_V373_SYSTEM_CONFIG_FILE)], "table_counts": payload["table_counts"]}
+
+
+def load_process_categories_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    ensure_system_settings_schema()
+    sql = "SELECT id, category_name, is_active, sort_order, note, created_at, updated_at FROM process_categories WHERE 1=1"
+    if active_only:
+        sql += " AND COALESCE(is_active,1)=1"
+    sql += " ORDER BY CASE WHEN category_name=? THEN 0 ELSE 1 END, sort_order, id"
+    df = query_df(sql, (PROCESS_CATEGORY_ALL,))
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+    return df
+
+
+def load_process_options_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    ensure_system_settings_schema()
+    sql = "SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options WHERE 1=1"
+    params: list[Any] = []
+    if active_only:
+        sql += " AND COALESCE(is_active, 1)=1"
+    sql += " ORDER BY CASE WHEN category_name=? THEN 0 ELSE 1 END, category_name, sort_order, id"
+    params.append(PROCESS_CATEGORY_ALL)
+    df = query_df(sql, params)
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+    return df
+
+
+def load_process_category_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    df = load_process_categories_df(active_only=True)
+    names = [str(x).strip() for x in df.get("category_name", []).dropna().tolist() if str(x).strip()] if df is not None and not df.empty else []
+    if include_common and PROCESS_CATEGORY_ALL not in names:
+        names.insert(0, PROCESS_CATEGORY_ALL)
+    return names or ([PROCESS_CATEGORY_ALL] if include_common else [])
+
+
+def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
+    # Strict link requested by user: selected Category decides Process list.
+    ensure_system_settings_schema()
+    category = _norm_category_name(category_name)
+    try:
+        df = query_df(
+            "SELECT process_name FROM process_category_options WHERE COALESCE(is_active,1)=1 AND category_name=? ORDER BY sort_order, id",
+            (category,),
+        )
+        names = [str(x).strip() for x in df.get("process_name", []).dropna().tolist() if str(x).strip()] if df is not None and not df.empty else []
+        return names
+    except Exception:
+        return []
+
+
+def get_process_options() -> list[str]:  # type: ignore[override]
+    return get_process_options_by_category(get_default_process_category(), include_common=False)
+
+
+def save_process_categories_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    _v373_s_schema_only()
+    if df is None:
+        return 0
+    now = _now(); count = 0
+    work = df.copy().drop(columns=["刪除", "delete", "selected"], errors="ignore").fillna("")
+    for idx, (_, r) in enumerate(work.iterrows(), start=1):
+        name = _norm_category_name(_row_get(r, "category_name", "category", "類別", "類別 / Category", default=""))
+        if not name:
+            continue
+        is_active = _v373_active(_row_get(r, "is_active", "啟用", "啟用 / Active", default=True))
+        try:
+            sort_order = int(float(_row_get(r, "sort_order", "排序", "排序 / Sort", default=idx) or idx))
+        except Exception:
+            sort_order = idx
+        note = str(_row_get(r, "note", "備註", "備註 / Note", default="") or "").strip()
+        rid = str(_row_get(r, "id", default="") or "").strip()
+        old_name = ""
+        if rid:
+            try:
+                old_row = query_one("SELECT category_name FROM process_categories WHERE id=?", (int(float(rid)),)) or {}
+                old_name = _norm_category_name(old_row.get("category_name")) if old_row else ""
+            except Exception:
+                old_name = ""
+        if rid:
+            try:
+                execute("UPDATE process_categories SET category_name=?, is_active=?, sort_order=?, note=?, updated_at=? WHERE id=?", (name, is_active, sort_order, note, now, int(float(rid))))
+                if old_name and old_name != name:
+                    execute("UPDATE process_category_options SET category_name=?, updated_at=? WHERE category_name=?", (name, now, old_name))
+                count += 1
+                continue
+            except Exception:
+                pass
+        execute(
+            """
+            INSERT INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(category_name) DO UPDATE SET is_active=excluded.is_active, sort_order=excluded.sort_order, note=excluded.note, updated_at=excluded.updated_at
+            """,
+            (name, is_active, sort_order, note, now, now),
+        )
+        count += 1
+    _clear_settings_cache()
+    export_system_settings_permanent("save_process_categories_v373", write_history=False)
+    return count
+
+
+def delete_process_categories(ids: Iterable[int]) -> int:  # type: ignore[override]
+    _v373_s_schema_only(); count = 0
+    for raw in ids or []:
+        try:
+            i = int(float(raw))
+        except Exception:
+            continue
+        row = query_one("SELECT category_name FROM process_categories WHERE id=?", (i,)) or {}
+        category = _norm_category_name(row.get("category_name")) if row else ""
+        if not category or category == PROCESS_CATEGORY_ALL:
+            continue
+        execute("DELETE FROM process_categories WHERE id=?", (i,))
+        execute("DELETE FROM process_category_options WHERE category_name=?", (category,))
+        count += 1
+    if count:
+        _clear_settings_cache()
+        export_system_settings_permanent("delete_process_categories_v373", write_history=False)
+    return count
+
+
+def save_process_options_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    _v373_s_schema_only()
+    if df is None:
+        return 0
+    now = _now(); count = 0
+    work = df.copy().drop(columns=["刪除", "delete", "selected"], errors="ignore").fillna("")
+    for idx, (_, r) in enumerate(work.iterrows(), start=1):
+        name = str(r.get("process_name", r.get("工段名稱", r.get("工段名稱 / Process", "")))).strip()
+        if not name:
+            continue
+        category = _norm_category_name(r.get("category_name", r.get("category", r.get("類別", r.get("類別 / Category", PROCESS_CATEGORY_ALL)))))
+        is_active = _v373_active(r.get("is_active", r.get("啟用", r.get("啟用 / Active", True))))
+        try:
+            sort_order = int(float(r.get("sort_order", r.get("排序", idx)) or idx))
+        except Exception:
+            sort_order = idx
+        note = str(r.get("note", r.get("備註", r.get("備註 / Note", ""))) or "")
+        rid = str(r.get("id", r.get("ID", r.get("ID / ID", "")))).strip()
+        if rid and rid.lower() not in {"nan", "none"}:
+            execute("UPDATE process_category_options SET category_name=?, process_name=?, is_active=?, sort_order=?, note=?, updated_at=? WHERE id=?", (category, name, is_active, sort_order, note, now, int(float(rid))))
+        else:
+            execute(
+                """
+                INSERT INTO process_category_options(category_name, process_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(category_name, process_name) DO UPDATE SET is_active=excluded.is_active, sort_order=excluded.sort_order, note=excluded.note, updated_at=excluded.updated_at
+                """,
+                (category, name, is_active, sort_order, note, now, now),
+            )
+        count += 1
+    _clear_settings_cache()
+    export_system_settings_permanent("save_category_process_options_v373", write_history=False)
+    return count
+
+
+def delete_process_options(ids: Iterable[int]) -> int:  # type: ignore[override]
+    _v373_s_schema_only(); count = 0
+    for rid in ids or []:
+        try:
+            i = int(float(rid))
+        except Exception:
+            continue
+        execute("DELETE FROM process_category_options WHERE id=?", (i,))
+        count += 1
+    if count:
+        _clear_settings_cache()
+        export_system_settings_permanent("delete_category_process_options_v373", write_history=False)
+    return count
+
+# Backward-compatible aliases.
+def load_process_model_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    return load_process_category_choices(include_common=include_common)
+
+def get_default_process_model() -> str:  # type: ignore[override]
+    return get_default_process_category()
+
+def save_default_process_model(type_name: str) -> str:  # type: ignore[override]
+    return save_default_process_category(type_name)
+
+def get_process_options_by_model(type_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
+    return get_process_options_by_category(type_name, include_common=False)
+# ===== V3.73 FINAL DIRECT-LATEST SYSTEM SETTINGS PATCH END =====
