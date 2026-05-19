@@ -1669,3 +1669,141 @@ def has_permission(username: str, module_code: str, action: str = "can_view") ->
     return _prev_v342_has_permission(username, module_code, action)
 
 check_permission = has_permission
+
+# ===== V3.46 permission persistence hardening =====
+# 目的：10｜權限管理帳號主檔在 Reboot 後即使 SQLite 已被預設帳號補滿，也要優先還原永久 JSON。
+
+def _v346_current_auth_summary() -> dict:
+    try:
+        init_permission_tables()
+        conn = connect_db(); cur = conn.cursor()
+        rows = cur.execute("SELECT username, role_code, is_active, note FROM auth_users").fetchall()
+        conn.close()
+        names = {str(r["username"] or "").strip() for r in rows}
+        default_only = bool(names) and names.issubset(_V341_DEFAULT_USERNAMES)
+        default_notes = 0
+        for r in rows:
+            note = str(r["note"] or "")
+            if "default account" in note.lower() or "預設" in note:
+                default_notes += 1
+        return {
+            "count": len(names),
+            "non_default": len([n for n in names if n and n not in _V341_DEFAULT_USERNAMES]),
+            "default_only": default_only,
+            "default_note_count": default_notes,
+            "names": names,
+        }
+    except Exception:
+        return {"count": 0, "non_default": 0, "default_only": True, "default_note_count": 0, "names": set()}
+
+
+def _v346_should_restore_permissions(current: dict, best_score: tuple[int, int, int, int, float]) -> bool:
+    if current.get("count", 0) == 0:
+        return True
+    if current.get("default_only") and best_score[0] >= int(current.get("count", 0)) and best_score[0] > 0:
+        return True
+    if best_score[1] > int(current.get("non_default", 0)):
+        return True
+    if best_score[0] > int(current.get("count", 0)):
+        return True
+    return False
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    """V3.46: restore permission tables from the richest local JSON; no network calls."""
+    init_permission_tables()
+    best_path, tables = _v341_best_permission_payload()
+    if not best_path or not tables:
+        return {"ok": False, "source": "", "restored": {}, "message": "找不到可用的 10_permissions 永久檔"}
+    current = _v346_current_auth_summary()
+    users = tables.get("auth_users", []) or []
+    perms = tables.get("auth_account_permissions", []) or []
+    settings = tables.get("auth_security_settings", []) or tables.get("security_settings", []) or []
+    best_score = _v341_permission_score(best_path, tables)
+    should_restore = force or _v346_should_restore_permissions(current, best_score)
+    if not should_restore and not settings:
+        return {"ok": False, "source": str(best_path), "restored": {}, "message": "目前帳號主檔不比永久檔少，略過還原", "current": current, "best_score": best_score}
+    restored: dict[str, int] = {}
+    conn = connect_db(); cur = conn.cursor()
+    try:
+        _ensure_legacy_security_tables(cur)
+        _ensure_security_setting_tables(cur)
+        table_order = ["auth_users", "auth_account_permissions", "auth_security_settings", "security_users", "security_user_roles", "security_settings"]
+        for table in table_order:
+            rows = tables.get(table, []) or []
+            if rows and (should_restore or table in {"auth_security_settings", "security_settings"}):
+                restored[table] = restored.get(table, 0) + _insert_or_replace_rows(cur, table, rows)
+        if tables.get("auth_security_settings"):
+            restored["security_settings"] = restored.get("security_settings", 0) + _insert_or_replace_rows(cur, "security_settings", tables.get("auth_security_settings", []))
+        conn.commit()
+    finally:
+        conn.close()
+    if restored:
+        try:
+            sync_auth_users_to_runtime_security()
+        except Exception:
+            pass
+        clear_permission_runtime_cache()
+    return {"ok": bool(restored), "source": str(best_path), "restored": restored, "current": current, "best_score": best_score}
+
+
+_old_get_users_v346 = get_users
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    try:
+        current = _v346_current_auth_summary()
+        best_path, tables = _v341_best_permission_payload()
+        if best_path:
+            score = _v341_permission_score(best_path, tables)
+            if _v346_should_restore_permissions(current, score):
+                restore_permission_settings_from_permanent_files(force=True)
+    except Exception:
+        pass
+    return _old_get_users_v346()
+
+
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
+    """V3.46: never let freshly seeded default users overwrite a richer 10_permissions JSON."""
+    init_permission_tables()
+    best_path, best_tables = _v341_best_permission_payload()
+    current = _v346_current_auth_summary()
+    if best_path:
+        best_score = _v341_permission_score(best_path, best_tables)
+        if _v346_should_restore_permissions(current, best_score) and reason not in {"auth_users_saved", "auth_users_deleted", "auth_account_permissions_saved"}:
+            return {"ok": False, "protected": True, "message": "已阻止預設帳號覆蓋較完整永久檔，並嘗試還原。", "restore": restore_permission_settings_from_permanent_files(force=True)}
+    try:
+        conn = connect_db(); cur = conn.cursor()
+        tables: dict[str, list[dict]] = {}
+        for table in ["auth_users", "auth_account_permissions", "auth_security_settings", "security_users", "security_user_roles", "security_settings"]:
+            try:
+                rows = cur.execute(f'SELECT * FROM "{table}"').fetchall()
+                tables[table] = [dict(r) for r in rows]
+            except Exception:
+                tables[table] = []
+        conn.close()
+        payload = {
+            "version": "V3.46",
+            "exported_at": now_text(),
+            "reason": reason,
+            "module_code": "10_permissions",
+            "tables": tables,
+            "table_counts": {k: len(v) for k, v in tables.items()},
+        }
+        base = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions"
+        hist = base / "history"
+        base.mkdir(parents=True, exist_ok=True); hist.mkdir(parents=True, exist_ok=True)
+        for name in ["10_permissions_records.json", "10_permissions_settings.json"]:
+            path = base / name
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            tmp.replace(path)
+        hpath = hist / f"10_permissions_records_{now_stamp()}.json"
+        hpath.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        try:
+            from services.db_service import mark_data_changed
+            mark_data_changed("10｜權限管理已建立本機永久檔；如需雲端備份請到 09 手動上傳 GitHub。", "10_permissions")
+        except Exception:
+            pass
+        return {"ok": True, "mode": "local_10_permissions_only", "files": [str(base / "10_permissions_records.json"), str(base / "10_permissions_settings.json")], "table_counts": payload["table_counts"]}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}

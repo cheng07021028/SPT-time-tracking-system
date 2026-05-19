@@ -611,3 +611,148 @@ def render_table(
         key=key or f"frame_{table_key}",
     )
     return None
+
+# ===== V3.46 reboot-safe table UI persistence hardening =====
+# 目的：所有模組共用的欄寬 / 欄位順序，不再因 Reboot 後 SQLite 已有預設列而略過永久 JSON 還原。
+# 不新增畫面功能；只加強既有 table_ui_settings 的保存與還原。
+
+def _v346_row_has_real_table_ui(row: dict[str, Any]) -> bool:
+    try:
+        w = json.loads(str(row.get("widths_json") or "{}"))
+    except Exception:
+        w = {}
+    try:
+        o = json.loads(str(row.get("order_json") or "[]"))
+    except Exception:
+        o = []
+    return bool(isinstance(w, dict) and w) or bool(isinstance(o, list) and o)
+
+
+def restore_table_ui_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    """V3.46: merge/overwrite useful permanent table UI rows instead of comparing only row count."""
+    ensure_table_ui_schema()
+    payload = _best_table_ui_payload()
+    rows = ((payload.get("tables") or {}).get("table_ui_settings") or []) if isinstance(payload, dict) else []
+    rows = [r for r in rows if isinstance(r, dict) and str(r.get("table_key") or "").strip() and _v346_row_has_real_table_ui(r)]
+    if not rows:
+        return {"ok": False, "restored": 0, "message": "找不到含有效欄寬/欄位順序的 table_ui_settings 永久檔"}
+    restored = 0
+    skipped = 0
+    for r in rows:
+        table_key = str(r.get("table_key") or "").strip()
+        if not table_key:
+            continue
+        permanent_widths = str(r.get("widths_json") or "{}")
+        permanent_order = str(r.get("order_json") or "[]")
+        current = query_one("SELECT widths_json, order_json FROM table_ui_settings WHERE table_key=?", (table_key,)) or {}
+        if not force:
+            cur_row = {"widths_json": current.get("widths_json") or "{}", "order_json": current.get("order_json") or "[]"}
+            if _v346_row_has_real_table_ui(cur_row):
+                skipped += 1
+                continue
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(table_key) DO UPDATE SET
+                widths_json=excluded.widths_json,
+                order_json=excluded.order_json,
+                updated_at=excluded.updated_at
+            """,
+            (table_key, permanent_widths, permanent_order, str(r.get("updated_at") or _now_text())),
+        )
+        restored += 1
+        try:
+            st.session_state.pop(f"_spt_width_cache_{table_key}", None)
+        except Exception:
+            pass
+    return {"ok": restored > 0, "restored": restored, "skipped": skipped, "source": payload.get("source"), "score": payload.get("score")}
+
+
+_old_render_width_settings_v346 = render_width_settings
+
+def render_width_settings(table_key: str, df: pd.DataFrame, title: str = "欄寬設定 / Column Width Settings") -> None:  # type: ignore[override]
+    # 每次進入既有欄位設定工具前，先嘗試從永久 JSON 補回 SQLite。若 SQLite 已有有效設定則不覆蓋。
+    try:
+        restore_table_ui_settings_from_permanent(force=False)
+    except Exception:
+        pass
+    return _old_render_width_settings_v346(table_key, df, title=title)
+
+
+_old_apply_column_order_v346 = apply_column_order
+
+def apply_column_order(table_key: str, df: pd.DataFrame) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        restore_table_ui_settings_from_permanent(force=False)
+    except Exception:
+        pass
+    return _old_apply_column_order_v346(table_key, df)
+
+# ===== V3.46 final no-recursion table UI schema/restore =====
+def _v346_ensure_table_ui_schema_basic() -> None:
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS table_ui_settings (
+            table_key TEXT PRIMARY KEY,
+            widths_json TEXT,
+            order_json TEXT,
+            updated_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+        """
+    )
+    try:
+        execute("ALTER TABLE table_ui_settings ADD COLUMN order_json TEXT")
+    except Exception:
+        pass
+
+
+def restore_table_ui_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    _v346_ensure_table_ui_schema_basic()
+    payload = _best_table_ui_payload()
+    rows = ((payload.get("tables") or {}).get("table_ui_settings") or []) if isinstance(payload, dict) else []
+    rows = [r for r in rows if isinstance(r, dict) and str(r.get("table_key") or "").strip() and _v346_row_has_real_table_ui(r)]
+    if not rows:
+        return {"ok": False, "restored": 0, "message": "找不到含有效欄寬/欄位順序的 table_ui_settings 永久檔"}
+    restored = 0
+    skipped = 0
+    for r in rows:
+        table_key = str(r.get("table_key") or "").strip()
+        permanent_widths = str(r.get("widths_json") or "{}")
+        permanent_order = str(r.get("order_json") or "[]")
+        current = query_one("SELECT widths_json, order_json FROM table_ui_settings WHERE table_key=?", (table_key,)) or {}
+        cur_row = {"widths_json": current.get("widths_json") or "{}", "order_json": current.get("order_json") or "[]"}
+        if not force and _v346_row_has_real_table_ui(cur_row):
+            skipped += 1
+            continue
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(table_key) DO UPDATE SET
+                widths_json=excluded.widths_json,
+                order_json=excluded.order_json,
+                updated_at=excluded.updated_at
+            """,
+            (table_key, permanent_widths, permanent_order, str(r.get("updated_at") or _now_text())),
+        )
+        restored += 1
+        try:
+            st.session_state.pop(f"_spt_width_cache_{table_key}", None)
+        except Exception:
+            pass
+    return {"ok": restored > 0, "restored": restored, "skipped": skipped, "source": payload.get("source"), "score": payload.get("score")}
+
+
+def ensure_table_ui_schema() -> None:  # type: ignore[override]
+    global _TABLE_UI_SCHEMA_READY, _TABLE_UI_RESTORED_ONCE
+    if _TABLE_UI_SCHEMA_READY:
+        return
+    _v346_ensure_table_ui_schema_basic()
+    _TABLE_UI_SCHEMA_READY = True
+    if not _TABLE_UI_RESTORED_ONCE:
+        _TABLE_UI_RESTORED_ONCE = True
+        try:
+            restore_table_ui_settings_from_permanent(force=False)
+        except Exception:
+            pass
