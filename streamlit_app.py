@@ -16,11 +16,20 @@ st.set_page_config(
 
 apply_theme()
 require_login("home")
-# V3.45 startup acceleration:
-# Do not run full local restore / index rebuild during login-home transition.
-# Permanent data is still protected by module save/load services and can be
-# audited or manually rebuilt from 12｜模組永久紀錄中心.
-st.session_state["_spt_v343_restore_guard_done"] = True
+# V3.60: one lightweight local bootstrap after login.
+# 永久設定主檔先建立/遷移，再執行既有 10/13/table 救援；不呼叫 GitHub，不掃大量 history。
+if not st.session_state.get("_spt_v360_persistence_bootstrap_done"):
+    try:
+        from services.persistence_core_service import bootstrap_persistent_state_once
+        bootstrap_persistent_state_once()
+    except Exception:
+        pass
+    try:
+        from services.permanent_restore_guard_service import restore_core_modules_from_local_permanent
+        restore_core_modules_from_local_permanent()
+    except Exception:
+        pass
+    st.session_state["_spt_v360_persistence_bootstrap_done"] = True
 _global_ui_settings = load_global_ui_settings()
 inject_global_font_scale(_global_ui_settings.get("global_font_scale_percent", 100))
 render_home_header()
