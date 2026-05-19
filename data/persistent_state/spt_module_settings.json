@@ -1,6 +1,6 @@
 {
   "schema_version": "v1.30",
-  "export_time": "2026-05-19 11:10:07",
+  "export_time": "2026-05-19 11:11:50",
   "tables": {
     "system_settings": [
       {
@@ -2379,15 +2379,15 @@
     "auth_security_settings": [
       {
         "setting_key": "idle_timeout_minutes",
-        "setting_value": "1",
+        "setting_value": "15",
         "note": "閒置多久自動登出，單位分鐘",
-        "updated_at": "2026-05-19 11:09:27"
+        "updated_at": "2026-05-19 11:11:22"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
         "note": "V3.10 synchronized permanent security setting",
-        "updated_at": "2026-05-19 00:21:40"
+        "updated_at": "2026-05-19 11:11:22"
       }
     ]
   },
