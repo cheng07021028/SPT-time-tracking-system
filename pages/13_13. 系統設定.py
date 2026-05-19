@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from io import BytesIO
+import json
+from pathlib import Path
 import pandas as pd
 import streamlit as st
 
@@ -12,16 +14,32 @@ from services.system_settings_service import (
     delete_process_options,
     delete_rest_periods,
     load_process_options_df,
-    load_process_model_choices,
     load_rest_periods_df,
-    save_default_process_model,
     save_process_options_df,
-    get_default_process_model,
     save_rest_periods_df,
     get_live_page_reset_time,
     save_live_page_reset_time,
+    export_system_settings_permanent,
 )
-from services.db_service import flush_pending_permanent_state
+
+from services.auto_backup_service import (
+    create_backup_by_mode,
+    get_available_backup_modes,
+    get_runtime_environment,
+    get_schedule_status,
+    load_backup_schedule,
+    normalize_backup_mode,
+    run_due_backup_if_needed,
+    save_backup_schedule,
+    start_auto_backup_scheduler_once,
+    validate_backup_destination,
+)
+
+from services.settings_durability_service import (
+    get_critical_settings_health,
+    upload_critical_settings_to_github,
+    download_critical_settings_from_github,
+)
 
 st.set_page_config(page_title="13. 系統設定", page_icon="⌬️", layout="wide")
 apply_theme()
@@ -68,21 +86,131 @@ def _normalize_delete_column(df: pd.DataFrame, delete_col: str = "刪除") -> pd
     return out
 
 
-def _export_permanent_settings(message: str) -> None:
-    """Create local permanent JSON immediately, but do not push GitHub here.
 
-    GitHub push is intentionally kept on 09｜資料永久保存與備份 to avoid the
-    10~20 second delay after every settings change.  The local permanent JSON is
-    enough to survive normal project reload/update flows when committed or backed up.
+
+# -----------------------------------------------------------------------------
+# V3.23: System settings permanent-file health center
+# -----------------------------------------------------------------------------
+def _project_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _file_health_row(path: Path, label: str) -> dict:
+    exists = path.exists()
+    size = path.stat().st_size if exists else 0
+    mtime = ""
+    ok = False
+    detail = "檔案不存在"
+    if exists:
+        try:
+            mtime = pd.to_datetime(path.stat().st_mtime, unit="s").strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            mtime = ""
+        try:
+            with path.open("r", encoding="utf-8") as fh:
+                payload = json.load(fh)
+            ok = isinstance(payload, (dict, list))
+            if isinstance(payload, dict):
+                keys = list(payload.keys())[:8]
+                detail = "JSON 可讀；keys=" + ", ".join(map(str, keys))
+            elif isinstance(payload, list):
+                detail = f"JSON 可讀；list rows={len(payload)}"
+            else:
+                detail = "JSON 可讀"
+        except Exception as exc:
+            ok = False
+            detail = f"JSON 讀取失敗：{exc}"
+    return {
+        "項目 / Item": label,
+        "狀態 / Status": "✅ 正常" if ok else "⚠️ 異常",
+        "路徑 / Path": str(path.relative_to(_project_root())) if str(path).startswith(str(_project_root())) else str(path),
+        "存在 / Exists": exists,
+        "大小 / Size": size,
+        "最後修改 / Modified": mtime,
+        "說明 / Detail": detail,
+    }
+
+
+def _render_system_settings_health_center() -> None:
+    root = _project_root()
+    health_targets = [
+        (root / "data" / "config" / "system_settings.json", "系統設定主檔 / system_settings.json"),
+        (root / "data" / "persistent_state" / "spt_system_settings.json", "系統設定狀態檔 / spt_system_settings.json"),
+        (root / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json", "13 模組永久檔 / 13_system_settings"),
+        (root / "data" / "config" / "auto_external_backup_schedule.json", "每日自動備份設定 / backup schedule"),
+        (root / "data" / "persistent_state" / "auto_external_backup_state.json", "每日自動備份狀態 / backup state"),
+    ]
+    rows = [_file_health_row(path, label) for path, label in health_targets]
+    ok_count = sum(1 for r in rows if str(r.get("狀態 / Status", "")).startswith("✅"))
+
+    with st.expander("系統設定永久保存健康檢查 / System Settings Persistence Health", expanded=True):
+        st.caption(
+            "此區檢查 13｜系統設定與每日自動備份設定是否真的寫入 data/ 永久檔。"
+            "設定後應保持不變，直到下次再套用設定。"
+        )
+        h1, h2, h3 = st.columns(3)
+        h1.metric("永久檔正常 / Healthy Files", f"{ok_count}/{len(rows)}")
+        h2.metric("目前工時頁重置時間", get_live_page_reset_time())
+        h3.metric("備份設定檔", "已檢查")
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=230)
+
+        st.markdown("#### 重要設定檔 GitHub 永久化狀態 / Critical Settings GitHub Durability")
+        critical_rows = get_critical_settings_health()
+        st.dataframe(pd.DataFrame(critical_rows), use_container_width=True, hide_index=True, height=260)
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            if st.button("◇ 重新檢查永久設定檔 / Recheck", use_container_width=True, key="v323_recheck_system_settings_health"):
+                st.rerun()
+        with c2:
+            if can_manage and st.button("▣ 立即刷新永久設定檔 / Refresh Permanent Settings", use_container_width=True, key="v323_refresh_system_settings_files"):
+                try:
+                    result = export_system_settings_permanent(reason="manual_refresh_from_health_center", write_history=True)
+                    if result.get("ok"):
+                        st.success("已重新寫入系統設定永久檔。")
+                    else:
+                        st.warning(f"永久檔刷新結果：{result}")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"刷新永久設定檔失敗：{exc}")
+        with c3:
+            if can_manage and st.button("⇧ 同步設定到 GitHub / Sync Settings to GitHub", use_container_width=True, key="v329_sync_settings_to_github"):
+                result = upload_critical_settings_to_github(archive=True, source="13_system_settings_health_button")
+                if result.get("ok"):
+                    st.success(f"設定檔已同步到 GitHub：{result.get('upload_count', 0)} 個檔案。")
+                elif result.get("skipped"):
+                    st.warning(result.get("message", "GitHub 未設定，已略過。"))
+                else:
+                    st.error(f"GitHub 同步失敗：{result.get('message', result.get('failures', ''))}")
+        with c4:
+            if can_manage and st.button("⇩ 從 GitHub 載入缺少設定 / Load Missing from GitHub", use_container_width=True, key="v329_load_missing_settings_from_github"):
+                result = download_critical_settings_from_github(only_missing=True, source="13_system_settings_health_button")
+                if result.get("ok"):
+                    st.success("已從 GitHub 載入缺少的設定檔。")
+                    st.rerun()
+                elif result.get("skipped"):
+                    st.warning(result.get("message", "GitHub 未設定，已略過。"))
+                else:
+                    st.error(f"GitHub 載入失敗：{result.get('failures', result.get('message', ''))}")
+        if ok_count < 3:
+            st.warning("部分 13 系統設定永久檔不存在或不可讀。請按『立即刷新永久設定檔』建立/修復。")
+        else:
+            st.success("13 系統設定永久檔已存在且可讀。")
+
+def _export_permanent_settings(message: str) -> None:
+    """Create the dedicated 13｜系統設定 permanent JSON only.
+
+    不再呼叫全系統 flush_pending_permanent_state，避免在一般設定套用後
+    被其他模組的 pending/export 流程干擾，導致設定看起來回到原始值。
     """
     try:
-        res = flush_pending_permanent_state(upload_github=False)
+        res = export_system_settings_permanent("13_system_settings_page_apply", write_history=True)
         if res.get("ok"):
-            st.success(message + "，已建立永久設定檔。")
+            st.success(message + "，已寫入 13 系統設定永久檔。")
         else:
-            st.warning(message + "，但永久設定檔建立結果需到 09｜資料永久保存與備份確認。")
+            st.warning(message + "，但 13 系統設定永久檔寫入結果需確認。")
     except Exception as exc:
-        st.warning(f"{message}，但永久設定檔建立失敗：{exc}")
+        st.warning(f"{message}，但 13 系統設定永久檔建立失敗：{exc}")
 
 
 def _set_edit_mode(key: str, enabled: bool) -> None:
@@ -114,6 +242,213 @@ def _refresh_after_apply(message: str, *edit_mode_keys: str) -> None:
     st.rerun()
 
 
+
+def _format_bytes_v296(n) -> str:
+    try:
+        n = float(n or 0)
+        for unit in ["B", "KB", "MB", "GB", "TB"]:
+            if n < 1024 or unit == "TB":
+                return f"{n:,.1f} {unit}" if unit != "B" else f"{int(n):,} {unit}"
+            n /= 1024
+    except Exception:
+        return "0 B"
+
+
+def _render_external_auto_backup_center() -> None:
+    """Daily backup settings with three professional modes.
+
+    V3.05 rules:
+    - Local Windows backup: only when Streamlit is truly running on Windows.
+    - Cloud project backup: usable on Streamlit Cloud/Linux, writes under data/_external_backup.
+    - GitHub cloud backup: uses existing GitHub cloud persistence service.
+    """
+    st.subheader("每日自動備份設定 / Daily Backup Schedule")
+    st.caption(
+        "備份模式分為三種，避免 Windows 本機路徑與 Streamlit Cloud/Linux 雲端環境混淆。"
+        "系統會依目前執行環境自動停用不適用的模式。"
+    )
+
+    try:
+        start_auto_backup_scheduler_once()
+        cfg = load_backup_schedule()
+        status = get_schedule_status()
+    except Exception as exc:
+        st.error(f"自動備份服務載入失敗：{exc}")
+        st.divider()
+        return
+
+    env_info = get_runtime_environment()
+    runtime_label = status.get("runtime_label") or ("Windows 本機" if env_info.get("is_windows") else ("Streamlit Cloud / Linux 雲端" if env_info.get("is_streamlit_cloud_like") else str(env_info.get("system") or "Unknown")))
+    current_mode = normalize_backup_mode(cfg.get("backup_mode"))
+
+    s1, s2, s3, s4 = st.columns(4)
+    s1.metric("排程狀態", "啟用" if cfg.get("enabled") else "停用")
+    s2.metric("每日時間", str(cfg.get("daily_time") or "未設定"))
+    s3.metric("備份模式", {"local_windows": "本機 Windows", "cloud_project": "雲端專案內", "github_cloud": "GitHub 雲端"}.get(current_mode, current_mode))
+    s4.metric("執行環境", runtime_label)
+    st.caption(f"下次執行：{status.get('next_run') or '-'}｜專案根目錄：{env_info.get('project_root')}")
+
+    state = status.get("state", {}) or {}
+    if state.get("last_backup_at"):
+        st.info(
+            f"最近備份：{state.get('last_backup_at')}｜"
+            f"模式：{state.get('last_backup_mode') or status.get('backup_mode') or '-'}｜"
+            f"檔案數：{state.get('last_file_count', 0)}｜"
+            f"大小：{_format_bytes_v296(state.get('last_total_bytes'))}｜"
+            f"路徑：{state.get('last_backup_dir', '')}"
+        )
+    if state.get("last_scheduler_error"):
+        st.warning(f"最近排程錯誤：{state.get('last_scheduler_error')}")
+
+    if not can_manage:
+        st.info("你目前只有查看權限。自動備份設定與還原需 can_manage / can_edit 權限。")
+        st.divider()
+        return
+
+    with st.expander("設定每日自動備份 / Configure Daily Backup", expanded=True):
+        enabled = st.checkbox("啟用每日自動備份", value=bool(cfg.get("enabled")), key="spt_v305_backup_enabled")
+        modes = get_available_backup_modes()
+        mode_labels = {m["mode"]: m["label"] for m in modes}
+        mode_desc = {m["mode"]: m["description"] for m in modes}
+        available = {m["mode"]: bool(m.get("available")) for m in modes}
+        mode_options = [m["mode"] for m in modes]
+        if current_mode not in mode_options:
+            current_mode = mode_options[0]
+        selected_mode = st.radio(
+            "備份模式 / Backup Mode",
+            options=mode_options,
+            index=mode_options.index(current_mode),
+            format_func=lambda x: mode_labels.get(x, x),
+            horizontal=True,
+            key="spt_v305_backup_mode",
+        )
+        st.caption(mode_desc.get(selected_mode, ""))
+
+        if not available.get(selected_mode, True):
+            st.warning("目前執行環境不支援這個備份模式。系統已停用相關路徑操作，請改用雲端專案內備份或 GitHub 雲端備份。")
+
+        col_a, col_b = st.columns([1, 2])
+        with col_a:
+            daily_time = st.time_input(
+                "每日備份時間",
+                value=pd.to_datetime(str(cfg.get("daily_time") or "17:30")).time(),
+                key="spt_v305_backup_daily_time",
+            )
+            keep_days = st.number_input(
+                "保留天數",
+                min_value=1,
+                max_value=3650,
+                value=int(cfg.get("keep_days") or 30),
+                step=1,
+                key="spt_v305_backup_keep_days",
+            )
+        with col_b:
+            if selected_mode == "local_windows":
+                target_folder = st.text_input(
+                    "本機 Windows 備份資料夾完整路徑",
+                    value=str(cfg.get("target_folder") or ""),
+                    placeholder="例如：D:/SPT_Backup/TimeTracking 或 E:\\Backup\\SPT",
+                    key="spt_v305_backup_target_folder",
+                    disabled=not available.get(selected_mode, True),
+                )
+                st.caption("只有公司電腦本機執行 streamlit run 時，才能寫入 D:/、E:/ 或 OneDrive 本機資料夾。")
+            elif selected_mode == "cloud_project":
+                target_folder = "data/_external_backup"
+                st.text_input("雲端專案內備份位置", value=target_folder, disabled=True, key="spt_v305_cloud_project_path")
+                st.caption("適合 Streamlit Cloud/Linux。備份會放在專案 data/_external_backup；建議再搭配 GitHub 或下載保存。")
+            else:
+                target_folder = ""
+                st.text_input("GitHub 備份目標", value="GitHub Contents API：data/persistent_state / data/persistent_modules", disabled=True, key="spt_v305_github_target")
+                st.caption("需在 Secrets 設定 GITHUB_TOKEN、GITHUB_REPOSITORY、GITHUB_BRANCH。")
+
+        validation = validate_backup_destination(selected_mode, target_folder, create=False)
+        if validation.get("ok"):
+            st.success(validation.get("message", "備份目的地可用。"))
+        else:
+            st.warning(validation.get("message", "備份目的地尚未通過檢查。"))
+        if validation.get("runtime_label"):
+            st.caption(f"目前執行環境：{validation.get('runtime_label')}｜備份模式：{mode_labels.get(selected_mode, selected_mode)}")
+
+        b1, b2, b3 = st.columns(3)
+        with b1:
+            if st.button("▣ 儲存自動備份設定", key="spt_v305_save_backup_schedule", use_container_width=True):
+                try:
+                    saved = save_backup_schedule({
+                        "enabled": bool(enabled),
+                        "daily_time": daily_time.strftime("%H:%M"),
+                        "backup_mode": selected_mode,
+                        "target_folder": str(target_folder or "").strip(),
+                        "keep_days": int(keep_days),
+                        "include_project_configs": True,
+                        "include_streamlit_config": True,
+                    })
+                    start_auto_backup_scheduler_once()
+                    st.success(f"已儲存自動備份設定：{mode_labels.get(saved.get('backup_mode'), saved.get('backup_mode'))}｜每日 {saved.get('daily_time')}。")
+                except Exception as exc:
+                    st.error(f"儲存自動備份設定失敗：{exc}")
+        with b2:
+            if st.button("◇ 建立/測試備份目的地", key="spt_v305_test_backup_destination", use_container_width=True):
+                res = validate_backup_destination(selected_mode, target_folder, create=True)
+                if res.get("ok"):
+                    st.success(res.get("message", f"備份目的地測試成功：{res.get('path', '')}"))
+                else:
+                    st.error(res.get("message", res))
+        with b3:
+            if st.button("▣ 立即依目前模式完整備份", key="spt_v305_run_backup_now", use_container_width=True):
+                try:
+                    save_backup_schedule({
+                        "enabled": bool(enabled),
+                        "daily_time": daily_time.strftime("%H:%M"),
+                        "backup_mode": selected_mode,
+                        "target_folder": str(target_folder or "").strip(),
+                        "keep_days": int(keep_days),
+                    })
+                    result = create_backup_by_mode(selected_mode, target_folder, reason="ui_manual_backup_from_13_v305", create_target=True)
+                    if result.get("ok"):
+                        st.success(
+                            f"備份完成：{result.get('backup_dir', result.get('mode', ''))}｜"
+                            f"檔案數：{result.get('file_count', 0)}｜"
+                            f"大小：{_format_bytes_v296(result.get('total_bytes'))}"
+                        )
+                    else:
+                        st.error(f"備份失敗：{result.get('message', result.get('errors', result))}")
+                except Exception as exc:
+                    st.error(f"備份失敗：{exc}")
+
+    with st.expander("三種備份模式說明 / Backup Mode Guide", expanded=False):
+        st.markdown(
+            """
+            **本機 Windows 備份**  
+            適合公司電腦本機執行 `streamlit run streamlit_app.py`，可寫入 `D:/`、`E:/`、OneDrive 本機資料夾。  
+
+            **雲端專案內備份**  
+            適合 Streamlit Cloud / Linux。備份到 `data/_external_backup`，不會要求 Windows 路徑。  
+
+            **GitHub 雲端備份**  
+            使用既有 GitHub Contents API，把永久 JSON 與資料狀態上傳到 GitHub。需設定 `GITHUB_TOKEN`。  
+            """
+        )
+
+    if st.button("◇ 檢查今日排程是否到期並補跑", key="spt_v305_run_due_backup_check", use_container_width=True):
+        try:
+            result = run_due_backup_if_needed(force=False)
+            if result.get("skipped"):
+                st.info(f"目前不用補跑：{result.get('reason')}")
+            elif result.get("ok"):
+                st.success(f"排程備份已完成：{result.get('backup_dir', result.get('mode', ''))}")
+            else:
+                st.error(f"排程備份失敗：{result}")
+        except Exception as exc:
+            st.error(f"排程檢查失敗：{exc}")
+
+    st.divider()
+
+
+# V3.23：先顯示系統設定永久保存健康檢查，再顯示自動備份設定。
+_render_system_settings_health_center()
+
+# V3.20：每日自動備份設定必須保留在 13｜系統設定，不可被系統設定修正覆蓋移除。
+_render_external_auto_backup_center()
 
 # -----------------------------------------------------------------------------
 # 0) Excel import/export for all system settings
@@ -160,37 +495,10 @@ st.divider()
 # 1) Process options
 # -----------------------------------------------------------------------------
 st.subheader("一、工段名稱設定 / Process Options")
-st.caption("這裡會套用到 01｜工時紀錄的『工段名稱』下拉選單。可依『機型』建立不同工段；機型空白或選『全部 / 通用』代表所有機型共用。")
-
-model_choices = load_process_model_choices(include_common=True)
-current_default_model = get_default_process_model()
-if current_default_model not in model_choices:
-    model_choices.append(current_default_model)
-
-dm1, dm2, dm3 = st.columns([2, 1, 3])
-with dm1:
-    selected_default_model = st.selectbox(
-        "預設機型 / Default Model",
-        model_choices,
-        index=model_choices.index(current_default_model) if current_default_model in model_choices else 0,
-        help="當製令機型空白、或該機型沒有專屬工段時，01 工時紀錄會使用此預設機型的工段。",
-        key="system_default_process_model_v328",
-    )
-with dm2:
-    st.write("")
-    st.write("")
-    if can_manage and st.button("▣ 套用預設機型", use_container_width=True, key="apply_default_process_model_v328"):
-        saved_model = save_default_process_model(selected_default_model)
-        _export_permanent_settings(f"已套用預設機型：{saved_model}")
-        _refresh_after_apply(f"已套用預設機型：{saved_model}，畫面已重新整理。")
-with dm3:
-    st.info("01｜工時紀錄會先依製令的『機型 / Type』載入專屬工段；若找不到，才改用這裡的預設機型與通用工段。")
-
+st.caption("這裡會套用到 01｜工時紀錄的『工段名稱』下拉選單。只有『啟用』的工段會出現在下拉選單。")
 proc_df = load_process_options_df(active_only=False)
 if proc_df.empty:
-    proc_df = pd.DataFrame(columns=["id", "type_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
-if "type_name" not in proc_df.columns:
-    proc_df.insert(1, "type_name", "全部 / 通用")
+    proc_df = pd.DataFrame(columns=["id", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
 proc_view = _normalize_delete_column(proc_df)
 
 proc_edit_key = "_spt_13_process_edit_mode"
