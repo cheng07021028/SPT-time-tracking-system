@@ -26,6 +26,11 @@ from typing import Any, Iterable
 
 import pandas as pd
 
+try:
+    import streamlit as st  # type: ignore
+except Exception:  # pragma: no cover - Streamlit may be unavailable during compile/tests
+    st = None  # type: ignore
+
 from services.timezone_service import now_text, now_stamp, today_text, today_date
 
 from .db_service import execute, query_df, query_one, mark_data_changed
