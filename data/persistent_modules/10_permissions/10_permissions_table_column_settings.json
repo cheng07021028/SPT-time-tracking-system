@@ -1,6 +1,6 @@
 {
   "version": "V3.50",
-  "updated_at": "20260519_190211",
+  "updated_at": "20260519_190337",
   "description": "全系統表格欄位設定永久紀錄；包含欄位顯示、順序、欄寬與標題，避免 Reboot App 後回到原始設定。",
   "table_column_settings_v2": {
     "13_13. 系統設定::13_13. 系統設定:456::dataframe::80435544260397582": {
@@ -228,7 +228,81 @@
           "order": 7
         }
       }
+    },
+    "global::dataframe::frame_12_module_persistence_status": {
+      "columns": {
+        "模組代碼 / Module Code": {
+          "source": "模組代碼 / Module Code",
+          "label": "模組代碼 / Module Code / 模組代碼 / Module Code",
+          "visible": true,
+          "width": "medium",
+          "order": 0
+        },
+        "模組 / Module": {
+          "source": "模組 / Module",
+          "label": "模組 / Module / 模組 / Module",
+          "visible": true,
+          "width": "medium",
+          "order": 1
+        },
+        "紀錄檔 / Records Exists": {
+          "source": "紀錄檔 / Records Exists",
+          "label": "紀錄檔 / Records Exists / 紀錄檔 / Records Exists",
+          "visible": true,
+          "width": "medium",
+          "order": 2
+        },
+        "設定檔 / Settings Exists": {
+          "source": "設定檔 / Settings Exists",
+          "label": "設定檔 / Settings Exists / 設定檔 / Settings Exists",
+          "visible": true,
+          "width": "medium",
+          "order": 3
+        },
+        "紀錄時間 / Exported At": {
+          "source": "紀錄時間 / Exported At",
+          "label": "紀錄時間 / Exported At / 紀錄時間 / Exported At",
+          "visible": true,
+          "width": "medium",
+          "order": 4
+        },
+        "設定時間 / Settings At": {
+          "source": "設定時間 / Settings At",
+          "label": "設定時間 / Settings At / 設定時間 / Settings At",
+          "visible": true,
+          "width": "medium",
+          "order": 5
+        },
+        "資料筆數 / Counts": {
+          "source": "資料筆數 / Counts",
+          "label": "資料筆數 / Counts / 資料筆數 / Counts",
+          "visible": true,
+          "width": "medium",
+          "order": 6
+        },
+        "路徑 / Path": {
+          "source": "路徑 / Path",
+          "label": "路徑 / Path / 路徑 / Path",
+          "visible": true,
+          "width": "medium",
+          "order": 7
+        },
+        "檢查說明 / Health Note": {
+          "source": "檢查說明 / Health Note",
+          "label": "檢查說明 / Health Note / 檢查說明 / Health Note",
+          "visible": true,
+          "width": "medium",
+          "order": 8
+        },
+        "設定路徑 / Settings Path": {
+          "source": "設定路徑 / Settings Path",
+          "label": "設定路徑 / Settings Path / 設定路徑 / Settings Path",
+          "visible": true,
+          "width": "medium",
+          "order": 9
+        }
+      }
     }
   },
-  "table_count": 4
+  "table_count": 5
 }
