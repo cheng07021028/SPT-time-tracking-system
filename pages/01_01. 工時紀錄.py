@@ -69,13 +69,10 @@ with left:
         index=category_choices.index(default_category) if default_category in category_choices else 0,
         key="time_record_process_category_v333",
     )
-    # V3.47：工段下拉只顯示所選類別自己的工段，不再混入「全部 / 通用」工段。
-    # 若選擇「全部 / 通用」，才顯示通用工段。
     PROCESS_OPTIONS = get_process_options_by_category(selected_category, include_common=False)
-    st.caption(f"目前工段類別 / Current Category：{selected_category or '全部 / 通用'}")
     if not PROCESS_OPTIONS:
-        st.warning("此類別尚未設定工段名稱，請先到 13｜系統設定新增『類別對應工段』並套用永久儲存。")
-        st.stop()
+        PROCESS_OPTIONS = get_process_options_by_category(default_category, include_common=False)
+    st.caption(f"目前工段類別 / Current Category：{selected_category or '全部 / 通用'}")
     process = st.selectbox("工段名稱｜Process", PROCESS_OPTIONS)
     remark = st.text_area("備註｜Remark", height=90)
     auto_pause = st.checkbox("切換不同工段時，自動暫停同人員其他未結束作業｜Auto pause different process", value=True)
@@ -176,8 +173,8 @@ df = today_records(include_finished=not show_unfinished_only, unfinished_only=sh
 if is_admin and not df.empty:
     with st.expander("▤ 01 工時紀錄表格欄位位置順序調整 / Admin Column Order Settings", expanded=False):
         st.caption("此區僅系統管理員可見。可調整今日工時紀錄表格的欄位寬度與欄位位置順序；設定會永久保存。")
-        render_width_settings("today_records", df, title="01 工時紀錄欄位順序與欄寬設定 / Column Order and Width")
-render_table(df, "today_records", editable=False, height=420)
+        render_width_settings("01.time_records.main", df, title="01 工時紀錄欄位順序與欄寬設定 / Column Order and Width")
+render_table(df, "01.time_records.main", editable=False, height=420)
 
 # V1.81：修改、刪除、存檔功能只允許管理員看見與操作。
 # 一般作業人員只能開始/暫停/下班/完工，不顯示人工維護工具，避免冒用或誤刪資料。
