@@ -1,7 +1,9 @@
 {
-  "schema_version": "3.02",
-  "exported_at": "2026-05-19 02:46:03",
-  "reason": "rescue:ensure_database",
+  "schema_version": "1.43",
+  "exported_at": "2026-05-19 10:56:28",
+  "module_code": "02_history",
+  "module_name_zh": "歷史紀錄",
+  "module_name_en": "History",
   "tables": {
     "time_records": [
       {
@@ -224,8 +226,5 @@
   },
   "counts": {
     "time_records": 8
-  },
-  "module_code": "02_history",
-  "module_name_zh": "歷史紀錄",
-  "module_name_en": "History"
+  }
 }
