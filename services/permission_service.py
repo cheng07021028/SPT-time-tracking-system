@@ -2490,3 +2490,266 @@ def init_permission_tables(force: bool = False) -> None:  # type: ignore[overrid
 # Backward compatible aliases after final override.
 init_auth_tables = init_permission_tables
 check_permission = has_permission
+
+
+# ===== V3.72 DIRECT LATEST PERMISSION SETTINGS LIKE 03/04 =====
+# 目的：10｜權限管理改成跟 03｜製令管理、04｜人員名單一樣的固定 latest JSON 讀寫。
+# - 儲存/刪除：直接寫 data/persistent_modules/10_permissions/10_permissions_records.json
+# - Reboot：直接讀同一個 latest JSON
+# - 不掃 history、不比帳號數、不用舊 master 檔救援、不跑 GitHub
+# - 刪除後帳號數變少也是有效設定
+_V372_PERMISSION_MODULE_DIR = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions"
+_V372_PERMISSION_LATEST_FILE = _V372_PERMISSION_MODULE_DIR / "10_permissions_records.json"
+_V372_PERMISSION_COMPAT_FILE = _V372_PERMISSION_MODULE_DIR / "10_permissions_settings.json"
+_V372_PERMISSION_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_settings.json"
+_V372_PERMISSION_RESTORE_STATE_KEY = "_v372_permission_latest_restored"
+try:
+    _v372_schema_init_only = init_permission_tables  # type: ignore[name-defined]
+except Exception:
+    _v372_schema_init_only = None
+try:
+    _v372_prev_save_users = save_users  # type: ignore[name-defined]
+except Exception:
+    _v372_prev_save_users = None
+try:
+    _v372_prev_delete_users = delete_users  # type: ignore[name-defined]
+except Exception:
+    _v372_prev_delete_users = None
+try:
+    _v372_prev_save_account_permissions = save_account_permissions  # type: ignore[name-defined]
+except Exception:
+    _v372_prev_save_account_permissions = None
+
+
+def _v372_read_json(path: Path) -> dict:
+    try:
+        if path.exists() and path.is_file() and path.stat().st_size > 2:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _v372_atomic_write(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v372_permission_read_latest() -> dict:
+    for path in [_V372_PERMISSION_LATEST_FILE, _V372_PERMISSION_COMPAT_FILE, _V372_PERMISSION_STATE_FILE]:
+        data = _v372_read_json(path)
+        tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
+        if isinstance(tables, dict) and "auth_users" in tables:
+            return data
+    return {}
+
+
+def _v372_permission_schema_only() -> None:
+    try:
+        if _v372_schema_init_only is not None:
+            _v372_schema_init_only(force=False)
+    except TypeError:
+        try:
+            _v372_schema_init_only()  # type: ignore[misc]
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def _v372_fetch_table(conn: sqlite3.Connection, table: str) -> list[dict]:
+    try:
+        rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+
+def _v372_permission_payload_from_db(reason: str = "permission_settings_saved") -> dict:
+    _v372_permission_schema_only()
+    conn = connect_db()
+    try:
+        tables = {
+            "auth_users": _v372_fetch_table(conn, "auth_users"),
+            "auth_account_permissions": _v372_fetch_table(conn, "auth_account_permissions"),
+            "auth_security_settings": _v372_fetch_table(conn, "auth_security_settings"),
+            "security_users": _v372_fetch_table(conn, "security_users"),
+            "security_user_roles": _v372_fetch_table(conn, "security_user_roles"),
+            "security_settings": _v372_fetch_table(conn, "security_settings"),
+        }
+    finally:
+        conn.close()
+    return {
+        "version": "V3.72-direct-latest-like-03-04",
+        "exported_at": now_text(),
+        "reason": reason,
+        "module_key": "10_permissions",
+        "module_code": "10_permissions",
+        "module_name_zh": "權限管理",
+        "module_name_en": "Permission Management",
+        "source": "permission_service_v372",
+        "description": "10｜權限管理固定 latest JSON。模式比照 03/04：儲存寫 latest，Reboot 讀 same latest；刪除後帳號數變少也是有效設定。",
+        "tables": tables,
+        "table_counts": {k: len(v) for k, v in tables.items()},
+        "counts": {k: len(v) for k, v in tables.items()},
+    }
+
+
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
+    """V3.72：照 03/04 成功模式，固定 latest 檔直接覆蓋。"""
+    payload = _v372_permission_payload_from_db(reason)
+    for path in [_V372_PERMISSION_LATEST_FILE, _V372_PERMISSION_COMPAT_FILE, _V372_PERMISSION_STATE_FILE]:
+        _v372_atomic_write(path, payload)
+    clear_permission_runtime_cache()
+    return {
+        "ok": True,
+        "mode": "v372_direct_latest_like_03_04",
+        "reason": reason,
+        "files": [str(_V372_PERMISSION_LATEST_FILE), str(_V372_PERMISSION_COMPAT_FILE), str(_V372_PERMISSION_STATE_FILE)],
+        "table_counts": payload.get("table_counts", {}),
+    }
+
+
+def _v372_replace_table(cur: sqlite3.Cursor, table: str, rows: list[dict]) -> int:
+    try:
+        cur.execute(f'DELETE FROM "{table}"')
+    except Exception:
+        return 0
+    if not rows:
+        return 0
+    count = 0
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        clean = {str(k): v for k, v in r.items() if str(k).strip()}
+        if not clean:
+            continue
+        cols = list(clean.keys())
+        placeholders = ",".join(["?"] * len(cols))
+        col_sql = ",".join([f'"{c}"' for c in cols])
+        try:
+            cur.execute(f'INSERT INTO "{table}" ({col_sql}) VALUES ({placeholders})', [clean[c] for c in cols])
+            count += 1
+        except Exception:
+            continue
+    return count
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    """V3.72：Reboot 後只讀固定 latest，不掃 history，不用帳號數猜測。"""
+    payload = _v372_permission_read_latest()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    if not isinstance(tables, dict) or "auth_users" not in tables:
+        return {"ok": False, "mode": "v372_direct_latest_like_03_04", "message": "no fixed latest permission file"}
+    _v372_permission_schema_only()
+    conn = connect_db(); cur = conn.cursor()
+    restored: dict[str, int] = {}
+    try:
+        try:
+            _ensure_legacy_security_tables(cur)
+            _ensure_security_setting_tables(cur)
+        except Exception:
+            pass
+        for table in ["auth_users", "auth_account_permissions", "auth_security_settings", "security_users", "security_user_roles", "security_settings"]:
+            rows = tables.get(table, []) if isinstance(tables.get(table), list) else []
+            restored[table] = _v372_replace_table(cur, table, rows)
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    clear_permission_runtime_cache()
+    if st is not None:
+        try:
+            st.session_state[_V372_PERMISSION_RESTORE_STATE_KEY] = True
+        except Exception:
+            pass
+    return {"ok": True, "mode": "v372_direct_latest_like_03_04", "source": str(_V372_PERMISSION_LATEST_FILE), "restored": restored}
+
+
+def _v372_restore_permission_once() -> None:
+    if st is not None:
+        try:
+            if st.session_state.get(_V372_PERMISSION_RESTORE_STATE_KEY):
+                return
+        except Exception:
+            pass
+    if _v372_permission_read_latest():
+        restore_permission_settings_from_permanent_files(force=True)
+    if st is not None:
+        try:
+            st.session_state[_V372_PERMISSION_RESTORE_STATE_KEY] = True
+        except Exception:
+            pass
+
+
+def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
+    """V3.72：平常只建 schema；force=True 才從 latest 還原。登入頁不做重流程。"""
+    _v372_permission_schema_only()
+    if force:
+        restore_permission_settings_from_permanent_files(force=True)
+
+
+init_auth_tables = init_permission_tables
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    """V3.72：10｜權限管理頁讀取帳號時，先從固定 latest 還原一次。"""
+    _v372_restore_permission_once()
+    conn = connect_db()
+    try:
+        rows = conn.execute("""
+            SELECT id, username,
+                   '********' AS password_display,
+                   '' AS new_password,
+                   employee_id, display_name, email, role_code,
+                   is_active, force_password_change, last_login_at, note, created_at, updated_at
+            FROM auth_users
+            ORDER BY username
+        """).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
+    """V3.72：儲存後直接覆蓋固定 latest JSON，不讓舊檔/預設值回蓋。"""
+    _v372_restore_permission_once()
+    if _v372_prev_save_users is not None:
+        result = _v372_prev_save_users(rows)
+    else:
+        result = {"saved": 0, "skipped": []}
+    export_result = export_permission_settings_permanently("auth_users_saved_v372")
+    if isinstance(result, dict):
+        result["permanent_save"] = export_result
+    return result
+
+
+def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
+    """V3.72：刪除後直接覆蓋固定 latest JSON；Reboot 不可從舊檔救回。"""
+    _v372_restore_permission_once()
+    if _v372_prev_delete_users is not None:
+        deleted = int(_v372_prev_delete_users(usernames) or 0)
+    else:
+        deleted = 0
+    export_permission_settings_permanently("auth_users_deleted_v372")
+    return deleted
+
+
+def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
+    _v372_restore_permission_once()
+    if _v372_prev_save_account_permissions is not None:
+        count = int(_v372_prev_save_account_permissions(rows) or 0)
+    else:
+        count = 0
+    export_permission_settings_permanently("account_permissions_saved_v372")
+    return count
+
+# Backward compatible alias after final override.
+check_permission = has_permission

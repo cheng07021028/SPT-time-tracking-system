@@ -2220,3 +2220,217 @@ def ensure_system_settings_schema() -> None:  # type: ignore[override]
     _SYSTEM_SETTINGS_SCHEMA_READY = True
     _V366_SYSTEM_SCHEMA_READY = True
 
+
+
+# ===== V3.72 DIRECT LATEST SYSTEM SETTINGS LIKE 03/04 =====
+# 目的：13｜系統設定改成跟 03｜製令管理、04｜人員名單一樣的固定 latest JSON 讀寫。
+# - 儲存：直接寫 data/persistent_modules/13_system_settings/13_system_settings_records.json
+# - Reboot：直接讀同一個 latest JSON
+# - 不掃 history、不比資料筆數、不讓 SQLite 預設值覆蓋使用者設定
+# - 空清單也是有效設定
+_V372_SYSTEM_MODULE_DIR = PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings"
+_V372_SYSTEM_LATEST_FILE = _V372_SYSTEM_MODULE_DIR / "13_system_settings_records.json"
+_V372_SYSTEM_COMPAT_FILE = _V372_SYSTEM_MODULE_DIR / "system_settings.json"
+_V372_SYSTEM_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json"
+_V372_SYSTEM_CONFIG_FILE = PROJECT_ROOT / "data" / "config" / "system_settings.json"
+_V372_SYSTEM_RESTORE_FLAG = "_v372_system_latest_restored"
+try:
+    _v372_prev_ensure_system_settings_schema = ensure_system_settings_schema  # type: ignore[name-defined]
+except Exception:
+    _v372_prev_ensure_system_settings_schema = None
+
+
+def _v372_system_read_latest() -> dict[str, Any]:
+    for path in [_V372_SYSTEM_LATEST_FILE, _V372_SYSTEM_COMPAT_FILE, _V372_SYSTEM_STATE_FILE, _V372_SYSTEM_CONFIG_FILE]:
+        data = _v366_system_read_json(path) if "_v366_system_read_json" in globals() else {}
+        if not isinstance(data, dict):
+            continue
+        tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
+        if isinstance(tables, dict) and any(k in tables for k in ["process_categories", "process_category_options", "process_options", "rest_periods", "app_settings"]):
+            return data
+    return {}
+
+
+def _v372_df_to_records(df: pd.DataFrame) -> list[dict[str, Any]]:
+    if df is None or df.empty:
+        return []
+    return df.where(pd.notna(df), "").to_dict(orient="records")
+
+
+def _v372_system_payload_from_db(reason: str = "system_settings_saved") -> dict[str, Any]:
+    _v366_create_category_tables_no_seed()
+    try:
+        cats = query_df("SELECT id, category_name, is_active, sort_order, note, created_at, updated_at FROM process_categories ORDER BY sort_order, id")
+    except Exception:
+        cats = pd.DataFrame(columns=["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+    try:
+        proc = query_df("SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options ORDER BY category_name, sort_order, id")
+    except Exception:
+        proc = pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+    try:
+        rest = query_df("SELECT id, name, start_time, end_time, is_active, sort_order FROM rest_periods ORDER BY sort_order, id")
+    except Exception:
+        rest = pd.DataFrame(columns=["id", "name", "start_time", "end_time", "is_active", "sort_order"])
+    try:
+        app = query_df("SELECT setting_key, setting_value, note, updated_at FROM app_settings ORDER BY setting_key")
+    except Exception:
+        app = pd.DataFrame(columns=["setting_key", "setting_value", "note", "updated_at"])
+    proc_rows = _v372_df_to_records(proc)
+    payload: dict[str, Any] = {
+        "version": "V3.72-direct-latest-like-03-04",
+        "exported_at": _now(),
+        "reason": reason,
+        "module_key": "13_system_settings",
+        "module_code": "13_system_settings",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "source": "system_settings_service_v372",
+        "description": "13｜系統設定固定 latest JSON。模式比照 03/04：儲存寫 latest，Reboot 讀 same latest；空表也是有效設定。",
+        "tables": {
+            "process_categories": _v372_df_to_records(cats),
+            "process_category_options": proc_rows,
+            # 相容舊呼叫端。注意：內容與 process_category_options 完全一致。
+            "process_options": proc_rows,
+            "rest_periods": _v372_df_to_records(rest),
+            "app_settings": _v372_df_to_records(app),
+        },
+        "table_counts": {
+            "process_categories": 0 if cats is None else len(cats),
+            "process_category_options": 0 if proc is None else len(proc),
+            "process_options": 0 if proc is None else len(proc),
+            "rest_periods": 0 if rest is None else len(rest),
+            "app_settings": 0 if app is None else len(app),
+        },
+        "counts": {
+            "process_categories": 0 if cats is None else len(cats),
+            "process_category_options": 0 if proc is None else len(proc),
+            "rest_periods": 0 if rest is None else len(rest),
+            "app_settings": 0 if app is None else len(app),
+        },
+    }
+    return payload
+
+
+def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    """V3.72：照 03/04 的成功模式，固定 latest 檔直接覆蓋。"""
+    payload = _v372_system_payload_from_db(reason)
+    for path in [_V372_SYSTEM_LATEST_FILE, _V372_SYSTEM_COMPAT_FILE, _V372_SYSTEM_STATE_FILE, _V372_SYSTEM_CONFIG_FILE]:
+        _v366_system_atomic_write(path, payload)
+    _clear_settings_cache()
+    return {
+        "ok": True,
+        "mode": "v372_direct_latest_like_03_04",
+        "files": [str(_V372_SYSTEM_LATEST_FILE), str(_V372_SYSTEM_COMPAT_FILE), str(_V372_SYSTEM_STATE_FILE), str(_V372_SYSTEM_CONFIG_FILE)],
+        "table_counts": payload.get("table_counts", {}),
+    }
+
+
+def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    """V3.72：Reboot 後只讀固定 latest，不掃 history，不用資料筆數猜測。"""
+    _v366_create_category_tables_no_seed()
+    payload = _v372_system_read_latest()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    if not isinstance(tables, dict) or not any(k in tables for k in ["process_categories", "process_category_options", "process_options", "rest_periods", "app_settings"]):
+        return {"ok": False, "mode": "v372_direct_latest_like_03_04", "message": "no fixed latest system settings file"}
+
+    restored: dict[str, int] = {}
+
+    def _active(v: Any, default: int = 1) -> int:
+        text = str(v if v is not None else default).strip().lower()
+        return 0 if text in {"0", "false", "no", "n", "off", "停用", "否"} else 1
+
+    # key 存在即代表有效設定；空清單也要覆蓋成空表。
+    if "process_categories" in tables:
+        execute("DELETE FROM process_categories")
+        count = 0
+        for idx, r in enumerate(tables.get("process_categories") or [], start=1):
+            if not isinstance(r, dict):
+                continue
+            name = _norm_category_name(r.get("category_name") or r.get("category") or r.get("類別"))
+            if not name:
+                continue
+            try:
+                sort_order = int(float(r.get("sort_order") or idx))
+            except Exception:
+                sort_order = idx
+            execute(
+                """
+                INSERT INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?)
+                ON CONFLICT(category_name) DO UPDATE SET
+                    is_active=excluded.is_active, sort_order=excluded.sort_order,
+                    note=excluded.note, updated_at=excluded.updated_at
+                """,
+                (name, _active(r.get("is_active", 1)), sort_order, str(r.get("note") or ""), str(r.get("created_at") or _now()), str(r.get("updated_at") or _now())),
+            )
+            count += 1
+        restored["process_categories"] = count
+
+    if "process_category_options" in tables or "process_options" in tables:
+        execute("DELETE FROM process_category_options")
+        execute("DELETE FROM process_options")
+        proc_rows = tables.get("process_category_options") if isinstance(tables.get("process_category_options"), list) else tables.get("process_options", [])
+        count = 0
+        for idx, r in enumerate(proc_rows or [], start=1):
+            if not isinstance(r, dict):
+                continue
+            category = _norm_category_name(r.get("category_name") or r.get("type_name") or PROCESS_CATEGORY_ALL)
+            proc = str(r.get("process_name") or "").strip()
+            if not proc:
+                continue
+            try:
+                sort_order = int(float(r.get("sort_order") or idx))
+            except Exception:
+                sort_order = idx
+            execute(
+                """
+                INSERT INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?)
+                ON CONFLICT(category_name, process_name) DO UPDATE SET
+                    is_active=excluded.is_active, sort_order=excluded.sort_order,
+                    note=excluded.note, updated_at=excluded.updated_at
+                """,
+                (category, proc, _active(r.get("is_active", 1)), sort_order, str(r.get("note") or ""), str(r.get("created_at") or _now()), str(r.get("updated_at") or _now())),
+            )
+            execute(
+                """
+                INSERT INTO process_options(process_name,is_active,sort_order,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?)
+                ON CONFLICT(process_name) DO UPDATE SET
+                    is_active=excluded.is_active, sort_order=excluded.sort_order,
+                    note=excluded.note, updated_at=excluded.updated_at
+                """,
+                (proc, _active(r.get("is_active", 1)), sort_order, str(r.get("note") or ""), str(r.get("created_at") or _now()), str(r.get("updated_at") or _now())),
+            )
+            count += 1
+        restored["process_category_options"] = count
+        restored["process_options"] = count
+
+    if "rest_periods" in tables:
+        execute("DELETE FROM rest_periods")
+        restored["rest_periods"] = _insert_rest_rows(tables.get("rest_periods") or [])
+
+    if "app_settings" in tables:
+        execute("DELETE FROM app_settings")
+        restored["app_settings"] = _insert_app_settings_rows(tables.get("app_settings") or [])
+
+    _clear_settings_cache()
+    return {"ok": True, "mode": "v372_direct_latest_like_03_04", "source": str(_V372_SYSTEM_LATEST_FILE), "restored": restored}
+
+
+def ensure_system_settings_schema() -> None:  # type: ignore[override]
+    """V3.72：先讀固定 latest；只有 latest 不存在才允許初始預設。"""
+    global _SYSTEM_SETTINGS_SCHEMA_READY
+    _v366_create_category_tables_no_seed()
+    payload = _v372_system_read_latest()
+    if payload:
+        restore_system_settings_from_permanent(force=True)
+    else:
+        # 固定 latest 不存在，才走舊版預設初始化一次。
+        try:
+            if _v372_prev_ensure_system_settings_schema is not None:
+                _v372_prev_ensure_system_settings_schema()
+        except Exception:
+            pass
+    _clear_settings_cache()
+    _SYSTEM_SETTINGS_SCHEMA_READY = True
