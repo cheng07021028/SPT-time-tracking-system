@@ -14,9 +14,9 @@ from services.system_settings_service import (
     delete_process_options,
     delete_rest_periods,
     load_process_options_df,
-    load_process_model_choices,
-    save_default_process_model,
-    get_default_process_model,
+    load_process_category_choices,
+    save_default_process_category,
+    get_default_process_category,
     load_rest_periods_df,
     save_process_options_df,
     save_rest_periods_df,
@@ -497,38 +497,55 @@ st.divider()
 # -----------------------------------------------------------------------------
 # 1) Process options
 # -----------------------------------------------------------------------------
-st.subheader("一、工段名稱設定 / Process Options")
-st.caption("這裡會套用到 01｜工時紀錄的『工段名稱』下拉選單。可依『機型』建立不同工段；機型空白或選『全部 / 通用』代表所有機型共用。")
+st.subheader("一、類別與工段名稱設定 / Category & Process Options")
+st.caption("這裡會套用到 01｜工時紀錄的『類別 / Category』與『工段名稱』下拉選單。可依類別建立不同工段；「全部 / 通用」代表所有類別共用。")
 
-model_choices = load_process_model_choices(include_common=True)
-current_default_model = get_default_process_model()
-if current_default_model not in model_choices:
-    model_choices.append(current_default_model)
+category_choices = load_process_category_choices(include_common=True)
+current_default_category = get_default_process_category()
+if current_default_category not in category_choices:
+    category_choices.append(current_default_category)
 
-dm1, dm2, dm3 = st.columns([2, 1, 3])
-with dm1:
-    selected_default_model = st.selectbox(
-        "預設機型 / Default Model",
-        model_choices,
-        index=model_choices.index(current_default_model) if current_default_model in model_choices else 0,
-        help="當製令機型空白、或該機型沒有專屬工段時，01 工時紀錄會使用此預設機型的工段。",
-        key="system_default_process_model_v328",
+cat1, cat2, cat3 = st.columns([2, 1, 3])
+with cat1:
+    selected_default_category = st.selectbox(
+        "預設類別 / Default Category",
+        category_choices,
+        index=category_choices.index(current_default_category) if current_default_category in category_choices else 0,
+        help="當 01 工時紀錄沒有選擇特定類別、或該類別沒有專屬工段時，會使用此預設類別與通用工段。",
+        key="system_default_process_category_v333",
     )
-with dm2:
+with cat2:
     st.write("")
     st.write("")
-    if can_manage and st.button("▣ 套用預設機型", use_container_width=True, key="apply_default_process_model_v328"):
-        saved_model = save_default_process_model(selected_default_model)
-        _export_permanent_settings(f"已套用預設機型：{saved_model}")
-        _refresh_after_apply(f"已套用預設機型：{saved_model}，畫面已重新整理。")
-with dm3:
-    st.info("01｜工時紀錄會先依製令的『機型 / Type』載入專屬工段；若找不到，才改用這裡的預設機型與通用工段。")
+    if can_manage and st.button("▣ 套用預設類別", use_container_width=True, key="apply_default_process_category_v333"):
+        saved_category = save_default_process_category(selected_default_category)
+        _export_permanent_settings(f"已套用預設類別：{saved_category}")
+        _refresh_after_apply(f"已套用預設類別：{saved_category}，畫面已重新整理。")
+with cat3:
+    st.info("01｜工時紀錄會依這裡的『類別 / Category』載入對應工段；『全部 / 通用』代表所有類別共用工段。")
+
+all_category_choices = load_process_category_choices(include_common=True)
+if current_default_category not in all_category_choices:
+    all_category_choices.append(current_default_category)
+filter_category = st.selectbox(
+    "顯示類別 / Show Category",
+    all_category_choices,
+    index=all_category_choices.index(current_default_category) if current_default_category in all_category_choices else 0,
+    key="system_process_category_filter_v333",
+    help="選擇類別後，下方表格只顯示該類別與通用工段，方便設定與檢查。",
+)
 
 proc_df = load_process_options_df(active_only=False)
 if proc_df.empty:
-    proc_df = pd.DataFrame(columns=["id", "type_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
-if "type_name" not in proc_df.columns:
-    proc_df.insert(1, "type_name", "全部 / 通用")
+    proc_df = pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+if "category_name" not in proc_df.columns:
+    if "type_name" in proc_df.columns:
+        proc_df = proc_df.rename(columns={"type_name": "category_name"})
+    else:
+        proc_df.insert(1, "category_name", "全部 / 通用")
+proc_df["category_name"] = proc_df["category_name"].fillna("全部 / 通用").astype(str).replace({"": "全部 / 通用"})
+if filter_category:
+    proc_df = proc_df[(proc_df["category_name"].eq("全部 / 通用")) | (proc_df["category_name"].eq(filter_category))].copy()
 proc_view = _normalize_delete_column(proc_df)
 
 proc_edit_key = "_spt_13_process_edit_mode"
@@ -565,6 +582,9 @@ if can_manage and st.session_state.get(proc_edit_key, False):
     if submitted and edited_proc is not None:
         if action == "套用並永久儲存工段名稱設定":
             save_df = edited_proc.drop(columns=["刪除"], errors="ignore")
+            if "category_name" not in save_df.columns:
+                save_df.insert(1, "category_name", filter_category or "全部 / 通用")
+            save_df["category_name"] = save_df["category_name"].fillna("").astype(str).replace({"": filter_category or "全部 / 通用"})
             count = save_process_options_df(save_df)
             _export_permanent_settings(f"已套用工段名稱設定 {count} 筆")
             _refresh_after_apply(f"已套用工段名稱設定 {count} 筆，畫面已重新整理。", proc_edit_key)

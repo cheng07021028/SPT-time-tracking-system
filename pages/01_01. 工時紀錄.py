@@ -27,7 +27,7 @@ from services.time_record_service import (
 )
 from services.db_service import query_one
 from services.table_ui_service import render_table
-from services.system_settings_service import get_process_options_by_model, get_default_process_model, get_live_page_reset_time
+from services.system_settings_service import get_process_options_by_category, get_default_process_category, load_process_category_choices, get_live_page_reset_time
 
 st.set_page_config(page_title="01. 工時紀錄", page_icon="⏱", layout="wide")
 apply_theme()
@@ -57,13 +57,20 @@ with left:
     wo_no = wo_label.split("｜")[0]
     work_order = query_one("SELECT * FROM work_orders WHERE work_order=?", (wo_no,))
 
-    selected_type_name = str((work_order or {}).get("type_name") or "").strip()
-    if not selected_type_name:
-        selected_type_name = get_default_process_model()
-    PROCESS_OPTIONS = get_process_options_by_model(selected_type_name, include_common=True)
+    category_choices = load_process_category_choices(include_common=True)
+    default_category = get_default_process_category()
+    if default_category not in category_choices:
+        category_choices.append(default_category)
+    selected_category = st.selectbox(
+        "類別｜Category",
+        category_choices,
+        index=category_choices.index(default_category) if default_category in category_choices else 0,
+        key="time_record_process_category_v333",
+    )
+    PROCESS_OPTIONS = get_process_options_by_category(selected_category, include_common=True)
     if not PROCESS_OPTIONS:
-        PROCESS_OPTIONS = get_process_options_by_model(get_default_process_model(), include_common=True)
-    st.caption(f"目前製令機型 / Current Model：{selected_type_name or '全部 / 通用'}")
+        PROCESS_OPTIONS = get_process_options_by_category(default_category, include_common=True)
+    st.caption(f"目前工段類別 / Current Category：{selected_category or '全部 / 通用'}")
     process = st.selectbox("工段名稱｜Process", PROCESS_OPTIONS)
     remark = st.text_area("備註｜Remark", height=90)
     auto_pause = st.checkbox("切換不同工段時，自動暫停同人員其他未結束作業｜Auto pause different process", value=True)
