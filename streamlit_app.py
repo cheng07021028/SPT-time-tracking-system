@@ -16,16 +16,11 @@ st.set_page_config(
 
 apply_theme()
 require_login("home")
-# V3.43: after login, run a local-only settings restore guard once per session.
-# This prevents Reboot App / SQLite rebuild from showing default permissions,
-# system settings, or table-width settings while avoiding network calls on login.
-if not st.session_state.get("_spt_v343_restore_guard_done"):
-    try:
-        from services.permanent_restore_guard_service import restore_core_modules_from_local_permanent
-        restore_core_modules_from_local_permanent()
-    except Exception:
-        pass
-    st.session_state["_spt_v343_restore_guard_done"] = True
+# V3.45 startup acceleration:
+# Do not run full local restore / index rebuild during login-home transition.
+# Permanent data is still protected by module save/load services and can be
+# audited or manually rebuilt from 12｜模組永久紀錄中心.
+st.session_state["_spt_v343_restore_guard_done"] = True
 _global_ui_settings = load_global_ui_settings()
 inject_global_font_scale(_global_ui_settings.get("global_font_scale_percent", 100))
 render_home_header()
