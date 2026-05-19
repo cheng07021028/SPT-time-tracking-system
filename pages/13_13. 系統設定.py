@@ -14,6 +14,9 @@ from services.system_settings_service import (
     delete_process_options,
     delete_rest_periods,
     load_process_options_df,
+    load_process_model_choices,
+    save_default_process_model,
+    get_default_process_model,
     load_rest_periods_df,
     save_process_options_df,
     save_rest_periods_df,
@@ -495,10 +498,37 @@ st.divider()
 # 1) Process options
 # -----------------------------------------------------------------------------
 st.subheader("一、工段名稱設定 / Process Options")
-st.caption("這裡會套用到 01｜工時紀錄的『工段名稱』下拉選單。只有『啟用』的工段會出現在下拉選單。")
+st.caption("這裡會套用到 01｜工時紀錄的『工段名稱』下拉選單。可依『機型』建立不同工段；機型空白或選『全部 / 通用』代表所有機型共用。")
+
+model_choices = load_process_model_choices(include_common=True)
+current_default_model = get_default_process_model()
+if current_default_model not in model_choices:
+    model_choices.append(current_default_model)
+
+dm1, dm2, dm3 = st.columns([2, 1, 3])
+with dm1:
+    selected_default_model = st.selectbox(
+        "預設機型 / Default Model",
+        model_choices,
+        index=model_choices.index(current_default_model) if current_default_model in model_choices else 0,
+        help="當製令機型空白、或該機型沒有專屬工段時，01 工時紀錄會使用此預設機型的工段。",
+        key="system_default_process_model_v328",
+    )
+with dm2:
+    st.write("")
+    st.write("")
+    if can_manage and st.button("▣ 套用預設機型", use_container_width=True, key="apply_default_process_model_v328"):
+        saved_model = save_default_process_model(selected_default_model)
+        _export_permanent_settings(f"已套用預設機型：{saved_model}")
+        _refresh_after_apply(f"已套用預設機型：{saved_model}，畫面已重新整理。")
+with dm3:
+    st.info("01｜工時紀錄會先依製令的『機型 / Type』載入專屬工段；若找不到，才改用這裡的預設機型與通用工段。")
+
 proc_df = load_process_options_df(active_only=False)
 if proc_df.empty:
-    proc_df = pd.DataFrame(columns=["id", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+    proc_df = pd.DataFrame(columns=["id", "type_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+if "type_name" not in proc_df.columns:
+    proc_df.insert(1, "type_name", "全部 / 通用")
 proc_view = _normalize_delete_column(proc_df)
 
 proc_edit_key = "_spt_13_process_edit_mode"
