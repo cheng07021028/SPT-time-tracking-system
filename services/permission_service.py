@@ -2454,3 +2454,39 @@ def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
             pass
     return deleted
 
+
+# ===== V3.69 login safe mode: no restore during login/page bootstrap =====
+# 問題：V366/V368 的 init_permission_tables() 在任何登入/權限查詢時會自動還原整包
+# 10_permissions JSON 並同步 runtime tables。登入頁或首頁若多次觸發權限檢查，會像一直運算。
+# 修正：初始化只做 schema/default，絕不自動 restore；只有 10｜權限管理 get_users()/手動 force 才還原。
+try:
+    _v369_schema_init_only = _prev_v366_init_permission_tables  # type: ignore[name-defined]
+except Exception:
+    _v369_schema_init_only = None
+
+
+def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
+    """V3.69: lightweight schema init only.
+
+    - Normal login/page entry: no JSON restore, no runtime sync, no history scan.
+    - 10｜權限管理 or maintenance can call force=True to restore direct latest files.
+    """
+    global _PERMISSION_SCHEMA_READY
+    try:
+        if _v369_schema_init_only is not None:
+            _v369_schema_init_only(force=False)
+        else:
+            # Fallback to the original schema-ready behavior if this file is reorganized later.
+            pass
+    except Exception:
+        pass
+    _PERMISSION_SCHEMA_READY = True
+    if force:
+        try:
+            restore_permission_settings_from_permanent_files(force=True)
+        except Exception:
+            pass
+
+# Backward compatible aliases after final override.
+init_auth_tables = init_permission_tables
+check_permission = has_permission

@@ -2226,3 +2226,191 @@ def require_module_access(module_code: str, action: str = 'can_view') -> None:  
         st.stop()
 
 require_permission = require_module_access
+
+# ===== V3.69 login safe mode: direct-account restore only, no history scan =====
+# 03/04 能穩定，是因為只讀固定 latest 檔。登入也改成同樣模式：只讀 10_permissions 固定檔，
+# 不掃 history、不比誰資料多、不碰 GitHub，避免登入畫面一直運算。
+_V369_DELETED_ACCOUNT_FILES = [
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "deleted_accounts.json",
+    PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_deleted_accounts.json",
+]
+
+
+def _v369_read_json_file(path: Path) -> dict[str, Any]:
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _v369_deleted_accounts() -> set[str]:
+    deleted: set[str] = set()
+    for p in _V369_DELETED_ACCOUNT_FILES:
+        data = _v369_read_json_file(p)
+        raw = data.get("deleted_usernames") if isinstance(data.get("deleted_usernames"), list) else []
+        for u in raw:
+            name = str(u or "").strip().lower()
+            if name and name != "admin":
+                deleted.add(name)
+    return deleted
+
+
+def _v369_extract_tables(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    if not isinstance(payload, dict):
+        return {}
+    tables = payload.get("tables")
+    if isinstance(tables, dict) and isinstance(tables.get("auth_users"), list):
+        return tables  # type: ignore[return-value]
+    ps = payload.get("permission_settings")
+    if isinstance(ps, dict):
+        for v in ps.values():
+            if isinstance(v, dict) and isinstance(v.get("tables"), dict) and isinstance(v.get("tables", {}).get("auth_users"), list):
+                return v.get("tables", {})  # type: ignore[return-value]
+    return {}
+
+
+def _best_local_auth_tables() -> dict[str, list[dict[str, Any]]]:  # type: ignore[override]
+    """V3.69: direct latest auth restore for login only.
+
+    Reads only fixed files written by 10｜權限管理 V366+.
+    No history, no GitHub, no broad persistence scan.
+    """
+    candidates = [
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_user_persistent_settings.json",
+    ]
+    best_tables: dict[str, list[dict[str, Any]]] = {}
+    best_stamp = ""
+    best_mtime = -1.0
+    for path in candidates:
+        payload = _v369_read_json_file(path)
+        tables = _v369_extract_tables(payload)
+        users = tables.get("auth_users", []) if isinstance(tables, dict) else []
+        if not isinstance(users, list) or not users:
+            continue
+        stamp = str(payload.get("exported_at") or payload.get("updated_at") or "")
+        try:
+            mtime = path.stat().st_mtime
+        except Exception:
+            mtime = 0.0
+        if (stamp, mtime) >= (best_stamp, best_mtime):
+            best_stamp, best_mtime = stamp, mtime
+            best_tables = {
+                "auth_users": list(users),
+                "auth_account_permissions": list(tables.get("auth_account_permissions", []) or []),
+            }
+    deleted = _v369_deleted_accounts()
+    if deleted and best_tables:
+        best_tables["auth_users"] = [r for r in best_tables.get("auth_users", []) if str(r.get("username", "")).strip().lower() not in deleted]
+        best_tables["auth_account_permissions"] = [r for r in best_tables.get("auth_account_permissions", []) if str(r.get("username", "")).strip().lower() not in deleted]
+    return best_tables
+
+
+def _restore_auth_users_lightweight_if_needed(username: str = "") -> None:  # type: ignore[override]
+    """V3.69: lazy login restore, direct files only.
+
+    It runs once per process, inserts/updates only auth_users and auth_account_permissions,
+    and never calls permission_service, GitHub, history scan, or full matrix rebuild.
+    """
+    global _AUTH_LIGHT_RESTORE_DONE
+    if _AUTH_LIGHT_RESTORE_DONE:
+        return
+    _AUTH_LIGHT_RESTORE_DONE = True
+    _ensure_auth_users_schema_lightweight()
+    try:
+        row = query_one("SELECT COUNT(*) AS c FROM auth_users") or {}
+        count = int(row.get("c", 0) or 0)
+        # If DB already has non-default account records, avoid any restore during login.
+        if count > 6:
+            return
+    except Exception:
+        pass
+    tables = _best_local_auth_tables()
+    users = tables.get("auth_users", [])
+    perms = tables.get("auth_account_permissions", [])
+    if not users:
+        return
+    try:
+        for u in users:
+            if not isinstance(u, dict):
+                continue
+            uname = str(u.get("username", "")).strip()
+            if not uname:
+                continue
+            execute("""
+                INSERT INTO auth_users
+                (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(username) DO UPDATE SET
+                    password_hash=excluded.password_hash,
+                    password_hint=excluded.password_hint,
+                    employee_id=excluded.employee_id,
+                    display_name=excluded.display_name,
+                    email=excluded.email,
+                    role_code=excluded.role_code,
+                    is_active=excluded.is_active,
+                    force_password_change=excluded.force_password_change,
+                    last_login_at=excluded.last_login_at,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (
+                uname,
+                str(u.get("password_hash", "") or ""),
+                str(u.get("password_hint", "") or ""),
+                str(u.get("employee_id", "") or ""),
+                str(u.get("display_name", "") or uname),
+                str(u.get("email", "") or ""),
+                str(u.get("role_code", "operator") or "operator"),
+                int(u.get("is_active", 1) or 0),
+                int(u.get("force_password_change", 0) or 0),
+                str(u.get("last_login_at", "") or ""),
+                str(u.get("note", "") or ""),
+                str(u.get("created_at", "") or _now()),
+                str(u.get("updated_at", "") or _now()),
+            ))
+        for r in perms:
+            if not isinstance(r, dict):
+                continue
+            uname = str(r.get("username", "")).strip()
+            module_code = str(r.get("module_code", "")).strip()
+            if not uname or not module_code:
+                continue
+            execute("""
+                INSERT INTO auth_account_permissions
+                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(username,module_code) DO UPDATE SET
+                    module_name_zh=excluded.module_name_zh,
+                    module_name_en=excluded.module_name_en,
+                    can_view=excluded.can_view,
+                    can_create=excluded.can_create,
+                    can_edit=excluded.can_edit,
+                    can_delete=excluded.can_delete,
+                    can_import=excluded.can_import,
+                    can_export=excluded.can_export,
+                    can_backup=excluded.can_backup,
+                    can_restore=excluded.can_restore,
+                    can_manage=excluded.can_manage,
+                    updated_at=excluded.updated_at
+            """, (
+                uname, module_code,
+                str(r.get("module_name_zh", "") or ""),
+                str(r.get("module_name_en", "") or ""),
+                int(r.get("can_view", 0) or 0),
+                int(r.get("can_create", 0) or 0),
+                int(r.get("can_edit", 0) or 0),
+                int(r.get("can_delete", 0) or 0),
+                int(r.get("can_import", 0) or 0),
+                int(r.get("can_export", 0) or 0),
+                int(r.get("can_backup", 0) or 0),
+                int(r.get("can_restore", 0) or 0),
+                int(r.get("can_manage", 0) or 0),
+                str(r.get("updated_at", "") or _now()),
+            ))
+    except Exception:
+        pass
