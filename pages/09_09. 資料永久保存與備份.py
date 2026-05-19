@@ -24,6 +24,16 @@ from services.github_cloud_storage_service import (
     restore_from_github_if_database_empty,
     upload_existing_permanent_files,
 )
+from services.github_retention_service import (
+    REMOTE_ALLOWED_ROOTS,
+    audit_module_github_links,
+    cleanup_github_files_by_date,
+    load_cleanup_settings,
+    preview_github_cleanup,
+    run_due_github_cleanup_if_needed,
+    save_cleanup_settings,
+    upload_all_module_persistent_files_to_github,
+)
 
 # V1.45: keep page 09 header style consistent with other modules.
 # Use the common two-argument render_header format to avoid showing only the module number.
@@ -53,6 +63,86 @@ with st.expander("GitHub 雲端設定檢查 / Cloud Settings", expanded=True):
             'GITHUB_REPOSITORY = "cheng07021028/SPT-time-tracking-system"\n'
             'GITHUB_BRANCH = "main"'
         )
+
+# V3.26: GitHub module persistent-file audit and cleanup center.
+with st.expander("GitHub 模組備份連結檢查 / Module Backup Link Audit", expanded=True):
+    st.caption("檢查每個模組在 data/persistent_modules 的 records/settings 是否也有對應 GitHub 檔案。這可避免 Reboot App 後 SQLite 空白但 GitHub 沒有主檔可還原。")
+    ga1, ga2, ga3 = st.columns(3)
+    if ga1.button("檢查所有模組 GitHub 連結 / Audit Links", use_container_width=True, key="v326_audit_module_github_links"):
+        res = audit_module_github_links(check_remote=True)
+        st.session_state["v326_module_github_audit"] = res
+    if ga2.button("上傳/修復模組資料與設定檔 / Sync Module Files", use_container_width=True, key="v326_upload_module_files"):
+        res = upload_all_module_persistent_files_to_github()
+        st.session_state["v326_module_upload_result"] = res
+        if res.get("ok"):
+            st.success("已同步所有可用的模組 records/settings 到 GitHub。")
+        else:
+            st.warning("部分模組檔案未同步，請查看結果。")
+    if ga3.button("執行到期的 GitHub 定期清理 / Run Due Cleanup", use_container_width=True, key="v326_run_due_cleanup"):
+        res = run_due_github_cleanup_if_needed()
+        st.session_state["v326_due_cleanup_result"] = res
+        st.info(res.get("message", "已執行檢查。"))
+
+    audit = st.session_state.get("v326_module_github_audit")
+    if audit:
+        summary = audit.get("summary", {})
+        ac1, ac2, ac3 = st.columns(3)
+        ac1.metric("模組數", summary.get("modules", 0))
+        ac2.metric("Records 已連結", summary.get("records_linked", 0))
+        ac3.metric("Settings 已連結", summary.get("settings_linked", 0))
+        st.dataframe(pd.DataFrame(audit.get("rows", [])), use_container_width=True, hide_index=True, height=360)
+    if st.session_state.get("v326_module_upload_result"):
+        with st.expander("模組檔案同步結果 / Sync Result", expanded=False):
+            st.json(st.session_state.get("v326_module_upload_result"))
+
+with st.expander("GitHub 備份檔清理 / GitHub Backup Cleanup", expanded=False):
+    st.caption("安全規則：預設只清理有時間戳的 history/backup 檔，不刪 latest 主檔，避免影響目前系統顯示與功能。")
+    cleanup_cfg = load_cleanup_settings()
+    roots_default = cleanup_cfg.get("roots", ["data/persistent_state/history", "data/persistent_state/audit_history", "data/persistent_modules"])
+    selected_roots = st.multiselect(
+        "清理範圍 / Cleanup Roots",
+        REMOTE_ALLOWED_ROOTS,
+        default=[r for r in roots_default if r in REMOTE_ALLOWED_ROOTS],
+        key="v326_cleanup_roots",
+    )
+    dc1, dc2, dc3 = st.columns(3)
+    start_date = dc1.date_input("開始日期 / Start", value=pd.Timestamp.today().date() - pd.Timedelta(days=180), key="v326_cleanup_start")
+    end_date = dc2.date_input("結束日期 / End", value=pd.Timestamp.today().date() - pd.Timedelta(days=90), key="v326_cleanup_end")
+    include_undated = dc3.checkbox("允許刪除無日期檔案 / Include undated files", value=False, key="v326_cleanup_undated")
+    pc1, pc2 = st.columns(2)
+    if pc1.button("預覽清理清單 / Preview Cleanup", use_container_width=True, key="v326_preview_cleanup"):
+        res = preview_github_cleanup(start_date, end_date, selected_roots, delete_undated_files=include_undated)
+        st.session_state["v326_cleanup_preview"] = res
+    confirm_delete = pc2.checkbox("我確認刪除 GitHub 上述範圍檔案 / Confirm Delete", value=False, key="v326_confirm_cleanup_delete")
+    preview = st.session_state.get("v326_cleanup_preview")
+    if preview:
+        st.metric("待刪除候選檔 / Candidates", len(preview.get("candidates", [])))
+        st.dataframe(pd.DataFrame(preview.get("candidates", [])), use_container_width=True, hide_index=True, height=260)
+    if st.button("正式刪除預覽範圍 GitHub 檔案 / Delete GitHub Files", use_container_width=True, disabled=not confirm_delete, key="v326_delete_cleanup"):
+        res = cleanup_github_files_by_date(start_date, end_date, selected_roots, delete_undated_files=include_undated, dry_run=False)
+        st.session_state["v326_cleanup_result"] = res
+        st.warning(f"GitHub 清理完成：刪除 {res.get('deleted_count', 0)} 個檔案。")
+    if st.session_state.get("v326_cleanup_result"):
+        with st.expander("GitHub 清理執行結果 / Cleanup Result", expanded=False):
+            st.json(st.session_state.get("v326_cleanup_result"))
+
+    st.markdown("#### 定期清理設定 / Scheduled Cleanup")
+    sc1, sc2, sc3, sc4 = st.columns(4)
+    sched_enabled = sc1.checkbox("啟用定期清理", value=bool(cleanup_cfg.get("enabled", False)), key="v326_cleanup_sched_enabled")
+    frequency = sc2.selectbox("週期", ["daily", "weekly", "monthly"], index=["daily", "weekly", "monthly"].index(str(cleanup_cfg.get("frequency", "weekly"))) if str(cleanup_cfg.get("frequency", "weekly")) in ["daily", "weekly", "monthly"] else 1, key="v326_cleanup_frequency")
+    keep_days = sc3.number_input("保留天數", min_value=7, max_value=3650, value=int(cleanup_cfg.get("keep_days", 90)), step=1, key="v326_cleanup_keep_days")
+    sc4.metric("上次清理", cleanup_cfg.get("last_run_at") or "尚未執行")
+    if st.button("儲存 GitHub 定期清理設定 / Save Cleanup Schedule", use_container_width=True, key="v326_save_cleanup_schedule"):
+        saved = save_cleanup_settings({
+            **cleanup_cfg,
+            "enabled": bool(sched_enabled),
+            "frequency": frequency,
+            "keep_days": int(keep_days),
+            "roots": selected_roots,
+            "delete_undated_files": bool(include_undated),
+        })
+        st.success("GitHub 定期清理設定已保存到 data/config/github_cleanup_settings.json。")
+        st.json(saved)
 
 st.divider()
 

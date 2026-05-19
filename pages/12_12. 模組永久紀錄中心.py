@@ -16,6 +16,7 @@ from services.module_persistence_service import (
 )
 from services.security_service import require_module_access
 from services.table_ui_service import render_table
+from services.github_retention_service import audit_module_github_links, upload_all_module_persistent_files_to_github
 
 st.set_page_config(page_title="12. 模組永久紀錄中心", page_icon="⧠️", layout="wide")
 apply_theme()
@@ -56,6 +57,24 @@ else:
             st.error("狀態表缺少 12_module_persistence，請確認 module_persistence_service.py 是否為最新版。")
 
 render_table(status_df, "12_module_persistence_status", editable=False, height=460)
+
+with st.expander("GitHub 模組備份連結狀態 / GitHub Module Backup Links", expanded=False):
+    st.caption("檢查每個模組的 data/persistent_modules records/settings 是否也同步到 GitHub。Reboot App 後若 SQLite 空白，這些檔案就是救援來源之一。")
+    cga1, cga2 = st.columns(2)
+    if cga1.button("檢查 GitHub 連結 / Audit GitHub Links", use_container_width=True, key="v326_12_audit_github_links"):
+        st.session_state["v326_12_module_github_audit"] = audit_module_github_links(check_remote=True)
+    if cga2.button("上傳/修復缺少的 GitHub 模組檔 / Sync Missing Module Files", use_container_width=True, key="v326_12_sync_github_module_files"):
+        st.session_state["v326_12_module_github_upload"] = upload_all_module_persistent_files_to_github()
+    audit = st.session_state.get("v326_12_module_github_audit")
+    if audit:
+        summary = audit.get("summary", {})
+        c1, c2, c3 = st.columns(3)
+        c1.metric("模組數", summary.get("modules", 0))
+        c2.metric("Records 已連結", summary.get("records_linked", 0))
+        c3.metric("Settings 已連結", summary.get("settings_linked", 0))
+        st.dataframe(pd.DataFrame(audit.get("rows", [])), use_container_width=True, hide_index=True, height=320)
+    if st.session_state.get("v326_12_module_github_upload"):
+        st.json(st.session_state["v326_12_module_github_upload"])
 
 with st.expander("進階手動維護 / Advanced Manual Maintenance", expanded=False):
     st.warning("這裡只做手動補齊、匯出與索引重建。每日自動備份排程請統一到 13｜系統設定，避免功能重複。")

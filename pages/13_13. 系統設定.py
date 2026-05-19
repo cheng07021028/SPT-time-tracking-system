@@ -22,6 +22,8 @@ from services.system_settings_service import (
     export_system_settings_permanent,
 )
 
+from services.github_retention_service import load_cleanup_settings, run_due_github_cleanup_if_needed, save_cleanup_settings, REMOTE_ALLOWED_ROOTS
+
 from services.auto_backup_service import (
     create_backup_by_mode,
     get_available_backup_modes,
@@ -415,11 +417,49 @@ def _render_external_auto_backup_center() -> None:
     st.divider()
 
 
+
+def _render_github_cleanup_schedule_center() -> None:
+    """V3.26: GitHub retention schedule settings in 13｜系統設定."""
+    with st.expander("GitHub 定期清理設定 / GitHub Cleanup Schedule", expanded=False):
+        st.caption("此功能只清理 GitHub 上有時間戳的備份/history 檔；預設不刪 latest 主檔，不影響目前顯示與功能。")
+        try:
+            cfg = load_cleanup_settings()
+        except Exception as exc:
+            st.error(f"讀取 GitHub 清理設定失敗：{exc}")
+            return
+        roots = cfg.get("roots", ["data/persistent_state/history", "data/persistent_state/audit_history", "data/persistent_modules"])
+        gc1, gc2, gc3, gc4 = st.columns(4)
+        enabled = gc1.checkbox("啟用定期清理", value=bool(cfg.get("enabled", False)), key="v326_13_cleanup_enabled", disabled=not can_manage)
+        freq_options = ["daily", "weekly", "monthly"]
+        current_freq = str(cfg.get("frequency", "weekly"))
+        freq_idx = freq_options.index(current_freq) if current_freq in freq_options else 1
+        frequency = gc2.selectbox("清理週期", freq_options, index=freq_idx, key="v326_13_cleanup_frequency", disabled=not can_manage)
+        keep_days = gc3.number_input("保留天數", min_value=7, max_value=3650, value=int(cfg.get("keep_days", 90)), key="v326_13_cleanup_keep_days", disabled=not can_manage)
+        gc4.metric("上次執行", cfg.get("last_run_at") or "尚未執行")
+        selected_roots = st.multiselect("GitHub 清理範圍", REMOTE_ALLOWED_ROOTS, default=[r for r in roots if r in REMOTE_ALLOWED_ROOTS], key="v326_13_cleanup_roots", disabled=not can_manage)
+        delete_undated = st.checkbox("允許刪除無日期檔案（不建議）", value=bool(cfg.get("delete_undated_files", False)), key="v326_13_cleanup_undated", disabled=not can_manage)
+        c1, c2 = st.columns(2)
+        if can_manage and c1.button("儲存 GitHub 定期清理設定", use_container_width=True, key="v326_13_save_cleanup"):
+            res = save_cleanup_settings({**cfg, "enabled": bool(enabled), "frequency": frequency, "keep_days": int(keep_days), "roots": selected_roots, "delete_undated_files": bool(delete_undated)})
+            st.success("GitHub 定期清理設定已保存。")
+            st.json(res)
+        if can_manage and c2.button("檢查並執行到期清理", use_container_width=True, key="v326_13_run_due_cleanup"):
+            res = run_due_github_cleanup_if_needed()
+            if res.get("skipped"):
+                st.info(res.get("message", "尚未到期。"))
+            else:
+                st.warning(f"GitHub 清理完成：刪除 {res.get('deleted_count', 0)} 個檔案。")
+                st.json(res)
+
+
 # V3.23：先顯示系統設定永久保存健康檢查，再顯示自動備份設定。
 _render_system_settings_health_center()
 
 # V3.20：每日自動備份設定必須保留在 13｜系統設定，不可被系統設定修正覆蓋移除。
 _render_external_auto_backup_center()
+
+# V3.26：GitHub 定期清理設定，避免 history/backup 檔案無限制累積。
+_render_github_cleanup_schedule_center()
 
 # -----------------------------------------------------------------------------
 # 0) Excel import/export for all system settings
