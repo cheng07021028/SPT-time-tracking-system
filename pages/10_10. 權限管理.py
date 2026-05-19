@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from io import StringIO, BytesIO
+from io import StringIO
 import pandas as pd
 import streamlit as st
 
@@ -55,29 +55,6 @@ ACCOUNT_DISPLAY_COLUMNS = {
     "note": "備註 / Note",
 }
 
-
-def _df_to_xlsx_bytes(df: pd.DataFrame, sheet_name: str = "Sheet1") -> bytes:
-    """Build Excel bytes for download buttons without touching source data."""
-    bio = BytesIO()
-    export_df = pd.DataFrame() if df is None else df.copy()
-    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
-        export_df.to_excel(writer, index=False, sheet_name=sheet_name[:31] or "Sheet1")
-    bio.seek(0)
-    return bio.getvalue()
-
-
-def _render_download_current_list(df: pd.DataFrame, label: str, file_name: str, key: str, sheet_name: str = "Current List") -> None:
-    """Unified current-list download button. Does not change UI state or persisted data."""
-    safe_df = pd.DataFrame() if df is None else df.copy()
-    st.download_button(
-        label=label,
-        data=_df_to_xlsx_bytes(safe_df, sheet_name=sheet_name),
-        file_name=file_name,
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
-        key=key,
-    )
-
 with st.expander("⧠ 權限設定使用說明 / User Guide", expanded=False):
     st.markdown("""
 ### 密碼欄位說明 / Password Field Design
@@ -106,19 +83,73 @@ with st.expander("⌖ 角色權限說明 / Role Permission Description", expande
     ]), use_container_width=True, hide_index=True)
 
 
+def _as_bool_value(value, default: bool = False) -> bool:
+    """Robust checkbox value parser for Streamlit data_editor.
+
+    Streamlit versions may return bool, numpy bool, integers, or text-like values
+    after column conversions.  Deletion must not silently fail because the UI
+    value came back as a string.
+    """
+    if value is None:
+        return default
+    try:
+        if pd.isna(value):
+            return default
+    except Exception:
+        pass
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value).strip().lower()
+    if text in {"true", "1", "yes", "y", "on", "checked", "☑", "✅", "是", "勾選", "刪除", "delete"}:
+        return True
+    if text in {"false", "0", "no", "n", "off", "unchecked", "☐", "□", "否", "不刪除", ""}:
+        return False
+    return default
+
+
 def _to_bool_series(df: pd.DataFrame, col: str, default: bool = False) -> pd.Series:
     if col not in df.columns:
-        return pd.Series([default] * len(df))
-    values = df[col].fillna(default)
-    # V3.21: The Delete column uses visible square marks so unchecked boxes are
-    # always visible in Streamlit data_editor without relying on hover rendering.
-    if values.astype(str).isin(["☐", "☑", "□", "■", "TRUE", "FALSE", "True", "False", "0", "1"]).any():
-        return values.map(lambda x: str(x).strip() in {"☑", "■", "TRUE", "True", "true", "1", "Y", "y", "是"}).fillna(default).astype(bool)
-    return values.astype(bool)
+        return pd.Series([default] * len(df), index=df.index)
+    return df[col].map(lambda v: _as_bool_value(v, default=default)).fillna(default).astype(bool)
 
 
-def _delete_mark(value) -> str:
-    return "☑" if bool(value) else "☐"
+def _selected_delete_usernames(df: pd.DataFrame, editor_key: str) -> list[str]:
+    """Return selected usernames from data_editor + widget delta state.
+
+    In some Streamlit builds, checkbox edits inside a form can be present in the
+    widget state even when the returned dataframe is not yet fully refreshed.
+    This fallback prevents the 'Delete' checkbox from looking checked but saving
+    zero deletions.
+    """
+    selected: set[str] = set()
+    if df is None or df.empty or "帳號 / Username" not in df.columns:
+        return []
+
+    mask = _to_bool_series(df, "刪除 / Delete")
+    for _, row in df.loc[mask].iterrows():
+        username = str(row.get("帳號 / Username", "")).strip()
+        if username:
+            selected.add(username)
+
+    state = st.session_state.get(editor_key, {})
+    if isinstance(state, dict):
+        edited_rows = state.get("edited_rows", {}) or {}
+        for row_idx, changes in edited_rows.items():
+            if not isinstance(changes, dict) or "刪除 / Delete" not in changes:
+                continue
+            if not _as_bool_value(changes.get("刪除 / Delete"), default=False):
+                continue
+            try:
+                idx = int(row_idx)
+            except Exception:
+                continue
+            if 0 <= idx < len(df):
+                username = str(df.iloc[idx].get("帳號 / Username", "")).strip()
+                if username:
+                    selected.add(username)
+    return sorted(selected)
 
 
 def _blank_user_row() -> dict:
@@ -471,32 +502,21 @@ with tab_accounts:
                 st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 st.rerun()
 
-        st.download_button(
-            "⇩ 下載目前帳號清單 / Download Current Account List",
-            data=_df_to_xlsx_bytes(st.session_state.get("v133_users_df", _users_for_editor()), sheet_name="Account Master"),
-            file_name="account_master_current.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-            key="v312_download_current_account_master",
-        )
-
-        st.warning("V1.76：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。設定不會因下載而改變。")
+        st.warning("V1.76：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。")
 
         # V1.71：帳號總表使用 st.form 包住 data_editor。
         # 原因：Streamlit 一般 data_editor 每次切換儲存格、勾選、下拉或其他元件互動都可能 rerun，
         # 導致尚未儲存的編輯草稿被資料庫原始資料重建覆蓋。
         # 放入 form 後，編輯期間不 rerun，只有按下 form_submit_button 才送出整張表。
         with st.form("v171_account_master_edit_form", clear_on_submit=False):
-            editor_source_df = st.session_state["v133_users_df"].copy()
-            if "刪除 / Delete" in editor_source_df.columns:
-                editor_source_df["刪除 / Delete"] = editor_source_df["刪除 / Delete"].fillna(False).astype(bool)
+            account_editor_key = f"v171_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
             edited_users = st.data_editor(
-                editor_source_df, key=f"v171_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}", use_container_width=True,
+                st.session_state["v133_users_df"], key=account_editor_key, use_container_width=True,
                 num_rows="fixed", hide_index=True,
                 disabled=not account_edit_enabled,
                 height=360,
                 column_config={
-                    "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small", help="勾選代表刪除；樣式比照右側 強制改密碼 checkbox"),
+                    "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
                     "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
                     "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
                     "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
@@ -504,8 +524,8 @@ with tab_accounts:
                     "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
                     "Email": st.column_config.TextColumn("Email"),
                     "角色 / Role": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
-                    "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active", width="small"),
-                    "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change", width="small"),
+                    "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active"),
+                    "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
                     "備註 / Note": st.column_config.TextColumn("備註 / Note"),
                     "最後登入 / Last Login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
                     "更新時間 / Updated At": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
@@ -532,10 +552,15 @@ with tab_accounts:
 
         if submitted_accounts:
             df = edited_users.copy()
-            to_delete = df.loc[_to_bool_series(df, "刪除 / Delete"), "帳號 / Username"].dropna().astype(str).str.strip().tolist()
-            save_df = df.loc[~_to_bool_series(df, "刪除 / Delete")].copy()
+            to_delete = _selected_delete_usernames(df, account_editor_key)
+            if to_delete:
+                save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy()
+            else:
+                save_df = df.copy()
             result = save_users(_users_to_service_rows(save_df))
             deleted = delete_users(to_delete)
+            if to_delete and deleted == 0:
+                st.warning("已偵測到刪除勾選，但未刪除任何帳號；admin 系統帳號不可刪除，其他帳號請確認帳號欄位是否有效。")
             st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
             if result.get("skipped"):
                 st.warning("；".join(result["skipped"]))
@@ -629,15 +654,6 @@ with tab_perm:
         view_df = view_df[view_df["module_code"] == selected_module.split(" ", 1)[0]]
     if selected_role != "全部 / All":
         view_df = view_df[view_df["role_code"] == selected_role]
-    st.download_button(
-        "⇩ 下載目前權限清單 / Download Current Permission List",
-        data=_df_to_xlsx_bytes(view_df, sheet_name="Account Permissions"),
-        file_name="account_module_permissions_current.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
-        key="v312_download_current_permission_matrix",
-    )
-
     st.markdown("#### 快速勾選 / Quick Toggle")
     b1, b2, b3, b4, b5 = st.columns(5)
     with b1:
@@ -686,15 +702,6 @@ with tab_sec:
     st.subheader("安全設定 / Security Settings")
     settings = get_security_settings()
     idle = int(settings.get("idle_timeout_minutes", "15") or 15)
-    st.download_button(
-        "⇩ 下載目前安全設定 / Download Current Security Settings",
-        data=_df_to_xlsx_bytes(pd.DataFrame([settings]), sheet_name="Security Settings"),
-        file_name="security_settings_current.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
-        key="v312_download_current_security_settings",
-    )
-
     with st.form("security_settings_commit_form", clear_on_submit=False):
         new_idle = st.number_input("閒置自動登出分鐘數 / Idle Auto Logout Minutes", min_value=1, max_value=240, value=idle, step=1)
         confirm_after_record = st.checkbox("工時完成後詢問是否繼續記錄 / Ask continue after time record", value=settings.get("ask_continue_after_record", "1") != "0")
