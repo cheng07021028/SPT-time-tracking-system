@@ -410,8 +410,15 @@ with tab_accounts:
         else:
             st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上帳號。")
 
+    # V3.46：進入帳號頁時先觸發永久檔輕量還原，避免 Reboot 後停留在預設帳號。
     if "v133_users_df" not in st.session_state:
         st.session_state["v133_users_df"] = _users_for_editor()
+    if "刪除 / Delete" not in st.session_state["v133_users_df"].columns:
+        st.session_state["v133_users_df"].insert(0, "刪除 / Delete", False)
+    else:
+        # 刪除勾選欄固定保留第一欄，避免欄位順序設定或資料匯入後看起來消失。
+        _cols = ["刪除 / Delete"] + [c for c in st.session_state["v133_users_df"].columns if c != "刪除 / Delete"]
+        st.session_state["v133_users_df"] = st.session_state["v133_users_df"][_cols]
 
     with account_tab_edit:
         st.markdown("### 新增帳號專用表單 / Stable Add User Form")
@@ -510,11 +517,16 @@ with tab_accounts:
         # 放入 form 後，編輯期間不 rerun，只有按下 form_submit_button 才送出整張表。
         with st.form("v171_account_master_edit_form", clear_on_submit=False):
             account_editor_key = f"v171_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
+            _account_editor_df = st.session_state["v133_users_df"].copy()
+            if "刪除 / Delete" not in _account_editor_df.columns:
+                _account_editor_df.insert(0, "刪除 / Delete", False)
+            _account_column_order = ["刪除 / Delete"] + [c for c in _account_editor_df.columns if c != "刪除 / Delete"]
             edited_users = st.data_editor(
-                st.session_state["v133_users_df"], key=account_editor_key, use_container_width=True,
+                _account_editor_df[_account_column_order], key=account_editor_key, use_container_width=True,
                 num_rows="fixed", hide_index=True,
                 disabled=not account_edit_enabled,
                 height=360,
+                column_order=_account_column_order,
                 column_config={
                     "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
                     "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
