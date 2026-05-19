@@ -192,9 +192,15 @@ def _table_ui_payload_from_db() -> dict[str, Any]:
 def export_table_ui_settings_permanent(reason: str = "table_ui_settings_changed", write_history: bool = True) -> dict[str, Any]:
     """Persist table_ui_settings outside SQLite so Reboot/App redeploy keeps widths/order."""
     payload = _table_ui_payload_from_db()
+    payload["version"] = "V3.49"
     payload["reason"] = reason
+    rows = _extract_table_ui_rows_from_payload(payload)
     for path in _TABLE_UI_PERSIST_FILES:
         _atomic_json(path, payload)
+    try:
+        _write_table_ui_into_module_settings(rows, reason)
+    except Exception:
+        pass
     if write_history:
         _TABLE_UI_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
         _atomic_json(_TABLE_UI_HISTORY_DIR / f"table_ui_settings_{_stamp_text()}.json", payload)
@@ -203,32 +209,139 @@ def export_table_ui_settings_permanent(reason: str = "table_ui_settings_changed"
         mark_data_changed("表格欄寬/欄位順序設定已變更，已寫入永久 JSON。", "table_ui_settings")
     except Exception:
         pass
+    try:
+        _try_upload_table_ui_permanent_files(reason)
+    except Exception:
+        pass
     return {"ok": True, "files": [str(p) for p in _TABLE_UI_PERSIST_FILES], "count": payload["table_counts"]["table_ui_settings"]}
 
 
+def _extract_table_ui_rows_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Read table_ui_settings rows from all supported permanent JSON shapes."""
+    if not isinstance(payload, dict):
+        return []
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    rows = tables.get("table_ui_settings") if isinstance(tables, dict) else None
+    if rows is None:
+        rows = payload.get("table_ui_settings")
+    if not isinstance(rows, list):
+        return []
+    return [r for r in rows if isinstance(r, dict) and str(r.get("table_key") or "").strip()]
+
+
+def _table_ui_candidate_paths() -> list[Path]:
+    """All places where table UI settings may be preserved.
+
+    V3.49 adds spt_module_settings.json and module-level settings as restore sources.
+    This is important on Streamlit Cloud: after Reboot App, direct local JSON files may
+    not exist yet, but GitHub restore usually downloads spt_module_settings.json first.
+    """
+    paths: list[Path] = []
+    paths.extend(_TABLE_UI_PERSIST_FILES)
+    paths.extend([
+        _PROJECT_ROOT / "data" / "persistent_state" / "spt_module_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "ui_table_settings_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json",
+    ])
+    history_roots = [
+        _TABLE_UI_HISTORY_DIR,
+        _PROJECT_ROOT / "data" / "persistent_state" / "history",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "history",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "history",
+    ]
+    for root in history_roots:
+        if root.exists():
+            paths.extend(root.glob("*.json"))
+    # de-duplicate while preserving order
+    seen: set[str] = set()
+    out: list[Path] = []
+    for path in paths:
+        key = str(path.resolve()) if path.exists() else str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(path)
+    return out
+
+
 def _best_table_ui_payload() -> dict[str, Any]:
-    candidates: list[Path] = []
-    candidates.extend([p for p in _TABLE_UI_PERSIST_FILES if p.exists()])
-    if _TABLE_UI_HISTORY_DIR.exists():
-        candidates.extend(_TABLE_UI_HISTORY_DIR.glob("table_ui_settings_*.json"))
-    # Newest among payloads with most rows wins; prevents an empty/default export from hiding richer settings.
+    # Newest among payloads with most *valid* rows wins; prevents empty/default exports
+    # from hiding richer settings. Supports both direct table_ui JSON and spt_module_settings.
     best: dict[str, Any] = {}
     best_score = (-1, -1.0)
-    for path in candidates:
+    for path in _table_ui_candidate_paths():
+        if not path.exists():
+            continue
         payload = _read_json(path)
-        tables = payload.get("tables") if isinstance(payload, dict) else None
-        rows = tables.get("table_ui_settings", []) if isinstance(tables, dict) else payload.get("table_ui_settings", [])
-        if not isinstance(rows, list):
-            rows = []
+        rows = _extract_table_ui_rows_from_payload(payload)
+        valid_rows = [r for r in rows if _v349_row_has_real_table_ui(r)] if "_v349_row_has_real_table_ui" in globals() else rows
+        if not valid_rows:
+            continue
         try:
             mtime = path.stat().st_mtime
         except Exception:
             mtime = 0.0
-        score = (len(rows), mtime)
-        if rows and score > best_score:
-            best = {"tables": {"table_ui_settings": rows}, "source": str(path), "score": score}
+        score = (len(valid_rows), mtime)
+        if score > best_score:
+            best = {"tables": {"table_ui_settings": valid_rows}, "source": str(path), "score": score}
             best_score = score
     return best
+
+
+def _write_table_ui_into_module_settings(rows: list[dict[str, Any]], reason: str) -> None:
+    """Mirror table_ui_settings into spt_module_settings.json and module settings.
+
+    This lets the existing GitHub latest-settings restore path bring table settings back
+    after Streamlit Reboot App, even when the standalone table UI JSON has not yet been
+    downloaded/restored.
+    """
+    if not rows:
+        return
+    targets = [
+        _PROJECT_ROOT / "data" / "persistent_state" / "spt_module_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "ui_table_settings_settings.json",
+        _PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json",
+    ]
+    for path in targets:
+        payload = _read_json(path)
+        if not isinstance(payload, dict):
+            payload = {}
+        payload.setdefault("version", "V3.49")
+        payload["exported_at"] = _now_text()
+        payload["reason"] = reason
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        tables["table_ui_settings"] = rows
+        payload["tables"] = tables
+        counts = payload.get("table_counts") if isinstance(payload.get("table_counts"), dict) else {}
+        counts["table_ui_settings"] = len(rows)
+        payload["table_counts"] = counts
+        _atomic_json(path, payload)
+
+
+def _try_upload_table_ui_permanent_files(reason: str) -> None:
+    """Best-effort small-file GitHub upload.
+
+    No error is shown to users here; page 09 can still show pending backup. The upload is
+    intentionally limited to small settings files to avoid slowing normal page use.
+    """
+    try:
+        from services.github_cloud_storage_service import github_config, upload_file_to_github
+        cfg = github_config()
+        if not cfg.get("token"):
+            return
+        stamp = _stamp_text()
+        files = [
+            (_PROJECT_ROOT / "data" / "persistent_state" / "spt_table_ui_settings.json", "data/persistent_state/spt_table_ui_settings.json"),
+            (_PROJECT_ROOT / "data" / "persistent_state" / "spt_module_settings.json", "data/persistent_state/spt_module_settings.json"),
+            (_PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_ui_settings.json", "data/persistent_modules/ui_table_settings/table_ui_settings.json"),
+            (_PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "ui_table_settings_settings.json", "data/persistent_modules/ui_table_settings/ui_table_settings_settings.json"),
+            (_PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json", "data/persistent_modules/01_time_records/01_time_records_settings.json"),
+        ]
+        for local, remote in files:
+            if local.exists():
+                upload_file_to_github(local, remote, f"SPT table UI settings {reason} {stamp}")
+    except Exception:
+        pass
 
 
 def restore_table_ui_settings_from_permanent(force: bool = False) -> dict[str, Any]:
@@ -761,3 +874,122 @@ def ensure_table_ui_schema() -> None:  # type: ignore[override]
             restore_table_ui_settings_from_permanent(force=False)
         except Exception:
             pass
+
+
+# ===== V3.49 table UI reboot persistence final guard =====
+# 修正 01｜工時紀錄與所有模組：Reboot App 後若 SQLite 已有預設欄位設定，仍必須以永久 JSON 為準還原。
+# 不新增畫面功能；只修正保存/還原底層。
+def _v349_row_has_real_table_ui(row: dict[str, Any]) -> bool:
+    try:
+        w = json.loads(str(row.get("widths_json") or "{}"))
+    except Exception:
+        w = {}
+    try:
+        o = json.loads(str(row.get("order_json") or "[]"))
+    except Exception:
+        o = []
+    return bool(isinstance(w, dict) and w) or bool(isinstance(o, list) and o)
+
+
+def restore_table_ui_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    """Always restore useful permanent rows over SQLite defaults.
+
+    Previous logic skipped restore whenever SQLite already had any row. That caused
+    Reboot App to keep default/original table settings and ignore the user's saved
+    settings. V3.49 makes permanent JSON the source of truth for every saved table_key.
+    """
+    _v346_ensure_table_ui_schema_basic()
+    payload = _best_table_ui_payload()
+    rows = ((payload.get("tables") or {}).get("table_ui_settings") or []) if isinstance(payload, dict) else []
+    rows = [r for r in rows if isinstance(r, dict) and str(r.get("table_key") or "").strip() and _v349_row_has_real_table_ui(r)]
+    if not rows:
+        return {"ok": False, "restored": 0, "message": "找不到含有效欄寬/欄位順序的 table_ui_settings 永久檔"}
+    restored = 0
+    unchanged = 0
+    for r in rows:
+        table_key = str(r.get("table_key") or "").strip()
+        permanent_widths = str(r.get("widths_json") or "{}")
+        permanent_order = str(r.get("order_json") or "[]")
+        current = query_one("SELECT widths_json, order_json FROM table_ui_settings WHERE table_key=?", (table_key,)) or {}
+        cur_widths = str(current.get("widths_json") or "{}")
+        cur_order = str(current.get("order_json") or "[]")
+        if not force and cur_widths == permanent_widths and cur_order == permanent_order:
+            unchanged += 1
+            continue
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(table_key) DO UPDATE SET
+                widths_json=excluded.widths_json,
+                order_json=excluded.order_json,
+                updated_at=excluded.updated_at
+            """,
+            (table_key, permanent_widths, permanent_order, str(r.get("updated_at") or _now_text())),
+        )
+        restored += 1
+        try:
+            st.session_state.pop(f"_spt_width_cache_{table_key}", None)
+        except Exception:
+            pass
+    return {"ok": restored > 0 or unchanged > 0, "restored": restored, "unchanged": unchanged, "source": payload.get("source"), "score": payload.get("score")}
+
+
+def ensure_table_ui_schema() -> None:  # type: ignore[override]
+    global _TABLE_UI_SCHEMA_READY, _TABLE_UI_RESTORED_ONCE
+    if _TABLE_UI_SCHEMA_READY:
+        return
+    _v346_ensure_table_ui_schema_basic()
+    _TABLE_UI_SCHEMA_READY = True
+    if not _TABLE_UI_RESTORED_ONCE:
+        _TABLE_UI_RESTORED_ONCE = True
+        try:
+            restore_table_ui_settings_from_permanent(force=False)
+        except Exception:
+            pass
+
+
+def load_widths(table_key: str) -> dict[str, int]:  # type: ignore[override]
+    ensure_table_ui_schema()
+    # V3.49：每次讀 01/所有模組欄寬前都先確保永久設定已蓋回，不被預設 SQLite 擋住。
+    try:
+        restore_table_ui_settings_from_permanent(force=False)
+    except Exception:
+        pass
+    cache_key = f"_spt_width_cache_{table_key}"
+    try:
+        cached = st.session_state.get(cache_key)
+        if cached and time.time() - float(cached.get("ts", 0)) < _WIDTH_CACHE_TTL_SECONDS:
+            return dict(cached.get("data", {}))
+    except Exception:
+        pass
+    row = query_one("SELECT widths_json FROM table_ui_settings WHERE table_key=?", (table_key,))
+    if not row or not row.get("widths_json"):
+        widths = {}
+    else:
+        try:
+            data = json.loads(row["widths_json"])
+            widths = {str(k): int(v) for k, v in data.items() if str(v).isdigit() or isinstance(v, int)}
+        except Exception:
+            widths = {}
+    try:
+        st.session_state[cache_key] = {"ts": time.time(), "data": widths}
+    except Exception:
+        pass
+    return widths
+
+
+def load_column_order(table_key: str) -> list[str]:  # type: ignore[override]
+    ensure_table_ui_schema()
+    try:
+        restore_table_ui_settings_from_permanent(force=False)
+    except Exception:
+        pass
+    row = query_one("SELECT order_json FROM table_ui_settings WHERE table_key=?", (table_key,))
+    if not row or not row.get("order_json"):
+        return []
+    try:
+        data = json.loads(row["order_json"])
+        return [str(x) for x in data if str(x)] if isinstance(data, list) else []
+    except Exception:
+        return []
