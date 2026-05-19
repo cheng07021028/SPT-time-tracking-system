@@ -187,19 +187,10 @@ def _load_latest_persistent_payload() -> dict[str, Any] | None:
         if _payload_has_useful_settings(data):
             return _normalize_persistent_payload(data or {})
 
-    # 1.5) On Streamlit Cloud / Reboot App, local data may be empty while GitHub
-    # still has the latest settings. Download once before falling back to defaults/history.
-    if not _REMOTE_SETTINGS_RESTORE_CHECKED:
-        _REMOTE_SETTINGS_RESTORE_CHECKED = True
-        try:
-            from services.settings_durability_service import download_critical_settings_from_github
-            download_critical_settings_from_github(only_missing=True, source="system_settings_bootstrap")
-            for p in SYSTEM_SETTINGS_FILES:
-                data = _load_json_file(p)
-                if _payload_has_useful_settings(data):
-                    return _normalize_persistent_payload(data or {})
-        except Exception:
-            pass
+    # 1.5) Important: do NOT contact GitHub here.
+    # This function can be called while rendering the login page or importing pages.
+    # Network I/O during boot/login caused the app to keep running indefinitely.
+    # GitHub restore is now manual from 13｜系統設定, or handled by explicit backup actions.
 
     # 2) History is fallback only, newest first.
     if SYSTEM_SETTINGS_HISTORY_DIR.exists():
@@ -520,15 +511,13 @@ def export_system_settings_permanent(reason: str = "system_settings_changed", wr
     if write_history:
         hist = SYSTEM_SETTINGS_HISTORY_DIR / f"system_settings_{now_stamp()}.json"
         _atomic_write_json(hist, payload)
-    github_sync: dict[str, Any] = {}
-    try:
-        from services.settings_durability_service import upload_critical_settings_to_github
-        github_sync = upload_critical_settings_to_github(archive=False, source=f"13_system_settings:{reason}")
-    except Exception as exc:
-        github_sync = {"ok": False, "skipped": True, "message": str(exc)}
+    # Do not upload to GitHub automatically from the save path.
+    # Auto network sync during normal page loads/saves can freeze login or rerun cycles.
+    # Use the explicit buttons in 13｜系統設定 for GitHub upload/download.
+    github_sync: dict[str, Any] = {"ok": True, "skipped": True, "message": "GitHub sync skipped on automatic setting export; use 13 manual sync."}
 
     try:
-        mark_data_changed("13｜系統設定已變更，永久設定檔已建立；若已設定 GITHUB_TOKEN 也會同步上傳 GitHub。", "system_settings_permanent_json")
+        mark_data_changed("13｜系統設定已變更，永久設定檔已建立；GitHub 同步請到 13 頁面手動執行。", "system_settings_permanent_json")
     except Exception:
         pass
     return {"ok": True, "files": [str(p) for p in SYSTEM_SETTINGS_FILES], "table_counts": payload["table_counts"], "github_sync": github_sync}
@@ -833,3 +822,320 @@ def dedupe_rest_periods() -> int:
     if n:
         export_system_settings_permanent("dedupe_rest_periods", write_history=True)
     return n
+
+# =============================================================================
+# V3.28 - Model-specific process options
+# =============================================================================
+PROCESS_MODEL_ALL = "全部 / 通用"
+DEFAULT_PROCESS_MODEL_KEY = "default_process_model"
+
+
+def _ensure_process_model_options_table() -> None:
+    """Create model-specific process option table without touching legacy data."""
+    ensure_system_settings_schema()
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS process_model_options (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type_name TEXT DEFAULT '',
+            process_name TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            UNIQUE(type_name, process_name)
+        )
+        """
+    )
+    # Migration: seed model-specific table from legacy process_options once.
+    try:
+        row = query_one("SELECT COUNT(*) AS c FROM process_model_options") or {"c": 0}
+        if int(row.get("c") or 0) == 0:
+            legacy = query_df("SELECT process_name, is_active, sort_order, note, created_at, updated_at FROM process_options ORDER BY sort_order, id")
+            now = _now()
+            for _, r in legacy.fillna("").iterrows():
+                name = str(r.get("process_name") or "").strip()
+                if not name:
+                    continue
+                execute(
+                    """
+                    INSERT OR IGNORE INTO process_model_options(type_name, process_name, is_active, sort_order, note, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        PROCESS_MODEL_ALL,
+                        name,
+                        int(float(r.get("is_active") or 1)),
+                        int(float(r.get("sort_order") or 0)),
+                        str(r.get("note") or ""),
+                        str(r.get("created_at") or now),
+                        str(r.get("updated_at") or now),
+                    ),
+                )
+    except Exception:
+        pass
+
+
+def _norm_model_name(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text or text.lower() in {"nan", "none", "null", "全部", "通用", "all", "common", "*"}:
+        return PROCESS_MODEL_ALL
+    return text
+
+
+def load_process_model_choices(include_common: bool = True) -> list[str]:
+    """Return model choices from work orders + process mappings."""
+    _ensure_process_model_options_table()
+    names: set[str] = set()
+    if include_common:
+        names.add(PROCESS_MODEL_ALL)
+    try:
+        wo = query_df("SELECT DISTINCT type_name FROM work_orders WHERE COALESCE(type_name,'')<>'' ORDER BY type_name")
+        for x in wo.get("type_name", []).dropna().tolist() if not wo.empty else []:
+            if str(x).strip():
+                names.add(str(x).strip())
+    except Exception:
+        pass
+    try:
+        mp = query_df("SELECT DISTINCT type_name FROM process_model_options WHERE COALESCE(type_name,'')<>'' ORDER BY type_name")
+        for x in mp.get("type_name", []).dropna().tolist() if not mp.empty else []:
+            if str(x).strip():
+                names.add(_norm_model_name(x))
+    except Exception:
+        pass
+    default = get_default_process_model()
+    if default:
+        names.add(default)
+    ordered = [PROCESS_MODEL_ALL] if include_common else []
+    ordered += sorted([n for n in names if n != PROCESS_MODEL_ALL])
+    return ordered
+
+
+def get_default_process_model() -> str:
+    _ensure_process_model_options_table()
+    try:
+        row = query_one("SELECT setting_value FROM app_settings WHERE setting_key=?", (DEFAULT_PROCESS_MODEL_KEY,)) or {}
+        value = str(row.get("setting_value") or "").strip()
+        return _norm_model_name(value) if value else PROCESS_MODEL_ALL
+    except Exception:
+        return PROCESS_MODEL_ALL
+
+
+def save_default_process_model(type_name: str) -> str:
+    _ensure_process_model_options_table()
+    model = _norm_model_name(type_name)
+    now = _now()
+    execute(
+        """
+        INSERT INTO app_settings(setting_key, setting_value, note, updated_at)
+        VALUES (?, ?, '01 工時紀錄：製令機型空白或找不到對應工段時使用的預設機型', ?)
+        ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value=excluded.setting_value,
+            note=excluded.note,
+            updated_at=excluded.updated_at
+        """,
+        (DEFAULT_PROCESS_MODEL_KEY, model, now),
+    )
+    _clear_settings_cache()
+    export_system_settings_permanent("save_default_process_model", write_history=True)
+    write_log("SAVE_DEFAULT_PROCESS_MODEL", f"儲存預設機型：{model}", "app_settings")
+    return model
+
+
+def load_process_options_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    _ensure_process_model_options_table()
+    sql = "SELECT id, type_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_model_options WHERE 1=1"
+    params: list = []
+    if active_only:
+        sql += " AND COALESCE(is_active, 1)=1"
+    sql += " ORDER BY CASE WHEN type_name=? THEN 0 ELSE 1 END, type_name, sort_order, id"
+    params.append(PROCESS_MODEL_ALL)
+    df = query_df(sql, params)
+    if df.empty:
+        # Last-resort legacy fallback.
+        legacy = query_df("SELECT id, process_name, is_active, sort_order, note, created_at, updated_at FROM process_options ORDER BY sort_order, id")
+        if not legacy.empty:
+            legacy.insert(1, "type_name", PROCESS_MODEL_ALL)
+        return legacy
+    return df
+
+
+def get_process_options_by_model(type_name: str | None = None, include_common: bool = True) -> list[str]:
+    """Return process names for selected model.
+
+    Selection logic:
+    1. Exact model rows + common rows.
+    2. If no exact model rows, default model rows + common rows.
+    3. If still empty, all active rows, then legacy defaults.
+    """
+    _ensure_process_model_options_table()
+    model = _norm_model_name(type_name)
+    common_names: list[str] = []
+    model_names: list[str] = []
+
+    def _names_for(where_sql: str, params: tuple) -> list[str]:
+        try:
+            df = query_df(
+                f"SELECT process_name FROM process_model_options WHERE COALESCE(is_active,1)=1 AND {where_sql} ORDER BY sort_order, id",
+                params,
+            )
+            return [str(x).strip() for x in df.get("process_name", []).dropna().tolist() if str(x).strip()] if not df.empty else []
+        except Exception:
+            return []
+
+    if include_common:
+        common_names = _names_for("(type_name=? OR COALESCE(type_name,'')='')", (PROCESS_MODEL_ALL,))
+    if model and model != PROCESS_MODEL_ALL:
+        model_names = _names_for("type_name=?", (model,))
+
+    names = common_names + [n for n in model_names if n not in common_names]
+    if names:
+        return names
+
+    default_model = get_default_process_model()
+    if default_model and default_model not in {PROCESS_MODEL_ALL, model}:
+        default_names = _names_for("type_name=?", (default_model,))
+        names = common_names + [n for n in default_names if n not in common_names]
+        if names:
+            return names
+
+    try:
+        df = query_df("SELECT process_name FROM process_model_options WHERE COALESCE(is_active,1)=1 ORDER BY sort_order, id")
+        names = []
+        for x in df.get("process_name", []).dropna().tolist() if not df.empty else []:
+            s = str(x).strip()
+            if s and s not in names:
+                names.append(s)
+        if names:
+            return names
+    except Exception:
+        pass
+    return DEFAULT_PROCESS_OPTIONS.copy()
+
+
+def get_process_options() -> list[str]:  # type: ignore[override]
+    return get_process_options_by_model(get_default_process_model(), include_common=True)
+
+
+def save_process_options_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    _ensure_process_model_options_table()
+    if df is None:
+        return 0
+    now = _now()
+    count = 0
+    work = df.copy().drop(columns=["刪除", "delete", "selected"], errors="ignore").fillna("")
+    for idx, (_, r) in enumerate(work.iterrows(), start=1):
+        name = str(r.get("process_name", r.get("工段名稱", ""))).strip()
+        if not name:
+            continue
+        model = _norm_model_name(r.get("type_name", r.get("機型", PROCESS_MODEL_ALL)))
+        active_raw = str(r.get("is_active", r.get("啟用", True))).strip().lower()
+        is_active = 0 if active_raw in {"0", "false", "no", "n", "off", "停用", "否"} else 1
+        try:
+            sort_order = int(float(r.get("sort_order", r.get("排序", idx)) or idx))
+        except Exception:
+            sort_order = idx
+        note = str(r.get("note", r.get("備註", "")) or "")
+        rid = str(r.get("id", "")).strip()
+        if rid and rid.lower() not in {"nan", "none"}:
+            execute(
+                """
+                UPDATE process_model_options
+                SET type_name=?, process_name=?, is_active=?, sort_order=?, note=?, updated_at=?
+                WHERE id=?
+                """,
+                (model, name, is_active, sort_order, note, now, int(float(rid))),
+            )
+        else:
+            execute(
+                """
+                INSERT INTO process_model_options(type_name, process_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(type_name, process_name) DO UPDATE SET
+                    is_active=excluded.is_active,
+                    sort_order=excluded.sort_order,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+                """,
+                (model, name, is_active, sort_order, note, now, now),
+            )
+        count += 1
+    _clear_settings_cache()
+    export_system_settings_permanent("save_model_process_options", write_history=True)
+    write_log("SAVE_PROCESS_OPTIONS", f"儲存機型對應工段設定 {count} 筆，已寫入 13 系統設定永久檔", "process_model_options")
+    return count
+
+
+def delete_process_options(ids: Iterable[int]) -> int:  # type: ignore[override]
+    _ensure_process_model_options_table()
+    count = 0
+    for rid in ids or []:
+        try:
+            i = int(float(rid))
+        except Exception:
+            continue
+        execute("DELETE FROM process_model_options WHERE id=?", (i,))
+        count += 1
+    if count:
+        _clear_settings_cache()
+        export_system_settings_permanent("delete_model_process_options", write_history=True)
+        write_log("DELETE_PROCESS_OPTIONS", f"刪除機型對應工段設定 {count} 筆，已寫入 13 系統設定永久檔", "process_model_options", level="WARN")
+    return count
+
+
+def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    """Write 13｜系統設定 permanent files, including model-specific process mappings.
+
+    V3.30 merge rule:
+    - Keep V3.28 model-specific process options used by 01｜工時紀錄.
+    - Keep V3.29 GitHub critical-settings sync and atomic JSON save.
+    """
+    ensure_system_settings_schema()
+    _ensure_process_model_options_table()
+    _ensure_permanent_dirs()
+    try:
+        proc = query_df("SELECT id, type_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_model_options ORDER BY type_name, sort_order, id")
+    except Exception:
+        proc = pd.DataFrame()
+    try:
+        rest = query_df("SELECT id, name, start_time, end_time, is_active, sort_order FROM rest_periods ORDER BY sort_order, id")
+    except Exception:
+        rest = pd.DataFrame()
+    try:
+        app = query_df("SELECT setting_key, setting_value, note, updated_at FROM app_settings ORDER BY setting_key")
+    except Exception:
+        app = pd.DataFrame()
+    payload: dict[str, Any] = {
+        "version": "V3.30",
+        "exported_at": _now(),
+        "reason": reason,
+        "description": "13｜系統設定永久紀錄：機型對應工段名稱、休息時間、01 工時紀錄每日重新整理時間。",
+        "tables": {
+            "process_options": _df_records(proc),
+            "rest_periods": _df_records(rest),
+            "app_settings": _df_records(app),
+        },
+        "table_counts": {
+            "process_options": 0 if proc is None else len(proc),
+            "rest_periods": 0 if rest is None else len(rest),
+            "app_settings": 0 if app is None else len(app),
+        },
+    }
+    for out_path in SYSTEM_SETTINGS_FILES:
+        _atomic_write_json(out_path, payload)
+    if write_history:
+        hist = SYSTEM_SETTINGS_HISTORY_DIR / f"system_settings_{now_stamp()}.json"
+        _atomic_write_json(hist, payload)
+
+    # Do not upload to GitHub automatically from the save path.
+    # Auto network sync during normal page loads/saves can freeze login or rerun cycles.
+    # Use the explicit buttons in 13｜系統設定 for GitHub upload/download.
+    github_sync: dict[str, Any] = {"ok": True, "skipped": True, "message": "GitHub sync skipped on automatic setting export; use 13 manual sync."}
+
+    try:
+        mark_data_changed("13｜系統設定已變更，永久設定檔已建立；GitHub 同步請到 13 頁面手動執行。", "system_settings_permanent_json")
+    except Exception:
+        pass
+    return {"ok": True, "files": [str(p) for p in SYSTEM_SETTINGS_FILES], "table_counts": payload["table_counts"], "github_sync": github_sync, "payload_version": "V3.30"}
+
