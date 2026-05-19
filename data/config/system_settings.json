@@ -1,12 +1,15 @@
 {
-  "version": "V3.33",
-  "exported_at": "2026-05-19 23:15:29",
-  "reason": "save_process_categories",
-  "description": "13｜系統設定永久紀錄：類別對應工段名稱、休息時間、01 工時紀錄每日重新整理時間。",
+  "version": "V3.66-direct-system-settings-persistence",
+  "exported_at": "2026-05-19 23:31:09",
+  "reason": "manual_refresh_from_health_center",
+  "module_key": "13_system_settings",
+  "module_name_zh": "系統設定",
+  "module_name_en": "System Settings",
+  "description": "13｜系統設定固定永久檔。模式比照 03/04：儲存直接寫 latest JSON，Reboot 直接讀 latest JSON；空表也是有效設定。",
   "tables": {
     "process_categories": [
       {
-        "id": 976,
+        "id": 7,
         "category_name": "全部 / 通用",
         "is_active": 1,
         "sort_order": 1,
@@ -15,7 +18,7 @@
         "updated_at": "2026-05-19 23:15:29"
       },
       {
-        "id": 1031,
+        "id": 8,
         "category_name": "1111",
         "is_active": 1,
         "sort_order": 2,
@@ -26,7 +29,7 @@
     ],
     "process_options": [
       {
-        "id": 5201,
+        "id": 17,
         "category_name": "全部 / 通用",
         "process_name": "前置鈑金",
         "is_active": 1,
@@ -36,7 +39,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5202,
+        "id": 18,
         "category_name": "全部 / 通用",
         "process_name": "LP改造",
         "is_active": 1,
@@ -46,7 +49,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5203,
+        "id": 19,
         "category_name": "全部 / 通用",
         "process_name": "骨架組立",
         "is_active": 1,
@@ -56,7 +59,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5204,
+        "id": 20,
         "category_name": "全部 / 通用",
         "process_name": "配電",
         "is_active": 1,
@@ -66,7 +69,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5205,
+        "id": 21,
         "category_name": "全部 / 通用",
         "process_name": "模組",
         "is_active": 1,
@@ -76,7 +79,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5206,
+        "id": 22,
         "category_name": "全部 / 通用",
         "process_name": "水平",
         "is_active": 1,
@@ -86,7 +89,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5207,
+        "id": 23,
         "category_name": "全部 / 通用",
         "process_name": "S.T.",
         "is_active": 1,
@@ -96,7 +99,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5208,
+        "id": 24,
         "category_name": "全部 / 通用",
         "process_name": "清潔",
         "is_active": 1,
@@ -106,7 +109,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5209,
+        "id": 25,
         "category_name": "全部 / 通用",
         "process_name": "收機",
         "is_active": 1,
@@ -116,7 +119,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5210,
+        "id": 26,
         "category_name": "全部 / 通用",
         "process_name": "包機",
         "is_active": 1,
@@ -126,7 +129,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5211,
+        "id": 27,
         "category_name": "全部 / 通用",
         "process_name": "Packing",
         "is_active": 1,
@@ -136,7 +139,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5212,
+        "id": 28,
         "category_name": "全部 / 通用",
         "process_name": "設變",
         "is_active": 1,
@@ -146,7 +149,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5213,
+        "id": 29,
         "category_name": "全部 / 通用",
         "process_name": "重工",
         "is_active": 1,
@@ -156,7 +159,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5214,
+        "id": 30,
         "category_name": "全部 / 通用",
         "process_name": "教育訓練",
         "is_active": 1,
@@ -166,7 +169,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5215,
+        "id": 31,
         "category_name": "全部 / 通用",
         "process_name": "IPQC",
         "is_active": 1,
@@ -176,7 +179,7 @@
         "updated_at": "2026-05-19 12:07:46"
       },
       {
-        "id": 5216,
+        "id": 32,
         "category_name": "全部 / 通用",
         "process_name": "其他",
         "is_active": 1,
@@ -188,7 +191,7 @@
     ],
     "rest_periods": [
       {
-        "id": 1,
+        "id": 11,
         "name": "上午休息",
         "start_time": "10:30",
         "end_time": "10:45",
@@ -196,7 +199,7 @@
         "sort_order": 1
       },
       {
-        "id": 2,
+        "id": 12,
         "name": "午休",
         "start_time": "12:00",
         "end_time": "13:00",
@@ -204,7 +207,7 @@
         "sort_order": 2
       },
       {
-        "id": 3,
+        "id": 13,
         "name": "下午休息",
         "start_time": "15:00",
         "end_time": "15:15",
@@ -212,7 +215,7 @@
         "sort_order": 3
       },
       {
-        "id": 4,
+        "id": 14,
         "name": "晚餐休息",
         "start_time": "18:00",
         "end_time": "18:30",
@@ -220,7 +223,7 @@
         "sort_order": 4
       },
       {
-        "id": 5,
+        "id": 15,
         "name": "晚上休息",
         "start_time": "20:00",
         "end_time": "20:15",
