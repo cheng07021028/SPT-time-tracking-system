@@ -123,7 +123,7 @@ with st.expander("GitHub 備份檔清理 / GitHub Backup Cleanup", expanded=Fals
         st.session_state["v326_cleanup_result"] = res
         st.warning(f"GitHub 清理完成：刪除 {res.get('deleted_count', 0)} 個檔案。")
     if st.session_state.get("v326_cleanup_result"):
-        with st.expander("GitHub 清理執行結果 / Cleanup Result", expanded=False):
+        with st.expander("GitHub 清理狀態 / Cleanup Status", expanded=False):
             st.json(st.session_state.get("v326_cleanup_result"))
 
     st.markdown("#### 定期清理設定 / Scheduled Cleanup")
