@@ -32,6 +32,18 @@ CRITICAL_SETTING_FILES: list[dict[str, str]] = [
     {"label": "permission security settings", "path": "data/persistent_modules/10_permissions/security_settings.json"},
     {"label": "permission module settings", "path": "data/persistent_modules/10_permissions/10_permissions_settings.json"},
     {"label": "module persistence settings", "path": "data/persistent_modules/12_module_persistence/12_module_persistence_settings.json"},
+    {"label": "table UI widths/order state", "path": "data/persistent_state/spt_table_ui_settings.json"},
+    {"label": "table UI widths/order module", "path": "data/persistent_modules/ui_table_settings/table_ui_settings.json"},
+    {"label": "table column settings", "path": "data/persistent_state/spt_table_column_settings.json"},
+    {"label": "history filter settings", "path": "data/persistent_state/spt_history_filter_settings.json"},
+    {"label": "analysis filter settings", "path": "data/persistent_state/spt_analysis_filter_settings.json"},
+    {"label": "global UI settings", "path": "data/persistent_state/spt_global_ui_settings.json"},
+    {"label": "home UI settings compatibility", "path": "data/persistent_state/spt_home_ui_settings.json"},
+    {"label": "idle timeout state", "path": "data/persistent_state/spt_idle_timeout_settings.json"},
+    {"label": "idle timeout config", "path": "data/config/idle_timeout_settings.json"},
+    {"label": "auto backup schedule config", "path": "data/config/auto_external_backup_schedule.json"},
+    {"label": "auto backup schedule state", "path": "data/persistent_state/auto_external_backup_state.json"},
+    {"label": "github cleanup settings", "path": "data/config/github_cleanup_settings.json"},
 ]
 
 

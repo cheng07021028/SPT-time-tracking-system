@@ -6,7 +6,8 @@ import re
 
 import json
 import time
-from typing import Iterable
+from pathlib import Path
+from typing import Iterable, Any
 
 import pandas as pd
 import streamlit as st
@@ -124,8 +125,151 @@ def _prepare_display_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+
 _TABLE_UI_SCHEMA_READY = False
 _WIDTH_CACHE_TTL_SECONDS = 300
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_TABLE_UI_PERSIST_FILES = [
+    _PROJECT_ROOT / "data" / "persistent_state" / "spt_table_ui_settings.json",
+    _PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_ui_settings.json",
+    _PROJECT_ROOT / "data" / "persistent_modules" / "12_module_persistence" / "table_ui_settings.json",
+]
+_TABLE_UI_HISTORY_DIR = _PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "history"
+_TABLE_UI_RESTORED_ONCE = False
+
+
+def _now_text() -> str:
+    try:
+        from services.timezone_service import now_text
+        return now_text()
+    except Exception:
+        return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _stamp_text() -> str:
+    try:
+        from services.timezone_service import now_stamp
+        return now_stamp()
+    except Exception:
+        return time.strftime("%Y%m%d_%H%M%S")
+
+
+def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _table_ui_payload_from_db() -> dict[str, Any]:
+    ensure_table_ui_schema()
+    try:
+        from .db_service import query_df
+        df = query_df("SELECT table_key, widths_json, order_json, updated_at FROM table_ui_settings ORDER BY table_key")
+        rows = df.fillna("").to_dict(orient="records") if df is not None and not df.empty else []
+    except Exception:
+        rows = []
+    return {
+        "version": "V3.43",
+        "exported_at": _now_text(),
+        "description": "全系統表格欄寬與欄位順序永久設定；避免 Reboot App 後恢復預設寬度/順序。",
+        "tables": {"table_ui_settings": rows},
+        "table_counts": {"table_ui_settings": len(rows)},
+    }
+
+
+def export_table_ui_settings_permanent(reason: str = "table_ui_settings_changed", write_history: bool = True) -> dict[str, Any]:
+    """Persist table_ui_settings outside SQLite so Reboot/App redeploy keeps widths/order."""
+    payload = _table_ui_payload_from_db()
+    payload["reason"] = reason
+    for path in _TABLE_UI_PERSIST_FILES:
+        _atomic_json(path, payload)
+    if write_history:
+        _TABLE_UI_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+        _atomic_json(_TABLE_UI_HISTORY_DIR / f"table_ui_settings_{_stamp_text()}.json", payload)
+    try:
+        from services.db_service import mark_data_changed
+        mark_data_changed("表格欄寬/欄位順序設定已變更，已寫入永久 JSON。", "table_ui_settings")
+    except Exception:
+        pass
+    return {"ok": True, "files": [str(p) for p in _TABLE_UI_PERSIST_FILES], "count": payload["table_counts"]["table_ui_settings"]}
+
+
+def _best_table_ui_payload() -> dict[str, Any]:
+    candidates: list[Path] = []
+    candidates.extend([p for p in _TABLE_UI_PERSIST_FILES if p.exists()])
+    if _TABLE_UI_HISTORY_DIR.exists():
+        candidates.extend(_TABLE_UI_HISTORY_DIR.glob("table_ui_settings_*.json"))
+    # Newest among payloads with most rows wins; prevents an empty/default export from hiding richer settings.
+    best: dict[str, Any] = {}
+    best_score = (-1, -1.0)
+    for path in candidates:
+        payload = _read_json(path)
+        tables = payload.get("tables") if isinstance(payload, dict) else None
+        rows = tables.get("table_ui_settings", []) if isinstance(tables, dict) else payload.get("table_ui_settings", [])
+        if not isinstance(rows, list):
+            rows = []
+        try:
+            mtime = path.stat().st_mtime
+        except Exception:
+            mtime = 0.0
+        score = (len(rows), mtime)
+        if rows and score > best_score:
+            best = {"tables": {"table_ui_settings": rows}, "source": str(path), "score": score}
+            best_score = score
+    return best
+
+
+def restore_table_ui_settings_from_permanent(force: bool = False) -> dict[str, Any]:
+    """Restore table width/order settings when SQLite was rebuilt by Reboot App."""
+    ensure_table_ui_schema()
+    payload = _best_table_ui_payload()
+    rows = ((payload.get("tables") or {}).get("table_ui_settings") or []) if isinstance(payload, dict) else []
+    if not rows:
+        return {"ok": False, "restored": 0, "message": "找不到 table_ui_settings 永久檔"}
+    try:
+        current = query_one("SELECT COUNT(*) AS c FROM table_ui_settings") or {"c": 0}
+        current_count = int(current.get("c") or 0)
+    except Exception:
+        current_count = 0
+    if not force and current_count >= len(rows):
+        return {"ok": False, "restored": 0, "message": "SQLite 現有欄位設定不比永久檔少，略過還原", "source": payload.get("source")}
+    if force:
+        try:
+            execute("DELETE FROM table_ui_settings")
+        except Exception:
+            pass
+    restored = 0
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        table_key = str(r.get("table_key") or "").strip()
+        if not table_key:
+            continue
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(table_key) DO UPDATE SET
+                widths_json=excluded.widths_json,
+                order_json=excluded.order_json,
+                updated_at=excluded.updated_at
+            """,
+            (table_key, str(r.get("widths_json") or "{}"), str(r.get("order_json") or "[]"), str(r.get("updated_at") or _now_text())),
+        )
+        restored += 1
+    return {"ok": restored > 0, "restored": restored, "source": payload.get("source"), "score": payload.get("score")}
 
 
 def label_for(col: str) -> str:
@@ -133,7 +277,7 @@ def label_for(col: str) -> str:
 
 
 def ensure_table_ui_schema() -> None:
-    global _TABLE_UI_SCHEMA_READY
+    global _TABLE_UI_SCHEMA_READY, _TABLE_UI_RESTORED_ONCE
     if _TABLE_UI_SCHEMA_READY:
         return
     execute(
@@ -151,6 +295,12 @@ def ensure_table_ui_schema() -> None:
     except Exception:
         pass
     _TABLE_UI_SCHEMA_READY = True
+    if not _TABLE_UI_RESTORED_ONCE:
+        _TABLE_UI_RESTORED_ONCE = True
+        try:
+            restore_table_ui_settings_from_permanent(force=False)
+        except Exception:
+            pass
 
 
 def load_widths(table_key: str) -> dict[str, int]:
@@ -194,6 +344,10 @@ def save_widths(table_key: str, widths: dict[str, int]) -> None:
         st.session_state[f"_spt_width_cache_{table_key}"] = {"ts": time.time(), "data": dict(widths)}
     except Exception:
         pass
+    try:
+        export_table_ui_settings_permanent("save_widths", write_history=True)
+    except Exception:
+        pass
 
 
 def load_column_order(table_key: str) -> list[str]:
@@ -221,6 +375,10 @@ def save_column_order(table_key: str, order: Iterable[str]) -> None:
         """,
         (table_key, json.dumps(cols, ensure_ascii=False)),
     )
+    try:
+        export_table_ui_settings_permanent("save_column_order", write_history=True)
+    except Exception:
+        pass
 
 
 def apply_column_order(table_key: str, df: pd.DataFrame) -> pd.DataFrame:

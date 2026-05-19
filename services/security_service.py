@@ -2041,3 +2041,29 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
         st.stop()
 
 require_permission = require_module_access
+
+# ===== V3.43 local restore guard after login =====
+# Pages can be opened directly from the Streamlit sidebar without rendering the
+# home page first.  Run the same local-only restore once after a successful login
+# so Reboot App cannot leave modules on SQLite defaults.  No GitHub/network calls.
+_prev_v343_require_login = require_login
+
+def require_login(module_code: str = "") -> None:  # type: ignore[override]
+    _prev_v343_require_login(module_code)
+    if st.session_state.get("auth_logged_in") and not st.session_state.get("_spt_v343_restore_guard_done"):
+        try:
+            from services.permanent_restore_guard_service import restore_core_modules_from_local_permanent
+            restore_core_modules_from_local_permanent()
+        except Exception:
+            pass
+        st.session_state["_spt_v343_restore_guard_done"] = True
+
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    require_login(module_code)
+    if not check_permission(module_code, action):
+        log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
+        st.error("權限不足，請聯絡系統管理員。")
+        st.stop()
+
+require_permission = require_module_access

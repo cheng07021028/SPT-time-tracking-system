@@ -44,56 +44,56 @@ MODULE_TABLES: Dict[str, Dict[str, Any]] = {
         "module_name_zh": "工時紀錄",
         "module_name_en": "Time Records",
         "records": ["time_records"],
-        "settings": ["table_column_settings", "table_sort_settings", "system_settings"],
+        "settings": ["table_column_settings", "table_sort_settings", "table_ui_settings", "system_settings"],
     },
     "02_history": {
         "module_code": "02",
         "module_name_zh": "歷史紀錄",
         "module_name_en": "History",
         "records": ["time_records"],
-        "settings": ["table_column_settings", "table_sort_settings"],
+        "settings": ["table_column_settings", "table_sort_settings", "table_ui_settings"],
     },
     "03_work_orders": {
         "module_code": "03",
         "module_name_zh": "製令管理",
         "module_name_en": "Work Orders",
         "records": ["work_orders"],
-        "settings": ["table_column_settings", "table_sort_settings"],
+        "settings": ["table_column_settings", "table_sort_settings", "table_ui_settings"],
     },
     "04_employees": {
         "module_code": "04",
         "module_name_zh": "人員名單",
         "module_name_en": "Employees",
         "records": ["employees"],
-        "settings": ["table_column_settings", "table_sort_settings"],
+        "settings": ["table_column_settings", "table_sort_settings", "table_ui_settings"],
     },
     "05_analysis": {
         "module_code": "05",
         "module_name_zh": "製令工時分析",
         "module_name_en": "Work Order Analysis",
         "records": ["time_records", "work_orders", "employees"],
-        "settings": ["table_column_settings", "table_sort_settings"],
+        "settings": ["table_column_settings", "table_sort_settings", "table_ui_settings"],
     },
     "06_system_logs": {
         "module_code": "06",
         "module_name_zh": "LOG查詢",
         "module_name_en": "System Logs",
         "records": ["system_logs"],
-        "settings": ["table_column_settings", "table_sort_settings"],
+        "settings": ["table_column_settings", "table_sort_settings", "table_ui_settings"],
     },
     "07_missing_records": {
         "module_code": "07",
         "module_name_zh": "今日未紀錄名單",
         "module_name_en": "Missing Records",
         "records": ["employees", "time_records"],
-        "settings": ["table_column_settings", "table_sort_settings"],
+        "settings": ["table_column_settings", "table_sort_settings", "table_ui_settings"],
     },
     "08_daily_hours": {
         "module_code": "08",
         "module_name_zh": "人員每日工時",
         "module_name_en": "Daily Hours",
         "records": ["employees", "time_records"],
-        "settings": ["table_column_settings", "table_sort_settings"],
+        "settings": ["table_column_settings", "table_sort_settings", "table_ui_settings"],
     },
     "09_persistence": {
         "module_code": "09",
@@ -114,7 +114,7 @@ MODULE_TABLES: Dict[str, Dict[str, Any]] = {
         "module_name_zh": "登入紀錄",
         "module_name_en": "Login Logs",
         "records": ["auth_login_logs", "security_login_logs", "login_logs"],
-        "settings": ["table_column_settings", "table_sort_settings"],
+        "settings": ["table_column_settings", "table_sort_settings", "table_ui_settings"],
     },
     "12_module_persistence": {
         "module_code": "12",
@@ -128,7 +128,7 @@ MODULE_TABLES: Dict[str, Dict[str, Any]] = {
         "module_name_zh": "表格欄位與排序設定",
         "module_name_en": "Table UI Settings",
         "records": ["table_column_settings", "table_sort_settings"],
-        "settings": ["table_column_settings", "table_sort_settings"],
+        "settings": ["table_column_settings", "table_sort_settings", "table_ui_settings"],
     },
 }
 
@@ -275,7 +275,8 @@ def export_all_local_permanent_files(force: bool = False, source: str = "manual"
 
         # 設定檔獨立保存：即使主資料是 0，權限/欄位/安全設定也要保存。
         setting_tables = [
-            "system_settings", "table_column_settings", "table_sort_settings",
+            "system_settings", "table_column_settings", "table_sort_settings", "table_ui_settings",
+            "process_categories", "process_category_options", "process_options", "rest_periods", "app_settings",
             "auth_users", "auth_account_permissions", "auth_security_settings",
             "security_users", "security_roles", "security_user_roles", "security_module_permissions", "security_settings",
         ]

@@ -1726,7 +1726,12 @@ def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any
         pass
     # Restore category master/options if present.
     cat_rows = tables.get("process_categories", []) if isinstance(tables.get("process_categories"), list) else []
+    # V3.43: current export stores category/process mapping under tables["process_options"].
+    # Older restore code looked only for "process_category_options", so Reboot could
+    # recreate the default category-process mapping and hide user-maintained rows.
     cat_proc_rows = tables.get("process_category_options", []) if isinstance(tables.get("process_category_options"), list) else []
+    if not cat_proc_rows and isinstance(tables.get("process_options"), list):
+        cat_proc_rows = tables.get("process_options", []) or []
     if force or (_table_count("process_categories") == 0 and cat_rows):
         if force:
             try: execute("DELETE FROM process_categories")

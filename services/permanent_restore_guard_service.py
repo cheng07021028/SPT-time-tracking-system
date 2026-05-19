@@ -50,6 +50,13 @@ def audit_core_permanent_files() -> list[dict[str, Any]]:
         PROJECT_ROOT / "data" / "config" / "system_settings.json",
         PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json",
         PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_table_ui_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_ui_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_table_column_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_history_filter_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_analysis_filter_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_global_ui_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
     ]
     return [_file_info(p) for p in paths]
 
@@ -73,6 +80,12 @@ def restore_core_modules_from_local_permanent() -> dict[str, Any]:
     except Exception as exc:
         result["ok"] = False
         result["modules"]["13_system_settings"] = {"ok": False, "error": str(exc)}
+    try:
+        from services.table_ui_service import restore_table_ui_settings_from_permanent
+        result["modules"]["ui_table_settings"] = restore_table_ui_settings_from_permanent(force=False)
+    except Exception as exc:
+        result["ok"] = False
+        result["modules"]["ui_table_settings"] = {"ok": False, "error": str(exc)}
     try:
         from services.module_persistence_service import ensure_dirs, rebuild_global_index, protect_gitignore_rules
         ensure_dirs(); protect_gitignore_rules()
