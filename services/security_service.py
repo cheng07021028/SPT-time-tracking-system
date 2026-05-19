@@ -307,16 +307,10 @@ def ensure_security_schema(force: bool = False) -> None:
     _migrate_security_schema_columns()
     seed_security_defaults()
 
-    # V1.78: login and page permission checks must see the permanent
-    # account/permission settings after GitHub/Streamlit rebuilds.
-    # SQLite is runtime-only, so restore auth_users/auth_account_permissions
-    # from data/persistent_state before authentication continues.
-    try:
-        from services.permission_service import restore_permission_settings_from_permanent_files
-        restore_permission_settings_from_permanent_files(force=False)
-    except Exception:
-        pass
-
+    # V3.40: login page must stay lightweight.
+    # Do NOT import permission_service or restore full permission matrices here;
+    # that can scan permanent files / DB and make the login page spin forever.
+    # auth_users are restored lazily only after a user submits credentials.
     _SECURITY_SCHEMA_READY = True
 
 
@@ -525,19 +519,246 @@ def _user_roles(username: str) -> list[str]:
     return df["role_code"].dropna().astype(str).tolist()
 
 
+
+def _ensure_auth_users_schema_lightweight() -> None:
+    """Create only auth tables needed by login; no full permission rebuild."""
+    try:
+        execute("""
+        CREATE TABLE IF NOT EXISTS auth_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            password_hint TEXT,
+            employee_id TEXT,
+            display_name TEXT,
+            email TEXT,
+            role_code TEXT DEFAULT 'operator',
+            is_active INTEGER DEFAULT 1,
+            force_password_change INTEGER DEFAULT 0,
+            last_login_at TEXT,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """)
+        execute("""
+        CREATE TABLE IF NOT EXISTS auth_account_permissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            module_code TEXT NOT NULL,
+            module_name_zh TEXT,
+            module_name_en TEXT,
+            can_view INTEGER DEFAULT 0,
+            can_create INTEGER DEFAULT 0,
+            can_edit INTEGER DEFAULT 0,
+            can_delete INTEGER DEFAULT 0,
+            can_import INTEGER DEFAULT 0,
+            can_export INTEGER DEFAULT 0,
+            can_backup INTEGER DEFAULT 0,
+            can_restore INTEGER DEFAULT 0,
+            can_manage INTEGER DEFAULT 0,
+            updated_at TEXT,
+            UNIQUE(username, module_code)
+        )
+        """)
+    except Exception:
+        pass
+
+
+_AUTH_LIGHT_RESTORE_DONE = False
+
+
+def _best_local_auth_tables() -> dict[str, list[dict[str, Any]]]:
+    """Find the richest local 10_permissions permanent JSON without GitHub/network."""
+    candidates: list[Path] = []
+    base = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions"
+    for name in ("10_permissions_records.json", "10_permissions_settings.json", "security_settings.json"):
+        candidates.append(base / name)
+    hist = base / "history"
+    try:
+        candidates.extend(sorted(hist.glob("10_permissions_records_*.json"), reverse=True))
+        candidates.extend(sorted(hist.glob("10_permissions_settings_*.json"), reverse=True))
+    except Exception:
+        pass
+    best: dict[str, list[dict[str, Any]]] = {}
+    best_score = -1
+    for path in candidates:
+        try:
+            if not path.exists():
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            tables = payload.get("tables", {}) if isinstance(payload, dict) else {}
+            users = tables.get("auth_users", []) if isinstance(tables, dict) else []
+            perms = tables.get("auth_account_permissions", []) if isinstance(tables, dict) else []
+            if not isinstance(users, list):
+                users = []
+            if not isinstance(perms, list):
+                perms = []
+            non_default = [u for u in users if str(u.get("note", "")).find("default account") < 0]
+            score = len(users) * 1000 + len(non_default) * 100 + len(perms)
+            if users and score > best_score:
+                best_score = score
+                best = {"auth_users": users, "auth_account_permissions": perms}
+        except Exception:
+            continue
+    return best
+
+
+def _restore_auth_users_lightweight_if_needed(username: str = "") -> None:
+    """Lazy local restore for login only; no GitHub, no full module reconciliation."""
+    global _AUTH_LIGHT_RESTORE_DONE
+    if _AUTH_LIGHT_RESTORE_DONE:
+        return
+    _AUTH_LIGHT_RESTORE_DONE = True
+    _ensure_auth_users_schema_lightweight()
+    try:
+        count_row = query_one("SELECT COUNT(*) AS c FROM auth_users") or {}
+        count = int(count_row.get("c", 0) or 0)
+        if count > 6:
+            return
+    except Exception:
+        count = 0
+    tables = _best_local_auth_tables()
+    users = tables.get("auth_users", [])
+    perms = tables.get("auth_account_permissions", [])
+    if not users:
+        return
+    try:
+        for u in users:
+            if not isinstance(u, dict) or not str(u.get("username", "")).strip():
+                continue
+            execute("""
+                INSERT INTO auth_users
+                (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(username) DO UPDATE SET
+                    password_hash=excluded.password_hash,
+                    password_hint=excluded.password_hint,
+                    employee_id=excluded.employee_id,
+                    display_name=excluded.display_name,
+                    email=excluded.email,
+                    role_code=excluded.role_code,
+                    is_active=excluded.is_active,
+                    force_password_change=excluded.force_password_change,
+                    last_login_at=excluded.last_login_at,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (
+                str(u.get("username", "")).strip(),
+                str(u.get("password_hash", "") or ""),
+                str(u.get("password_hint", "") or ""),
+                str(u.get("employee_id", "") or ""),
+                str(u.get("display_name", "") or u.get("username", "")),
+                str(u.get("email", "") or ""),
+                str(u.get("role_code", "operator") or "operator"),
+                int(u.get("is_active", 1) or 0),
+                int(u.get("force_password_change", 0) or 0),
+                str(u.get("last_login_at", "") or ""),
+                str(u.get("note", "") or ""),
+                str(u.get("created_at", "") or _now()),
+                str(u.get("updated_at", "") or _now()),
+            ))
+        for r in perms:
+            if not isinstance(r, dict) or not str(r.get("username", "")).strip():
+                continue
+            execute("""
+                INSERT INTO auth_account_permissions
+                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(username,module_code) DO UPDATE SET
+                    module_name_zh=excluded.module_name_zh,
+                    module_name_en=excluded.module_name_en,
+                    can_view=excluded.can_view,
+                    can_create=excluded.can_create,
+                    can_edit=excluded.can_edit,
+                    can_delete=excluded.can_delete,
+                    can_import=excluded.can_import,
+                    can_export=excluded.can_export,
+                    can_backup=excluded.can_backup,
+                    can_restore=excluded.can_restore,
+                    can_manage=excluded.can_manage,
+                    updated_at=excluded.updated_at
+            """, (
+                str(r.get("username", "")).strip(),
+                str(r.get("module_code", "") or ""),
+                str(r.get("module_name_zh", "") or ""),
+                str(r.get("module_name_en", "") or ""),
+                int(r.get("can_view", 0) or 0),
+                int(r.get("can_create", 0) or 0),
+                int(r.get("can_edit", 0) or 0),
+                int(r.get("can_delete", 0) or 0),
+                int(r.get("can_import", 0) or 0),
+                int(r.get("can_export", 0) or 0),
+                int(r.get("can_backup", 0) or 0),
+                int(r.get("can_restore", 0) or 0),
+                int(r.get("can_manage", 0) or 0),
+                str(r.get("updated_at", "") or _now()),
+            ))
+    except Exception:
+        pass
+
+
+def _auth_role_for_username(username: str) -> str:
+    """Return the authoritative single role from auth_users.
+
+    10｜權限管理的帳號主檔 auth_users.role_code 是唯一角色來源。
+    舊版 security_user_roles 只保留相容用途，不可讓舊角色與新角色合併成
+    admin, operator，也不可讓 admin 顯示未設定角色。
+    """
+    try:
+        _restore_auth_users_lightweight_if_needed(username)
+        row = query_one("SELECT role_code FROM auth_users WHERE username=? AND COALESCE(is_active, 0)=1", (username,))
+        role = str((row or {}).get("role_code", "") or "").strip()
+        return role
+    except Exception:
+        return ""
+
+
+def _single_authoritative_roles(username: str, fallback_row: dict[str, Any] | None = None) -> list[str]:
+    role = _auth_role_for_username(username)
+    if not role and fallback_row:
+        role = str(fallback_row.get("role_code", "") or "").strip()
+    if not role:
+        legacy = _user_roles(username)
+        role = str(legacy[0]).strip() if legacy else ""
+    return [role] if role else []
+
+
+def _is_admin_user(username: str | None = None, roles: list[str] | None = None) -> bool:
+    username = username or st.session_state.get("auth_username", "")
+    clean_roles = [str(r).strip() for r in (roles or st.session_state.get("auth_roles", []) or []) if str(r).strip()]
+    if "admin" in clean_roles:
+        return True
+    return _auth_role_for_username(str(username)) == "admin"
+
+
+def _repair_session_role_from_account_master() -> list[str]:
+    username = st.session_state.get("auth_username", "")
+    if not username:
+        return []
+    roles = _single_authoritative_roles(username)
+    if roles:
+        st.session_state["auth_roles"] = roles
+    return roles
+
+
 def get_current_user() -> dict[str, Any] | None:
     if not st.session_state.get("auth_logged_in"):
         return None
+    roles = st.session_state.get("auth_roles", []) or []
+    if not roles:
+        roles = _repair_session_role_from_account_master()
     return {
         "username": st.session_state.get("auth_username", ""),
         "display_name": st.session_state.get("auth_display_name", ""),
-        "roles": st.session_state.get("auth_roles", []),
+        "roles": roles,
     }
 
 
 def _auth_user_row(username: str) -> dict[str, Any] | None:
     """Read the V1.29+ account master row used by 10｜權限管理."""
     try:
+        _restore_auth_users_lightweight_if_needed(username)
         return query_one("SELECT * FROM auth_users WHERE username=?", (username,))
     except Exception:
         return None
@@ -578,6 +799,8 @@ def _sync_auth_user_to_security_runtime(auth_row: dict[str, Any]) -> None:
             now,
         ))
         role_code = str(auth_row.get("role_code", "") or "").strip()
+        # auth_users.role_code is authoritative; clear old legacy roles first to avoid admin, operator residues.
+        execute("DELETE FROM security_user_roles WHERE username=?", (username,))
         if role_code:
             execute("INSERT OR IGNORE INTO security_user_roles (username, role_code, created_at) VALUES (?, ?, ?)", (username, role_code, now))
     except Exception:
@@ -606,11 +829,7 @@ def authenticate(username: str, password: str) -> tuple[bool, str]:
     if auth_row:
         _sync_auth_user_to_security_runtime(auth_row)
 
-    roles = _user_roles(username)
-    # 若帳號來自 auth_users，角色存在 role_code，不一定已同步到 security_user_roles。
-    auth_role = str(row.get("role_code", "") or "").strip()
-    if auth_role and auth_role not in roles:
-        roles.append(auth_role)
+    roles = _single_authoritative_roles(username, row)
 
     st.session_state["auth_logged_in"] = True
     st.session_state["auth_username"] = username
@@ -663,7 +882,7 @@ def _load_permission_cache(username: str, roles: list[str], force: bool = False)
     ensure_security_schema()
     data: dict[str, dict[str, bool]] = {}
 
-    if "admin" in roles:
+    if _is_admin_user(username, roles):
         for m in MODULES:
             data[m["module_code"]] = {c: True for c in PERMISSION_COLUMNS}
         st.session_state[cache_key] = {"ts": now_ts, "data": data}
@@ -730,6 +949,8 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:
     if not user:
         return False
     roles = user.get("roles", [])
+    if _is_admin_user(user.get("username", ""), roles):
+        return True
     if action not in PERMISSION_COLUMNS:
         action = "can_view"
     perms = _load_permission_cache(user["username"], roles)
@@ -1159,7 +1380,8 @@ def render_user_bar(module_code: str = "") -> None:
     if not user:
         return
     render_idle_watchdog()
-    roles = ", ".join(user.get("roles", [])) or "未設定角色"
+    roles_list = user.get("roles", []) or _repair_session_role_from_account_master()
+    roles = ", ".join(roles_list) or "未設定角色"
     display_name = escape(str(user.get("display_name") or user.get("username") or ""))
     username = escape(str(user.get("username") or ""))
     role_text = escape(str(roles))
@@ -1793,112 +2015,8 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:  # typ
     return _old_check_permission_v199(module_code, action)
 
 
-# ===== V2.43 default idle timeout policy =====
-# Company requirement: the built-in default idle logout is 1 minute.  Existing
-# permanent files are preserved unless they contain the old unmodified default 15.
+# ===== V3.40 login-page no-side-effect policy =====
+# Do not mutate idle timeout during import/Reboot. The value must come from
+# permanent JSON/DB, and DEFAULT_IDLE_MINUTES is only a read fallback.
 def _v243_seed_idle_timeout_one_minute() -> None:
-    # V3.32: Disabled.  This legacy startup seed was the real cause of
-    # 「Reboot App 後閒置自動登出又變成 1 分鐘」.
-    # It overwrote missing files and even user-saved 15-minute settings with 1.
-    # Security settings must only change when the user presses Apply in 10｜權限管理.
-    return None
-
-# V3.32: do not run any startup seed that changes user settings.
-
-
-# ===== V3.32 idle timeout no-reset final override =====
-def _v332_read_idle_timeout_from_files() -> int | None:
-    """Read the newest valid idle-timeout file without treating 15 as old default.
-
-    Earlier V2.43 logic changed 15 to 1 during import.  This final reader uses
-    all known permanent paths and picks the newest valid value, so stale files do
-    not override the latest user-applied setting.
-    """
-    candidates: list[tuple[float, int, str]] = []
-    for path in _v208_idle_timeout_paths():
-        try:
-            if not path.exists():
-                continue
-            payload = json.loads(path.read_text(encoding="utf-8"))
-            minutes = _v208_extract_idle_timeout(payload)
-            if minutes is None or int(minutes) < 1:
-                continue
-            candidates.append((float(path.stat().st_mtime), int(minutes), str(path)))
-        except Exception:
-            continue
-    if not candidates:
-        return None
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    return int(candidates[0][1])
-
-
-def get_idle_timeout_minutes() -> int:  # type: ignore[override]
-    """V3.32: Final no-reset source-of-truth reader for idle auto logout minutes."""
-    try:
-        cache = st.session_state.get("_spt_idle_timeout_cache")
-        if cache:
-            minutes = int(float(cache.get("minutes", 0)))
-            if minutes >= 1:
-                return minutes
-    except Exception:
-        pass
-
-    minutes = _v332_read_idle_timeout_from_files()
-    if minutes is None:
-        try:
-            ensure_security_schema()
-            db_candidates: list[int] = []
-            for table in ("auth_security_settings", "security_settings"):
-                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
-                if row and row.get("setting_value") not in (None, ""):
-                    val = int(float(row.get("setting_value")))
-                    if val >= 1:
-                        db_candidates.append(val)
-            if db_candidates:
-                minutes = db_candidates[0]
-        except Exception:
-            minutes = None
-    if minutes is None:
-        minutes = DEFAULT_IDLE_MINUTES
-    minutes = max(1, int(minutes))
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
-    except Exception:
-        pass
-    return minutes
-
-
-def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
-    """V3.32: Save idle timeout to DB + all permanent JSON paths, without startup reset."""
-    minutes = max(1, int(minutes))
-    try:
-        ensure_security_schema()
-        for table in ("auth_security_settings", "security_settings"):
-            execute(f"""
-                CREATE TABLE IF NOT EXISTS {table} (
-                    setting_key TEXT PRIMARY KEY,
-                    setting_value TEXT,
-                    note TEXT,
-                    updated_at TEXT
-                )
-            """)
-            execute(f"""
-                INSERT INTO {table} (setting_key, setting_value, note, updated_at)
-                VALUES ('idle_timeout_minutes', ?, '閒置多久自動登出，單位分鐘', ?)
-                ON CONFLICT(setting_key) DO UPDATE SET
-                    setting_value=excluded.setting_value,
-                    note=excluded.note,
-                    updated_at=excluded.updated_at
-            """, (str(minutes), _now()))
-    except Exception:
-        pass
-    _v208_write_idle_timeout_files(minutes)
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
-        settings = st.session_state.get("spt_security_settings", {})
-        if not isinstance(settings, dict):
-            settings = {}
-        settings["idle_timeout_minutes"] = str(minutes)
-        st.session_state["spt_security_settings"] = settings
-    except Exception:
-        pass
+    return
