@@ -1,6 +1,6 @@
 {
   "version": "V363",
-  "updated_at": "2026-05-19 22:24:18",
+  "updated_at": "2026-05-19 22:24:27",
   "description": "超慧科技製造部工時紀錄系統唯一設定主來源；SQLite 僅作運行快取。",
   "table_settings": {
     "01.time_records.main": {
@@ -1093,6 +1093,66 @@
       }
     },
     "4907734016268996834": {
+      "columns": {
+        "label": {
+          "source": "label",
+          "label": "label / label",
+          "visible": true,
+          "width": "medium",
+          "order": 0
+        },
+        "path": {
+          "source": "path",
+          "label": "path / path",
+          "visible": true,
+          "width": "medium",
+          "order": 1
+        },
+        "exists": {
+          "source": "exists",
+          "label": "exists / exists",
+          "visible": true,
+          "width": "medium",
+          "order": 2
+        },
+        "json_readable": {
+          "source": "json_readable",
+          "label": "json_readable / json_readable",
+          "visible": true,
+          "width": "medium",
+          "order": 3
+        },
+        "size": {
+          "source": "size",
+          "label": "size / size",
+          "visible": true,
+          "width": "medium",
+          "order": 4
+        },
+        "modified": {
+          "source": "modified",
+          "label": "modified / modified",
+          "visible": true,
+          "width": "medium",
+          "order": 5
+        },
+        "detail": {
+          "source": "detail",
+          "label": "詳細 / Detail",
+          "visible": true,
+          "width": "medium",
+          "order": 6
+        },
+        "top_keys": {
+          "source": "top_keys",
+          "label": "top_keys / top_keys",
+          "visible": true,
+          "width": "medium",
+          "order": 7
+        }
+      }
+    },
+    "13_13._系統設定_13_13._系統設定_456_dataframe": {
       "columns": {
         "label": {
           "source": "label",
