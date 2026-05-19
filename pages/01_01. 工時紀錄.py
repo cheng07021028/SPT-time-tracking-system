@@ -69,10 +69,13 @@ with left:
         index=category_choices.index(default_category) if default_category in category_choices else 0,
         key="time_record_process_category_v333",
     )
-    PROCESS_OPTIONS = get_process_options_by_category(selected_category, include_common=True)
-    if not PROCESS_OPTIONS:
-        PROCESS_OPTIONS = get_process_options_by_category(default_category, include_common=True)
+    # V3.47：工段下拉只顯示所選類別自己的工段，不再混入「全部 / 通用」工段。
+    # 若選擇「全部 / 通用」，才顯示通用工段。
+    PROCESS_OPTIONS = get_process_options_by_category(selected_category, include_common=False)
     st.caption(f"目前工段類別 / Current Category：{selected_category or '全部 / 通用'}")
+    if not PROCESS_OPTIONS:
+        st.warning("此類別尚未設定工段名稱，請先到 13｜系統設定新增『類別對應工段』並套用永久儲存。")
+        st.stop()
     process = st.selectbox("工段名稱｜Process", PROCESS_OPTIONS)
     remark = st.text_area("備註｜Remark", height=90)
     auto_pause = st.checkbox("切換不同工段時，自動暫停同人員其他未結束作業｜Auto pause different process", value=True)

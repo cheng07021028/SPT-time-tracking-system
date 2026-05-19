@@ -606,8 +606,23 @@ if "category_name" not in proc_df.columns:
     else:
         proc_df.insert(1, "category_name", "全部 / 通用")
 proc_df["category_name"] = proc_df["category_name"].fillna("全部 / 通用").astype(str).replace({"": "全部 / 通用"})
+# V3.47：此表格只顯示目前選定類別自己的工段；不再混入「全部 / 通用」。
+# 即使該類別目前沒有任何工段，也保留一列空白新增列，讓使用者可直接新增並永久儲存。
 if filter_category:
-    proc_df = proc_df[(proc_df["category_name"].eq("全部 / 通用")) | (proc_df["category_name"].eq(filter_category))].copy()
+    proc_df = proc_df[proc_df["category_name"].eq(filter_category)].copy()
+if proc_df.empty:
+    proc_df = pd.DataFrame([
+        {
+            "id": "",
+            "category_name": filter_category or "全部 / 通用",
+            "process_name": "",
+            "is_active": True,
+            "sort_order": 1,
+            "note": "",
+            "created_at": "",
+            "updated_at": "",
+        }
+    ])
 proc_view = _normalize_delete_column(proc_df)
 
 proc_edit_key = "_spt_13_process_edit_mode"
