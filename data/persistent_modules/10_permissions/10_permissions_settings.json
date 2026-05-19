@@ -1,12 +1,15 @@
 {
-  "version": "V3.41",
-  "exported_at": "2026-05-19 22:46:32",
-  "reason": "auth_users_saved",
-  "module_code": "10_permissions",
+  "version": "V3.66.1-direct-permission-persistence",
+  "exported_at": "2026-05-19 23:33:20",
+  "reason": "auth_users_deleted",
+  "module_key": "10_permissions",
+  "module_name_zh": "權限管理",
+  "module_name_en": "Permission Management",
+  "description": "權限管理固定永久檔。模式比照 03/04：儲存直接寫 latest JSON，Reboot 直接讀 latest JSON，不掃 history、不用帳號數比較。",
   "tables": {
     "auth_users": [
       {
-        "id": 1,
+        "id": 16,
         "username": "admin",
         "password_hash": "pbkdf2_sha256$3a6f3a7befa0885e8c08cc2eb15a9859$4c37ee557e8e94cd84ddf1e2c31156cdb5fed35b9880b147e7e72302444f72ee",
         "password_hint": "預設密碼，正式使用請修改",
@@ -19,10 +22,10 @@
         "last_login_at": "2026-05-19 22:43:33",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 2,
+        "id": 17,
         "username": "manager",
         "password_hash": "pbkdf2_sha256$10ba828719f2b82390101445bbcf4386$f6814b12a67e894cc25729467ebeb5b931c0a2e962c9be78011f0a7c96bed7ec",
         "password_hint": "預設密碼，正式使用請修改",
@@ -35,10 +38,10 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 3,
+        "id": 18,
         "username": "leader",
         "password_hash": "pbkdf2_sha256$820402735ad1b2eea21d45fe0dde7d92$61071ad17632fe72811f7954a9f0285315dc41cc9ad744a0f91696a25d427cbf",
         "password_hint": "預設密碼，正式使用請修改",
@@ -51,10 +54,10 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 4,
+        "id": 19,
         "username": "operator",
         "password_hash": "pbkdf2_sha256$4d4520bfc0e2c72ba9b6139d26256b67$8b16d1dc77c04c2a285e5e1f21ec03dccc169bf0db45f2c1612d80ecd0b7dc40",
         "password_hint": "預設密碼，正式使用請修改",
@@ -67,10 +70,10 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 5,
+        "id": 20,
         "username": "viewer",
         "password_hash": "pbkdf2_sha256$205d2b7f07efb7edb59124464db1b85c$496673a805306de4f438898de0dc6178c71b9a83cd2b10242fa20f3bef738859",
         "password_hint": "預設密碼，正式使用請修改",
@@ -83,10 +86,10 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 6,
+        "id": 21,
         "username": "auditor",
         "password_hash": "pbkdf2_sha256$f0810956eb383df03a679f2fc23e5bd0$11465b9812094ab5ff80cc844dbf555a2b107fc534cd7bd9f46db3122d43425d",
         "password_hint": "預設密碼，正式使用請修改",
@@ -99,10 +102,10 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 13,
+        "id": 22,
         "username": "spt142",
         "password_hash": "pbkdf2_sha256$767f80cda95ff0103ed131ffe8f43d95$77c112f466cb74aa5de47ce378f2e30b3a3360228948301569e8c1cd894df5d9",
         "password_hint": "由權限管理頁建立",
@@ -115,26 +118,10 @@
         "last_login_at": "2026-05-15 11:18:26",
         "note": "",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 14,
-        "username": "B211",
-        "password_hash": "pbkdf2_sha256$80bd0fbcd7f99be462a491ef162f8803$fb7e693d3fb4e38b3738297e723e7026fe406e31ea35a42f207fab1ce914f09c",
-        "password_hint": "由權限管理頁建立",
-        "employee_id": "",
-        "display_name": "B211",
-        "email": "",
-        "role_code": "operator",
-        "is_active": 1,
-        "force_password_change": 0,
-        "last_login_at": "2026-05-15 11:21:46",
-        "note": "",
-        "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-15 11:21:46"
-      },
-      {
-        "id": 15,
+        "id": 24,
         "username": "Ethan",
         "password_hash": "pbkdf2_sha256$4a2137fb90480f1b82a4721549f178ff$e85de92dedccb2791d7c297a55882100182babccdb5fd0485b63bfa5ac24bca0",
         "password_hint": "由權限管理頁建立",
@@ -147,233 +134,12 @@
         "last_login_at": null,
         "note": "",
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       }
     ],
     "auth_account_permissions": [
       {
-        "id": 1,
-        "username": "B211",
-        "module_code": "01",
-        "module_name_zh": "工時紀錄",
-        "module_name_en": "Time Recording",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:58:31"
-      },
-      {
-        "id": 2,
-        "username": "B211",
-        "module_code": "02",
-        "module_name_zh": "歷史紀錄",
-        "module_name_en": "History Records",
-        "can_view": 1,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:58:31"
-      },
-      {
-        "id": 3,
-        "username": "B211",
-        "module_code": "03",
-        "module_name_zh": "製令管理",
-        "module_name_en": "Work Order Management",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:58:31"
-      },
-      {
-        "id": 4,
-        "username": "B211",
-        "module_code": "04",
-        "module_name_zh": "人員名單",
-        "module_name_en": "Employee Master",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:58:31"
-      },
-      {
-        "id": 5,
-        "username": "B211",
-        "module_code": "05",
-        "module_name_zh": "製令工時分析",
-        "module_name_en": "Work Order Time Analysis",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:58:31"
-      },
-      {
-        "id": 6,
-        "username": "B211",
-        "module_code": "06",
-        "module_name_zh": "LOG查詢",
-        "module_name_en": "Log Inquiry",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:58:31"
-      },
-      {
-        "id": 7,
-        "username": "B211",
-        "module_code": "07",
-        "module_name_zh": "今日未紀錄名單",
-        "module_name_en": "Missing Records Today",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:58:31"
-      },
-      {
-        "id": 8,
-        "username": "B211",
-        "module_code": "08",
-        "module_name_zh": "人員每日工時",
-        "module_name_en": "Daily Employee Hours",
-        "can_view": 1,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:58:31"
-      },
-      {
-        "id": 9,
-        "username": "B211",
-        "module_code": "09",
-        "module_name_zh": "資料永久保存與備份",
-        "module_name_en": "Permanent Backup",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:58:31"
-      },
-      {
-        "id": 10,
-        "username": "B211",
-        "module_code": "10",
-        "module_name_zh": "權限管理",
-        "module_name_en": "Permission Management",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:58:31"
-      },
-      {
-        "id": 11,
-        "username": "B211",
-        "module_code": "11",
-        "module_name_zh": "登入紀錄",
-        "module_name_en": "Login Logs",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:58:31"
-      },
-      {
-        "id": 12,
-        "username": "B211",
-        "module_code": "12",
-        "module_name_zh": "模組永久紀錄中心",
-        "module_name_en": "Module Permanent Records",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:58:31"
-      },
-      {
-        "id": 13,
-        "username": "B211",
-        "module_code": "13",
-        "module_name_zh": "系統設定",
-        "module_name_en": "System Settings",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-18 15:25:08"
-      },
-      {
-        "id": 14,
+        "id": 248,
         "username": "Ethan",
         "module_code": "01",
         "module_name_zh": "工時紀錄",
@@ -390,7 +156,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 15,
+        "id": 249,
         "username": "Ethan",
         "module_code": "02",
         "module_name_zh": "歷史紀錄",
@@ -407,7 +173,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 16,
+        "id": 250,
         "username": "Ethan",
         "module_code": "03",
         "module_name_zh": "製令管理",
@@ -424,7 +190,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 17,
+        "id": 251,
         "username": "Ethan",
         "module_code": "04",
         "module_name_zh": "人員名單",
@@ -441,7 +207,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 18,
+        "id": 252,
         "username": "Ethan",
         "module_code": "05",
         "module_name_zh": "製令工時分析",
@@ -458,7 +224,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 19,
+        "id": 253,
         "username": "Ethan",
         "module_code": "06",
         "module_name_zh": "LOG查詢",
@@ -475,7 +241,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 20,
+        "id": 254,
         "username": "Ethan",
         "module_code": "07",
         "module_name_zh": "今日未紀錄名單",
@@ -492,7 +258,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 21,
+        "id": 255,
         "username": "Ethan",
         "module_code": "08",
         "module_name_zh": "人員每日工時",
@@ -509,7 +275,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 22,
+        "id": 256,
         "username": "Ethan",
         "module_code": "09",
         "module_name_zh": "資料永久保存與備份",
@@ -526,7 +292,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 23,
+        "id": 257,
         "username": "Ethan",
         "module_code": "10",
         "module_name_zh": "權限管理",
@@ -543,7 +309,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 24,
+        "id": 258,
         "username": "Ethan",
         "module_code": "11",
         "module_name_zh": "登入紀錄",
@@ -560,7 +326,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 25,
+        "id": 259,
         "username": "Ethan",
         "module_code": "12",
         "module_name_zh": "模組永久紀錄中心",
@@ -577,7 +343,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 26,
+        "id": 260,
         "username": "Ethan",
         "module_code": "13",
         "module_name_zh": "系統設定",
@@ -594,7 +360,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 27,
+        "id": 261,
         "username": "admin",
         "module_code": "01",
         "module_name_zh": "工時紀錄",
@@ -611,7 +377,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 28,
+        "id": 262,
         "username": "admin",
         "module_code": "02",
         "module_name_zh": "歷史紀錄",
@@ -628,7 +394,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 29,
+        "id": 263,
         "username": "admin",
         "module_code": "03",
         "module_name_zh": "製令管理",
@@ -645,7 +411,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 30,
+        "id": 264,
         "username": "admin",
         "module_code": "04",
         "module_name_zh": "人員名單",
@@ -662,7 +428,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 31,
+        "id": 265,
         "username": "admin",
         "module_code": "05",
         "module_name_zh": "製令工時分析",
@@ -679,7 +445,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 32,
+        "id": 266,
         "username": "admin",
         "module_code": "06",
         "module_name_zh": "LOG查詢",
@@ -696,7 +462,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 33,
+        "id": 267,
         "username": "admin",
         "module_code": "07",
         "module_name_zh": "今日未紀錄名單",
@@ -713,7 +479,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 34,
+        "id": 268,
         "username": "admin",
         "module_code": "08",
         "module_name_zh": "人員每日工時",
@@ -730,7 +496,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 35,
+        "id": 269,
         "username": "admin",
         "module_code": "09",
         "module_name_zh": "資料永久保存與備份",
@@ -747,7 +513,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 36,
+        "id": 270,
         "username": "admin",
         "module_code": "10",
         "module_name_zh": "權限管理",
@@ -764,7 +530,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 37,
+        "id": 271,
         "username": "admin",
         "module_code": "11",
         "module_name_zh": "登入紀錄",
@@ -781,7 +547,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 38,
+        "id": 272,
         "username": "admin",
         "module_code": "12",
         "module_name_zh": "模組永久紀錄中心",
@@ -798,7 +564,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 39,
+        "id": 273,
         "username": "admin",
         "module_code": "13",
         "module_name_zh": "系統設定",
@@ -815,7 +581,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 40,
+        "id": 274,
         "username": "auditor",
         "module_code": "01",
         "module_name_zh": "工時紀錄",
@@ -832,7 +598,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 41,
+        "id": 275,
         "username": "auditor",
         "module_code": "02",
         "module_name_zh": "歷史紀錄",
@@ -849,7 +615,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 42,
+        "id": 276,
         "username": "auditor",
         "module_code": "03",
         "module_name_zh": "製令管理",
@@ -866,7 +632,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 43,
+        "id": 277,
         "username": "auditor",
         "module_code": "04",
         "module_name_zh": "人員名單",
@@ -883,7 +649,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 44,
+        "id": 278,
         "username": "auditor",
         "module_code": "05",
         "module_name_zh": "製令工時分析",
@@ -900,7 +666,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 45,
+        "id": 279,
         "username": "auditor",
         "module_code": "06",
         "module_name_zh": "LOG查詢",
@@ -917,7 +683,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 46,
+        "id": 280,
         "username": "auditor",
         "module_code": "07",
         "module_name_zh": "今日未紀錄名單",
@@ -934,7 +700,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 47,
+        "id": 281,
         "username": "auditor",
         "module_code": "08",
         "module_name_zh": "人員每日工時",
@@ -951,7 +717,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 48,
+        "id": 282,
         "username": "auditor",
         "module_code": "09",
         "module_name_zh": "資料永久保存與備份",
@@ -968,7 +734,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 49,
+        "id": 283,
         "username": "auditor",
         "module_code": "10",
         "module_name_zh": "權限管理",
@@ -985,7 +751,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 50,
+        "id": 284,
         "username": "auditor",
         "module_code": "11",
         "module_name_zh": "登入紀錄",
@@ -1002,7 +768,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 51,
+        "id": 285,
         "username": "auditor",
         "module_code": "12",
         "module_name_zh": "模組永久紀錄中心",
@@ -1019,7 +785,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 52,
+        "id": 286,
         "username": "auditor",
         "module_code": "13",
         "module_name_zh": "系統設定",
@@ -1036,7 +802,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 53,
+        "id": 287,
         "username": "leader",
         "module_code": "01",
         "module_name_zh": "工時紀錄",
@@ -1053,7 +819,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 54,
+        "id": 288,
         "username": "leader",
         "module_code": "02",
         "module_name_zh": "歷史紀錄",
@@ -1070,7 +836,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 55,
+        "id": 289,
         "username": "leader",
         "module_code": "03",
         "module_name_zh": "製令管理",
@@ -1087,7 +853,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 56,
+        "id": 290,
         "username": "leader",
         "module_code": "04",
         "module_name_zh": "人員名單",
@@ -1104,7 +870,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 57,
+        "id": 291,
         "username": "leader",
         "module_code": "05",
         "module_name_zh": "製令工時分析",
@@ -1121,7 +887,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 58,
+        "id": 292,
         "username": "leader",
         "module_code": "06",
         "module_name_zh": "LOG查詢",
@@ -1138,7 +904,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 59,
+        "id": 293,
         "username": "leader",
         "module_code": "07",
         "module_name_zh": "今日未紀錄名單",
@@ -1155,7 +921,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 60,
+        "id": 294,
         "username": "leader",
         "module_code": "08",
         "module_name_zh": "人員每日工時",
@@ -1172,7 +938,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 61,
+        "id": 295,
         "username": "leader",
         "module_code": "09",
         "module_name_zh": "資料永久保存與備份",
@@ -1189,7 +955,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 62,
+        "id": 296,
         "username": "leader",
         "module_code": "10",
         "module_name_zh": "權限管理",
@@ -1206,7 +972,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 63,
+        "id": 297,
         "username": "leader",
         "module_code": "11",
         "module_name_zh": "登入紀錄",
@@ -1223,7 +989,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 64,
+        "id": 298,
         "username": "leader",
         "module_code": "12",
         "module_name_zh": "模組永久紀錄中心",
@@ -1240,7 +1006,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 65,
+        "id": 299,
         "username": "leader",
         "module_code": "13",
         "module_name_zh": "系統設定",
@@ -1257,7 +1023,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 66,
+        "id": 300,
         "username": "manager",
         "module_code": "01",
         "module_name_zh": "工時紀錄",
@@ -1274,7 +1040,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 67,
+        "id": 301,
         "username": "manager",
         "module_code": "02",
         "module_name_zh": "歷史紀錄",
@@ -1291,7 +1057,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 68,
+        "id": 302,
         "username": "manager",
         "module_code": "03",
         "module_name_zh": "製令管理",
@@ -1308,7 +1074,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 69,
+        "id": 303,
         "username": "manager",
         "module_code": "04",
         "module_name_zh": "人員名單",
@@ -1325,7 +1091,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 70,
+        "id": 304,
         "username": "manager",
         "module_code": "05",
         "module_name_zh": "製令工時分析",
@@ -1342,7 +1108,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 71,
+        "id": 305,
         "username": "manager",
         "module_code": "06",
         "module_name_zh": "LOG查詢",
@@ -1359,7 +1125,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 72,
+        "id": 306,
         "username": "manager",
         "module_code": "07",
         "module_name_zh": "今日未紀錄名單",
@@ -1376,7 +1142,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 73,
+        "id": 307,
         "username": "manager",
         "module_code": "08",
         "module_name_zh": "人員每日工時",
@@ -1393,7 +1159,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 74,
+        "id": 308,
         "username": "manager",
         "module_code": "09",
         "module_name_zh": "資料永久保存與備份",
@@ -1410,7 +1176,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 75,
+        "id": 309,
         "username": "manager",
         "module_code": "10",
         "module_name_zh": "權限管理",
@@ -1427,7 +1193,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 76,
+        "id": 310,
         "username": "manager",
         "module_code": "11",
         "module_name_zh": "登入紀錄",
@@ -1444,7 +1210,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 77,
+        "id": 311,
         "username": "manager",
         "module_code": "12",
         "module_name_zh": "模組永久紀錄中心",
@@ -1461,7 +1227,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 78,
+        "id": 312,
         "username": "manager",
         "module_code": "13",
         "module_name_zh": "系統設定",
@@ -1478,7 +1244,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 79,
+        "id": 313,
         "username": "operator",
         "module_code": "01",
         "module_name_zh": "工時紀錄",
@@ -1495,7 +1261,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 80,
+        "id": 314,
         "username": "operator",
         "module_code": "02",
         "module_name_zh": "歷史紀錄",
@@ -1512,7 +1278,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 81,
+        "id": 315,
         "username": "operator",
         "module_code": "03",
         "module_name_zh": "製令管理",
@@ -1529,7 +1295,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 82,
+        "id": 316,
         "username": "operator",
         "module_code": "04",
         "module_name_zh": "人員名單",
@@ -1546,7 +1312,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 83,
+        "id": 317,
         "username": "operator",
         "module_code": "05",
         "module_name_zh": "製令工時分析",
@@ -1563,7 +1329,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 84,
+        "id": 318,
         "username": "operator",
         "module_code": "06",
         "module_name_zh": "LOG查詢",
@@ -1580,7 +1346,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 85,
+        "id": 319,
         "username": "operator",
         "module_code": "07",
         "module_name_zh": "今日未紀錄名單",
@@ -1597,7 +1363,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 86,
+        "id": 320,
         "username": "operator",
         "module_code": "08",
         "module_name_zh": "人員每日工時",
@@ -1614,7 +1380,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 87,
+        "id": 321,
         "username": "operator",
         "module_code": "09",
         "module_name_zh": "資料永久保存與備份",
@@ -1631,7 +1397,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 88,
+        "id": 322,
         "username": "operator",
         "module_code": "10",
         "module_name_zh": "權限管理",
@@ -1648,7 +1414,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 89,
+        "id": 323,
         "username": "operator",
         "module_code": "11",
         "module_name_zh": "登入紀錄",
@@ -1665,7 +1431,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 90,
+        "id": 324,
         "username": "operator",
         "module_code": "12",
         "module_name_zh": "模組永久紀錄中心",
@@ -1682,7 +1448,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 91,
+        "id": 325,
         "username": "operator",
         "module_code": "13",
         "module_name_zh": "系統設定",
@@ -1699,7 +1465,7 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 92,
+        "id": 326,
         "username": "spt142",
         "module_code": "01",
         "module_name_zh": "工時紀錄",
@@ -1716,7 +1482,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 93,
+        "id": 327,
         "username": "spt142",
         "module_code": "02",
         "module_name_zh": "歷史紀錄",
@@ -1733,7 +1499,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 94,
+        "id": 328,
         "username": "spt142",
         "module_code": "03",
         "module_name_zh": "製令管理",
@@ -1750,7 +1516,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 95,
+        "id": 329,
         "username": "spt142",
         "module_code": "04",
         "module_name_zh": "人員名單",
@@ -1767,7 +1533,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 96,
+        "id": 330,
         "username": "spt142",
         "module_code": "05",
         "module_name_zh": "製令工時分析",
@@ -1784,7 +1550,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 97,
+        "id": 331,
         "username": "spt142",
         "module_code": "06",
         "module_name_zh": "LOG查詢",
@@ -1801,7 +1567,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 98,
+        "id": 332,
         "username": "spt142",
         "module_code": "07",
         "module_name_zh": "今日未紀錄名單",
@@ -1818,7 +1584,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 99,
+        "id": 333,
         "username": "spt142",
         "module_code": "08",
         "module_name_zh": "人員每日工時",
@@ -1835,7 +1601,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 100,
+        "id": 334,
         "username": "spt142",
         "module_code": "09",
         "module_name_zh": "資料永久保存與備份",
@@ -1852,7 +1618,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 101,
+        "id": 335,
         "username": "spt142",
         "module_code": "10",
         "module_name_zh": "權限管理",
@@ -1869,7 +1635,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 102,
+        "id": 336,
         "username": "spt142",
         "module_code": "11",
         "module_name_zh": "登入紀錄",
@@ -1886,7 +1652,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 103,
+        "id": 337,
         "username": "spt142",
         "module_code": "12",
         "module_name_zh": "模組永久紀錄中心",
@@ -1903,7 +1669,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 104,
+        "id": 338,
         "username": "spt142",
         "module_code": "13",
         "module_name_zh": "系統設定",
@@ -1920,7 +1686,7 @@
         "updated_at": "2026-05-19 00:16:24"
       },
       {
-        "id": 105,
+        "id": 339,
         "username": "viewer",
         "module_code": "01",
         "module_name_zh": "工時紀錄",
@@ -1937,7 +1703,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 106,
+        "id": 340,
         "username": "viewer",
         "module_code": "02",
         "module_name_zh": "歷史紀錄",
@@ -1954,7 +1720,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 107,
+        "id": 341,
         "username": "viewer",
         "module_code": "03",
         "module_name_zh": "製令管理",
@@ -1971,7 +1737,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 108,
+        "id": 342,
         "username": "viewer",
         "module_code": "04",
         "module_name_zh": "人員名單",
@@ -1988,7 +1754,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 109,
+        "id": 343,
         "username": "viewer",
         "module_code": "05",
         "module_name_zh": "製令工時分析",
@@ -2005,7 +1771,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 110,
+        "id": 344,
         "username": "viewer",
         "module_code": "06",
         "module_name_zh": "LOG查詢",
@@ -2022,7 +1788,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 111,
+        "id": 345,
         "username": "viewer",
         "module_code": "07",
         "module_name_zh": "今日未紀錄名單",
@@ -2039,7 +1805,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 112,
+        "id": 346,
         "username": "viewer",
         "module_code": "08",
         "module_name_zh": "人員每日工時",
@@ -2056,7 +1822,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 113,
+        "id": 347,
         "username": "viewer",
         "module_code": "09",
         "module_name_zh": "資料永久保存與備份",
@@ -2073,7 +1839,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 114,
+        "id": 348,
         "username": "viewer",
         "module_code": "10",
         "module_name_zh": "權限管理",
@@ -2090,7 +1856,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 115,
+        "id": 349,
         "username": "viewer",
         "module_code": "11",
         "module_name_zh": "登入紀錄",
@@ -2107,7 +1873,7 @@
         "updated_at": "2026-05-15 03:46:59"
       },
       {
-        "id": 116,
+        "id": 350,
         "username": "viewer",
         "module_code": "12",
         "module_name_zh": "模組永久紀錄中心",
@@ -2124,7 +1890,7 @@
         "updated_at": "2026-05-15 10:48:48"
       },
       {
-        "id": 117,
+        "id": 351,
         "username": "viewer",
         "module_code": "13",
         "module_name_zh": "系統設定",
@@ -2157,7 +1923,7 @@
     ],
     "security_users": [
       {
-        "id": 1,
+        "id": 19,
         "username": "admin",
         "password_hash": "pbkdf2_sha256$3a6f3a7befa0885e8c08cc2eb15a9859$4c37ee557e8e94cd84ddf1e2c31156cdb5fed35b9880b147e7e72302444f72ee",
         "employee_id": "nan",
@@ -2167,10 +1933,10 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-19 22:43:33",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 2,
+        "id": 20,
         "username": "manager",
         "password_hash": "pbkdf2_sha256$10ba828719f2b82390101445bbcf4386$f6814b12a67e894cc25729467ebeb5b931c0a2e962c9be78011f0a7c96bed7ec",
         "employee_id": "nan",
@@ -2180,10 +1946,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 3,
+        "id": 21,
         "username": "leader",
         "password_hash": "pbkdf2_sha256$820402735ad1b2eea21d45fe0dde7d92$61071ad17632fe72811f7954a9f0285315dc41cc9ad744a0f91696a25d427cbf",
         "employee_id": "nan",
@@ -2193,10 +1959,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 4,
+        "id": 22,
         "username": "operator",
         "password_hash": "pbkdf2_sha256$4d4520bfc0e2c72ba9b6139d26256b67$8b16d1dc77c04c2a285e5e1f21ec03dccc169bf0db45f2c1612d80ecd0b7dc40",
         "employee_id": "nan",
@@ -2206,10 +1972,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 5,
+        "id": 23,
         "username": "viewer",
         "password_hash": "pbkdf2_sha256$205d2b7f07efb7edb59124464db1b85c$496673a805306de4f438898de0dc6178c71b9a83cd2b10242fa20f3bef738859",
         "employee_id": "nan",
@@ -2219,10 +1985,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 6,
+        "id": 24,
         "username": "auditor",
         "password_hash": "pbkdf2_sha256$f0810956eb383df03a679f2fc23e5bd0$11465b9812094ab5ff80cc844dbf555a2b107fc534cd7bd9f46db3122d43425d",
         "employee_id": "nan",
@@ -2232,10 +1998,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 7,
+        "id": 25,
         "username": "spt142",
         "password_hash": "pbkdf2_sha256$767f80cda95ff0103ed131ffe8f43d95$77c112f466cb74aa5de47ce378f2e30b3a3360228948301569e8c1cd894df5d9",
         "employee_id": "",
@@ -2245,23 +2011,10 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:18:26",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
       },
       {
-        "id": 8,
-        "username": "B211",
-        "password_hash": "pbkdf2_sha256$80bd0fbcd7f99be462a491ef162f8803$fb7e693d3fb4e38b3738297e723e7026fe406e31ea35a42f207fab1ce914f09c",
-        "employee_id": "",
-        "display_name": "B211",
-        "email": "",
-        "is_active": 1,
-        "force_password_change": 0,
-        "last_login_at": "2026-05-15 11:21:46",
-        "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 9,
+        "id": 27,
         "username": "Ethan",
         "password_hash": "pbkdf2_sha256$4a2137fb90480f1b82a4721549f178ff$e85de92dedccb2791d7c297a55882100182babccdb5fd0485b63bfa5ac24bca0",
         "employee_id": "SPT142",
@@ -2271,7 +2024,57 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-19 22:46:32"
+        "updated_at": "2026-05-19 23:33:20"
+      }
+    ],
+    "security_user_roles": [
+      {
+        "id": 160,
+        "username": "Ethan",
+        "role_code": "admin",
+        "created_at": "2026-05-19 23:33:20"
+      },
+      {
+        "id": 161,
+        "username": "admin",
+        "role_code": "admin",
+        "created_at": "2026-05-19 23:33:20"
+      },
+      {
+        "id": 162,
+        "username": "auditor",
+        "role_code": "auditor",
+        "created_at": "2026-05-19 23:33:20"
+      },
+      {
+        "id": 163,
+        "username": "leader",
+        "role_code": "leader",
+        "created_at": "2026-05-19 23:33:20"
+      },
+      {
+        "id": 164,
+        "username": "manager",
+        "role_code": "manager",
+        "created_at": "2026-05-19 23:33:20"
+      },
+      {
+        "id": 165,
+        "username": "operator",
+        "role_code": "operator",
+        "created_at": "2026-05-19 23:33:20"
+      },
+      {
+        "id": 166,
+        "username": "spt142",
+        "role_code": "operator",
+        "created_at": "2026-05-19 23:33:20"
+      },
+      {
+        "id": 167,
+        "username": "viewer",
+        "role_code": "viewer",
+        "created_at": "2026-05-19 23:33:20"
       }
     ],
     "security_settings": [
@@ -2287,22 +2090,14 @@
         "note": "V1.69 synchronized security setting",
         "updated_at": "2026-05-15 11:23:50"
       }
-    ],
-    "table_ui_settings": [
-      {
-        "table_key": "01.time_records.main",
-        "widths_json": "{\"id\": 70, \"record_key\": 280, \"status\": 140, \"work_order\": 150, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 190, \"remark\": 260, \"start_date\": 140, \"start_time\": 140, \"end_date\": 140, \"end_time\": 140, \"work_hours\": 140, \"assembly_location\": 140, \"group_key\": 140, \"is_group_work\": 140, \"source\": 140, \"created_at\": 180, \"updated_at\": 180}",
-        "order_json": "[\"id\", \"employee_id\", \"employee_name\", \"status\", \"work_order\", \"part_no\", \"type_name\", \"process_name\", \"start_action\", \"start_timestamp\", \"end_action\", \"end_timestamp\", \"remark\", \"start_date\", \"start_time\", \"end_date\", \"end_time\", \"work_hours\", \"assembly_location\", \"group_key\", \"is_group_work\", \"source\", \"created_at\", \"record_key\", \"updated_at\"]",
-        "updated_at": "2026-05-19 14:46:00"
-      }
     ]
   },
   "table_counts": {
-    "auth_users": 9,
-    "auth_account_permissions": 117,
+    "auth_users": 8,
+    "auth_account_permissions": 104,
     "auth_security_settings": 2,
-    "security_users": 9,
-    "security_settings": 2,
-    "table_ui_settings": 1
+    "security_users": 8,
+    "security_user_roles": 8,
+    "security_settings": 2
   }
 }
