@@ -13,6 +13,8 @@ from __future__ import annotations
 import inspect
 import json
 import hashlib
+import re
+import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
@@ -22,6 +24,17 @@ import streamlit as st
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR = PROJECT_ROOT / "data" / "persistent_state"
 SETTINGS_PATH = STATE_DIR / "spt_table_column_settings.json"
+
+# V3.50：表格「欄位設定 / Column Settings」不可只存在單一本機 JSON。
+# Streamlit Cloud Reboot App 或套用更新後，可能只先還原 module settings；
+# 因此讀取與保存都鏡像到共用、10 權限管理、13 系統設定三個永久位置。
+COLUMN_SETTINGS_MIRROR_PATHS = [
+    STATE_DIR / "spt_table_column_settings.json",
+    STATE_DIR / "spt_module_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_column_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_table_column_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_column_settings.json",
+]
 
 _ORIGINAL_DATAFRAME = None
 _ORIGINAL_DATA_EDITOR = None
@@ -104,28 +117,182 @@ def _ensure_state_dir() -> None:
         gitkeep.write_text("keep persistent state files\n", encoding="utf-8")
 
 
+def _atomic_save_json(path: Path, payload: Dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _read_json_file(path: Path) -> Dict[str, Any]:
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _stamp() -> str:
+    try:
+        from services.timezone_service import now_stamp
+        return str(now_stamp())
+    except Exception:
+        return time.strftime("%Y%m%d_%H%M%S")
+
+
+def _normalize_widget_key_for_table_id(key: Any) -> str:
+    """Make dynamic Streamlit keys stable across rerun/Reboot.
+
+    10｜權限管理的帳號總表 key 會帶 revision，例如
+    v171_account_password_editor_0 / _1 / _2。舊邏輯把 revision 當成不同表格，
+    所以欄位設定 Reboot 或重新載入後就像失效。這裡把這類尾碼正規化。
+    """
+    text = str(key or "").strip()
+    if not text:
+        return ""
+    # Common rerun/revision suffixes.
+    text = re.sub(r"_(rev|revision)?\d+$", "", text, flags=re.IGNORECASE)
+    # Streamlit generated keys may include volatile long hashes; keep explicit key stable but safe.
+    text = re.sub(r"[^0-9A-Za-z_\-\.\u4e00-\u9fff]+", "_", text).strip("_")
+    return text or "table"
+
+
+def _canonical_table_id(table_id: str) -> str:
+    raw = str(table_id or "")
+    # If table_id has page/callsite/kind/key format, keep only kind + normalized explicit key.
+    parts = raw.split("::")
+    if len(parts) >= 4 and parts[-2] in {"dataframe", "data_editor"}:
+        key = _normalize_widget_key_for_table_id(parts[-1])
+        return f"global::{parts[-2]}::{key}"
+    # Account editor revisions from old persisted IDs.
+    raw = re.sub(r"v171_account_password_editor_\d+", "v171_account_password_editor", raw)
+    return raw
+
+
+def _normalize_loaded_settings(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Support direct setting JSON and module wrapper JSON shapes, then add canonical aliases."""
+    if not isinstance(data, dict):
+        return {}
+    # Mirror files may wrap settings under table_column_settings_v2.
+    if isinstance(data.get("table_column_settings_v2"), dict):
+        base = dict(data.get("table_column_settings_v2") or {})
+    elif isinstance(data.get("settings"), dict) and isinstance(data["settings"].get("table_column_settings_v2"), dict):
+        base = dict(data["settings"].get("table_column_settings_v2") or {})
+    else:
+        # spt_table_column_settings.json original shape: {table_id: {columns:{...}}}
+        base = {k: v for k, v in data.items() if isinstance(v, dict) and isinstance(v.get("columns"), dict)}
+    # Add canonical aliases without deleting older keys, so old saved settings still work.
+    for k, v in list(base.items()):
+        ck = _canonical_table_id(k)
+        if ck and ck not in base:
+            base[ck] = v
+    return base
+
+
+def _candidate_settings_files() -> List[Path]:
+    paths: List[Path] = []
+    paths.extend(COLUMN_SETTINGS_MIRROR_PATHS)
+    history_roots = [
+        STATE_DIR / "history",
+        PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "history",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "history",
+        PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "history",
+    ]
+    for root in history_roots:
+        if root.exists():
+            paths.extend(root.glob("*.json"))
+    seen: set[str] = set()
+    out: List[Path] = []
+    for path in paths:
+        key = str(path.resolve()) if path.exists() else str(path)
+        if key not in seen:
+            seen.add(key)
+            out.append(path)
+    return out
+
+
 def load_settings() -> Dict[str, Any]:
     _ensure_state_dir()
+    best: Dict[str, Any] = {}
+    best_score = (-1, -1.0)
+    for path in _candidate_settings_files():
+        data = _normalize_loaded_settings(_read_json_file(path))
+        if not data:
+            continue
+        try:
+            mtime = path.stat().st_mtime
+        except Exception:
+            mtime = 0.0
+        # Prefer more table settings; if equal, newest file wins.
+        score = (len(data), mtime)
+        if score > best_score:
+            best = data
+            best_score = score
+    if best:
+        # Ensure the primary file exists after Reboot restore from a mirror file.
+        try:
+            if not SETTINGS_PATH.exists() or _normalize_loaded_settings(_read_json_file(SETTINGS_PATH)) != best:
+                _atomic_save_json(SETTINGS_PATH, best)
+        except Exception:
+            pass
+        return best
+    return {}
+
+
+def _mirror_settings(settings: Dict[str, Any]) -> None:
+    payload = {
+        "version": "V3.50",
+        "updated_at": _stamp(),
+        "description": "全系統表格欄位設定永久紀錄；包含欄位顯示、順序、欄寬與標題，避免 Reboot App 後回到原始設定。",
+        "table_column_settings_v2": settings,
+        "table_count": len(settings),
+    }
+    # Primary remains original flat shape for backward compatibility.
+    _atomic_save_json(SETTINGS_PATH, settings)
+    for path in COLUMN_SETTINGS_MIRROR_PATHS:
+        if path == SETTINGS_PATH:
+            continue
+        _atomic_save_json(path, payload)
+    # Also keep a lightweight history copy under ui_table_settings.
     try:
-        from services.persistence_guard_service import safe_load_json
-        data = safe_load_json(SETTINGS_PATH, {}, allow_default_when_missing=True)
-        return data if isinstance(data, dict) else {}
-    except Exception as exc:
-        if SETTINGS_PATH.exists():
-            raise RuntimeError(f"表格欄位設定檔讀取失敗，已阻止回到預設：{SETTINGS_PATH} | {exc}") from exc
-        return {}
+        hist = PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "history" / f"table_column_settings_{_stamp()}.json"
+        _atomic_save_json(hist, payload)
+    except Exception:
+        pass
+    try:
+        from services.db_service import mark_data_changed
+        mark_data_changed("表格欄位設定已變更，已寫入永久 JSON。", "table_column_settings")
+    except Exception:
+        pass
+    # Best-effort small-file upload; silent if GitHub is not configured.
+    try:
+        from services.github_cloud_storage_service import github_config, upload_file_to_github
+        cfg = github_config()
+        if cfg.get("token"):
+            for local, remote in [
+                (SETTINGS_PATH, "data/persistent_state/spt_table_column_settings.json"),
+                (PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_column_settings.json", "data/persistent_modules/ui_table_settings/table_column_settings.json"),
+                (PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_table_column_settings.json", "data/persistent_modules/10_permissions/10_permissions_table_column_settings.json"),
+                (PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_column_settings.json", "data/persistent_modules/13_system_settings/13_system_settings_table_column_settings.json"),
+            ]:
+                if local.exists():
+                    upload_file_to_github(local, remote, f"SPT table column settings V3.50 {_stamp()}")
+    except Exception:
+        pass
 
 
 def save_settings(settings: Dict[str, Any]) -> None:
     _ensure_state_dir()
-    try:
-        from services.persistence_guard_service import atomic_save_json
-        atomic_save_json(SETTINGS_PATH, settings, backup_existing=True)
-    except Exception:
-        tmp = SETTINGS_PATH.with_suffix(SETTINGS_PATH.suffix + ".tmp")
-        tmp.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
-        json.loads(tmp.read_text(encoding="utf-8"))
-        tmp.replace(SETTINGS_PATH)
+    # Add canonical aliases before writing so dynamic keys from 10 權限管理 do not split settings.
+    normalized = dict(settings or {})
+    for k, v in list(normalized.items()):
+        ck = _canonical_table_id(k)
+        if ck and ck not in normalized and isinstance(v, dict):
+            normalized[ck] = v
+    _mirror_settings(normalized)
 
 
 def _normalize_df(data: Any) -> pd.DataFrame | None:
@@ -181,10 +348,13 @@ def _safe_widget_suffix(value: str) -> str:
 
 
 def _stable_table_id(df: pd.DataFrame, key: Any = None, kind: str = "table") -> str:
+    # V3.50：有明確 key 的表格，不再把頁面行號納入設定 ID。
+    # 原本 line number / revision 會讓 10、13 與其他模組 Reboot 或改版後讀不到舊設定。
+    if key:
+        stable_key = _normalize_widget_key_for_table_id(key)
+        return f"global::{kind}::{stable_key}"
     page = _current_page_name()
     callsite = _callsite_signature()
-    if key:
-        return f"{page}::{callsite}::{kind}::{key}"
     cols = "|".join([str(c) for c in df.columns])[:180]
     return f"{page}::{callsite}::{kind}::{abs(hash(cols))}"
 
@@ -202,16 +372,23 @@ def _default_column_setting(col: str) -> Dict[str, Any]:
 def _get_table_setting(table_id: str, columns: Iterable[str]) -> Dict[str, Any]:
     all_settings = load_settings()
     table_setting = all_settings.get(table_id, {})
-    col_settings = table_setting.get("columns", {})
-    # 補齊新欄位，不覆蓋既有設定
+    col_settings = table_setting.get("columns", {}) if isinstance(table_setting, dict) else {}
+    changed = table_id not in all_settings or not isinstance(table_setting, dict)
+    if not isinstance(table_setting, dict):
+        table_setting = {}
+    # 補齊新欄位，不覆蓋既有設定；沒有異動時不重寫永久檔，避免每次進頁都上傳/寫檔拖慢。
     for idx, col in enumerate(columns):
         c = str(col)
         if c not in col_settings:
             col_settings[c] = _default_column_setting(c)
             col_settings[c]["order"] = idx
-    table_setting["columns"] = col_settings
-    all_settings[table_id] = table_setting
-    save_settings(all_settings)
+            changed = True
+    if table_setting.get("columns") != col_settings:
+        table_setting["columns"] = col_settings
+        changed = True
+    if changed:
+        all_settings[table_id] = table_setting
+        save_settings(all_settings)
     return table_setting
 
 
