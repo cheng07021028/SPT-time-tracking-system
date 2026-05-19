@@ -138,6 +138,189 @@ def clear_query_cache() -> None:
         pass
 
 
+# ===== V3.53 schema migration guard =====
+def _column_exists(conn: sqlite3.Connection, table_name: str, column_name: str) -> bool:
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        return any(str(r[1]) == column_name for r in rows)
+    except Exception:
+        return False
+
+
+def _add_column_if_missing(conn: sqlite3.Connection, table_name: str, column_name: str, definition: str) -> None:
+    """Add a missing column to an existing SQLite table.
+
+    SQLite CREATE TABLE IF NOT EXISTS does not upgrade older tables.  Several
+    Streamlit Cloud deployments keep the old app.db across code updates, so a
+    page can fail with pandas.errors.DatabaseError when code queries new columns
+    such as employees.is_active / is_in_factory.  This migration is intentionally
+    small and idempotent; it never drops tables and never rewrites user data.
+    """
+    try:
+        if not _column_exists(conn, table_name, column_name):
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+    except Exception:
+        # Never block app startup.  The actual query will still surface a clear
+        # error if the DB file is not writable or the table is corrupted.
+        pass
+
+
+def _migrate_existing_schema(conn: sqlite3.Connection) -> None:
+    """Upgrade existing DB tables that were created by older app versions."""
+    migrations = {
+        "work_orders": [
+            ("work_order", "TEXT"),
+            ("part_no", "TEXT"),
+            ("type_name", "TEXT"),
+            ("assembly_location", "TEXT"),
+            ("customer", "TEXT"),
+            ("note", "TEXT"),
+            ("is_active", "INTEGER DEFAULT 1"),
+            ("created_at", "TEXT"),
+            ("updated_at", "TEXT"),
+        ],
+        "employees": [
+            ("employee_id", "TEXT"),
+            ("employee_name", "TEXT"),
+            ("department", "TEXT"),
+            ("title", "TEXT"),
+            ("is_active", "INTEGER DEFAULT 1"),
+            ("is_in_factory", "INTEGER DEFAULT 1"),
+            ("is_today_attendance", "INTEGER DEFAULT 1"),
+            ("note", "TEXT"),
+            ("created_at", "TEXT"),
+            ("updated_at", "TEXT"),
+        ],
+        "time_records": [
+            ("record_key", "TEXT"),
+            ("status", "TEXT"),
+            ("work_order", "TEXT"),
+            ("part_no", "TEXT"),
+            ("type_name", "TEXT"),
+            ("process_name", "TEXT"),
+            ("employee_id", "TEXT"),
+            ("employee_name", "TEXT"),
+            ("start_action", "TEXT"),
+            ("start_timestamp", "TEXT"),
+            ("end_action", "TEXT"),
+            ("end_timestamp", "TEXT"),
+            ("remark", "TEXT"),
+            ("start_date", "TEXT"),
+            ("start_time", "TEXT"),
+            ("end_date", "TEXT"),
+            ("end_time", "TEXT"),
+            ("work_hours", "REAL DEFAULT 0"),
+            ("assembly_location", "TEXT"),
+            ("group_key", "TEXT"),
+            ("is_group_work", "INTEGER DEFAULT 0"),
+            ("source", "TEXT DEFAULT 'streamlit'"),
+            ("created_at", "TEXT"),
+            ("updated_at", "TEXT"),
+        ],
+        "process_options": [
+            ("process_name", "TEXT"),
+            ("is_active", "INTEGER DEFAULT 1"),
+            ("sort_order", "INTEGER DEFAULT 0"),
+            ("note", "TEXT"),
+            ("created_at", "TEXT"),
+            ("updated_at", "TEXT"),
+        ],
+        "rest_periods": [
+            ("name", "TEXT"),
+            ("start_time", "TEXT"),
+            ("end_time", "TEXT"),
+            ("is_active", "INTEGER DEFAULT 1"),
+            ("sort_order", "INTEGER DEFAULT 0"),
+        ],
+        "system_settings": [
+            ("setting_key", "TEXT"),
+            ("setting_value", "TEXT"),
+            ("note", "TEXT"),
+            ("updated_at", "TEXT"),
+        ],
+        "table_column_settings": [
+            ("page_key", "TEXT"),
+            ("table_key", "TEXT"),
+            ("column_key", "TEXT"),
+            ("column_width", "INTEGER"),
+            ("sort_order", "INTEGER"),
+            ("updated_at", "TEXT"),
+        ],
+        "table_sort_settings": [
+            ("page_key", "TEXT"),
+            ("table_key", "TEXT"),
+            ("sort_column", "TEXT"),
+            ("sort_ascending", "INTEGER DEFAULT 1"),
+            ("updated_at", "TEXT"),
+        ],
+        "auth_users": [
+            ("username", "TEXT"),
+            ("password_hash", "TEXT"),
+            ("password_hint", "TEXT"),
+            ("employee_id", "TEXT"),
+            ("display_name", "TEXT"),
+            ("email", "TEXT"),
+            ("role_code", "TEXT DEFAULT 'operator'"),
+            ("is_active", "INTEGER DEFAULT 1"),
+            ("force_password_change", "INTEGER DEFAULT 0"),
+            ("last_login_at", "TEXT"),
+            ("note", "TEXT"),
+            ("created_at", "TEXT"),
+            ("updated_at", "TEXT"),
+        ],
+        "auth_account_permissions": [
+            ("username", "TEXT"),
+            ("module_code", "TEXT"),
+            ("module_name_zh", "TEXT"),
+            ("module_name_en", "TEXT"),
+            ("can_view", "INTEGER DEFAULT 0"),
+            ("can_create", "INTEGER DEFAULT 0"),
+            ("can_edit", "INTEGER DEFAULT 0"),
+            ("can_delete", "INTEGER DEFAULT 0"),
+            ("can_import", "INTEGER DEFAULT 0"),
+            ("can_export", "INTEGER DEFAULT 0"),
+            ("can_backup", "INTEGER DEFAULT 0"),
+            ("can_restore", "INTEGER DEFAULT 0"),
+            ("can_manage", "INTEGER DEFAULT 0"),
+            ("updated_at", "TEXT"),
+        ],
+        "auth_login_logs": [
+            ("username", "TEXT"),
+            ("display_name", "TEXT"),
+            ("event_time", "TEXT"),
+            ("event_type", "TEXT"),
+            ("result", "TEXT"),
+            ("module_code", "TEXT"),
+            ("module_name", "TEXT"),
+            ("message", "TEXT"),
+            ("ip_address", "TEXT"),
+            ("user_agent", "TEXT"),
+        ],
+        "auth_security_settings": [
+            ("setting_key", "TEXT"),
+            ("setting_value", "TEXT"),
+            ("note", "TEXT"),
+            ("updated_at", "TEXT"),
+        ],
+    }
+    for table_name, columns in migrations.items():
+        try:
+            exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                (table_name,),
+            ).fetchone()
+            if not exists:
+                continue
+            for column_name, definition in columns:
+                _add_column_if_missing(conn, table_name, column_name, definition)
+        except Exception:
+            pass
+    try:
+        conn.commit()
+    except Exception:
+        pass
+
+
 def _init_schema(conn: sqlite3.Connection) -> None:
     cur = conn.cursor()
 
@@ -342,6 +525,10 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         updated_at TEXT
     )
     """)
+
+    # V3.53: CREATE TABLE IF NOT EXISTS does not add missing columns to old DB files.
+    # Run an idempotent migration before default inserts and SELECT queries.
+    _migrate_existing_schema(conn)
 
     now = _now()
 
