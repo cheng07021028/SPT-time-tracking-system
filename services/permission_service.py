@@ -2167,3 +2167,290 @@ def _v366_permission_tables_payload(reason: str = "permission_saved") -> dict:  
         }
     finally:
         conn.close()
+
+# ===== V3.68 account deletion tombstone + latest-file authoritative restore =====
+# 問題修正：刪除帳號後 Reboot 又恢復，多半是固定檔之間版本不同或舊 latest 檔先被讀取。
+# V368 原則：
+# 1) 儲存/刪除只寫固定 latest 檔，不掃 history、不跑 GitHub。
+# 2) 還原時在固定檔中挑 exported_at 最新者，不用固定路徑優先權。
+# 3) 刪除帳號會寫 tombstone；即使舊帳號檔被讀到，也不可把已刪帳號救回。
+# 4) 若之後重新新增同名帳號，會自動從 tombstone 移除。
+
+_V368_DELETED_MODULE_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "deleted_accounts.json"
+_V368_DELETED_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_deleted_accounts.json"
+
+
+def _v368_json_load(path: Path) -> dict:
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _v368_atomic_write(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v368_deleted_payload() -> dict:
+    # 兩個固定檔以資料聯集為準。
+    deleted: set[str] = set()
+    latest = ""
+    for p in [_V368_DELETED_MODULE_FILE, _V368_DELETED_STATE_FILE]:
+        data = _v368_json_load(p)
+        raw = data.get("deleted_usernames") if isinstance(data.get("deleted_usernames"), list) else []
+        for u in raw:
+            name = str(u or "").strip()
+            if name and name.lower() != "admin":
+                deleted.add(name)
+        ts = str(data.get("updated_at") or "")
+        if ts > latest:
+            latest = ts
+    return {"deleted_usernames": sorted(deleted, key=lambda x: x.lower()), "updated_at": latest}
+
+
+def _v368_write_deleted_usernames(usernames: Iterable[str], mode: str = "add") -> None:
+    current = set(_v368_deleted_payload().get("deleted_usernames", []))
+    names = {str(u or "").strip() for u in usernames if str(u or "").strip() and str(u or "").strip().lower() != "admin"}
+    if mode == "remove":
+        current = {u for u in current if u.lower() not in {n.lower() for n in names}}
+    else:
+        by_lower = {u.lower(): u for u in current}
+        for n in names:
+            by_lower[n.lower()] = n
+        current = set(by_lower.values())
+    payload = {
+        "version": "V3.68-deleted-account-tombstone",
+        "updated_at": now_text(),
+        "deleted_usernames": sorted(current, key=lambda x: x.lower()),
+        "note": "帳號明確刪除紀錄；Reboot 還原權限固定檔時，會用此檔避免舊帳號被救回。重新新增同名帳號時會自動移除。",
+    }
+    _v368_atomic_write(_V368_DELETED_MODULE_FILE, payload)
+    _v368_atomic_write(_V368_DELETED_STATE_FILE, payload)
+
+
+def _v368_payload_score(path: Path, payload: dict) -> tuple[str, float, int]:
+    ts = str(payload.get("exported_at") or payload.get("updated_at") or "")
+    try:
+        mtime = path.stat().st_mtime
+    except Exception:
+        mtime = 0.0
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    users = tables.get("auth_users") if isinstance(tables.get("auth_users"), list) else []
+    return (ts, mtime, len(users))
+
+
+def _v368_permission_direct_candidates() -> list[tuple[Path, dict]]:
+    out: list[tuple[Path, dict]] = []
+    for p in [_V366_PERMISSION_MODULE_FILE, _V366_PERMISSION_SETTINGS_FILE, _V366_PERMISSION_STATE_FILE]:
+        data = _v368_json_load(p)
+        if isinstance(data.get("tables"), dict) and "auth_users" in data.get("tables", {}):
+            out.append((p, data))
+            continue
+        # 相容 master 格式：permission_settings 裡可能包多個 payload。
+        ps = data.get("permission_settings") if isinstance(data.get("permission_settings"), dict) else {}
+        for key, val in ps.items():
+            if isinstance(val, dict) and isinstance(val.get("tables"), dict) and "auth_users" in val.get("tables", {}):
+                out.append((p, val))
+    return out
+
+
+def _v366_permission_direct_payload() -> dict:  # type: ignore[override]
+    """V3.68：固定檔中選 exported_at 最新者，並套用刪除 tombstone。"""
+    candidates = _v368_permission_direct_candidates()
+    if not candidates:
+        return {}
+    candidates = sorted(candidates, key=lambda x: _v368_payload_score(x[0], x[1]), reverse=True)
+    payload = json.loads(json.dumps(candidates[0][1], ensure_ascii=False, default=str))
+    deleted = {str(u or "").strip().lower() for u in _v368_deleted_payload().get("deleted_usernames", []) if str(u or "").strip()}
+    if deleted and isinstance(payload.get("tables"), dict):
+        tables = payload["tables"]
+        def _filter(rows, user_fields=("username",)):
+            if not isinstance(rows, list):
+                return []
+            kept = []
+            for r in rows:
+                if not isinstance(r, dict):
+                    continue
+                hit = False
+                for f in user_fields:
+                    name = str(r.get(f) or "").strip().lower()
+                    if name and name in deleted:
+                        hit = True
+                        break
+                if not hit:
+                    kept.append(r)
+            return kept
+        tables["auth_users"] = _filter(tables.get("auth_users", []), ("username",))
+        tables["auth_account_permissions"] = _filter(tables.get("auth_account_permissions", []), ("username",))
+        tables["security_users"] = _filter(tables.get("security_users", []), ("username",))
+        tables["security_user_roles"] = _filter(tables.get("security_user_roles", []), ("username",))
+        payload["table_counts"] = {k: len(v) for k, v in tables.items() if isinstance(v, list)}
+        payload["deleted_filter_applied"] = sorted(deleted)
+    return payload
+
+
+def _v368_permission_payload_from_db(reason: str = "permission_settings_saved") -> dict:
+    # 只確保 schema，不觸發 v366/v368 restore。
+    try:
+        _prev_v366_init_permission_tables(force=False)
+    except Exception:
+        pass
+    conn = connect_db()
+    try:
+        tables: dict[str, list[dict]] = {}
+        for table in [
+            "auth_users",
+            "auth_account_permissions",
+            "auth_security_settings",
+            "security_users",
+            "security_user_roles",
+            "security_settings",
+        ]:
+            try:
+                rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
+                tables[table] = [dict(r) for r in rows]
+            except Exception:
+                tables[table] = []
+        return {
+            "version": "V3.68-direct-permission-persistence",
+            "exported_at": now_text(),
+            "reason": reason,
+            "module_key": "10_permissions",
+            "module_name_zh": "權限管理",
+            "module_name_en": "Permission Management",
+            "description": "帳號權限固定永久檔；刪除帳號以 tombstone 防止 Reboot 後被舊檔還原。",
+            "tables": tables,
+            "table_counts": {k: len(v) for k, v in tables.items()},
+            "deleted_accounts": _v368_deleted_payload().get("deleted_usernames", []),
+        }
+    finally:
+        conn.close()
+
+
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
+    """V3.68：固定檔直接覆蓋，不掃 history、不跑 GitHub、不觸發全域同步。"""
+    payload = _v368_permission_payload_from_db(reason)
+    for path in [_V366_PERMISSION_MODULE_FILE, _V366_PERMISSION_SETTINGS_FILE, _V366_PERMISSION_STATE_FILE]:
+        _v368_atomic_write(path, payload)
+    clear_permission_runtime_cache()
+    return {
+        "ok": True,
+        "mode": "v368_direct_with_delete_tombstone",
+        "reason": reason,
+        "files": [str(_V366_PERMISSION_MODULE_FILE), str(_V366_PERMISSION_SETTINGS_FILE), str(_V366_PERMISSION_STATE_FILE)],
+        "delete_tombstone_files": [str(_V368_DELETED_MODULE_FILE), str(_V368_DELETED_STATE_FILE)],
+        "table_counts": payload.get("table_counts", {}),
+    }
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    """V3.68：從最新固定檔還原，並套用刪除 tombstone。"""
+    global _V366_PERMISSION_RESTORE_RUNNING
+    if _V366_PERMISSION_RESTORE_RUNNING:
+        return {"ok": False, "message": "restore already running"}
+    payload = _v366_permission_direct_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    auth_rows = tables.get("auth_users") if isinstance(tables.get("auth_users"), list) else []
+    if not isinstance(auth_rows, list):
+        return {"ok": False, "message": "no direct permission payload"}
+    _V366_PERMISSION_RESTORE_RUNNING = True
+    try:
+        try:
+            _prev_v366_init_permission_tables(force=False)
+        except Exception:
+            pass
+        conn = connect_db(); cur = conn.cursor()
+        try:
+            _ensure_legacy_security_tables(cur)
+            _ensure_security_setting_tables(cur)
+            restored: dict[str, int] = {}
+            for table in ["auth_users", "auth_account_permissions", "auth_security_settings", "security_users", "security_user_roles", "security_settings"]:
+                try:
+                    restored[table] = _v366_replace_table(cur, table, tables.get(table, []) if isinstance(tables.get(table), list) else [])
+                except Exception as exc:
+                    restored[f"{table}_error"] = str(exc)
+            conn.commit()
+        finally:
+            conn.close()
+        try:
+            sync_auth_users_to_runtime_security()
+        except Exception:
+            pass
+        clear_permission_runtime_cache()
+        return {"ok": True, "mode": "v368_direct_latest_with_tombstone", "restored": restored, "deleted_accounts": _v368_deleted_payload().get("deleted_usernames", [])}
+    finally:
+        _V366_PERMISSION_RESTORE_RUNNING = False
+
+
+_prev_save_users_v368 = save_users
+
+def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
+    """V3.68：新增/重新建立同名帳號時，移除刪除 tombstone。"""
+    input_rows = list(rows)
+    result = _prev_save_users_v368(input_rows)
+    saved_names = [str(r.get("username") or "").strip() for r in input_rows if str(r.get("username") or "").strip()]
+    if saved_names:
+        try:
+            _v368_write_deleted_usernames(saved_names, mode="remove")
+            # 前一層 save_users 已 export 過；移除 tombstone 後再寫一次最新固定檔。
+            export_permission_settings_permanently("auth_users_saved_v368")
+        except Exception:
+            pass
+    return result
+
+
+def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
+    """V3.68：刪除帳號後立即寫固定檔與刪除 tombstone，Reboot 不可救回。"""
+    try:
+        _prev_v366_init_permission_tables(force=False)
+    except Exception:
+        pass
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for u in usernames:
+        name = str(u or "").strip()
+        key = name.lower()
+        if not name or key == "admin" or key in seen:
+            continue
+        cleaned.append(name)
+        seen.add(key)
+    if not cleaned:
+        return 0
+    conn = connect_db(); cur = conn.cursor()
+    deleted = 0
+    try:
+        _ensure_legacy_security_tables(cur)
+        for u in cleaned:
+            cur.execute("DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)", (u,))
+            cur.execute("DELETE FROM auth_users WHERE lower(username)=lower(?)", (u,))
+            deleted += max(int(cur.rowcount or 0), 0)
+            cur.execute("DELETE FROM security_user_roles WHERE lower(username)=lower(?)", (u,))
+            cur.execute("DELETE FROM security_users WHERE lower(username)=lower(?)", (u,))
+        conn.commit()
+    finally:
+        conn.close()
+    if deleted > 0:
+        try:
+            _v368_write_deleted_usernames(cleaned, mode="add")
+        except Exception:
+            pass
+        try:
+            export_permission_settings_permanently("auth_users_deleted_v368")
+        except Exception:
+            pass
+    clear_permission_runtime_cache()
+    if st is not None:
+        try:
+            st.session_state["_v365_permission_direct_loaded"] = True
+            st.session_state["_v366_permission_delete_saved"] = now_text()
+        except Exception:
+            pass
+    return deleted
+
