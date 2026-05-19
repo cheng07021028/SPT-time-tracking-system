@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import streamlit as st
+import pandas as pd
 
 from services.theme_service import apply_theme, render_header
 from services.ui_size_service import apply_dropdown_menu_size_only
@@ -28,7 +29,7 @@ from services.time_record_service import (
 )
 from services.db_service import query_one
 from services.table_ui_service import render_table, render_width_settings
-from services.system_settings_service import get_process_options_by_category, get_default_process_category, load_process_category_choices, get_live_page_reset_time
+from services.system_settings_service import get_process_options_by_category_exact, get_default_process_category, load_process_category_choices, get_live_page_reset_time
 
 st.set_page_config(page_title="01. 工時紀錄", page_icon="⏱", layout="wide")
 apply_theme()
@@ -69,17 +70,23 @@ with left:
         index=category_choices.index(default_category) if default_category in category_choices else 0,
         key="time_record_process_category_v333",
     )
-    PROCESS_OPTIONS = get_process_options_by_category(selected_category, include_common=False)
-    if not PROCESS_OPTIONS:
-        PROCESS_OPTIONS = get_process_options_by_category(default_category, include_common=False)
+    PROCESS_OPTIONS = get_process_options_by_category_exact(selected_category)
     st.caption(f"目前工段類別 / Current Category：{selected_category or '全部 / 通用'}")
-    process = st.selectbox("工段名稱｜Process", PROCESS_OPTIONS)
+    if PROCESS_OPTIONS:
+        process = st.selectbox("工段名稱｜Process", PROCESS_OPTIONS)
+        no_process_options = False
+    else:
+        process = ""
+        no_process_options = True
+        st.warning(
+            f"目前類別『{selected_category}』尚未在 13｜系統設定 → 一、類別與工段名稱設定 / Category & Process Options 設定任何啟用的工段名稱。請先完成設定並永久儲存。"
+        )
     remark = st.text_area("備註｜Remark", height=90)
     auto_pause = st.checkbox("切換不同工段時，自動暫停同人員其他未結束作業｜Auto pause different process", value=True)
 
     active = get_active_record(emp_id)
-    duplicate = get_active_same_work(emp_id, wo_no, process, employee_name=str(employee.get("employee_name") or "").strip())
-    conflicts = get_conflicting_active_records(emp_id, process, employee_name=str(employee.get("employee_name") or "").strip())
+    duplicate = None if no_process_options else get_active_same_work(emp_id, wo_no, process, employee_name=str(employee.get("employee_name") or "").strip())
+    conflicts = pd.DataFrame() if no_process_options else get_conflicting_active_records(emp_id, process, employee_name=str(employee.get("employee_name") or "").strip())
     if active:
         group = get_active_group(int(active["id"]))
         st.info(f"目前作業中：{active['process_name']}，同步計時 {len(group)} 筆。同工段不同製令可同步作業；不同工段需先暫停舊紀錄。")
@@ -91,7 +98,7 @@ with left:
         render_table(conflicts, "start_conflicting_active_records", editable=False, height=180)
         confirm_pause = st.checkbox("我確認先暫停前一個不同工段紀錄，再開始新紀錄", value=False, key="confirm_pause_before_start")
 
-    if st.button("⏱ 開始作業 / Start", use_container_width=True, disabled=bool(duplicate) or (not confirm_pause)):
+    if st.button("⏱ 開始作業 / Start", use_container_width=True, disabled=no_process_options or bool(duplicate) or (not confirm_pause)):
         if not check_permission("01_time_record", "can_create"):
             st.error("權限不足：你沒有新增工時紀錄權限。")
         else:
