@@ -362,16 +362,224 @@ def _to_records(obj: Any) -> List[Dict[str, Any]]:
     return obj if isinstance(obj, list) else []
 
 
+def _login_record_key(r: Dict[str, Any]) -> str:
+    """Stable de-dup key for login/audit records across DB and JSON backups."""
+    return "|".join([
+        str(r.get("source") or ""),
+        str(r.get("username") or ""),
+        str(r.get("event_type") or ""),
+        str(r.get("result") or ""),
+        str(r.get("login_time") or r.get("created_at") or ""),
+        str(r.get("module_code") or ""),
+        str(r.get("message") or ""),
+    ])
+
+
+def _normalise_backup_row(table_name: str, row: Dict[str, Any]) -> Dict[str, Any]:
+    d = dict(row or {})
+    if table_name in {"security_login_logs", "auth_login_logs"}:
+        idle_seconds = d.get("idle_seconds")
+        try:
+            idle_minutes = round(float(idle_seconds) / 60, 2) if idle_seconds not in (None, "") else d.get("idle_minutes")
+        except Exception:
+            idle_minutes = d.get("idle_minutes")
+        return {
+            "id": f"S{d.get('id')}" if table_name == "security_login_logs" and d.get("id") is not None else d.get("id"),
+            "source": table_name,
+            "username": d.get("username") or d.get("user_name"),
+            "display_name": d.get("display_name") or d.get("name"),
+            "event_type": d.get("event_type") or d.get("event") or "LOGIN",
+            "result": d.get("result") or "SUCCESS",
+            "message": d.get("message") or "",
+            "module_code": d.get("module_code") or d.get("module") or "",
+            "login_time": d.get("login_time") or d.get("created_at") or d.get("log_time"),
+            "logout_time": d.get("logout_time"),
+            "idle_minutes": idle_minutes,
+            "ip_address": d.get("ip_address") or "",
+            "user_agent": d.get("user_agent") or "",
+            "created_at": d.get("created_at") or d.get("login_time") or d.get("log_time"),
+        }
+    d.setdefault("source", table_name or "login_logs")
+    return d
+
+
+def _extract_login_records_from_payload(payload: Any) -> List[Dict[str, Any]]:
+    """Support every historical permanent format used by this project.
+
+    Older exports used top-level records; module-persistence exports used
+    tables.login_logs / tables.security_login_logs.  Page 11 must recover from
+    all formats after Reboot App, otherwise it looks like login logs disappeared.
+    """
+    if not isinstance(payload, dict):
+        return []
+    out: List[Dict[str, Any]] = []
+    top_records = payload.get("records")
+    if isinstance(top_records, list):
+        out.extend(_normalise_backup_row("login_logs", r) for r in top_records if isinstance(r, dict))
+    tables = payload.get("tables")
+    if isinstance(tables, dict):
+        for table_name in ("login_logs", "security_login_logs", "auth_login_logs"):
+            rows = tables.get(table_name, [])
+            if isinstance(rows, list):
+                out.extend(_normalise_backup_row(table_name, r) for r in rows if isinstance(r, dict))
+    # de-duplicate while preserving chronological content
+    merged: Dict[str, Dict[str, Any]] = {}
+    for r in out:
+        key = _login_record_key(r)
+        if key.strip("|"):
+            merged[key] = r
+    return list(merged.values())
+
+
+def _read_json_file(path: Path) -> Dict[str, Any]:
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return {}
+
+
+def _permanent_candidate_paths() -> List[Path]:
+    paths: List[Path] = [AUDIT_STATE_PATH, MODULE_RECORDS_PATH]
+    paths.extend(sorted(AUDIT_HISTORY_DIR.glob("spt_audit_log_state_*.json"), reverse=True)[:3])
+    paths.extend(sorted((MODULE_DIR / "history").glob("11_login_logs_records_*.json"), reverse=True)[:3])
+    # keep order, remove duplicates
+    seen = set()
+    unique = []
+    for x in paths:
+        sx = str(x)
+        if sx not in seen:
+            seen.add(sx)
+            unique.append(x)
+    return unique
+
+
+def _best_permanent_records() -> tuple[List[Dict[str, Any]], str]:
+    best: List[Dict[str, Any]] = []
+    best_path = ""
+    for path in _permanent_candidate_paths():
+        records = _extract_login_records_from_payload(_read_json_file(path))
+        if len(records) > len(best):
+            best = records
+            best_path = str(path)
+    return best, best_path
+
+
+def _merge_record_sets(*sets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    merged: Dict[str, Dict[str, Any]] = {}
+    for rows in sets:
+        for r in rows or []:
+            if not isinstance(r, dict):
+                continue
+            key = _login_record_key(r)
+            if key.strip("|"):
+                merged[key] = r
+    rows = list(merged.values())
+    rows.sort(key=lambda r: str(r.get("login_time") or r.get("created_at") or ""), reverse=True)
+    return rows
+
+
+def _db_login_count(include_legacy: bool = True) -> int:
+    ensure_login_logs_table()
+    conn = get_connection()
+    total = int(conn.execute("SELECT COUNT(*) FROM login_logs").fetchone()[0])
+    if include_legacy and _table_exists(conn, "security_login_logs"):
+        total += int(conn.execute("SELECT COUNT(*) FROM security_login_logs").fetchone()[0])
+    conn.close()
+    return total
+
+
+def restore_audit_logs_from_permanent_file(path: Optional[str] = None, merge: bool = False) -> Dict[str, Any]:
+    _ensure_dirs()
+    ensure_login_logs_table()
+    if path:
+        src = Path(path)
+        records = _extract_login_records_from_payload(_read_json_file(src))
+    else:
+        records, best_path = _best_permanent_records()
+        src = Path(best_path) if best_path else AUDIT_STATE_PATH
+    if not records:
+        return {"ok": False, "message": f"找不到可還原的登入紀錄永久檔：{src}", "count": 0}
+
+    conn = get_connection()
+    cur = conn.cursor()
+    existing_keys = set()
+    if merge:
+        for r in _primary_login_rows(conn):
+            existing_keys.add(_login_record_key(r))
+    else:
+        cur.execute("DELETE FROM login_logs")
+    inserted = 0
+    for r in records:
+        if merge and _login_record_key(r) in existing_keys:
+            continue
+        # Do not preserve ids during merge; SQLite will assign a safe id.
+        rid = r.get("id") if not merge else None
+        if not isinstance(rid, int):
+            rid = None
+        cur.execute("""
+        INSERT INTO login_logs (
+            id, username, display_name, event_type, result, message, module_code,
+            login_time, logout_time, idle_minutes, ip_address, user_agent, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (rid, r.get("username"), r.get("display_name"), r.get("event_type"),
+              r.get("result"), r.get("message"), r.get("module_code"), r.get("login_time"),
+              r.get("logout_time"), r.get("idle_minutes"), r.get("ip_address"), r.get("user_agent"), r.get("created_at")))
+        inserted += 1
+    conn.commit()
+    conn.close()
+    return {"ok": True, "message": "登入紀錄已從永久檔還原", "count": inserted, "source_count": len(records), "path": str(src)}
+
+
+def _auto_restore_if_db_lacks_permanent_records() -> Dict[str, Any]:
+    """Restore/merge when Streamlit Cloud reboot leaves SQLite with fewer logs.
+
+    This is the real protection: login itself writes a new row after reboot, so DB is
+    not always zero.  We compare counts and merge if permanent JSON has more.
+    """
+    try:
+        db_count = _db_login_count(include_legacy=True)
+        permanent_records, src = _best_permanent_records()
+        if permanent_records and len(permanent_records) > db_count:
+            res = restore_audit_logs_from_permanent_file(src, merge=True)
+            res["auto_restored"] = True
+            return res
+        return {"ok": True, "auto_restored": False, "db_count": db_count, "permanent_count": len(permanent_records), "path": src}
+    except Exception as exc:
+        return {"ok": False, "auto_restored": False, "message": str(exc)}
+
+
 def export_audit_logs_to_permanent_file(create_history: bool = True) -> Dict[str, Any]:
     _ensure_dirs()
     ensure_login_logs_table()
-    records = _to_records(load_login_logs(limit=100000, include_legacy=True))
-    payload = {"version": "V1.49", "exported_at": _now(), "table": "login_logs", "count": len(records), "records": records}
-    AUDIT_STATE_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    MODULE_RECORDS_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    db_records = _to_records(load_login_logs(limit=100000, include_legacy=True))
+    existing_records, _src = _best_permanent_records()
+    # Never let a fresh/rebooted SQLite with only 1-2 rows overwrite a richer permanent file.
+    records = _merge_record_sets(existing_records, db_records)
+    payload = {
+        "version": "V1.50",
+        "exported_at": _now(),
+        "source": "audit_log_service",
+        "module_key": "11_login_logs",
+        "module_code": "11_login_logs",
+        "module_name_zh": "登入紀錄",
+        "module_name_en": "Login Logs",
+        "table": "login_logs",
+        "count": len(records),
+        "records": records,
+        "tables": {"login_logs": records},
+        "table_counts": {"login_logs": len(records)},
+    }
+    tmp_state = AUDIT_STATE_PATH.with_suffix(".tmp")
+    tmp_module = MODULE_RECORDS_PATH.with_suffix(".tmp")
+    tmp_state.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp_module.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp_state.replace(AUDIT_STATE_PATH)
+    tmp_module.replace(MODULE_RECORDS_PATH)
     MODULE_SETTINGS_PATH.write_text(json.dumps({
-        "version": "V1.49", "exported_at": _now(), "module": "11_login_logs",
-        "settings": {"source_tables": ["login_logs", "security_login_logs"], "auto_github_upload_on_login": False}
+        "version": "V1.50", "exported_at": _now(), "module": "11_login_logs",
+        "settings": {"source_tables": ["login_logs", "security_login_logs", "auth_login_logs"], "auto_github_upload_on_login": False}
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     hist = ""
     if create_history:
@@ -393,37 +601,6 @@ export_audit_logs_to_state = export_audit_logs_to_permanent_file
 create_audit_logs_state = export_audit_logs_to_permanent_file
 build_audit_logs_state = export_audit_logs_to_permanent_file
 export_login_logs_to_state = export_audit_logs_to_permanent_file
-
-
-def restore_audit_logs_from_permanent_file(path: Optional[str] = None) -> Dict[str, Any]:
-    _ensure_dirs()
-    ensure_login_logs_table()
-    src = Path(path) if path else AUDIT_STATE_PATH
-    if not src.exists() and MODULE_RECORDS_PATH.exists():
-        src = MODULE_RECORDS_PATH
-    if not src.exists():
-        return {"ok": False, "message": f"找不到登入紀錄永久檔：{src}", "count": 0}
-    payload = json.loads(src.read_text(encoding="utf-8"))
-    records = payload.get("records", []) if isinstance(payload, dict) else []
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM login_logs")
-    for r in records:
-        # skip legacy string id rows when restoring into integer pk
-        rid = r.get("id")
-        if not isinstance(rid, int):
-            rid = None
-        cur.execute("""
-        INSERT INTO login_logs (
-            id, username, display_name, event_type, result, message, module_code,
-            login_time, logout_time, idle_minutes, ip_address, user_agent, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (rid, r.get("username"), r.get("display_name"), r.get("event_type"),
-              r.get("result"), r.get("message"), r.get("module_code"), r.get("login_time"),
-              r.get("logout_time"), r.get("idle_minutes"), r.get("ip_address"), r.get("user_agent"), r.get("created_at")))
-    conn.commit()
-    conn.close()
-    return {"ok": True, "message": "登入紀錄已從永久檔還原", "count": len(records), "path": str(src)}
 
 
 restore_login_logs_from_permanent_file = restore_audit_logs_from_permanent_file
@@ -465,17 +642,17 @@ upload_audit_logs_to_state_github = upload_audit_logs_to_github
 
 def get_audit_permanent_status() -> Dict[str, Any]:
     _ensure_dirs()
-    exists = AUDIT_STATE_PATH.exists()
-    count = 0
-    exported_at = ""
-    if exists:
-        try:
-            payload = json.loads(AUDIT_STATE_PATH.read_text(encoding="utf-8"))
-            count = int(payload.get("count", len(payload.get("records", []))))
-            exported_at = str(payload.get("exported_at", ""))
-        except Exception:
-            pass
-    return {"exists": exists, "path": str(AUDIT_STATE_PATH), "size": AUDIT_STATE_PATH.stat().st_size if exists else 0, "count": count, "exported_at": exported_at}
+    records, best_path = _best_permanent_records()
+    path = Path(best_path) if best_path else AUDIT_STATE_PATH
+    payload = _read_json_file(path)
+    return {
+        "exists": bool(best_path),
+        "path": str(path),
+        "size": path.stat().st_size if path.exists() else 0,
+        "count": len(records),
+        "exported_at": str(payload.get("exported_at", "")) if isinstance(payload, dict) else "",
+        "db_count": _db_login_count(include_legacy=True),
+    }
 
 
 audit_permanent_status = get_audit_permanent_status
@@ -487,5 +664,5 @@ get_login_log_permanent_status = get_audit_permanent_status
 def bootstrap_audit_log_service() -> Dict[str, Any]:
     ensure_login_logs_table()
     _ensure_dirs()
-    # Do not fabricate records unless DB is completely empty and page wants status.
-    return {"ok": True, "message": "audit_log_service ready", "count": count_login_logs(include_legacy=True)}
+    restore_res = _auto_restore_if_db_lacks_permanent_records()
+    return {"ok": True, "message": "audit_log_service ready", "count": count_login_logs(include_legacy=True), "restore": restore_res}
