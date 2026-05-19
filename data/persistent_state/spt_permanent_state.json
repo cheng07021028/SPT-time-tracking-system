@@ -1,6 +1,6 @@
 {
   "schema_version": "v1.30",
-  "export_time": "2026-05-19 11:10:07",
+  "export_time": "2026-05-19 11:11:50",
   "database_path": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
   "tables": {
     "app_settings": [
@@ -2006,15 +2006,15 @@
     "auth_security_settings": [
       {
         "setting_key": "idle_timeout_minutes",
-        "setting_value": "1",
+        "setting_value": "15",
         "note": "閒置多久自動登出，單位分鐘",
-        "updated_at": "2026-05-19 11:09:27"
+        "updated_at": "2026-05-19 11:11:22"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
         "note": "V3.10 synchronized permanent security setting",
-        "updated_at": "2026-05-19 00:21:40"
+        "updated_at": "2026-05-19 11:11:22"
       }
     ],
     "auth_users": [
@@ -4811,71 +4811,71 @@
     "security_settings": [
       {
         "setting_key": "idle_timeout_minutes",
-        "setting_value": "1",
+        "setting_value": "15",
         "note": "閒置多久自動登出，單位分鐘",
-        "updated_at": "2026-05-19 11:09:27"
+        "updated_at": "2026-05-19 11:11:22"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
         "note": "V3.10 synchronized permanent security setting",
-        "updated_at": "2026-05-19 00:21:40"
+        "updated_at": "2026-05-19 11:11:22"
       }
     ],
     "security_user_roles": [
       {
-        "id": 8810,
+        "id": 17963,
         "username": "admin",
         "role_code": "admin",
-        "created_at": "2026-05-19 00:24:51"
+        "created_at": "2026-05-19 11:10:49"
       },
       {
-        "id": 8811,
+        "id": 17964,
         "username": "manager",
         "role_code": "manager",
-        "created_at": "2026-05-19 00:21:27"
+        "created_at": "2026-05-19 11:10:49"
       },
       {
-        "id": 8812,
+        "id": 17965,
         "username": "leader",
         "role_code": "leader",
-        "created_at": "2026-05-19 00:21:27"
+        "created_at": "2026-05-19 11:10:49"
       },
       {
-        "id": 8813,
+        "id": 17966,
         "username": "operator",
         "role_code": "operator",
-        "created_at": "2026-05-19 00:21:27"
+        "created_at": "2026-05-19 11:10:49"
       },
       {
-        "id": 8814,
+        "id": 17967,
         "username": "viewer",
         "role_code": "viewer",
-        "created_at": "2026-05-19 00:21:27"
+        "created_at": "2026-05-19 11:10:49"
       },
       {
-        "id": 8815,
+        "id": 17968,
         "username": "auditor",
         "role_code": "auditor",
-        "created_at": "2026-05-19 00:21:27"
+        "created_at": "2026-05-19 11:10:49"
       },
       {
-        "id": 8816,
+        "id": 17969,
         "username": "spt142",
         "role_code": "operator",
-        "created_at": "2026-05-19 00:24:04"
+        "created_at": "2026-05-19 11:10:49"
       },
       {
-        "id": 8817,
+        "id": 17970,
         "username": "B211",
         "role_code": "operator",
-        "created_at": "2026-05-19 00:21:27"
+        "created_at": "2026-05-19 11:10:49"
       },
       {
-        "id": 8818,
+        "id": 17971,
         "username": "Ethan",
         "role_code": "admin",
-        "created_at": "2026-05-19 00:21:27"
+        "created_at": "2026-05-19 11:10:49"
       }
     ],
     "security_users": [
@@ -4890,7 +4890,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-19 00:24:51",
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-19 00:24:51"
+        "updated_at": "2026-05-19 11:10:49"
       },
       {
         "id": 2,
@@ -4903,7 +4903,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-19 00:21:27"
+        "updated_at": "2026-05-19 11:10:49"
       },
       {
         "id": 3,
@@ -4916,7 +4916,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-19 00:21:27"
+        "updated_at": "2026-05-19 11:10:49"
       },
       {
         "id": 4,
@@ -4929,7 +4929,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-19 00:21:27"
+        "updated_at": "2026-05-19 11:10:49"
       },
       {
         "id": 5,
@@ -4942,7 +4942,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-19 00:21:27"
+        "updated_at": "2026-05-19 11:10:49"
       },
       {
         "id": 6,
@@ -4955,7 +4955,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:42:53",
-        "updated_at": "2026-05-19 00:21:27"
+        "updated_at": "2026-05-19 11:10:49"
       },
       {
         "id": 13,
@@ -4968,7 +4968,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-19 00:24:05",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-19 00:24:05"
+        "updated_at": "2026-05-19 11:10:49"
       },
       {
         "id": 14,
@@ -4981,7 +4981,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-16 11:50:11",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-19 00:21:27"
+        "updated_at": "2026-05-19 11:10:49"
       },
       {
         "id": 15,
@@ -4994,7 +4994,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-19 00:21:27"
+        "updated_at": "2026-05-19 11:10:49"
       }
     ],
     "system_logs": [
