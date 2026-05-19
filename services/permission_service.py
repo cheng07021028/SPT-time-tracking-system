@@ -161,6 +161,42 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
+def _truthy(value, default: bool = False) -> bool:
+    """Robust bool parser for Streamlit editors / Excel pasted text."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        try:
+            return float(value) != 0
+        except Exception:
+            return default
+    text = str(value).strip().lower()
+    if text in {"1", "true", "t", "yes", "y", "on", "啟用", "是", "可", "勾選", "checked"}:
+        return True
+    if text in {"0", "false", "f", "no", "n", "off", "停用", "否", "不可", "未勾選", "unchecked", ""}:
+        return False
+    return default
+
+
+def _auth_user_role(username: str) -> tuple[str, int]:
+    try:
+        conn = connect_db()
+        row = conn.execute("SELECT role_code, is_active FROM auth_users WHERE username=?", (str(username or '').strip(),)).fetchone()
+        conn.close()
+        if row:
+            return str(row["role_code"] or "").strip(), int(row["is_active"] or 0)
+    except Exception:
+        pass
+    return "", 0
+
+
+def _is_admin_account(username: str) -> bool:
+    role, active = _auth_user_role(username)
+    return bool(active) and role == "admin"
+
+
 def _ensure_legacy_security_tables(cur) -> None:
     """Ensure legacy runtime login tables exist.
 
@@ -706,7 +742,7 @@ def save_users(rows: Iterable[dict]) -> dict:
             old_role = str(exists["role_code"] or "operator").strip() or "operator"
             params = [
                 str(r.get("employee_id", "")).strip(), display_name, str(r.get("email", "")).strip(),
-                role_code, int(bool(r.get("is_active", True))), int(bool(r.get("force_password_change", False))),
+                role_code, int(_truthy(r.get("is_active", True), True)), int(_truthy(r.get("force_password_change", False), False)),
                 str(r.get("note", "")).strip(), now_text(), username
             ]
             cur.execute("""
@@ -729,8 +765,8 @@ def save_users(rows: Iterable[dict]) -> dict:
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
             """, (
                 username, hash_password(new_password), "由權限管理頁建立", str(r.get("employee_id", "")).strip(),
-                display_name, str(r.get("email", "")).strip(), role_code, int(bool(r.get("is_active", True))),
-                int(bool(r.get("force_password_change", False))), str(r.get("note", "")).strip(), now_text(), now_text()
+                display_name, str(r.get("email", "")).strip(), role_code, int(_truthy(r.get("is_active", True), True)),
+                int(_truthy(r.get("force_password_change", False), False)), str(r.get("note", "")).strip(), now_text(), now_text()
             ))
             role_sync_users.append(username)
         saved += 1
@@ -850,7 +886,7 @@ def save_account_permissions(rows: Iterable[dict]) -> int:
         module_info = next((m for m in MODULES if m["module_code"] == module_code), None)
         if not module_info:
             module_info = {"module_name_zh": str(r.get("module_name_zh", "")), "module_name_en": str(r.get("module_name_en", ""))}
-        vals = {k: int(bool(r.get(k, False))) for k, _, _ in ACTIONS}
+        vals = {k: int(_truthy(r.get(k, False), False)) for k, _, _ in ACTIONS}
         cur.execute("""
             INSERT INTO auth_account_permissions
             (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
@@ -895,6 +931,8 @@ def has_permission(username: str, module_code: str, action: str = "can_view") ->
     conn.close()
     if not row or not row["is_active"]:
         return False
+    if _is_admin_account(username):
+        return True
     if row["can_manage"]:
         return True
     return bool(row[action]) if action in row.keys() else False
@@ -1563,8 +1601,13 @@ def get_users() -> List[dict]:  # type: ignore[override]
         summary = _v341_current_auth_summary()
         if summary["count"] == 0 or summary["count"] <= len(_V341_DEFAULT_USERNAMES):
             best_path, tables = _v341_best_permission_payload()
-            if best_path and _v341_permission_score(best_path, tables)[0] > summary["count"]:
-                restore_permission_settings_from_permanent_files(force=True)
+            if best_path:
+                score = _v341_permission_score(best_path, tables)
+                # Reboot App can recreate the same number of default accounts.  Restore even
+                # when counts are equal so changed passwords, disabled accounts, roles and
+                # module permissions do not silently fall back to defaults.
+                if score[0] >= summary["count"] and score[0] > 0:
+                    restore_permission_settings_from_permanent_files(force=True)
     except Exception:
         pass
     return _old_get_users_v341()
@@ -1614,3 +1657,15 @@ def export_permission_settings_permanently(reason: str = "permission_settings_sa
         return {"ok": True, "mode": "local_10_permissions_only", "files": [str(base / "10_permissions_records.json"), str(base / "10_permissions_settings.json")], "table_counts": payload["table_counts"]}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+
+
+# ===== V3.42 final permission hardening =====
+# 管理員帳號必須能自由進入所有模組；文字/Excel 匯入的布林值也不可誤判。
+_prev_v342_has_permission = has_permission
+
+def has_permission(username: str, module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    if _is_admin_account(username):
+        return True
+    return _prev_v342_has_permission(username, module_code, action)
+
+check_permission = has_permission

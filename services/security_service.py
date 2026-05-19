@@ -2020,3 +2020,24 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:  # typ
 # permanent JSON/DB, and DEFAULT_IDLE_MINUTES is only a read fallback.
 def _v243_seed_idle_timeout_one_minute() -> None:
     return
+
+
+# ===== V3.42 final security permission hardening =====
+# System administrators must bypass every module/action check even if a stale permission matrix exists.
+_prev_v342_check_permission = check_permission
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    user = get_current_user()
+    if user and _is_admin_user(user.get("username", ""), user.get("roles", [])):
+        return True
+    return _prev_v342_check_permission(module_code, action)
+
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    require_login(module_code)
+    if not check_permission(module_code, action):
+        log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
+        st.error("權限不足，請聯絡系統管理員。")
+        st.stop()
+
+require_permission = require_module_access
