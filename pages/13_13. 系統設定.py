@@ -8,13 +8,17 @@ import pandas as pd
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
+from services.ui_size_service import apply_dropdown_menu_size_only
 from services.security_service import require_module_access, check_permission
 from services.table_ui_service import render_table
 from services.system_settings_service import (
+    delete_process_categories,
     delete_process_options,
     delete_rest_periods,
+    load_process_categories_df,
     load_process_options_df,
     load_process_category_choices,
+    save_process_categories_df,
     save_default_process_category,
     get_default_process_category,
     load_rest_periods_df,
@@ -46,6 +50,7 @@ from services.settings_durability_service import (
 
 st.set_page_config(page_title="13. 系統設定", page_icon="⌬️", layout="wide")
 apply_theme()
+apply_dropdown_menu_size_only(560)
 require_module_access("13_system_settings", "can_view")
 render_header("13｜系統設定", "工段名稱下拉選單、休息時間扣除規則｜新增、刪除、修改、套用後永久保存")
 
@@ -524,6 +529,63 @@ with cat2:
 with cat3:
     st.info("01｜工時紀錄會依這裡的『類別 / Category』載入對應工段；『全部 / 通用』代表所有類別共用工段。")
 
+
+st.markdown("#### 類別清單管理 / Category Master")
+st.caption("類別可新增、修改、刪除；刪除類別時會一併移除該類別對應工段。『全部 / 通用』為系統保留類別，不建議刪除。")
+cat_df = load_process_categories_df(active_only=False)
+if cat_df.empty:
+    cat_df = pd.DataFrame(columns=["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+cat_view = _normalize_delete_column(cat_df)
+cat_edit_key = "_spt_13_category_edit_mode"
+if can_manage:
+    cc1, cc2, cc3 = st.columns([1, 1, 4])
+    if not st.session_state.get(cat_edit_key, False):
+        if cc1.button("◇ 啟動編輯類別", key="enable_category_edit", use_container_width=True):
+            _set_edit_mode(cat_edit_key, True)
+    else:
+        if cc1.button("◌ 停止編輯類別", key="disable_category_edit", use_container_width=True):
+            _set_edit_mode(cat_edit_key, False)
+    cc2.caption("新增：啟動編輯後，在表格最下方新增列。")
+
+if can_manage and st.session_state.get(cat_edit_key, False):
+    with st.form("system_process_categories_apply_form", clear_on_submit=False):
+        edited_cat = render_table(
+            cat_view,
+            "system_process_categories",
+            editable=True,
+            disabled=["id", "created_at", "updated_at"],
+            key="system_process_categories_editor_v334",
+            height=300,
+            num_rows="dynamic",
+        )
+        cat_action = st.radio(
+            "確認後執行動作",
+            ["套用並永久儲存類別設定", "刪除勾選類別"],
+            horizontal=True,
+            key="system_category_apply_action_v334",
+        )
+        cat_submitted = st.form_submit_button("▣ 確認套用類別 / Apply Categories", type="primary", use_container_width=True)
+    if cat_submitted and edited_cat is not None:
+        if cat_action == "套用並永久儲存類別設定":
+            save_df = edited_cat.drop(columns=["刪除"], errors="ignore")
+            count = save_process_categories_df(save_df)
+            _export_permanent_settings(f"已套用類別設定 {count} 筆")
+            _refresh_after_apply(f"已套用類別設定 {count} 筆，畫面已重新整理。", cat_edit_key)
+        else:
+            try:
+                ids = [int(float(x)) for x in edited_cat[edited_cat["刪除"].astype(bool)]["id"].dropna().tolist()]
+            except Exception:
+                ids = []
+            if not ids:
+                st.warning("請先勾選要刪除的既有類別，再按確認套用。")
+            else:
+                count = delete_process_categories(ids)
+                _export_permanent_settings(f"已刪除類別設定 {count} 筆")
+                _refresh_after_apply(f"已刪除類別設定 {count} 筆，畫面已重新整理。", cat_edit_key)
+else:
+    render_table(cat_view.drop(columns=["刪除"], errors="ignore"), "system_process_categories", editable=False, height=260)
+
+st.markdown("#### 類別對應工段設定 / Category-specific Process Options")
 all_category_choices = load_process_category_choices(include_common=True)
 if current_default_category not in all_category_choices:
     all_category_choices.append(current_default_category)

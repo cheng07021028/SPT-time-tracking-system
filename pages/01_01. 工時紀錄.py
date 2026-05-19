@@ -4,6 +4,7 @@ from __future__ import annotations
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
+from services.ui_size_service import apply_dropdown_menu_size_only
 from services.security_service import (
     check_permission,
     get_current_user,
@@ -26,11 +27,12 @@ from services.time_record_service import (
     today_records,
 )
 from services.db_service import query_one
-from services.table_ui_service import render_table
+from services.table_ui_service import render_table, render_width_settings
 from services.system_settings_service import get_process_options_by_category, get_default_process_category, load_process_category_choices, get_live_page_reset_time
 
 st.set_page_config(page_title="01. 工時紀錄", page_icon="⏱", layout="wide")
 apply_theme()
+apply_dropdown_menu_size_only(560)
 require_module_access("01_time_record")
 render_header("01｜工時紀錄", "快速開始、同步作業、暫停、下班、完工｜自動記錄時間與扣除休息")
 render_post_record_continue_prompt()
@@ -168,6 +170,10 @@ if is_admin:
             st.success(f"已重新整理 01 頁顯示；02 歷史紀錄不受影響。已隱藏目前已結束筆數：{n}")
             st.rerun()
 df = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
+if is_admin and not df.empty:
+    with st.expander("▤ 01 工時紀錄表格欄位位置順序調整 / Admin Column Order Settings", expanded=False):
+        st.caption("此區僅系統管理員可見。可調整今日工時紀錄表格的欄位寬度與欄位位置順序；設定會永久保存。")
+        render_width_settings("today_records", df, title="01 工時紀錄欄位順序與欄寬設定 / Column Order and Width")
 render_table(df, "today_records", editable=False, height=420)
 
 # V1.81：修改、刪除、存檔功能只允許管理員看見與操作。
