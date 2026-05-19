@@ -62,7 +62,7 @@ def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def _blank_master() -> dict[str, Any]:
     return {
-        "version": "V360",
+        "version": "V364",
         "updated_at": now_text(),
         "description": "超慧科技製造部工時紀錄系統唯一設定主來源；SQLite 僅作運行快取。",
         "table_settings": {},
@@ -194,13 +194,40 @@ def bootstrap_persistent_state_once() -> dict[str, Any]:
 REMOTE_MASTER_SETTINGS_PATH = "data/persistent_state/spt_user_persistent_settings.json"
 
 
-def _v363_remote_download_if_missing() -> None:
-    """Download the canonical master only when local canonical file is missing.
+def _v364_auto_remote_enabled() -> bool:
+    """Remote settings bootstrap is opt-in only.
 
-    No history scan, no DB restore, no rerun.  This avoids login spinning but fixes
-    the Streamlit Cloud case where local ephemeral settings vanished after reboot.
+    The previous V364 tried to contact GitHub during load/login when the local
+    canonical file was missing.  On Streamlit Cloud this may block the login
+    transition and look like endless spinning.  Keep login deterministic:
+    local files are used by default; GitHub sync remains available through the
+    existing manual permanent-backup/sync pages.
     """
     try:
+        import os
+        val = os.environ.get("SPT_AUTO_REMOTE_SETTINGS_BOOTSTRAP", "").strip().lower()
+        if val in {"1", "true", "yes", "on"}:
+            return True
+    except Exception:
+        pass
+    try:
+        import streamlit as st  # type: ignore
+        val = str(st.secrets.get("SPT_AUTO_REMOTE_SETTINGS_BOOTSTRAP", "")).strip().lower()
+        return val in {"1", "true", "yes", "on"}
+    except Exception:
+        return False
+
+
+def _v364_remote_download_if_missing() -> None:
+    """V364 safe mode: never contact GitHub during normal login/page load.
+
+    Network calls during login caused endless spinning.  This function is kept
+    for compatibility, but it only runs if explicitly enabled by the secret/env
+    `SPT_AUTO_REMOTE_SETTINGS_BOOTSTRAP = "1"`.
+    """
+    try:
+        if not _v364_auto_remote_enabled():
+            return
         if MASTER_SETTINGS_PATH.exists() and MASTER_SETTINGS_PATH.stat().st_size > 0:
             return
         from services.github_cloud_storage_service import github_config, download_text_from_github
@@ -218,8 +245,7 @@ def _v363_remote_download_if_missing() -> None:
     except Exception:
         pass
 
-
-def _v363_normalize_master_payload(payload: dict[str, Any]) -> dict[str, Any]:
+def _v364_normalize_master_payload(payload: dict[str, Any]) -> dict[str, Any]:
     base = _blank_master()
     if not isinstance(payload, dict):
         return base
@@ -229,19 +255,19 @@ def _v363_normalize_master_payload(payload: dict[str, Any]) -> dict[str, Any]:
         if isinstance(payload.get(section), dict):
             base[section] = dict(payload.get(section) or {})
     base["updated_at"] = str(payload.get("updated_at") or now_text())
-    base["version"] = str(payload.get("version") or "V363")
+    base["version"] = str(payload.get("version") or "V364")
     return base
 
 
 def load_master_settings() -> dict[str, Any]:  # type: ignore[override]
-    """V363: deterministic load.
+    """V364: deterministic load.
 
     Old logic picked the 'richest' mirror by counts; that is unsafe after user
     deletes rows or intentionally leaves a table empty.  Now we merge mirrors in
     a fixed order and let the canonical master file win.
     """
     ensure_dirs()
-    _v363_remote_download_if_missing()
+    _v364_remote_download_if_missing()
     merged = _blank_master()
     # Lowest priority first, canonical master last.
     ordered_paths = [p for p in MASTER_MIRROR_PATHS if p != MASTER_SETTINGS_PATH] + [MASTER_SETTINGS_PATH]
@@ -251,7 +277,7 @@ def load_master_settings() -> dict[str, Any]:  # type: ignore[override]
         if not payload:
             continue
         found = True
-        norm = _v363_normalize_master_payload(payload)
+        norm = _v364_normalize_master_payload(payload)
         for section in ["table_settings", "column_settings", "system_settings", "permission_settings"]:
             cur = merged.get(section) if isinstance(merged.get(section), dict) else {}
             incoming = norm.get(section) if isinstance(norm.get(section), dict) else {}
@@ -274,37 +300,23 @@ def load_master_settings() -> dict[str, Any]:  # type: ignore[override]
     return merged if found else _blank_master()
 
 
-def _v363_upload_master_files_to_github(reason: str) -> dict[str, Any]:
-    try:
-        from services.github_cloud_storage_service import github_config, upload_file_to_github
-        if not github_config().get("token"):
-            return {"ok": False, "skipped": True, "message": "GITHUB_TOKEN not configured"}
-        uploads = []
-        # Upload only small canonical / compatibility files.  No history, no DB dump.
-        for local, remote in [
-            (MASTER_SETTINGS_PATH, REMOTE_MASTER_SETTINGS_PATH),
-            (STATE_DIR / "spt_module_settings.json", "data/persistent_state/spt_module_settings.json"),
-            (STATE_DIR / "spt_table_ui_settings.json", "data/persistent_state/spt_table_ui_settings.json"),
-            (STATE_DIR / "spt_table_column_settings.json", "data/persistent_state/spt_table_column_settings.json"),
-        ]:
-            try:
-                if local.exists() and local.stat().st_size > 0:
-                    uploads.append(upload_file_to_github(local, remote, f"SPT V363 settings save {reason} {now_text()}"))
-            except Exception as exc:
-                uploads.append({"ok": False, "path": remote, "message": str(exc)})
-        return {"ok": all(bool(x.get("ok")) for x in uploads) if uploads else False, "uploads": uploads}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)}
+def _v364_upload_master_files_to_github(reason: str) -> dict[str, Any]:
+    """V364: automatic GitHub upload disabled on normal saves.
 
+    Synchronous GitHub upload inside settings save can block login/page reruns.
+    Keep local canonical JSON writes fast and let the existing 09/manual sync
+    workflow handle cloud upload.
+    """
+    return {"ok": True, "skipped": True, "mode": "v364_auto_github_disabled", "reason": reason}
 
-def save_master_settings(master: dict[str, Any], *, reason: str = "v363_save") -> dict[str, Any]:  # type: ignore[override]
+def save_master_settings(master: dict[str, Any], *, reason: str = "v364_save") -> dict[str, Any]:  # type: ignore[override]
     ensure_dirs()
     payload = _blank_master()
     for section in ["table_settings", "column_settings", "system_settings", "permission_settings"]:
         if isinstance(master.get(section), dict):
             payload[section] = dict(master.get(section) or {})
     payload["updated_at"] = now_text()
-    payload["version"] = "V363"
+    payload["version"] = "V364"
     payload["reason"] = reason
     written = []
     for path in MASTER_MIRROR_PATHS:
@@ -314,12 +326,12 @@ def save_master_settings(master: dict[str, Any], *, reason: str = "v363_save") -
                 existing = {}
             existing["v360_user_persistent_settings"] = payload
             existing["updated_at"] = payload["updated_at"]
-            existing["version"] = str(existing.get("version") or "V363")
+            existing["version"] = str(existing.get("version") or "V364")
             atomic_write_json(path, existing)
         else:
             atomic_write_json(path, payload)
         written.append(str(path))
-    upload = _v363_upload_master_files_to_github(reason)
+    upload = _v364_upload_master_files_to_github(reason)
     return {"ok": True, "files": written, "reason": reason, "github_upload": upload}
 
 
@@ -327,7 +339,7 @@ def bootstrap_persistent_state_once() -> dict[str, Any]:  # type: ignore[overrid
     ensure_dirs()
     result: dict[str, Any] = {"ok": True, "steps": []}
     try:
-        _v363_remote_download_if_missing()
+        _v364_remote_download_if_missing()
         master = load_master_settings()
         # Write local mirrors only.  No GitHub upload during boot.
         payload = _blank_master()
@@ -335,8 +347,8 @@ def bootstrap_persistent_state_once() -> dict[str, Any]:  # type: ignore[overrid
             if isinstance(master.get(section), dict):
                 payload[section] = dict(master.get(section) or {})
         payload["updated_at"] = str(master.get("updated_at") or now_text())
-        payload["version"] = "V363"
-        payload["reason"] = "v363_bootstrap_local_only"
+        payload["version"] = "V364"
+        payload["reason"] = "v364_bootstrap_local_only"
         for path in MASTER_MIRROR_PATHS:
             if path.name == "spt_module_settings.json":
                 existing = read_json(path)
@@ -347,7 +359,7 @@ def bootstrap_persistent_state_once() -> dict[str, Any]:  # type: ignore[overrid
                 atomic_write_json(path, existing)
             else:
                 atomic_write_json(path, payload)
-        result["steps"].append({"step": "master_settings", "ok": True, "mode": "v363_local_bootstrap"})
+        result["steps"].append({"step": "master_settings", "ok": True, "mode": "v364_local_bootstrap"})
     except Exception as exc:
         result["ok"] = False
         result["steps"].append({"step": "master_settings", "ok": False, "error": str(exc)})
