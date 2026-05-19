@@ -1117,7 +1117,67 @@
           "order": 7
         }
       }
+    },
+    "13_13._系統設定_13_13._系統設定_456_dataframe": {
+      "columns": {
+        "label": {
+          "source": "label",
+          "label": "label / label",
+          "visible": true,
+          "width": "medium",
+          "order": 0
+        },
+        "path": {
+          "source": "path",
+          "label": "path / path",
+          "visible": true,
+          "width": "medium",
+          "order": 1
+        },
+        "exists": {
+          "source": "exists",
+          "label": "exists / exists",
+          "visible": true,
+          "width": "medium",
+          "order": 2
+        },
+        "json_readable": {
+          "source": "json_readable",
+          "label": "json_readable / json_readable",
+          "visible": true,
+          "width": "medium",
+          "order": 3
+        },
+        "size": {
+          "source": "size",
+          "label": "size / size",
+          "visible": true,
+          "width": "medium",
+          "order": 4
+        },
+        "modified": {
+          "source": "modified",
+          "label": "modified / modified",
+          "visible": true,
+          "width": "medium",
+          "order": 5
+        },
+        "detail": {
+          "source": "detail",
+          "label": "詳細 / Detail",
+          "visible": true,
+          "width": "medium",
+          "order": 6
+        },
+        "top_keys": {
+          "source": "top_keys",
+          "label": "top_keys / top_keys",
+          "visible": true,
+          "width": "medium",
+          "order": 7
+        }
+      }
     }
   },
-  "table_count": 15
+  "table_count": 16
 }
