@@ -1140,59 +1140,37 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
     return result
 
 
-# ===== V18.0 refresh latest time-record memory after history edits/deletes =====
-# 目的：02 歷史紀錄刪除/儲存後立即刷新 01/02 latest 記憶檔，避免 Reboot 後舊資料復活。
-_V18_ORIGINAL_SAVE_TIME_RECORDS = save_time_records
-_V18_ORIGINAL_DELETE_TIME_RECORDS = delete_time_records
 
 
-def _v18_refresh_time_records_latest(reason: str = "time_records_changed") -> None:
-    try:
-        from services.time_records_guard_service import mirror_time_records_to_module_files
-        rows_df = query_df("SELECT * FROM time_records ORDER BY id")
-        rows = rows_df.where(pd.notna(rows_df), "").to_dict(orient="records") if rows_df is not None and not rows_df.empty else []
-        # 空表也是有效狀態：若使用者刪到 0 筆，要寫入空 latest，避免 Reboot 從舊檔救回。
-        if not rows:
-            try:
-                import json
-                from pathlib import Path
-                from services.time_records_guard_service import PERSIST_ROOT, CANONICAL_01, HISTORY_02, now_text
-                payload = {"schema_version": "V18-empty-valid", "exported_at": now_text(), "reason": reason, "tables": {"time_records": []}, "counts": {"time_records": 0}}
-                for code, zh, en in [(CANONICAL_01, "工時紀錄", "Time Records"), (HISTORY_02, "歷史紀錄", "History")]:
-                    p = PERSIST_ROOT / code / f"{code}_records.json"
-                    p.parent.mkdir(parents=True, exist_ok=True)
-                    tmp = p.with_suffix(p.suffix + ".tmp")
-                    data = dict(payload); data.update({"module_code": code, "module_name_zh": zh, "module_name_en": en})
-                    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-                    tmp.replace(p)
-            except Exception:
-                pass
-        else:
-            mirror_time_records_to_module_files(rows, reason=reason)
-        try:
-            from services.permanent_write_through_service import write_through_paths
-            from services.time_records_guard_service import PERSIST_ROOT, CANONICAL_01, HISTORY_02
-            write_through_paths([
-                PERSIST_ROOT / CANONICAL_01 / f"{CANONICAL_01}_records.json",
-                PERSIST_ROOT / HISTORY_02 / f"{HISTORY_02}_records.json",
-            ], reason=reason)
-        except Exception:
-            pass
-    except Exception:
-        pass
 
+# ========================= V28 Permanent Authority Overrides =========================
+try:
+    from services.permanent_authority_service import update_tables as _v28_update_tables, table_from_df as _v28_table_from_df, df_from_table as _v28_df_from_table
+except Exception:
+    _v28_update_tables = _v28_table_from_df = _v28_df_from_table = None  # type: ignore
+
+_original_v28_save_time_records = save_time_records
+_original_v28_load_records = load_records
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    # 02/01 讀取先走 canonical，避免刪除後被 SQLite 舊快取救回。
+    if _v28_df_from_table is not None:
+        df = _v28_df_from_table("02_history", "time_records")
+        if df is not None and not df.empty:
+            if start_date and "work_date" in df.columns: df = df[df["work_date"].astype(str) >= str(start_date)]
+            if end_date and "work_date" in df.columns: df = df[df["work_date"].astype(str) <= str(end_date)]
+            if employee_id and "employee_id" in df.columns: df = df[df["employee_id"].astype(str) == str(employee_id)]
+            if work_order and "work_order" in df.columns: df = df[df["work_order"].astype(str) == str(work_order)]
+            return df.reset_index(drop=True)
+    return _original_v28_load_records(start_date, end_date, employee_id, work_order)
 
 def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
-    count = _V18_ORIGINAL_SAVE_TIME_RECORDS(df, recalc_edited_timestamps=recalc_edited_timestamps)
-    if count:
-        clear_query_cache()
-        _v18_refresh_time_records_latest("save_time_records_v18")
-    return count
-
-
-def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
-    count = _V18_ORIGINAL_DELETE_TIME_RECORDS(record_ids, reason=reason)
-    # 即使 count=0 也刷新一次 latest，避免畫面與檔案狀態不一致。
-    clear_query_cache()
-    _v18_refresh_time_records_latest("delete_time_records_v18")
-    return count
+    n = _original_v28_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps)
+    try:
+        rows = _v28_table_from_df(df) if _v28_table_from_df is not None else []
+        if _v28_update_tables is not None:
+            _v28_update_tables("01_time_records", {"time_records": rows}, reason="save_time_records_01_v28")
+            _v28_update_tables("02_history", {"time_records": rows}, reason="save_time_records_02_v28")
+    except Exception:
+        pass
+    return n

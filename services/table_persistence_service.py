@@ -204,11 +204,11 @@ def mirror_legacy_table_ui_settings(table_settings: dict[str, Any] | None = None
         table_settings = master.get("table_settings") if isinstance(master.get("table_settings"), dict) else {}
     payload = _legacy_payload_table_ui(table_settings or {})
     paths = [
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_table_ui_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "ui_table_settings" / "table_ui_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_ui_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_table_ui_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_ui_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_ui_settings.json",
     ]
     for path in paths:
         try:
@@ -235,11 +235,11 @@ def mirror_legacy_column_settings(settings: dict[str, Any] | None = None) -> Non
         settings = load_column_settings()
     payload = {"version": "V360", "table_column_settings_v2": settings or {}, "table_count": len(settings or {})}
     paths = [
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_table_column_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "ui_table_settings" / "table_column_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "01_time_records" / "01_time_records_table_column_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_table_column_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_column_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_table_column_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_column_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_table_column_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_table_column_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_column_settings.json",
     ]
     for path in paths:
         try:
@@ -275,19 +275,19 @@ def migrate_legacy_table_settings_to_master(*, write: bool = True) -> dict[str, 
     table_settings = master.get("table_settings") if isinstance(master.get("table_settings"), dict) else {}
     column_settings = master.get("column_settings") if isinstance(master.get("column_settings"), dict) else {}
     table_paths = [
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_table_ui_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "ui_table_settings" / "table_ui_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "13_system_settings_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_ui_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_table_ui_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_ui_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_ui_settings.json",
     ]
     column_paths = [
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_table_column_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "ui_table_settings" / "table_column_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "01_time_records" / "01_time_records_table_column_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_table_column_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_column_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_table_column_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_column_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_table_column_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_table_column_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_table_column_settings.json",
     ]
     migrated_tables = 0
     migrated_columns = 0
@@ -339,12 +339,12 @@ def migrate_legacy_table_settings_to_master(*, write: bool = True) -> dict[str, 
 
 import time as _v366_time
 
-_V366_STATE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_table_persistence.json"
+_V366_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_table_persistence.json"
 _V366_MODULE_FILES = {
-    "01": PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "01_time_records" / "table_persistence.json",
-    "10": PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "table_persistence.json",
-    "13": PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "table_persistence.json",
-    "ui": PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "ui_table_settings" / "table_persistence.json",
+    "01": PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "table_persistence.json",
+    "10": PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "table_persistence.json",
+    "13": PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "table_persistence.json",
+    "ui": PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_persistence.json",
 }
 
 
@@ -451,21 +451,6 @@ def _v366_write_direct(all_payload: dict[str, Any], changed_key: str | None = No
         mirror_legacy_column_settings(all_payload.get("column_settings") or {})
     except Exception:
         pass
-
-
-
-
-def _v374_write_through_table_files(source: str = "table_settings_saved") -> dict[str, Any]:
-    """Upload table/column setting latest files immediately after user save.
-
-    Without this, Streamlit Cloud reboot reloads the repository copy and column
-    order can revert even though the local container file changed.
-    """
-    try:
-        from services.permanent_write_through_service import github_write_through_files
-        return github_write_through_files(_v370_direct_paths(), source=source)
-    except Exception as exc:
-        return {"ok": False, "message": str(exc), "source": source}
 
 
 def load_table_settings(table_key: Any) -> dict[str, Any]:  # type: ignore[override]
@@ -640,18 +625,18 @@ def migrate_legacy_table_settings_to_master(*, write: bool = False) -> dict[str,
 
 # ===== V3.70 direct latest settings file persistence, same as 03/04 modules =====
 # 背景：V366/V367 將表格設定寫到 table_persistence.json，但 03/04 成功模式是
-# data/permanent_store/persistent_modules/<module>/<module>_settings.json 或 <module>_records.json 這種 latest 固定檔。
+# data/persistent_modules/<module>/<module>_settings.json 或 <module>_records.json 這種 latest 固定檔。
 # 09｜資料永久保存與備份 / GitHub 同步通常會優先處理 <module>_settings.json。
 # 因此 01｜工時紀錄表格設定改為：儲存時同步寫入 01_time_records_settings.json；
 # Reboot 時優先從同一固定 latest settings 檔讀回，不再只靠 table_persistence.json。
 
 _V370_MODULE_SETTINGS_FILES = {
-    "01": PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json",
-    "10": PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-    "13": PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "13_system_settings_settings.json",
-    "ui": PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "ui_table_settings" / "ui_table_settings_settings.json",
+    "01": PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "01_time_records_settings.json",
+    "10": PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+    "13": PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_settings.json",
+    "ui": PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "ui_table_settings_settings.json",
 }
-_V370_13_SYSTEM_SETTINGS_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "system_settings.json"
+_V370_13_SYSTEM_SETTINGS_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json"
 
 
 def _v370_stamp_to_float(value: Any, fallback: float = 0.0) -> float:
@@ -753,8 +738,8 @@ def _v370_direct_paths() -> list[Path]:
         *_V366_MODULE_FILES.values(),
         *_V370_MODULE_SETTINGS_FILES.values(),
         _V370_13_SYSTEM_SETTINGS_FILE,
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_user_persistent_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_module_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_user_persistent_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_module_settings.json",
     ]
     seen: set[str] = set()
     out: list[Path] = []
@@ -883,21 +868,6 @@ def _v370_write_direct(all_payload: dict[str, Any], changed_key: str | None = No
         pass
 
 
-
-
-def _v374_write_through_table_files(source: str = "table_settings_saved") -> dict[str, Any]:
-    """Upload table/column setting latest files immediately after user save.
-
-    Without this, Streamlit Cloud reboot reloads the repository copy and column
-    order can revert even though the local container file changed.
-    """
-    try:
-        from services.permanent_write_through_service import github_write_through_files
-        return github_write_through_files(_v370_direct_paths(), source=source)
-    except Exception as exc:
-        return {"ok": False, "message": str(exc), "source": source}
-
-
 def load_table_settings(table_key: Any) -> dict[str, Any]:  # type: ignore[override]
     key = canonical_table_key(table_key)
     payload = _v370_load_all_direct_latest()
@@ -929,13 +899,11 @@ def save_table_settings(table_key: Any, *, widths: dict[str, int] | None = None,
     table_settings[key] = cur
     payload["table_settings"] = table_settings
     _v370_write_direct(payload, changed_key=key)
-    github_upload = _v374_write_through_table_files(source=reason)
     return {
         "ok": True,
-        "mode": "v374_direct_latest_settings_write_through",
+        "mode": "v370_direct_latest_settings_file",
         "key": key,
         "reason": reason,
-        "github_upload": github_upload,
         "files": [
             str(_V366_STATE_FILE),
             str(_V366_MODULE_FILES[_v366_module_code_for_key(key)]),
@@ -961,8 +929,7 @@ def save_column_settings(settings: dict[str, Any], *, reason: str = "column_sett
             normalized[canonical_table_key(k)] = item
     payload["column_settings"] = normalized
     _v370_write_direct(payload)
-    github_upload = _v374_write_through_table_files(source=reason)
-    return {"ok": True, "mode": "v374_direct_latest_settings_write_through", "table_count": len(normalized), "reason": reason, "file": str(_V366_STATE_FILE), "github_upload": github_upload}
+    return {"ok": True, "mode": "v370_direct_latest_settings_file", "table_count": len(normalized), "reason": reason, "file": str(_V366_STATE_FILE)}
 
 
 def migrate_legacy_table_settings_to_master(*, write: bool = False) -> dict[str, Any]:  # type: ignore[override]
@@ -976,164 +943,51 @@ def migrate_legacy_table_settings_to_master(*, write: bool = False) -> dict[str,
     }
 
 
-# ===== V3.75 / V7 performance patch: cached latest settings + targeted GitHub upload =====
-# 不改資料路徑、不改 UI、不刪功能。只減少重複讀 JSON 與重複上傳所有 mirror 檔。
-_V375_DIRECT_CACHE = {"sig": None, "payload": None}
 
 
-def _v375_file_sig(paths: list[Path]) -> tuple:
-    sig = []
-    for path in paths:
-        try:
-            if path.exists():
-                st = path.stat()
-                sig.append((str(path), int(st.st_mtime_ns), int(st.st_size)))
-            else:
-                sig.append((str(path), 0, 0))
-        except Exception:
-            sig.append((str(path), -1, -1))
-    return tuple(sig)
+# ========================= V28 Permanent Authority Overrides =========================
+try:
+    from services.permanent_authority_service import load_settings as _v28_load_settings, save_settings as _v28_save_settings
+except Exception:
+    _v28_load_settings = _v28_save_settings = None  # type: ignore
 
-
-# Keep original V370 loader available, then wrap it with a file-signature cache.
-_v375_uncached_load_all_direct_latest = _v370_load_all_direct_latest
-
-
-def _v370_load_all_direct_latest() -> dict[str, Any]:  # type: ignore[override]
-    paths = _v370_direct_paths()
-    sig = _v375_file_sig(paths)
-    try:
-        if _V375_DIRECT_CACHE.get("sig") == sig and isinstance(_V375_DIRECT_CACHE.get("payload"), dict):
-            # JSON round-trip is still cheaper than reading 10+ files repeatedly; it also protects callers from mutating cache.
-            return json.loads(json.dumps(_V375_DIRECT_CACHE["payload"], ensure_ascii=False, default=str))
-    except Exception:
-        pass
-    payload = _v375_uncached_load_all_direct_latest()
-    try:
-        _V375_DIRECT_CACHE["sig"] = sig
-        _V375_DIRECT_CACHE["payload"] = json.loads(json.dumps(payload, ensure_ascii=False, default=str))
-    except Exception:
-        pass
-    return payload
-
-
-def _v375_changed_table_files(key: str) -> list[Path]:
-    module_code = _v366_module_code_for_key(key)
-    files = [
-        _V366_STATE_FILE,
-        _V366_MODULE_FILES.get(module_code, _V366_MODULE_FILES["ui"]),
-        _V370_MODULE_SETTINGS_FILES.get(module_code, _V370_MODULE_SETTINGS_FILES["ui"]),
-    ]
-    if module_code == "13":
-        files.append(_V370_13_SYSTEM_SETTINGS_FILE)
-    # ui shard is the global safety mirror; keep it, but avoid reuploading every other module.
-    files.append(_V366_MODULE_FILES["ui"])
-    files.append(_V370_MODULE_SETTINGS_FILES["ui"])
-    seen: set[str] = set()
-    out: list[Path] = []
-    for f in files:
-        if not f:
-            continue
-        s = str(f)
-        if s not in seen:
-            seen.add(s)
-            out.append(f)
-    return out
-
-
-def _v375_all_column_files() -> list[Path]:
-    # Column settings are global by design, but V7 write-through skips unchanged content.
-    files = [_V366_STATE_FILE, *_V366_MODULE_FILES.values(), *_V370_MODULE_SETTINGS_FILES.values(), _V370_13_SYSTEM_SETTINGS_FILE]
-    seen: set[str] = set()
-    out: list[Path] = []
-    for f in files:
-        s = str(f)
-        if s not in seen:
-            seen.add(s)
-            out.append(f)
-    return out
-
-
-def _v374_write_through_table_files(source: str = "table_settings_saved", paths: list[Path] | None = None) -> dict[str, Any]:  # type: ignore[override]
-    """V7: upload only affected latest files; unchanged files are skipped by write-through service."""
-    try:
-        from services.permanent_write_through_service import github_write_through_files
-        return github_write_through_files(paths or _v375_all_column_files(), source=source)
-    except Exception as exc:
-        return {"ok": False, "message": str(exc), "source": source}
-
+def _v28_table_module(table_key: Any) -> str:
+    s = str(table_key or "ui").lower()
+    if s.startswith("01") or "time" in s: return "01_time_records"
+    if s.startswith("02") or "history" in s: return "02_history"
+    if s.startswith("03") or "work" in s: return "03_work_orders"
+    if s.startswith("04") or "employee" in s: return "04_employees"
+    if s.startswith("10") or "permission" in s or "account" in s: return "10_permissions"
+    if s.startswith("13") or "system" in s: return "13_system_settings"
+    return "ui_table_settings"
 
 def load_table_settings(table_key: Any) -> dict[str, Any]:  # type: ignore[override]
-    key = canonical_table_key(table_key)
-    payload = _v370_load_all_direct_latest()
-    settings = payload.get("table_settings") if isinstance(payload.get("table_settings"), dict) else {}
-    data = settings.get(key) if isinstance(settings, dict) else {}
-    if not isinstance(data, dict):
-        data = {}
-    return {
-        "table_key": key,
-        "widths": _normalize_widths(data.get("widths", {})),
-        "order": _normalize_order(data.get("order", [])),
-        "sort": data.get("sort", {}) if isinstance(data.get("sort"), dict) else {},
-    }
-
+    if _v28_load_settings is not None:
+        settings = _v28_load_settings(_v28_table_module(table_key)) or {}
+        all_tables = settings.get("table_settings") if isinstance(settings.get("table_settings"), dict) else {}
+        return dict(all_tables.get(str(table_key), {}))
+    return {}
 
 def save_table_settings(table_key: Any, *, widths: dict[str, int] | None = None, order: Iterable[str] | None = None, sort: dict[str, Any] | None = None, reason: str = "table_settings_saved") -> dict[str, Any]:  # type: ignore[override]
-    key = canonical_table_key(table_key)
-    payload = _v370_load_all_direct_latest()
-    table_settings = payload.get("table_settings") if isinstance(payload.get("table_settings"), dict) else {}
-    cur = table_settings.get(key) if isinstance(table_settings.get(key), dict) else {}
-    if widths is not None:
-        cur["widths"] = _normalize_widths(widths)
-    if order is not None:
-        cur["order"] = _normalize_order(order)
-    if sort is not None:
-        cur["sort"] = dict(sort or {})
-    cur["updated_at"] = _v366_now_text()
-    cur["reason"] = reason
-    table_settings[key] = cur
-    payload["table_settings"] = table_settings
-    _v370_write_direct(payload, changed_key=key)
-    files = _v375_changed_table_files(key)
-    github_upload = _v374_write_through_table_files(source=reason, paths=files)
-    return {
-        "ok": True,
-        "mode": "v375_fast_targeted_write_through",
-        "key": key,
-        "reason": reason,
-        "github_upload": github_upload,
-        "files": [str(p) for p in files],
-    }
-
+    module = _v28_table_module(table_key)
+    settings = _v28_load_settings(module) if _v28_load_settings is not None else {}
+    settings.setdefault("table_settings", {})
+    cur = dict(settings["table_settings"].get(str(table_key), {}))
+    if widths is not None: cur["widths"] = dict(widths)
+    if order is not None: cur["order"] = list(order)
+    if sort is not None: cur["sort"] = dict(sort)
+    cur["updated_at"] = now_text()
+    settings["table_settings"][str(table_key)] = cur
+    if _v28_save_settings is not None:
+        return _v28_save_settings(module, settings, reason=reason)
+    return {"ok": False}
 
 def load_column_settings() -> dict[str, Any]:  # type: ignore[override]
-    payload = _v370_load_all_direct_latest()
-    data = payload.get("column_settings") if isinstance(payload.get("column_settings"), dict) else {}
-    return {canonical_table_key(k): v for k, v in dict(data or {}).items() if isinstance(v, dict)}
-
+    if _v28_load_settings is not None:
+        return _v28_load_settings("ui_table_settings") or {}
+    return {}
 
 def save_column_settings(settings: dict[str, Any], *, reason: str = "column_settings_saved") -> dict[str, Any]:  # type: ignore[override]
-    payload = _v370_load_all_direct_latest()
-    normalized: dict[str, Any] = {}
-    for k, v in dict(settings or {}).items():
-        if isinstance(v, dict):
-            item = dict(v)
-            item["updated_at"] = item.get("updated_at") or _v366_now_text()
-            item["reason"] = reason
-            normalized[canonical_table_key(k)] = item
-    payload["column_settings"] = normalized
-    _v370_write_direct(payload)
-    files = _v375_all_column_files()
-    github_upload = _v374_write_through_table_files(source=reason, paths=files)
-    return {"ok": True, "mode": "v375_fast_targeted_write_through", "table_count": len(normalized), "reason": reason, "file_count": len(files), "github_upload": github_upload}
-
-
-def migrate_legacy_table_settings_to_master(*, write: bool = False) -> dict[str, Any]:  # type: ignore[override]
-    direct = _v370_load_all_direct_latest()
-    return {
-        "ok": True,
-        "mode": "v375_cached_direct_latest_no_load_migration",
-        "table_count": len(direct.get("table_settings") or {}),
-        "column_count": len(direct.get("column_settings") or {}),
-        "write": False,
-    }
+    if _v28_save_settings is not None:
+        return _v28_save_settings("ui_table_settings", settings or {}, reason=reason)
+    return {"ok": False}

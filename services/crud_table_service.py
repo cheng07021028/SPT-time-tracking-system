@@ -11,15 +11,14 @@ import pandas as pd
 from services.timezone_service import now_text, now_stamp, today_text, today_date
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PERMANENT_STORE_DIR = PROJECT_ROOT / "data" / "permanent_store"
-DB_PATH = PERMANENT_STORE_DIR / "database" / "spt_time_tracking.db"
+DB_PATH = PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
 
 
 # ===== V3.04 MASTER DATA RESCUE GUARD START =====
 # Purpose: 03｜製令管理 and 04｜人員名單 primarily read SQLite tables.
 # If a module update/reboot creates an empty SQLite DB while permanent JSON still has data,
-# restore the SQLite table from data/permanent_store/persistent_modules before the page displays empty data.
-PERSIST_ROOT = PERMANENT_STORE_DIR / "persistent_modules"
+# restore the SQLite table from data/persistent_modules before the page displays empty data.
+PERSIST_ROOT = PROJECT_ROOT / "data" / "persistent_modules"
 
 _MASTER_MODULES = {
     "work_orders": {
@@ -64,25 +63,27 @@ def _extract_rows_from_payload(payload: Any, table: str) -> list[dict[str, Any]]
 
 
 def _candidate_record_files(table: str) -> list[Path]:
-    """Fast latest-only lookup for master data permanent files.
-
-    V11: do not scan every history file on normal page open.  03/04 pages only
-    need the fixed latest records file.  This is the main speed fix for 04｜人員名單.
-    """
     info = _MASTER_MODULES.get(table, {})
     files: list[Path] = []
     for code in info.get("module_codes", []):
         d = PERSIST_ROOT / code
         for name in info.get("latest_names", []):
             files.append(d / name)
+        files.extend(sorted((d / "history").glob("*_records_*.json"), reverse=True) if (d / "history").exists() else [])
+    # Also scan all persistent modules for a table-bearing record, newest first.
+    try:
+        files.extend(sorted(PERSIST_ROOT.glob(f"*/**/*records*.json"), key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True))
+    except Exception:
+        pass
     seen = set()
     out = []
     for p in files:
-        key = str(p)
-        if key not in seen:
-            seen.add(key)
+        s = str(p.resolve()) if p.exists() else str(p)
+        if s not in seen:
+            seen.add(s)
             out.append(p)
     return out
+
 
 def _find_best_persistent_rows(table: str) -> tuple[list[dict[str, Any]], str]:
     best_rows: list[dict[str, Any]] = []
@@ -131,22 +132,18 @@ def _normalise_row_for_table(table: str, row: dict[str, Any], now: str) -> dict[
 
 
 def _restore_table_from_persistent_if_empty(table: str) -> dict[str, Any]:
-    """Restore work_orders/employees from permanent JSON when SQLite is stale.
-
-    V11: Not only when DB is empty. If SQLite has 1 row but permanent JSON has
-    70~80 employees, merge JSON into SQLite once so 04｜人員名單 is correct.
-    """
+    """Restore work_orders/employees from persistent JSON when SQLite table is empty."""
     ensure_tables()
     if table not in _MASTER_MODULES:
         return {"restored": 0, "source": "", "reason": "unsupported_table"}
     conn = get_conn()
     try:
         current = _table_row_count(conn, table)
+        if current > 0:
+            return {"restored": 0, "source": "", "reason": "db_not_empty", "current": current}
         rows, source = _find_best_persistent_rows(table)
         if not rows:
-            return {"restored": 0, "source": "", "reason": "no_persistent_rows", "current": current}
-        if current >= len(rows):
-            return {"restored": 0, "source": source, "reason": "db_has_latest_or_more", "current": current, "permanent_rows": len(rows)}
+            return {"restored": 0, "source": "", "reason": "no_persistent_rows"}
         now = now_text()
         restored = 0
         cur = conn.cursor()
@@ -236,13 +233,6 @@ def _mirror_table_to_persistent_module(table: str) -> None:
         tmp.replace(latest)
         hist = h / f"{code}_records_{now_stamp()}.json"
         hist.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-        # V17: write-through only after the user explicitly saves/imports data.
-        # This keeps Reboot protection without slowing normal page reads.
-        try:
-            from services.permanent_write_through_service import github_write_through_files
-            github_write_through_files([latest], source=f"v17_save_{code}", force=False)
-        except Exception:
-            pass
     except Exception:
         pass
 # ===== V3.04 MASTER DATA RESCUE GUARD END =====
@@ -316,21 +306,13 @@ def log_action(action_type: str, target_table: str, message: str, detail: str = 
     conn.commit()
     conn.close()
 
-_V11_RESTORE_DONE: set[str] = set()
-
 def _load(table: str, order_by: str = "id DESC") -> pd.DataFrame:
     ensure_tables()
-    if table in ("work_orders", "employees") and table not in _V11_RESTORE_DONE:
-        _V11_RESTORE_DONE.add(table)
+    if table in ("work_orders", "employees"):
         try:
-            from services.db_service import suspend_after_write_sync
-            with suspend_after_write_sync(f"v11_crud_restore_{table}"):
-                _restore_table_from_persistent_if_empty(table)
+            _restore_table_from_persistent_if_empty(table)
         except Exception:
-            try:
-                _restore_table_from_persistent_if_empty(table)
-            except Exception:
-                pass
+            pass
     conn = get_conn()
     try:
         return pd.read_sql_query(f"SELECT * FROM {table} ORDER BY {order_by}", conn)
@@ -479,3 +461,46 @@ def save_employees(df: pd.DataFrame) -> dict:
         pass
     log_action("SAVE_EMPLOYEES", "employees", "儲存人員名單", f"inserted={inserted}, updated={updated}, deleted={deleted}, skipped={skipped}")
     return {"inserted": inserted, "updated": updated, "deleted": deleted, "skipped": skipped}
+
+
+
+
+# ========================= V28 Permanent Authority Overrides =========================
+try:
+    from services.permanent_authority_service import df_from_table as _v28_df_from_table, update_tables as _v28_update_tables, table_from_df as _v28_table_from_df
+except Exception:
+    _v28_df_from_table = _v28_update_tables = _v28_table_from_df = None  # type: ignore
+
+def load_work_orders() -> pd.DataFrame:  # type: ignore[override]
+    cols = ["id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
+    if _v28_df_from_table is not None:
+        df = _v28_df_from_table("03_work_orders", "work_orders", columns=cols)
+        if df is not None:
+            for c in cols:
+                if c not in df.columns: df[c] = ""
+            return df[cols]
+    return pd.DataFrame(columns=cols)
+
+def load_employees() -> pd.DataFrame:  # type: ignore[override]
+    cols = ["id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at"]
+    if _v28_df_from_table is not None:
+        df = _v28_df_from_table("04_employees", "employees", columns=cols)
+        if df is not None:
+            for c in cols:
+                if c not in df.columns: df[c] = ""
+            return df[cols]
+    return pd.DataFrame(columns=cols)
+
+def save_work_orders(df: pd.DataFrame) -> dict:  # type: ignore[override]
+    rows = _v28_table_from_df(df.drop(columns=["刪除 / Delete", "刪除", "_delete"], errors="ignore")) if _v28_table_from_df is not None else []
+    if _v28_update_tables is not None:
+        _v28_update_tables("03_work_orders", {"work_orders": rows}, reason="crud_save_work_orders_v28")
+    log_action("SAVE_WORK_ORDERS", "work_orders", "V28 儲存製令清單", f"rows={len(rows)}")
+    return {"inserted": 0, "updated": len(rows), "deleted": 0, "skipped": 0, "saved": len(rows)}
+
+def save_employees(df: pd.DataFrame) -> dict:  # type: ignore[override]
+    rows = _v28_table_from_df(df.drop(columns=["刪除 / Delete", "刪除", "_delete"], errors="ignore")) if _v28_table_from_df is not None else []
+    if _v28_update_tables is not None:
+        _v28_update_tables("04_employees", {"employees": rows}, reason="crud_save_employees_v28")
+    log_action("SAVE_EMPLOYEES", "employees", "V28 儲存人員清單", f"rows={len(rows)}")
+    return {"inserted": 0, "updated": len(rows), "deleted": 0, "skipped": 0, "saved": len(rows)}

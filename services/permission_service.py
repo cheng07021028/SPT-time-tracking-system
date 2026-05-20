@@ -21,7 +21,7 @@ except Exception:  # tools / batch scripts may import without Streamlit context
     st = None
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
+DB_PATH = PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
 _PERMISSION_SCHEMA_READY = False
 _PERMISSION_CACHE_TTL_SECONDS = 300
 
@@ -250,17 +250,17 @@ def _permission_persistent_candidates() -> list[Path]:
     root = PROJECT_ROOT
     candidates: list[Path] = []
     direct = [
-        root / "data" / "permanent_store" / "persistent_state" / "spt_module_settings.json",
-        root / "data" / "permanent_store" / "persistent_state" / "spt_permanent_state.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+        root / "data" / "persistent_state" / "spt_module_settings.json",
+        root / "data" / "persistent_state" / "spt_permanent_state.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
     ]
     candidates.extend([p for p in direct if p.exists()])
     for pattern in [
-        "data/permanent_store/persistent_state/history/spt_module_settings_*.json",
-        "data/permanent_store/persistent_state/history/spt_permanent_state_*.json",
-        "data/permanent_store/persistent_modules/10_permissions/history/10_permissions_settings_*.json",
-        "data/permanent_store/persistent_modules/10_permissions/history/10_permissions_records_*.json",
+        "data/persistent_state/history/spt_module_settings_*.json",
+        "data/persistent_state/history/spt_permanent_state_*.json",
+        "data/persistent_modules/10_permissions/history/10_permissions_settings_*.json",
+        "data/persistent_modules/10_permissions/history/10_permissions_records_*.json",
     ]:
         candidates.extend(root.glob(pattern))
     # newest first, remove duplicates
@@ -981,8 +981,8 @@ def _persist_security_settings_files(settings: Dict[str, str]) -> None:
         import json
         from pathlib import Path
         root = Path(__file__).resolve().parents[1]
-        state_dir = root / "data" / "permanent_store" / "persistent_state"
-        mod_dir = root / "data" / "permanent_store" / "persistent_modules" / "10_permissions"
+        state_dir = root / "data" / "persistent_state"
+        mod_dir = root / "data" / "persistent_modules" / "10_permissions"
         hist_dir = mod_dir / "history"
         state_dir.mkdir(parents=True, exist_ok=True)
         mod_dir.mkdir(parents=True, exist_ok=True)
@@ -1121,8 +1121,8 @@ check_permission = has_permission
 
 
 # ===== V1.69 persistent security setting compatibility =====
-_SECURITY_PERSISTENT_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json"
-_SECURITY_MODULE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
+_SECURITY_PERSISTENT_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_security_settings.json"
+_SECURITY_MODULE_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
 
 def _v169_load_persistent_security_settings() -> Dict[str, str]:
     """Load only real security settings from permanent JSON files.
@@ -1216,10 +1216,10 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
 def _v199_security_setting_paths() -> list[Path]:
     root = Path(__file__).resolve().parents[1]
     return [
-        root / "data" / "permanent_store" / "config" / "security_settings.json",
-        root / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "security_settings.json",
+        root / "data" / "config" / "security_settings.json",
+        root / "data" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
     ]
 
 
@@ -1227,9 +1227,9 @@ def _v199_read_security_settings_from_files() -> Dict[str, str]:
     out: Dict[str, str] = {}
     allowed = {"idle_timeout_minutes", "ask_continue_after_record"}
     extra_idle_paths = [
-        PROJECT_ROOT / "data" / "permanent_store" / "config" / "idle_timeout_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_idle_timeout_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "config" / "idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
     ]
     for path in _v199_security_setting_paths() + extra_idle_paths:
         try:
@@ -1261,9 +1261,9 @@ def _v204_write_idle_timeout_files(minutes: int) -> None:
         "note": "閒置自動登出分鐘數永久設定；GitHub 更新或 SQLite 重建後優先讀取此檔。",
     }
     paths = [
-        PROJECT_ROOT / "data" / "permanent_store" / "config" / "idle_timeout_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_idle_timeout_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "config" / "idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
     ]
     for path in paths:
         try:
@@ -1479,7 +1479,7 @@ def has_permission(username: str, module_code: str, action: str = "can_view") ->
 check_permission = has_permission
 
 # ===== V3.41 10｜權限管理永久檔防回原始設定守門 =====
-# 重點：Reboot App 後 SQLite 若只剩預設帳號，不可覆蓋 data/permanent_store/persistent_modules 裡較完整的帳號主檔。
+# 重點：Reboot App 後 SQLite 若只剩預設帳號，不可覆蓋 data/persistent_modules 裡較完整的帳號主檔。
 # 登入頁仍保持輕量，不在 import 時做 GitHub 或全量掃描。
 _V341_DEFAULT_USERNAMES = {u[0] for u in DEFAULT_USERS}
 
@@ -1488,20 +1488,20 @@ def _v341_permission_candidate_paths() -> list[Path]:
     root = PROJECT_ROOT
     paths: list[Path] = []
     direct = [
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "security_settings.json",
-        root / "data" / "permanent_store" / "config" / "security_settings.json",
-        root / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json",
-        root / "data" / "permanent_store" / "persistent_state" / "spt_module_settings.json",
-        root / "data" / "permanent_store" / "persistent_state" / "spt_permanent_state.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
+        root / "data" / "config" / "security_settings.json",
+        root / "data" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "persistent_state" / "spt_module_settings.json",
+        root / "data" / "persistent_state" / "spt_permanent_state.json",
     ]
     paths.extend([p for p in direct if p.exists()])
     for pattern in [
-        "data/permanent_store/persistent_modules/10_permissions/history/10_permissions_records_*.json",
-        "data/permanent_store/persistent_modules/10_permissions/history/10_permissions_settings_*.json",
-        "data/permanent_store/persistent_state/history/spt_module_settings_*.json",
-        "data/permanent_store/persistent_state/history/spt_permanent_state_*.json",
+        "data/persistent_modules/10_permissions/history/10_permissions_records_*.json",
+        "data/persistent_modules/10_permissions/history/10_permissions_settings_*.json",
+        "data/persistent_state/history/spt_module_settings_*.json",
+        "data/persistent_state/history/spt_permanent_state_*.json",
     ]:
         paths.extend(root.glob(pattern))
     uniq: dict[str, Path] = {str(p): p for p in paths if p.exists()}
@@ -1669,7 +1669,7 @@ def export_permission_settings_permanently(reason: str = "permission_settings_sa
             "tables": tables,
             "table_counts": {k: len(v) for k, v in tables.items()},
         }
-        base = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions"
+        base = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions"
         hist = base / "history"
         base.mkdir(parents=True, exist_ok=True); hist.mkdir(parents=True, exist_ok=True)
         for name in ["10_permissions_records.json", "10_permissions_settings.json"]:
@@ -1707,14 +1707,14 @@ check_permission = has_permission
 
 def _v363_permission_direct_paths() -> list[Path]:
     direct = [
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_module_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_module_settings.json",
     ]
     existing = [p for p in direct if p.exists() and p.stat().st_size > 0]
     if existing:
         return existing
-    hist = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "history"
+    hist = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "history"
     if hist.exists():
         return sorted(hist.glob("10_permissions_records_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
     return []
@@ -1735,11 +1735,11 @@ def _v363_upload_permission_files(reason: str) -> dict:
         if not github_config().get("token"):
             return {"ok": False, "skipped": True, "message": "GITHUB_TOKEN not configured"}
         uploads = []
-        base = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions"
+        base = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions"
         for local, remote in [
-            (base / "10_permissions_records.json", "data/permanent_store/persistent_modules/10_permissions/10_permissions_records.json"),
-            (base / "10_permissions_settings.json", "data/permanent_store/persistent_modules/10_permissions/10_permissions_settings.json"),
-            (PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_user_persistent_settings.json", "data/permanent_store/persistent_state/spt_user_persistent_settings.json"),
+            (base / "10_permissions_records.json", "data/persistent_modules/10_permissions/10_permissions_records.json"),
+            (base / "10_permissions_settings.json", "data/persistent_modules/10_permissions/10_permissions_settings.json"),
+            (PROJECT_ROOT / "data" / "persistent_state" / "spt_user_persistent_settings.json", "data/persistent_state/spt_user_persistent_settings.json"),
         ]:
             if local.exists() and local.stat().st_size > 0:
                 uploads.append(upload_file_to_github(local, remote, f"SPT V363 permission settings {reason} {now_text()}"))
@@ -1753,7 +1753,7 @@ _prev_export_permission_settings_permanently_v363 = export_permission_settings_p
 def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
     res = _prev_export_permission_settings_permanently_v363(reason=reason)
     try:
-        base = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json"
+        base = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json"
         payload = _json_load(base)
         if isinstance(payload, dict):
             from services.persistence_core_service import load_master_settings, save_master_settings
@@ -1835,12 +1835,12 @@ def export_permission_settings_permanently(reason: str = 'permission_settings_sa
     """V3.65：本機輕量匯出，不連 GitHub、不掃 history、不觸發全域同步。"""
     init_permission_tables()
     payload = _v365_permission_payload_from_db(reason)
-    base = PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_modules' / '10_permissions'
+    base = PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions'
     files = [base / '10_permissions_records.json', base / '10_permissions_settings.json']
     for p in files:
         _v365_write_json_atomic(p, payload)
     try:
-        master_path = PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_state' / 'spt_user_persistent_settings.json'
+        master_path = PROJECT_ROOT / 'data' / 'persistent_state' / 'spt_user_persistent_settings.json'
         master = _json_load(master_path)
         if not isinstance(master, dict):
             master = {}
@@ -1858,9 +1858,9 @@ def export_permission_settings_permanently(reason: str = 'permission_settings_sa
 
 def _v365_direct_permission_payload() -> tuple[Path | None, dict]:
     direct = [
-        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_modules' / '10_permissions' / '10_permissions_records.json',
-        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_modules' / '10_permissions' / '10_permissions_settings.json',
-        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_state' / 'spt_user_persistent_settings.json',
+        PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions' / '10_permissions_records.json',
+        PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions' / '10_permissions_settings.json',
+        PROJECT_ROOT / 'data' / 'persistent_state' / 'spt_user_persistent_settings.json',
     ]
     for p in direct:
         raw = _json_load(p)
@@ -1976,9 +1976,9 @@ def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
 # 原則：10｜權限管理儲存帳號/權限後，直接寫入固定 latest JSON；
 # Reboot/App 啟動時，若固定 latest JSON 存在，就以它為主，不掃 history、不用筆數比較、不跑 GitHub。
 
-_V366_PERMISSION_STATE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_permission_settings.json"
-_V366_PERMISSION_MODULE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json"
-_V366_PERMISSION_SETTINGS_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
+_V366_PERMISSION_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_settings.json"
+_V366_PERMISSION_MODULE_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json"
+_V366_PERMISSION_SETTINGS_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
 _V366_PERMISSION_RESTORE_RUNNING = False
 _V366_PERMISSION_RESTORED_ONCE = False
 
@@ -2176,8 +2176,8 @@ def _v366_permission_tables_payload(reason: str = "permission_saved") -> dict:  
 # 3) 刪除帳號會寫 tombstone；即使舊帳號檔被讀到，也不可把已刪帳號救回。
 # 4) 若之後重新新增同名帳號，會自動從 tombstone 移除。
 
-_V368_DELETED_MODULE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "deleted_accounts.json"
-_V368_DELETED_STATE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_permission_deleted_accounts.json"
+_V368_DELETED_MODULE_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "deleted_accounts.json"
+_V368_DELETED_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_deleted_accounts.json"
 
 
 def _v368_json_load(path: Path) -> dict:
@@ -2494,14 +2494,14 @@ check_permission = has_permission
 
 # ===== V3.72 DIRECT LATEST PERMISSION SETTINGS LIKE 03/04 =====
 # 目的：10｜權限管理改成跟 03｜製令管理、04｜人員名單一樣的固定 latest JSON 讀寫。
-# - 儲存/刪除：直接寫 data/permanent_store/persistent_modules/10_permissions/10_permissions_records.json
+# - 儲存/刪除：直接寫 data/persistent_modules/10_permissions/10_permissions_records.json
 # - Reboot：直接讀同一個 latest JSON
 # - 不掃 history、不比帳號數、不用舊 master 檔救援、不跑 GitHub
 # - 刪除後帳號數變少也是有效設定
-_V372_PERMISSION_MODULE_DIR = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions"
+_V372_PERMISSION_MODULE_DIR = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions"
 _V372_PERMISSION_LATEST_FILE = _V372_PERMISSION_MODULE_DIR / "10_permissions_records.json"
 _V372_PERMISSION_COMPAT_FILE = _V372_PERMISSION_MODULE_DIR / "10_permissions_settings.json"
-_V372_PERMISSION_STATE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_permission_settings.json"
+_V372_PERMISSION_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_settings.json"
 _V372_PERMISSION_RESTORE_STATE_KEY = "_v372_permission_latest_restored"
 try:
     _v372_schema_init_only = init_permission_tables  # type: ignore[name-defined]
@@ -2760,9 +2760,9 @@ check_permission = has_permission
 #   1. Save/delete writes one fixed latest JSON directly.
 #   2. Reboot/page load restores from the fixed latest JSON only when DB is empty/default-only.
 #   3. No history scan, no GitHub, no previous layered save/delete wrappers.
-_V373_PERMISSION_LATEST_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json"
-_V373_PERMISSION_COMPAT_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
-_V373_PERMISSION_STATE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_permission_settings.json"
+_V373_PERMISSION_LATEST_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json"
+_V373_PERMISSION_COMPAT_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
+_V373_PERMISSION_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_settings.json"
 _V373_PERMISSION_RESTORE_KEY = "_v373_permission_latest_restored"
 
 
@@ -2784,41 +2784,14 @@ def _v373_p_atomic_write(path: Path, payload: dict) -> None:
     tmp.replace(path)
 
 
-def _v373_p_payload_stamp(data: dict, path: Path) -> float:
-    """Return comparable timestamp for permanent permission payload selection."""
-    for key in ("exported_at", "updated_at", "saved_at"):
-        text = str(data.get(key) or "").strip()
-        if text:
-            try:
-                return datetime.fromisoformat(text.replace("/", "-")).timestamp()
-            except Exception:
-                try:
-                    return datetime.strptime(text[:19].replace("/", "-"), "%Y-%m-%d %H:%M:%S").timestamp()
-                except Exception:
-                    pass
-    try:
-        return path.stat().st_mtime if path.exists() else 0.0
-    except Exception:
-        return 0.0
-
-
 def _v373_p_latest_payload() -> dict:
-    """Pick newest valid permission payload, not the first candidate.
-
-    This fixes the case where 10_permissions_records.json still contains an
-    older account master while 10_permissions_settings.json contains the latest
-    deletion/edit.  Reboot must restore the newest exported_at payload.
-    """
-    candidates: list[tuple[float, str, dict]] = []
+    # Fixed latest is authoritative. Compat/state are only migration fallback when latest is absent.
     for path in [_V373_PERMISSION_LATEST_FILE, _V373_PERMISSION_COMPAT_FILE, _V373_PERMISSION_STATE_FILE]:
         data = _v373_p_read_json(path)
         tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
         if isinstance(tables, dict) and isinstance(tables.get("auth_users"), list):
-            candidates.append((_v373_p_payload_stamp(data, path), str(path), data))
-    if not candidates:
-        return {}
-    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
-    return candidates[0][2]
+            return data
+    return {}
 
 
 def _v373_p_schema_only() -> None:
@@ -2924,18 +2897,17 @@ def restore_permission_settings_from_permanent_files(force: bool = False) -> dic
         conn.commit()
     finally:
         conn.close()
-    # Mark before runtime sync to prevent recursive restore through init_permission_tables().
-    if st is not None:
-        try:
-            st.session_state[_V373_PERMISSION_RESTORE_KEY] = True
-        except Exception:
-            pass
     try:
         sync_auth_users_to_runtime_security()
     except Exception:
         pass
     clear_permission_runtime_cache()
-    return {"ok": True, "mode": "v374_authoritative_json_restore", "source": str(_V373_PERMISSION_LATEST_FILE), "restored": restored}
+    if st is not None:
+        try:
+            st.session_state[_V373_PERMISSION_RESTORE_KEY] = True
+        except Exception:
+            pass
+    return {"ok": True, "mode": "v373_direct_latest_like_03_04", "source": str(_V373_PERMISSION_LATEST_FILE), "restored": restored}
 
 
 def _v373_restore_permission_once_if_needed() -> None:
@@ -2945,10 +2917,8 @@ def _v373_restore_permission_once_if_needed() -> None:
                 return
         except Exception:
             pass
-    # V3.74: On Streamlit Cloud reboot, SQLite from GitHub can be non-empty
-    # but stale.  The newest permanent JSON is authoritative, so restore once
-    # per session even when auth_users already has rows.
-    restore_permission_settings_from_permanent_files(force=True)
+    # Same spirit as 03/04: rescue DB only when it is empty/default-only.
+    restore_permission_settings_from_permanent_files(force=False)
     if st is not None:
         try:
             st.session_state[_V373_PERMISSION_RESTORE_KEY] = True
@@ -2960,8 +2930,6 @@ def init_permission_tables(force: bool = False) -> None:  # type: ignore[overrid
     _v373_p_schema_only()
     if force:
         restore_permission_settings_from_permanent_files(force=True)
-    else:
-        _v373_restore_permission_once_if_needed()
 
 
 init_auth_tables = init_permission_tables
@@ -2999,17 +2967,10 @@ def _v373_permission_payload_from_db(reason: str = "permission_settings_saved") 
 
 def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
     payload = _v373_permission_payload_from_db(reason)
-    files = [_V373_PERMISSION_LATEST_FILE, _V373_PERMISSION_COMPAT_FILE, _V373_PERMISSION_STATE_FILE]
-    for path in files:
+    for path in [_V373_PERMISSION_LATEST_FILE, _V373_PERMISSION_COMPAT_FILE, _V373_PERMISSION_STATE_FILE]:
         _v373_p_atomic_write(path, payload)
-    github_upload = {"ok": True, "skipped": True, "message": "write-through not attempted"}
-    try:
-        from services.permanent_write_through_service import github_write_through_files
-        github_upload = github_write_through_files(files, source=reason)
-    except Exception as exc:
-        github_upload = {"ok": False, "message": str(exc)}
     clear_permission_runtime_cache()
-    return {"ok": True, "mode": "v374_authoritative_json_restore", "files": [str(p) for p in files], "table_counts": payload.get("table_counts", {}), "github_upload": github_upload}
+    return {"ok": True, "mode": "v373_direct_latest_like_03_04_final", "files": [str(_V373_PERMISSION_LATEST_FILE), str(_V373_PERMISSION_COMPAT_FILE), str(_V373_PERMISSION_STATE_FILE)], "table_counts": payload.get("table_counts", {})}
 
 
 def get_users() -> List[dict]:  # type: ignore[override]
@@ -3171,463 +3132,115 @@ def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[overr
 check_permission = has_permission
 # ===== V3.73 FINAL DIRECT-LATEST PERMISSION PATCH END =====
 
-# ===== V9 PERMISSION DELETE + STARTUP SPEED PATCH =====
-# 1) 內部權限還原不觸發 GitHub write-through，避免登入/開頁變慢。
-# 2) 帳號刪除改為強制同步 auth/security 兩套表與永久檔，避免畫面勾選刪除但 Reboot 又回來。
+
+
+
+# ========================= V28 Permanent Authority Overrides =========================
+# 權限管理：帳號權限讀寫以 10_permissions/records.json 為唯一權威；SQLite 僅為快取。
 try:
-    _v9_prev_restore_permission_settings_from_permanent_files = restore_permission_settings_from_permanent_files
-    def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
-        try:
-            from services.db_service import suspend_after_write_sync
-            with suspend_after_write_sync("permission_restore_v9"):
-                return _v9_prev_restore_permission_settings_from_permanent_files(force=force)
-        except Exception:
-            return _v9_prev_restore_permission_settings_from_permanent_files(force=force)
+    from services.permanent_authority_service import load_tables as _v28_load_tables, update_tables as _v28_update_tables
 except Exception:
-    pass
+    _v28_load_tables = _v28_update_tables = None  # type: ignore
 
-
-def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
-    _v373_p_schema_only()
-    targets: list[str] = []
-    for u in usernames or []:
-        text = str(u or "").strip()
-        if not text or text.lower() == "admin":
-            continue
-        if text not in targets:
-            targets.append(text)
-    if not targets:
-        return 0
-
-    conn = connect_db()
-    cur = conn.cursor()
-    deleted = 0
-    try:
-        try:
-            _ensure_legacy_security_tables(cur)
-        except Exception:
-            pass
-        for u in targets:
-            # Delete permission rows first to avoid orphan permissions and stale restore.
-            for sql in [
-                "DELETE FROM auth_account_permissions WHERE username=?",
-                "DELETE FROM security_module_permissions WHERE username=?",
-                "DELETE FROM security_user_roles WHERE username=?",
-            ]:
-                try:
-                    cur.execute(sql, (u,))
-                except Exception:
-                    pass
-
-            row_deleted = 0
-            for sql in [
-                "DELETE FROM auth_users WHERE username=?",
-                "DELETE FROM security_users WHERE username=?",
-            ]:
-                try:
-                    cur.execute(sql, (u,))
-                    row_deleted += max(int(cur.rowcount or 0), 0)
-                except Exception:
-                    pass
-            if row_deleted > 0:
-                deleted += 1
-        conn.commit()
-    finally:
-        conn.close()
-
-    clear_permission_runtime_cache()
-    if deleted:
-        export_result = export_permission_settings_permanently("auth_users_deleted_v9")
-        # Force upload the exact permission permanent files.  This prevents Reboot App
-        # from restoring a deleted account from GitHub's previous JSON.
-        try:
-            files = []
-            for path in [_V373_PERMISSION_LATEST_FILE, _V373_PERMISSION_SETTINGS_FILE, _V373_PERMISSION_STATE_FILE, _V373_PERMISSION_SECURITY_FILE]:
-                try:
-                    if path.exists():
-                        files.append(path)
-                except Exception:
-                    pass
-            if files:
-                from services.permanent_write_through_service import github_write_through_files
-                github_write_through_files(files, source="auth_users_deleted_v9", force=True)
-        except Exception:
-            pass
-    return deleted
-# ===== V9 PERMISSION DELETE + STARTUP SPEED PATCH END =====
-
-# ===== V11 ACCOUNT MASTER FINAL SAVE/DELETE HOTFIX START =====
-# Fixes:
-# - 10｜權限管理「帳號清單編輯」新增/刪除後沒有穩定落地。
-# - Do not use layered delete wrappers or undefined compatibility constants.
-# - Save/delete writes one authoritative latest JSON and targeted GitHub write-through.
-_V11_PERMISSION_FILES = [
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_permission_settings.json",
-]
-_V11_PERMISSION_RESTORE_KEY = "_v11_permission_latest_restored"
-
-
-def _v11_schema_only() -> None:
-    try:
-        _v373_p_schema_only()  # type: ignore[name-defined]
-    except Exception:
-        try:
-            if _v372_schema_init_only is not None:  # type: ignore[name-defined]
-                _v372_schema_init_only(force=False)  # type: ignore[misc]
-        except Exception:
-            pass
-
-
-def _v11_atomic_write(path: Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-    json.loads(tmp.read_text(encoding="utf-8"))
-    tmp.replace(path)
-
-
-def _v11_upload_permission_files(reason: str) -> dict:
-    try:
-        from services.permanent_write_through_service import github_write_through_files
-        return github_write_through_files([p for p in _V11_PERMISSION_FILES if p.exists()], source=reason)
-    except Exception as exc:
-        return {"ok": False, "message": str(exc)}
-
-
-def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
-    _v11_schema_only()
-    payload = _v373_permission_payload_from_db(reason)  # type: ignore[name-defined]
-    payload["version"] = "V11-account-master-authoritative"
-    payload["reason"] = reason
-    for path in _V11_PERMISSION_FILES:
-        _v11_atomic_write(path, payload)
-    upload = _v11_upload_permission_files(reason)
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    return {"ok": True, "mode": "v11_account_master_authoritative", "files": [str(p) for p in _V11_PERMISSION_FILES], "table_counts": payload.get("table_counts", {}), "github_upload": upload}
-
-
-def _v11_latest_permission_payload() -> dict:
-    candidates: list[tuple[float, dict]] = []
-    for path in _V11_PERMISSION_FILES:
-        try:
-            data = json.loads(path.read_text(encoding="utf-8")) if path.exists() and path.stat().st_size > 2 else {}
-            tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
-            if isinstance(tables.get("auth_users"), list):
-                stamp = 0.0
-                for key in ("exported_at", "updated_at", "saved_at"):
-                    text = str(data.get(key) or "").strip()
-                    if text:
-                        try:
-                            stamp = datetime.fromisoformat(text.replace("/", "-")).timestamp()
-                            break
-                        except Exception:
-                            pass
-                if not stamp:
-                    stamp = path.stat().st_mtime
-                candidates.append((stamp, data))
-        except Exception:
-            continue
-    if not candidates:
-        return {}
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    return candidates[0][1]
-
-
-def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
-    _v11_schema_only()
-    payload = _v11_latest_permission_payload()
-    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
-    if not isinstance(tables, dict) or not isinstance(tables.get("auth_users"), list):
-        return {"ok": False, "mode": "v11_account_master_authoritative", "message": "no latest permission payload"}
-    conn = connect_db(); cur = conn.cursor()
-    restored = {}
-    try:
-        try:
-            _ensure_legacy_security_tables(cur)
-            _ensure_security_setting_tables(cur)
-        except Exception:
-            pass
-        for table in ["auth_users", "auth_account_permissions", "auth_security_settings", "security_users", "security_user_roles", "security_settings"]:
-            rows = tables.get(table, []) if isinstance(tables.get(table), list) else []
-            restored[table] = _v373_replace_table(cur, table, rows)  # type: ignore[name-defined]
-        conn.commit()
-    finally:
-        conn.close()
-    try:
-        sync_auth_users_to_runtime_security()
-    except Exception:
-        pass
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    return {"ok": True, "mode": "v11_account_master_authoritative", "restored": restored}
-
-
-def _v11_restore_once() -> None:
-    if st is not None:
-        try:
-            if st.session_state.get(_V11_PERMISSION_RESTORE_KEY):
-                return
-        except Exception:
-            pass
-    restore_permission_settings_from_permanent_files(force=True)
-    if st is not None:
-        try:
-            st.session_state[_V11_PERMISSION_RESTORE_KEY] = True
-        except Exception:
-            pass
-
+def _v28_perm_tables() -> dict:
+    if _v28_load_tables is not None:
+        return _v28_load_tables("10_permissions")
+    return {}
 
 def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
-    _v11_schema_only()
-    if force:
-        restore_permission_settings_from_permanent_files(force=True)
-
+    # Only ensure schema. Never seed defaults over authority file.
+    try: _v373_p_schema_only()
+    except Exception: pass
 
 init_auth_tables = init_permission_tables
 
-
 def get_users() -> List[dict]:  # type: ignore[override]
-    _v11_restore_once()
-    conn = connect_db()
-    try:
-        rows = conn.execute("""
-            SELECT id, username,
-                   '********' AS password_display,
-                   '' AS new_password,
-                   employee_id, display_name, email, role_code,
-                   is_active, force_password_change, last_login_at, note, created_at, updated_at
-            FROM auth_users
-            ORDER BY username
-        """).fetchall()
-        return [dict(r) for r in rows]
-    finally:
-        conn.close()
+    rows = _v28_perm_tables().get("auth_users", [])
+    out: list[dict] = []
+    for r in rows:
+        if not isinstance(r, dict): continue
+        x = dict(r)
+        x["password_display"] = "********"
+        x.setdefault("new_password", "")
+        out.append(x)
+    return sorted(out, key=lambda r: str(r.get("username", "")))
 
+def _v28_replace_table_in_auth(table: str, rows: list[dict]) -> None:
+    try:
+        conn = connect_db(); cur = conn.cursor()
+        cur.execute(f'DELETE FROM "{table}"')
+        for row in rows:
+            if not isinstance(row, dict) or not row: continue
+            clean = {str(k): v for k, v in row.items() if str(k).strip() and str(k) not in {"password_display", "new_password"}}
+            if not clean: continue
+            cols = list(clean.keys())
+            cur.execute(f'INSERT INTO "{table}" ({",".join([chr(34)+c+chr(34) for c in cols])}) VALUES ({",".join(["?"]*len(cols))})', [clean[c] for c in cols])
+        conn.commit(); conn.close()
+    except Exception:
+        try: conn.close()  # type: ignore
+        except Exception: pass
 
 def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
-    _v11_schema_only()
-    input_rows = list(rows or [])
-    conn = connect_db(); cur = conn.cursor()
-    saved = 0; skipped: list[str] = []; role_sync_users: list[str] = []; saved_usernames: list[str] = []
-    try:
-        for r in input_rows:
-            if not isinstance(r, dict):
-                continue
-            username = str(r.get("username", "")).strip()
-            if not username:
-                continue
-            display_name = str(r.get("display_name", "")).strip() or username
-            role_code = str(r.get("role_code", "operator")).strip() or "operator"
-            new_password = str(r.get("new_password", "")).strip()
-            exists = cur.execute("SELECT username, role_code FROM auth_users WHERE username=?", (username,)).fetchone()
-            if exists:
-                old_role = str(exists["role_code"] or "operator").strip() or "operator"
-                cur.execute("""
-                    UPDATE auth_users
-                    SET employee_id=?, display_name=?, email=?, role_code=?, is_active=?,
-                        force_password_change=?, note=?, updated_at=?
-                    WHERE username=?
-                """, (
-                    str(r.get("employee_id", "")).strip(), display_name, str(r.get("email", "")).strip(),
-                    role_code, _v373_bool(r.get("is_active", True), True), _v373_bool(r.get("force_password_change", False), False),
-                    str(r.get("note", "")).strip(), now_text(), username,
-                ))
-                if new_password:
-                    cur.execute("UPDATE auth_users SET password_hash=?, updated_at=? WHERE username=?", (hash_password(new_password), now_text(), username))
-                if old_role != role_code:
-                    role_sync_users.append(username)
-            else:
-                if not new_password:
-                    skipped.append(f"{username} 未設定新密碼 / new password required")
-                    continue
-                cur.execute("""
-                    INSERT INTO auth_users
-                    (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,note,created_at,updated_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-                """, (
-                    username, hash_password(new_password), "由權限管理頁建立", str(r.get("employee_id", "")).strip(),
-                    display_name, str(r.get("email", "")).strip(), role_code, _v373_bool(r.get("is_active", True), True),
-                    _v373_bool(r.get("force_password_change", False), False), str(r.get("note", "")).strip(), now_text(), now_text(),
-                ))
-                role_sync_users.append(username)
-            saved += 1
-            saved_usernames.append(username)
-        conn.commit()
-    finally:
-        conn.close()
-    try:
-        ensure_permissions_for_all_users(force=True)
-        if role_sync_users:
-            sync_user_permissions_from_roles(role_sync_users, reason="account_role_changed")
-        sync_auth_users_to_runtime_security(saved_usernames)
-    except Exception:
-        pass
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    export_result = export_permission_settings_permanently("auth_users_saved_v11")
-    return {"saved": saved, "skipped": skipped, "role_synced_users": sorted(set(role_sync_users)), "permanent_save": export_result}
-
+    # Authoritative replacement: the editor's current full list is the truth.
+    tables = _v28_perm_tables()
+    old_by_user = {str(r.get("username", "")).strip(): r for r in tables.get("auth_users", []) if isinstance(r, dict)}
+    out: list[dict] = []
+    skipped: list[str] = []
+    for r in list(rows or []):
+        if not isinstance(r, dict): continue
+        username = str(r.get("username", "")).strip()
+        if not username: continue
+        old = dict(old_by_user.get(username, {}))
+        x = old.copy()
+        for k in ["employee_id", "display_name", "email", "role_code", "is_active", "force_password_change", "note"]:
+            if k in r: x[k] = r.get(k)
+        x["username"] = username
+        x.setdefault("display_name", username)
+        x.setdefault("role_code", "operator")
+        x.setdefault("created_at", now_text())
+        x["updated_at"] = now_text()
+        new_password = str(r.get("new_password", "") or "").strip()
+        if new_password and new_password != "********":
+            x["password_hash"] = hash_password(new_password)
+        elif not x.get("password_hash"):
+            skipped.append(f"{username} 未設定密碼")
+            continue
+        out.append(x)
+    tables["auth_users"] = out
+    # Remove permissions for deleted users.
+    usernames = {str(r.get("username", "")).strip() for r in out}
+    for t in ["auth_account_permissions", "security_user_roles", "security_module_permissions"]:
+        if isinstance(tables.get(t), list):
+            tables[t] = [r for r in tables[t] if str(r.get("username", "")).strip() in usernames]
+    if _v28_update_tables is not None:
+        _v28_update_tables("10_permissions", tables, reason="save_users_authoritative_v28")
+    _v28_replace_table_in_auth("auth_users", out)
+    clear_permission_runtime_cache()
+    return {"saved": len(out), "skipped": skipped, "mode": "v28_authoritative_replace"}
 
 def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
-    _v11_schema_only()
-    targets = []
-    seen = set()
-    for u in usernames or []:
-        name = str(u or "").strip()
-        low = name.lower()
-        if not name or low == "admin" or low in seen:
-            continue
-        targets.append(name); seen.add(low)
-    if not targets:
-        return 0
-    conn = connect_db(); cur = conn.cursor(); deleted = 0
-    try:
+    targets = {str(u).strip() for u in usernames or [] if str(u).strip() and str(u).strip().lower() != "admin"}
+    if not targets: return 0
+    tables = _v28_perm_tables()
+    before = len(tables.get("auth_users", []))
+    tables["auth_users"] = [r for r in tables.get("auth_users", []) if str(r.get("username", "")).strip() not in targets]
+    for t in ["auth_account_permissions", "security_user_roles", "security_module_permissions"]:
+        if isinstance(tables.get(t), list): tables[t] = [r for r in tables[t] if str(r.get("username", "")).strip() not in targets]
+    if _v28_update_tables is not None:
+        _v28_update_tables("10_permissions", tables, reason="delete_users_authoritative_v28")
+    for t in ["auth_users", "auth_account_permissions", "security_user_roles", "security_module_permissions"]:
         try:
-            _ensure_legacy_security_tables(cur)
+            conn = connect_db(); cur = conn.cursor()
+            for u in targets: cur.execute(f'DELETE FROM "{t}" WHERE username=?', (u,))
+            conn.commit(); conn.close()
         except Exception:
-            pass
-        for u in targets:
-            before = 0
-            for table in ["auth_users", "security_users"]:
-                try:
-                    before += 1 if cur.execute(f"SELECT 1 FROM {table} WHERE username=?", (u,)).fetchone() else 0
-                except Exception:
-                    pass
-            for sql in [
-                "DELETE FROM auth_account_permissions WHERE username=?",
-                "DELETE FROM security_module_permissions WHERE username=?",
-                "DELETE FROM security_user_roles WHERE username=?",
-                "DELETE FROM auth_users WHERE username=?",
-                "DELETE FROM security_users WHERE username=?",
-            ]:
-                try:
-                    cur.execute(sql, (u,))
-                except Exception:
-                    pass
-            after = 0
-            for table in ["auth_users", "security_users"]:
-                try:
-                    after += 1 if cur.execute(f"SELECT 1 FROM {table} WHERE username=?", (u,)).fetchone() else 0
-                except Exception:
-                    pass
-            if before > 0 and after == 0:
-                deleted += 1
-        conn.commit()
-    finally:
-        conn.close()
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    # Export even when deleted==0 but user selected targets, so stale JSON cannot restore them.
-    export_permission_settings_permanently("auth_users_deleted_v11")
-    return deleted
+            try: conn.close()  # type: ignore
+            except Exception: pass
+    clear_permission_runtime_cache()
+    return max(0, before - len(tables.get("auth_users", [])))
 
-
-def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
-    _v11_schema_only()
-    count = 0
-    conn = connect_db(); cur = conn.cursor()
-    try:
-        for r in rows or []:
-            if not isinstance(r, dict):
-                continue
-            username = str(r.get("username", "")).strip()
-            module_code = str(r.get("module_code", "")).strip()
-            if not username or not module_code:
-                continue
-            vals = {k: _v373_bool(r.get(k, False)) for k in ["can_view", "can_create", "can_edit", "can_delete", "can_import", "can_export", "can_backup", "can_restore", "can_manage"]}
-            cur.execute("""
-                INSERT INTO auth_account_permissions
-                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                ON CONFLICT(username,module_code) DO UPDATE SET
-                    module_name_zh=excluded.module_name_zh, module_name_en=excluded.module_name_en,
-                    can_view=excluded.can_view, can_create=excluded.can_create, can_edit=excluded.can_edit,
-                    can_delete=excluded.can_delete, can_import=excluded.can_import, can_export=excluded.can_export,
-                    can_backup=excluded.can_backup, can_restore=excluded.can_restore, can_manage=excluded.can_manage,
-                    updated_at=excluded.updated_at
-            """, (
-                username, module_code, str(r.get("module_name_zh", "")).strip(), str(r.get("module_name_en", "")).strip(),
-                vals["can_view"], vals["can_create"], vals["can_edit"], vals["can_delete"], vals["can_import"], vals["can_export"], vals["can_backup"], vals["can_restore"], vals["can_manage"], now_text(),
-            ))
-            count += 1
-        conn.commit()
-    finally:
-        conn.close()
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    export_permission_settings_permanently("account_permissions_saved_v11")
-    return count
-
-check_permission = has_permission
-# ===== V11 ACCOUNT MASTER FINAL SAVE/DELETE HOTFIX END =====
-
-
-# ===== V24 PERMISSION ACCOUNT MASTER AUTHORITATIVE SAVE FIX =====
-# 修正：帳號清單編輯套用儲存後又被舊 records/settings 還原；新增/刪除必須以畫面完整清單為權威。
-
-def replace_users_authoritative(rows: Iterable[dict], delete_usernames: Iterable[str] | None = None, reason: str = 'account_master_authoritative_save_v24') -> dict:
-    _v11_schema_only()
-    delete_set = {str(x or '').strip().lower() for x in (delete_usernames or []) if str(x or '').strip()}
-    delete_set.discard('admin')
-    input_rows = []
-    seen = set()
-    for r in rows or []:
-        if not isinstance(r, dict):
-            continue
-        username = str(r.get('username', '')).strip()
-        low = username.lower()
-        if not username or low in delete_set or low in seen:
-            continue
-        seen.add(low)
-        input_rows.append(r)
-    result = save_users(input_rows)
-    conn = connect_db(); cur = conn.cursor(); deleted = 0
-    try:
-        # 全表編輯送出後，以畫面剩餘帳號為權威；不在畫面中的非 admin 帳號全部刪除。
-        keep = {str(r.get('username','')).strip().lower() for r in input_rows if str(r.get('username','')).strip()}
-        existing = []
-        try:
-            existing = [str(x['username']).strip() for x in cur.execute('SELECT username FROM auth_users').fetchall()]
-        except Exception:
-            existing = []
-        delete_all = sorted({u for u in existing if u and u.lower() != 'admin' and u.lower() not in keep} | {x for x in delete_set if x != 'admin'})
-        for u in delete_all:
-            for sql in [
-                'DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)',
-                'DELETE FROM security_module_permissions WHERE lower(username)=lower(?)',
-                'DELETE FROM security_user_roles WHERE lower(username)=lower(?)',
-                'DELETE FROM auth_users WHERE lower(username)=lower(?)',
-                'DELETE FROM security_users WHERE lower(username)=lower(?)',
-            ]:
-                try:
-                    cur.execute(sql, (u,))
-                except Exception:
-                    pass
-            deleted += 1
-        conn.commit()
-    finally:
-        conn.close()
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    export_result = export_permission_settings_permanently(reason)
-    return {'saved': int(result.get('saved', 0) if isinstance(result, dict) else 0), 'deleted': deleted, 'skipped': result.get('skipped', []) if isinstance(result, dict) else [], 'permanent_save': export_result}
-
-
-def reload_permission_from_latest_authoritative() -> dict:
-    return restore_permission_settings_from_permanent_files(force=True)
-# ===== END V24 PERMISSION ACCOUNT MASTER AUTHORITATIVE SAVE FIX =====
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
+    tables = _v28_perm_tables()
+    if _v28_update_tables is not None:
+        return _v28_update_tables("10_permissions", tables, reason=reason)
+    return {"ok": False, "reason": "authority_service_unavailable"}
