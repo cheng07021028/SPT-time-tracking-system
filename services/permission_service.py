@@ -3573,3 +3573,61 @@ def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[overr
 
 check_permission = has_permission
 # ===== V11 ACCOUNT MASTER FINAL SAVE/DELETE HOTFIX END =====
+
+
+# ===== V24 PERMISSION ACCOUNT MASTER AUTHORITATIVE SAVE FIX =====
+# 修正：帳號清單編輯套用儲存後又被舊 records/settings 還原；新增/刪除必須以畫面完整清單為權威。
+
+def replace_users_authoritative(rows: Iterable[dict], delete_usernames: Iterable[str] | None = None, reason: str = 'account_master_authoritative_save_v24') -> dict:
+    _v11_schema_only()
+    delete_set = {str(x or '').strip().lower() for x in (delete_usernames or []) if str(x or '').strip()}
+    delete_set.discard('admin')
+    input_rows = []
+    seen = set()
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        username = str(r.get('username', '')).strip()
+        low = username.lower()
+        if not username or low in delete_set or low in seen:
+            continue
+        seen.add(low)
+        input_rows.append(r)
+    result = save_users(input_rows)
+    conn = connect_db(); cur = conn.cursor(); deleted = 0
+    try:
+        # 全表編輯送出後，以畫面剩餘帳號為權威；不在畫面中的非 admin 帳號全部刪除。
+        keep = {str(r.get('username','')).strip().lower() for r in input_rows if str(r.get('username','')).strip()}
+        existing = []
+        try:
+            existing = [str(x['username']).strip() for x in cur.execute('SELECT username FROM auth_users').fetchall()]
+        except Exception:
+            existing = []
+        delete_all = sorted({u for u in existing if u and u.lower() != 'admin' and u.lower() not in keep} | {x for x in delete_set if x != 'admin'})
+        for u in delete_all:
+            for sql in [
+                'DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)',
+                'DELETE FROM security_module_permissions WHERE lower(username)=lower(?)',
+                'DELETE FROM security_user_roles WHERE lower(username)=lower(?)',
+                'DELETE FROM auth_users WHERE lower(username)=lower(?)',
+                'DELETE FROM security_users WHERE lower(username)=lower(?)',
+            ]:
+                try:
+                    cur.execute(sql, (u,))
+                except Exception:
+                    pass
+            deleted += 1
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    export_result = export_permission_settings_permanently(reason)
+    return {'saved': int(result.get('saved', 0) if isinstance(result, dict) else 0), 'deleted': deleted, 'skipped': result.get('skipped', []) if isinstance(result, dict) else [], 'permanent_save': export_result}
+
+
+def reload_permission_from_latest_authoritative() -> dict:
+    return restore_permission_settings_from_permanent_files(force=True)
+# ===== END V24 PERMISSION ACCOUNT MASTER AUTHORITATIVE SAVE FIX =====

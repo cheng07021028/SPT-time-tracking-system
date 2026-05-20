@@ -19,6 +19,7 @@ from services.permission_service import (
     save_account_permissions,
     save_security_settings,
     save_users,
+    replace_users_authoritative,
 )
 
 apply_theme()
@@ -520,11 +521,16 @@ with tab_accounts:
         with c2:
             if st.button("⊖ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_select_delete"):
                 st.session_state["v133_users_df"]["刪除 / Delete"] = True
+                try:
+                    st.session_state["v9_direct_delete_usernames"] = [str(x).strip() for x in st.session_state["v133_users_df"].get("帳號 / Username", pd.Series(dtype=str)).tolist() if str(x).strip() and str(x).strip().lower() != "admin"]
+                except Exception:
+                    pass
                 st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 st.rerun()
         with c3:
             if st.button("◌ 刪除欄取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_clear_delete"):
                 st.session_state["v133_users_df"]["刪除 / Delete"] = False
+                st.session_state["v9_direct_delete_usernames"] = []
                 st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 st.rerun()
         with c4:
@@ -606,13 +612,13 @@ with tab_accounts:
                 save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy()
             else:
                 save_df = df.copy()
-            result = save_users(_users_to_service_rows(save_df))
-            deleted = delete_users(to_delete)
+            result = replace_users_authoritative(_users_to_service_rows(save_df), delete_usernames=to_delete, reason="account_master_page_apply_v24")
+            deleted = int(result.get("deleted", 0) or 0)
             if to_delete and deleted == 0:
                 st.warning("已偵測到刪除帳號，但未刪除任何帳號；admin 系統帳號不可刪除，其他帳號請確認帳號欄位是否有效。")
             elif to_delete:
                 st.info("已刪除帳號 / Deleted accounts：" + "、".join(to_delete))
-            st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
+            st.success(f"帳號已儲存：{result.get('saved', 0)} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
             if result.get("skipped"):
                 st.warning("；".join(result["skipped"]))
             st.session_state["v166_account_edit_enabled"] = False

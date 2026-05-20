@@ -1432,3 +1432,108 @@ def query_one(sql: str, params: Iterable[Any] | None = None) -> dict | None:  # 
             pass
     return out
 # ===== END V23 QUERY_ONE DB ERROR HOTFIX =====
+
+
+# ===== V24 LIGHTWEIGHT SYSTEM LOG AUDIT FOR ALL DB WRITES =====
+# 目的：06.LOG查詢需要能看到各模組實際資料異動。此處只做輕量記錄，不改原寫入路徑。
+import re as _v24_re
+import getpass as _v24_getpass
+
+_v24_prev_execute = execute
+_v24_prev_executemany = executemany
+_v24_prev_execute_transaction = execute_transaction
+
+
+def _v24_sql_action_and_table(sql: str | None) -> tuple[str, str]:
+    text = str(sql or '').strip()
+    low = text.lower()
+    if not text:
+        return '', ''
+    if low.startswith('insert'):
+        m = _v24_re.search(r'insert\s+(?:or\s+\w+\s+)?into\s+([\w_]+)', low, _v24_re.I)
+        return 'INSERT', (m.group(1) if m else '')
+    if low.startswith('update'):
+        m = _v24_re.search(r'update\s+([\w_]+)', low, _v24_re.I)
+        return 'UPDATE', (m.group(1) if m else '')
+    if low.startswith('delete'):
+        m = _v24_re.search(r'delete\s+from\s+([\w_]+)', low, _v24_re.I)
+        return 'DELETE', (m.group(1) if m else '')
+    if low.startswith('replace'):
+        m = _v24_re.search(r'replace\s+into\s+([\w_]+)', low, _v24_re.I)
+        return 'REPLACE', (m.group(1) if m else '')
+    return '', ''
+
+
+def _v24_should_audit_sql(sql: str | None) -> bool:
+    action, table = _v24_sql_action_and_table(sql)
+    if action not in {'INSERT','UPDATE','DELETE','REPLACE'}:
+        return False
+    if table in {'system_logs', 'login_logs', 'security_login_logs', 'auth_login_logs', 'sqlite_sequence'}:
+        return False
+    # schema/init/repair 類 SQL 不進 LOG，避免洗版與遞迴。
+    low = str(sql or '').lower()
+    if low.startswith(('create ', 'alter ', 'drop ', 'pragma ')):
+        return False
+    return True
+
+
+def _v24_audit_sql(sql: str | None, params: object = None, detail_prefix: str = '') -> None:
+    if not _v24_should_audit_sql(sql):
+        return
+    action, table = _v24_sql_action_and_table(sql)
+    try:
+        user_name = _v24_getpass.getuser()
+    except Exception:
+        user_name = 'system'
+    try:
+        message = f'{action} {table}'.strip()
+        detail = (detail_prefix + ' ' + str(sql or '')[:900]).strip()
+        with _open_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO system_logs
+                (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (now_text(), user_name, action, table, '', message, detail, 'INFO'),
+            )
+            conn.commit()
+    except Exception:
+        pass
+
+
+def execute(sql: str, params: Iterable[Any] | None = None) -> int:  # type: ignore[override]
+    result = _v24_prev_execute(sql, params)
+    _v24_audit_sql(sql, params)
+    return result
+
+
+def executemany(sql: str, rows: list[Iterable[Any]]) -> None:  # type: ignore[override]
+    _v24_prev_executemany(sql, rows)
+    try:
+        count = len(rows or [])
+    except Exception:
+        count = 0
+    _v24_audit_sql(sql, None, detail_prefix=f'batch_rows={count};')
+
+
+def execute_transaction(
+    operations: list[tuple[str, Iterable[Any]]] | tuple[tuple[str, Iterable[Any]], ...],
+    mark_changed: bool = True,
+    reason: str = '資料已變更，待備份',
+    source_sql: str = 'BATCH_TRANSACTION',
+) -> list[int]:  # type: ignore[override]
+    ids = _v24_prev_execute_transaction(operations, mark_changed=mark_changed, reason=reason, source_sql=source_sql)
+    audited_tables: set[tuple[str, str]] = set()
+    try:
+        for item in operations or []:
+            sql = item[0] if item else ''
+            action, table = _v24_sql_action_and_table(sql)
+            key = (action, table)
+            if key not in audited_tables:
+                _v24_audit_sql(sql, None, detail_prefix=f'transaction={source_sql};')
+                audited_tables.add(key)
+    except Exception:
+        pass
+    return ids
+# ===== END V24 LIGHTWEIGHT SYSTEM LOG AUDIT FOR ALL DB WRITES =====
