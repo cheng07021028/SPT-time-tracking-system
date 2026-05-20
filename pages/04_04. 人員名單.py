@@ -230,38 +230,32 @@ def reload_data():
     st.session_state[STATE_KEY] = ensure_cols(df)
 
 
-
-
+# V27: button callbacks must be defined before widgets are created.
+# These callbacks update the dataframe stored in session_state and then rotate
+# the data_editor key, so Streamlit immediately shows the checkbox changes.
 def _v25_emp_set_edit(enabled: bool) -> None:
-    """V26: stable edit-mode callback. Runs before widgets are created."""
     st.session_state["v253_employee_edit_enabled"] = bool(enabled)
-    if bool(enabled):
-        if STATE_KEY not in st.session_state:
-            reload_data()
-    else:
+    if not enabled:
+        reload_data()
+    elif STATE_KEY not in st.session_state:
         reload_data()
     _refresh_editor_widget()
 
 
-def _v25_emp_blank_row() -> dict:
-    return {
-        "_delete": False, "id": "", "employee_id": "", "employee_name": "",
-        "department": "", "title": "", "is_active": True, "is_in_factory": True,
-        "is_today_attendance": True, "note": "", "created_at": "", "updated_at": "",
-    }
-
-
 def _v25_emp_batch(action: str) -> None:
-    """V26: all employee editor buttons update the draft before data_editor renders."""
-    if STATE_KEY not in st.session_state:
+    df = st.session_state.get(STATE_KEY)
+    if df is None or not isinstance(df, pd.DataFrame):
         reload_data()
-    df = ensure_cols(pd.DataFrame(st.session_state.get(STATE_KEY, pd.DataFrame())).copy())
-    if action == "reload":
-        reload_data()
-        _refresh_editor_widget()
-        return
+        df = st.session_state.get(STATE_KEY, pd.DataFrame())
+    df = ensure_cols(df.copy())
     if action == "add":
-        df = pd.concat([pd.DataFrame([_v25_emp_blank_row()]), df], ignore_index=True)
+        blank = pd.DataFrame([{
+            "_delete": False, "id": "", "employee_id": "", "employee_name": "",
+            "department": "", "title": "", "is_active": True,
+            "is_in_factory": True, "is_today_attendance": True, "note": "",
+            "created_at": "", "updated_at": "",
+        }])
+        df = pd.concat([blank, df], ignore_index=True)
     elif action == "delete_on":
         df["_delete"] = True
     elif action == "delete_off":
@@ -278,6 +272,10 @@ def _v25_emp_batch(action: str) -> None:
         df["is_today_attendance"] = True
     elif action == "today_off":
         df["is_today_attendance"] = False
+    elif action == "reload":
+        reload_data()
+        _refresh_editor_widget()
+        return
     st.session_state[STATE_KEY] = ensure_cols(df)
     _refresh_editor_widget()
 

@@ -1103,96 +1103,128 @@ with tab1:
         _render_history_view_table(df, "history_records", height=520)
     else:
         edit_key = "history_edit_enabled"
+        delete_select_key = "_spt_history_delete_ids_v27"
+        recalc_select_key = "_spt_history_recalc_ids_v27"
+        editor_version_key = "history_editor_version_v27"
+
         if edit_key not in st.session_state:
             st.session_state[edit_key] = False
+        if editor_version_key not in st.session_state:
+            st.session_state[editor_version_key] = 0
+
+        def _history_all_ids() -> list[int]:
+            try:
+                return [int(x) for x in df["id"].dropna().tolist()] if "id" in df.columns else []
+            except Exception:
+                return []
+
+        def _history_refresh_editor() -> None:
+            st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+
+        def _history_set_edit(enabled: bool) -> None:
+            st.session_state[edit_key] = bool(enabled)
+            if not enabled:
+                st.session_state[delete_select_key] = []
+                st.session_state[recalc_select_key] = []
+            _history_refresh_editor()
+
+        def _history_select(kind: str, select_all: bool) -> None:
+            key = delete_select_key if kind == "delete" else recalc_select_key
+            st.session_state[key] = _history_all_ids() if select_all else []
+            _history_refresh_editor()
+
         ec1, ec2, ec3 = st.columns([1, 1, 2])
-        if ec1.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, key="history_enable_edit"):
-            st.session_state[edit_key] = True
-            rerun()
-        if ec2.button("◌ 停止編輯 / Stop Edit", use_container_width=True, key="history_stop_edit"):
-            st.session_state[edit_key] = False
-            rerun()
-        ec3.info("編輯啟動後可修改資料；勾選『刪除』後可整列刪除。刪除需具備 can_delete 權限。")
+        ec1.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, key="history_enable_edit_v27", disabled=bool(st.session_state[edit_key]), on_click=_history_set_edit, args=(True,))
+        ec2.button("◌ 停止編輯 / Stop Edit", use_container_width=True, key="history_stop_edit_v27", disabled=not bool(st.session_state[edit_key]), on_click=_history_set_edit, args=(False,))
+        ec3.info("編輯啟動後可修改資料；『刪除』與『重算』分開勾選。儲存編輯不需要勾選。")
 
         if st.session_state[edit_key]:
             edit_df = df.copy()
-            history_select_key = "_spt_select_history_records_delete_ids"
-            editor_version_key = "history_editor_version"
-            if editor_version_key not in st.session_state:
-                st.session_state[editor_version_key] = 0
-            _all_history_ids = [int(x) for x in edit_df["id"].dropna().tolist()] if "id" in edit_df.columns else []
-            _selected_history_ids = set(int(x) for x in st.session_state.get(history_select_key, []) if int(x) in set(_all_history_ids))
-            hc1, hc2, hc3 = st.columns([1, 1, 3])
-            if hc1.button("◈ 勾選全部紀錄 / Select All", use_container_width=True, key="history_select_all_rows"):
-                st.session_state[history_select_key] = _all_history_ids
-                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                rerun()
-            if hc2.button("◌ 取消全部勾選 / Clear All", use_container_width=True, key="history_clear_all_rows"):
-                st.session_state[history_select_key] = []
-                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                rerun()
-            hc3.caption("勾選會保留到你手動取消、刪除成功或離開本頁；不會因重新計算後自動清空。")
-            # V18：移除額外 multiselect，避免 Streamlit 新版 widget key 在建立後被 session_state 修改而造成按鈕失效。
-            _selected_history_ids = set(int(x) for x in st.session_state.get(history_select_key, []) if int(x) in set(_all_history_ids))
-            if "刪除" not in edit_df.columns:
-                edit_df.insert(0, "刪除", edit_df["id"].map(lambda x: int(x) in _selected_history_ids if str(x).strip() not in {"", "nan", "None"} else False) if "id" in edit_df.columns else False)
+            all_ids = _history_all_ids()
+            all_id_set = set(all_ids)
+            delete_ids_state = set(int(x) for x in st.session_state.get(delete_select_key, []) if int(x) in all_id_set)
+            recalc_ids_state = set(int(x) for x in st.session_state.get(recalc_select_key, []) if int(x) in all_id_set)
+
+            hc1, hc2, hc3, hc4 = st.columns(4)
+            hc1.button("⊖ 全選刪除 / Select Delete", use_container_width=True, key="history_select_delete_all_v27", on_click=_history_select, args=("delete", True))
+            hc2.button("◌ 取消刪除 / Clear Delete", use_container_width=True, key="history_clear_delete_all_v27", on_click=_history_select, args=("delete", False))
+            hc3.button("⊕ 全選重算 / Select Recalc", use_container_width=True, key="history_select_recalc_all_v27", on_click=_history_select, args=("recalc", True))
+            hc4.button("◌ 取消重算 / Clear Recalc", use_container_width=True, key="history_clear_recalc_all_v27", on_click=_history_select, args=("recalc", False))
+
+            def _id_in_state(x, id_set: set[int]) -> bool:
+                try:
+                    return int(x) in id_set
+                except Exception:
+                    return False
+
+            if "刪除" in edit_df.columns:
+                edit_df["刪除"] = edit_df["id"].map(lambda x: _id_in_state(x, delete_ids_state)) if "id" in edit_df.columns else False
             else:
-                edit_df["刪除"] = edit_df["id"].map(lambda x: int(x) in _selected_history_ids if str(x).strip() not in {"", "nan", "None"} else False) if "id" in edit_df.columns else False
-            # V2.34：全選/取消全選後必須換新 data_editor key，否則 Streamlit 會沿用舊 widget 暫存，看起來按鈕無作用。
-            editor_key = f"history_editor_{st.session_state[editor_version_key]}"
-            st.info("V2.28：表格內輸入或勾選不會立即重算；確認執行後會重新載入表格，顯示最新日期、時間與工時小計。")
-            with st.form("history_records_commit_form", clear_on_submit=False):
+                edit_df.insert(0, "刪除", edit_df["id"].map(lambda x: _id_in_state(x, delete_ids_state)) if "id" in edit_df.columns else False)
+            if "重算" in edit_df.columns:
+                edit_df["重算"] = edit_df["id"].map(lambda x: _id_in_state(x, recalc_ids_state)) if "id" in edit_df.columns else False
+            else:
+                edit_df.insert(1, "重算", edit_df["id"].map(lambda x: _id_in_state(x, recalc_ids_state)) if "id" in edit_df.columns else False)
+
+            editor_key = f"history_editor_v27_{st.session_state[editor_version_key]}"
+            st.info("批次按鈕會先改畫面勾選狀態；刪除、重算、儲存皆需按下方確認執行。")
+            with st.form("history_records_commit_form_v27", clear_on_submit=False):
                 edited = render_table(edit_df, "history_records", editable=True, disabled=["id", "record_key", "created_at", "updated_at"], key=editor_key, height=560)
                 history_action = st.radio(
                     "確認後執行動作",
                     ["儲存編輯", "重新計算勾選紀錄工時", "刪除勾選整列紀錄"],
                     horizontal=True,
-                    key="history_action",
+                    key="history_action_v27",
                 )
                 submitted_history = st.form_submit_button("⚡ 確認執行 / Confirm", type="primary", use_container_width=True)
 
             if submitted_history and edited is not None:
-                try:
-                    delete_rows = edited[edited["刪除"].astype(bool)] if "刪除" in edited.columns else pd.DataFrame()
-                    table_ids = [int(x) for x in delete_rows["id"].dropna().tolist()]
-                except Exception:
-                    table_ids = []
-                delete_ids = sorted(set(table_ids))
-                # V2.32：保留目前勾選狀態，直到使用者取消、刪除成功或離開頁面。
-                st.session_state[history_select_key] = delete_ids
+                def _checked_ids(frame: pd.DataFrame, col: str) -> list[int]:
+                    if frame is None or frame.empty or col not in frame.columns or "id" not in frame.columns:
+                        return []
+                    try:
+                        mask = frame[col].map(lambda v: str(v).strip().lower() in {"true", "1", "yes", "y", "on", "勾選", "是"} if not isinstance(v, bool) else v)
+                        return [int(x) for x in frame.loc[mask, "id"].dropna().tolist()]
+                    except Exception:
+                        return []
+
+                delete_ids = sorted(set(_checked_ids(edited, "刪除")))
+                recalc_ids = sorted(set(_checked_ids(edited, "重算")))
+                st.session_state[delete_select_key] = delete_ids
+                st.session_state[recalc_select_key] = recalc_ids
 
                 if history_action == "儲存編輯":
-                    save_df = edited.drop(columns=["刪除"], errors="ignore")
+                    save_df = edited.drop(columns=["刪除", "重算"], errors="ignore")
                     count = save_time_records(save_df)
                     _add_history_result("success", f"已儲存 {count} 筆歷史紀錄。", append=False)
-                    st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                    _history_refresh_editor()
                     rerun()
                 elif history_action == "重新計算勾選紀錄工時":
-                    if not delete_ids:
-                        _add_history_result("warning", "請先在『刪除』勾選欄勾選要重新計算的紀錄，再按確認執行。", append=False)
+                    if not recalc_ids:
+                        _add_history_result("warning", "請先在『重算』欄勾選要重新計算的紀錄，再按確認執行。", append=False)
                         rerun()
                     else:
-                        # V2.26：若管理員剛修改開始/結束時間戳，先儲存並同步日期/時間欄位，再重新計算。
-                        save_df = edited.drop(columns=["刪除"], errors="ignore")
+                        save_df = edited.drop(columns=["刪除", "重算"], errors="ignore")
                         save_time_records(save_df, recalc_edited_timestamps=True)
-                        count = recalculate_time_records(delete_ids)
+                        count = recalculate_time_records(recalc_ids)
                         _add_history_result("success", f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時。", append=False)
-                        st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                        _history_refresh_editor()
                         rerun()
                 else:
                     if not can_delete:
                         _add_history_result("error", "權限不足：你沒有刪除歷史紀錄權限。", append=False)
                         rerun()
                     elif not delete_ids:
-                        _add_history_result("warning", "請先在『刪除』勾選欄勾選要刪除的紀錄，再按確認執行。", append=False)
+                        _add_history_result("warning", "請先在『刪除』欄勾選要刪除的紀錄，再按確認執行。", append=False)
                         rerun()
                     else:
                         count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
-                        remaining = [x for x in st.session_state.get(history_select_key, []) if int(x) not in set(delete_ids)]
-                        st.session_state[history_select_key] = remaining
+                        st.session_state[delete_select_key] = []
+                        st.session_state[recalc_select_key] = []
                         _add_history_result("success", f"已刪除 {count} 筆歷史紀錄。", append=False)
-                        st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                        _history_refresh_editor()
                         rerun()
+
         else:
             _render_history_view_table(df, "history_records", height=520)
 

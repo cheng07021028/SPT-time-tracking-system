@@ -19,7 +19,6 @@ from services.permission_service import (
     save_account_permissions,
     save_security_settings,
     save_users,
-    replace_users_authoritative,
 )
 
 apply_theme()
@@ -229,52 +228,6 @@ def _users_to_service_rows(df: pd.DataFrame) -> list[dict]:
     return rows
 
 
-
-
-def _v26_account_editor_df() -> pd.DataFrame:
-    df = pd.DataFrame(st.session_state.get("v133_users_df", pd.DataFrame())).copy()
-    if df.empty:
-        df = _users_for_editor()
-    if "刪除 / Delete" not in df.columns:
-        df.insert(0, "刪除 / Delete", False)
-    return df
-
-
-def _v25_account_set_edit(enabled: bool) -> None:
-    """V26: edit button must not reload an older account source."""
-    st.session_state["v166_account_edit_enabled"] = bool(enabled)
-    if bool(enabled):
-        st.session_state["v133_users_df"] = _v26_account_editor_df()
-    else:
-        st.session_state["v133_users_df"] = _users_for_editor()
-    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
-
-
-def _v25_account_add_blank() -> None:
-    df = _v26_account_editor_df()
-    df = pd.concat([pd.DataFrame([_blank_user_row()]), df], ignore_index=True)
-    st.session_state["v133_users_df"] = df
-    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
-
-
-def _v25_account_delete_flag(flag: bool) -> None:
-    df = _v26_account_editor_df()
-    if "刪除 / Delete" not in df.columns:
-        df.insert(0, "刪除 / Delete", False)
-    df["刪除 / Delete"] = bool(flag)
-    st.session_state["v133_users_df"] = df
-    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
-
-
-def _v25_account_reload() -> None:
-    st.session_state["v133_users_df"] = _users_for_editor()
-    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
-
-
-def _v25_permission_quick(action: str) -> None:
-    st.session_state["v25_permission_quick_action"] = str(action or "")
-
-
 def _norm_header(v) -> str:
     return str(v).strip().lower().replace("　", " ").replace("/", " ").replace("\\", " ").replace("-", " ").replace("_", " ")
 
@@ -422,6 +375,51 @@ def _permission_summary(df: pd.DataFrame) -> pd.DataFrame:
         可還原_Restore=("can_restore", "sum"),
         可管理_Manage=("can_manage", "sum"),
     )
+
+
+# V27: stable account/permission callbacks.
+# Important: Enable Edit must NOT reload old JSON/SQLite data over the current
+# visible account table. It copies the currently displayed authoritative list
+# into the editable draft and rotates the editor key so bulk checkbox buttons
+# show the 0/1 changes immediately.
+def _v25_account_set_edit(enabled: bool) -> None:
+    st.session_state["v166_account_edit_enabled"] = bool(enabled)
+    if enabled:
+        if "v133_users_df" not in st.session_state or not isinstance(st.session_state.get("v133_users_df"), pd.DataFrame):
+            st.session_state["v133_users_df"] = _users_for_editor()
+    else:
+        st.session_state["v133_users_df"] = _users_for_editor()
+    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
+
+
+def _v25_account_add_blank() -> None:
+    df = st.session_state.get("v133_users_df")
+    if df is None or not isinstance(df, pd.DataFrame):
+        df = _users_for_editor()
+    st.session_state["v133_users_df"] = pd.concat([pd.DataFrame([_blank_user_row()]), df.copy()], ignore_index=True)
+    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
+
+
+def _v25_account_delete_flag(flag: bool) -> None:
+    df = st.session_state.get("v133_users_df")
+    if df is None or not isinstance(df, pd.DataFrame):
+        df = _users_for_editor()
+    df = df.copy()
+    if "刪除 / Delete" not in df.columns:
+        df.insert(0, "刪除 / Delete", False)
+    df["刪除 / Delete"] = bool(flag)
+    st.session_state["v133_users_df"] = df
+    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
+
+
+def _v25_account_reload() -> None:
+    st.session_state["v133_users_df"] = _users_for_editor()
+    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
+
+
+def _v25_permission_quick(action: str) -> None:
+    st.session_state["v25_permission_quick_action"] = str(action or "")
+    st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
 
 
 tab_accounts, tab_perm, tab_sec = st.tabs([
@@ -582,12 +580,8 @@ with tab_accounts:
                 save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy()
             else:
                 save_df = df.copy()
-            try:
-                result = replace_users_authoritative(_users_to_service_rows(save_df), delete_usernames=to_delete, reason="account_master_page_apply_v26")
-                deleted = int(result.get("deleted", 0) if isinstance(result, dict) else 0)
-            except Exception:
-                result = save_users(_users_to_service_rows(save_df))
-                deleted = delete_users(to_delete)
+            result = save_users(_users_to_service_rows(save_df))
+            deleted = delete_users(to_delete)
             if to_delete and deleted == 0:
                 st.warning("已偵測到刪除勾選，但未刪除任何帳號；admin 系統帳號不可刪除，其他帳號請確認帳號欄位是否有效。")
             st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
