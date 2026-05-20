@@ -1,14 +1,11 @@
 {
-  "schema_version": "14.0",
-  "exported_at": "2026-05-20 15:41:09",
-  "reason": "delete_time_records",
-  "tables": {
-    "time_records": []
-  },
-  "counts": {
-    "time_records": 0
-  },
-  "module_code": "01_time_records",
+  "version": "V1.48",
+  "exported_at": "2026-05-20 15:47:37",
+  "source": "db_service_write",
+  "module_key": "01_time_records",
+  "module_code": "01",
   "module_name_zh": "工時紀錄",
-  "module_name_en": "Time Records"
+  "module_name_en": "Time Records",
+  "tables": {},
+  "table_counts": {}
 }
