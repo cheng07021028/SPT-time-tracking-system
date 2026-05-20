@@ -191,6 +191,37 @@ def _users_for_editor() -> pd.DataFrame:
     return out
 
 
+
+
+def _reload_account_editor_from_source() -> pd.DataFrame:
+    """V15：帳號總表唯一畫面來源重載。
+
+    問題：啟動編輯 / 停止編輯時若沿用舊的 st.session_state 草稿，
+    畫面會出現兩份不同名單；使用者會看到「編輯前一份、編輯後又一份」。
+    修正：進入編輯、停止編輯、唯讀顯示、重新載入，都統一從 get_users()
+    取得目前權威名單，再建立 data_editor 草稿。
+    """
+    df = _users_for_editor()
+    st.session_state["v133_users_df"] = df.copy()
+    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
+    try:
+        st.session_state.pop("v9_direct_delete_usernames", None)
+    except Exception:
+        pass
+    try:
+        from services.column_settings_service import clear_editor_draft
+        clear_editor_draft("v171_account_password_editor")
+        clear_editor_draft("account")
+    except Exception:
+        pass
+    return df
+
+
+def _ensure_account_editor_source_loaded(editing: bool) -> None:
+    """V15：非編輯狀態永遠顯示權威名單；編輯中才保留草稿。"""
+    if (not editing) or ("v133_users_df" not in st.session_state):
+        st.session_state["v133_users_df"] = _users_for_editor()
+
 def _password_from_editor_row(r: pd.Series) -> str:
     """Return a new password only when the user really typed one.
 
@@ -397,12 +428,15 @@ with tab_accounts:
     c_edit1, c_edit2, c_edit3 = st.columns([1.2, 1.2, 3])
     with c_edit1:
         if st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=_edit_on, key="v169_enable_account_edit_top"):
+            # V15：啟動編輯前先從權威來源重載，避免沿用舊草稿造成名單不同。
+            _reload_account_editor_from_source()
             st.session_state["v166_account_edit_enabled"] = True
             st.rerun()
     with c_edit2:
         if st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not _edit_on, key="v169_disable_account_edit_top"):
+            # V15：停止編輯等同放棄未儲存草稿，回到目前已儲存權威名單。
             st.session_state["v166_account_edit_enabled"] = False
-            st.session_state["v133_users_df"] = _users_for_editor()
+            _reload_account_editor_from_source()
             st.rerun()
     with c_edit3:
         if _edit_on:
@@ -410,8 +444,8 @@ with tab_accounts:
         else:
             st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上帳號。")
 
-    if "v133_users_df" not in st.session_state:
-        st.session_state["v133_users_df"] = _users_for_editor()
+    # V15：非編輯狀態不保留舊草稿；每次顯示都以目前權威帳號清單為準。
+    _ensure_account_editor_source_loaded(bool(st.session_state.get("v166_account_edit_enabled", False)))
 
     with account_tab_edit:
         st.markdown("### 新增帳號專用表單 / Stable Add User Form")
@@ -455,12 +489,7 @@ with tab_accounts:
                 }])
                 if result.get("saved", 0) > 0:
                     st.success(f"帳號已建立 / Account created：{username}")
-                    st.session_state["v133_users_df"] = _users_for_editor()
-                    try:
-                        from services.column_settings_service import clear_editor_draft
-                        clear_editor_draft("account")
-                    except Exception:
-                        pass
+                    _reload_account_editor_from_source()
                     st.rerun()
                 if result.get("skipped"):
                     st.warning("；".join(result.get("skipped", [])))
@@ -473,6 +502,8 @@ with tab_accounts:
             st.session_state["v166_account_edit_enabled"] = False
         account_edit_enabled = bool(st.session_state.get("v166_account_edit_enabled", False))
         st.session_state.setdefault("v235_account_editor_rev", 0)
+        # V15：此區塊再次保護，確保唯讀與編輯狀態不會各自顯示不同資料源。
+        _ensure_account_editor_source_loaded(account_edit_enabled)
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -498,8 +529,7 @@ with tab_accounts:
                 st.rerun()
         with c4:
             if st.button("⟳ 重新載入 / Reload", use_container_width=True):
-                st.session_state["v133_users_df"] = _users_for_editor()
-                st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
+                _reload_account_editor_from_source()
                 st.rerun()
 
         # V9：除 data_editor 勾選刪除外，另外提供穩定刪除選擇器。
@@ -585,9 +615,8 @@ with tab_accounts:
             st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
             if result.get("skipped"):
                 st.warning("；".join(result["skipped"]))
-            st.session_state.pop("v133_users_df", None)
-            st.session_state.pop("v9_direct_delete_usernames", None)
             st.session_state["v166_account_edit_enabled"] = False
+            _reload_account_editor_from_source()
             st.rerun()
 
     with account_tab_excel:
