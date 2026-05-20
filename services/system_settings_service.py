@@ -2996,3 +2996,160 @@ def save_process_categories_df(df: pd.DataFrame) -> int:  # type: ignore[overrid
     export_system_settings_permanent("save_process_categories_v10_active_default", write_history=False)
     return count
 # ===== V10 CATEGORY ACTIVE/STABLE APPLY PATCH END =====
+
+# ===== V12 SYSTEM SETTINGS SAVE SPEED PATCH START =====
+# 目的：13.系統設定儲存很慢時，不改功能、不改正式路徑、不刪檔案，
+# 只把大量 DB row-by-row 寫入期間的昂貴 after-write 匯出/GitHub 同步暫停，
+# 最後仍由 export_system_settings_permanent 一次性寫入正式 permanent_store。
+# 同時 GitHub write-through 僅即時上傳 canonical latest 檔；其他 mirror 檔仍寫在本機 permanent_store，
+# Reboot 時會以 exported_at 最新檔為準，不影響既有還原邏輯。
+
+_V12_PREV_EXPORT_SYSTEM_SETTINGS_PERMANENT = export_system_settings_permanent
+
+def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    """V12: fast export for 13｜系統設定.
+
+    保留原本 4 個 permanent_store 檔案：
+    - data/permanent_store/persistent_modules/13_system_settings/13_system_settings_records.json
+    - data/permanent_store/persistent_modules/13_system_settings/system_settings.json
+    - data/permanent_store/persistent_state/spt_system_settings.json
+    - data/permanent_store/config/system_settings.json
+
+    加速點：
+    - 本機仍四檔同步寫入，避免相容功能失效。
+    - GitHub 即時 write-through 只傳 canonical latest records 檔，減少 4 次 API 上傳變 1 次。
+      其他 mirror 檔仍可由 09/備份或下一次完整同步處理；Reboot 讀取時 latest 檔已足夠保留最新設定。
+    """
+    _v373_s_schema_only()
+    try:
+        cats = query_df("SELECT id, category_name, is_active, sort_order, note, created_at, updated_at FROM process_categories ORDER BY sort_order, id")
+    except Exception:
+        cats = pd.DataFrame(columns=["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+    try:
+        proc = query_df("SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options ORDER BY category_name, sort_order, id")
+    except Exception:
+        proc = pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+    try:
+        rest = query_df("SELECT id, name, start_time, end_time, is_active, sort_order FROM rest_periods ORDER BY sort_order, id")
+    except Exception:
+        rest = pd.DataFrame(columns=["id", "name", "start_time", "end_time", "is_active", "sort_order"])
+    try:
+        app = query_df("SELECT setting_key, setting_value, note, updated_at FROM app_settings ORDER BY setting_key")
+    except Exception:
+        app = pd.DataFrame(columns=["setting_key", "setting_value", "note", "updated_at"])
+
+    proc_rows = _v373_df_records(proc)
+    payload = {
+        "version": "V12-fast-system-settings-save",
+        "exported_at": _now(),
+        "reason": reason,
+        "module_key": "13_system_settings",
+        "module_code": "13_system_settings",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "source": "system_settings_service_v12_fast_save",
+        "description": "13 系統設定：本機四個 permanent_store mirror 仍完整寫入；GitHub 即時同步只上傳 canonical latest records 檔以提升存檔速度。",
+        "tables": {
+            "process_categories": _v373_df_records(cats),
+            "process_category_options": proc_rows,
+            "process_options": proc_rows,
+            "rest_periods": _v373_df_records(rest),
+            "app_settings": _v373_df_records(app),
+        },
+        "table_counts": {
+            "process_categories": 0 if cats is None else len(cats),
+            "process_category_options": 0 if proc is None else len(proc),
+            "process_options": 0 if proc is None else len(proc),
+            "rest_periods": 0 if rest is None else len(rest),
+            "app_settings": 0 if app is None else len(app),
+        },
+    }
+    files = [_V373_SYSTEM_LATEST_FILE, _V373_SYSTEM_COMPAT_FILE, _V373_SYSTEM_STATE_FILE, _V373_SYSTEM_CONFIG_FILE]
+    for path in files:
+        _v373_s_atomic_write(path, payload)
+
+    github_upload = {"ok": True, "skipped": True, "message": "GitHub write-through skipped"}
+    try:
+        from services.permanent_write_through_service import github_write_through_files
+        # V12 加速：只即時上傳 canonical latest file；此檔是 Reboot 後最新權威來源。
+        github_upload = github_write_through_files([_V373_SYSTEM_LATEST_FILE], source=f"{reason}_v12_fast_system_settings")
+    except Exception as exc:
+        github_upload = {"ok": False, "message": str(exc)}
+    _clear_settings_cache()
+    return {
+        "ok": True,
+        "mode": "v12_fast_system_settings_save",
+        "files": [str(p) for p in files],
+        "github_immediate_files": [str(_V373_SYSTEM_LATEST_FILE)],
+        "table_counts": payload["table_counts"],
+        "github_upload": github_upload,
+    }
+
+
+def _v12_call_with_suspended_db_after_write(fn, *args, **kwargs):
+    try:
+        from services.db_service import suspend_after_write_sync
+        with suspend_after_write_sync("v12_system_settings_user_save_batch"):
+            return fn(*args, **kwargs)
+    except Exception:
+        # 如果 db_service 不具備 suspend context，仍維持原功能。
+        return fn(*args, **kwargs)
+
+
+_V12_PREV_SAVE_PROCESS_CATEGORIES_DF = save_process_categories_df
+_V12_PREV_DELETE_PROCESS_CATEGORIES = delete_process_categories
+_V12_PREV_SAVE_PROCESS_OPTIONS_DF = save_process_options_df
+_V12_PREV_DELETE_PROCESS_OPTIONS = delete_process_options
+
+
+def save_process_categories_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    return _v12_call_with_suspended_db_after_write(_V12_PREV_SAVE_PROCESS_CATEGORIES_DF, df)
+
+
+def delete_process_categories(ids: Iterable[int]) -> int:  # type: ignore[override]
+    return _v12_call_with_suspended_db_after_write(_V12_PREV_DELETE_PROCESS_CATEGORIES, ids)
+
+
+def save_process_options_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    return _v12_call_with_suspended_db_after_write(_V12_PREV_SAVE_PROCESS_OPTIONS_DF, df)
+
+
+def delete_process_options(ids: Iterable[int]) -> int:  # type: ignore[override]
+    return _v12_call_with_suspended_db_after_write(_V12_PREV_DELETE_PROCESS_OPTIONS, ids)
+
+# 其他 13 系統設定儲存函式也同樣包成批次寫入：大量 execute 期間不觸發每筆 after-write。
+try:
+    _V12_PREV_SAVE_REST_PERIODS_DF = save_rest_periods_df
+    def save_rest_periods_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+        return _v12_call_with_suspended_db_after_write(_V12_PREV_SAVE_REST_PERIODS_DF, df)
+except Exception:
+    pass
+
+try:
+    _V12_PREV_DELETE_REST_PERIODS = delete_rest_periods
+    def delete_rest_periods(ids: Iterable[int]) -> int:  # type: ignore[override]
+        return _v12_call_with_suspended_db_after_write(_V12_PREV_DELETE_REST_PERIODS, ids)
+except Exception:
+    pass
+
+try:
+    _V12_PREV_SAVE_LIVE_PAGE_RESET_TIME = save_live_page_reset_time
+    def save_live_page_reset_time(value: str) -> str:  # type: ignore[override]
+        return _v12_call_with_suspended_db_after_write(_V12_PREV_SAVE_LIVE_PAGE_RESET_TIME, value)
+except Exception:
+    pass
+
+try:
+    _V12_PREV_SAVE_DEFAULT_PROCESS_CATEGORY = save_default_process_category
+    def save_default_process_category(category_name: str) -> str:  # type: ignore[override]
+        return _v12_call_with_suspended_db_after_write(_V12_PREV_SAVE_DEFAULT_PROCESS_CATEGORY, category_name)
+except Exception:
+    pass
+
+try:
+    _V12_PREV_SAVE_DEFAULT_PROCESS_MODEL = save_default_process_model
+    def save_default_process_model(type_name: str) -> str:  # type: ignore[override]
+        return _v12_call_with_suspended_db_after_write(_V12_PREV_SAVE_DEFAULT_PROCESS_MODEL, type_name)
+except Exception:
+    pass
+# ===== V12 SYSTEM SETTINGS SAVE SPEED PATCH END =====
