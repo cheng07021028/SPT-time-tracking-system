@@ -148,3 +148,9 @@ def github_write_through_files(paths: Iterable[Path | str], *, source: str = "se
     except Exception:
         pass
     return result
+
+# ===== V20.0 compatibility alias for time-record/system write-through =====
+def write_through_paths(paths, reason: str = "write_through_paths", force: bool = False):
+    """Backward-compatible wrapper used by older V18/V19 patches."""
+    return github_write_through_files(paths, source=reason, force=force)
+# ===== V20.0 compatibility alias END =====

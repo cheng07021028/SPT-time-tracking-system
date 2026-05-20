@@ -1196,3 +1196,41 @@ def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工
     clear_query_cache()
     _v18_refresh_time_records_latest("delete_time_records_v18")
     return count
+
+# ===== V20.0 immediate 01-to-02 history sync patch START =====
+# 目的：01｜工時紀錄按「開始/結束」後，02｜歷史紀錄與 01/02 latest JSON 立刻同步，
+# 不需要等待其他頁面觸發匯出，也避免 Reboot 後讀回舊 latest。
+try:
+    _V20_ORIGINAL_START_WORK = start_work  # type: ignore[name-defined]
+    _V20_ORIGINAL_FINISH_WORK = finish_work  # type: ignore[name-defined]
+except Exception:
+    _V20_ORIGINAL_START_WORK = None  # type: ignore[assignment]
+    _V20_ORIGINAL_FINISH_WORK = None  # type: ignore[assignment]
+
+
+def _v20_refresh_after_time_action(reason: str) -> None:
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        _v18_refresh_time_records_latest(reason)
+    except Exception:
+        pass
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if _V20_ORIGINAL_START_WORK is None:
+        raise RuntimeError("start_work original function is not available")
+    rid = _V20_ORIGINAL_START_WORK(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old)
+    _v20_refresh_after_time_action("start_work_v20_immediate_history_sync")
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if _V20_ORIGINAL_FINISH_WORK is None:
+        raise RuntimeError("finish_work original function is not available")
+    count = _V20_ORIGINAL_FINISH_WORK(record_id, end_action, remark, finish_parallel_group=finish_parallel_group)
+    _v20_refresh_after_time_action("finish_work_v20_immediate_history_sync")
+    return count
+# ===== V20.0 immediate 01-to-02 history sync patch END =====
