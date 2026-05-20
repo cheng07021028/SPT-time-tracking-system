@@ -1,6 +1,6 @@
 {
   "version": "V11-account-master-authoritative",
-  "exported_at": "2026-05-20 15:21:09",
+  "exported_at": "2026-05-20 15:48:30",
   "reason": "auth_users_saved_v11",
   "module_key": "10_permissions",
   "module_code": "10_permissions",
@@ -24,7 +24,7 @@
         "last_login_at": "2026-05-20 14:32:16",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
         "id": 2,
@@ -40,7 +40,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
         "id": 3,
@@ -56,7 +56,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
         "id": 4,
@@ -72,7 +72,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
         "id": 5,
@@ -88,7 +88,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
         "id": 6,
@@ -104,7 +104,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
         "id": 15,
@@ -120,7 +120,7 @@
         "last_login_at": null,
         "note": "",
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
         "id": 16,
@@ -1925,7 +1925,7 @@
     ],
     "security_users": [
       {
-        "id": 19,
+        "id": 34,
         "username": "admin",
         "password_hash": "pbkdf2_sha256$3a6f3a7befa0885e8c08cc2eb15a9859$4c37ee557e8e94cd84ddf1e2c31156cdb5fed35b9880b147e7e72302444f72ee",
         "employee_id": "nan",
@@ -1935,10 +1935,10 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-20 14:32:16",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 20,
+        "id": 35,
         "username": "manager",
         "password_hash": "pbkdf2_sha256$10ba828719f2b82390101445bbcf4386$f6814b12a67e894cc25729467ebeb5b931c0a2e962c9be78011f0a7c96bed7ec",
         "employee_id": "nan",
@@ -1948,10 +1948,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 21,
+        "id": 36,
         "username": "leader",
         "password_hash": "pbkdf2_sha256$820402735ad1b2eea21d45fe0dde7d92$61071ad17632fe72811f7954a9f0285315dc41cc9ad744a0f91696a25d427cbf",
         "employee_id": "nan",
@@ -1961,10 +1961,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 22,
+        "id": 37,
         "username": "operator",
         "password_hash": "pbkdf2_sha256$4d4520bfc0e2c72ba9b6139d26256b67$8b16d1dc77c04c2a285e5e1f21ec03dccc169bf0db45f2c1612d80ecd0b7dc40",
         "employee_id": "nan",
@@ -1974,10 +1974,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 23,
+        "id": 38,
         "username": "viewer",
         "password_hash": "pbkdf2_sha256$205d2b7f07efb7edb59124464db1b85c$496673a805306de4f438898de0dc6178c71b9a83cd2b10242fa20f3bef738859",
         "employee_id": "nan",
@@ -1987,10 +1987,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 24,
+        "id": 39,
         "username": "auditor",
         "password_hash": "pbkdf2_sha256$f0810956eb383df03a679f2fc23e5bd0$11465b9812094ab5ff80cc844dbf555a2b107fc534cd7bd9f46db3122d43425d",
         "employee_id": "nan",
@@ -2000,10 +2000,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 25,
+        "id": 40,
         "username": "Ethan",
         "password_hash": "pbkdf2_sha256$4a2137fb90480f1b82a4721549f178ff$e85de92dedccb2791d7c297a55882100182babccdb5fd0485b63bfa5ac24bca0",
         "employee_id": "SPT142",
@@ -2013,10 +2013,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 33,
+        "id": 41,
         "username": "AAA",
         "password_hash": "pbkdf2_sha256$21cd6962bf5f6a736fadc1f638e56983$3466aa0e9ae0a785a4e72a902aa985289c9eda46e5cdf57ad9730536ef16c25d",
         "employee_id": "",
@@ -2026,57 +2026,57 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-20 15:21:09",
-        "updated_at": "2026-05-20 15:21:09"
+        "updated_at": "2026-05-20 15:48:24"
       }
     ],
     "security_user_roles": [
       {
-        "id": 33,
+        "id": 48,
         "username": "AAA",
         "role_code": "operator",
-        "created_at": "2026-05-20 15:21:09"
+        "created_at": "2026-05-20 15:48:24"
       },
       {
-        "id": 34,
+        "id": 49,
         "username": "Ethan",
         "role_code": "admin",
-        "created_at": "2026-05-20 15:21:09"
+        "created_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 35,
+        "id": 50,
         "username": "admin",
         "role_code": "admin",
-        "created_at": "2026-05-20 15:21:09"
+        "created_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 36,
+        "id": 51,
         "username": "auditor",
         "role_code": "auditor",
-        "created_at": "2026-05-20 15:21:09"
+        "created_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 37,
+        "id": 52,
         "username": "leader",
         "role_code": "leader",
-        "created_at": "2026-05-20 15:21:09"
+        "created_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 38,
+        "id": 53,
         "username": "manager",
         "role_code": "manager",
-        "created_at": "2026-05-20 15:21:09"
+        "created_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 39,
+        "id": 54,
         "username": "operator",
         "role_code": "operator",
-        "created_at": "2026-05-20 15:21:09"
+        "created_at": "2026-05-20 15:48:30"
       },
       {
-        "id": 40,
+        "id": 55,
         "username": "viewer",
         "role_code": "viewer",
-        "created_at": "2026-05-20 15:21:09"
+        "created_at": "2026-05-20 15:48:30"
       }
     ],
     "security_settings": []
