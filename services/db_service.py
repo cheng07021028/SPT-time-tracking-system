@@ -1352,3 +1352,83 @@ def execute_transaction(
             pass
     return ids
 # ===== V16 FAST BOOTSTRAP + TRANSACTION HOTFIX END =====
+
+# ===== V23 QUERY_ONE DB ERROR HOTFIX =====
+# Streamlit Cloud can keep an older/corrupted SQLite file after deployments.  Earlier
+# query_df/execute paths already repaired and retried, but the latest query_one override
+# still executed SELECT directly and could crash pages such as 01. 工時紀錄 when checking
+# active records.  This final override gives query_one the same repair/retry behavior.
+_v23_prev_query_one = query_one
+
+
+def _v23_is_retryable_query_one_error(exc: Exception) -> bool:
+    msg = str(exc or '').lower()
+    retry_keywords = (
+        'no such table',
+        'no such column',
+        'database disk image is malformed',
+        'file is not a database',
+        'unable to open database file',
+        'database is locked',
+        'database schema has changed',
+        'readonly database',
+        'attempt to write a readonly database',
+    )
+    return isinstance(exc, (sqlite3.DatabaseError, sqlite3.OperationalError)) or any(k in msg for k in retry_keywords)
+
+
+def query_one(sql: str, params: Iterable[Any] | None = None) -> dict | None:  # type: ignore[override]
+    """Return one row with SQLite self-repair/retry.
+
+    This preserves the existing cache and guard behavior, but prevents single-row reads
+    from bypassing the DB repair path.  It is intentionally read-only and does not change
+    any persistence path, GitHub write-through behavior, or UI logic.
+    """
+    ensure_database()
+    if (not _v16_should_skip_guard_for_fast_read(sql)) and _should_run_data_guard(sql):
+        ensure_data_guard_restore()
+    if params is None:
+        params = ()
+
+    cacheable = _is_select_sql(sql)
+    key = _query_cache_key(sql, params)
+    now_ts = time.time()
+    if cacheable:
+        try:
+            cached = _QUERY_ONE_CACHE.get(key)
+            if cached and now_ts - cached[0] <= _QUERY_CACHE_TTL_SEC:
+                return dict(cached[1]) if isinstance(cached[1], dict) else None
+        except Exception:
+            pass
+
+    def _run_once() -> dict | None:
+        with _open_connection() as conn:
+            row = conn.execute(sql, tuple(params)).fetchone()
+            return dict(row) if row else None
+
+    try:
+        out = _run_once()
+    except Exception as exc:
+        if not _v23_is_retryable_query_one_error(exc):
+            raise
+        # Locked DB usually resolves after a short wait; corrupted/missing schema needs repair.
+        try:
+            time.sleep(0.15)
+            out = _run_once()
+        except Exception:
+            repaired = _repair_database_after_error(exc)
+            if not repaired.get('ok'):
+                raise exc
+            clear_query_cache()
+            out = _run_once()
+
+    if cacheable:
+        try:
+            if len(_QUERY_ONE_CACHE) >= _QUERY_CACHE_MAX_ITEMS:
+                oldest = min(_QUERY_ONE_CACHE.items(), key=lambda kv: kv[1][0])[0]
+                _QUERY_ONE_CACHE.pop(oldest, None)
+            _QUERY_ONE_CACHE[key] = (now_ts, dict(out) if isinstance(out, dict) else None)
+        except Exception:
+            pass
+    return out
+# ===== END V23 QUERY_ONE DB ERROR HOTFIX =====
