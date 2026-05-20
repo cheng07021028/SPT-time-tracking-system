@@ -2885,664 +2885,150 @@ def get_process_options_by_model(type_name: str | None = None, include_common: b
     return get_process_options_by_category(type_name, include_common=False)
 # ===== V3.73 FINAL DIRECT-LATEST SYSTEM SETTINGS PATCH END =====
 
-# ===== V3.74 / V22 SYSTEM SETTINGS DB READ HOTFIX START =====
-# 目的：13.系統設定開頁時，如果 SQLite 舊表缺欄位/缺表/查詢異常，不能讓頁面直接掛掉。
-# 原則：
-# 1. 先用 sqlite3 直接補齊 process_categories / process_category_options / process_options / rest_periods / app_settings 基本 schema。
-# 2. DB 查詢失敗時，直接讀 data/permanent_store 內 13_system_settings latest JSON 做畫面資料來源。
-# 3. 不改正式路徑、不刪資料、不改 UI；只避免 pandas DatabaseError 造成 13 頁面打不開。
+# ===== V18.0 direct memory read for 01 Time Record category/process linkage =====
+# 目的：01 工時紀錄不需要先進 13 系統設定，就能直接讀取 13 已儲存的最新類別/工段設定。
+# 原則：不改 UI、不改儲存路徑；讀取時優先讀 data/permanent_store latest JSON，失敗才退回 SQLite。
+_V18_SYSTEM_PAYLOAD_CACHE: dict[str, Any] = {"mtime": None, "payload": None}
 
-def _v22_direct_system_schema_repair() -> None:
+
+def _v18_load_system_latest_payload() -> dict[str, Any]:
     try:
-        import sqlite3
-        from .db_service import DB_PATH  # type: ignore
-        db_path = Path(DB_PATH)
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(db_path), timeout=30)
-        try:
-            cur = conn.cursor()
-            cur.execute("PRAGMA journal_mode=WAL")
-            cur.execute("PRAGMA busy_timeout=30000")
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS process_categories (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    category_name TEXT UNIQUE NOT NULL,
-                    is_active INTEGER DEFAULT 1,
-                    sort_order INTEGER DEFAULT 0,
-                    note TEXT,
-                    created_at TEXT,
-                    updated_at TEXT
-                )
-                """
-            )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS process_category_options (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    category_name TEXT DEFAULT '',
-                    process_name TEXT NOT NULL,
-                    is_active INTEGER DEFAULT 1,
-                    sort_order INTEGER DEFAULT 0,
-                    note TEXT,
-                    created_at TEXT,
-                    updated_at TEXT,
-                    UNIQUE(category_name, process_name)
-                )
-                """
-            )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS process_options (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    process_name TEXT UNIQUE NOT NULL,
-                    is_active INTEGER DEFAULT 1,
-                    sort_order INTEGER DEFAULT 0,
-                    note TEXT,
-                    created_at TEXT,
-                    updated_at TEXT
-                )
-                """
-            )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS rest_periods (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT,
-                    start_time TEXT NOT NULL,
-                    end_time TEXT NOT NULL,
-                    is_active INTEGER DEFAULT 1,
-                    sort_order INTEGER DEFAULT 0,
-                    note TEXT,
-                    created_at TEXT,
-                    updated_at TEXT
-                )
-                """
-            )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS app_settings (
-                    setting_key TEXT PRIMARY KEY,
-                    setting_value TEXT,
-                    note TEXT,
-                    updated_at TEXT
-                )
-                """
-            )
-            # 補舊表缺欄位。ALTER 失敗通常代表欄位已存在，忽略即可。
-            for table, cols in {
-                "process_categories": [
-                    ("category_name", "TEXT"), ("is_active", "INTEGER DEFAULT 1"), ("sort_order", "INTEGER DEFAULT 0"),
-                    ("note", "TEXT"), ("created_at", "TEXT"), ("updated_at", "TEXT"),
-                ],
-                "process_category_options": [
-                    ("category_name", "TEXT DEFAULT ''"), ("process_name", "TEXT"), ("is_active", "INTEGER DEFAULT 1"),
-                    ("sort_order", "INTEGER DEFAULT 0"), ("note", "TEXT"), ("created_at", "TEXT"), ("updated_at", "TEXT"),
-                ],
-                "process_options": [
-                    ("process_name", "TEXT"), ("is_active", "INTEGER DEFAULT 1"), ("sort_order", "INTEGER DEFAULT 0"),
-                    ("note", "TEXT"), ("created_at", "TEXT"), ("updated_at", "TEXT"),
-                ],
-                "rest_periods": [
-                    ("name", "TEXT"), ("start_time", "TEXT"), ("end_time", "TEXT"), ("is_active", "INTEGER DEFAULT 1"),
-                    ("sort_order", "INTEGER DEFAULT 0"), ("note", "TEXT"), ("created_at", "TEXT"), ("updated_at", "TEXT"),
-                ],
-                "app_settings": [("setting_key", "TEXT"), ("setting_value", "TEXT"), ("note", "TEXT"), ("updated_at", "TEXT")],
-            }.items():
-                try:
-                    existing = {str(r[1]) for r in cur.execute(f'PRAGMA table_info("{table}")').fetchall()}
-                except Exception:
-                    existing = set()
-                for col, typ in cols:
-                    if col not in existing:
-                        try:
-                            cur.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col}" {typ}')
-                        except Exception:
-                            pass
-            conn.commit()
-        finally:
-            conn.close()
+        path = _V373_SYSTEM_LATEST_FILE  # type: ignore[name-defined]
     except Exception:
-        # 這裡不能再拋錯，避免 13 頁面因修補失敗直接掛掉。
-        pass
-
-
-def _v22_read_json_file(path: Path) -> dict[str, Any]:
+        path = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "13_system_settings_records.json"
     try:
-        if path.exists() and path.stat().st_size > 0:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
+        if not path.exists():
+            return {}
+        mtime = path.stat().st_mtime
+        if _V18_SYSTEM_PAYLOAD_CACHE.get("mtime") == mtime and isinstance(_V18_SYSTEM_PAYLOAD_CACHE.get("payload"), dict):
+            return _V18_SYSTEM_PAYLOAD_CACHE["payload"] or {}
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            payload = {}
+        _V18_SYSTEM_PAYLOAD_CACHE["mtime"] = mtime
+        _V18_SYSTEM_PAYLOAD_CACHE["payload"] = payload
+        return payload
     except Exception:
         return {}
-    return {}
 
 
-def _v22_system_payload() -> dict[str, Any]:
-    # 永久單一路徑優先；舊路徑只做保底讀取，避免正式 latest 還沒搬完時 13 頁面空白或崩潰。
-    candidates = [
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "13_system_settings_records.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "system_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_system_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "config" / "system_settings.json",
-        PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "13_system_settings_records.json",
-        PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json",
-        PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json",
-        PROJECT_ROOT / "data" / "config" / "system_settings.json",
-    ]
-    best: dict[str, Any] = {}
-    best_stamp = ""
-    for path in candidates:
-        data = _v22_read_json_file(path)
-        tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
-        if not isinstance(tables, dict) or not any(k in tables for k in ["process_categories", "process_category_options", "process_options", "rest_periods", "app_settings", "system_settings"]):
-            continue
-        stamp = str(data.get("exported_at") or data.get("updated_at") or data.get("saved_at") or data.get("timestamp") or "")
-        # candidates 已按權威路徑排序；同層有時間戳時取較新。
-        if not best or (stamp and stamp >= best_stamp):
-            best = data
-            best_stamp = stamp
-            best["_v22_source"] = str(path)
-    return best
-
-
-def _v22_tables() -> dict[str, Any]:
-    data = _v22_system_payload()
-    tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
+def _v18_system_tables() -> dict[str, Any]:
+    payload = _v18_load_system_latest_payload()
+    tables = payload.get("tables") if isinstance(payload, dict) else {}
     return tables if isinstance(tables, dict) else {}
 
 
-def _v22_df_from_rows(rows: Any, columns: list[str]) -> pd.DataFrame:
-    if not isinstance(rows, list):
-        rows = []
-    out: list[dict[str, Any]] = []
-    now = _now()
-    for idx, r in enumerate(rows or [], start=1):
+def _v18_active_value(value: Any, default: int = 1) -> bool:
+    text = str(value if value is not None else default).strip().lower()
+    return text not in {"0", "false", "no", "n", "off", "停用", "否"}
+
+
+def _v18_json_category_choices(include_common: bool = True) -> list[str]:
+    tables = _v18_system_tables()
+    rows = tables.get("process_categories") if isinstance(tables.get("process_categories"), list) else []
+    names: list[str] = []
+    for r in rows:
+        if not isinstance(r, dict) or not _v18_active_value(r.get("is_active", 1)):
+            continue
+        name = _norm_category_name(r.get("category_name") or r.get("category") or r.get("類別"))
+        if name and name not in names:
+            names.append(name)
+    # 若舊檔沒有 process_categories，就從 process_category_options 反推類別。
+    if not names:
+        proc_rows = tables.get("process_category_options") if isinstance(tables.get("process_category_options"), list) else tables.get("process_options", [])
+        for r in proc_rows or []:
+            if not isinstance(r, dict) or not _v18_active_value(r.get("is_active", 1)):
+                continue
+            name = _norm_category_name(r.get("category_name") or r.get("type_name") or PROCESS_CATEGORY_ALL)
+            if name and name not in names:
+                names.append(name)
+    if include_common and PROCESS_CATEGORY_ALL not in names:
+        names.insert(0, PROCESS_CATEGORY_ALL)
+    return names
+
+
+def _v18_json_default_category() -> str:
+    tables = _v18_system_tables()
+    app_rows = tables.get("app_settings") if isinstance(tables.get("app_settings"), list) else []
+    for r in app_rows:
         if not isinstance(r, dict):
             continue
-        row = {c: r.get(c, "") for c in columns}
-        if "id" in columns:
-            row["id"] = r.get("id") or idx
-        if "is_active" in columns:
-            row["is_active"] = _v373_active(r.get("is_active", 1)) if "_v373_active" in globals() else (0 if str(r.get("is_active", 1)).lower() in {"0", "false", "no"} else 1)
-        if "sort_order" in columns:
-            try:
-                row["sort_order"] = int(float(r.get("sort_order") or idx))
-            except Exception:
-                row["sort_order"] = idx
-        if "created_at" in columns:
-            row["created_at"] = r.get("created_at") or r.get("updated_at") or now
-        if "updated_at" in columns:
-            row["updated_at"] = r.get("updated_at") or r.get("created_at") or now
-        out.append(row)
-    return pd.DataFrame(out, columns=columns)
+        if str(r.get("setting_key") or "").strip() == DEFAULT_PROCESS_CATEGORY_KEY:
+            val = _norm_category_name(r.get("setting_value") or "")
+            if val:
+                return val
+    choices = _v18_json_category_choices(include_common=True)
+    return choices[0] if choices else PROCESS_CATEGORY_ALL
 
 
-_v22_previous_ensure_system_settings_schema = ensure_system_settings_schema
-
-def ensure_system_settings_schema() -> None:  # type: ignore[override]
-    _v22_direct_system_schema_repair()
-    try:
-        _v22_previous_ensure_system_settings_schema()
-    except Exception:
-        # schema 已由 direct repair 補完；舊還原流程失敗不應阻止 13 頁面開啟。
-        pass
-
-
-def load_process_categories_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
-    columns = ["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"]
-    ensure_system_settings_schema()
-    try:
-        sql = "SELECT id, category_name, is_active, sort_order, note, created_at, updated_at FROM process_categories WHERE 1=1"
-        params: list[Any] = []
-        if active_only:
-            sql += " AND COALESCE(is_active,1)=1"
-        sql += " ORDER BY CASE WHEN category_name=? THEN 0 ELSE 1 END, sort_order, id"
-        params.append(PROCESS_CATEGORY_ALL)
-        df = query_df(sql, params)
-        if df is not None and not df.empty:
-            return df
-    except Exception:
-        pass
-    tables = _v22_tables()
-    df = _v22_df_from_rows(tables.get("process_categories") or [], columns)
-    if active_only and not df.empty:
-        df = df[df["is_active"].fillna(1).astype(str).str.lower().isin(["1", "true", "yes", "y", "on"])]
-    if df.empty:
-        df = pd.DataFrame([{"id": 1, "category_name": PROCESS_CATEGORY_ALL, "is_active": 1, "sort_order": 1, "note": "", "created_at": _now(), "updated_at": _now()}], columns=columns)
-    return df
-
-
-def load_process_options_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
-    columns = ["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"]
-    ensure_system_settings_schema()
-    try:
-        sql = "SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options WHERE 1=1"
-        params: list[Any] = []
-        if active_only:
-            sql += " AND COALESCE(is_active, 1)=1"
-        sql += " ORDER BY CASE WHEN category_name=? THEN 0 ELSE 1 END, category_name, sort_order, id"
-        params.append(PROCESS_CATEGORY_ALL)
-        df = query_df(sql, params)
-        if df is not None and not df.empty:
-            return df
-    except Exception:
-        pass
-    tables = _v22_tables()
-    rows = tables.get("process_category_options")
-    if not isinstance(rows, list) or not rows:
-        rows = tables.get("process_options") if isinstance(tables.get("process_options"), list) else []
-    normalized: list[dict[str, Any]] = []
-    for idx, r in enumerate(rows or [], start=1):
-        if not isinstance(r, dict):
+def _v18_json_process_options(category_name: str | None = None) -> list[str]:
+    tables = _v18_system_tables()
+    proc_rows = tables.get("process_category_options") if isinstance(tables.get("process_category_options"), list) else tables.get("process_options", [])
+    category = _norm_category_name(category_name or _v18_json_default_category())
+    items: list[tuple[int, int, str]] = []
+    for idx, r in enumerate(proc_rows or [], start=1):
+        if not isinstance(r, dict) or not _v18_active_value(r.get("is_active", 1)):
             continue
-        item = dict(r)
-        item["id"] = item.get("id") or idx
-        item["category_name"] = _norm_category_name(item.get("category_name") or item.get("type_name") or PROCESS_CATEGORY_ALL)
-        item["process_name"] = str(item.get("process_name") or item.get("工段名稱") or "").strip()
-        if item["process_name"]:
-            normalized.append(item)
-    df = _v22_df_from_rows(normalized, columns)
-    if active_only and not df.empty:
-        df = df[df["is_active"].fillna(1).astype(str).str.lower().isin(["1", "true", "yes", "y", "on"])]
-    return df
+        cat = _norm_category_name(r.get("category_name") or r.get("type_name") or PROCESS_CATEGORY_ALL)
+        if cat != category:
+            continue
+        proc = str(r.get("process_name") or "").strip()
+        if not proc:
+            continue
+        try:
+            sort_order = int(float(r.get("sort_order") or idx))
+        except Exception:
+            sort_order = idx
+        items.append((sort_order, idx, proc))
+    out: list[str] = []
+    for _, _, name in sorted(items):
+        if name not in out:
+            out.append(name)
+    return out
 
 
 def load_process_category_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    names = _v18_json_category_choices(include_common=include_common)
+    if names:
+        return names
     try:
-        df = load_process_categories_df(active_only=True)
-        names = [str(x).strip() for x in df.get("category_name", []).dropna().tolist() if str(x).strip()] if df is not None and not df.empty else []
+        df = load_process_categories_df(active_only=True)  # type: ignore[name-defined]
+        out = [str(x).strip() for x in df.get("category_name", []).dropna().tolist() if str(x).strip()] if df is not None and not df.empty else []
+        if include_common and PROCESS_CATEGORY_ALL not in out:
+            out.insert(0, PROCESS_CATEGORY_ALL)
+        return out or ([PROCESS_CATEGORY_ALL] if include_common else [])
     except Exception:
-        names = []
-    if include_common and PROCESS_CATEGORY_ALL not in names:
-        names.insert(0, PROCESS_CATEGORY_ALL)
-    return names or ([PROCESS_CATEGORY_ALL] if include_common else [])
+        return [PROCESS_CATEGORY_ALL] if include_common else []
+
+
+def get_default_process_category() -> str:  # type: ignore[override]
+    val = _v18_json_default_category()
+    if val:
+        return val
+    try:
+        _v373_s_schema_only()  # type: ignore[name-defined]
+        row = query_one("SELECT setting_value FROM app_settings WHERE setting_key=?", (DEFAULT_PROCESS_CATEGORY_KEY,)) or {}
+        return _norm_category_name(row.get("setting_value") or PROCESS_CATEGORY_ALL)
+    except Exception:
+        return PROCESS_CATEGORY_ALL
 
 
 def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
-    category = _norm_category_name(category_name)
+    # 01 工時紀錄使用此函式。V18：優先直接讀最新記憶檔，不依賴先進 13 頁面做 DB restore。
+    names = _v18_json_process_options(category_name)
+    if names:
+        return names
     try:
-        df = load_process_options_df(active_only=True)
-        if df is None or df.empty:
-            return []
-        work = df.copy()
-        work["category_name"] = work.get("category_name", "").apply(_norm_category_name)
-        names = work.loc[work["category_name"] == category, "process_name"].dropna().astype(str).str.strip().tolist()
-        if include_common and category != PROCESS_CATEGORY_ALL:
-            names += work.loc[work["category_name"] == PROCESS_CATEGORY_ALL, "process_name"].dropna().astype(str).str.strip().tolist()
-        seen: set[str] = set(); out: list[str] = []
-        for name in names:
-            if name and name not in seen:
-                seen.add(name); out.append(name)
-        return out
+        _v373_s_schema_only()  # type: ignore[name-defined]
+        category = _norm_category_name(category_name or get_default_process_category())
+        df = query_df(
+            "SELECT process_name FROM process_category_options WHERE COALESCE(is_active,1)=1 AND category_name=? ORDER BY sort_order, id",
+            (category,),
+        )
+        return [str(x).strip() for x in df.get("process_name", []).dropna().tolist() if str(x).strip()] if df is not None and not df.empty else []
     except Exception:
         return []
 
 
-def get_process_options() -> list[str]:  # type: ignore[override]
-    return get_process_options_by_category(get_default_process_category(), include_common=False)
-
-# Backward-compatible aliases re-bound after V22 overrides.
-def load_process_model_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
-    return load_process_category_choices(include_common=include_common)
-
-def get_process_options_by_model(type_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
-    return get_process_options_by_category(type_name, include_common=False)
-# ===== V3.74 / V22 SYSTEM SETTINGS DB READ HOTFIX END =====
-
-
-# ===== V24 SYSTEM SETTINGS AUTHORITATIVE LATEST + GITHUB WRITE-THROUGH FIX =====
-import json as _v24_json
-from pathlib import Path as _V24Path
-
-_V24_ROOT = _V24Path(__file__).resolve().parents[1]
-_V24_STORE = _V24_ROOT / 'data' / 'permanent_store'
-_V24_SYSTEM_DIR = _V24_STORE / 'persistent_modules' / '13_system_settings'
-_V24_SYSTEM_LATEST = _V24_SYSTEM_DIR / '13_system_settings_records.json'
-_V24_SYSTEM_COMPAT = _V24_SYSTEM_DIR / 'system_settings.json'
-_V24_SYSTEM_STATE = _V24_STORE / 'persistent_state' / 'spt_system_settings.json'
-_V24_SYSTEM_CONFIG = _V24_STORE / 'config' / 'system_settings.json'
-_V24_SYSTEM_FILES = [_V24_SYSTEM_LATEST, _V24_SYSTEM_COMPAT, _V24_SYSTEM_STATE, _V24_SYSTEM_CONFIG]
-
-
-def _v24_parse_stamp(text: object) -> float:
-    try:
-        import datetime as _dt
-        t = str(text or '').strip().replace('/', '-')
-        if not t:
-            return 0.0
-        return _dt.datetime.fromisoformat(t).timestamp()
-    except Exception:
-        return 0.0
-
-
-def _v24_read_json(path: _V24Path) -> dict:
-    try:
-        if path.exists() and path.stat().st_size > 2:
-            data = _v24_json.loads(path.read_text(encoding='utf-8'))
-            return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-    return {}
-
-
-def _v24_payload_score(path: _V24Path, data: dict) -> tuple[float, int, int]:
-    tables = data.get('tables') if isinstance(data.get('tables'), dict) else {}
-    cats = tables.get('process_categories') if isinstance(tables.get('process_categories'), list) else []
-    procs = tables.get('process_category_options') if isinstance(tables.get('process_category_options'), list) else tables.get('process_options') if isinstance(tables.get('process_options'), list) else []
-    stamp = max(_v24_parse_stamp(data.get('exported_at')), _v24_parse_stamp(data.get('updated_at')), _v24_parse_stamp(data.get('saved_at')))
-    if not stamp:
-        try:
-            stamp = path.stat().st_mtime
-        except Exception:
-            stamp = 0.0
-    return (float(stamp), int(len(cats) + len(procs)), int(path.stat().st_size if path.exists() else 0))
-
-
-def _v24_latest_system_payload() -> dict:
-    candidates: list[tuple[tuple[float, int, int], dict]] = []
-    for path in _V24_SYSTEM_FILES:
-        data = _v24_read_json(path)
-        tables = data.get('tables') if isinstance(data.get('tables'), dict) else {}
-        if isinstance(tables, dict) and any(k in tables for k in ('process_categories', 'process_category_options', 'process_options', 'rest_periods', 'app_settings')):
-            candidates.append((_v24_payload_score(path, data), data))
-    if not candidates:
-        return {}
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    return candidates[0][1]
-
-
-def _v24_rows(payload: dict, table: str) -> list[dict]:
-    tables = payload.get('tables') if isinstance(payload.get('tables'), dict) else {}
-    rows = tables.get(table)
-    if table == 'process_category_options' and not isinstance(rows, list):
-        rows = tables.get('process_options')
-    return [dict(r) for r in rows] if isinstance(rows, list) else []
-
-
-def _v24_atomic_write(path: _V24Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + '.tmp')
-    tmp.write_text(_v24_json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding='utf-8')
-    tmp.replace(path)
-
-
-def _v24_upload_system_files(reason: str = 'system_settings_v24') -> dict:
-    try:
-        from services.permanent_write_through_service import write_through_paths
-        return write_through_paths([str(p) for p in _V24_SYSTEM_FILES if p.exists()], reason=reason)
-    except Exception as exc:
-        return {'ok': False, 'message': str(exc)}
-
-
-def _v24_build_system_payload(reason: str = 'system_settings_changed') -> dict:
-    try:
-        _v373_s_schema_only()  # type: ignore[name-defined]
-    except Exception:
-        try:
-            _v22_direct_schema_repair()  # type: ignore[name-defined]
-        except Exception:
-            pass
-    def _q(sql: str, cols: list[str]):
-        try:
-            return query_df(sql)
-        except Exception:
-            try:
-                return pd.DataFrame(columns=cols)
-            except Exception:
-                return None
-    cats = _q('SELECT id, category_name, is_active, sort_order, note, created_at, updated_at FROM process_categories ORDER BY sort_order, id', ['id','category_name','is_active','sort_order','note','created_at','updated_at'])
-    proc = _q('SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options ORDER BY category_name, sort_order, id', ['id','category_name','process_name','is_active','sort_order','note','created_at','updated_at'])
-    rest = _q('SELECT id, name, start_time, end_time, is_active, sort_order FROM rest_periods ORDER BY sort_order, id', ['id','name','start_time','end_time','is_active','sort_order'])
-    app = _q('SELECT setting_key, setting_value, note, updated_at FROM app_settings ORDER BY setting_key', ['setting_key','setting_value','note','updated_at'])
-    try:
-        cats_rows = _v373_df_records(cats)  # type: ignore[name-defined]
-        proc_rows = _v373_df_records(proc)  # type: ignore[name-defined]
-        rest_rows = _v373_df_records(rest)  # type: ignore[name-defined]
-        app_rows = _v373_df_records(app)  # type: ignore[name-defined]
-    except Exception:
-        cats_rows = cats.to_dict(orient='records') if cats is not None else []
-        proc_rows = proc.to_dict(orient='records') if proc is not None else []
-        rest_rows = rest.to_dict(orient='records') if rest is not None else []
-        app_rows = app.to_dict(orient='records') if app is not None else []
-    return {'version':'V24-system-settings-authoritative-latest','exported_at':_now(),'reason':reason,'module_key':'13_system_settings','module_code':'13_system_settings','module_name_zh':'系統設定','module_name_en':'System Settings','source':'system_settings_service_v24_authoritative_latest','tables':{'process_categories':cats_rows,'process_category_options':proc_rows,'process_options':proc_rows,'rest_periods':rest_rows,'app_settings':app_rows},'table_counts':{'process_categories':len(cats_rows),'process_category_options':len(proc_rows),'process_options':len(proc_rows),'rest_periods':len(rest_rows),'app_settings':len(app_rows)}}
-
-
-def export_system_settings_permanent(reason: str = 'system_settings_changed', write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
-    payload = _v24_build_system_payload(reason=reason)
-    for path in _V24_SYSTEM_FILES:
-        _v24_atomic_write(path, payload)
-    try:
-        _clear_settings_cache()
-    except Exception:
-        pass
-    upload = _v24_upload_system_files(reason=reason)
-    return {'ok': True, 'mode': 'v24_system_authoritative_latest', 'files': [str(p) for p in _V24_SYSTEM_FILES], 'table_counts': payload.get('table_counts', {}), 'github_upload': upload}
-
-
-def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
-    payload = _v24_latest_system_payload()
-    if not payload:
-        return {'ok': False, 'mode': 'v24_system_authoritative_latest', 'message': 'no latest payload'}
-    try:
-        _v373_s_schema_only()  # type: ignore[name-defined]
-    except Exception:
-        try:
-            _v22_direct_schema_repair()  # type: ignore[name-defined]
-        except Exception:
-            pass
-    cats = _v24_rows(payload, 'process_categories')
-    procs = _v24_rows(payload, 'process_category_options')
-    rests = _v24_rows(payload, 'rest_periods')
-    apps = _v24_rows(payload, 'app_settings')
-    restored = {}
-    try:
-        execute('DELETE FROM process_categories')
-        for idx, r in enumerate(cats, start=1):
-            name = _norm_category_name(r.get('category_name') or r.get('category') or r.get('類別'))
-            if not name:
-                continue
-            execute("""INSERT INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at)
-                      VALUES (?,?,?,?,?,?)
-                      ON CONFLICT(category_name) DO UPDATE SET is_active=excluded.is_active, sort_order=excluded.sort_order, note=excluded.note, updated_at=excluded.updated_at""",
-                    (name, _v373_active(r.get('is_active', 1)), int(float(r.get('sort_order') or idx)), str(r.get('note') or ''), str(r.get('created_at') or _now()), str(r.get('updated_at') or _now())))
-        restored['process_categories'] = len(cats)
-    except Exception as exc:
-        restored['process_categories_error'] = str(exc)
-    try:
-        execute('DELETE FROM process_category_options')
-        try:
-            execute('DELETE FROM process_options')
-        except Exception:
-            pass
-        for idx, r in enumerate(procs, start=1):
-            name = str(r.get('process_name') or r.get('工段名稱') or r.get('工段名稱 / Process') or '').strip()
-            if not name:
-                continue
-            category = _norm_category_name(r.get('category_name') or r.get('category') or r.get('類別') or r.get('類別 / Category') or PROCESS_CATEGORY_ALL)
-            execute("""INSERT INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at)
-                      VALUES (?,?,?,?,?,?,?)
-                      ON CONFLICT(category_name, process_name) DO UPDATE SET is_active=excluded.is_active, sort_order=excluded.sort_order, note=excluded.note, updated_at=excluded.updated_at""",
-                    (category, name, _v373_active(r.get('is_active', 1)), int(float(r.get('sort_order') or idx)), str(r.get('note') or ''), str(r.get('created_at') or _now()), str(r.get('updated_at') or _now())))
-        restored['process_category_options'] = len(procs)
-    except Exception as exc:
-        restored['process_category_options_error'] = str(exc)
-    try:
-        _clear_settings_cache()
-    except Exception:
-        pass
-    return {'ok': True, 'mode': 'v24_system_authoritative_latest', 'restored': restored, 'payload_exported_at': payload.get('exported_at')}
-
-
-_v24_system_restore_key = '_v24_system_latest_restored_once'
-
-
-def ensure_system_settings_schema() -> None:  # type: ignore[override]
-    try:
-        _v373_s_schema_only()  # type: ignore[name-defined]
-    except Exception:
-        try:
-            _v22_direct_schema_repair()  # type: ignore[name-defined]
-        except Exception:
-            pass
-    do_restore = True
-    try:
-        if st is not None and st.session_state.get(_v24_system_restore_key):
-            do_restore = False
-    except Exception:
-        pass
-    if do_restore:
-        try:
-            restore_system_settings_from_permanent(force=True)
-        except Exception:
-            pass
-        try:
-            if st is not None:
-                st.session_state[_v24_system_restore_key] = True
-        except Exception:
-            pass
-
-
-def load_process_categories_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
-    ensure_system_settings_schema()
-    cols = ['id','category_name','is_active','sort_order','note','created_at','updated_at']
-    payload = _v24_latest_system_payload()
-    rows = _v24_rows(payload, 'process_categories')
-    if rows:
-        df = pd.DataFrame(rows)
-        for c in cols:
-            if c not in df.columns:
-                df[c] = ''
-        if active_only:
-            df = df[df['is_active'].fillna(1).astype(str).str.lower().isin(['1','true','yes','y','on'])]
-        return df[cols].sort_values(by=['sort_order','id'], kind='stable', na_position='last').reset_index(drop=True)
-    try:
-        sql = 'SELECT id, category_name, is_active, sort_order, note, created_at, updated_at FROM process_categories WHERE 1=1'
-        params = []
-        if active_only:
-            sql += ' AND COALESCE(is_active,1)=1'
-        sql += ' ORDER BY CASE WHEN category_name=? THEN 0 ELSE 1 END, sort_order, id'
-        params.append(PROCESS_CATEGORY_ALL)
-        df = query_df(sql, params)
-        return df if df is not None else pd.DataFrame(columns=cols)
-    except Exception:
-        return pd.DataFrame(columns=cols)
-
-
-def load_process_options_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
-    ensure_system_settings_schema()
-    cols = ['id','category_name','process_name','is_active','sort_order','note','created_at','updated_at']
-    payload = _v24_latest_system_payload()
-    rows = _v24_rows(payload, 'process_category_options')
-    if rows:
-        norm = []
-        for idx, r in enumerate(rows, start=1):
-            d = dict(r)
-            d['id'] = d.get('id') or idx
-            d['category_name'] = _norm_category_name(d.get('category_name') or d.get('category') or d.get('類別') or PROCESS_CATEGORY_ALL)
-            d['process_name'] = str(d.get('process_name') or d.get('工段名稱') or d.get('工段名稱 / Process') or '').strip()
-            if d['process_name']:
-                norm.append(d)
-        df = pd.DataFrame(norm)
-        for c in cols:
-            if c not in df.columns:
-                df[c] = ''
-        if active_only:
-            df = df[df['is_active'].fillna(1).astype(str).str.lower().isin(['1','true','yes','y','on'])]
-        return df[cols].sort_values(by=['category_name','sort_order','id'], kind='stable', na_position='last').reset_index(drop=True)
-    try:
-        sql = 'SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options WHERE 1=1'
-        params = []
-        if active_only:
-            sql += ' AND COALESCE(is_active,1)=1'
-        sql += ' ORDER BY CASE WHEN category_name=? THEN 0 ELSE 1 END, category_name, sort_order, id'
-        params.append(PROCESS_CATEGORY_ALL)
-        df = query_df(sql, params)
-        return df if df is not None else pd.DataFrame(columns=cols)
-    except Exception:
-        return pd.DataFrame(columns=cols)
-
-
-def save_process_categories_df(df: pd.DataFrame) -> int:  # type: ignore[override]
-    try:
-        _v373_s_schema_only()  # type: ignore[name-defined]
-    except Exception:
-        pass
-    if df is None:
-        return 0
-    now = _now(); count = 0
-    work = df.copy().drop(columns=['刪除','delete','selected','刪除 / Delete'], errors='ignore').fillna('')
-    try:
-        execute('DELETE FROM process_categories')
-    except Exception:
-        pass
-    for idx, (_, r) in enumerate(work.iterrows(), start=1):
-        name = _norm_category_name(_row_get(r, 'category_name', 'category', '類別', '類別 / Category', default=''))
-        if not name:
-            continue
-        is_active = _v373_active(_row_get(r, 'is_active', '啟用', '啟用 / Active', default=True))
-        try:
-            sort_order = int(float(_row_get(r, 'sort_order', '排序', '排序 / Sort', default=idx) or idx))
-        except Exception:
-            sort_order = idx
-        note = str(_row_get(r, 'note', '備註', '備註 / Note', default='') or '').strip()
-        execute("""INSERT INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at)
-                  VALUES (?,?,?,?,?,?)
-                  ON CONFLICT(category_name) DO UPDATE SET is_active=excluded.is_active, sort_order=excluded.sort_order, note=excluded.note, updated_at=excluded.updated_at""",
-                (name, is_active, sort_order, note, now, now))
-        count += 1
-    try:
-        _clear_settings_cache()
-    except Exception:
-        pass
-    export_system_settings_permanent('save_process_categories_v24', write_history=False)
-    return count
-
-
-def save_process_options_df(df: pd.DataFrame) -> int:  # type: ignore[override]
-    try:
-        _v373_s_schema_only()  # type: ignore[name-defined]
-    except Exception:
-        pass
-    if df is None:
-        return 0
-    now = _now(); count = 0
-    work = df.copy().drop(columns=['刪除','delete','selected','刪除 / Delete'], errors='ignore').fillna('')
-    try:
-        execute('DELETE FROM process_category_options')
-    except Exception:
-        pass
-    for idx, (_, r) in enumerate(work.iterrows(), start=1):
-        name = str(r.get('process_name', r.get('工段名稱', r.get('工段名稱 / Process', '')))).strip()
-        if not name:
-            continue
-        category = _norm_category_name(r.get('category_name', r.get('category', r.get('類別', r.get('類別 / Category', PROCESS_CATEGORY_ALL)))))
-        is_active = _v373_active(r.get('is_active', r.get('啟用', r.get('啟用 / Active', True))))
-        try:
-            sort_order = int(float(r.get('sort_order', r.get('排序', idx)) or idx))
-        except Exception:
-            sort_order = idx
-        note = str(r.get('note', r.get('備註', r.get('備註 / Note', ''))) or '')
-        execute("""INSERT INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at)
-                  VALUES (?,?,?,?,?,?,?)
-                  ON CONFLICT(category_name, process_name) DO UPDATE SET is_active=excluded.is_active, sort_order=excluded.sort_order, note=excluded.note, updated_at=excluded.updated_at""",
-                (category, name, is_active, sort_order, note, now, now))
-        count += 1
-    try:
-        _clear_settings_cache()
-    except Exception:
-        pass
-    export_system_settings_permanent('save_category_process_options_v24', write_history=False)
-    return count
-
-
-def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
-    category = _norm_category_name(category_name)
-    try:
-        df = load_process_options_df(active_only=True)
-        if df is None or df.empty:
-            return []
-        matched = df[df['category_name'].astype(str).str.strip() == category]
-        return [str(x).strip() for x in matched.get('process_name', []).dropna().tolist() if str(x).strip()]
-    except Exception:
-        return []
-# ===== END V24 SYSTEM SETTINGS AUTHORITATIVE LATEST + GITHUB WRITE-THROUGH FIX =====
+def get_process_options_by_category_exact(category_name: str | None = None) -> list[str]:  # type: ignore[override]
+    return get_process_options_by_category(category_name, include_common=False)
