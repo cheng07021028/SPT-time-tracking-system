@@ -459,38 +459,49 @@ def import_employees_df(df: pd.DataFrame) -> int:  # type: ignore[override]
         work = work.drop_duplicates(subset=["employee_id"], keep="last")
     return save_employees_df(work)
 
-# ---------------------------------------------------------------------------
-# V31 compatibility wrappers
-# ---------------------------------------------------------------------------
-# Some deployed page files still import the fast names below.  Keep these
-# lightweight wrappers so 01. 工時紀錄 never fails during import after the
-# authority-store refactor.  They deliberately call the current authoritative
-# loaders rather than old persistent_modules / SQLite-first paths.
-def load_employees_for_time_record_fast(active_only: bool = True, in_factory_only: bool = False) -> pd.DataFrame:
+# ===== V35 master data compatibility wrappers =====
+def load_employees_for_time_record_fast(active_only: bool = True, in_factory_only: bool = False):
+    """Compatibility wrapper for 01｜工時紀錄.
+
+    Keeps the page import stable while using the existing employee loader.
+    """
+    return load_employees(active_only=active_only, in_factory_only=in_factory_only)
+
+
+def load_work_orders_for_time_record_fast(active_only: bool = True):
+    """Compatibility wrapper for 01｜工時紀錄.
+
+    Keeps the page import stable while using the existing work-order loader.
+    """
+    return load_work_orders(active_only=active_only)
+
+
+def has_master_data_for_time_record_fast(employees=None, work_orders=None):
+    """Return master-data availability for 01｜工時紀錄.
+
+    Supports both current page usage:
+        has_employees_master, has_work_orders_master = has_master_data_for_time_record_fast(employees, work_orders)
+
+    and diagnostic usage:
+        has_master_data_for_time_record_fast()
+    """
     try:
-        return load_employees(active_only=active_only, in_factory_only=in_factory_only)
-    except TypeError:
-        try:
-            return load_employees(active_only=active_only)
-        except Exception:
-            return pd.DataFrame()
+        emp_df = employees if employees is not None else load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
     except Exception:
-        return pd.DataFrame()
-
-
-def load_work_orders_for_time_record_fast(active_only: bool = True) -> pd.DataFrame:
+        emp_df = None
     try:
-        return load_work_orders(active_only=active_only)
+        wo_df = work_orders if work_orders is not None else load_work_orders_for_time_record_fast(active_only=True)
     except Exception:
-        return pd.DataFrame()
+        wo_df = None
 
+    has_emp = bool(emp_df is not None and hasattr(emp_df, "empty") and not emp_df.empty)
+    has_wo = bool(wo_df is not None and hasattr(wo_df, "empty") and not wo_df.empty)
 
-def has_master_data_for_time_record_fast() -> dict:
-    employees = load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
-    work_orders = load_work_orders_for_time_record_fast(active_only=True)
-    return {
-        "has_employees": bool(employees is not None and not employees.empty),
-        "has_work_orders": bool(work_orders is not None and not work_orders.empty),
-        "employee_count": int(len(employees)) if employees is not None else 0,
-        "work_order_count": int(len(work_orders)) if work_orders is not None else 0,
-    }
+    if employees is None and work_orders is None:
+        return {
+            "has_employees_master": has_emp,
+            "has_work_orders_master": has_wo,
+            "employees_count": int(len(emp_df)) if emp_df is not None and hasattr(emp_df, "__len__") else 0,
+            "work_orders_count": int(len(wo_df)) if wo_df is not None and hasattr(wo_df, "__len__") else 0,
+        }
+    return has_emp, has_wo
