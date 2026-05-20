@@ -1,15 +1,33 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-20 16:12:13",
+  "exported_at": "2026-05-20 16:17:01",
   "source": "db_service_write",
   "module_key": "11_login_logs",
   "module_code": "11",
   "module_name_zh": "登入紀錄",
   "module_name_en": "Login Logs",
   "tables": {
-    "auth_login_logs": []
+    "auth_login_logs": [],
+    "login_logs": [
+      {
+        "id": 1,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "11_login_logs",
+        "login_time": "2026-05-20 16:16:53",
+        "logout_time": null,
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "",
+        "created_at": "2026-05-20 16:16:53"
+      }
+    ]
   },
   "table_counts": {
-    "auth_login_logs": 0
+    "auth_login_logs": 0,
+    "login_logs": 1
   }
 }
