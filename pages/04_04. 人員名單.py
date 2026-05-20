@@ -230,6 +230,58 @@ def reload_data():
     st.session_state[STATE_KEY] = ensure_cols(df)
 
 
+
+
+def _v25_emp_set_edit(enabled: bool) -> None:
+    """V26: stable edit-mode callback. Runs before widgets are created."""
+    st.session_state["v253_employee_edit_enabled"] = bool(enabled)
+    if bool(enabled):
+        if STATE_KEY not in st.session_state:
+            reload_data()
+    else:
+        reload_data()
+    _refresh_editor_widget()
+
+
+def _v25_emp_blank_row() -> dict:
+    return {
+        "_delete": False, "id": "", "employee_id": "", "employee_name": "",
+        "department": "", "title": "", "is_active": True, "is_in_factory": True,
+        "is_today_attendance": True, "note": "", "created_at": "", "updated_at": "",
+    }
+
+
+def _v25_emp_batch(action: str) -> None:
+    """V26: all employee editor buttons update the draft before data_editor renders."""
+    if STATE_KEY not in st.session_state:
+        reload_data()
+    df = ensure_cols(pd.DataFrame(st.session_state.get(STATE_KEY, pd.DataFrame())).copy())
+    if action == "reload":
+        reload_data()
+        _refresh_editor_widget()
+        return
+    if action == "add":
+        df = pd.concat([pd.DataFrame([_v25_emp_blank_row()]), df], ignore_index=True)
+    elif action == "delete_on":
+        df["_delete"] = True
+    elif action == "delete_off":
+        df["_delete"] = False
+    elif action == "active_on":
+        df["is_active"] = True
+    elif action == "active_off":
+        df["is_active"] = False
+    elif action == "factory_on":
+        df["is_in_factory"] = True
+    elif action == "factory_off":
+        df["is_in_factory"] = False
+    elif action == "today_on":
+        df["is_today_attendance"] = True
+    elif action == "today_off":
+        df["is_today_attendance"] = False
+    st.session_state[STATE_KEY] = ensure_cols(df)
+    _refresh_editor_widget()
+
+
 if STATE_KEY not in st.session_state:
     reload_data()
 
