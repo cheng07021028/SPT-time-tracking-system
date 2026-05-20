@@ -1,7 +1,11 @@
 {
-  "schema_version": "3.02",
-  "exported_at": "2026-05-20 11:16:10",
-  "reason": "start_work_v20_immediate_history_sync",
+  "version": "V1.48",
+  "exported_at": "2026-05-20 19:20:52",
+  "source": "db_service_write",
+  "module_key": "01_time_records",
+  "module_code": "01",
+  "module_name_zh": "工時紀錄",
+  "module_name_en": "Time Records",
   "tables": {
     "time_records": [
       {
@@ -205,13 +209,13 @@
         "employee_name": "張文品",
         "start_action": "開始",
         "start_timestamp": "2026-05-20 19:16:08",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": null,
+        "end_timestamp": null,
         "remark": "",
         "start_date": "2026-05-20",
         "start_time": "19:16:08",
-        "end_date": "",
-        "end_time": "",
+        "end_date": null,
+        "end_time": null,
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "B002|ABC|2026-05-20",
@@ -222,10 +226,7 @@
       }
     ]
   },
-  "counts": {
+  "table_counts": {
     "time_records": 8
-  },
-  "module_code": "01_time_records",
-  "module_name_zh": "工時紀錄",
-  "module_name_en": "Time Records"
+  }
 }
