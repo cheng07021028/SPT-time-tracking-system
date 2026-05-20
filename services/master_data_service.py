@@ -458,3 +458,39 @@ def import_employees_df(df: pd.DataFrame) -> int:  # type: ignore[override]
     if "employee_id" in work.columns:
         work = work.drop_duplicates(subset=["employee_id"], keep="last")
     return save_employees_df(work)
+
+# ---------------------------------------------------------------------------
+# V31 compatibility wrappers
+# ---------------------------------------------------------------------------
+# Some deployed page files still import the fast names below.  Keep these
+# lightweight wrappers so 01. 工時紀錄 never fails during import after the
+# authority-store refactor.  They deliberately call the current authoritative
+# loaders rather than old persistent_modules / SQLite-first paths.
+def load_employees_for_time_record_fast(active_only: bool = True, in_factory_only: bool = False) -> pd.DataFrame:
+    try:
+        return load_employees(active_only=active_only, in_factory_only=in_factory_only)
+    except TypeError:
+        try:
+            return load_employees(active_only=active_only)
+        except Exception:
+            return pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
+
+
+def load_work_orders_for_time_record_fast(active_only: bool = True) -> pd.DataFrame:
+    try:
+        return load_work_orders(active_only=active_only)
+    except Exception:
+        return pd.DataFrame()
+
+
+def has_master_data_for_time_record_fast() -> dict:
+    employees = load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
+    work_orders = load_work_orders_for_time_record_fast(active_only=True)
+    return {
+        "has_employees": bool(employees is not None and not employees.empty),
+        "has_work_orders": bool(work_orders is not None and not work_orders.empty),
+        "employee_count": int(len(employees)) if employees is not None else 0,
+        "work_order_count": int(len(work_orders)) if work_orders is not None else 0,
+    }
