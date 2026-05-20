@@ -13,7 +13,7 @@ from services.security_service import (
     render_post_record_continue_prompt,
     trigger_post_record_continue_prompt,
 )
-from services.master_data_service import load_employees, load_work_orders
+from services.master_data_service import load_employees, load_work_orders, has_master_data_for_time_record
 from services.time_record_service import (
     clear_today_finished_from_work_page,
     delete_time_records,
@@ -42,11 +42,18 @@ render_post_record_continue_prompt()
 employees = load_employees(active_only=True, in_factory_only=False)
 work_orders = load_work_orders(active_only=True)
 
+# V11: master-data existence must be checked before employee account filtering.
+# A normal operator may only see one employee, or zero if not bound.  That should
+# not be treated as missing 03/04 master data.
+has_employees_master, has_work_orders_master = has_master_data_for_time_record()
+
 if employees.empty or work_orders.empty:
     if st.session_state.get("_spt_employee_binding_required"):
         st.warning("該人員未在人員名單，請洽管理員設定。")
-    else:
+    elif not has_employees_master or not has_work_orders_master:
         st.warning("請先到『03. 製令管理』與『04. 人員名單』匯入或新增資料。")
+    else:
+        st.warning("目前帳號可用資料為空，請確認帳號是否已綁定人員或是否具備此模組權限。")
     st.stop()
 
 left, right = st.columns([1.1, 1])

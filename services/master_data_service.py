@@ -14,45 +14,12 @@ from .log_service import write_log
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PERSISTENT_MODULES_DIR = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules"
-
-
-WORK_ORDER_COLUMNS = [
-    "id", "work_order", "part_no", "type_name", "assembly_location",
-    "customer", "note", "is_active", "created_at", "updated_at",
-]
-EMPLOYEE_COLUMNS = [
-    "id", "employee_id", "employee_name", "department", "title",
-    "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at",
-]
-
-
-def _empty_df(columns: list[str]) -> pd.DataFrame:
-    return pd.DataFrame(columns=columns)
-
-
-def _rows_to_df(rows: list[dict], columns: list[str]) -> pd.DataFrame:
-    if not rows:
-        return _empty_df(columns)
-    df = pd.DataFrame(rows)
-    for col in columns:
-        if col not in df.columns:
-            if col.startswith("is_"):
-                df[col] = 1
-            else:
-                df[col] = ""
-    return df[columns].copy()
-
-
-def _safe_query_df(sql: str, params=None, columns: list[str] | None = None) -> pd.DataFrame:
-    try:
-        return query_df(sql, params or [])
-    except Exception:
-        return _empty_df(columns or [])
+PERMANENT_STORE_DIR = PROJECT_ROOT / "data" / "permanent_store"
+PERSISTENT_MODULES_DIR = PERMANENT_STORE_DIR / "persistent_modules"
 
 
 def _load_persistent_module_rows(module_code: str, table_name: str) -> list[dict]:
-    """Load rows from data/permanent_store/persistent_modules as a non-destructive fallback.
+    """Load rows from data/permanent_store/persistent_modules as a fast non-destructive fallback.
 
     模組更新後如果 SQLite 暫時為空，但 data/permanent_store/persistent_modules 仍有資料，
     01｜工時紀錄不應誤判成 03/04 沒資料。這裡只在讀取為空時使用，
@@ -94,6 +61,106 @@ def _restore_employees_from_persistent() -> int:
             continue
     return count
 
+
+
+# ===== V11 FAST MASTER DATA LATEST CACHE START =====
+# Purpose:
+# - 01｜工時紀錄 and 04｜人員名單 must load the newest permanent JSON after reboot.
+# - Do not scan history or GitHub on every page open.
+# - If SQLite has only 1 stale row but permanent JSON has 70~80 rows, merge the latest JSON into SQLite once.
+_FAST_MASTER_RESTORE_DONE: set[str] = set()
+_FAST_MASTER_JSON_CACHE: dict[str, tuple[float, list[dict]]] = {}
+
+_MASTER_LATEST_MAP = {
+    "work_orders": ("03_work_orders", "03_work_orders_records.json"),
+    "employees": ("04_employees", "04_employees_records.json"),
+}
+
+
+def _extract_fast_rows(payload, table_name: str) -> list[dict]:
+    if isinstance(payload, dict):
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        rows = tables.get(table_name)
+        if isinstance(rows, list):
+            return [r for r in rows if isinstance(r, dict)]
+        for key in ("records", "rows", "data"):
+            rows = payload.get(key)
+            if isinstance(rows, list):
+                return [r for r in rows if isinstance(r, dict)]
+    if isinstance(payload, list):
+        return [r for r in payload if isinstance(r, dict)]
+    return []
+
+
+def _fast_latest_rows(table_name: str) -> list[dict]:
+    mod, fname = _MASTER_LATEST_MAP.get(table_name, ("", ""))
+    if not mod:
+        return []
+    path = PERSISTENT_MODULES_DIR / mod / fname
+    try:
+        mtime = path.stat().st_mtime
+    except Exception:
+        return []
+    cache = _FAST_MASTER_JSON_CACHE.get(str(path))
+    if cache and cache[0] == mtime:
+        return cache[1]
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        rows = _extract_fast_rows(payload, table_name)
+        _FAST_MASTER_JSON_CACHE[str(path)] = (mtime, rows)
+        return rows
+    except Exception:
+        return []
+
+
+def _row_count_sql(table_name: str) -> int:
+    try:
+        row = query_one(f"SELECT COUNT(*) AS cnt FROM {table_name}")
+        return int((row or {}).get("cnt") or 0)
+    except Exception:
+        return 0
+
+
+def _restore_master_if_permanent_newer(table_name: str) -> int:
+    # Once per process/table; keeps page open fast and avoids repeated write-through.
+    if table_name in _FAST_MASTER_RESTORE_DONE:
+        return 0
+    _FAST_MASTER_RESTORE_DONE.add(table_name)
+    rows = _fast_latest_rows(table_name)
+    if not rows:
+        return 0
+    current = _row_count_sql(table_name)
+    # Important: restore not only when DB is empty.  If DB has 1 old row but JSON has 80 rows,
+    # merge the JSON so 04｜人員名單 and 01｜工時紀錄 do not show false missing data.
+    if current >= len(rows):
+        return 0
+    count = 0
+    try:
+        from services.db_service import suspend_after_write_sync
+    except Exception:
+        suspend_after_write_sync = None
+    def _do_restore():
+        nonlocal count
+        for row in rows:
+            try:
+                if table_name == "employees":
+                    if upsert_employee(dict(row or {})):
+                        count += 1
+                elif table_name == "work_orders":
+                    if upsert_work_order(dict(row or {})):
+                        count += 1
+            except Exception:
+                continue
+    if suspend_after_write_sync is not None:
+        try:
+            with suspend_after_write_sync(f"v11_fast_restore_{table_name}"):
+                _do_restore()
+        except Exception:
+            _do_restore()
+    else:
+        _do_restore()
+    return count
+# ===== V11 FAST MASTER DATA LATEST CACHE END =====
 
 def _now() -> str:
     return now_text()
@@ -225,26 +292,23 @@ def _filter_employees_for_time_record(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_work_orders(active_only: bool = True) -> pd.DataFrame:
+    _restore_master_if_permanent_newer("work_orders")
     sql = "SELECT * FROM work_orders"
     if active_only:
         sql += " WHERE is_active=1"
     sql += " ORDER BY work_order"
-    df = _safe_query_df(sql, [], WORK_ORDER_COLUMNS)
+    df = query_df(sql)
     if not df.empty:
         return df
 
-    # Fallback: if DB is temporarily empty after module update/reboot, recover
-    # from canonical permanent JSON.  If SQLite is still unavailable, return the
-    # JSON rows directly so 01 工時紀錄 does not crash.
-    restored = _restore_work_orders_from_persistent()
-    df = _safe_query_df(sql, [], WORK_ORDER_COLUMNS)
-    if not df.empty:
-        return df
-    rows = _load_persistent_module_rows("03_work_orders", "work_orders")
-    return _rows_to_df(rows, WORK_ORDER_COLUMNS)
+    # Fallback: if DB is temporarily empty after module update, recover from
+    # persistent module JSON instead of showing a false "請先到 03/04 匯入資料" message.
+    _restore_work_orders_from_persistent()
+    return query_df(sql)
 
 
 def load_employees(active_only: bool = True, in_factory_only: bool = False) -> pd.DataFrame:
+    _restore_master_if_permanent_newer("employees")
     sql = "SELECT * FROM employees WHERE 1=1"
     params = []
     if active_only:
@@ -252,19 +316,32 @@ def load_employees(active_only: bool = True, in_factory_only: bool = False) -> p
     if in_factory_only:
         sql += " AND is_in_factory=1"
     sql += " ORDER BY employee_id"
-    df = _safe_query_df(sql, params, EMPLOYEE_COLUMNS)
+    df = query_df(sql, params)
     if df.empty:
         _restore_employees_from_persistent()
-        df = _safe_query_df(sql, params, EMPLOYEE_COLUMNS)
-    if df.empty:
-        rows = _load_persistent_module_rows("04_employees", "employees")
-        df = _rows_to_df(rows, EMPLOYEE_COLUMNS)
-        if active_only and "is_active" in df.columns:
-            df = df[df["is_active"].fillna(1).astype(str).isin(["1", "True", "true", "是", "Y", "y"])]
-        if in_factory_only and "is_in_factory" in df.columns:
-            df = df[df["is_in_factory"].fillna(1).astype(str).isin(["1", "True", "true", "是", "Y", "y"])]
+        df = query_df(sql, params)
     return _filter_employees_for_time_record(df)
 
+
+
+def has_master_data_for_time_record() -> tuple[bool, bool]:
+    """Fast raw master-data check for 01｜工時紀錄.
+
+    This intentionally bypasses employee account filtering.  It prevents a normal
+    operator with one visible employee from causing the page to display the false
+    message:「請先到 03/04 匯入或新增資料」when master data actually exists.
+    """
+    _restore_master_if_permanent_newer("employees")
+    _restore_master_if_permanent_newer("work_orders")
+    try:
+        emp_count = _row_count_sql("employees")
+    except Exception:
+        emp_count = len(_fast_latest_rows("employees"))
+    try:
+        wo_count = _row_count_sql("work_orders")
+    except Exception:
+        wo_count = len(_fast_latest_rows("work_orders"))
+    return emp_count > 0, wo_count > 0
 
 def upsert_work_order(row: dict) -> bool:
     now = _now()

@@ -23,11 +23,12 @@ except Exception:  # pragma: no cover
     pd = None
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
-PERSISTENT_STATE_DIR = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state"
+PERMANENT_STORE_DIR = PROJECT_ROOT / "data" / "permanent_store"
+DB_PATH = PERMANENT_STORE_DIR / "database" / "spt_time_tracking.db"
+PERSISTENT_STATE_DIR = PERMANENT_STORE_DIR / "persistent_state"
 AUDIT_HISTORY_DIR = PERSISTENT_STATE_DIR / "audit_history"
 AUDIT_STATE_PATH = PERSISTENT_STATE_DIR / "spt_audit_log_state.json"
-MODULE_DIR = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "11_login_logs"
+MODULE_DIR = PERMANENT_STORE_DIR / "persistent_modules" / "11_login_logs"
 MODULE_RECORDS_PATH = MODULE_DIR / "11_login_logs_records.json"
 MODULE_SETTINGS_PATH = MODULE_DIR / "11_login_logs_settings.json"
 MODULE_AUDIT_PATH = MODULE_DIR / "11_login_logs_audit.jsonl"
@@ -318,26 +319,42 @@ login_log_stats = get_login_log_stats
 
 
 def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:
+    """Delete login logs and immediately refresh permanent files.
+
+    V11 fixes Clear Login Logs no-op by deleting all known login-log tables,
+    including auth_login_logs, and uploading the latest permanent JSON when
+    GitHub write-through is available.
+    """
     ensure_login_logs_table()
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("""
-        DELETE FROM login_logs
-        WHERE date(COALESCE(login_time, created_at)) >= date(?)
-          AND date(COALESCE(login_time, created_at)) <= date(?)
-    """, (str(start_date), str(end_date)))
-    deleted = int(cur.rowcount if cur.rowcount is not None else 0)
-    if _table_exists(conn, "security_login_logs"):
-        cur.execute("""
-            DELETE FROM security_login_logs
-            WHERE date(COALESCE(login_time, created_at)) >= date(?)
-              AND date(COALESCE(login_time, created_at)) <= date(?)
-        """, (str(start_date), str(end_date)))
-        deleted += int(cur.rowcount if cur.rowcount is not None else 0)
+    deleted = 0
+    date_exprs = {
+        "login_logs": "date(COALESCE(login_time, created_at))",
+        "security_login_logs": "date(COALESCE(login_time, created_at))",
+        "auth_login_logs": "date(COALESCE(login_at, login_time, created_at))",
+    }
+    for table, expr in date_exprs.items():
+        try:
+            if table != "login_logs" and not _table_exists(conn, table):
+                continue
+            cur.execute(f"""
+                DELETE FROM {table}
+                WHERE {expr} >= date(?)
+                  AND {expr} <= date(?)
+            """, (str(start_date), str(end_date)))
+            deleted += int(cur.rowcount if cur.rowcount is not None else 0)
+        except Exception:
+            continue
     conn.commit()
     conn.close()
     try:
         export_audit_logs_to_permanent_file(create_history=True)
+        try:
+            from services.permanent_write_through_service import github_write_through_files
+            github_write_through_files([AUDIT_STATE_PATH, MODULE_RECORDS_PATH, MODULE_SETTINGS_PATH], source="v11_clear_login_logs")
+        except Exception:
+            pass
     except Exception:
         pass
     return deleted

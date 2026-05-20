@@ -11,14 +11,15 @@ import pandas as pd
 from services.timezone_service import now_text, now_stamp, today_text, today_date
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
+PERMANENT_STORE_DIR = PROJECT_ROOT / "data" / "permanent_store"
+DB_PATH = PERMANENT_STORE_DIR / "database" / "spt_time_tracking.db"
 
 
 # ===== V3.04 MASTER DATA RESCUE GUARD START =====
 # Purpose: 03｜製令管理 and 04｜人員名單 primarily read SQLite tables.
 # If a module update/reboot creates an empty SQLite DB while permanent JSON still has data,
 # restore the SQLite table from data/permanent_store/persistent_modules before the page displays empty data.
-PERSIST_ROOT = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules"
+PERSIST_ROOT = PERMANENT_STORE_DIR / "persistent_modules"
 
 _MASTER_MODULES = {
     "work_orders": {
@@ -63,27 +64,25 @@ def _extract_rows_from_payload(payload: Any, table: str) -> list[dict[str, Any]]
 
 
 def _candidate_record_files(table: str) -> list[Path]:
+    """Fast latest-only lookup for master data permanent files.
+
+    V11: do not scan every history file on normal page open.  03/04 pages only
+    need the fixed latest records file.  This is the main speed fix for 04｜人員名單.
+    """
     info = _MASTER_MODULES.get(table, {})
     files: list[Path] = []
     for code in info.get("module_codes", []):
         d = PERSIST_ROOT / code
         for name in info.get("latest_names", []):
             files.append(d / name)
-        files.extend(sorted((d / "history").glob("*_records_*.json"), reverse=True) if (d / "history").exists() else [])
-    # Also scan all persistent modules for a table-bearing record, newest first.
-    try:
-        files.extend(sorted(PERSIST_ROOT.glob(f"*/**/*records*.json"), key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True))
-    except Exception:
-        pass
     seen = set()
     out = []
     for p in files:
-        s = str(p.resolve()) if p.exists() else str(p)
-        if s not in seen:
-            seen.add(s)
+        key = str(p)
+        if key not in seen:
+            seen.add(key)
             out.append(p)
     return out
-
 
 def _find_best_persistent_rows(table: str) -> tuple[list[dict[str, Any]], str]:
     best_rows: list[dict[str, Any]] = []
@@ -132,18 +131,22 @@ def _normalise_row_for_table(table: str, row: dict[str, Any], now: str) -> dict[
 
 
 def _restore_table_from_persistent_if_empty(table: str) -> dict[str, Any]:
-    """Restore work_orders/employees from persistent JSON when SQLite table is empty."""
+    """Restore work_orders/employees from permanent JSON when SQLite is stale.
+
+    V11: Not only when DB is empty. If SQLite has 1 row but permanent JSON has
+    70~80 employees, merge JSON into SQLite once so 04｜人員名單 is correct.
+    """
     ensure_tables()
     if table not in _MASTER_MODULES:
         return {"restored": 0, "source": "", "reason": "unsupported_table"}
     conn = get_conn()
     try:
         current = _table_row_count(conn, table)
-        if current > 0:
-            return {"restored": 0, "source": "", "reason": "db_not_empty", "current": current}
         rows, source = _find_best_persistent_rows(table)
         if not rows:
-            return {"restored": 0, "source": "", "reason": "no_persistent_rows"}
+            return {"restored": 0, "source": "", "reason": "no_persistent_rows", "current": current}
+        if current >= len(rows):
+            return {"restored": 0, "source": source, "reason": "db_has_latest_or_more", "current": current, "permanent_rows": len(rows)}
         now = now_text()
         restored = 0
         cur = conn.cursor()
@@ -237,20 +240,6 @@ def _mirror_table_to_persistent_module(table: str) -> None:
         pass
 # ===== V3.04 MASTER DATA RESCUE GUARD END =====
 
-
-def _durable_sync_after_direct_save(source: str) -> None:
-    """Direct CRUD pages bypass db_service.execute, so explicitly sync latest JSON/GitHub."""
-    try:
-        from services.auto_github_sync_service import auto_sync_after_write
-        auto_sync_after_write(source=source, force=False, archive=False)
-    except Exception:
-        try:
-            from services.persistence_service import safe_export_after_write
-            safe_export_after_write()
-        except Exception:
-            pass
-
-
 def get_conn() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
@@ -320,13 +309,21 @@ def log_action(action_type: str, target_table: str, message: str, detail: str = 
     conn.commit()
     conn.close()
 
+_V11_RESTORE_DONE: set[str] = set()
+
 def _load(table: str, order_by: str = "id DESC") -> pd.DataFrame:
     ensure_tables()
-    if table in ("work_orders", "employees"):
+    if table in ("work_orders", "employees") and table not in _V11_RESTORE_DONE:
+        _V11_RESTORE_DONE.add(table)
         try:
-            _restore_table_from_persistent_if_empty(table)
+            from services.db_service import suspend_after_write_sync
+            with suspend_after_write_sync(f"v11_crud_restore_{table}"):
+                _restore_table_from_persistent_if_empty(table)
         except Exception:
-            pass
+            try:
+                _restore_table_from_persistent_if_empty(table)
+            except Exception:
+                pass
     conn = get_conn()
     try:
         return pd.read_sql_query(f"SELECT * FROM {table} ORDER BY {order_by}", conn)
@@ -420,7 +417,6 @@ def save_work_orders(df: pd.DataFrame) -> dict:
     except Exception:
         pass
     log_action("SAVE_WORK_ORDERS", "work_orders", "儲存製令清單", f"inserted={inserted}, updated={updated}, deleted={deleted}, skipped={skipped}")
-    _durable_sync_after_direct_save("crud_table_service_save_work_orders")
     return {"inserted": inserted, "updated": updated, "deleted": deleted, "skipped": skipped}
 
 def save_employees(df: pd.DataFrame) -> dict:
@@ -475,5 +471,4 @@ def save_employees(df: pd.DataFrame) -> dict:
     except Exception:
         pass
     log_action("SAVE_EMPLOYEES", "employees", "儲存人員名單", f"inserted={inserted}, updated={updated}, deleted={deleted}, skipped={skipped}")
-    _durable_sync_after_direct_save("crud_table_service_save_employees")
     return {"inserted": inserted, "updated": updated, "deleted": deleted, "skipped": skipped}

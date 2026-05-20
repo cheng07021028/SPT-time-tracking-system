@@ -61,10 +61,10 @@ def _remote_path(local_path: Path) -> str:
 
 def _allowed_remote(remote: str) -> bool:
     # V7: 保留 V5 安全限制，同時相容目前專案仍在使用的 latest JSON 路徑。
-    return remote.startswith("data/permanent_store/") or remote.startswith("data/persistent_modules/") or remote.startswith("data/persistent_state/") or remote.startswith("data/config/")
+    return remote.startswith("data/permanent_store/")
 
 
-def github_write_through_files(paths: Iterable[Path | str], *, source: str = "settings_save") -> dict[str, Any]:
+def github_write_through_files(paths: Iterable[Path | str], *, source: str = "settings_save", force: bool = False) -> dict[str, Any]:
     """Upload selected JSON files to GitHub if token is configured.
 
     V7 會略過內容沒有變更的檔案，避免每次儲存都把所有 mirror 檔重傳。
@@ -99,7 +99,8 @@ def github_write_through_files(paths: Iterable[Path | str], *, source: str = "se
         "uploaded_count": 0,
         "skipped_unchanged_count": 0,
         "uploads": [],
-        "mode": "v7_skip_unchanged_targeted_upload",
+        "mode": "v11_skip_unchanged_targeted_upload_force_supported",
+        "force": bool(force),
     }
     if not unique:
         result.update({"ok": False, "message": "no existing files to upload"})
@@ -124,7 +125,7 @@ def github_write_through_files(paths: Iterable[Path | str], *, source: str = "se
                 text = path.read_text(encoding="utf-8")
                 json.loads(text)  # validate JSON before upload
                 digest = _sha256_text(text)
-                if str(known_hashes.get(remote) or "") == digest:
+                if (not force) and str(known_hashes.get(remote) or "") == digest:
                     uploads.append({"ok": True, "path": remote, "skipped": True, "message": "unchanged"})
                     result["skipped_unchanged_count"] += 1
                     continue

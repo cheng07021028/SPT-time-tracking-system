@@ -3255,3 +3255,321 @@ def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
             pass
     return deleted
 # ===== V9 PERMISSION DELETE + STARTUP SPEED PATCH END =====
+
+# ===== V11 ACCOUNT MASTER FINAL SAVE/DELETE HOTFIX START =====
+# Fixes:
+# - 10｜權限管理「帳號清單編輯」新增/刪除後沒有穩定落地。
+# - Do not use layered delete wrappers or undefined compatibility constants.
+# - Save/delete writes one authoritative latest JSON and targeted GitHub write-through.
+_V11_PERMISSION_FILES = [
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_permission_settings.json",
+]
+_V11_PERMISSION_RESTORE_KEY = "_v11_permission_latest_restored"
+
+
+def _v11_schema_only() -> None:
+    try:
+        _v373_p_schema_only()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            if _v372_schema_init_only is not None:  # type: ignore[name-defined]
+                _v372_schema_init_only(force=False)  # type: ignore[misc]
+        except Exception:
+            pass
+
+
+def _v11_atomic_write(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v11_upload_permission_files(reason: str) -> dict:
+    try:
+        from services.permanent_write_through_service import github_write_through_files
+        return github_write_through_files([p for p in _V11_PERMISSION_FILES if p.exists()], source=reason)
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}
+
+
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
+    _v11_schema_only()
+    payload = _v373_permission_payload_from_db(reason)  # type: ignore[name-defined]
+    payload["version"] = "V11-account-master-authoritative"
+    payload["reason"] = reason
+    for path in _V11_PERMISSION_FILES:
+        _v11_atomic_write(path, payload)
+    upload = _v11_upload_permission_files(reason)
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    return {"ok": True, "mode": "v11_account_master_authoritative", "files": [str(p) for p in _V11_PERMISSION_FILES], "table_counts": payload.get("table_counts", {}), "github_upload": upload}
+
+
+def _v11_latest_permission_payload() -> dict:
+    candidates: list[tuple[float, dict]] = []
+    for path in _V11_PERMISSION_FILES:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8")) if path.exists() and path.stat().st_size > 2 else {}
+            tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
+            if isinstance(tables.get("auth_users"), list):
+                stamp = 0.0
+                for key in ("exported_at", "updated_at", "saved_at"):
+                    text = str(data.get(key) or "").strip()
+                    if text:
+                        try:
+                            stamp = datetime.fromisoformat(text.replace("/", "-")).timestamp()
+                            break
+                        except Exception:
+                            pass
+                if not stamp:
+                    stamp = path.stat().st_mtime
+                candidates.append((stamp, data))
+        except Exception:
+            continue
+    if not candidates:
+        return {}
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return candidates[0][1]
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    _v11_schema_only()
+    payload = _v11_latest_permission_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    if not isinstance(tables, dict) or not isinstance(tables.get("auth_users"), list):
+        return {"ok": False, "mode": "v11_account_master_authoritative", "message": "no latest permission payload"}
+    conn = connect_db(); cur = conn.cursor()
+    restored = {}
+    try:
+        try:
+            _ensure_legacy_security_tables(cur)
+            _ensure_security_setting_tables(cur)
+        except Exception:
+            pass
+        for table in ["auth_users", "auth_account_permissions", "auth_security_settings", "security_users", "security_user_roles", "security_settings"]:
+            rows = tables.get(table, []) if isinstance(tables.get(table), list) else []
+            restored[table] = _v373_replace_table(cur, table, rows)  # type: ignore[name-defined]
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    return {"ok": True, "mode": "v11_account_master_authoritative", "restored": restored}
+
+
+def _v11_restore_once() -> None:
+    if st is not None:
+        try:
+            if st.session_state.get(_V11_PERMISSION_RESTORE_KEY):
+                return
+        except Exception:
+            pass
+    restore_permission_settings_from_permanent_files(force=True)
+    if st is not None:
+        try:
+            st.session_state[_V11_PERMISSION_RESTORE_KEY] = True
+        except Exception:
+            pass
+
+
+def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
+    _v11_schema_only()
+    if force:
+        restore_permission_settings_from_permanent_files(force=True)
+
+
+init_auth_tables = init_permission_tables
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    _v11_restore_once()
+    conn = connect_db()
+    try:
+        rows = conn.execute("""
+            SELECT id, username,
+                   '********' AS password_display,
+                   '' AS new_password,
+                   employee_id, display_name, email, role_code,
+                   is_active, force_password_change, last_login_at, note, created_at, updated_at
+            FROM auth_users
+            ORDER BY username
+        """).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
+    _v11_schema_only()
+    input_rows = list(rows or [])
+    conn = connect_db(); cur = conn.cursor()
+    saved = 0; skipped: list[str] = []; role_sync_users: list[str] = []; saved_usernames: list[str] = []
+    try:
+        for r in input_rows:
+            if not isinstance(r, dict):
+                continue
+            username = str(r.get("username", "")).strip()
+            if not username:
+                continue
+            display_name = str(r.get("display_name", "")).strip() or username
+            role_code = str(r.get("role_code", "operator")).strip() or "operator"
+            new_password = str(r.get("new_password", "")).strip()
+            exists = cur.execute("SELECT username, role_code FROM auth_users WHERE username=?", (username,)).fetchone()
+            if exists:
+                old_role = str(exists["role_code"] or "operator").strip() or "operator"
+                cur.execute("""
+                    UPDATE auth_users
+                    SET employee_id=?, display_name=?, email=?, role_code=?, is_active=?,
+                        force_password_change=?, note=?, updated_at=?
+                    WHERE username=?
+                """, (
+                    str(r.get("employee_id", "")).strip(), display_name, str(r.get("email", "")).strip(),
+                    role_code, _v373_bool(r.get("is_active", True), True), _v373_bool(r.get("force_password_change", False), False),
+                    str(r.get("note", "")).strip(), now_text(), username,
+                ))
+                if new_password:
+                    cur.execute("UPDATE auth_users SET password_hash=?, updated_at=? WHERE username=?", (hash_password(new_password), now_text(), username))
+                if old_role != role_code:
+                    role_sync_users.append(username)
+            else:
+                if not new_password:
+                    skipped.append(f"{username} 未設定新密碼 / new password required")
+                    continue
+                cur.execute("""
+                    INSERT INTO auth_users
+                    (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,note,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                """, (
+                    username, hash_password(new_password), "由權限管理頁建立", str(r.get("employee_id", "")).strip(),
+                    display_name, str(r.get("email", "")).strip(), role_code, _v373_bool(r.get("is_active", True), True),
+                    _v373_bool(r.get("force_password_change", False), False), str(r.get("note", "")).strip(), now_text(), now_text(),
+                ))
+                role_sync_users.append(username)
+            saved += 1
+            saved_usernames.append(username)
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        ensure_permissions_for_all_users(force=True)
+        if role_sync_users:
+            sync_user_permissions_from_roles(role_sync_users, reason="account_role_changed")
+        sync_auth_users_to_runtime_security(saved_usernames)
+    except Exception:
+        pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    export_result = export_permission_settings_permanently("auth_users_saved_v11")
+    return {"saved": saved, "skipped": skipped, "role_synced_users": sorted(set(role_sync_users)), "permanent_save": export_result}
+
+
+def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
+    _v11_schema_only()
+    targets = []
+    seen = set()
+    for u in usernames or []:
+        name = str(u or "").strip()
+        low = name.lower()
+        if not name or low == "admin" or low in seen:
+            continue
+        targets.append(name); seen.add(low)
+    if not targets:
+        return 0
+    conn = connect_db(); cur = conn.cursor(); deleted = 0
+    try:
+        try:
+            _ensure_legacy_security_tables(cur)
+        except Exception:
+            pass
+        for u in targets:
+            before = 0
+            for table in ["auth_users", "security_users"]:
+                try:
+                    before += 1 if cur.execute(f"SELECT 1 FROM {table} WHERE username=?", (u,)).fetchone() else 0
+                except Exception:
+                    pass
+            for sql in [
+                "DELETE FROM auth_account_permissions WHERE username=?",
+                "DELETE FROM security_module_permissions WHERE username=?",
+                "DELETE FROM security_user_roles WHERE username=?",
+                "DELETE FROM auth_users WHERE username=?",
+                "DELETE FROM security_users WHERE username=?",
+            ]:
+                try:
+                    cur.execute(sql, (u,))
+                except Exception:
+                    pass
+            after = 0
+            for table in ["auth_users", "security_users"]:
+                try:
+                    after += 1 if cur.execute(f"SELECT 1 FROM {table} WHERE username=?", (u,)).fetchone() else 0
+                except Exception:
+                    pass
+            if before > 0 and after == 0:
+                deleted += 1
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    # Export even when deleted==0 but user selected targets, so stale JSON cannot restore them.
+    export_permission_settings_permanently("auth_users_deleted_v11")
+    return deleted
+
+
+def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
+    _v11_schema_only()
+    count = 0
+    conn = connect_db(); cur = conn.cursor()
+    try:
+        for r in rows or []:
+            if not isinstance(r, dict):
+                continue
+            username = str(r.get("username", "")).strip()
+            module_code = str(r.get("module_code", "")).strip()
+            if not username or not module_code:
+                continue
+            vals = {k: _v373_bool(r.get(k, False)) for k in ["can_view", "can_create", "can_edit", "can_delete", "can_import", "can_export", "can_backup", "can_restore", "can_manage"]}
+            cur.execute("""
+                INSERT INTO auth_account_permissions
+                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(username,module_code) DO UPDATE SET
+                    module_name_zh=excluded.module_name_zh, module_name_en=excluded.module_name_en,
+                    can_view=excluded.can_view, can_create=excluded.can_create, can_edit=excluded.can_edit,
+                    can_delete=excluded.can_delete, can_import=excluded.can_import, can_export=excluded.can_export,
+                    can_backup=excluded.can_backup, can_restore=excluded.can_restore, can_manage=excluded.can_manage,
+                    updated_at=excluded.updated_at
+            """, (
+                username, module_code, str(r.get("module_name_zh", "")).strip(), str(r.get("module_name_en", "")).strip(),
+                vals["can_view"], vals["can_create"], vals["can_edit"], vals["can_delete"], vals["can_import"], vals["can_export"], vals["can_backup"], vals["can_restore"], vals["can_manage"], now_text(),
+            ))
+            count += 1
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    export_permission_settings_permanently("account_permissions_saved_v11")
+    return count
+
+check_permission = has_permission
+# ===== V11 ACCOUNT MASTER FINAL SAVE/DELETE HOTFIX END =====
