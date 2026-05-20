@@ -48,6 +48,12 @@ from services.settings_durability_service import (
     download_critical_settings_from_github,
 )
 
+from services.legacy_cleanup_service import (
+    get_legacy_local_status,
+    get_legacy_remote_status,
+    cleanup_legacy_paths,
+)
+
 st.set_page_config(page_title="13. 系統設定", page_icon="⌬️", layout="wide")
 apply_theme()
 apply_dropdown_menu_size_only(560)
@@ -204,6 +210,90 @@ def _render_system_settings_health_center() -> None:
             st.warning("部分 13 系統設定永久檔不存在或不可讀。請按『立即刷新永久設定檔』建立/修復。")
         else:
             st.success("13 系統設定永久檔已存在且可讀。")
+
+
+def _render_legacy_cleanup_center() -> None:
+    """Danger-zone cleanup for obsolete pre-single-store paths.
+
+    This UI intentionally does not touch data/permanent_store/.  It only removes
+    legacy root-level data folders that caused old settings to be read after
+    Streamlit Reboot App or GitHub redeploy.
+    """
+    with st.expander("危險操作：清除舊資料來源 / Legacy Source Cleanup", expanded=False):
+        st.warning(
+            "此功能只清除舊版多路徑資料來源，不會刪除正式資料路徑 `data/permanent_store/`。"
+            "建議先確認 13｜系統設定永久檔健康檢查正常，再執行清除。"
+        )
+        st.markdown("**本機舊路徑狀態 / Local Legacy Paths**")
+        try:
+            local_rows = get_legacy_local_status()
+            st.dataframe(pd.DataFrame(local_rows), use_container_width=True, hide_index=True, height=220)
+        except Exception as exc:
+            st.error(f"本機舊路徑檢查失敗：{exc}")
+
+        include_github = False
+        if can_manage:
+            include_github = st.checkbox(
+                "同時清除 GitHub 倉庫內舊路徑 / Also remove legacy paths from GitHub",
+                value=False,
+                key="v374_cleanup_legacy_include_github",
+                help="若 GitHub 還保留 data/persistent_modules、data/persistent_state 等舊資料夾，Reboot App 重新部署後可能又被帶回來。",
+            )
+            if include_github:
+                try:
+                    remote_status = get_legacy_remote_status()
+                    if remote_status.get("skipped"):
+                        st.warning(remote_status.get("message", "GitHub 未設定，無法檢查。"))
+                    else:
+                        st.markdown("**GitHub 舊路徑狀態 / GitHub Legacy Paths**")
+                        st.dataframe(pd.DataFrame(remote_status.get("rows", [])), use_container_width=True, hide_index=True, height=220)
+                except Exception as exc:
+                    st.error(f"GitHub 舊路徑檢查失敗：{exc}")
+
+            confirm = st.checkbox(
+                "我確認只清除舊路徑，保留 data/permanent_store 正式資料 / I confirm cleanup legacy sources only",
+                value=False,
+                key="v374_cleanup_legacy_confirm",
+            )
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("◇ 先預覽將清除的舊檔 / Dry Run", use_container_width=True, key="v374_cleanup_legacy_dry_run"):
+                    res = cleanup_legacy_paths(include_github=include_github, dry_run=True)
+                    st.session_state["v374_cleanup_legacy_result"] = res
+                    st.rerun()
+            with c2:
+                if st.button(
+                    "🧹 清除所有舊檔來源 / Clean Legacy Sources",
+                    type="primary",
+                    use_container_width=True,
+                    key="v374_cleanup_legacy_execute",
+                    disabled=not confirm,
+                ):
+                    res = cleanup_legacy_paths(include_github=include_github, dry_run=False)
+                    st.session_state["v374_cleanup_legacy_result"] = res
+                    st.rerun()
+
+            result = st.session_state.get("v374_cleanup_legacy_result")
+            if isinstance(result, dict):
+                st.markdown("**清理結果 / Cleanup Result**")
+                local = result.get("local", {})
+                remote = result.get("remote", {})
+                if local.get("ok"):
+                    st.success(f"本機舊路徑清理完成；刪除 {local.get('deleted_count', 0)} 個舊路徑。")
+                else:
+                    st.error(f"本機舊路徑清理有錯誤：{local.get('errors')}")
+                st.dataframe(pd.DataFrame(local.get("rows", [])), use_container_width=True, hide_index=True, height=220)
+                if result.get("include_github"):
+                    if remote.get("ok"):
+                        st.success(f"GitHub 舊路徑清理完成；刪除 {remote.get('deleted_file_count', 0)} 個舊檔。")
+                    elif remote.get("skipped"):
+                        st.warning(remote.get("message", "GitHub 清理已略過。"))
+                    else:
+                        st.error(f"GitHub 舊路徑清理有錯誤：{remote.get('errors') or remote.get('message')}")
+                    st.dataframe(pd.DataFrame(remote.get("rows", [])), use_container_width=True, hide_index=True, height=260)
+        else:
+            st.info("你目前沒有管理權限，因此不能執行舊檔清理。")
+
 
 def _export_permanent_settings(message: str) -> None:
     """Create the dedicated 13｜系統設定 permanent JSON only.
@@ -452,8 +542,9 @@ def _render_external_auto_backup_center() -> None:
     st.divider()
 
 
-# V3.23：先顯示系統設定永久保存健康檢查，再顯示自動備份設定。
+# V3.23：先顯示系統設定永久保存健康檢查，再顯示舊檔清理，再顯示自動備份設定。
 _render_system_settings_health_center()
+_render_legacy_cleanup_center()
 
 # V3.20：每日自動備份設定必須保留在 13｜系統設定，不可被系統設定修正覆蓋移除。
 _render_external_auto_backup_center()
