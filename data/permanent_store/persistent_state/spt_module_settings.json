@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-20 13:11:09",
+  "exported_at": "2026-05-20 13:25:38",
   "source": "db_service_write",
   "tables": {
     "system_settings": [
@@ -43,166 +43,348 @@
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
-    "process_categories": [],
-    "process_category_options": [],
-    "process_options": [
+    "table_ui_settings": [],
+    "process_categories": [
       {
         "id": 1,
+        "category_name": "全部 / 通用",
+        "is_active": 1,
+        "sort_order": 0,
+        "note": "所有類別共用工段",
+        "created_at": "2026-05-20 13:11:48",
+        "updated_at": "2026-05-20 13:11:48"
+      }
+    ],
+    "process_category_options": [
+      {
+        "id": 1,
+        "category_name": "全部 / 通用",
         "process_name": "前置鈑金",
         "is_active": 1,
         "sort_order": 1,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 2,
+        "category_name": "全部 / 通用",
         "process_name": "LP改造",
         "is_active": 1,
         "sort_order": 2,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 3,
+        "category_name": "全部 / 通用",
         "process_name": "骨架組立",
         "is_active": 1,
         "sort_order": 3,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 4,
+        "category_name": "全部 / 通用",
         "process_name": "配電",
         "is_active": 1,
         "sort_order": 4,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 5,
+        "category_name": "全部 / 通用",
         "process_name": "模組",
         "is_active": 1,
         "sort_order": 5,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 6,
+        "category_name": "全部 / 通用",
         "process_name": "水平",
         "is_active": 1,
         "sort_order": 6,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 7,
+        "category_name": "全部 / 通用",
         "process_name": "S.T.",
         "is_active": 1,
         "sort_order": 7,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 8,
+        "category_name": "全部 / 通用",
         "process_name": "清潔",
         "is_active": 1,
         "sort_order": 8,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 9,
+        "category_name": "全部 / 通用",
         "process_name": "收機",
         "is_active": 1,
         "sort_order": 9,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 10,
+        "category_name": "全部 / 通用",
         "process_name": "包機",
         "is_active": 1,
         "sort_order": 10,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 11,
+        "category_name": "全部 / 通用",
         "process_name": "Packing",
         "is_active": 1,
         "sort_order": 11,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 12,
+        "category_name": "全部 / 通用",
         "process_name": "異常",
         "is_active": 1,
         "sort_order": 12,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 13,
+        "category_name": "全部 / 通用",
         "process_name": "設變",
         "is_active": 1,
         "sort_order": 13,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 14,
+        "category_name": "全部 / 通用",
         "process_name": "重工",
         "is_active": 1,
         "sort_order": 14,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 15,
+        "category_name": "全部 / 通用",
         "process_name": "教育訓練",
         "is_active": 1,
         "sort_order": 15,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 16,
+        "category_name": "全部 / 通用",
         "process_name": "IPQC",
         "is_active": 1,
         "sort_order": 16,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       },
       {
         "id": 17,
+        "category_name": "全部 / 通用",
         "process_name": "其他",
         "is_active": 1,
         "sort_order": 17,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-20 13:04:26",
-        "updated_at": "2026-05-20 13:04:26"
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      }
+    ],
+    "process_options": [
+      {
+        "id": 35,
+        "process_name": "前置鈑金",
+        "is_active": 1,
+        "sort_order": 1,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 36,
+        "process_name": "LP改造",
+        "is_active": 1,
+        "sort_order": 2,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 37,
+        "process_name": "骨架組立",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 38,
+        "process_name": "配電",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 39,
+        "process_name": "模組",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 40,
+        "process_name": "水平",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 41,
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 42,
+        "process_name": "清潔",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 43,
+        "process_name": "收機",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 44,
+        "process_name": "包機",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 45,
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 46,
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 47,
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 13,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 48,
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 49,
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 50,
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
+      },
+      {
+        "id": 51,
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-19 10:46:03",
+        "updated_at": "2026-05-19 10:46:03"
       }
     ],
     "rest_periods": [
       {
-        "id": 1,
+        "id": 6,
         "name": "上午休息",
         "start_time": "10:30",
         "end_time": "10:45",
@@ -210,7 +392,7 @@
         "sort_order": 1
       },
       {
-        "id": 2,
+        "id": 7,
         "name": "午休",
         "start_time": "12:00",
         "end_time": "13:00",
@@ -218,7 +400,7 @@
         "sort_order": 2
       },
       {
-        "id": 3,
+        "id": 8,
         "name": "下午休息",
         "start_time": "15:00",
         "end_time": "15:15",
@@ -226,7 +408,7 @@
         "sort_order": 3
       },
       {
-        "id": 4,
+        "id": 9,
         "name": "晚餐休息",
         "start_time": "18:00",
         "end_time": "18:30",
@@ -234,7 +416,7 @@
         "sort_order": 4
       },
       {
-        "id": 5,
+        "id": 10,
         "name": "晚上休息",
         "start_time": "20:00",
         "end_time": "20:15",
@@ -2588,8 +2770,9 @@
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "process_categories": 0,
-    "process_category_options": 0,
+    "table_ui_settings": 0,
+    "process_categories": 1,
+    "process_category_options": 17,
     "process_options": 17,
     "rest_periods": 5,
     "app_settings": 0,
