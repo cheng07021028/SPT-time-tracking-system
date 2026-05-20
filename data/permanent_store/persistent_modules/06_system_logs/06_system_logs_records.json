@@ -1,38 +1,11 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-20 13:53:31",
+  "exported_at": "2026-05-20 14:24:53",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
   "module_name_zh": "LOG查詢",
   "module_name_en": "System Logs",
-  "tables": {
-    "system_logs": [
-      {
-        "id": 1,
-        "log_time": "2026-05-19 12:07:46",
-        "user_name": "SYSTEM",
-        "action_type": "AUTO_INIT_DATABASE",
-        "target_table": "ALL",
-        "target_id": "",
-        "message": "自動初始化資料庫完成",
-        "detail": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
-        "level": "INFO"
-      },
-      {
-        "id": 11,
-        "log_time": "2026-05-20 13:50:09",
-        "user_name": "admin",
-        "action_type": "DELETE_LOG_RANGE",
-        "target_table": "system_logs",
-        "target_id": "2026-05-13~2026-05-20",
-        "message": "刪除 LOG 日期區間：2026-05-13 ~ 2026-05-20，刪除筆數：8",
-        "detail": "deleted_count=8",
-        "level": "WARN"
-      }
-    ]
-  },
-  "table_counts": {
-    "system_logs": 2
-  }
+  "tables": {},
+  "table_counts": {}
 }
