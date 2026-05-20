@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-20 13:53:31",
+  "exported_at": "2026-05-20 14:02:56",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 677,
@@ -16,7 +16,7 @@
     "process_category_options": 0,
     "process_options": 17,
     "rest_periods": 5,
-    "security_settings": 0,
+    "security_settings": 2,
     "security_user_roles": 9,
     "security_users": 9,
     "system_logs": 2,
@@ -4018,7 +4018,20 @@
         "sort_order": 5
       }
     ],
-    "security_settings": [],
+    "security_settings": [
+      {
+        "setting_key": "idle_timeout_minutes",
+        "setting_value": "15",
+        "note": "V1.69 synchronized security setting",
+        "updated_at": "2026-05-15 11:23:50"
+      },
+      {
+        "setting_key": "ask_continue_after_record",
+        "setting_value": "1",
+        "note": "V1.69 synchronized security setting",
+        "updated_at": "2026-05-15 11:23:50"
+      }
+    ],
     "security_user_roles": [
       {
         "id": 19,
