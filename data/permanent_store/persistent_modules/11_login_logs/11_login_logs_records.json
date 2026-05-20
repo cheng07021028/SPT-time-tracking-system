@@ -1,18 +1,15 @@
 {
-  "version": "V1.60-delete-aware",
-  "exported_at": "2026-05-20 15:48:17",
-  "source": "audit_log_service.delete_aware",
+  "version": "V1.48",
+  "exported_at": "2026-05-20 16:12:13",
+  "source": "db_service_write",
   "module_key": "11_login_logs",
-  "module_code": "11_login_logs",
+  "module_code": "11",
   "module_name_zh": "登入紀錄",
   "module_name_en": "Login Logs",
-  "table": "login_logs",
-  "count": 0,
-  "records": [],
   "tables": {
-    "login_logs": []
+    "auth_login_logs": []
   },
   "table_counts": {
-    "login_logs": 0
+    "auth_login_logs": 0
   }
 }
