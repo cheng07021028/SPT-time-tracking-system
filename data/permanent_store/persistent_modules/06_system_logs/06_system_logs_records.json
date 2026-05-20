@@ -1,7 +1,7 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-20 13:47:34",
-  "source": "crud_table_service_save_work_orders",
+  "exported_at": "2026-05-20 13:48:34",
+  "source": "crud_table_service_save_employees",
   "module_key": "06_system_logs",
   "module_code": "06",
   "module_name_zh": "LOG查詢",
@@ -73,10 +73,32 @@
         "message": "儲存製令清單",
         "detail": "inserted=0, updated=600, deleted=3, skipped=0",
         "level": "INFO"
+      },
+      {
+        "id": 9,
+        "log_time": "2026-05-20 13:48:28",
+        "user_name": "streamlit_user",
+        "action_type": "SAVE_EMPLOYEES",
+        "target_table": "employees",
+        "target_id": "",
+        "message": "儲存人員名單",
+        "detail": "inserted=0, updated=74, deleted=0, skipped=0",
+        "level": "INFO"
+      },
+      {
+        "id": 10,
+        "log_time": "2026-05-20 13:48:34",
+        "user_name": "streamlit_user",
+        "action_type": "SAVE_EMPLOYEES",
+        "target_table": "employees",
+        "target_id": "",
+        "message": "儲存人員名單",
+        "detail": "inserted=1, updated=74, deleted=0, skipped=0",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 6
+    "system_logs": 8
   }
 }
