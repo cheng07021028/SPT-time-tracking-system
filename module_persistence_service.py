@@ -20,10 +20,10 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
-PERSIST_ROOT = PROJECT_ROOT / "data" / "persistent_modules"
-GLOBAL_STATE = PROJECT_ROOT / "data" / "persistent_state" / "spt_module_independent_state.json"
-GLOBAL_SETTINGS = PROJECT_ROOT / "data" / "persistent_state" / "spt_module_independent_settings.json"
+DB_PATH = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
+PERSIST_ROOT = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules"
+GLOBAL_STATE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_module_independent_state.json"
+GLOBAL_SETTINGS = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_module_independent_settings.json"
 
 MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
     "01_time_record": {
@@ -129,7 +129,7 @@ def _json_default(obj: Any) -> str:
 
 def ensure_dirs() -> None:
     PERSIST_ROOT.mkdir(parents=True, exist_ok=True)
-    (PROJECT_ROOT / "data" / "persistent_state").mkdir(parents=True, exist_ok=True)
+    (PROJECT_ROOT / "data" / "permanent_store" / "persistent_state").mkdir(parents=True, exist_ok=True)
     for code in MODULE_TABLE_MAP:
         module_dir(code).mkdir(parents=True, exist_ok=True)
         (module_dir(code) / "history").mkdir(parents=True, exist_ok=True)
@@ -354,13 +354,13 @@ def protect_gitignore_rules() -> None:
     add_lines = [
         "",
         "# V1.43 independent permanent module records - keep these tracked",
-        "!data/persistent_modules/",
-        "!data/persistent_modules/**",
-        "!data/persistent_state/spt_module_independent_state.json",
-        "!data/persistent_state/spt_module_independent_settings.json",
-        "!data/persistent_state/spt_audit_log_state.json",
+        "!data/permanent_store/persistent_modules/",
+        "!data/permanent_store/persistent_modules/**",
+        "!data/permanent_store/persistent_state/spt_module_independent_state.json",
+        "!data/permanent_store/persistent_state/spt_module_independent_settings.json",
+        "!data/permanent_store/persistent_state/spt_audit_log_state.json",
     ]
-    if "!data/persistent_modules/**" not in text:
+    if "!data/permanent_store/persistent_modules/**" not in text:
         lines.extend(add_lines)
         gitignore.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

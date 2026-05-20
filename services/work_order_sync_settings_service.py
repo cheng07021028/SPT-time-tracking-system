@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import Any, Dict
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG_PATH = ROOT / "data" / "config" / "work_order_sync_settings.json"
-STATE_PATH = ROOT / "data" / "persistent_state" / "spt_work_order_sync_settings.json"
-MODULE_PATH = ROOT / "data" / "persistent_modules" / "03_work_orders" / "work_order_sync_settings.json"
+CONFIG_PATH = ROOT / "data" / "permanent_store" / "config" / "work_order_sync_settings.json"
+STATE_PATH = ROOT / "data" / "permanent_store" / "persistent_state" / "spt_work_order_sync_settings.json"
+MODULE_PATH = ROOT / "data" / "permanent_store" / "persistent_modules" / "03_work_orders" / "work_order_sync_settings.json"
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
     "version": "V2.52",

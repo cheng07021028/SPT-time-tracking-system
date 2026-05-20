@@ -692,13 +692,15 @@ def get_connection() -> sqlite3.Connection:
 
 
 def _auto_export_after_write_enabled() -> bool:
-    """Optional compatibility switch.
+    """Durability switch.
 
-    Default is OFF because automatic GitHub/permanent JSON export after every
-    delete/update was the main cause of 20-second operations.  If a deployment
-    explicitly needs the old behavior, set SPT_AUTO_EXPORT_AFTER_WRITE=1.
+    Default is ON because Streamlit Cloud local files are disposable after Reboot.
+    Every real write must refresh data/permanent_store latest JSON and, when
+    GITHUB_TOKEN is configured, upload it to GitHub. Set
+    SPT_AUTO_EXPORT_AFTER_WRITE=0 only for temporary offline debugging.
     """
-    return str(os.environ.get("SPT_AUTO_EXPORT_AFTER_WRITE", "")).strip().lower() in {"1", "true", "yes", "on"}
+    val = str(os.environ.get("SPT_AUTO_EXPORT_AFTER_WRITE", "1")).strip().lower()
+    return val not in {"0", "false", "no", "off", "disable", "disabled"}
 
 
 def mark_data_changed(reason: str = "資料已變更，待備份", source_sql: str | None = None) -> None:
@@ -789,16 +791,23 @@ def _after_write(sql: str | None = None) -> None:
     if not _auto_export_after_write_enabled():
         return
 
-    # Compatibility mode only: export/upload is throttled and opt-in.
+    # Durable write-through mode. This refreshes the single permanent store and,
+    # when GITHUB_TOKEN is configured, uploads latest JSON to GitHub. The called
+    # service has its own throttle to avoid excessive API calls.
     now_ts = time.time()
     if now_ts - _LAST_CLOUD_SYNC_TS < _CLOUD_SYNC_INTERVAL_SEC:
         return
     try:
-        from services.persistence_service import safe_export_after_write
-        safe_export_after_write()
+        from services.auto_github_sync_service import auto_sync_after_write
+        auto_sync_after_write(source="db_service_write", force=False, archive=False)
         _LAST_CLOUD_SYNC_TS = now_ts
     except Exception:
-        pass
+        try:
+            from services.persistence_service import safe_export_after_write
+            safe_export_after_write()
+            _LAST_CLOUD_SYNC_TS = now_ts
+        except Exception:
+            pass
 
 
 def execute(sql: str, params: Iterable[Any] | None = None) -> int:

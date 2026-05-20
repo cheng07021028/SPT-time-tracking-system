@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DB_DIR = PROJECT_ROOT / "data" / "database"
+DB_DIR = PROJECT_ROOT / "data" / "permanent_store" / "database"
 DB_PATH = DB_DIR / "spt_time_tracking.db"
 
 

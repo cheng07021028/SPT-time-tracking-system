@@ -1675,7 +1675,7 @@ def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
 def _v199_security_setting_paths() -> list[Path]:
     root = Path(__file__).resolve().parents[1]
     return [
-        root / "data" / "config" / "security_settings.json",
+        root / "data" / "permanent_store" / "config" / "security_settings.json",
         root / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json",
         root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
         root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "security_settings.json",
@@ -1814,10 +1814,10 @@ def _v208_idle_timeout_paths() -> list[Path]:
     """
     root = Path(__file__).resolve().parents[1]
     return [
-        root / "data" / "config" / "idle_timeout_settings.json",
+        root / "data" / "permanent_store" / "config" / "idle_timeout_settings.json",
         root / "data" / "permanent_store" / "persistent_state" / "spt_idle_timeout_settings.json",
         root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
-        root / "data" / "config" / "security_settings.json",
+        root / "data" / "permanent_store" / "config" / "security_settings.json",
         root / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json",
         root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
         root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "security_settings.json",
@@ -2030,10 +2030,10 @@ _AUTH_LIGHT_RESTORE_DONE = False
 def _v365_permission_direct_payloads() -> list[dict]:
     payloads: list[dict] = []
     paths = [
-        PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions' / '10_permissions_records.json',
-        PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions' / '10_permissions_settings.json',
-        PROJECT_ROOT / 'data' / 'persistent_state' / 'spt_user_persistent_settings.json',
-        PROJECT_ROOT / 'data' / 'persistent_state' / 'spt_module_settings.json',
+        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_modules' / '10_permissions' / '10_permissions_records.json',
+        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_modules' / '10_permissions' / '10_permissions_settings.json',
+        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_state' / 'spt_user_persistent_settings.json',
+        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_state' / 'spt_module_settings.json',
     ]
     for p in paths:
         try:
@@ -2077,8 +2077,14 @@ def _restore_auth_users_lightweight_if_needed(username: str = '') -> None:  # ty
     _AUTH_LIGHT_RESTORE_DONE = True
     _ensure_auth_users_schema_lightweight()
     try:
-        row = query_one('SELECT COUNT(*) AS c FROM auth_users') or {}
-        if int(row.get('c', 0) or 0) > 0:
+        rows = query_df('SELECT username, role_code FROM auth_users')
+        users = [str(x).strip().lower() for x in rows.get('username', []).tolist()] if hasattr(rows, 'get') else []
+        roles = {str(r.get('username', '')).strip().lower(): str(r.get('role_code', '')).strip().lower() for r in rows.to_dict(orient='records')} if hasattr(rows, 'to_dict') else {}
+        # A freshly booted Streamlit Cloud DB may contain only default admin/demo accounts.
+        # That is not real persistence; restore from the fixed latest permanent file.
+        non_default = [u for u in users if u not in {'admin', 'operator', 'viewer', 'demo', 'spt'}]
+        default_only = (not users) or (not non_default and len(users) <= 6)
+        if users and not default_only:
             return
     except Exception:
         pass

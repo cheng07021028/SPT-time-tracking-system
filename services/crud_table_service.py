@@ -237,6 +237,20 @@ def _mirror_table_to_persistent_module(table: str) -> None:
         pass
 # ===== V3.04 MASTER DATA RESCUE GUARD END =====
 
+
+def _durable_sync_after_direct_save(source: str) -> None:
+    """Direct CRUD pages bypass db_service.execute, so explicitly sync latest JSON/GitHub."""
+    try:
+        from services.auto_github_sync_service import auto_sync_after_write
+        auto_sync_after_write(source=source, force=False, archive=False)
+    except Exception:
+        try:
+            from services.persistence_service import safe_export_after_write
+            safe_export_after_write()
+        except Exception:
+            pass
+
+
 def get_conn() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
@@ -406,6 +420,7 @@ def save_work_orders(df: pd.DataFrame) -> dict:
     except Exception:
         pass
     log_action("SAVE_WORK_ORDERS", "work_orders", "儲存製令清單", f"inserted={inserted}, updated={updated}, deleted={deleted}, skipped={skipped}")
+    _durable_sync_after_direct_save("crud_table_service_save_work_orders")
     return {"inserted": inserted, "updated": updated, "deleted": deleted, "skipped": skipped}
 
 def save_employees(df: pd.DataFrame) -> dict:
@@ -460,4 +475,5 @@ def save_employees(df: pd.DataFrame) -> dict:
     except Exception:
         pass
     log_action("SAVE_EMPLOYEES", "employees", "儲存人員名單", f"inserted={inserted}, updated={updated}, deleted={deleted}, skipped={skipped}")
+    _durable_sync_after_direct_save("crud_table_service_save_employees")
     return {"inserted": inserted, "updated": updated, "deleted": deleted, "skipped": skipped}

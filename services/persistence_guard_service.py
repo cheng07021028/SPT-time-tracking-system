@@ -559,7 +559,7 @@ def guard_before_database_init() -> dict[str, Any]:
 
     if not DB_PATH.exists() and existing_evidence:
         for backup in list_all_persistent_backups(include_external=True):
-            src = backup / "data" / "database" / DB_PATH.name
+            src = backup / "data" / "permanent_store" / "database" / DB_PATH.name
             if src.exists() and src.stat().st_size > 0:
                 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, DB_PATH)

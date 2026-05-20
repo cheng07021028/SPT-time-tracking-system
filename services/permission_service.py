@@ -1216,7 +1216,7 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
 def _v199_security_setting_paths() -> list[Path]:
     root = Path(__file__).resolve().parents[1]
     return [
-        root / "data" / "config" / "security_settings.json",
+        root / "data" / "permanent_store" / "config" / "security_settings.json",
         root / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json",
         root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
         root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "security_settings.json",
@@ -1491,7 +1491,7 @@ def _v341_permission_candidate_paths() -> list[Path]:
         root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
         root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
         root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "security_settings.json",
-        root / "data" / "config" / "security_settings.json",
+        root / "data" / "permanent_store" / "config" / "security_settings.json",
         root / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json",
         root / "data" / "permanent_store" / "persistent_state" / "spt_module_settings.json",
         root / "data" / "permanent_store" / "persistent_state" / "spt_permanent_state.json",
@@ -1835,12 +1835,12 @@ def export_permission_settings_permanently(reason: str = 'permission_settings_sa
     """V3.65：本機輕量匯出，不連 GitHub、不掃 history、不觸發全域同步。"""
     init_permission_tables()
     payload = _v365_permission_payload_from_db(reason)
-    base = PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions'
+    base = PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_modules' / '10_permissions'
     files = [base / '10_permissions_records.json', base / '10_permissions_settings.json']
     for p in files:
         _v365_write_json_atomic(p, payload)
     try:
-        master_path = PROJECT_ROOT / 'data' / 'persistent_state' / 'spt_user_persistent_settings.json'
+        master_path = PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_state' / 'spt_user_persistent_settings.json'
         master = _json_load(master_path)
         if not isinstance(master, dict):
             master = {}
@@ -1858,9 +1858,9 @@ def export_permission_settings_permanently(reason: str = 'permission_settings_sa
 
 def _v365_direct_permission_payload() -> tuple[Path | None, dict]:
     direct = [
-        PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions' / '10_permissions_records.json',
-        PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions' / '10_permissions_settings.json',
-        PROJECT_ROOT / 'data' / 'persistent_state' / 'spt_user_persistent_settings.json',
+        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_modules' / '10_permissions' / '10_permissions_records.json',
+        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_modules' / '10_permissions' / '10_permissions_settings.json',
+        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_state' / 'spt_user_persistent_settings.json',
     ]
     for p in direct:
         raw = _json_load(p)

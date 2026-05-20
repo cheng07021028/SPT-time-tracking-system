@@ -6,8 +6,8 @@ import json
 import sqlite3
 
 ROOT = Path(__file__).resolve().parents[1]
-DB = ROOT / "data" / "database" / "spt_time_tracking.db"
-PERSIST = ROOT / "data" / "persistent_modules"
+DB = ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
+PERSIST = ROOT / "data" / "permanent_store" / "persistent_modules"
 
 TARGETS = {
     "work_orders": PERSIST / "03_work_orders" / "03_work_orders_records.json",

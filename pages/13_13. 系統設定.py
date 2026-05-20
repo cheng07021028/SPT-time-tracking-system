@@ -142,10 +142,10 @@ def _file_health_row(path: Path, label: str) -> dict:
 def _render_system_settings_health_center() -> None:
     root = _project_root()
     health_targets = [
-        (root / "data" / "config" / "system_settings.json", "系統設定主檔 / system_settings.json"),
+        (root / "data" / "permanent_store" / "config" / "system_settings.json", "系統設定主檔 / system_settings.json"),
         (root / "data" / "permanent_store" / "persistent_state" / "spt_system_settings.json", "系統設定狀態檔 / spt_system_settings.json"),
         (root / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "system_settings.json", "13 模組永久檔 / 13_system_settings"),
-        (root / "data" / "config" / "auto_external_backup_schedule.json", "每日自動備份設定 / backup schedule"),
+        (root / "data" / "permanent_store" / "config" / "auto_external_backup_schedule.json", "每日自動備份設定 / backup schedule"),
         (root / "data" / "permanent_store" / "persistent_state" / "auto_external_backup_state.json", "每日自動備份狀態 / backup state"),
     ]
     rows = [_file_health_row(path, label) for path, label in health_targets]

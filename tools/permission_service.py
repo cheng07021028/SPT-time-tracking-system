@@ -19,7 +19,7 @@ except Exception:  # tools / batch scripts may import without Streamlit context
     st = None
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
+DB_PATH = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
 _PERMISSION_SCHEMA_READY = False
 _PERMISSION_CACHE_TTL_SECONDS = 300
 
