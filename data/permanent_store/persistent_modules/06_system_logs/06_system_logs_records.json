@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-20 14:50:38",
+  "exported_at": "2026-05-20 14:56:00",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -40,10 +40,43 @@
         "message": "儲存預設類別：SSS",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-20 14:55:11",
+        "user_name": "appuser",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "9",
+        "message": "陳長彥 開始 21M0241-02 / BNM",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 5,
+        "log_time": "2026-05-20 14:55:45",
+        "user_name": "appuser",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "9",
+        "message": "結束工時紀錄 #9，同步結束=1筆，狀態=暫停，群組總工時=0.01，平均工時=0.01",
+        "detail": "9",
+        "level": "INFO"
+      },
+      {
+        "id": 6,
+        "log_time": "2026-05-20 14:55:45",
+        "user_name": "appuser",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "10",
+        "message": "陳長彥 開始 21M0241-04 / 前置鈑金",
+        "detail": "",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 3
+    "system_logs": 6
   }
 }
