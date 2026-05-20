@@ -1189,3 +1189,166 @@ def executemany(sql: str, rows: list[Iterable[Any]]) -> None:  # type: ignore[ov
     if _should_after_write_sync(sql) and not is_after_write_sync_suspended():
         _after_write(sql)
 # ===== V9 STARTUP SPEED PATCH END =====
+
+
+# ===== V16 FAST BOOTSTRAP + TRANSACTION HOTFIX =====
+# 目的：
+# 1) 修正 V14 time_record_service 匯入 execute_transaction 時的 ImportError。
+# 2) 01 工時紀錄按下確認/開始/結束時改用單一 SQLite transaction，避免每一筆 SQL 都重跑永久保存流程。
+# 3) 各模組讀取時不再重複進入昂貴資料防護流程；正式還原仍保留於第一次啟動、DB 空白、或手動 force 時。
+
+_V16_FAST_READ_GUARD_READY = False
+
+
+def _v16_is_read_sql(sql: str | None) -> bool:
+    try:
+        return _normalise_sql(sql or '').strip().startswith('select')
+    except Exception:
+        return False
+
+
+def _v16_should_skip_guard_for_fast_read(sql: str | None) -> bool:
+    """Skip expensive restore checks for normal SELECT after schema is ready.
+
+    This does not change any save path.  If DB is missing/corrupted, ensure_database()
+    still repairs it.  If user manually triggers restore/backup pages, those flows still
+    call force=True routines directly.
+    """
+    if not _v16_is_read_sql(sql):
+        return False
+    try:
+        if not DB_PATH.exists() or DB_PATH.stat().st_size <= 0:
+            return False
+    except Exception:
+        return False
+    # Once schema was initialized in this Python process, do not re-enter data guard
+    # for ordinary reads.  This is the major source of slow page switching.
+    return bool(globals().get('_SCHEMA_READY')) or bool(globals().get('_RESTORE_CHECKED'))
+
+
+# keep previous functions for fallback
+_v16_prev_query_df = query_df
+_v16_prev_query_one = query_one
+
+
+def query_df(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:  # type: ignore[override]
+    ensure_database()
+    if (not _v16_should_skip_guard_for_fast_read(sql)) and _should_run_data_guard(sql):
+        ensure_data_guard_restore()
+    if params is None:
+        params = ()
+    cacheable = _is_select_sql(sql)
+    key = _query_cache_key(sql, params)
+    now_ts = time.time()
+    if cacheable:
+        hit = _v7_cache_get_df(key, now_ts) if '_v7_cache_get_df' in globals() else None
+        if hit is not None:
+            return hit
+    try:
+        with _open_connection() as conn:
+            df = pd.read_sql_query(sql, conn, params=tuple(params))
+    except Exception as exc:
+        try:
+            _repair_database_after_error(exc)
+            with _open_connection() as conn:
+                df = pd.read_sql_query(sql, conn, params=tuple(params))
+        except Exception:
+            raise exc
+    if cacheable:
+        try:
+            if '_v7_cache_put_df' in globals():
+                _v7_cache_put_df(key, now_ts, df)
+        except Exception:
+            pass
+    return df
+
+
+def query_one(sql: str, params: Iterable[Any] | None = None) -> dict | None:  # type: ignore[override]
+    ensure_database()
+    if (not _v16_should_skip_guard_for_fast_read(sql)) and _should_run_data_guard(sql):
+        ensure_data_guard_restore()
+    if params is None:
+        params = ()
+    cacheable = _is_select_sql(sql)
+    key = _query_cache_key(sql, params)
+    now_ts = time.time()
+    if cacheable:
+        try:
+            cached = _QUERY_ONE_CACHE.get(key)
+            if cached and now_ts - cached[0] <= _QUERY_CACHE_TTL_SEC:
+                return dict(cached[1]) if isinstance(cached[1], dict) else None
+        except Exception:
+            pass
+    with _open_connection() as conn:
+        row = conn.execute(sql, tuple(params)).fetchone()
+        out = dict(row) if row else None
+    if cacheable:
+        try:
+            if len(_QUERY_ONE_CACHE) >= _QUERY_CACHE_MAX_ITEMS:
+                oldest = min(_QUERY_ONE_CACHE.items(), key=lambda kv: kv[1][0])[0]
+                _QUERY_ONE_CACHE.pop(oldest, None)
+            _QUERY_ONE_CACHE[key] = (now_ts, dict(out) if isinstance(out, dict) else None)
+        except Exception:
+            pass
+    return out
+
+
+def execute_transaction(
+    operations: list[tuple[str, Iterable[Any]]] | tuple[tuple[str, Iterable[Any]], ...],
+    mark_changed: bool = True,
+    reason: str = '資料已變更，待備份',
+    source_sql: str = 'BATCH_TRANSACTION',
+) -> list[int]:
+    """Run many SQL writes in one SQLite transaction and one persistence cycle.
+
+    operations item format: (sql, params).  It returns lastrowid for each statement so
+    callers can identify inserted records.  This preserves behavior while avoiding
+    the previous slow pattern: execute() -> export -> GitHub check per SQL statement.
+    """
+    ensure_database()
+    if operations is None:
+        operations = []
+    ids: list[int] = []
+    if not operations:
+        return ids
+    try:
+        with _open_connection() as conn:
+            cur = conn.cursor()
+            for item in operations:
+                if not item:
+                    ids.append(0)
+                    continue
+                sql = item[0]
+                params = item[1] if len(item) > 1 and item[1] is not None else ()
+                cur.execute(sql, tuple(params))
+                ids.append(int(cur.lastrowid or 0))
+            conn.commit()
+    except Exception as exc:
+        if not _is_repairable_database_error(exc):
+            raise
+        repaired = _repair_database_after_error(exc)
+        if not repaired.get('ok'):
+            raise
+        with _open_connection() as conn:
+            cur = conn.cursor()
+            ids = []
+            for item in operations:
+                sql = item[0]
+                params = item[1] if len(item) > 1 and item[1] is not None else ()
+                cur.execute(sql, tuple(params))
+                ids.append(int(cur.lastrowid or 0))
+            conn.commit()
+    clear_query_cache()
+    if mark_changed:
+        try:
+            mark_data_changed(reason=reason, source_sql=source_sql)
+        except Exception:
+            pass
+        # One lightweight export/sync attempt for the whole transaction, not per SQL.
+        try:
+            if not is_after_write_sync_suspended() and _auto_export_after_write_enabled():
+                _after_write(source_sql)
+        except Exception:
+            pass
+    return ids
+# ===== V16 FAST BOOTSTRAP + TRANSACTION HOTFIX END =====

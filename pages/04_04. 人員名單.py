@@ -224,6 +224,63 @@ def parse_pasted_employees(raw: str) -> tuple[pd.DataFrame, bool, list[str]]:
         warnings.append(f"已略過 {dropped} 筆缺少工號或姓名的資料列。")
     return ensure_cols(df), has_header, warnings
 
+
+
+def parse_excel_employees(source: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    """Parse uploaded Excel with the same header-mapping rules as pasted data."""
+    warnings: list[str] = []
+    if source is None or source.empty:
+        return ensure_cols(pd.DataFrame()), ["Excel 檔案沒有可匯入資料。"]
+    source = source.copy()
+    source.columns = [str(c).strip() for c in source.columns]
+    alias_groups = {
+        "employee_id": ["工號", "員工編號", "人員編號", "employee id", "employee_id", "emp id", "empid", "id", "編號"],
+        "employee_name": ["姓名", "員工姓名", "人員姓名", "employee name", "employee_name", "name", "名字"],
+        "department": ["單位", "部門", "課別", "廠別", "department", "dept", "section"],
+        "title": ["職稱", "職務", "工段", "title", "job title", "position", "作業類別"],
+        "note": ["備註", "note", "remark", "remarks", "說明", "memo"],
+        "is_active": ["啟用", "active", "is active", "is_active", "在職", "狀態", "有效"],
+        "is_in_factory": ["在廠", "在廠內", "in factory", "is in factory", "is_in_factory", "現場", "廠內"],
+        "is_today_attendance": ["今日出勤", "今天出勤", "出勤", "today", "attendance", "is_today_attendance", "今日到班"],
+    }
+    employee_id = _pick_series(source, alias_groups["employee_id"])
+    employee_name = _pick_series(source, alias_groups["employee_name"])
+    if isinstance(employee_id, str) or isinstance(employee_name, str):
+        return ensure_cols(pd.DataFrame()), ["找不到必要欄位：工號 / 姓名。請使用範本或確認 Excel 標題列。"]
+    active_series = _pick_series(source, alias_groups["is_active"], default=None)
+    factory_series = _pick_series(source, alias_groups["is_in_factory"], default=None)
+    today_series = _pick_series(source, alias_groups["is_today_attendance"], default=None)
+    df = pd.DataFrame({
+        "_delete": False,
+        "id": "",
+        "employee_id": employee_id,
+        "employee_name": employee_name,
+        "department": _pick_series(source, alias_groups["department"]),
+        "title": _pick_series(source, alias_groups["title"]),
+        "is_active": True if active_series is None else active_series.map(_is_truthy),
+        "is_in_factory": True if factory_series is None else factory_series.map(_is_truthy),
+        "is_today_attendance": True if today_series is None else today_series.map(_is_truthy),
+        "note": _pick_series(source, alias_groups["note"]),
+        "created_at": "",
+        "updated_at": "",
+    })
+    for c in ["employee_id", "employee_name", "department", "title", "note"]:
+        df[c] = df[c].map(_normalize_text)
+    before = len(df)
+    df = df[(df["employee_id"] != "") & (df["employee_name"] != "")].copy()
+    dropped = before - len(df)
+    if dropped > 0:
+        warnings.append(f"已略過 {dropped} 筆缺少工號或姓名的資料列。")
+    return ensure_cols(df), warnings
+
+
+def _reset_employee_editor_state() -> None:
+    """Clear stale Streamlit data_editor widget state after button actions."""
+    for k in list(st.session_state.keys()):
+        if str(k).startswith("employees_data_editor_v253_"):
+            st.session_state.pop(k, None)
+    _refresh_editor_widget()
+
 def reload_data():
     df = load_employees()
     df.insert(0, "_delete", False)
@@ -245,14 +302,15 @@ with tab1:
     ec1, ec2, ec3 = st.columns([1.2, 1.2, 3])
     with ec1:
         if st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=employee_edit_enabled, key="v253_enable_employee_edit"):
+            reload_data()
             st.session_state["v253_employee_edit_enabled"] = True
-            _refresh_editor_widget()
+            _reset_employee_editor_state()
             rerun()
     with ec2:
         if st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not employee_edit_enabled, key="v253_disable_employee_edit"):
             st.session_state["v253_employee_edit_enabled"] = False
             reload_data()
-            _refresh_editor_widget()
+            _reset_employee_editor_state()
             rerun()
     with ec3:
         if employee_edit_enabled:
@@ -268,45 +326,45 @@ with tab1:
             "is_today_attendance": True, "note": "", "created_at": "", "updated_at": ""
         }])
         st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
-        _refresh_editor_widget()
+        _reset_employee_editor_state()
         rerun()
     if c2.button("⊖ 刪除欄全選", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["_delete"] = True
-        _refresh_editor_widget()
+        _reset_employee_editor_state()
         rerun()
     if c3.button("◌ 刪除欄取消", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["_delete"] = False
-        _refresh_editor_widget()
+        _reset_employee_editor_state()
         rerun()
     if c4.button("◈ 啟用全選", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_active"] = True
-        _refresh_editor_widget()
+        _reset_employee_editor_state()
         rerun()
     if c5.button("◌ 啟用全取消", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_active"] = False
-        _refresh_editor_widget()
+        _reset_employee_editor_state()
         rerun()
     if c6.button("⟳ 重新載入", use_container_width=True):
         reload_data()
-        _refresh_editor_widget()
+        _reset_employee_editor_state()
         rerun()
 
     b1, b2, b3, b4 = st.columns(4)
     if b1.button("⬡ 在廠全選", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_in_factory"] = True
-        _refresh_editor_widget()
+        _reset_employee_editor_state()
         rerun()
     if b2.button("⬡ 在廠全取消", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_in_factory"] = False
-        _refresh_editor_widget()
+        _reset_employee_editor_state()
         rerun()
     if b3.button("⧖ 今日出勤全選", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_today_attendance"] = True
-        _refresh_editor_widget()
+        _reset_employee_editor_state()
         rerun()
     if b4.button("⧖ 今日出勤全取消", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_today_attendance"] = False
-        _refresh_editor_widget()
+        _reset_employee_editor_state()
         rerun()
 
     st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。工號 / Employee ID、姓名 / Name 為必填。")
@@ -347,18 +405,55 @@ with tab1:
         st.session_state[STATE_KEY] = ensure_cols(edited)
         result = save_employees(st.session_state[STATE_KEY])
         reload_data()
-        _refresh_editor_widget()
+        _reset_employee_editor_state()
         st.session_state["v253_employee_edit_enabled"] = False
         st.success(f"儲存完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
         rerun()
 
 with tab2:
     st.subheader("Excel 匯入 / Excel Import")
+    st.caption("V17：Excel 匯入已增加確認儲存按鈕；儲存後會寫入正式記憶檔，Reboot App 不會消失。")
     uploaded = st.file_uploader("上傳人員 Excel", type=["xlsx", "xlsm", "xls"])
     if uploaded is not None:
-        source_df = pd.read_excel(uploaded)
-        st.dataframe(source_df, use_container_width=True)
-        st.info("可先確認欄位，再複製到『貼上資料』或『人員清單編輯』處理。")
+        try:
+            source_df = pd.read_excel(uploaded)
+        except Exception as exc:
+            source_df = pd.DataFrame()
+            st.error(f"Excel 讀取失敗：{exc}")
+        if not source_df.empty:
+            parsed_excel, excel_warnings = parse_excel_employees(source_df)
+            st.markdown("#### 原始 Excel 預覽 / Source Preview")
+            st.dataframe(source_df, use_container_width=True, height=260)
+            for msg in excel_warnings:
+                st.warning(msg)
+            if parsed_excel.empty:
+                st.error("解析後沒有可儲存資料。請確認至少包含：工號、姓名。")
+            else:
+                st.success(f"已解析 {len(parsed_excel)} 筆人員資料。請確認下方預覽後按確認儲存。")
+                st.markdown("#### 匯入資料預覽 / Import Preview")
+                st.dataframe(
+                    parsed_excel[["employee_id", "employee_name", "department", "title", "note", "is_active", "is_in_factory", "is_today_attendance"]],
+                    use_container_width=True,
+                    height=360,
+                )
+                c_excel1, c_excel2 = st.columns(2)
+                with c_excel1:
+                    confirm_excel_import = st.checkbox("我確認要匯入並儲存這批人員資料 / Confirm Excel import", key="v17_confirm_excel_employee_import")
+                with c_excel2:
+                    save_excel_import = st.button(
+                        "▣ 確認儲存 Excel 人員資料 / Confirm Save Excel Employees",
+                        type="primary",
+                        use_container_width=True,
+                        disabled=not confirm_excel_import,
+                        key="v17_save_excel_employees",
+                    )
+                if save_excel_import:
+                    result = save_employees(parsed_excel)
+                    reload_data()
+                    _reset_employee_editor_state()
+                    st.session_state["v253_employee_edit_enabled"] = False
+                    st.success(f"Excel 資料已儲存：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
+                    rerun()
 
 with tab3:
     st.subheader("貼上資料 / Paste Data")

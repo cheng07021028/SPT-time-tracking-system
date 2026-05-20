@@ -349,7 +349,7 @@ def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:
     conn.commit()
     conn.close()
     try:
-        export_audit_logs_to_permanent_file(create_history=True)
+        export_audit_logs_to_permanent_file(create_history=True, merge_existing=False)
         try:
             from services.permanent_write_through_service import github_write_through_files
             github_write_through_files([AUDIT_STATE_PATH, MODULE_RECORDS_PATH, MODULE_SETTINGS_PATH], source="v11_clear_login_logs")
@@ -458,10 +458,16 @@ def _read_json_file(path: Path) -> Dict[str, Any]:
 
 
 def _permanent_candidate_paths() -> List[Path]:
+    """Return login-log permanent candidates in authority order.
+
+    V17: do not let old history files with more rows override the latest file.
+    Clear Login Logs must stay cleared after Reboot, so the current latest JSON
+    is the authority.  History is only a fallback when latest files are missing.
+    """
     paths: List[Path] = [AUDIT_STATE_PATH, MODULE_RECORDS_PATH]
-    paths.extend(sorted(AUDIT_HISTORY_DIR.glob("spt_audit_log_state_*.json"), reverse=True)[:3])
-    paths.extend(sorted((MODULE_DIR / "history").glob("11_login_logs_records_*.json"), reverse=True)[:3])
-    # keep order, remove duplicates
+    if not any(p.exists() and p.stat().st_size > 2 for p in paths):
+        paths.extend(sorted(AUDIT_HISTORY_DIR.glob("spt_audit_log_state_*.json"), reverse=True)[:3])
+        paths.extend(sorted((MODULE_DIR / "history").glob("11_login_logs_records_*.json"), reverse=True)[:3])
     seen = set()
     unique = []
     for x in paths:
@@ -472,14 +478,36 @@ def _permanent_candidate_paths() -> List[Path]:
     return unique
 
 
+def _payload_timestamp(payload: Any, path: Path) -> str:
+    if isinstance(payload, dict):
+        for k in ("exported_at", "updated_at", "created_at"):
+            v = payload.get(k)
+            if v:
+                return str(v)
+    try:
+        return str(path.stat().st_mtime)
+    except Exception:
+        return ""
+
+
 def _best_permanent_records() -> tuple[List[Dict[str, Any]], str]:
+    """Pick the newest authority file, not the biggest old backup.
+
+    The previous count-based selection caused deleted login logs to come back
+    because an older history backup had more rows than the newly-cleared latest file.
+    """
     best: List[Dict[str, Any]] = []
     best_path = ""
+    best_ts = ""
     for path in _permanent_candidate_paths():
-        records = _extract_login_records_from_payload(_read_json_file(path))
-        if len(records) > len(best):
-            best = records
-            best_path = str(path)
+        payload = _read_json_file(path)
+        records = _extract_login_records_from_payload(payload)
+        ts = _payload_timestamp(payload, path)
+        if records or path.exists():
+            if not best_path or ts >= best_ts:
+                best = records
+                best_path = str(path)
+                best_ts = ts
     return best, best_path
 
 
@@ -567,13 +595,15 @@ def _auto_restore_if_db_lacks_permanent_records() -> Dict[str, Any]:
         return {"ok": False, "auto_restored": False, "message": str(exc)}
 
 
-def export_audit_logs_to_permanent_file(create_history: bool = True) -> Dict[str, Any]:
+def export_audit_logs_to_permanent_file(create_history: bool = True, merge_existing: bool = True) -> Dict[str, Any]:
     _ensure_dirs()
     ensure_login_logs_table()
     db_records = _to_records(load_login_logs(limit=100000, include_legacy=True))
     existing_records, _src = _best_permanent_records()
-    # Never let a fresh/rebooted SQLite with only 1-2 rows overwrite a richer permanent file.
-    records = _merge_record_sets(existing_records, db_records)
+    # Normal login writes merge with existing records.  Clear/delete operations must
+    # be able to overwrite the latest file with fewer rows, otherwise deleted logs
+    # come back after Reboot App.
+    records = _merge_record_sets(existing_records, db_records) if merge_existing else db_records
     payload = {
         "version": "V1.50",
         "exported_at": _now(),
@@ -683,3 +713,147 @@ def bootstrap_audit_log_service() -> Dict[str, Any]:
     _ensure_dirs()
     restore_res = _auto_restore_if_db_lacks_permanent_records()
     return {"ok": True, "message": "audit_log_service ready", "count": count_login_logs(include_legacy=True), "restore": restore_res}
+
+
+# ===== V16 ROBUST LOGIN LOG DELETE =====
+def _v16_parse_date(value: Any):
+    """Parse common Taiwan/SQLite datetime strings into date()."""
+    if value in (None, ''):
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    s = s.replace('T', ' ').replace('/', '-').replace('.', '-')
+    # Remove timezone suffix conservatively for date parsing.
+    if '+' in s:
+        s = s.split('+', 1)[0].strip()
+    if s.endswith('Z'):
+        s = s[:-1]
+    candidates = [
+        s[:10],
+        s.split(' ')[0],
+        s,
+    ]
+    for c in candidates:
+        for fmt in ('%Y-%m-%d', '%Y%m%d'):
+            try:
+                return datetime.strptime(c, fmt).date()
+            except Exception:
+                pass
+    try:
+        return datetime.fromisoformat(s).date()
+    except Exception:
+        return None
+
+
+def _v16_row_log_date(row: Dict[str, Any]):
+    for key in ('login_time', 'login_at', 'created_at', 'log_time', 'event_time', 'timestamp'):
+        d = _v16_parse_date(row.get(key))
+        if d is not None:
+            return d
+    return None
+
+
+def _v16_export_audit_logs_from_db_only(create_history: bool = True) -> Dict[str, Any]:
+    """Export current DB state only.
+
+    Used after deletion.  The normal export intentionally merges old permanent records
+    to protect against accidental data loss after reboot; that behavior is wrong after
+    an explicit Clear Login Logs action because it resurrects deleted rows.
+    """
+    _ensure_dirs()
+    ensure_login_logs_table()
+    db_records = _to_records(load_login_logs(limit=100000, include_legacy=True))
+    payload = {
+        'version': 'V1.60-delete-aware',
+        'exported_at': _now(),
+        'source': 'audit_log_service.delete_aware',
+        'module_key': '11_login_logs',
+        'module_code': '11_login_logs',
+        'module_name_zh': '登入紀錄',
+        'module_name_en': 'Login Logs',
+        'table': 'login_logs',
+        'count': len(db_records),
+        'records': db_records,
+        'tables': {'login_logs': db_records},
+        'table_counts': {'login_logs': len(db_records)},
+    }
+    AUDIT_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    MODULE_RECORDS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    for path in (AUDIT_STATE_PATH, MODULE_RECORDS_PATH):
+        tmp = path.with_suffix(path.suffix + '.tmp')
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding='utf-8')
+        tmp.replace(path)
+    MODULE_SETTINGS_PATH.write_text(json.dumps({
+        'version': 'V1.60-delete-aware',
+        'exported_at': _now(),
+        'module': '11_login_logs',
+        'settings': {'source_tables': ['login_logs', 'security_login_logs', 'auth_login_logs'], 'delete_aware': True},
+    }, ensure_ascii=False, indent=2), encoding='utf-8')
+    hist = ''
+    if create_history:
+        ts = _now_file()
+        hist_path = AUDIT_HISTORY_DIR / f'spt_audit_log_state_{ts}.json'
+        hist_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding='utf-8')
+        module_hist = MODULE_DIR / 'history' / f'11_login_logs_records_{ts}.json'
+        module_hist.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding='utf-8')
+        hist = str(hist_path)
+    return {'ok': True, 'message': '登入紀錄永久檔已依刪除後 DB 狀態更新', 'count': len(db_records), 'path': str(AUDIT_STATE_PATH), 'history_path': hist}
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    """Delete login logs by Python date parsing, then export DB-only state.
+
+    Fixes no-op deletes caused by SQLite date() not parsing strings like
+    2026/05/20 08:00:00 and prevents deleted rows from being merged back from
+    permanent JSON on the next Reboot App.
+    """
+    ensure_login_logs_table()
+    start_d = _v16_parse_date(start_date)
+    end_d = _v16_parse_date(end_date)
+    if start_d is None or end_d is None:
+        return 0
+    if end_d < start_d:
+        start_d, end_d = end_d, start_d
+
+    conn = get_connection()
+    cur = conn.cursor()
+    deleted = 0
+    for table in ('login_logs', 'security_login_logs', 'auth_login_logs'):
+        try:
+            if not _table_exists(conn, table):
+                continue
+            rows = conn.execute(f'SELECT rowid AS _rowid_, * FROM {table}').fetchall()
+            rowids = []
+            for r in rows:
+                d = dict(r)
+                rd = _v16_row_log_date(d)
+                if rd is not None and start_d <= rd <= end_d:
+                    rowids.append(d.get('_rowid_'))
+            if rowids:
+                cur.executemany(f'DELETE FROM {table} WHERE rowid=?', [(x,) for x in rowids])
+                deleted += len(rowids)
+        except Exception:
+            continue
+    conn.commit()
+    conn.close()
+
+    try:
+        _v16_export_audit_logs_from_db_only(create_history=True)
+        try:
+            from services.permanent_write_through_service import github_write_through_files
+            github_write_through_files([AUDIT_STATE_PATH, MODULE_RECORDS_PATH, MODULE_SETTINGS_PATH], source='v16_clear_login_logs_delete_aware')
+        except Exception:
+            pass
+    except Exception:
+        pass
+    return int(deleted)
+
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+delete_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+clear_audit_logs_by_date = delete_login_logs_by_date_range
+# ===== V16 ROBUST LOGIN LOG DELETE END =====

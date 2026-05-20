@@ -236,6 +236,13 @@ def _mirror_table_to_persistent_module(table: str) -> None:
         tmp.replace(latest)
         hist = h / f"{code}_records_{now_stamp()}.json"
         hist.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        # V17: write-through only after the user explicitly saves/imports data.
+        # This keeps Reboot protection without slowing normal page reads.
+        try:
+            from services.permanent_write_through_service import github_write_through_files
+            github_write_through_files([latest], source=f"v17_save_{code}", force=False)
+        except Exception:
+            pass
     except Exception:
         pass
 # ===== V3.04 MASTER DATA RESCUE GUARD END =====
