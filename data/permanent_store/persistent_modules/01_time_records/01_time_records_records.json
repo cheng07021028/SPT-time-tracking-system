@@ -1,7 +1,11 @@
 {
-  "schema_version": "3.02",
-  "exported_at": "2026-05-19 11:24:34",
-  "reason": "rescue:ensure_database",
+  "version": "V1.48",
+  "exported_at": "2026-05-20 12:01:42",
+  "source": "db_service_write",
+  "module_key": "01_time_records",
+  "module_code": "01",
+  "module_name_zh": "工時紀錄",
+  "module_name_en": "Time Records",
   "tables": {
     "time_records": [
       {
@@ -222,10 +226,7 @@
       }
     ]
   },
-  "counts": {
+  "table_counts": {
     "time_records": 8
-  },
-  "module_code": "01_time_records",
-  "module_name_zh": "工時紀錄",
-  "module_name_en": "Time Records"
+  }
 }
