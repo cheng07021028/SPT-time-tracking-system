@@ -1117,6 +1117,7 @@ with tab1:
         if st.session_state[edit_key]:
             edit_df = df.copy()
             history_select_key = "_spt_select_history_records_delete_ids"
+            stable_select_key = "_spt_history_stable_selected_ids"
             editor_version_key = "history_editor_version"
             if editor_version_key not in st.session_state:
                 st.session_state[editor_version_key] = 0
@@ -1125,14 +1126,27 @@ with tab1:
             hc1, hc2, hc3 = st.columns([1, 1, 3])
             if hc1.button("◈ 勾選全部紀錄 / Select All", use_container_width=True, key="history_select_all_rows"):
                 st.session_state[history_select_key] = _all_history_ids
+                st.session_state[stable_select_key] = _all_history_ids
                 st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                 rerun()
             if hc2.button("◌ 取消全部勾選 / Clear All", use_container_width=True, key="history_clear_all_rows"):
                 st.session_state[history_select_key] = []
+                st.session_state[stable_select_key] = []
                 st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                 rerun()
             hc3.caption("勾選會保留到你手動取消、刪除成功或離開本頁；不會因重新計算後自動清空。")
-            _selected_history_ids = set(int(x) for x in st.session_state.get(history_select_key, []) if int(x) in set(_all_history_ids))
+            # V14.1：data_editor 在部分 Streamlit 版本會沿用舊 widget 暫存，導致「勾選全部」看似無作用。
+            # 這個穩定選擇器只保存 ID，不改原表格 UI；確認執行時會與表格勾選結果合併。
+            current_default_ids = [int(x) for x in st.session_state.get(stable_select_key, st.session_state.get(history_select_key, [])) if int(x) in set(_all_history_ids)]
+            stable_selected_ids = st.multiselect(
+                "穩定勾選紀錄 ID / Stable Selected Record IDs",
+                options=_all_history_ids,
+                default=current_default_ids,
+                key=stable_select_key,
+                help="若表格內刪除勾選未即時刷新，可用此欄確認已選 ID；上方『勾選全部』會自動填入目前篩選清單所有 ID。",
+            )
+            _selected_history_ids = set(int(x) for x in stable_selected_ids if int(x) in set(_all_history_ids))
+            st.session_state[history_select_key] = sorted(_selected_history_ids)
             if "刪除" not in edit_df.columns:
                 edit_df.insert(0, "刪除", edit_df["id"].map(lambda x: int(x) in _selected_history_ids if str(x).strip() not in {"", "nan", "None"} else False) if "id" in edit_df.columns else False)
             else:
@@ -1153,9 +1167,15 @@ with tab1:
             if submitted_history and edited is not None:
                 try:
                     delete_rows = edited[edited["刪除"].astype(bool)] if "刪除" in edited.columns else pd.DataFrame()
-                    delete_ids = [int(x) for x in delete_rows["id"].dropna().tolist()]
+                    table_ids = [int(x) for x in delete_rows["id"].dropna().tolist()]
                 except Exception:
-                    delete_ids = []
+                    table_ids = []
+                stable_ids = []
+                try:
+                    stable_ids = [int(x) for x in st.session_state.get(stable_select_key, []) if int(x) in set(_all_history_ids)]
+                except Exception:
+                    stable_ids = []
+                delete_ids = sorted(set(table_ids + stable_ids))
                 # V2.32：保留目前勾選狀態，直到使用者取消、刪除成功或離開頁面。
                 st.session_state[history_select_key] = delete_ids
 
@@ -1188,6 +1208,7 @@ with tab1:
                         count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
                         remaining = [x for x in st.session_state.get(history_select_key, []) if int(x) not in set(delete_ids)]
                         st.session_state[history_select_key] = remaining
+                        st.session_state[stable_select_key] = remaining
                         _add_history_result("success", f"已刪除 {count} 筆歷史紀錄。", append=False)
                         st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                         rerun()

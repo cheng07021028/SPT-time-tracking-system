@@ -4,16 +4,77 @@ from __future__ import annotations
 from datetime import datetime, date, timedelta
 import sqlite3
 import uuid
+import getpass
+import json
+from pathlib import Path
 import pandas as pd
 
 from services.timezone_service import now_text, now_stamp, today_text, today_date, taiwan_now
 
-from .db_service import DB_PATH, clear_query_cache, execute, mark_data_changed, query_df, query_one
+from .db_service import DB_PATH, clear_query_cache, execute, execute_transaction, mark_data_changed, query_df, query_one
 from .calculation_service import calculate_work_hours, split_timestamp
 from .log_service import write_log
 from .duration_service import hms_to_hours
 
 
+
+
+
+def _atomic_write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _fast_mirror_time_records_latest(reason: str = "time_action") -> None:
+    """Refresh latest 01/02 time-record JSON without full permanent export.
+
+    This keeps Reboot protection for the time-record action, but avoids the old
+    full-project export/history sweep that made Start/Confirm buttons slow.
+    """
+    try:
+        project_root = Path(__file__).resolve().parents[1]
+        base = project_root / "data" / "permanent_store" / "persistent_modules"
+        rows_df = query_df("SELECT * FROM time_records ORDER BY id")
+        rows = rows_df.to_dict("records") if rows_df is not None and not rows_df.empty else []
+        payload_common = {
+            "schema_version": "14.0",
+            "exported_at": now_text(),
+            "reason": reason,
+            "tables": {"time_records": rows},
+            "counts": {"time_records": len(rows)},
+        }
+        paths: list[Path] = []
+        for code, zh, en in [
+            ("01_time_records", "工時紀錄", "Time Records"),
+            ("02_history", "歷史紀錄", "History"),
+        ]:
+            payload = dict(payload_common)
+            payload.update({"module_code": code, "module_name_zh": zh, "module_name_en": en})
+            path = base / code / f"{code}_records.json"
+            _atomic_write_json(path, payload)
+            paths.append(path)
+        try:
+            from services.permanent_write_through_service import github_write_through_files
+            github_write_through_files(paths, source=f"v14_{reason}", force=True)
+        except Exception:
+            pass
+    except Exception:
+        # Button action must not fail only because mirror/upload failed.
+        pass
+
+def _log_insert_op(action_type: str, message: str, target_table: str = "", target_id: str | int = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> tuple[str, tuple]:
+    """Return a system_logs INSERT operation for batched user actions."""
+    return (
+        """
+        INSERT INTO system_logs
+        (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (now_text(), user_name or getpass.getuser(), action_type, target_table, str(target_id or ""), message, detail, level),
+    )
 
 def ensure_time_records_available(trigger: str = "time_record_service") -> None:
     """V3.02: restore 01/02 shared records if DB was recreated empty after update."""
@@ -264,7 +325,50 @@ def get_conflicting_active_records(employee_id: str, process_name: str, start_da
         return active
     return active[(active["process_name"].astype(str) != str(process_name)) | (active["start_date"].astype(str) != str(start_date))].copy()
 
+def _append_finish_group_ops(group: pd.DataFrame, end_action: str, remark: str, now: str) -> tuple[list[tuple[str, tuple]], list[int], float, float]:
+    """Build UPDATE operations for closing one active group without per-row execute()."""
+    if group is None or group.empty:
+        return [], [], 0.0, 0.0
+    end_date, end_time = split_timestamp(now)
+    status = end_action if end_action in ("下班", "暫停", "完工") else "已結束"
+    group_ids = [int(x) for x in group["id"].tolist()]
+    starts = [str(x) for x in group.get("start_timestamp", pd.Series(dtype=object)).dropna().tolist() if str(x).strip()]
+    earliest_start = min(starts) if starts else now
+    total_hours = calculate_work_hours(earliest_start, now)
+    avg_hours = round(total_hours / max(len(group_ids), 1), 2)
+    first = group.iloc[0].to_dict()
+    group_key = first.get("group_key") or f"{first.get('employee_id')}|{first.get('process_name')}|{first.get('start_date')}"
+    is_group = 1 if len(group_ids) > 1 else int(first.get("is_group_work") or 0)
+
+    ops: list[tuple[str, tuple]] = []
+    for _, row in group.iterrows():
+        rid = int(row.get("id"))
+        old_remark = str(row.get("remark") or "").strip()
+        append = str(remark or "").strip()
+        if len(group_ids) > 1:
+            append = (append + "；" if append else "") + f"同步作業平均分配：{len(group_ids)}筆，群組總工時={total_hours:.2f}，平均={avg_hours:.2f}"
+        new_remark = old_remark
+        if append:
+            new_remark = (old_remark + "；" if old_remark else "") + append
+        ops.append((
+            """
+            UPDATE time_records
+            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
+            WHERE id=? AND end_timestamp IS NULL
+            """,
+            (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, is_group, now, rid),
+        ))
+    return ops, group_ids, total_hours, avg_hours
+
+
 def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:
+    """Start one work record using a single fast write transaction.
+
+    V14 keeps the original rules but avoids multiple execute()/log/export cycles
+    after pressing Start.  Reads still validate duplicate/conflict status; writes
+    are committed once, then cache/pending marker is updated once.
+    """
     now = _now()
     start_date, start_time = split_timestamp(now)
     employee_id = str(employee.get("employee_id") or "").strip()
@@ -275,21 +379,54 @@ def start_work(employee: dict, work_order: dict, process_name: str, remark: str 
     if not employee_id or not wo_no or not process_name:
         raise ValueError("工號、製令、工段名稱不可空白。")
 
-    # 規則 1：同工號/姓名、同製令、同工段名稱不可重複計時。
-    duplicate = get_active_same_work(employee_id, wo_no, process_name, start_date, employee_name=employee_name)
+    # Read active rows once; use the same snapshot for duplicate, conflict, and parallel checks.
+    active_all = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if active_all is None:
+        active_all = pd.DataFrame()
+
+    duplicate = None
+    if not active_all.empty:
+        dup_df = active_all[
+            (active_all["work_order"].astype(str) == wo_no)
+            & (active_all["process_name"].astype(str) == process_name)
+            & (active_all["start_date"].astype(str) == str(start_date))
+        ]
+        if not dup_df.empty:
+            duplicate = dup_df.iloc[0].to_dict()
     if duplicate:
         raise ValueError(f"此人員已有相同製令與工段正在計時，禁止重複紀錄：{wo_no} / {process_name}")
 
-    # 規則 2：同人員同工段、不同製令可視為同步作業；不同工段必須先暫停前一個作業。
-    conflicts = get_conflicting_active_records(employee_id, process_name, start_date, employee_name=employee_name)
+    conflicts = pd.DataFrame()
+    if not active_all.empty:
+        conflicts = active_all[
+            (active_all["process_name"].astype(str) != str(process_name))
+            | (active_all["start_date"].astype(str) != str(start_date))
+        ].copy()
+    if not conflicts.empty and not auto_pause_old:
+        raise ValueError("此人員已有不同工段正在計時，請先確認暫停前一筆作業後再開始新紀錄。")
+
+    ops: list[tuple[str, tuple]] = []
+    closed_details: list[str] = []
     if not conflicts.empty:
-        if not auto_pause_old:
-            raise ValueError("此人員已有不同工段正在計時，請先確認暫停前一筆作業後再開始新紀錄。")
-        _pause_conflicting_active_records(employee_id, employee_name, process_name, start_date)
+        # Close each conflicting active process/day group once.
+        for (_, proc, sdate), g in conflicts.groupby(["employee_id", "process_name", "start_date"], dropna=False):
+            finish_ops, group_ids, total_hours, avg_hours = _append_finish_group_ops(
+                g.copy(), "暫停", "系統自動暫停：同一人員切換不同工段或不同日期作業", now
+            )
+            ops.extend(finish_ops)
+            if group_ids:
+                closed_details.append(",".join(str(x) for x in group_ids))
+                ops.append(_log_insert_op(
+                    "END_WORK_GROUP" if len(group_ids) > 1 else "END_WORK",
+                    f"自動暫停舊工時，員工={employee_name}，工段={proc}，同步結束={len(group_ids)}筆，群組總工時={total_hours:.2f}，平均工時={avg_hours:.2f}",
+                    "time_records",
+                    group_ids[0],
+                    detail=",".join(str(x) for x in group_ids),
+                ))
 
     record_key = make_record_key(employee_id, wo_no, process_name, now)
     group_key = f"{employee_id}|{process_name}|{start_date}"
-    rid = execute(
+    insert_op = (
         """
         INSERT INTO time_records(
             record_key, status, work_order, part_no, type_name, process_name,
@@ -320,23 +457,39 @@ def start_work(employee: dict, work_order: dict, process_name: str, remark: str 
             now,
         ),
     )
+    insert_index = len(ops)
+    ops.append(insert_op)
 
-    parallel = get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date)
-    if len(parallel) > 1:
-        execute(
+    # If same employee/process/date already has active rows, mark all parallel rows as group work.
+    parallel_count = 1
+    if not active_all.empty:
+        parallel_count += int(len(active_all[
+            (active_all["process_name"].astype(str) == process_name)
+            & (active_all["start_date"].astype(str) == str(start_date))
+        ]))
+    if parallel_count > 1:
+        ops.append((
             "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL",
             (group_key, now, employee_id, employee_name, process_name, start_date),
-        )
-    write_log("START_WORK", f"{employee_name} 開始 {wo_no} / {process_name}", "time_records", rid)
-    return rid
-def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:
-    """Finish work record.
+        ))
 
-    V1.3 core rule:
-    - Same employee + same day + same process = parallel active group.
-    - Ending any one record ends all records in that active group.
-    - The elapsed group hours from earliest start to end now, after rest deduction, are averaged back to each record.
-    """
+    ops.append(_log_insert_op("START_WORK", f"{employee_name} 開始 {wo_no} / {process_name}", "time_records", ""))
+    ids = execute_transaction(
+        ops,
+        mark_changed=True,
+        reason="01 工時紀錄已更新",
+        source_sql="START_WORK_FAST_TRANSACTION",
+    )
+    rid = int(ids[insert_index] or 0)
+    _fast_mirror_time_records_latest("start_work")
+
+    # Fill target_id in the START_WORK log is not critical for UI; keeping the action batched
+    # is more important for button latency.  The record id is returned to the user.
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:
+    """Finish work record using one batched transaction."""
     rec = query_one("SELECT * FROM time_records WHERE id=?", (record_id,))
     if not rec:
         raise ValueError("找不到工時紀錄")
@@ -344,51 +497,33 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
         return 0
 
     now = _now()
-    end_date, end_time = split_timestamp(now)
     status = end_action if end_action in ("下班", "暫停", "完工") else "已結束"
 
     if finish_parallel_group:
         group = get_active_group(record_id)
     else:
         group = pd.DataFrame([rec])
-
     if group.empty:
         group = pd.DataFrame([rec])
 
-    group_ids = [int(x) for x in group["id"].tolist()]
-    earliest_start = min(str(x) for x in group["start_timestamp"].dropna().tolist())
-    total_hours = calculate_work_hours(earliest_start, now)
-    avg_hours = round(total_hours / max(len(group_ids), 1), 2)
-    is_group = 1 if len(group_ids) > 1 else int(rec.get("is_group_work") or 0)
-    group_key = rec.get("group_key") or f"{rec.get('employee_id')}|{rec.get('process_name')}|{rec.get('start_date')}"
-
-    for rid in group_ids:
-        old = query_one("SELECT remark FROM time_records WHERE id=?", (rid,)) or {}
-        new_remark = old.get("remark") or ""
-        append = remark or ""
-        if len(group_ids) > 1:
-            append = (append + "；" if append else "") + f"同步作業平均分配：{len(group_ids)}筆，群組總工時={total_hours:.2f}，平均={avg_hours:.2f}"
-        if append:
-            new_remark = (new_remark + "；" if new_remark else "") + append
-        execute(
-            """
-            UPDATE time_records
-            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
-                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
-            WHERE id=? AND end_timestamp IS NULL
-            """,
-            (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, is_group, now, rid),
-        )
-
-    write_log(
+    ops, group_ids, total_hours, avg_hours = _append_finish_group_ops(group, end_action, remark, now)
+    if not group_ids:
+        return 0
+    ops.append(_log_insert_op(
         "END_WORK_GROUP" if len(group_ids) > 1 else "END_WORK",
         f"結束工時紀錄 #{record_id}，同步結束={len(group_ids)}筆，狀態={status}，群組總工時={total_hours:.2f}，平均工時={avg_hours:.2f}",
         "time_records",
         record_id,
         detail=",".join(str(x) for x in group_ids),
+    ))
+    execute_transaction(
+        ops,
+        mark_changed=True,
+        reason="01 工時紀錄已更新",
+        source_sql="FINISH_WORK_FAST_TRANSACTION",
     )
+    _fast_mirror_time_records_latest("finish_work")
     return len(group_ids)
-
 
 def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:
     ensure_time_records_available("load_records")
@@ -735,6 +870,8 @@ def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) 
         )
         count += 1
     write_log("SAVE_TIME_RECORDS", f"人工編輯並儲存工時紀錄 {count} 筆；已同步確認日期/時間欄位", "time_records")
+    if count:
+        _fast_mirror_time_records_latest("save_time_records")
     return count
 
 
@@ -811,7 +948,10 @@ def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工
 
     if deleted:
         clear_query_cache()
-        mark_data_changed(f"已刪除工時紀錄 {deleted} 筆，待手動永久備份。", "FAST_DELETE time_records")
+        # V14.1：刪除歷史/工時紀錄後立刻刷新 01/02 latest JSON 並嘗試寫回 GitHub。
+        # 否則 Streamlit Cloud Reboot 後會從 GitHub 舊 latest 檔把已刪紀錄還原。
+        _fast_mirror_time_records_latest("delete_time_records")
+        mark_data_changed(f"已刪除工時紀錄 {deleted} 筆，已刷新永久記憶檔。", "FAST_DELETE time_records")
     return deleted
 
 
@@ -1135,7 +1275,8 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
 
     clear_query_cache()
     if result["inserted"] or result["updated"]:
-        mark_data_changed("歷史紀錄匯入已變更，待手動永久備份。", "IMPORT time_records")
+        _fast_mirror_time_records_latest("import_time_records")
+        mark_data_changed("歷史紀錄匯入已變更，已刷新永久記憶檔。", "IMPORT time_records")
     result["errors"] = errors
     return result
 
