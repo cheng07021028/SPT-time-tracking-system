@@ -7,8 +7,6 @@ import pandas as pd
 from services.timezone_service import today_date
 import streamlit as st
 
-from services.button_rule_service import render_button
-
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access, check_permission
 from services.time_record_service import (
@@ -1120,11 +1118,21 @@ with tab1:
             except Exception:
                 return []
 
+        def _history_clear_widget_state(prefix: str) -> None:
+            # Clear previous data_editor/form widget state so Select All/Clear buttons
+            # immediately render the intended checkbox state.
+            for k in list(st.session_state.keys()):
+                if str(k).startswith(prefix):
+                    try:
+                        del st.session_state[k]
+                    except Exception:
+                        pass
+
         def _history_refresh_editor() -> None:
+            _history_clear_widget_state("history_editor_v27_")
             st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
 
         def _history_set_edit(enabled: bool) -> None:
-            st.session_state["_last_button_action"] = f"02_history.set_edit={enabled}"
             st.session_state[edit_key] = bool(enabled)
             if not enabled:
                 st.session_state[delete_select_key] = []
@@ -1132,7 +1140,6 @@ with tab1:
             _history_refresh_editor()
 
         def _history_select(kind: str, select_all: bool) -> None:
-            st.session_state["_last_button_action"] = f"02_history.select={kind}:{select_all}"
             key = delete_select_key if kind == "delete" else recalc_select_key
             st.session_state[key] = _history_all_ids() if select_all else []
             _history_refresh_editor()

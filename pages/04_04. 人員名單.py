@@ -6,8 +6,6 @@ from io import BytesIO
 import pandas as pd
 import streamlit as st
 
-from services.button_rule_service import render_button
-
 try:
     from services.theme_service import apply_theme, render_header
 except Exception:
@@ -41,7 +39,17 @@ def _editor_key() -> str:
     return f"employees_data_editor_v253_{st.session_state[EDITOR_VERSION_KEY]}"
 
 
+def _v37_clear_widget_state(prefix: str) -> None:
+    # Clear old data_editor/form widget state before rotating key.
+    for k in list(st.session_state.keys()):
+        if str(k).startswith(prefix):
+            try:
+                del st.session_state[k]
+            except Exception:
+                pass
+
 def _refresh_editor_widget() -> None:
+    _v37_clear_widget_state("employees_data_editor_v253_")
     st.session_state[EDITOR_VERSION_KEY] = int(st.session_state.get(EDITOR_VERSION_KEY, 0)) + 1
 
 COLS = [
@@ -236,7 +244,6 @@ def reload_data():
 # These callbacks update the dataframe stored in session_state and then rotate
 # the data_editor key, so Streamlit immediately shows the checkbox changes.
 def _v25_emp_set_edit(enabled: bool) -> None:
-    st.session_state["_last_button_action"] = f"04_employees.set_edit={enabled}"
     st.session_state["v253_employee_edit_enabled"] = bool(enabled)
     if not enabled:
         reload_data()
@@ -246,7 +253,6 @@ def _v25_emp_set_edit(enabled: bool) -> None:
 
 
 def _v25_emp_batch(action: str) -> None:
-    st.session_state["_last_button_action"] = f"04_employees.batch={action}"
     df = st.session_state.get(STATE_KEY)
     if df is None or not isinstance(df, pd.DataFrame):
         reload_data()
@@ -298,9 +304,9 @@ with tab1:
     employee_edit_enabled = bool(st.session_state.get("v253_employee_edit_enabled", False))
     ec1, ec2, ec3 = st.columns([1.2, 1.2, 3])
     with ec1:
-        render_button("◇ 啟動編輯 / Enable Edit", key="v25_enable_employee_edit", disabled=employee_edit_enabled, on_click=_v25_emp_set_edit, args=(True,))
+        st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=employee_edit_enabled, key="v25_enable_employee_edit", on_click=_v25_emp_set_edit, args=(True,))
     with ec2:
-        render_button("◌ 停止編輯 / Lock Edit", key="v25_disable_employee_edit", disabled=not employee_edit_enabled, on_click=_v25_emp_set_edit, args=(False,))
+        st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not employee_edit_enabled, key="v25_disable_employee_edit", on_click=_v25_emp_set_edit, args=(False,))
     with ec3:
         if employee_edit_enabled:
             st.success("目前：已啟動編輯。修改後請按儲存才會正式寫入。")

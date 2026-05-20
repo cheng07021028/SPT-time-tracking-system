@@ -5,8 +5,6 @@ from io import StringIO
 import pandas as pd
 import streamlit as st
 
-from services.button_rule_service import render_button
-
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access, check_permission
 from services.permission_service import (
@@ -379,33 +377,46 @@ def _permission_summary(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+
+def _v37_clear_widget_state(prefix: str) -> None:
+    # Clear stale data_editor/form widget state. Without this, a Select All button can
+    # set values to True, then the old editor delta immediately writes them back to False.
+    for k in list(st.session_state.keys()):
+        if str(k).startswith(prefix):
+            try:
+                del st.session_state[k]
+            except Exception:
+                pass
+
+def _v37_touch_account_editor() -> None:
+    _v37_clear_widget_state("v171_account_password_editor_")
+    _v37_touch_account_editor()
+    st.session_state["v37_account_bulk_just_applied"] = True
+
 # V27: stable account/permission callbacks.
 # Important: Enable Edit must NOT reload old JSON/SQLite data over the current
 # visible account table. It copies the currently displayed authoritative list
 # into the editable draft and rotates the editor key so bulk checkbox buttons
 # show the 0/1 changes immediately.
 def _v25_account_set_edit(enabled: bool) -> None:
-    st.session_state["_last_button_action"] = f"10_permissions.set_edit={enabled}"
     st.session_state["v166_account_edit_enabled"] = bool(enabled)
     if enabled:
         if "v133_users_df" not in st.session_state or not isinstance(st.session_state.get("v133_users_df"), pd.DataFrame):
             st.session_state["v133_users_df"] = _users_for_editor()
     else:
         st.session_state["v133_users_df"] = _users_for_editor()
-    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
+    _v37_touch_account_editor()
 
 
 def _v25_account_add_blank() -> None:
-    st.session_state["_last_button_action"] = "10_permissions.add_blank"
     df = st.session_state.get("v133_users_df")
     if df is None or not isinstance(df, pd.DataFrame):
         df = _users_for_editor()
     st.session_state["v133_users_df"] = pd.concat([pd.DataFrame([_blank_user_row()]), df.copy()], ignore_index=True)
-    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
+    _v37_touch_account_editor()
 
 
 def _v25_account_delete_flag(flag: bool) -> None:
-    st.session_state["_last_button_action"] = f"10_permissions.delete_flag={flag}"
     df = st.session_state.get("v133_users_df")
     if df is None or not isinstance(df, pd.DataFrame):
         df = _users_for_editor()
@@ -414,17 +425,15 @@ def _v25_account_delete_flag(flag: bool) -> None:
         df.insert(0, "刪除 / Delete", False)
     df["刪除 / Delete"] = bool(flag)
     st.session_state["v133_users_df"] = df
-    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
+    _v37_touch_account_editor()
 
 
 def _v25_account_reload() -> None:
-    st.session_state["_last_button_action"] = "10_permissions.reload"
     st.session_state["v133_users_df"] = _users_for_editor()
     st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
 
 
 def _v25_permission_quick(action: str) -> None:
-    st.session_state["_last_button_action"] = f"10_permissions.quick={action}"
     st.session_state["v25_permission_quick_action"] = str(action or "")
     st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
 
@@ -448,9 +457,9 @@ with tab_accounts:
     _edit_on = bool(st.session_state.get("v166_account_edit_enabled", False))
     c_edit1, c_edit2, c_edit3 = st.columns([1.2, 1.2, 3])
     with c_edit1:
-        render_button("◇ 啟動編輯 / Enable Edit", key="v25_enable_account_edit_top", disabled=_edit_on, on_click=_v25_account_set_edit, args=(True,))
+        st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=_edit_on, key="v25_enable_account_edit_top", on_click=_v25_account_set_edit, args=(True,))
     with c_edit2:
-        render_button("◌ 停止編輯 / Lock Edit", key="v25_disable_account_edit_top", disabled=not _edit_on, on_click=_v25_account_set_edit, args=(False,))
+        st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not _edit_on, key="v25_disable_account_edit_top", on_click=_v25_account_set_edit, args=(False,))
     with c_edit3:
         if _edit_on:
             st.success("目前：已啟動編輯。修改後請按儲存才會正式寫入。")
@@ -576,8 +585,9 @@ with tab_accounts:
                 disabled=not account_edit_enabled,
             )
 
-        if account_edit_enabled:
-            # 只有表單送出或頁面真正 rerun 後才把完整回傳結果保存為草稿。
+        if account_edit_enabled and not st.session_state.pop("v37_account_bulk_just_applied", False):
+            # Keep normal manual edits, but do not let a stale data_editor/form return value
+            # undo a bulk button result in the same rerun.
             st.session_state["v133_users_df"] = edited_users.copy()
 
         if submitted_accounts:

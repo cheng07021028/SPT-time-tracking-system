@@ -6,8 +6,6 @@ import pandas as pd
 from services.timezone_service import today_date
 import streamlit as st
 
-from services.button_rule_service import render_button
-
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access, check_permission
 from services.crud_table_service import load_employees, save_employees
@@ -52,13 +50,22 @@ def reload_employees() -> None:
     st.session_state[EDITOR_REV_KEY] = int(st.session_state.get(EDITOR_REV_KEY, 0)) + 1
 
 
+def _v37_clear_widget_state(prefix: str) -> None:
+    # Bulk buttons must win over the previous data_editor widget delta.
+    for k in list(st.session_state.keys()):
+        if str(k).startswith(prefix):
+            try:
+                del st.session_state[k]
+            except Exception:
+                pass
+
 def touch_editor() -> None:
+    _v37_clear_widget_state("today_attendance_editor_v202_")
     st.session_state[EDITOR_REV_KEY] = int(st.session_state.get(EDITOR_REV_KEY, 0)) + 1
 
 
 # V25: stable callbacks for bulk buttons.
 def _v25_today_batch(action: str) -> None:
-    st.session_state["_last_button_action"] = f"07_missing.batch={action}"
     df = st.session_state.get(STATE_KEY)
     if df is None or not isinstance(df, pd.DataFrame):
         reload_employees()
@@ -80,6 +87,7 @@ def _v25_today_batch(action: str) -> None:
         reload_employees()
         return
     st.session_state[STATE_KEY] = ensure_cols(df)
+    st.session_state["v37_today_bulk_just_applied"] = True
     touch_editor()
 
 
@@ -132,7 +140,11 @@ else:
         key=editor_key,
     )
 
-    st.session_state[STATE_KEY] = ensure_cols(edited)
+    if st.session_state.pop("v37_today_bulk_just_applied", False):
+        # Keep the bulk-button result. Do not let the old data_editor return value write it back to 0.
+        pass
+    else:
+        st.session_state[STATE_KEY] = ensure_cols(edited)
     if st.button("▣ 確認儲存今日出勤設定 / Save Today Attendance", type="primary", use_container_width=True, key="save_today_attendance_v202"):
         save_df = st.session_state[STATE_KEY].copy()
         save_df.insert(0, "_delete", False)
