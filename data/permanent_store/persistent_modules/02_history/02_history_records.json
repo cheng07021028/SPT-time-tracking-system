@@ -1,7 +1,11 @@
 {
-  "schema_version": "14.0",
-  "exported_at": "2026-05-20 15:56:48",
-  "reason": "finish_work",
+  "version": "V1.48",
+  "exported_at": "2026-05-20 16:17:01",
+  "source": "db_service_write",
+  "module_key": "02_history",
+  "module_code": "02",
+  "module_name_zh": "歷史紀錄",
+  "module_name_en": "History",
   "tables": {
     "time_records": [
       {
@@ -97,13 +101,13 @@
         "employee_name": "張傑威",
         "start_action": "開始",
         "start_timestamp": "2026-05-15 07:38:16",
-        "end_action": NaN,
-        "end_timestamp": NaN,
+        "end_action": null,
+        "end_timestamp": null,
         "remark": "",
         "start_date": "2026-05-15",
         "start_time": "07:38:16",
-        "end_date": NaN,
-        "end_time": NaN,
+        "end_date": null,
+        "end_time": null,
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "B052|前置鈑金|2026-05-15",
@@ -124,13 +128,13 @@
         "employee_name": "沈啟頤",
         "start_action": "開始",
         "start_timestamp": "2026-05-15 08:41:33",
-        "end_action": NaN,
-        "end_timestamp": NaN,
+        "end_action": null,
+        "end_timestamp": null,
         "remark": "",
         "start_date": "2026-05-15",
         "start_time": "08:41:33",
-        "end_date": NaN,
-        "end_time": NaN,
+        "end_date": null,
+        "end_time": null,
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "B030|配電|2026-05-15",
@@ -259,13 +263,13 @@
         "employee_name": "陳長彥",
         "start_action": "開始",
         "start_timestamp": "2026-05-20 14:55:45",
-        "end_action": NaN,
-        "end_timestamp": NaN,
+        "end_action": null,
+        "end_timestamp": null,
         "remark": "",
         "start_date": "2026-05-20",
         "start_time": "14:55:45",
-        "end_date": NaN,
-        "end_time": NaN,
+        "end_date": null,
+        "end_time": null,
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT034|前置鈑金|2026-05-20",
@@ -276,10 +280,7 @@
       }
     ]
   },
-  "counts": {
+  "table_counts": {
     "time_records": 10
-  },
-  "module_code": "02_history",
-  "module_name_zh": "歷史紀錄",
-  "module_name_en": "History"
+  }
 }
