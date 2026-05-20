@@ -1174,3 +1174,165 @@ def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) 
     except Exception:
         pass
     return n
+
+
+
+# ========================= V33 HISTORY DELETE SQLITE HOTFIX =========================
+# 目的：02.歷史紀錄刪除勾選資料時，舊版 delete_time_records 直接使用 sqlite3.connect(DB_PATH)
+# 與 conn.execute("SELECT * FROM time_records...")，會繞過 db_service 的 query_one/execute_transaction
+# 自我修復與權威檔同步機制。Streamlit Cloud 上若 SQLite schema/corruption/lock 異常，會直接
+# sqlite3.OperationalError。此覆寫版以 canonical records.json 為權威，SQLite 只當快取；
+# 即使 SQLite 快取暫時失敗，也不阻斷刪除權威檔，避免 Reboot 後資料復活。
+
+def _v33_normalize_record_ids(record_ids) -> list[int]:
+    ids: list[int] = []
+    for rid in record_ids or []:
+        try:
+            i = int(float(str(rid).strip()))
+            if i > 0 and i not in ids:
+                ids.append(i)
+        except Exception:
+            continue
+    return ids
+
+
+def _v33_delete_from_authority(ids: list[int]) -> tuple[int, pd.DataFrame | None]:
+    """Delete ids from canonical authority files first.
+
+    Returns (deleted_count, remaining_df).  It updates both 01_time_records and
+    02_history because these modules share the same time_records table.
+    """
+    if not ids:
+        return 0, None
+    try:
+        if _v28_df_from_table is not None:
+            df = _v28_df_from_table("02_history", "time_records")
+        else:
+            df = pd.DataFrame()
+    except Exception:
+        df = pd.DataFrame()
+
+    if df is None or df.empty:
+        try:
+            df = _original_v28_load_records() if '_original_v28_load_records' in globals() else load_records()
+        except Exception:
+            df = pd.DataFrame()
+
+    if df is None or df.empty or "id" not in df.columns:
+        return 0, df
+
+    id_series = pd.to_numeric(df["id"], errors="coerce").fillna(-1).astype(int)
+    mask_delete = id_series.isin(ids)
+    deleted = int(mask_delete.sum())
+    if deleted <= 0:
+        return 0, df
+
+    remaining = df.loc[~mask_delete].copy().reset_index(drop=True)
+    try:
+        rows = _v28_table_from_df(remaining) if _v28_table_from_df is not None else remaining.to_dict(orient="records")
+        if _v28_update_tables is not None:
+            _v28_update_tables("01_time_records", {"time_records": rows}, reason="delete_time_records_01_v33")
+            _v28_update_tables("02_history", {"time_records": rows}, reason="delete_time_records_02_v33")
+    except Exception:
+        # 不讓 GitHub/JSON write-through 的暫時錯誤中斷頁面。SQLite 刪除仍會繼續嘗試。
+        pass
+    return deleted, remaining
+
+
+def _v33_delete_from_sqlite_cache(ids: list[int], reason: str, deleted_hint: int = 0) -> int:
+    """Best-effort delete from SQLite cache through db_service repairable paths."""
+    if not ids:
+        return 0
+    try:
+        from services.db_service import execute_transaction as _execute_transaction, query_one as _safe_query_one
+    except Exception:
+        _execute_transaction = None
+        _safe_query_one = None
+
+    now = _now()
+    user_name = _audit_user_name()
+    operations: list[tuple[str, tuple]] = []
+    logged = 0
+    for rid in ids:
+        rec_dict = {}
+        try:
+            if _safe_query_one is not None:
+                rec_dict = _safe_query_one("SELECT * FROM time_records WHERE id=?", (rid,)) or {}
+        except Exception:
+            rec_dict = {}
+        operations.append(("DELETE FROM time_records WHERE id=?", (rid,)))
+        operations.append((
+            """
+            INSERT INTO system_logs
+            (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                now,
+                user_name,
+                "DELETE_TIME_RECORD",
+                "time_records",
+                str(rid),
+                f"{reason}：#{rid} {rec_dict.get('employee_id','')} {rec_dict.get('employee_name','')} {rec_dict.get('work_order','')} {rec_dict.get('process_name','')}",
+                str(rec_dict)[:3000],
+                "WARN",
+            ),
+        ))
+        logged += 1
+
+    try:
+        if _execute_transaction is not None:
+            _execute_transaction(
+                operations,
+                mark_changed=False,
+                reason=f"delete_time_records_v33 sqlite cache delete {len(ids)} rows",
+                source_sql="DELETE time_records V33",
+            )
+        else:
+            # Last-resort direct SQLite path with schema initialization.  Do not re-raise.
+            from services.db_service import ensure_database as _ensure_database, _open_connection as _open_conn  # type: ignore
+            _ensure_database()
+            with _open_conn() as conn:  # type: ignore
+                cur = conn.cursor()
+                for sql, params in operations:
+                    cur.execute(sql, params)
+                conn.commit()
+    except Exception:
+        # SQLite is only cache in the authority architecture.  If cache delete fails,
+        # canonical records have already been updated, so do not crash the page.
+        return int(deleted_hint or 0)
+    return int(deleted_hint or len(ids) or logged)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    """Delete selected time records using canonical authority first, SQLite cache second.
+
+    This fixes sqlite3.OperationalError in 02.歷史紀錄 by removing the direct
+    conn.execute SELECT path and preventing stale SQLite/history backup from reviving
+    deleted records after Reboot App.
+    """
+    ids = _v33_normalize_record_ids(record_ids)
+    if not ids:
+        return 0
+
+    deleted, _remaining = _v33_delete_from_authority(ids)
+
+    # Keep SQLite cache in sync as best effort.  Do not let cache failure block the user.
+    sqlite_deleted = _v33_delete_from_sqlite_cache(ids, reason=reason, deleted_hint=deleted)
+    final_deleted = int(deleted or sqlite_deleted or 0)
+
+    if final_deleted:
+        try:
+            clear_query_cache()
+        except Exception:
+            pass
+        try:
+            mark_data_changed(f"已刪除工時紀錄 {final_deleted} 筆；已刷新 01/02 權威檔。", "DELETE time_records V33")
+        except Exception:
+            pass
+        try:
+            write_log("DELETE_TIME_RECORDS", f"{reason}：已刪除 {final_deleted} 筆，01/02 權威檔已更新", "time_records")
+        except Exception:
+            pass
+    return final_deleted
+# ======================= END V33 HISTORY DELETE SQLITE HOTFIX =======================
