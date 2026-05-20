@@ -26,9 +26,9 @@ from typing import Any, Iterable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = PROJECT_ROOT / "data"
-DB_PATH = DATA_DIR / "permanent_store" / "database" / "spt_time_tracking.db"
-PERSIST_ROOT = DATA_DIR / "permanent_store" / "persistent_modules"
-STATE_DIR = DATA_DIR / "permanent_store" / "persistent_state"
+DB_PATH = DATA_DIR / "database" / "spt_time_tracking.db"
+PERSIST_ROOT = DATA_DIR / "persistent_modules"
+STATE_DIR = DATA_DIR / "persistent_state"
 CORRUPT_DIR = DATA_DIR / "_persistent_corrupt"
 RESTORE_LOG = STATE_DIR / "time_records_guard_log.jsonl"
 CANONICAL_01 = "01_time_records"
@@ -134,8 +134,8 @@ def _persistent_state_candidates() -> list[Path]:
 
 def _load_auto_backup_config() -> dict[str, Any]:
     for path in [
-        DATA_DIR / "permanent_store" / "config" / "auto_backup_settings.json",
-        DATA_DIR / "permanent_store" / "config" / "daily_external_backup_settings.json",
+        DATA_DIR / "config" / "auto_backup_settings.json",
+        DATA_DIR / "config" / "daily_external_backup_settings.json",
         STATE_DIR / "auto_backup_settings.json",
     ]:
         payload = _safe_load_json(path)
@@ -396,3 +396,41 @@ def health_report() -> dict[str, Any]:
         "canonical_module_dir": str((PERSIST_ROOT / CANONICAL_01).relative_to(PROJECT_ROOT)),
         "legacy_module_alias": LEGACY_01,
     }
+
+# ===== V18.0 permanent_store-first guard override =====
+# 目的：刪除歷史紀錄後 Reboot 不再從舊 history / 舊 persistent_modules 大檔還原回來。
+# 原則：只在 DB 空白時救援；救援來源優先固定 latest，不再用「筆數最多」舊備份當權威。
+DATA_DIR = PROJECT_ROOT / "data"
+PERMANENT_ROOT = DATA_DIR / "permanent_store"
+DB_PATH = PERMANENT_ROOT / "database" / "spt_time_tracking.db"
+PERSIST_ROOT = PERMANENT_ROOT / "persistent_modules"
+STATE_DIR = PERMANENT_ROOT / "persistent_state"
+RESTORE_LOG = STATE_DIR / "time_records_guard_log.jsonl"
+
+
+def _module_records_candidates() -> list[Path]:  # type: ignore[override]
+    candidates: list[Path] = []
+    # 固定 latest 檔為權威來源。history 僅保留人工查核，不再自動還原避免刪除資料復活。
+    for code in (CANONICAL_01, HISTORY_02, LEGACY_01):
+        canonical = normalize_time_module_code(code)
+        candidates.append(PERSIST_ROOT / canonical / f"{canonical}_records.json")
+        candidates.append(PERSIST_ROOT / code / f"{code}_records.json")
+    # 相容：若尚未搬移到 permanent_store，才 read-through 舊 latest，不掃舊 history。
+    legacy_root = DATA_DIR / "persistent_modules"
+    for code in (CANONICAL_01, HISTORY_02, LEGACY_01):
+        canonical = normalize_time_module_code(code)
+        candidates.append(legacy_root / canonical / f"{canonical}_records.json")
+        candidates.append(legacy_root / code / f"{code}_records.json")
+    return _dedupe_existing(candidates)
+
+
+def find_time_record_backup_candidates(include_external: bool = True) -> list[TimeRecordBackupCandidate]:  # type: ignore[override]
+    candidates: list[TimeRecordBackupCandidate] = []
+    for path in _module_records_candidates():
+        payload = _safe_load_json(path)
+        rows = _extract_time_records(payload)
+        if rows:
+            candidates.append(TimeRecordBackupCandidate(path=path, row_count=len(rows), source_type="module_latest", rows=rows))
+    # latest 優先，若都有資料，以檔案更新時間決定，不以筆數最多決定，避免已刪除資料被舊大檔復活。
+    candidates.sort(key=lambda c: (c.path.stat().st_mtime if c.path.exists() else 0, c.row_count), reverse=True)
+    return candidates

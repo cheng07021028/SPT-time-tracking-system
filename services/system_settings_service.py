@@ -12,9 +12,9 @@ V2.09 修正重點：
 - 每次套用工段、休息時間、01 顯示重新整理時間時，都會立即寫入獨立永久設定檔。
 - Streamlit / GitHub 更新後，如果 SQLite 被重建，會優先從永久設定檔還原，再決定是否建立系統預設值。
 - 永久設定檔路徑：
-  data/permanent_store/config/system_settings.json
-  data/permanent_store/persistent_state/spt_system_settings.json
-  data/permanent_store/persistent_modules/13_system_settings/system_settings.json
+  data/config/system_settings.json
+  data/persistent_state/spt_system_settings.json
+  data/persistent_modules/13_system_settings/system_settings.json
 """
 from __future__ import annotations
 
@@ -38,11 +38,11 @@ from .log_service import write_log
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SYSTEM_SETTINGS_FILES = [
-    PROJECT_ROOT / "data" / "permanent_store" / "config" / "system_settings.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_system_settings.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "system_settings.json",
+    PROJECT_ROOT / "data" / "config" / "system_settings.json",
+    PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json",
 ]
-SYSTEM_SETTINGS_HISTORY_DIR = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "history"
+SYSTEM_SETTINGS_HISTORY_DIR = PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "history"
 
 DEFAULT_PROCESS_OPTIONS = [
     "前置鈑金", "LP改造", "骨架組立", "配電", "模組", "水平", "S.T.", "清潔", "收機", "包機",
@@ -1815,9 +1815,9 @@ def _v363_upload_system_settings_files(reason: str) -> dict[str, Any]:
             return {"ok": False, "skipped": True, "message": "GITHUB_TOKEN not configured"}
         uploads = []
         for local, remote in [
-            (PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_system_settings.json", "data/permanent_store/persistent_state/spt_system_settings.json"),
-            (PROJECT_ROOT / "data" / "permanent_store" / "config" / "system_settings.json", "data/permanent_store/config/system_settings.json"),
-            (PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "system_settings.json", "data/permanent_store/persistent_modules/13_system_settings/system_settings.json"),
+            (PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json", "data/persistent_state/spt_system_settings.json"),
+            (PROJECT_ROOT / "data" / "config" / "system_settings.json", "data/config/system_settings.json"),
+            (PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json", "data/persistent_modules/13_system_settings/system_settings.json"),
         ]:
             if local.exists() and local.stat().st_size > 0:
                 uploads.append(upload_file_to_github(local, remote, f"SPT V363 system settings {reason} {now_text()}"))
@@ -1829,9 +1829,9 @@ def _v363_upload_system_settings_files(reason: str) -> dict[str, Any]:
 def _v363_direct_system_candidate_paths() -> list[Path]:
     # Direct/latest files first by priority.  History is fallback only.
     direct = [
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_system_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "system_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "config" / "system_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json",
+        PROJECT_ROOT / "data" / "config" / "system_settings.json",
     ]
     existing = [p for p in direct if p.exists() and p.stat().st_size > 0]
     if existing:
@@ -1860,7 +1860,7 @@ def export_system_settings_permanent(reason: str = "system_settings_changed", wr
     try:
         # Mirror this module into unified master so table/system state lives in the same top-level source.
         from services.persistence_core_service import load_master_settings, save_master_settings
-        payload = _load_json_file(PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_system_settings.json") or {}
+        payload = _load_json_file(PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json") or {}
         master = load_master_settings()
         sys_section = master.get("system_settings") if isinstance(master.get("system_settings"), dict) else {}
         sys_section["13.system_settings"] = payload
@@ -1951,9 +1951,9 @@ def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any
 # 原則：13｜系統設定儲存後直接寫固定 latest JSON；Reboot 直接讀固定 JSON。
 # 不再用「資料越多越好」、不掃 history、不自動 GitHub、不讓空表被預設值覆蓋。
 
-_V366_SYSTEM_STATE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_system_settings.json"
-_V366_SYSTEM_MODULE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "system_settings.json"
-_V366_SYSTEM_CONFIG_FILE = PROJECT_ROOT / "data" / "permanent_store" / "config" / "system_settings.json"
+_V366_SYSTEM_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json"
+_V366_SYSTEM_MODULE_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "system_settings.json"
+_V366_SYSTEM_CONFIG_FILE = PROJECT_ROOT / "data" / "config" / "system_settings.json"
 _V366_SYSTEM_SCHEMA_READY = False
 _V366_SYSTEM_RESTORED_DIRECT = False
 
@@ -2229,15 +2229,15 @@ def ensure_system_settings_schema() -> None:  # type: ignore[override]
 
 # ===== V3.72 DIRECT LATEST SYSTEM SETTINGS LIKE 03/04 =====
 # 目的：13｜系統設定改成跟 03｜製令管理、04｜人員名單一樣的固定 latest JSON 讀寫。
-# - 儲存：直接寫 data/permanent_store/persistent_modules/13_system_settings/13_system_settings_records.json
+# - 儲存：直接寫 data/persistent_modules/13_system_settings/13_system_settings_records.json
 # - Reboot：直接讀同一個 latest JSON
 # - 不掃 history、不比資料筆數、不讓 SQLite 預設值覆蓋使用者設定
 # - 空清單也是有效設定
-_V372_SYSTEM_MODULE_DIR = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings"
+_V372_SYSTEM_MODULE_DIR = PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings"
 _V372_SYSTEM_LATEST_FILE = _V372_SYSTEM_MODULE_DIR / "13_system_settings_records.json"
 _V372_SYSTEM_COMPAT_FILE = _V372_SYSTEM_MODULE_DIR / "system_settings.json"
-_V372_SYSTEM_STATE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_system_settings.json"
-_V372_SYSTEM_CONFIG_FILE = PROJECT_ROOT / "data" / "permanent_store" / "config" / "system_settings.json"
+_V372_SYSTEM_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json"
+_V372_SYSTEM_CONFIG_FILE = PROJECT_ROOT / "data" / "config" / "system_settings.json"
 _V372_SYSTEM_RESTORE_FLAG = "_v372_system_latest_restored"
 try:
     _v372_prev_ensure_system_settings_schema = ensure_system_settings_schema  # type: ignore[name-defined]
@@ -2446,11 +2446,11 @@ def ensure_system_settings_schema() -> None:  # type: ignore[override]
 #   1. Save/delete writes one fixed latest JSON directly.
 #   2. Reboot/page load restores from the fixed latest JSON only when DB is empty.
 #   3. No history scan, no "larger file wins", no load-time overwrite loop.
-_V373_SYSTEM_MODULE_DIR = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings"
+_V373_SYSTEM_MODULE_DIR = PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings"
 _V373_SYSTEM_LATEST_FILE = _V373_SYSTEM_MODULE_DIR / "13_system_settings_records.json"
 _V373_SYSTEM_COMPAT_FILE = _V373_SYSTEM_MODULE_DIR / "system_settings.json"
-_V373_SYSTEM_STATE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_system_settings.json"
-_V373_SYSTEM_CONFIG_FILE = PROJECT_ROOT / "data" / "permanent_store" / "config" / "system_settings.json"
+_V373_SYSTEM_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_system_settings.json"
+_V373_SYSTEM_CONFIG_FILE = PROJECT_ROOT / "data" / "config" / "system_settings.json"
 _V373_SYSTEM_RESTORE_KEY = "_v373_system_latest_restored"
 
 
@@ -2472,45 +2472,14 @@ def _v373_s_atomic_write(path: Path, payload: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
-def _v373_s_payload_stamp(data: dict[str, Any], path: Path) -> float:
-    """Return comparable timestamp for permanent payload selection.
-
-    V3.74: ZIP/extract mtime can be identical on Streamlit Cloud, so choosing
-    the first file is unsafe.  Use exported_at/updated_at first, mtime second.
-    """
-    for key in ("exported_at", "updated_at", "saved_at"):
-        text = str(data.get(key) or "").strip()
-        if text:
-            try:
-                return datetime.fromisoformat(text.replace("/", "-")).timestamp()
-            except Exception:
-                try:
-                    return datetime.strptime(text[:19].replace("/", "-"), "%Y-%m-%d %H:%M:%S").timestamp()
-                except Exception:
-                    pass
-    try:
-        return path.stat().st_mtime if path.exists() else 0.0
-    except Exception:
-        return 0.0
-
-
 def _v373_s_latest_payload() -> dict[str, Any]:
-    """Pick the newest valid system-settings payload, not the first file.
-
-    Some repos still contain an older 13_system_settings_records.json beside a
-    newer system_settings.json/config file.  On reboot, the older file used to
-    win and restored the previous category/process settings.
-    """
-    candidates: list[tuple[float, str, dict[str, Any]]] = []
+    # Fixed latest is authoritative. Compat/state/config are only migration fallback when latest is absent.
     for path in [_V373_SYSTEM_LATEST_FILE, _V373_SYSTEM_COMPAT_FILE, _V373_SYSTEM_STATE_FILE, _V373_SYSTEM_CONFIG_FILE]:
         data = _v373_s_read_json(path)
         tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
         if isinstance(tables, dict) and any(k in tables for k in ["process_categories", "process_category_options", "process_options", "rest_periods", "app_settings"]):
-            candidates.append((_v373_s_payload_stamp(data, path), str(path), data))
-    if not candidates:
-        return {}
-    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
-    return candidates[0][2]
+            return data
+    return {}
 
 
 def _v373_s_schema_only() -> None:
@@ -2659,10 +2628,7 @@ def _v373_restore_system_once_if_needed() -> None:
                 return
         except Exception:
             pass
-    # V3.74: On Streamlit Cloud reboot, SQLite may be non-empty but stale
-    # because the repo contains an older DB.  JSON permanent_store is the
-    # authority, so restore it once per session regardless of DB row count.
-    restore_system_settings_from_permanent(force=True)
+    restore_system_settings_from_permanent(force=False)
     if st is not None:
         try:
             st.session_state[_V373_SYSTEM_RESTORE_KEY] = True
@@ -2730,17 +2696,10 @@ def export_system_settings_permanent(reason: str = "system_settings_changed", wr
             "app_settings": 0 if app is None else len(app),
         },
     }
-    files = [_V373_SYSTEM_LATEST_FILE, _V373_SYSTEM_COMPAT_FILE, _V373_SYSTEM_STATE_FILE, _V373_SYSTEM_CONFIG_FILE]
-    for path in files:
+    for path in [_V373_SYSTEM_LATEST_FILE, _V373_SYSTEM_COMPAT_FILE, _V373_SYSTEM_STATE_FILE, _V373_SYSTEM_CONFIG_FILE]:
         _v373_s_atomic_write(path, payload)
-    github_upload = {"ok": True, "skipped": True, "message": "write-through not attempted"}
-    try:
-        from services.permanent_write_through_service import github_write_through_files
-        github_upload = github_write_through_files(files, source=reason)
-    except Exception as exc:
-        github_upload = {"ok": False, "message": str(exc)}
     _clear_settings_cache()
-    return {"ok": True, "mode": "v374_authoritative_json_restore", "files": [str(p) for p in files], "table_counts": payload["table_counts"], "github_upload": github_upload}
+    return {"ok": True, "mode": "v373_direct_latest_like_03_04_final", "files": [str(_V373_SYSTEM_LATEST_FILE), str(_V373_SYSTEM_COMPAT_FILE), str(_V373_SYSTEM_STATE_FILE), str(_V373_SYSTEM_CONFIG_FILE)], "table_counts": payload["table_counts"]}
 
 
 def load_process_categories_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
@@ -2926,230 +2885,150 @@ def get_process_options_by_model(type_name: str | None = None, include_common: b
     return get_process_options_by_category(type_name, include_common=False)
 # ===== V3.73 FINAL DIRECT-LATEST SYSTEM SETTINGS PATCH END =====
 
-# ===== V9 STARTUP SPEED PATCH =====
-# 13 系統設定/01 工時紀錄啟動時會把 permanent_store 最新設定還原到 SQLite。
-# 這是內部讀取還原，不是使用者儲存；禁止觸發昂貴的 GitHub write-through。
-try:
-    _v9_prev_restore_system_settings_from_permanent = restore_system_settings_from_permanent
-    def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
-        try:
-            from services.db_service import suspend_after_write_sync
-            with suspend_after_write_sync("system_settings_restore_v9"):
-                return _v9_prev_restore_system_settings_from_permanent(force=force)
-        except Exception:
-            return _v9_prev_restore_system_settings_from_permanent(force=force)
-except Exception:
-    pass
-# ===== V9 STARTUP SPEED PATCH END =====
+# ===== V18.0 direct memory read for 01 Time Record category/process linkage =====
+# 目的：01 工時紀錄不需要先進 13 系統設定，就能直接讀取 13 已儲存的最新類別/工段設定。
+# 原則：不改 UI、不改儲存路徑；讀取時優先讀 data/permanent_store latest JSON，失敗才退回 SQLite。
+_V18_SYSTEM_PAYLOAD_CACHE: dict[str, Any] = {"mtime": None, "payload": None}
 
 
-# ===== V10 CATEGORY ACTIVE/STABLE APPLY PATCH START =====
-# 修正 13.系統設定「類別與工段名稱設定」新增類別後，
-# 按下確認套用會從預設類別下拉消失、但啟動編輯又看得到的狀況。
-# 根因通常是 data_editor 新增列的 is_active 預設值被 Streamlit 當成 False，
-# 導致新類別已存入但被視為停用，所以 active_only=True 的預設類別選單不顯示。
-def save_process_categories_df(df: pd.DataFrame) -> int:  # type: ignore[override]
-    _v373_s_schema_only()
-    if df is None:
-        return 0
-    now = _now(); count = 0
-    work = df.copy().drop(columns=["刪除", "delete", "selected"], errors="ignore").fillna("")
-    for idx, (_, r) in enumerate(work.iterrows(), start=1):
-        name = _norm_category_name(_row_get(r, "category_name", "category", "類別", "類別 / Category", default=""))
-        if not name:
+def _v18_load_system_latest_payload() -> dict[str, Any]:
+    try:
+        path = _V373_SYSTEM_LATEST_FILE  # type: ignore[name-defined]
+    except Exception:
+        path = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "13_system_settings_records.json"
+    try:
+        if not path.exists():
+            return {}
+        mtime = path.stat().st_mtime
+        if _V18_SYSTEM_PAYLOAD_CACHE.get("mtime") == mtime and isinstance(_V18_SYSTEM_PAYLOAD_CACHE.get("payload"), dict):
+            return _V18_SYSTEM_PAYLOAD_CACHE["payload"] or {}
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            payload = {}
+        _V18_SYSTEM_PAYLOAD_CACHE["mtime"] = mtime
+        _V18_SYSTEM_PAYLOAD_CACHE["payload"] = payload
+        return payload
+    except Exception:
+        return {}
+
+
+def _v18_system_tables() -> dict[str, Any]:
+    payload = _v18_load_system_latest_payload()
+    tables = payload.get("tables") if isinstance(payload, dict) else {}
+    return tables if isinstance(tables, dict) else {}
+
+
+def _v18_active_value(value: Any, default: int = 1) -> bool:
+    text = str(value if value is not None else default).strip().lower()
+    return text not in {"0", "false", "no", "n", "off", "停用", "否"}
+
+
+def _v18_json_category_choices(include_common: bool = True) -> list[str]:
+    tables = _v18_system_tables()
+    rows = tables.get("process_categories") if isinstance(tables.get("process_categories"), list) else []
+    names: list[str] = []
+    for r in rows:
+        if not isinstance(r, dict) or not _v18_active_value(r.get("is_active", 1)):
             continue
-        rid = str(_row_get(r, "id", default="") or "").strip()
-        # 新增類別預設啟用。既有類別才尊重使用者停用設定。
-        raw_active = _row_get(r, "is_active", "啟用", "啟用 / Active", default=(True if not rid else True))
-        is_active = 1 if not rid else _v373_active(raw_active, default=1)
+        name = _norm_category_name(r.get("category_name") or r.get("category") or r.get("類別"))
+        if name and name not in names:
+            names.append(name)
+    # 若舊檔沒有 process_categories，就從 process_category_options 反推類別。
+    if not names:
+        proc_rows = tables.get("process_category_options") if isinstance(tables.get("process_category_options"), list) else tables.get("process_options", [])
+        for r in proc_rows or []:
+            if not isinstance(r, dict) or not _v18_active_value(r.get("is_active", 1)):
+                continue
+            name = _norm_category_name(r.get("category_name") or r.get("type_name") or PROCESS_CATEGORY_ALL)
+            if name and name not in names:
+                names.append(name)
+    if include_common and PROCESS_CATEGORY_ALL not in names:
+        names.insert(0, PROCESS_CATEGORY_ALL)
+    return names
+
+
+def _v18_json_default_category() -> str:
+    tables = _v18_system_tables()
+    app_rows = tables.get("app_settings") if isinstance(tables.get("app_settings"), list) else []
+    for r in app_rows:
+        if not isinstance(r, dict):
+            continue
+        if str(r.get("setting_key") or "").strip() == DEFAULT_PROCESS_CATEGORY_KEY:
+            val = _norm_category_name(r.get("setting_value") or "")
+            if val:
+                return val
+    choices = _v18_json_category_choices(include_common=True)
+    return choices[0] if choices else PROCESS_CATEGORY_ALL
+
+
+def _v18_json_process_options(category_name: str | None = None) -> list[str]:
+    tables = _v18_system_tables()
+    proc_rows = tables.get("process_category_options") if isinstance(tables.get("process_category_options"), list) else tables.get("process_options", [])
+    category = _norm_category_name(category_name or _v18_json_default_category())
+    items: list[tuple[int, int, str]] = []
+    for idx, r in enumerate(proc_rows or [], start=1):
+        if not isinstance(r, dict) or not _v18_active_value(r.get("is_active", 1)):
+            continue
+        cat = _norm_category_name(r.get("category_name") or r.get("type_name") or PROCESS_CATEGORY_ALL)
+        if cat != category:
+            continue
+        proc = str(r.get("process_name") or "").strip()
+        if not proc:
+            continue
         try:
-            sort_order = int(float(_row_get(r, "sort_order", "排序", "排序 / Sort", default=idx) or idx))
+            sort_order = int(float(r.get("sort_order") or idx))
         except Exception:
             sort_order = idx
-        note = str(_row_get(r, "note", "備註", "備註 / Note", default="") or "").strip()
-        old_name = ""
-        if rid:
-            try:
-                old_row = query_one("SELECT category_name FROM process_categories WHERE id=?", (int(float(rid)),)) or {}
-                old_name = _norm_category_name(old_row.get("category_name")) if old_row else ""
-            except Exception:
-                old_name = ""
-        if rid:
-            try:
-                execute("UPDATE process_categories SET category_name=?, is_active=?, sort_order=?, note=?, updated_at=? WHERE id=?", (name, is_active, sort_order, note, now, int(float(rid))))
-                if old_name and old_name != name:
-                    execute("UPDATE process_category_options SET category_name=?, updated_at=? WHERE category_name=?", (name, now, old_name))
-                count += 1
-                continue
-            except Exception:
-                pass
-        execute(
-            """
-            INSERT INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(category_name) DO UPDATE SET is_active=excluded.is_active, sort_order=excluded.sort_order, note=excluded.note, updated_at=excluded.updated_at
-            """,
-            (name, is_active, sort_order, note, now, now),
+        items.append((sort_order, idx, proc))
+    out: list[str] = []
+    for _, _, name in sorted(items):
+        if name not in out:
+            out.append(name)
+    return out
+
+
+def load_process_category_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    names = _v18_json_category_choices(include_common=include_common)
+    if names:
+        return names
+    try:
+        df = load_process_categories_df(active_only=True)  # type: ignore[name-defined]
+        out = [str(x).strip() for x in df.get("category_name", []).dropna().tolist() if str(x).strip()] if df is not None and not df.empty else []
+        if include_common and PROCESS_CATEGORY_ALL not in out:
+            out.insert(0, PROCESS_CATEGORY_ALL)
+        return out or ([PROCESS_CATEGORY_ALL] if include_common else [])
+    except Exception:
+        return [PROCESS_CATEGORY_ALL] if include_common else []
+
+
+def get_default_process_category() -> str:  # type: ignore[override]
+    val = _v18_json_default_category()
+    if val:
+        return val
+    try:
+        _v373_s_schema_only()  # type: ignore[name-defined]
+        row = query_one("SELECT setting_value FROM app_settings WHERE setting_key=?", (DEFAULT_PROCESS_CATEGORY_KEY,)) or {}
+        return _norm_category_name(row.get("setting_value") or PROCESS_CATEGORY_ALL)
+    except Exception:
+        return PROCESS_CATEGORY_ALL
+
+
+def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
+    # 01 工時紀錄使用此函式。V18：優先直接讀最新記憶檔，不依賴先進 13 頁面做 DB restore。
+    names = _v18_json_process_options(category_name)
+    if names:
+        return names
+    try:
+        _v373_s_schema_only()  # type: ignore[name-defined]
+        category = _norm_category_name(category_name or get_default_process_category())
+        df = query_df(
+            "SELECT process_name FROM process_category_options WHERE COALESCE(is_active,1)=1 AND category_name=? ORDER BY sort_order, id",
+            (category,),
         )
-        count += 1
-    _clear_settings_cache()
-    export_system_settings_permanent("save_process_categories_v10_active_default", write_history=False)
-    return count
-# ===== V10 CATEGORY ACTIVE/STABLE APPLY PATCH END =====
-
-# ===== V12 SYSTEM SETTINGS SAVE SPEED PATCH START =====
-# 目的：13.系統設定儲存很慢時，不改功能、不改正式路徑、不刪檔案，
-# 只把大量 DB row-by-row 寫入期間的昂貴 after-write 匯出/GitHub 同步暫停，
-# 最後仍由 export_system_settings_permanent 一次性寫入正式 permanent_store。
-# 同時 GitHub write-through 僅即時上傳 canonical latest 檔；其他 mirror 檔仍寫在本機 permanent_store，
-# Reboot 時會以 exported_at 最新檔為準，不影響既有還原邏輯。
-
-_V12_PREV_EXPORT_SYSTEM_SETTINGS_PERMANENT = export_system_settings_permanent
-
-def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
-    """V12: fast export for 13｜系統設定.
-
-    保留原本 4 個 permanent_store 檔案：
-    - data/permanent_store/persistent_modules/13_system_settings/13_system_settings_records.json
-    - data/permanent_store/persistent_modules/13_system_settings/system_settings.json
-    - data/permanent_store/persistent_state/spt_system_settings.json
-    - data/permanent_store/config/system_settings.json
-
-    加速點：
-    - 本機仍四檔同步寫入，避免相容功能失效。
-    - GitHub 即時 write-through 只傳 canonical latest records 檔，減少 4 次 API 上傳變 1 次。
-      其他 mirror 檔仍可由 09/備份或下一次完整同步處理；Reboot 讀取時 latest 檔已足夠保留最新設定。
-    """
-    _v373_s_schema_only()
-    try:
-        cats = query_df("SELECT id, category_name, is_active, sort_order, note, created_at, updated_at FROM process_categories ORDER BY sort_order, id")
+        return [str(x).strip() for x in df.get("process_name", []).dropna().tolist() if str(x).strip()] if df is not None and not df.empty else []
     except Exception:
-        cats = pd.DataFrame(columns=["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
-    try:
-        proc = query_df("SELECT id, category_name, process_name, is_active, sort_order, note, created_at, updated_at FROM process_category_options ORDER BY category_name, sort_order, id")
-    except Exception:
-        proc = pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
-    try:
-        rest = query_df("SELECT id, name, start_time, end_time, is_active, sort_order FROM rest_periods ORDER BY sort_order, id")
-    except Exception:
-        rest = pd.DataFrame(columns=["id", "name", "start_time", "end_time", "is_active", "sort_order"])
-    try:
-        app = query_df("SELECT setting_key, setting_value, note, updated_at FROM app_settings ORDER BY setting_key")
-    except Exception:
-        app = pd.DataFrame(columns=["setting_key", "setting_value", "note", "updated_at"])
-
-    proc_rows = _v373_df_records(proc)
-    payload = {
-        "version": "V12-fast-system-settings-save",
-        "exported_at": _now(),
-        "reason": reason,
-        "module_key": "13_system_settings",
-        "module_code": "13_system_settings",
-        "module_name_zh": "系統設定",
-        "module_name_en": "System Settings",
-        "source": "system_settings_service_v12_fast_save",
-        "description": "13 系統設定：本機四個 permanent_store mirror 仍完整寫入；GitHub 即時同步只上傳 canonical latest records 檔以提升存檔速度。",
-        "tables": {
-            "process_categories": _v373_df_records(cats),
-            "process_category_options": proc_rows,
-            "process_options": proc_rows,
-            "rest_periods": _v373_df_records(rest),
-            "app_settings": _v373_df_records(app),
-        },
-        "table_counts": {
-            "process_categories": 0 if cats is None else len(cats),
-            "process_category_options": 0 if proc is None else len(proc),
-            "process_options": 0 if proc is None else len(proc),
-            "rest_periods": 0 if rest is None else len(rest),
-            "app_settings": 0 if app is None else len(app),
-        },
-    }
-    files = [_V373_SYSTEM_LATEST_FILE, _V373_SYSTEM_COMPAT_FILE, _V373_SYSTEM_STATE_FILE, _V373_SYSTEM_CONFIG_FILE]
-    for path in files:
-        _v373_s_atomic_write(path, payload)
-
-    github_upload = {"ok": True, "skipped": True, "message": "GitHub write-through skipped"}
-    try:
-        from services.permanent_write_through_service import github_write_through_files
-        # V12 加速：只即時上傳 canonical latest file；此檔是 Reboot 後最新權威來源。
-        github_upload = github_write_through_files([_V373_SYSTEM_LATEST_FILE], source=f"{reason}_v12_fast_system_settings")
-    except Exception as exc:
-        github_upload = {"ok": False, "message": str(exc)}
-    _clear_settings_cache()
-    return {
-        "ok": True,
-        "mode": "v12_fast_system_settings_save",
-        "files": [str(p) for p in files],
-        "github_immediate_files": [str(_V373_SYSTEM_LATEST_FILE)],
-        "table_counts": payload["table_counts"],
-        "github_upload": github_upload,
-    }
+        return []
 
 
-def _v12_call_with_suspended_db_after_write(fn, *args, **kwargs):
-    try:
-        from services.db_service import suspend_after_write_sync
-        with suspend_after_write_sync("v12_system_settings_user_save_batch"):
-            return fn(*args, **kwargs)
-    except Exception:
-        # 如果 db_service 不具備 suspend context，仍維持原功能。
-        return fn(*args, **kwargs)
-
-
-_V12_PREV_SAVE_PROCESS_CATEGORIES_DF = save_process_categories_df
-_V12_PREV_DELETE_PROCESS_CATEGORIES = delete_process_categories
-_V12_PREV_SAVE_PROCESS_OPTIONS_DF = save_process_options_df
-_V12_PREV_DELETE_PROCESS_OPTIONS = delete_process_options
-
-
-def save_process_categories_df(df: pd.DataFrame) -> int:  # type: ignore[override]
-    return _v12_call_with_suspended_db_after_write(_V12_PREV_SAVE_PROCESS_CATEGORIES_DF, df)
-
-
-def delete_process_categories(ids: Iterable[int]) -> int:  # type: ignore[override]
-    return _v12_call_with_suspended_db_after_write(_V12_PREV_DELETE_PROCESS_CATEGORIES, ids)
-
-
-def save_process_options_df(df: pd.DataFrame) -> int:  # type: ignore[override]
-    return _v12_call_with_suspended_db_after_write(_V12_PREV_SAVE_PROCESS_OPTIONS_DF, df)
-
-
-def delete_process_options(ids: Iterable[int]) -> int:  # type: ignore[override]
-    return _v12_call_with_suspended_db_after_write(_V12_PREV_DELETE_PROCESS_OPTIONS, ids)
-
-# 其他 13 系統設定儲存函式也同樣包成批次寫入：大量 execute 期間不觸發每筆 after-write。
-try:
-    _V12_PREV_SAVE_REST_PERIODS_DF = save_rest_periods_df
-    def save_rest_periods_df(df: pd.DataFrame) -> int:  # type: ignore[override]
-        return _v12_call_with_suspended_db_after_write(_V12_PREV_SAVE_REST_PERIODS_DF, df)
-except Exception:
-    pass
-
-try:
-    _V12_PREV_DELETE_REST_PERIODS = delete_rest_periods
-    def delete_rest_periods(ids: Iterable[int]) -> int:  # type: ignore[override]
-        return _v12_call_with_suspended_db_after_write(_V12_PREV_DELETE_REST_PERIODS, ids)
-except Exception:
-    pass
-
-try:
-    _V12_PREV_SAVE_LIVE_PAGE_RESET_TIME = save_live_page_reset_time
-    def save_live_page_reset_time(value: str) -> str:  # type: ignore[override]
-        return _v12_call_with_suspended_db_after_write(_V12_PREV_SAVE_LIVE_PAGE_RESET_TIME, value)
-except Exception:
-    pass
-
-try:
-    _V12_PREV_SAVE_DEFAULT_PROCESS_CATEGORY = save_default_process_category
-    def save_default_process_category(category_name: str) -> str:  # type: ignore[override]
-        return _v12_call_with_suspended_db_after_write(_V12_PREV_SAVE_DEFAULT_PROCESS_CATEGORY, category_name)
-except Exception:
-    pass
-
-try:
-    _V12_PREV_SAVE_DEFAULT_PROCESS_MODEL = save_default_process_model
-    def save_default_process_model(type_name: str) -> str:  # type: ignore[override]
-        return _v12_call_with_suspended_db_after_write(_V12_PREV_SAVE_DEFAULT_PROCESS_MODEL, type_name)
-except Exception:
-    pass
-# ===== V12 SYSTEM SETTINGS SAVE SPEED PATCH END =====
+def get_process_options_by_category_exact(category_name: str | None = None) -> list[str]:  # type: ignore[override]
+    return get_process_options_by_category(category_name, include_common=False)
