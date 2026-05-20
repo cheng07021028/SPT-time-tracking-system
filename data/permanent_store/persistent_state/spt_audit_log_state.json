@@ -1,14 +1,30 @@
 {
   "version": "V1.50",
-  "exported_at": "2026-05-20 15:06:48",
+  "exported_at": "2026-05-20 15:18:51",
   "source": "audit_log_service",
   "module_key": "11_login_logs",
   "module_code": "11_login_logs",
   "module_name_zh": "登入紀錄",
   "module_name_en": "Login Logs",
   "table": "login_logs",
-  "count": 44,
+  "count": 45,
   "records": [
+    {
+      "id": 43,
+      "username": "admin",
+      "display_name": "系統管理員",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "message": "roles=admin",
+      "module_code": "11_login_logs",
+      "login_time": "2026-05-20 15:18:46",
+      "logout_time": NaN,
+      "idle_minutes": NaN,
+      "ip_address": "",
+      "user_agent": "",
+      "created_at": "2026-05-20 15:18:46",
+      "source": "login_logs"
+    },
     {
       "id": 43,
       "username": "admin",
@@ -724,6 +740,22 @@
         "result": "SUCCESS",
         "message": "roles=admin",
         "module_code": "11_login_logs",
+        "login_time": "2026-05-20 15:18:46",
+        "logout_time": NaN,
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "",
+        "created_at": "2026-05-20 15:18:46",
+        "source": "login_logs"
+      },
+      {
+        "id": 43,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "11_login_logs",
         "login_time": "2026-05-20 15:06:43",
         "logout_time": NaN,
         "idle_minutes": NaN,
@@ -1423,6 +1455,6 @@
     ]
   },
   "table_counts": {
-    "login_logs": 44
+    "login_logs": 45
   }
 }
