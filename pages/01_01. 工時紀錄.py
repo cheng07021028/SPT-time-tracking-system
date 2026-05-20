@@ -13,7 +13,11 @@ from services.security_service import (
     render_post_record_continue_prompt,
     trigger_post_record_continue_prompt,
 )
-from services.master_data_service import load_employees, load_work_orders, has_master_data_for_time_record
+from services.master_data_service import (
+    load_employees_for_time_record_fast,
+    load_work_orders_for_time_record_fast,
+    has_master_data_for_time_record_fast,
+)
 from services.time_record_service import (
     clear_today_finished_from_work_page,
     delete_time_records,
@@ -39,13 +43,14 @@ render_header("01｜工時紀錄", "快速開始、同步作業、暫停、下�
 render_post_record_continue_prompt()
 
 
-employees = load_employees(active_only=True, in_factory_only=False)
-work_orders = load_work_orders(active_only=True)
+# V13: 01 opens from latest memory files/SQLite without doing heavy master restore inline.
+employees = load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
+work_orders = load_work_orders_for_time_record_fast(active_only=True)
 
 # V11: master-data existence must be checked before employee account filtering.
 # A normal operator may only see one employee, or zero if not bound.  That should
 # not be treated as missing 03/04 master data.
-has_employees_master, has_work_orders_master = has_master_data_for_time_record()
+has_employees_master, has_work_orders_master = has_master_data_for_time_record_fast(employees, work_orders)
 
 if employees.empty or work_orders.empty:
     if st.session_state.get("_spt_employee_binding_required"):
@@ -61,11 +66,13 @@ with left:
     st.subheader("開始作業 / Start Work")
     emp_label = st.selectbox("工號 / 姓名｜Employee", employees.apply(lambda r: f"{r['employee_id']}｜{r['employee_name']}", axis=1).tolist())
     emp_id = emp_label.split("｜")[0]
-    employee = query_one("SELECT * FROM employees WHERE employee_id=?", (emp_id,))
+    emp_match = employees[employees["employee_id"].fillna("").astype(str).str.strip() == emp_id]
+    employee = emp_match.iloc[0].fillna("").to_dict() if not emp_match.empty else (query_one("SELECT * FROM employees WHERE employee_id=?", (emp_id,)) or {})
 
     wo_label = st.selectbox("製令｜Work Order", work_orders.apply(lambda r: f"{r['work_order']}｜{r.get('part_no','')}｜{r.get('type_name','')}", axis=1).tolist())
     wo_no = wo_label.split("｜")[0]
-    work_order = query_one("SELECT * FROM work_orders WHERE work_order=?", (wo_no,))
+    wo_match = work_orders[work_orders["work_order"].fillna("").astype(str).str.strip() == wo_no]
+    work_order = wo_match.iloc[0].fillna("").to_dict() if not wo_match.empty else (query_one("SELECT * FROM work_orders WHERE work_order=?", (wo_no,)) or {})
 
     category_choices = load_process_category_choices(include_common=True)
     default_category = get_default_process_category()

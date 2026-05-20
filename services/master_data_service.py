@@ -162,6 +162,114 @@ def _restore_master_if_permanent_newer(table_name: str) -> int:
     return count
 # ===== V11 FAST MASTER DATA LATEST CACHE END =====
 
+
+
+# ===== V13 01 FAST OPEN MASTER DATA START =====
+def _safe_bool_series(series) -> pd.Series:
+    try:
+        text = series.fillna("").astype(str).str.strip().str.lower()
+        return text.isin({"1", "true", "yes", "y", "on", "啟用", "是"})
+    except Exception:
+        return pd.Series([], dtype=bool)
+
+
+def _fast_master_df_from_latest_json(table_name: str) -> pd.DataFrame:
+    """Return latest permanent master rows as DataFrame without restoring into SQLite.
+
+    01｜工時紀錄只需要下拉選單資料，不應在開頁時把 03/04 主檔大量
+    merge 回 SQLite。舊版在冷啟動或 DB 筆數少於 JSON 時會逐筆 upsert，
+    製令很多時會讓 01 開頁超過數分鐘。
+    """
+    rows = _fast_latest_rows(table_name)
+    if not rows:
+        return pd.DataFrame()
+    try:
+        return pd.DataFrame(rows).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+def _fast_master_df_from_sql(sql: str, params: list | tuple | None = None) -> pd.DataFrame:
+    try:
+        df = query_df(sql, list(params or []))
+        if df is None:
+            return pd.DataFrame()
+        return df.fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+def _pick_fast_master_df(table_name: str, sql: str, params: list | tuple | None = None) -> pd.DataFrame:
+    """Pick the larger/fresher source for fast opening, but do not write to DB."""
+    sql_df = _fast_master_df_from_sql(sql, params)
+    json_df = _fast_master_df_from_latest_json(table_name)
+    if json_df.empty:
+        return sql_df
+    if sql_df.empty:
+        return json_df
+    # 若 permanent_store 有較完整資料，01 頁直接使用 JSON；避免等待 DB 修復。
+    if len(json_df) > len(sql_df):
+        return json_df
+    return sql_df
+
+
+def _filter_active_df(df: pd.DataFrame, active_only: bool = True, in_factory_only: bool = False) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    if active_only and "is_active" in out.columns:
+        mask = _safe_bool_series(out["is_active"])
+        # 若整欄不是 0/1/true/false 格式，不用誤殺資料。
+        if mask.any():
+            out = out[mask].copy()
+    if in_factory_only and "is_in_factory" in out.columns:
+        mask = _safe_bool_series(out["is_in_factory"])
+        if mask.any():
+            out = out[mask].copy()
+    return out.fillna("")
+
+
+def _sort_df(df: pd.DataFrame, by: str) -> pd.DataFrame:
+    if df is None or df.empty or by not in df.columns:
+        return df if df is not None else pd.DataFrame()
+    try:
+        return df.sort_values(by=by, kind="stable").reset_index(drop=True)
+    except Exception:
+        return df.reset_index(drop=True)
+
+
+def load_employees_for_time_record_fast(active_only: bool = True, in_factory_only: bool = False) -> pd.DataFrame:
+    """Fast 01｜工時紀錄 employee dropdown loader.
+
+    不改 04 人員名單正式儲存邏輯，只讓 01 頁開啟時直接讀最新記憶檔/SQLite
+    中較完整者，避免冷啟動時逐筆還原造成超過 3 分鐘。
+    """
+    sql = "SELECT * FROM employees ORDER BY employee_id"
+    df = _pick_fast_master_df("employees", sql)
+    df = _filter_active_df(df, active_only=active_only, in_factory_only=in_factory_only)
+    df = _sort_df(df, "employee_id")
+    return _filter_employees_for_time_record(df)
+
+
+def load_work_orders_for_time_record_fast(active_only: bool = True) -> pd.DataFrame:
+    """Fast 01｜工時紀錄 work-order dropdown loader."""
+    sql = "SELECT * FROM work_orders ORDER BY work_order"
+    df = _pick_fast_master_df("work_orders", sql)
+    df = _filter_active_df(df, active_only=active_only, in_factory_only=False)
+    return _sort_df(df, "work_order")
+
+
+def has_master_data_for_time_record_fast(employees_df: pd.DataFrame | None = None, work_orders_df: pd.DataFrame | None = None) -> tuple[bool, bool]:
+    """Fast existence check for 01 page; never restores master rows inline."""
+    emp_ok = employees_df is not None and not employees_df.empty
+    wo_ok = work_orders_df is not None and not work_orders_df.empty
+    if not emp_ok:
+        emp_ok = bool(_fast_latest_rows("employees")) or _row_count_sql("employees") > 0
+    if not wo_ok:
+        wo_ok = bool(_fast_latest_rows("work_orders")) or _row_count_sql("work_orders") > 0
+    return bool(emp_ok), bool(wo_ok)
+# ===== V13 01 FAST OPEN MASTER DATA END =====
+
 def _now() -> str:
     return now_text()
 
@@ -327,21 +435,10 @@ def load_employees(active_only: bool = True, in_factory_only: bool = False) -> p
 def has_master_data_for_time_record() -> tuple[bool, bool]:
     """Fast raw master-data check for 01｜工時紀錄.
 
-    This intentionally bypasses employee account filtering.  It prevents a normal
-    operator with one visible employee from causing the page to display the false
-    message:「請先到 03/04 匯入或新增資料」when master data actually exists.
+    V13: do not restore 03/04 master data inline during 01 page open.
+    This keeps opening time under control while still recognizing permanent_store data.
     """
-    _restore_master_if_permanent_newer("employees")
-    _restore_master_if_permanent_newer("work_orders")
-    try:
-        emp_count = _row_count_sql("employees")
-    except Exception:
-        emp_count = len(_fast_latest_rows("employees"))
-    try:
-        wo_count = _row_count_sql("work_orders")
-    except Exception:
-        wo_count = len(_fast_latest_rows("work_orders"))
-    return emp_count > 0, wo_count > 0
+    return has_master_data_for_time_record_fast()
 
 def upsert_work_order(row: dict) -> bool:
     now = _now()
