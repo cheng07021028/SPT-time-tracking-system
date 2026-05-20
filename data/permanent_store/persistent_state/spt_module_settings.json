@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-20 13:33:42",
+  "exported_at": "2026-05-20 13:36:27",
   "source": "db_service_write",
   "tables": {
     "system_settings": [
@@ -8,201 +8,199 @@
         "setting_key": "company_name",
         "setting_value": "超慧科技",
         "note": "公司名稱",
-        "updated_at": "2026-05-20 13:04:26"
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
         "setting_key": "system_name",
         "setting_value": "製造部智慧工時紀錄系統",
         "note": "系統名稱",
-        "updated_at": "2026-05-20 13:04:26"
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
         "setting_key": "standard_work_start",
         "setting_value": "09:00",
         "note": "標準上班時間",
-        "updated_at": "2026-05-20 13:04:26"
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
         "setting_key": "standard_work_end",
         "setting_value": "18:00",
         "note": "標準下班時間",
-        "updated_at": "2026-05-20 13:04:26"
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
         "setting_key": "daily_expected_hours_min",
         "setting_value": "7.0",
         "note": "每日最低合理工時",
-        "updated_at": "2026-05-20 13:04:26"
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
         "setting_key": "daily_expected_hours_max",
         "setting_value": "7.5",
         "note": "每日最高合理工時",
-        "updated_at": "2026-05-20 13:04:26"
+        "updated_at": "2026-05-20 13:36:26"
       }
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
-    "process_categories": [],
-    "process_category_options": [],
     "process_options": [
       {
-        "id": 35,
+        "id": 1,
         "process_name": "前置鈑金",
         "is_active": 1,
         "sort_order": 1,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 36,
+        "id": 2,
         "process_name": "LP改造",
         "is_active": 1,
         "sort_order": 2,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 37,
+        "id": 3,
         "process_name": "骨架組立",
         "is_active": 1,
         "sort_order": 3,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 38,
+        "id": 4,
         "process_name": "配電",
         "is_active": 1,
         "sort_order": 4,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 39,
+        "id": 5,
         "process_name": "模組",
         "is_active": 1,
         "sort_order": 5,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 40,
+        "id": 6,
         "process_name": "水平",
         "is_active": 1,
         "sort_order": 6,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 41,
+        "id": 7,
         "process_name": "S.T.",
         "is_active": 1,
         "sort_order": 7,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 42,
+        "id": 8,
         "process_name": "清潔",
         "is_active": 1,
         "sort_order": 8,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 43,
+        "id": 9,
         "process_name": "收機",
         "is_active": 1,
         "sort_order": 9,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 44,
+        "id": 10,
         "process_name": "包機",
         "is_active": 1,
         "sort_order": 10,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 45,
+        "id": 11,
         "process_name": "Packing",
         "is_active": 1,
         "sort_order": 11,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 46,
+        "id": 12,
         "process_name": "異常",
         "is_active": 1,
         "sort_order": 12,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 47,
+        "id": 13,
         "process_name": "設變",
         "is_active": 1,
         "sort_order": 13,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 48,
+        "id": 14,
         "process_name": "重工",
         "is_active": 1,
         "sort_order": 14,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 49,
+        "id": 15,
         "process_name": "教育訓練",
         "is_active": 1,
         "sort_order": 15,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 50,
+        "id": 16,
         "process_name": "IPQC",
         "is_active": 1,
         "sort_order": 16,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       },
       {
-        "id": 51,
+        "id": 17,
         "process_name": "其他",
         "is_active": 1,
         "sort_order": 17,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-19 10:46:03",
-        "updated_at": "2026-05-19 10:46:03"
+        "created_at": "2026-05-20 13:36:26",
+        "updated_at": "2026-05-20 13:36:26"
       }
     ],
     "rest_periods": [
       {
-        "id": 6,
+        "id": 1,
         "name": "上午休息",
         "start_time": "10:30",
         "end_time": "10:45",
@@ -210,7 +208,7 @@
         "sort_order": 1
       },
       {
-        "id": 7,
+        "id": 2,
         "name": "午休",
         "start_time": "12:00",
         "end_time": "13:00",
@@ -218,7 +216,7 @@
         "sort_order": 2
       },
       {
-        "id": 8,
+        "id": 3,
         "name": "下午休息",
         "start_time": "15:00",
         "end_time": "15:15",
@@ -226,7 +224,7 @@
         "sort_order": 3
       },
       {
-        "id": 9,
+        "id": 4,
         "name": "晚餐休息",
         "start_time": "18:00",
         "end_time": "18:30",
@@ -234,7 +232,7 @@
         "sort_order": 4
       },
       {
-        "id": 10,
+        "id": 5,
         "name": "晚上休息",
         "start_time": "20:00",
         "end_time": "20:15",
@@ -242,7 +240,6 @@
         "sort_order": 5
       }
     ],
-    "app_settings": [],
     "auth_users": [
       {
         "id": 1,
@@ -255,10 +252,10 @@
         "role_code": "admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-20 13:04:43",
+        "last_login_at": "2026-05-15 11:23:39",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 13:04:43"
+        "updated_at": "2026-05-15 11:23:39"
       },
       {
         "id": 2,
@@ -2404,9 +2401,9 @@
         "email": "Admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-20 13:04:43",
+        "last_login_at": "2026-05-15 11:23:39",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 13:04:43"
+        "updated_at": "2026-05-19 17:35:07"
       },
       {
         "id": 2,
@@ -2521,8 +2518,8 @@
         "role_name_en": "System Admin",
         "description": "System Admin",
         "is_system_role": 1,
-        "created_at": "2026-05-20 13:33:36",
-        "updated_at": "2026-05-20 13:33:36"
+        "created_at": "2026-05-20 13:36:27",
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 2,
@@ -2531,8 +2528,8 @@
         "role_name_en": "Manufacturing Manager",
         "description": "Manufacturing Manager",
         "is_system_role": 1,
-        "created_at": "2026-05-20 13:33:36",
-        "updated_at": "2026-05-20 13:33:36"
+        "created_at": "2026-05-20 13:36:27",
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 3,
@@ -2541,8 +2538,8 @@
         "role_name_en": "Line Leader",
         "description": "Line Leader",
         "is_system_role": 1,
-        "created_at": "2026-05-20 13:33:36",
-        "updated_at": "2026-05-20 13:33:36"
+        "created_at": "2026-05-20 13:36:27",
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 4,
@@ -2551,8 +2548,8 @@
         "role_name_en": "Operator",
         "description": "Operator",
         "is_system_role": 1,
-        "created_at": "2026-05-20 13:33:36",
-        "updated_at": "2026-05-20 13:33:36"
+        "created_at": "2026-05-20 13:36:27",
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 5,
@@ -2561,8 +2558,8 @@
         "role_name_en": "Viewer",
         "description": "Viewer",
         "is_system_role": 1,
-        "created_at": "2026-05-20 13:33:36",
-        "updated_at": "2026-05-20 13:33:36"
+        "created_at": "2026-05-20 13:36:27",
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 6,
@@ -2571,8 +2568,8 @@
         "role_name_en": "Auditor",
         "description": "Auditor",
         "is_system_role": 1,
-        "created_at": "2026-05-20 13:33:36",
-        "updated_at": "2026-05-20 13:33:36"
+        "created_at": "2026-05-20 13:36:27",
+        "updated_at": "2026-05-20 13:36:27"
       }
     ],
     "security_user_roles": [
@@ -2648,7 +2645,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 2,
@@ -2666,7 +2663,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 3,
@@ -2684,7 +2681,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 4,
@@ -2702,7 +2699,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 5,
@@ -2720,7 +2717,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 6,
@@ -2738,7 +2735,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 7,
@@ -2756,7 +2753,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 8,
@@ -2774,7 +2771,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 9,
@@ -2792,7 +2789,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 10,
@@ -2810,7 +2807,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 11,
@@ -2828,7 +2825,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 12,
@@ -2846,7 +2843,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 13,
@@ -2864,7 +2861,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 14,
@@ -2882,7 +2879,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 15,
@@ -2900,7 +2897,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 16,
@@ -2918,7 +2915,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 17,
@@ -2936,7 +2933,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 18,
@@ -2954,7 +2951,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 19,
@@ -2972,7 +2969,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 20,
@@ -2990,7 +2987,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 21,
@@ -3008,7 +3005,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 22,
@@ -3026,7 +3023,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 23,
@@ -3044,7 +3041,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 24,
@@ -3062,7 +3059,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 25,
@@ -3080,7 +3077,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 26,
@@ -3098,7 +3095,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 27,
@@ -3116,7 +3113,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 28,
@@ -3134,7 +3131,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 29,
@@ -3152,7 +3149,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 30,
@@ -3170,7 +3167,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 31,
@@ -3188,7 +3185,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 32,
@@ -3206,7 +3203,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 33,
@@ -3224,7 +3221,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 34,
@@ -3242,7 +3239,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 35,
@@ -3260,7 +3257,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 36,
@@ -3278,7 +3275,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 37,
@@ -3296,7 +3293,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 38,
@@ -3314,7 +3311,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 39,
@@ -3332,7 +3329,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 40,
@@ -3350,7 +3347,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 41,
@@ -3368,7 +3365,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 42,
@@ -3386,7 +3383,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 43,
@@ -3404,7 +3401,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 44,
@@ -3422,7 +3419,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 45,
@@ -3440,7 +3437,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 46,
@@ -3458,7 +3455,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 47,
@@ -3476,7 +3473,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 48,
@@ -3494,7 +3491,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 49,
@@ -3512,7 +3509,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 50,
@@ -3530,7 +3527,7 @@
         "can_backup": 1,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 51,
@@ -3548,7 +3545,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 52,
@@ -3566,7 +3563,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 53,
@@ -3584,7 +3581,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 54,
@@ -3602,7 +3599,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 55,
@@ -3620,7 +3617,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 56,
@@ -3638,7 +3635,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 57,
@@ -3656,7 +3653,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 58,
@@ -3674,7 +3671,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 59,
@@ -3692,7 +3689,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 60,
@@ -3710,7 +3707,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 61,
@@ -3728,7 +3725,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 62,
@@ -3746,7 +3743,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 63,
@@ -3764,7 +3761,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 64,
@@ -3782,7 +3779,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 65,
@@ -3800,7 +3797,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 66,
@@ -3818,7 +3815,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 67,
@@ -3836,7 +3833,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 68,
@@ -3854,7 +3851,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 69,
@@ -3872,7 +3869,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 70,
@@ -3890,7 +3887,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 71,
@@ -3908,7 +3905,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 72,
@@ -3926,7 +3923,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 73,
@@ -3944,7 +3941,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 74,
@@ -3962,7 +3959,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 75,
@@ -3980,7 +3977,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 76,
@@ -3998,7 +3995,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 77,
@@ -4016,7 +4013,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       },
       {
         "id": 78,
@@ -4034,7 +4031,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-20 13:33:36"
+        "updated_at": "2026-05-20 13:36:27"
       }
     ],
     "security_settings": [
@@ -4056,11 +4053,8 @@
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "process_categories": 0,
-    "process_category_options": 0,
     "process_options": 17,
     "rest_periods": 5,
-    "app_settings": 0,
     "auth_users": 9,
     "auth_account_permissions": 117,
     "auth_security_settings": 2,
