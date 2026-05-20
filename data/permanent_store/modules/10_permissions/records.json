@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-20 23:47:28",
-  "exported_at": "2026-05-20 23:47:28",
+  "updated_at": "2026-05-21 00:00:47",
+  "exported_at": "2026-05-21 00:00:47",
   "reason": "save_users_authoritative_v28",
   "empty_authoritative": false,
   "tables": {
@@ -22,7 +22,20 @@
         "last_login_at": null,
         "note": "",
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-20 23:47:27"
+        "updated_at": "2026-05-21 00:00:47"
+      },
+      {
+        "employee_id": "nan",
+        "display_name": "查詢者",
+        "email": "Viewer",
+        "role_code": "viewer",
+        "is_active": true,
+        "force_password_change": false,
+        "note": "V1.29 default account",
+        "username": "SS",
+        "created_at": "2026-05-20 23:47:27",
+        "updated_at": "2026-05-21 00:00:47",
+        "password_hash": "pbkdf2_sha256$64a8e5ae6ac75a11fb285fa3665882c4$c8aee92994ee0bfc4dba8b09cf83dbcf40c04e09a3bb26249d7d73cf887c6c68"
       },
       {
         "id": 1,
@@ -38,7 +51,7 @@
         "last_login_at": "2026-05-20 16:11:56",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 23:47:27"
+        "updated_at": "2026-05-21 00:00:47"
       },
       {
         "id": 6,
@@ -54,7 +67,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 23:47:27"
+        "updated_at": "2026-05-21 00:00:47"
       },
       {
         "id": 3,
@@ -70,7 +83,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 23:47:27"
+        "updated_at": "2026-05-21 00:00:47"
       },
       {
         "id": 2,
@@ -86,7 +99,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 23:47:27"
+        "updated_at": "2026-05-21 00:00:47"
       },
       {
         "id": 4,
@@ -102,46 +115,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 23:47:27"
-      },
-      {
-        "employee_id": "nan",
-        "display_name": "查詢者",
-        "email": "Viewer",
-        "role_code": "viewer",
-        "is_active": true,
-        "force_password_change": false,
-        "note": "V1.29 default account",
-        "username": "SS",
-        "created_at": "2026-05-20 23:47:27",
-        "updated_at": "2026-05-20 23:47:27",
-        "password_hash": "pbkdf2_sha256$64a8e5ae6ac75a11fb285fa3665882c4$c8aee92994ee0bfc4dba8b09cf83dbcf40c04e09a3bb26249d7d73cf887c6c68"
-      },
-      {
-        "employee_id": "nan",
-        "display_name": "查詢者",
-        "email": "Viewer",
-        "role_code": "viewer",
-        "is_active": true,
-        "force_password_change": false,
-        "note": "V1.29 default account",
-        "username": "CC",
-        "created_at": "2026-05-20 23:47:27",
-        "updated_at": "2026-05-20 23:47:27",
-        "password_hash": "pbkdf2_sha256$a6af841925fb0dd27041ca29c7eb77cc$69c91b897e183a417e820e09cd318690e1d6627965d09708c8f8b70965af4056"
-      },
-      {
-        "employee_id": "nan",
-        "display_name": "查詢者",
-        "email": "Viewer",
-        "role_code": "viewer",
-        "is_active": true,
-        "force_password_change": false,
-        "note": "V1.29 default account",
-        "username": "GG",
-        "created_at": "2026-05-20 23:47:27",
-        "updated_at": "2026-05-20 23:47:27",
-        "password_hash": "pbkdf2_sha256$276626cbaae81b6900bab1b914997ea5$b5a9c93ec517976935b8b95b17ce499f95538f2cbbf49ae371034d550160b3ed"
+        "updated_at": "2026-05-21 00:00:47"
       }
     ],
     "auth_account_permissions": [
@@ -1489,7 +1463,7 @@
   },
   "settings": {},
   "table_counts": {
-    "auth_users": 9,
+    "auth_users": 7,
     "auth_account_permissions": 78,
     "auth_security_settings": 2
   }
