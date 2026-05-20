@@ -1,8 +1,8 @@
 {
-  "version": "V1.48",
+  "version": "V3.70-direct-latest-settings-file",
   "exported_at": "2026-05-20 13:25:38",
   "source": "db_service_write",
-  "module_key": "10_permissions",
+  "module_key": "10",
   "module_code": "10",
   "module_name_zh": "權限管理",
   "module_name_en": "Permissions",
@@ -2157,11 +2157,215 @@
         "note": "V1.69 synchronized security setting",
         "updated_at": "2026-05-15 11:23:50"
       }
-    ]
+    ],
+    "table_ui_settings": []
   },
   "table_counts": {
     "auth_users": 9,
     "auth_account_permissions": 117,
-    "auth_security_settings": 2
+    "auth_security_settings": 2,
+    "table_ui_settings": 0
+  },
+  "updated_at": "2026-05-20 13:35:47",
+  "description": "表格欄寬/欄位順序設定固定 latest 檔；讀寫方式比照 03/04 模組。",
+  "table_settings": {},
+  "column_settings": {
+    "10.permissions.account_master": {
+      "columns": {
+        "刪除 / Delete": {
+          "source": "刪除 / Delete",
+          "label": "刪除 / Delete / 刪除 / Delete",
+          "visible": true,
+          "width": "medium",
+          "order": -999
+        },
+        "帳號 / Username": {
+          "source": "帳號 / Username",
+          "label": "帳號 / Username / 帳號 / Username",
+          "visible": true,
+          "width": "medium",
+          "order": 0
+        },
+        "密碼狀態 / Password Status": {
+          "source": "密碼狀態 / Password Status",
+          "label": "密碼狀態 / Password Status / 密碼狀態 / Password Status",
+          "visible": true,
+          "width": "medium",
+          "order": 1
+        },
+        "新密碼 / New Password": {
+          "source": "新密碼 / New Password",
+          "label": "新密碼 / New Password / 新密碼 / New Password",
+          "visible": true,
+          "width": "medium",
+          "order": 2
+        },
+        "工號 / Employee ID": {
+          "source": "工號 / Employee ID",
+          "label": "工號 / Employee ID / 工號 / Employee ID",
+          "visible": true,
+          "width": "medium",
+          "order": 3
+        },
+        "姓名 / Display Name": {
+          "source": "姓名 / Display Name",
+          "label": "姓名 / Display Name / 姓名 / Display Name",
+          "visible": true,
+          "width": "medium",
+          "order": 4
+        },
+        "Email": {
+          "source": "Email",
+          "label": "Email / Email",
+          "visible": true,
+          "width": "medium",
+          "order": 5
+        },
+        "角色 / Role": {
+          "source": "角色 / Role",
+          "label": "角色 / Role / 角色 / Role",
+          "visible": true,
+          "width": "medium",
+          "order": 6
+        },
+        "啟用 / Active": {
+          "source": "啟用 / Active",
+          "label": "啟用 / Active / 啟用 / Active",
+          "visible": true,
+          "width": "medium",
+          "order": 7
+        },
+        "強制改密碼 / Force Change": {
+          "source": "強制改密碼 / Force Change",
+          "label": "強制改密碼 / Force Change / 強制改密碼 / Force Change",
+          "visible": true,
+          "width": "medium",
+          "order": 8
+        },
+        "備註 / Note": {
+          "source": "備註 / Note",
+          "label": "備註 / Note / 備註 / Note",
+          "visible": true,
+          "width": "medium",
+          "order": 9
+        },
+        "最後登入 / Last Login": {
+          "source": "最後登入 / Last Login",
+          "label": "最後登入 / Last Login / 最後登入 / Last Login",
+          "visible": true,
+          "width": "medium",
+          "order": 10
+        },
+        "更新時間 / Updated At": {
+          "source": "更新時間 / Updated At",
+          "label": "更新時間 / Updated At / 更新時間 / Updated At",
+          "visible": true,
+          "width": "medium",
+          "order": 11
+        }
+      },
+      "updated_at": "2026-05-19 22:46:34"
+    }
+  },
+  "ui": {
+    "table_settings": {},
+    "column_settings": {
+      "10.permissions.account_master": {
+        "columns": {
+          "刪除 / Delete": {
+            "source": "刪除 / Delete",
+            "label": "刪除 / Delete / 刪除 / Delete",
+            "visible": true,
+            "width": "medium",
+            "order": -999
+          },
+          "帳號 / Username": {
+            "source": "帳號 / Username",
+            "label": "帳號 / Username / 帳號 / Username",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "密碼狀態 / Password Status": {
+            "source": "密碼狀態 / Password Status",
+            "label": "密碼狀態 / Password Status / 密碼狀態 / Password Status",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "新密碼 / New Password": {
+            "source": "新密碼 / New Password",
+            "label": "新密碼 / New Password / 新密碼 / New Password",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "工號 / Employee ID": {
+            "source": "工號 / Employee ID",
+            "label": "工號 / Employee ID / 工號 / Employee ID",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "姓名 / Display Name": {
+            "source": "姓名 / Display Name",
+            "label": "姓名 / Display Name / 姓名 / Display Name",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "Email": {
+            "source": "Email",
+            "label": "Email / Email",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "角色 / Role": {
+            "source": "角色 / Role",
+            "label": "角色 / Role / 角色 / Role",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "啟用 / Active": {
+            "source": "啟用 / Active",
+            "label": "啟用 / Active / 啟用 / Active",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "強制改密碼 / Force Change": {
+            "source": "強制改密碼 / Force Change",
+            "label": "強制改密碼 / Force Change / 強制改密碼 / Force Change",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "備註 / Note": {
+            "source": "備註 / Note",
+            "label": "備註 / Note / 備註 / Note",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          },
+          "最後登入 / Last Login": {
+            "source": "最後登入 / Last Login",
+            "label": "最後登入 / Last Login / 最後登入 / Last Login",
+            "visible": true,
+            "width": "medium",
+            "order": 10
+          },
+          "更新時間 / Updated At": {
+            "source": "更新時間 / Updated At",
+            "label": "更新時間 / Updated At / 更新時間 / Updated At",
+            "visible": true,
+            "width": "medium",
+            "order": 11
+          }
+        },
+        "updated_at": "2026-05-19 22:46:34"
+      }
+    }
   }
 }
