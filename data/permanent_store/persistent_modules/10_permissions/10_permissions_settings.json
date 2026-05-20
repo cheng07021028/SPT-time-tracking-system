@@ -1,11 +1,13 @@
 {
-  "version": "V1.48",
-  "exported_at": "2026-05-20 15:02:29",
-  "source": "db_service_write",
+  "version": "V11-account-master-authoritative",
+  "exported_at": "2026-05-20 15:20:48",
+  "reason": "auth_users_saved_v11",
   "module_key": "10_permissions",
-  "module_code": "10",
+  "module_code": "10_permissions",
   "module_name_zh": "權限管理",
-  "module_name_en": "Permissions",
+  "module_name_en": "Permission Management",
+  "source": "permission_service_v373",
+  "description": "10 權限管理：比照 03/04，儲存寫固定 latest JSON；Reboot 僅在 DB 空白/預設時讀同一 latest JSON。",
   "tables": {
     "auth_users": [
       {
@@ -22,7 +24,7 @@
         "last_login_at": "2026-05-20 14:32:16",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:20:48"
       },
       {
         "id": 2,
@@ -38,7 +40,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:20:48"
       },
       {
         "id": 3,
@@ -54,7 +56,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:20:48"
       },
       {
         "id": 4,
@@ -70,7 +72,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:20:48"
       },
       {
         "id": 5,
@@ -86,7 +88,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:20:48"
       },
       {
         "id": 6,
@@ -102,7 +104,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:20:48"
       },
       {
         "id": 15,
@@ -118,7 +120,7 @@
         "last_login_at": null,
         "note": "",
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:20:48"
       }
     ],
     "auth_account_permissions": [
@@ -1683,11 +1685,160 @@
         "note": "V1.69 synchronized security setting",
         "updated_at": "2026-05-15 11:23:50"
       }
-    ]
+    ],
+    "security_users": [
+      {
+        "id": 19,
+        "username": "admin",
+        "password_hash": "pbkdf2_sha256$3a6f3a7befa0885e8c08cc2eb15a9859$4c37ee557e8e94cd84ddf1e2c31156cdb5fed35b9880b147e7e72302444f72ee",
+        "employee_id": "nan",
+        "display_name": "系統管理員",
+        "email": "Admin",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-20 14:32:16",
+        "created_at": "2026-05-15 03:46:58",
+        "updated_at": "2026-05-20 15:20:48"
+      },
+      {
+        "id": 20,
+        "username": "manager",
+        "password_hash": "pbkdf2_sha256$10ba828719f2b82390101445bbcf4386$f6814b12a67e894cc25729467ebeb5b931c0a2e962c9be78011f0a7c96bed7ec",
+        "employee_id": "nan",
+        "display_name": "製造主管",
+        "email": "Manager",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-15 03:46:58",
+        "updated_at": "2026-05-20 15:20:48"
+      },
+      {
+        "id": 21,
+        "username": "leader",
+        "password_hash": "pbkdf2_sha256$820402735ad1b2eea21d45fe0dde7d92$61071ad17632fe72811f7954a9f0285315dc41cc9ad744a0f91696a25d427cbf",
+        "employee_id": "nan",
+        "display_name": "現場幹部",
+        "email": "Leader",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-15 03:46:58",
+        "updated_at": "2026-05-20 15:20:48"
+      },
+      {
+        "id": 22,
+        "username": "operator",
+        "password_hash": "pbkdf2_sha256$4d4520bfc0e2c72ba9b6139d26256b67$8b16d1dc77c04c2a285e5e1f21ec03dccc169bf0db45f2c1612d80ecd0b7dc40",
+        "employee_id": "nan",
+        "display_name": "作業人員",
+        "email": "Operator",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-15 03:46:58",
+        "updated_at": "2026-05-20 15:20:48"
+      },
+      {
+        "id": 23,
+        "username": "viewer",
+        "password_hash": "pbkdf2_sha256$205d2b7f07efb7edb59124464db1b85c$496673a805306de4f438898de0dc6178c71b9a83cd2b10242fa20f3bef738859",
+        "employee_id": "nan",
+        "display_name": "查詢者",
+        "email": "Viewer",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-15 03:46:58",
+        "updated_at": "2026-05-20 15:20:48"
+      },
+      {
+        "id": 24,
+        "username": "auditor",
+        "password_hash": "pbkdf2_sha256$f0810956eb383df03a679f2fc23e5bd0$11465b9812094ab5ff80cc844dbf555a2b107fc534cd7bd9f46db3122d43425d",
+        "employee_id": "nan",
+        "display_name": "稽核",
+        "email": "Auditor",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-15 03:46:58",
+        "updated_at": "2026-05-20 15:20:48"
+      },
+      {
+        "id": 25,
+        "username": "Ethan",
+        "password_hash": "pbkdf2_sha256$4a2137fb90480f1b82a4721549f178ff$e85de92dedccb2791d7c297a55882100182babccdb5fd0485b63bfa5ac24bca0",
+        "employee_id": "SPT142",
+        "display_name": "Ethan",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-16 14:29:55",
+        "updated_at": "2026-05-20 15:20:48"
+      }
+    ],
+    "security_user_roles": [
+      {
+        "id": 26,
+        "username": "Ethan",
+        "role_code": "admin",
+        "created_at": "2026-05-20 15:20:48"
+      },
+      {
+        "id": 27,
+        "username": "admin",
+        "role_code": "admin",
+        "created_at": "2026-05-20 15:20:48"
+      },
+      {
+        "id": 28,
+        "username": "auditor",
+        "role_code": "auditor",
+        "created_at": "2026-05-20 15:20:48"
+      },
+      {
+        "id": 29,
+        "username": "leader",
+        "role_code": "leader",
+        "created_at": "2026-05-20 15:20:48"
+      },
+      {
+        "id": 30,
+        "username": "manager",
+        "role_code": "manager",
+        "created_at": "2026-05-20 15:20:48"
+      },
+      {
+        "id": 31,
+        "username": "operator",
+        "role_code": "operator",
+        "created_at": "2026-05-20 15:20:48"
+      },
+      {
+        "id": 32,
+        "username": "viewer",
+        "role_code": "viewer",
+        "created_at": "2026-05-20 15:20:48"
+      }
+    ],
+    "security_settings": []
   },
   "table_counts": {
     "auth_users": 7,
     "auth_account_permissions": 91,
-    "auth_security_settings": 2
+    "auth_security_settings": 2,
+    "security_users": 7,
+    "security_user_roles": 7,
+    "security_settings": 0
+  },
+  "counts": {
+    "auth_users": 7,
+    "auth_account_permissions": 91,
+    "auth_security_settings": 2,
+    "security_users": 7,
+    "security_user_roles": 7,
+    "security_settings": 0
   }
 }
