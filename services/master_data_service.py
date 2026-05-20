@@ -17,6 +17,40 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PERSISTENT_MODULES_DIR = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules"
 
 
+WORK_ORDER_COLUMNS = [
+    "id", "work_order", "part_no", "type_name", "assembly_location",
+    "customer", "note", "is_active", "created_at", "updated_at",
+]
+EMPLOYEE_COLUMNS = [
+    "id", "employee_id", "employee_name", "department", "title",
+    "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at",
+]
+
+
+def _empty_df(columns: list[str]) -> pd.DataFrame:
+    return pd.DataFrame(columns=columns)
+
+
+def _rows_to_df(rows: list[dict], columns: list[str]) -> pd.DataFrame:
+    if not rows:
+        return _empty_df(columns)
+    df = pd.DataFrame(rows)
+    for col in columns:
+        if col not in df.columns:
+            if col.startswith("is_"):
+                df[col] = 1
+            else:
+                df[col] = ""
+    return df[columns].copy()
+
+
+def _safe_query_df(sql: str, params=None, columns: list[str] | None = None) -> pd.DataFrame:
+    try:
+        return query_df(sql, params or [])
+    except Exception:
+        return _empty_df(columns or [])
+
+
 def _load_persistent_module_rows(module_code: str, table_name: str) -> list[dict]:
     """Load rows from data/permanent_store/persistent_modules as a non-destructive fallback.
 
@@ -195,14 +229,19 @@ def load_work_orders(active_only: bool = True) -> pd.DataFrame:
     if active_only:
         sql += " WHERE is_active=1"
     sql += " ORDER BY work_order"
-    df = query_df(sql)
+    df = _safe_query_df(sql, [], WORK_ORDER_COLUMNS)
     if not df.empty:
         return df
 
-    # Fallback: if DB is temporarily empty after module update, recover from
-    # persistent module JSON instead of showing a false "請先到 03/04 匯入資料" message.
-    _restore_work_orders_from_persistent()
-    return query_df(sql)
+    # Fallback: if DB is temporarily empty after module update/reboot, recover
+    # from canonical permanent JSON.  If SQLite is still unavailable, return the
+    # JSON rows directly so 01 工時紀錄 does not crash.
+    restored = _restore_work_orders_from_persistent()
+    df = _safe_query_df(sql, [], WORK_ORDER_COLUMNS)
+    if not df.empty:
+        return df
+    rows = _load_persistent_module_rows("03_work_orders", "work_orders")
+    return _rows_to_df(rows, WORK_ORDER_COLUMNS)
 
 
 def load_employees(active_only: bool = True, in_factory_only: bool = False) -> pd.DataFrame:
@@ -213,10 +252,17 @@ def load_employees(active_only: bool = True, in_factory_only: bool = False) -> p
     if in_factory_only:
         sql += " AND is_in_factory=1"
     sql += " ORDER BY employee_id"
-    df = query_df(sql, params)
+    df = _safe_query_df(sql, params, EMPLOYEE_COLUMNS)
     if df.empty:
         _restore_employees_from_persistent()
-        df = query_df(sql, params)
+        df = _safe_query_df(sql, params, EMPLOYEE_COLUMNS)
+    if df.empty:
+        rows = _load_persistent_module_rows("04_employees", "employees")
+        df = _rows_to_df(rows, EMPLOYEE_COLUMNS)
+        if active_only and "is_active" in df.columns:
+            df = df[df["is_active"].fillna(1).astype(str).isin(["1", "True", "true", "是", "Y", "y"])]
+        if in_factory_only and "is_in_factory" in df.columns:
+            df = df[df["is_in_factory"].fillna(1).astype(str).isin(["1", "True", "true", "是", "Y", "y"])]
     return _filter_employees_for_time_record(df)
 
 

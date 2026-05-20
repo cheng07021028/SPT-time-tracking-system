@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import shutil
 import time
 from datetime import datetime
 from pathlib import Path
@@ -601,12 +602,96 @@ def _init_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+
+# ===== V3.54 database self-repair guard =====
+def _is_repairable_database_error(exc: Exception) -> bool:
+    """Detect SQLite errors that can be repaired by schema migration/recreate.
+
+    Streamlit Cloud sometimes keeps an old/empty DB file after file moves.  The
+    visible error becomes pandas.errors.DatabaseError on pages such as 01 工時紀錄,
+    while the actual cause is usually "no such table", "no such column", or a
+    damaged SQLite file.  This guard lets the app repair once instead of crashing.
+    """
+    msg = str(exc or "").lower()
+    keywords = (
+        "no such table",
+        "no such column",
+        "has no column named",
+        "database disk image is malformed",
+        "file is not a database",
+        "unable to open database file",
+        "readonly database",
+        "attempt to write a readonly database",
+    )
+    return any(k in msg for k in keywords)
+
+
+def _backup_broken_database(reason: str = "") -> Path | None:
+    """Move a corrupted DB aside before recreating schema.
+
+    This is only used for damaged/non-SQLite files.  Normal schema migrations do
+    not move the DB and never drop user data.
+    """
+    try:
+        if not DB_PATH.exists():
+            return None
+        backup_dir = DB_DIR / "broken_backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        target = backup_dir / f"spt_time_tracking_broken_{stamp}.db"
+        shutil.move(str(DB_PATH), str(target))
+        return target
+    except Exception:
+        return None
+
+
+def _repair_database_after_error(exc: Exception, *, destructive_if_corrupted: bool = True) -> dict[str, Any]:
+    """Repair DB after a query/execute failure, then caller may retry once."""
+    global _SCHEMA_READY, _RESTORE_CHECKED
+    msg = str(exc or "")
+    low = msg.lower()
+    result: dict[str, Any] = {"ok": False, "message": msg, "backup_path": ""}
+    try:
+        DB_DIR.mkdir(parents=True, exist_ok=True)
+        if destructive_if_corrupted and (
+            "database disk image is malformed" in low or "file is not a database" in low
+        ):
+            backup = _backup_broken_database(msg)
+            result["backup_path"] = str(backup or "")
+
+        _SCHEMA_READY = False
+        _RESTORE_CHECKED = False
+        with _open_connection() as conn:
+            _init_schema(conn)
+        _SCHEMA_READY = True
+
+        # Try to rescue business data from the canonical permanent JSON after a
+        # recreated/empty database.  Failures here must not block app startup.
+        try:
+            ensure_data_guard_restore(force=True)
+        except Exception:
+            pass
+        result["ok"] = True
+        result["message"] = "SQLite schema repaired and data guard executed."
+    except Exception as repair_exc:
+        result["ok"] = False
+        result["message"] = f"repair failed: {repair_exc}; original: {msg}"
+    return result
+
 def ensure_database() -> None:
     global _SCHEMA_READY
     if _SCHEMA_READY:
         return
-    with _open_connection() as conn:
-        _init_schema(conn)
+    try:
+        with _open_connection() as conn:
+            _init_schema(conn)
+    except Exception as exc:
+        if _is_repairable_database_error(exc):
+            repaired = _repair_database_after_error(exc)
+            if not repaired.get("ok"):
+                raise
+        else:
+            raise
     # V3.02: 01/02 share time_records. If DB was recreated empty after a module update,
     # restore from canonical/legacy module JSON, local backups, or external backups.
     try:
@@ -816,10 +901,21 @@ def execute(sql: str, params: Iterable[Any] | None = None) -> int:
         ensure_data_guard_restore()
     if params is None:
         params = ()
-    with _open_connection() as conn:
-        cur = conn.execute(sql, tuple(params))
-        conn.commit()
-        last_id = cur.lastrowid
+    try:
+        with _open_connection() as conn:
+            cur = conn.execute(sql, tuple(params))
+            conn.commit()
+            last_id = cur.lastrowid
+    except Exception as exc:
+        if not _is_repairable_database_error(exc):
+            raise
+        repaired = _repair_database_after_error(exc)
+        if not repaired.get("ok"):
+            raise
+        with _open_connection() as conn:
+            cur = conn.execute(sql, tuple(params))
+            conn.commit()
+            last_id = cur.lastrowid
     clear_query_cache()
     if _should_after_write_sync(sql):
         _after_write(sql)
@@ -830,9 +926,19 @@ def executemany(sql: str, rows: list[Iterable[Any]]) -> None:
     ensure_database()
     if _should_run_data_guard(sql):
         ensure_data_guard_restore()
-    with _open_connection() as conn:
-        conn.executemany(sql, rows)
-        conn.commit()
+    try:
+        with _open_connection() as conn:
+            conn.executemany(sql, rows)
+            conn.commit()
+    except Exception as exc:
+        if not _is_repairable_database_error(exc):
+            raise
+        repaired = _repair_database_after_error(exc)
+        if not repaired.get("ok"):
+            raise
+        with _open_connection() as conn:
+            conn.executemany(sql, rows)
+            conn.commit()
     clear_query_cache()
     if _should_after_write_sync(sql):
         _after_write(sql)
@@ -853,8 +959,18 @@ def query_df(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:
         if cached and now_ts - cached[0] <= _QUERY_CACHE_TTL_SEC:
             return cached[1].copy()
 
-    with _open_connection() as conn:
-        df = pd.read_sql_query(sql, conn, params=tuple(params))
+    try:
+        with _open_connection() as conn:
+            df = pd.read_sql_query(sql, conn, params=tuple(params))
+    except Exception as exc:
+        if not _is_repairable_database_error(exc):
+            raise
+        repaired = _repair_database_after_error(exc)
+        if not repaired.get("ok"):
+            raise
+        # Retry once after schema repair / data rescue.
+        with _open_connection() as conn:
+            df = pd.read_sql_query(sql, conn, params=tuple(params))
 
     if cacheable:
         try:
