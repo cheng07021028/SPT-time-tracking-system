@@ -1,7 +1,7 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-20 14:36:08",
-  "source": "db_service_write",
+  "exported_at": "2026-05-20 14:36:34",
+  "source": "crud_table_service_save_employees",
   "module_key": "06_system_logs",
   "module_code": "06",
   "module_name_zh": "LOG查詢",
@@ -29,10 +29,32 @@
         "message": "從永久 JSON 救援 work_orders",
         "detail": "restored=603, source=/mount/src/spt-time-tracking-system/data/permanent_store/persistent_modules/03_work_orders/history/03_work_orders_records_20260517_112128.json",
         "level": "INFO"
+      },
+      {
+        "id": 3,
+        "log_time": "2026-05-20 14:36:31",
+        "user_name": "streamlit_user",
+        "action_type": "SAVE_EMPLOYEES",
+        "target_table": "employees",
+        "target_id": "",
+        "message": "儲存人員名單",
+        "detail": "inserted=0, updated=1, deleted=0, skipped=0",
+        "level": "INFO"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-20 14:36:34",
+        "user_name": "streamlit_user",
+        "action_type": "SAVE_EMPLOYEES",
+        "target_table": "employees",
+        "target_id": "",
+        "message": "儲存人員名單",
+        "detail": "inserted=0, updated=1, deleted=0, skipped=0",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 2
+    "system_logs": 4
   }
 }
