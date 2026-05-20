@@ -1,25 +1,25 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-20 16:17:01",
+  "exported_at": "2026-05-20 16:20:04",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 702,
   "table_counts": {
-    "app_settings": 0,
+    "app_settings": 1,
     "auth_account_permissions": 91,
     "auth_login_logs": 0,
     "auth_security_settings": 2,
     "auth_users": 7,
     "employees": 84,
     "login_logs": 1,
-    "process_categories": 1,
-    "process_category_options": 17,
+    "process_categories": 3,
+    "process_category_options": 19,
     "process_options": 17,
     "rest_periods": 5,
     "security_settings": 0,
     "security_user_roles": 7,
     "security_users": 7,
-    "system_logs": 1,
+    "system_logs": 2,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
@@ -28,7 +28,14 @@
     "work_orders": 608
   },
   "tables": {
-    "app_settings": [],
+    "app_settings": [
+      {
+        "setting_key": "default_process_category",
+        "setting_value": "BBB",
+        "note": "01 工時紀錄：類別空白或找不到對應工段時使用的預設類別",
+        "updated_at": "2026-05-20 16:19:55"
+      }
+    ],
     "auth_account_permissions": [
       {
         "id": 14,
@@ -2826,7 +2833,25 @@
         "sort_order": 1,
         "note": "系統預設類別",
         "created_at": "2026-05-20 16:12:13",
-        "updated_at": "2026-05-20 16:12:13"
+        "updated_at": "2026-05-20 16:18:49"
+      },
+      {
+        "id": 2,
+        "category_name": "AAA",
+        "is_active": 1,
+        "sort_order": 2,
+        "note": "",
+        "created_at": "2026-05-20 16:18:49",
+        "updated_at": "2026-05-20 16:18:49"
+      },
+      {
+        "id": 3,
+        "category_name": "BBB",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-20 16:18:49",
+        "updated_at": "2026-05-20 16:18:49"
       }
     ],
     "process_category_options": [
@@ -2999,6 +3024,26 @@
         "note": "系統預設工段，可於 13 系統設定修改",
         "created_at": "2026-05-20 16:11:58",
         "updated_at": "2026-05-20 16:11:58"
+      },
+      {
+        "id": 35,
+        "category_name": "AAA",
+        "process_name": "QQQ",
+        "is_active": 1,
+        "sort_order": 1,
+        "note": "",
+        "created_at": "2026-05-20 16:19:10",
+        "updated_at": "2026-05-20 16:19:41"
+      },
+      {
+        "id": 36,
+        "category_name": "BBB",
+        "process_name": "RRR",
+        "is_active": 1,
+        "sort_order": 2,
+        "note": "",
+        "created_at": "2026-05-20 16:19:41",
+        "updated_at": "2026-05-20 16:19:41"
       }
     ],
     "process_options": [
@@ -3346,6 +3391,17 @@
         "target_id": "",
         "message": "自動初始化資料庫完成",
         "detail": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
+        "level": "INFO"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-20 16:19:55",
+        "user_name": "appuser",
+        "action_type": "SAVE_DEFAULT_PROCESS_CATEGORY",
+        "target_table": "app_settings",
+        "target_id": "",
+        "message": "儲存預設類別：BBB",
+        "detail": "",
         "level": "INFO"
       }
     ],
