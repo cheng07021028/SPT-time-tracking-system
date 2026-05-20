@@ -16,6 +16,7 @@ import base64
 import hashlib
 import hmac
 import os
+import sqlite3
 import time
 from datetime import datetime
 from pathlib import Path
@@ -36,9 +37,9 @@ from services.db_service import execute, query_df, query_one
 # causes the whole app to fail before login.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 IDLE_TIMEOUT_FILES = [
-    PROJECT_ROOT / "data" / "permanent_store" / "config" / "idle_timeout_settings.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_idle_timeout_settings.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+    PROJECT_ROOT / "data" / "config" / "idle_timeout_settings.json",
+    PROJECT_ROOT / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
 ]
 
 PBKDF2_ITERATIONS = 180_000
@@ -146,25 +147,108 @@ def verify_password(password: str, stored_hash: str | None) -> bool:
     return False
 
 
+def _security_db_path() -> Path:
+    """Return the active SQLite path used by db_service without importing internals at runtime."""
+    try:
+        from services import db_service as _db
+        return Path(getattr(_db, "DB_PATH"))
+    except Exception:
+        return Path(__file__).resolve().parents[1] / "data" / "database" / "spt_time_tracking.db"
+
+
+def _security_direct_connect() -> sqlite3.Connection:
+    db_path = _security_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path, check_same_thread=False, timeout=20)
+    try:
+        conn.execute("PRAGMA busy_timeout=12000")
+        conn.execute("PRAGMA journal_mode=WAL")
+    except Exception:
+        pass
+    return conn
+
+
+def _table_columns_direct(table: str) -> set[str]:
+    """Read SQLite columns directly to avoid db_service/query_df recursion during login."""
+    try:
+        with _security_direct_connect() as conn:
+            rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        return {str(r[1]) for r in rows}
+    except Exception:
+        return set()
+
+
 def _ensure_sqlite_columns(table: str, columns: dict[str, str]) -> None:
     """Add newly introduced columns when Streamlit/GitHub keeps an older SQLite table.
 
-    SQLite CREATE TABLE IF NOT EXISTS does not upgrade existing tables, so older
-    deployments can miss can_backup/can_restore/can_manage and crash during
-    default permission seeding.
+    V6 hotfix:
+    db_service.execute()/query_df can themselves call schema checks during login.  The
+    previous migration used those wrappers and could silently fail, then seed_security_defaults
+    inserted can_backup/can_restore/can_manage into an older table and crashed the app.
+    This migration uses a direct sqlite connection and commits before seeding.
     """
-    try:
-        existing_df = query_df(f"PRAGMA table_info({table})")
-        existing = set(existing_df["name"].astype(str).tolist()) if not existing_df.empty else set()
-    except Exception:
-        existing = set()
-    for col, ddl in columns.items():
-        if col not in existing:
-            try:
-                execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
-            except Exception:
-                # Ignore duplicate-column race conditions on Streamlit reruns.
-                pass
+    existing = _table_columns_direct(table)
+    if not existing:
+        return
+    with _security_direct_connect() as conn:
+        for col, ddl in columns.items():
+            if col not in existing:
+                try:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+                    existing.add(col)
+                except sqlite3.OperationalError as exc:
+                    if "duplicate column" not in str(exc).lower():
+                        # Keep login alive; seed uses adaptive columns below.
+                        pass
+                except Exception:
+                    pass
+        try:
+            conn.commit()
+        except Exception:
+            pass
+
+
+def _insert_or_ignore_adaptive(table: str, values: dict[str, object], required: tuple[str, ...] = ()) -> None:
+    """INSERT OR IGNORE using only columns that truly exist in the live DB.
+
+    This prevents Streamlit Cloud from going down when an older SQLite file is kept in
+    GitHub/permanent storage and is missing newer columns. Missing optional columns are
+    ignored for this run; _ensure_sqlite_columns will add them when SQLite allows it.
+    """
+    cols = _table_columns_direct(table)
+    if not cols or any(c not in cols for c in required):
+        return
+    usable = [c for c in values.keys() if c in cols]
+    if not usable:
+        return
+    placeholders = ", ".join(["?"] * len(usable))
+    sql = f"INSERT OR IGNORE INTO {table} ({', '.join(usable)}) VALUES ({placeholders})"
+    params = tuple(values[c] for c in usable)
+    execute(sql, params)
+
+
+def _seed_security_permission_adaptive(role_code: str, module: dict, perm: dict[str, int], now: str) -> None:
+    _insert_or_ignore_adaptive(
+        "security_module_permissions",
+        {
+            "role_code": role_code,
+            "module_code": module["module_code"],
+            "module_no": module["module_no"],
+            "module_name": module["module_name"],
+            "module_name_en": module["module_name_en"],
+            "can_view": perm.get("can_view", 0),
+            "can_create": perm.get("can_create", 0),
+            "can_edit": perm.get("can_edit", 0),
+            "can_delete": perm.get("can_delete", 0),
+            "can_import": perm.get("can_import", 0),
+            "can_export": perm.get("can_export", 0),
+            "can_backup": perm.get("can_backup", 0),
+            "can_restore": perm.get("can_restore", 0),
+            "can_manage": perm.get("can_manage", 0),
+            "updated_at": now,
+        },
+        required=("role_code", "module_code"),
+    )
 
 
 def _migrate_security_schema_columns() -> None:
@@ -371,20 +455,13 @@ def seed_security_defaults() -> None:
             VALUES (?, ?, ?, ?, 1, ?, ?)
         """, (role_code, role_name, role_en, role_en, now, now))
 
+    # V6: older SQLite files may not yet contain can_backup/can_restore/can_manage.
+    # Seed with adaptive columns so login/home never crashes during Reboot App.
+    _migrate_security_schema_columns()
     for m in MODULES:
         for role_code, _, _ in ROLES:
             p = _role_perm_template(role_code, m["module_code"])
-            execute("""
-                INSERT OR IGNORE INTO security_module_permissions
-                (role_code, module_code, module_no, module_name, module_name_en,
-                 can_view, can_create, can_edit, can_delete, can_import, can_export,
-                 can_backup, can_restore, can_manage, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                role_code, m["module_code"], m["module_no"], m["module_name"], m["module_name_en"],
-                p["can_view"], p["can_create"], p["can_edit"], p["can_delete"], p["can_import"], p["can_export"],
-                p["can_backup"], p["can_restore"], p["can_manage"], now,
-            ))
+            _seed_security_permission_adaptive(role_code, m, p, now)
 
     for username, password, display_name, role_code in DEFAULT_USERS:
         existing = query_one("SELECT username FROM security_users WHERE username=?", (username,))
@@ -571,7 +648,7 @@ _AUTH_LIGHT_RESTORE_DONE = False
 def _best_local_auth_tables() -> dict[str, list[dict[str, Any]]]:
     """Find the richest local 10_permissions permanent JSON without GitHub/network."""
     candidates: list[Path] = []
-    base = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions"
+    base = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions"
     for name in ("10_permissions_records.json", "10_permissions_settings.json", "security_settings.json"):
         candidates.append(base / name)
     hist = base / "history"
@@ -1560,8 +1637,8 @@ def login_logs_df(limit: int = 1000) -> pd.DataFrame:
 
 
 # ===== V1.69 persistent security settings override =====
-_SECURITY_PERSISTENT_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json"
-_SECURITY_MODULE_FILE = PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
+_SECURITY_PERSISTENT_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_security_settings.json"
+_SECURITY_MODULE_FILE = PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json"
 
 def _v169_load_persistent_security_settings() -> dict[str, str]:
     """Load only real security settings from permanent JSON files.
@@ -1675,10 +1752,10 @@ def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
 def _v199_security_setting_paths() -> list[Path]:
     root = Path(__file__).resolve().parents[1]
     return [
-        root / "data" / "permanent_store" / "config" / "security_settings.json",
-        root / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "security_settings.json",
+        root / "data" / "config" / "security_settings.json",
+        root / "data" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
     ]
 
 
@@ -1814,13 +1891,13 @@ def _v208_idle_timeout_paths() -> list[Path]:
     """
     root = Path(__file__).resolve().parents[1]
     return [
-        root / "data" / "permanent_store" / "config" / "idle_timeout_settings.json",
-        root / "data" / "permanent_store" / "persistent_state" / "spt_idle_timeout_settings.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
-        root / "data" / "permanent_store" / "config" / "security_settings.json",
-        root / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "security_settings.json",
+        root / "data" / "config" / "idle_timeout_settings.json",
+        root / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+        root / "data" / "config" / "security_settings.json",
+        root / "data" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
     ]
 
 
@@ -2030,10 +2107,10 @@ _AUTH_LIGHT_RESTORE_DONE = False
 def _v365_permission_direct_payloads() -> list[dict]:
     payloads: list[dict] = []
     paths = [
-        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_modules' / '10_permissions' / '10_permissions_records.json',
-        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_modules' / '10_permissions' / '10_permissions_settings.json',
-        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_state' / 'spt_user_persistent_settings.json',
-        PROJECT_ROOT / 'data' / 'permanent_store' / 'persistent_state' / 'spt_module_settings.json',
+        PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions' / '10_permissions_records.json',
+        PROJECT_ROOT / 'data' / 'persistent_modules' / '10_permissions' / '10_permissions_settings.json',
+        PROJECT_ROOT / 'data' / 'persistent_state' / 'spt_user_persistent_settings.json',
+        PROJECT_ROOT / 'data' / 'persistent_state' / 'spt_module_settings.json',
     ]
     for p in paths:
         try:
@@ -2077,14 +2154,8 @@ def _restore_auth_users_lightweight_if_needed(username: str = '') -> None:  # ty
     _AUTH_LIGHT_RESTORE_DONE = True
     _ensure_auth_users_schema_lightweight()
     try:
-        rows = query_df('SELECT username, role_code FROM auth_users')
-        users = [str(x).strip().lower() for x in rows.get('username', []).tolist()] if hasattr(rows, 'get') else []
-        roles = {str(r.get('username', '')).strip().lower(): str(r.get('role_code', '')).strip().lower() for r in rows.to_dict(orient='records')} if hasattr(rows, 'to_dict') else {}
-        # A freshly booted Streamlit Cloud DB may contain only default admin/demo accounts.
-        # That is not real persistence; restore from the fixed latest permanent file.
-        non_default = [u for u in users if u not in {'admin', 'operator', 'viewer', 'demo', 'spt'}]
-        default_only = (not users) or (not non_default and len(users) <= 6)
-        if users and not default_only:
+        row = query_one('SELECT COUNT(*) AS c FROM auth_users') or {}
+        if int(row.get('c', 0) or 0) > 0:
             return
     except Exception:
         pass
@@ -2237,8 +2308,8 @@ require_permission = require_module_access
 # 03/04 能穩定，是因為只讀固定 latest 檔。登入也改成同樣模式：只讀 10_permissions 固定檔，
 # 不掃 history、不比誰資料多、不碰 GitHub，避免登入畫面一直運算。
 _V369_DELETED_ACCOUNT_FILES = [
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "deleted_accounts.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_permission_deleted_accounts.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "deleted_accounts.json",
+    PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_deleted_accounts.json",
 ]
 
 
@@ -2285,10 +2356,10 @@ def _best_local_auth_tables() -> dict[str, list[dict[str, Any]]]:  # type: ignor
     No history, no GitHub, no broad persistence scan.
     """
     candidates = [
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_permission_settings.json",
-        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_user_persistent_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_settings.json",
+        PROJECT_ROOT / "data" / "persistent_state" / "spt_user_persistent_settings.json",
     ]
     best_tables: dict[str, list[dict[str, Any]]] = {}
     best_stamp = ""
