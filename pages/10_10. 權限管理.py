@@ -19,7 +19,6 @@ from services.permission_service import (
     save_account_permissions,
     save_security_settings,
     save_users,
-    replace_users_authoritative,
 )
 
 apply_theme()
@@ -191,37 +190,6 @@ def _users_for_editor() -> pd.DataFrame:
     out["更新時間 / Updated At"] = raw.get("updated_at", "")
     return out
 
-
-
-
-def _reload_account_editor_from_source() -> pd.DataFrame:
-    """V15：帳號總表唯一畫面來源重載。
-
-    問題：啟動編輯 / 停止編輯時若沿用舊的 st.session_state 草稿，
-    畫面會出現兩份不同名單；使用者會看到「編輯前一份、編輯後又一份」。
-    修正：進入編輯、停止編輯、唯讀顯示、重新載入，都統一從 get_users()
-    取得目前權威名單，再建立 data_editor 草稿。
-    """
-    df = _users_for_editor()
-    st.session_state["v133_users_df"] = df.copy()
-    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
-    try:
-        st.session_state.pop("v9_direct_delete_usernames", None)
-    except Exception:
-        pass
-    try:
-        from services.column_settings_service import clear_editor_draft
-        clear_editor_draft("v171_account_password_editor")
-        clear_editor_draft("account")
-    except Exception:
-        pass
-    return df
-
-
-def _ensure_account_editor_source_loaded(editing: bool) -> None:
-    """V15：非編輯狀態永遠顯示權威名單；編輯中才保留草稿。"""
-    if (not editing) or ("v133_users_df" not in st.session_state):
-        st.session_state["v133_users_df"] = _users_for_editor()
 
 def _password_from_editor_row(r: pd.Series) -> str:
     """Return a new password only when the user really typed one.
@@ -428,25 +396,17 @@ with tab_accounts:
     _edit_on = bool(st.session_state.get("v166_account_edit_enabled", False))
     c_edit1, c_edit2, c_edit3 = st.columns([1.2, 1.2, 3])
     with c_edit1:
-        if st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=_edit_on, key="v169_enable_account_edit_top"):
-            # V15：啟動編輯前先從權威來源重載，避免沿用舊草稿造成名單不同。
-            _reload_account_editor_from_source()
-            st.session_state["v166_account_edit_enabled"] = True
-            st.rerun()
+        st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=_edit_on, key="v25_enable_account_edit_top", on_click=_v25_account_set_edit, args=(True,))
     with c_edit2:
-        if st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not _edit_on, key="v169_disable_account_edit_top"):
-            # V15：停止編輯等同放棄未儲存草稿，回到目前已儲存權威名單。
-            st.session_state["v166_account_edit_enabled"] = False
-            _reload_account_editor_from_source()
-            st.rerun()
+        st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not _edit_on, key="v25_disable_account_edit_top", on_click=_v25_account_set_edit, args=(False,))
     with c_edit3:
         if _edit_on:
             st.success("目前：已啟動編輯。修改後請按儲存才會正式寫入。")
         else:
             st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上帳號。")
 
-    # V15：非編輯狀態不保留舊草稿；每次顯示都以目前權威帳號清單為準。
-    _ensure_account_editor_source_loaded(bool(st.session_state.get("v166_account_edit_enabled", False)))
+    if "v133_users_df" not in st.session_state:
+        st.session_state["v133_users_df"] = _users_for_editor()
 
     with account_tab_edit:
         st.markdown("### 新增帳號專用表單 / Stable Add User Form")
@@ -490,7 +450,12 @@ with tab_accounts:
                 }])
                 if result.get("saved", 0) > 0:
                     st.success(f"帳號已建立 / Account created：{username}")
-                    _reload_account_editor_from_source()
+                    st.session_state["v133_users_df"] = _users_for_editor()
+                    try:
+                        from services.column_settings_service import clear_editor_draft
+                        clear_editor_draft("account")
+                    except Exception:
+                        pass
                     st.rerun()
                 if result.get("skipped"):
                     st.warning("；".join(result.get("skipped", [])))
@@ -503,58 +468,18 @@ with tab_accounts:
             st.session_state["v166_account_edit_enabled"] = False
         account_edit_enabled = bool(st.session_state.get("v166_account_edit_enabled", False))
         st.session_state.setdefault("v235_account_editor_rev", 0)
-        # V15：此區塊再次保護，確保唯讀與編輯狀態不會各自顯示不同資料源。
-        _ensure_account_editor_source_loaded(account_edit_enabled)
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            if st.button("⊕ 新增帳號 / Add User", use_container_width=True, disabled=not account_edit_enabled, key="v204_add_user_row_once"):
-                st.session_state["v133_users_df"] = pd.concat([st.session_state["v133_users_df"], pd.DataFrame([_blank_user_row()])], ignore_index=True)
-                st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
-                try:
-                    from services.column_settings_service import clear_editor_draft
-                    clear_editor_draft("v171_account_password_editor")
-                    clear_editor_draft("account")
-                except Exception:
-                    pass
-                st.rerun()
+            st.button("⊕ 新增帳號 / Add User", use_container_width=True, disabled=not account_edit_enabled, key="v25_account_add_user_row", on_click=_v25_account_add_blank)
         with c2:
-            if st.button("⊖ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_select_delete"):
-                st.session_state["v133_users_df"]["刪除 / Delete"] = True
-                try:
-                    st.session_state["v9_direct_delete_usernames"] = [str(x).strip() for x in st.session_state["v133_users_df"].get("帳號 / Username", pd.Series(dtype=str)).tolist() if str(x).strip() and str(x).strip().lower() != "admin"]
-                except Exception:
-                    pass
-                st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
-                st.rerun()
+            st.button("⊖ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled, key="v25_account_select_delete", on_click=_v25_account_delete_flag, args=(True,))
         with c3:
-            if st.button("◌ 刪除欄取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled, key="v204_account_clear_delete"):
-                st.session_state["v133_users_df"]["刪除 / Delete"] = False
-                st.session_state["v9_direct_delete_usernames"] = []
-                st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
-                st.rerun()
+            st.button("◌ 刪除欄取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled, key="v25_account_clear_delete", on_click=_v25_account_delete_flag, args=(False,))
         with c4:
-            if st.button("⟳ 重新載入 / Reload", use_container_width=True):
-                _reload_account_editor_from_source()
-                st.rerun()
+            st.button("⟳ 重新載入 / Reload", use_container_width=True, key="v25_account_reload", on_click=_v25_account_reload)
 
-        # V9：除 data_editor 勾選刪除外，另外提供穩定刪除選擇器。
-        # 原因：部分 Streamlit 版本在 form + data_editor checkbox 組合下，勾選畫面有變，
-        # 但 submitted dataframe / widget delta 沒有完整帶回，造成「看起來有勾選，實際刪除 0 筆」。
-        delete_options = [
-            str(x).strip() for x in st.session_state["v133_users_df"].get("帳號 / Username", pd.Series(dtype=str)).tolist()
-            if str(x).strip() and str(x).strip().lower() != "admin"
-        ]
-        st.multiselect(
-            "穩定刪除選擇 / Stable Delete Selector（可搭配左側刪除欄使用；admin 不可刪）",
-            options=delete_options,
-            default=[x for x in st.session_state.get("v9_direct_delete_usernames", []) if x in delete_options],
-            key="v9_direct_delete_usernames",
-            disabled=not account_edit_enabled,
-            help="如果表格內刪除勾選沒有生效，請直接在這裡選帳號，再按下方『套用並儲存』。",
-        )
-
-        st.warning("V1.76/V9：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。")
+        st.warning("V1.76：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。")
 
         # V1.71：帳號總表使用 st.form 包住 data_editor。
         # 原因：Streamlit 一般 data_editor 每次切換儲存格、勾選、下拉或其他元件互動都可能 rerun，
@@ -605,24 +530,20 @@ with tab_accounts:
 
         if submitted_accounts:
             df = edited_users.copy()
-            table_delete = _selected_delete_usernames(df, account_editor_key)
-            direct_delete = [str(x).strip() for x in st.session_state.get("v9_direct_delete_usernames", []) if str(x).strip()]
-            to_delete = sorted({x for x in (table_delete + direct_delete) if x and x.lower() != "admin"})
+            to_delete = _selected_delete_usernames(df, account_editor_key)
             if to_delete:
                 save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy()
             else:
                 save_df = df.copy()
-            result = replace_users_authoritative(_users_to_service_rows(save_df), delete_usernames=to_delete, reason="account_master_page_apply_v24")
-            deleted = int(result.get("deleted", 0) or 0)
+            result = save_users(_users_to_service_rows(save_df))
+            deleted = delete_users(to_delete)
             if to_delete and deleted == 0:
-                st.warning("已偵測到刪除帳號，但未刪除任何帳號；admin 系統帳號不可刪除，其他帳號請確認帳號欄位是否有效。")
-            elif to_delete:
-                st.info("已刪除帳號 / Deleted accounts：" + "、".join(to_delete))
-            st.success(f"帳號已儲存：{result.get('saved', 0)} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
+                st.warning("已偵測到刪除勾選，但未刪除任何帳號；admin 系統帳號不可刪除，其他帳號請確認帳號欄位是否有效。")
+            st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
             if result.get("skipped"):
                 st.warning("；".join(result["skipped"]))
+            st.session_state.pop("v133_users_df", None)
             st.session_state["v166_account_edit_enabled"] = False
-            _reload_account_editor_from_source()
             st.rerun()
 
     with account_tab_excel:
@@ -714,25 +635,21 @@ with tab_perm:
     st.markdown("#### 快速勾選 / Quick Toggle")
     b1, b2, b3, b4, b5 = st.columns(5)
     with b1:
-        if st.button("◈ 可進入全選 / Select View", use_container_width=True):
-            view_df["can_view"] = True
-            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
+        st.button("◈ 可進入全選 / Select View", use_container_width=True, key="v25_perm_select_view", on_click=_v25_permission_quick, args=("can_view:on",))
     with b2:
-        if st.button("◌ 可進入取消 / Clear View", use_container_width=True):
-            view_df["can_view"] = False
-            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
+        st.button("◌ 可進入取消 / Clear View", use_container_width=True, key="v25_perm_clear_view", on_click=_v25_permission_quick, args=("can_view:off",))
     with b3:
-        if st.button("◈ 編輯全選 / Select Edit", use_container_width=True):
-            view_df["can_edit"] = True
-            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
+        st.button("◈ 編輯全選 / Select Edit", use_container_width=True, key="v25_perm_select_edit", on_click=_v25_permission_quick, args=("can_edit:on",))
     with b4:
-        if st.button("⟰ 匯出全選 / Select Export", use_container_width=True):
-            view_df["can_export"] = True
-            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
+        st.button("⟰ 匯出全選 / Select Export", use_container_width=True, key="v25_perm_select_export", on_click=_v25_permission_quick, args=("can_export:on",))
     with b5:
-        if st.button("⛨ 管理全選 / Select Manage", use_container_width=True):
-            view_df["can_manage"] = True
-            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
+        st.button("⛨ 管理全選 / Select Manage", use_container_width=True, key="v25_perm_select_manage", on_click=_v25_permission_quick, args=("can_manage:on",))
+    _v25_perm_action = st.session_state.pop("v25_permission_quick_action", None)
+    if _v25_perm_action and ":" in _v25_perm_action:
+        _col, _mode = _v25_perm_action.split(":", 1)
+        if _col in ACTION_COLS and _col in view_df.columns:
+            view_df[_col] = (_mode == "on")
+
     base_cols = ["username", "display_name", "role_code", "module_code", "module_name_zh", "module_name_en"]
     col_cfg = {
         "username": st.column_config.TextColumn("帳號 / Username", disabled=True),

@@ -225,6 +225,44 @@ def reload_data():
     st.session_state[STATE_KEY] = ensure_cols(df)
 
 
+# V25: Stable callback actions for Streamlit buttons.
+# Reason: some Streamlit versions/pages can lose the transient return value of st.button
+# after data_editor/form reruns.  These callbacks mutate session_state before repaint.
+def _v25_wo_set_edit(enabled: bool) -> None:
+    st.session_state["v253_work_order_edit_enabled"] = bool(enabled)
+    if not enabled:
+        reload_data()
+    _refresh_editor_widget()
+
+
+def _v25_wo_batch(action: str) -> None:
+    df = st.session_state.get(STATE_KEY)
+    if df is None or not isinstance(df, pd.DataFrame):
+        reload_data()
+        df = st.session_state.get(STATE_KEY, pd.DataFrame())
+    df = ensure_cols(df.copy())
+    if action == "add":
+        blank = pd.DataFrame([{
+            "_delete": False, "id": "", "work_order": "", "part_no": "", "type_name": "",
+            "assembly_location": "", "customer": "", "note": "", "is_active": True,
+            "created_at": "", "updated_at": ""
+        }])
+        df = pd.concat([blank, df], ignore_index=True)
+    elif action == "active_on":
+        df["is_active"] = True
+    elif action == "active_off":
+        df["is_active"] = False
+    elif action == "delete_on":
+        df["_delete"] = True
+    elif action == "delete_off":
+        df["_delete"] = False
+    elif action == "reload":
+        reload_data()
+        return
+    st.session_state[STATE_KEY] = ensure_cols(df)
+    _refresh_editor_widget()
+
+
 def render_work_order_summary(df: pd.DataFrame):
     """Render concise work-order KPIs for 03 module.
 
@@ -577,16 +615,9 @@ with tab1:
     work_order_edit_enabled = bool(st.session_state.get("v253_work_order_edit_enabled", False))
     ec1, ec2, ec3 = st.columns([1.2, 1.2, 3])
     with ec1:
-        if st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=work_order_edit_enabled, key="v253_enable_work_order_edit"):
-            st.session_state["v253_work_order_edit_enabled"] = True
-            _refresh_editor_widget()
-            rerun()
+        st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=work_order_edit_enabled, key="v25_enable_work_order_edit", on_click=_v25_wo_set_edit, args=(True,))
     with ec2:
-        if st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not work_order_edit_enabled, key="v253_disable_work_order_edit"):
-            st.session_state["v253_work_order_edit_enabled"] = False
-            reload_data()
-            _refresh_editor_widget()
-            rerun()
+        st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not work_order_edit_enabled, key="v25_disable_work_order_edit", on_click=_v25_wo_set_edit, args=(False,))
     with ec3:
         if work_order_edit_enabled:
             st.success("目前：已啟動編輯。修改後請按儲存才會正式寫入。")
@@ -594,35 +625,12 @@ with tab1:
             st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上製令。")
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    if c1.button("⊕ 新增空白列", use_container_width=True, disabled=not work_order_edit_enabled):
-        blank = pd.DataFrame([{
-            "_delete": False, "id": "", "work_order": "", "part_no": "", "type_name": "",
-            "assembly_location": "", "customer": "", "note": "", "is_active": True,
-            "created_at": "", "updated_at": ""
-        }])
-        st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
-        _refresh_editor_widget()
-        rerun()
-    if c2.button("◈ 啟用全選", use_container_width=True, disabled=not work_order_edit_enabled):
-        st.session_state[STATE_KEY]["is_active"] = True
-        _refresh_editor_widget()
-        rerun()
-    if c3.button("◌ 啟用全取消", use_container_width=True, disabled=not work_order_edit_enabled):
-        st.session_state[STATE_KEY]["is_active"] = False
-        _refresh_editor_widget()
-        rerun()
-    if c4.button("⊖ 刪除欄全選", use_container_width=True, disabled=not work_order_edit_enabled):
-        st.session_state[STATE_KEY]["_delete"] = True
-        _refresh_editor_widget()
-        rerun()
-    if c5.button("◌ 刪除欄取消", use_container_width=True, disabled=not work_order_edit_enabled):
-        st.session_state[STATE_KEY]["_delete"] = False
-        _refresh_editor_widget()
-        rerun()
-    if c6.button("⟳ 重新載入", use_container_width=True):
-        reload_data()
-        _refresh_editor_widget()
-        rerun()
+    c1.button("⊕ 新增空白列", use_container_width=True, disabled=not work_order_edit_enabled, key="v25_wo_add_blank", on_click=_v25_wo_batch, args=("add",))
+    c2.button("◈ 啟用全選", use_container_width=True, disabled=not work_order_edit_enabled, key="v25_wo_active_all_on", on_click=_v25_wo_batch, args=("active_on",))
+    c3.button("◌ 啟用全取消", use_container_width=True, disabled=not work_order_edit_enabled, key="v25_wo_active_all_off", on_click=_v25_wo_batch, args=("active_off",))
+    c4.button("⊖ 刪除欄全選", use_container_width=True, disabled=not work_order_edit_enabled, key="v25_wo_delete_all_on", on_click=_v25_wo_batch, args=("delete_on",))
+    c5.button("◌ 刪除欄取消", use_container_width=True, disabled=not work_order_edit_enabled, key="v25_wo_delete_all_off", on_click=_v25_wo_batch, args=("delete_off",))
+    c6.button("⟳ 重新載入", use_container_width=True, key="v25_wo_reload", on_click=_v25_wo_batch, args=("reload",))
 
     st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。製令 / Work Order 為必填。")
     cur_export_df = load_work_orders()
@@ -678,12 +686,9 @@ with tab2:
         parsed = parse_pasted_work_orders(source_df.to_csv(sep="\t", index=False))[0] if not source_df.empty else ensure_cols(pd.DataFrame())
         st.success(f"已解析 {len(parsed)} 筆製令資料。")
         st.dataframe(parsed[["work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active"]], use_container_width=True, height=300)
-        st.caption("V17：Excel 匯入可直接確認儲存，不再被『製令清單編輯』的啟動/停止編輯狀態鎖住。")
-        confirm_wo_import = st.checkbox("我確認要匯入並儲存這批 Excel 製令 / Confirm Excel import", key="v17_confirm_excel_work_order_import")
-        if st.button("▣ 確認匯入 Excel 製令 / Import Excel Work Orders", type="primary", use_container_width=True, key="wo_excel_import_confirm_v243", disabled=(not confirm_wo_import or parsed.empty)):
+        if st.button("▣ 確認匯入 Excel 製令 / Import Excel Work Orders", type="primary", use_container_width=True, key="wo_excel_import_confirm_v243", disabled=not st.session_state.get("v253_work_order_edit_enabled", False)):
             result = save_work_orders(parsed)
             reload_data()
-            st.session_state["v253_work_order_edit_enabled"] = False
             st.success(f"Excel 匯入完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
             rerun()
 

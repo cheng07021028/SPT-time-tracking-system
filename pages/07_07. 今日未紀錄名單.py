@@ -54,6 +54,32 @@ def touch_editor() -> None:
     st.session_state[EDITOR_REV_KEY] = int(st.session_state.get(EDITOR_REV_KEY, 0)) + 1
 
 
+# V25: stable callbacks for bulk buttons.
+def _v25_today_batch(action: str) -> None:
+    df = st.session_state.get(STATE_KEY)
+    if df is None or not isinstance(df, pd.DataFrame):
+        reload_employees()
+        df = st.session_state.get(STATE_KEY, pd.DataFrame())
+    df = ensure_cols(df.copy())
+    if action == "factory_on":
+        df["is_in_factory"] = True
+    elif action == "factory_off":
+        df["is_in_factory"] = False
+    elif action == "today_on":
+        df["is_today_attendance"] = True
+    elif action == "today_off":
+        df["is_today_attendance"] = False
+    elif action == "active_on":
+        df["is_active"] = True
+    elif action == "active_off":
+        df["is_active"] = False
+    elif action == "reload":
+        reload_employees()
+        return
+    st.session_state[STATE_KEY] = ensure_cols(df)
+    touch_editor()
+
+
 if STATE_KEY not in st.session_state:
     reload_employees()
 
@@ -68,35 +94,15 @@ if not can_edit:
     render_table(view_df, "today_attendance_readonly_v202", editable=False, height=460)
 else:
     c1, c2, c3, c4 = st.columns(4)
-    if c1.button("⬡ 全選在廠", use_container_width=True, key="v202_today_factory_all_on"):
-        st.session_state[STATE_KEY]["is_in_factory"] = True
-        touch_editor()
-        rerun()
-    if c2.button("⬡ 取消全選在廠", use_container_width=True, key="v202_today_factory_all_off"):
-        st.session_state[STATE_KEY]["is_in_factory"] = False
-        touch_editor()
-        rerun()
-    if c3.button("⧖ 全選今日出勤", use_container_width=True, key="v202_today_attendance_all_on"):
-        st.session_state[STATE_KEY]["is_today_attendance"] = True
-        touch_editor()
-        rerun()
-    if c4.button("⧖ 取消全選今日出勤", use_container_width=True, key="v202_today_attendance_all_off"):
-        st.session_state[STATE_KEY]["is_today_attendance"] = False
-        touch_editor()
-        rerun()
+    c1.button("⬡ 全選在廠", use_container_width=True, key="v25_today_factory_all_on", on_click=_v25_today_batch, args=("factory_on",))
+    c2.button("⬡ 取消全選在廠", use_container_width=True, key="v25_today_factory_all_off", on_click=_v25_today_batch, args=("factory_off",))
+    c3.button("⧖ 全選今日出勤", use_container_width=True, key="v25_today_attendance_all_on", on_click=_v25_today_batch, args=("today_on",))
+    c4.button("⧖ 取消全選今日出勤", use_container_width=True, key="v25_today_attendance_all_off", on_click=_v25_today_batch, args=("today_off",))
 
     c5, c6, c7, c8 = st.columns(4)
-    if c5.button("◈ 啟用全選", use_container_width=True, key="v202_today_active_all_on"):
-        st.session_state[STATE_KEY]["is_active"] = True
-        touch_editor()
-        rerun()
-    if c6.button("◌ 啟用全取消", use_container_width=True, key="v202_today_active_all_off"):
-        st.session_state[STATE_KEY]["is_active"] = False
-        touch_editor()
-        rerun()
-    if c7.button("⟳ 重新載入", use_container_width=True, key="v202_today_reload"):
-        reload_employees()
-        rerun()
+    c5.button("◈ 啟用全選", use_container_width=True, key="v25_today_active_all_on", on_click=_v25_today_batch, args=("active_on",))
+    c6.button("◌ 啟用全取消", use_container_width=True, key="v25_today_active_all_off", on_click=_v25_today_batch, args=("active_off",))
+    c7.button("⟳ 重新載入", use_container_width=True, key="v25_today_reload", on_click=_v25_today_batch, args=("reload",))
     c8.caption("批次按鈕只改畫面暫存，按儲存後才寫入。")
 
     editor_key = f"today_attendance_editor_v202_{st.session_state.get(EDITOR_REV_KEY, 0)}"

@@ -48,12 +48,6 @@ from services.settings_durability_service import (
     download_critical_settings_from_github,
 )
 
-from services.legacy_cleanup_service import (
-    get_legacy_local_status,
-    get_legacy_remote_status,
-    cleanup_legacy_paths,
-)
-
 st.set_page_config(page_title="13. 系統設定", page_icon="⌬️", layout="wide")
 apply_theme()
 apply_dropdown_menu_size_only(560)
@@ -146,6 +140,12 @@ def _file_health_row(path: Path, label: str) -> dict:
 
 
 def _render_system_settings_health_center() -> None:
+    """V25: keep the health center but make page open fast.
+
+    The old version rendered several dataframes and scanned many files on every page open.
+    That made 13｜系統設定 feel slow even when the user only wanted to edit categories/processes.
+    This version shows a lightweight summary first; full diagnostics run only when requested.
+    """
     root = _project_root()
     health_targets = [
         (root / "data" / "permanent_store" / "config" / "system_settings.json", "系統設定主檔 / system_settings.json"),
@@ -154,41 +154,42 @@ def _render_system_settings_health_center() -> None:
         (root / "data" / "permanent_store" / "config" / "auto_external_backup_schedule.json", "每日自動備份設定 / backup schedule"),
         (root / "data" / "permanent_store" / "persistent_state" / "auto_external_backup_state.json", "每日自動備份狀態 / backup state"),
     ]
-    rows = [_file_health_row(path, label) for path, label in health_targets]
-    ok_count = sum(1 for r in rows if str(r.get("狀態 / Status", "")).startswith("✅"))
+    quick_rows = []
+    for path, label in health_targets:
+        try:
+            quick_rows.append({"項目 / Item": label, "存在 / Exists": path.exists(), "最後修改 / Modified": datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S") if path.exists() else ""})
+        except Exception:
+            quick_rows.append({"項目 / Item": label, "存在 / Exists": False, "最後修改 / Modified": ""})
+    ok_count = sum(1 for r in quick_rows if r.get("存在 / Exists"))
 
-    with st.expander("系統設定永久保存健康檢查 / System Settings Persistence Health", expanded=True):
-        st.caption(
-            "此區檢查 13｜系統設定與每日自動備份設定是否真的寫入 data/ 永久檔。"
-            "設定後應保持不變，直到下次再套用設定。"
-        )
+    with st.expander("系統設定永久保存健康檢查 / System Settings Persistence Health", expanded=False):
         h1, h2, h3 = st.columns(3)
-        h1.metric("永久檔正常 / Healthy Files", f"{ok_count}/{len(rows)}")
+        h1.metric("永久檔存在 / Existing Files", f"{ok_count}/{len(quick_rows)}")
         h2.metric("目前工時頁重置時間", get_live_page_reset_time())
-        h3.metric("備份設定檔", "已檢查")
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=230)
+        h3.metric("完整檢查", "按需執行")
+        st.dataframe(pd.DataFrame(quick_rows), use_container_width=True, hide_index=True, height=180)
 
-        st.markdown("#### 重要設定檔 GitHub 永久化狀態 / Critical Settings GitHub Durability")
-        critical_rows = get_critical_settings_health()
-        st.dataframe(pd.DataFrame(critical_rows), use_container_width=True, hide_index=True, height=260)
+        run_full = st.checkbox("顯示完整永久檔 / GitHub 診斷 / Show full diagnostics", value=False, key="v25_show_full_system_health")
+        if run_full:
+            rows = [_file_health_row(path, label) for path, label in health_targets]
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=230)
+            st.markdown("#### 重要設定檔 GitHub 永久化狀態 / Critical Settings GitHub Durability")
+            critical_rows = get_critical_settings_health()
+            st.dataframe(pd.DataFrame(critical_rows), use_container_width=True, hide_index=True, height=260)
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            if st.button("◇ 重新檢查永久設定檔 / Recheck", use_container_width=True, key="v323_recheck_system_settings_health"):
-                st.rerun()
+            st.button("◇ 重新檢查永久設定檔 / Recheck", use_container_width=True, key="v25_recheck_system_settings_health")
         with c2:
-            if can_manage and st.button("▣ 立即刷新永久設定檔 / Refresh Permanent Settings", use_container_width=True, key="v323_refresh_system_settings_files"):
+            if can_manage and st.button("▣ 立即刷新永久設定檔 / Refresh Permanent Settings", use_container_width=True, key="v25_refresh_system_settings_files"):
                 try:
                     result = export_system_settings_permanent(reason="manual_refresh_from_health_center", write_history=True)
-                    if result.get("ok"):
-                        st.success("已重新寫入系統設定永久檔。")
-                    else:
-                        st.warning(f"永久檔刷新結果：{result}")
+                    st.success("已重新寫入系統設定永久檔。" if result.get("ok") else f"永久檔刷新結果：{result}")
                     st.rerun()
                 except Exception as exc:
                     st.error(f"刷新永久設定檔失敗：{exc}")
         with c3:
-            if can_manage and st.button("⇧ 同步設定到 GitHub / Sync Settings to GitHub", use_container_width=True, key="v329_sync_settings_to_github"):
+            if can_manage and st.button("⇧ 同步設定到 GitHub / Sync Settings to GitHub", use_container_width=True, key="v25_sync_settings_to_github"):
                 result = upload_critical_settings_to_github(archive=True, source="13_system_settings_health_button")
                 if result.get("ok"):
                     st.success(f"設定檔已同步到 GitHub：{result.get('upload_count', 0)} 個檔案。")
@@ -197,7 +198,7 @@ def _render_system_settings_health_center() -> None:
                 else:
                     st.error(f"GitHub 同步失敗：{result.get('message', result.get('failures', ''))}")
         with c4:
-            if can_manage and st.button("⇩ 從 GitHub 載入缺少設定 / Load Missing from GitHub", use_container_width=True, key="v329_load_missing_settings_from_github"):
+            if can_manage and st.button("⇩ 從 GitHub 載入缺少設定 / Load Missing from GitHub", use_container_width=True, key="v25_load_missing_settings_from_github"):
                 result = download_critical_settings_from_github(only_missing=True, source="13_system_settings_health_button")
                 if result.get("ok"):
                     st.success("已從 GitHub 載入缺少的設定檔。")
@@ -206,94 +207,6 @@ def _render_system_settings_health_center() -> None:
                     st.warning(result.get("message", "GitHub 未設定，已略過。"))
                 else:
                     st.error(f"GitHub 載入失敗：{result.get('failures', result.get('message', ''))}")
-        if ok_count < 3:
-            st.warning("部分 13 系統設定永久檔不存在或不可讀。請按『立即刷新永久設定檔』建立/修復。")
-        else:
-            st.success("13 系統設定永久檔已存在且可讀。")
-
-
-def _render_legacy_cleanup_center() -> None:
-    """Danger-zone cleanup for obsolete pre-single-store paths.
-
-    This UI intentionally does not touch data/permanent_store/.  It only removes
-    legacy root-level data folders that caused old settings to be read after
-    Streamlit Reboot App or GitHub redeploy.
-    """
-    with st.expander("危險操作：清除舊資料來源 / Legacy Source Cleanup", expanded=False):
-        st.warning(
-            "此功能只清除舊版多路徑資料來源，不會刪除正式資料路徑 `data/permanent_store/`。"
-            "建議先確認 13｜系統設定永久檔健康檢查正常，再執行清除。"
-        )
-        st.markdown("**本機舊路徑狀態 / Local Legacy Paths**")
-        try:
-            local_rows = get_legacy_local_status()
-            st.dataframe(pd.DataFrame(local_rows), use_container_width=True, hide_index=True, height=220)
-        except Exception as exc:
-            st.error(f"本機舊路徑檢查失敗：{exc}")
-
-        include_github = False
-        if can_manage:
-            include_github = st.checkbox(
-                "同時清除 GitHub 倉庫內舊路徑 / Also remove legacy paths from GitHub",
-                value=False,
-                key="v374_cleanup_legacy_include_github",
-                help="若 GitHub 還保留 data/persistent_modules、data/persistent_state 等舊資料夾，Reboot App 重新部署後可能又被帶回來。",
-            )
-            if include_github:
-                try:
-                    remote_status = get_legacy_remote_status()
-                    if remote_status.get("skipped"):
-                        st.warning(remote_status.get("message", "GitHub 未設定，無法檢查。"))
-                    else:
-                        st.markdown("**GitHub 舊路徑狀態 / GitHub Legacy Paths**")
-                        st.dataframe(pd.DataFrame(remote_status.get("rows", [])), use_container_width=True, hide_index=True, height=220)
-                except Exception as exc:
-                    st.error(f"GitHub 舊路徑檢查失敗：{exc}")
-
-            confirm = st.checkbox(
-                "我確認只清除舊路徑，保留 data/permanent_store 正式資料 / I confirm cleanup legacy sources only",
-                value=False,
-                key="v374_cleanup_legacy_confirm",
-            )
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.button("◇ 先預覽將清除的舊檔 / Dry Run", use_container_width=True, key="v374_cleanup_legacy_dry_run"):
-                    res = cleanup_legacy_paths(include_github=include_github, dry_run=True)
-                    st.session_state["v374_cleanup_legacy_result"] = res
-                    st.rerun()
-            with c2:
-                if st.button(
-                    "🧹 清除所有舊檔來源 / Clean Legacy Sources",
-                    type="primary",
-                    use_container_width=True,
-                    key="v374_cleanup_legacy_execute",
-                    disabled=not confirm,
-                ):
-                    res = cleanup_legacy_paths(include_github=include_github, dry_run=False)
-                    st.session_state["v374_cleanup_legacy_result"] = res
-                    st.rerun()
-
-            result = st.session_state.get("v374_cleanup_legacy_result")
-            if isinstance(result, dict):
-                st.markdown("**清理結果 / Cleanup Result**")
-                local = result.get("local", {})
-                remote = result.get("remote", {})
-                if local.get("ok"):
-                    st.success(f"本機舊路徑清理完成；刪除 {local.get('deleted_count', 0)} 個舊路徑。")
-                else:
-                    st.error(f"本機舊路徑清理有錯誤：{local.get('errors')}")
-                st.dataframe(pd.DataFrame(local.get("rows", [])), use_container_width=True, hide_index=True, height=220)
-                if result.get("include_github"):
-                    if remote.get("ok"):
-                        st.success(f"GitHub 舊路徑清理完成；刪除 {remote.get('deleted_file_count', 0)} 個舊檔。")
-                    elif remote.get("skipped"):
-                        st.warning(remote.get("message", "GitHub 清理已略過。"))
-                    else:
-                        st.error(f"GitHub 舊路徑清理有錯誤：{remote.get('errors') or remote.get('message')}")
-                    st.dataframe(pd.DataFrame(remote.get("rows", [])), use_container_width=True, hide_index=True, height=260)
-        else:
-            st.info("你目前沒有管理權限，因此不能執行舊檔清理。")
-
 
 def _export_permanent_settings(message: str) -> None:
     """Create the dedicated 13｜系統設定 permanent JSON only.
@@ -331,8 +244,6 @@ def _refresh_after_apply(message: str, *edit_mode_keys: str) -> None:
         if k:
             st.session_state[k] = False
     _clear_editor_state(
-        "system_process_categories_editor_v334",
-        "system_category_apply_action_v334",
         "system_process_options_editor_v192",
         "system_process_apply_action_v192",
         "system_rest_periods_editor_v192",
@@ -544,9 +455,8 @@ def _render_external_auto_backup_center() -> None:
     st.divider()
 
 
-# V3.23：先顯示系統設定永久保存健康檢查，再顯示舊檔清理，再顯示自動備份設定。
+# V3.23：先顯示系統設定永久保存健康檢查，再顯示自動備份設定。
 _render_system_settings_health_center()
-_render_legacy_cleanup_center()
 
 # V3.20：每日自動備份設定必須保留在 13｜系統設定，不可被系統設定修正覆蓋移除。
 _render_external_auto_backup_center()
