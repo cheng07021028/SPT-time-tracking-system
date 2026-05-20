@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
-"""SPT permanent-store GitHub write-through helper.
+"""SPT permanent-store GitHub write-through helper - V7 speed optimized.
 
-Purpose:
-- Keep Streamlit Cloud reboot persistence deterministic.
-- When a user presses Save/Apply for settings that live in JSON files, upload
-  exactly those JSON files to GitHub immediately.
-- This is intentionally targeted; it does not upload the whole project and it
-  never deletes data.
+保留原功能與路徑：使用者按儲存後，仍會把必要永久 JSON 寫回 GitHub，
+確保 Streamlit Cloud Reboot 後不回復舊設定。
+
+V7 加速重點：
+- 只上傳呼叫端指定的檔案。
+- 以 SHA256 比對內容，未變更的檔案不重複上傳。
+- 失敗只回傳狀態，不讓頁面卡死或崩潰。
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Iterable
@@ -45,24 +47,32 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def _remote_path(local_path: Path) -> str:
     p = Path(local_path).resolve()
     try:
         return p.relative_to(PROJECT_ROOT).as_posix()
     except Exception:
-        # Safety: only upload files inside this project. Unknown files are rejected.
         return ""
 
 
-def github_write_through_files(paths: Iterable[Path | str], *, source: str = "settings_save") -> dict[str, Any]:
-    """Upload selected permanent JSON files to GitHub if token is configured.
+def _allowed_remote(remote: str) -> bool:
+    # V7: 保留 V5 安全限制，同時相容目前專案仍在使用的 latest JSON 路徑。
+    return remote.startswith("data/permanent_store/") or remote.startswith("data/persistent_modules/") or remote.startswith("data/persistent_state/") or remote.startswith("data/config/")
 
-    Returns a structured result. Failure is reported but never raises, so the UI
-    can still show a precise warning instead of crashing.
+
+def github_write_through_files(paths: Iterable[Path | str], *, source: str = "settings_save") -> dict[str, Any]:
+    """Upload selected JSON files to GitHub if token is configured.
+
+    V7 會略過內容沒有變更的檔案，避免每次儲存都把所有 mirror 檔重傳。
     """
+    raw_paths = list(paths or [])
     unique: list[Path] = []
     seen: set[str] = set()
-    for raw in paths or []:
+    for raw in raw_paths:
         path = Path(raw)
         try:
             path = path.resolve()
@@ -72,20 +82,28 @@ def github_write_through_files(paths: Iterable[Path | str], *, source: str = "se
         if key in seen:
             continue
         seen.add(key)
-        if path.exists() and path.is_file() and path.stat().st_size > 0:
-            unique.append(path)
+        try:
+            if path.exists() and path.is_file() and path.stat().st_size > 0:
+                unique.append(path)
+        except Exception:
+            pass
 
+    status = _read_json(STATUS_PATH)
+    known_hashes = status.get("file_hashes") if isinstance(status.get("file_hashes"), dict) else {}
     result: dict[str, Any] = {
         "ok": True,
         "source": source,
         "uploaded_at": _now_text(),
-        "requested_count": len(list(paths or [])) if not isinstance(paths, list) else len(paths),
+        "requested_count": len(raw_paths),
         "file_count": len(unique),
+        "uploaded_count": 0,
+        "skipped_unchanged_count": 0,
         "uploads": [],
+        "mode": "v7_skip_unchanged_targeted_upload",
     }
     if not unique:
         result.update({"ok": False, "message": "no existing files to upload"})
-        _write_json(STATUS_PATH, result)
+        _write_json(STATUS_PATH, {**status, **result})
         return result
 
     try:
@@ -93,28 +111,37 @@ def github_write_through_files(paths: Iterable[Path | str], *, source: str = "se
         cfg = github_config()
         if not cfg.get("token"):
             result.update({"ok": False, "skipped": True, "message": "GITHUB_TOKEN not configured"})
-            _write_json(STATUS_PATH, result)
+            _write_json(STATUS_PATH, {**status, **result})
             return result
         uploads = []
+        new_hashes = dict(known_hashes or {})
         for path in unique:
             remote = _remote_path(path)
-            if not remote or not remote.startswith("data/permanent_store/"):
-                uploads.append({"ok": False, "path": str(path), "message": "refuse to upload non permanent_store file"})
+            if not remote or not _allowed_remote(remote):
+                uploads.append({"ok": False, "path": str(path), "message": "refuse to upload unknown data path"})
                 continue
             try:
                 text = path.read_text(encoding="utf-8")
-                # Validate JSON before upload; most permanent files here are JSON.
-                json.loads(text)
-                uploads.append(upload_text_to_github(remote, text, f"SPT write-through {source}: {remote}"))
+                json.loads(text)  # validate JSON before upload
+                digest = _sha256_text(text)
+                if str(known_hashes.get(remote) or "") == digest:
+                    uploads.append({"ok": True, "path": remote, "skipped": True, "message": "unchanged"})
+                    result["skipped_unchanged_count"] += 1
+                    continue
+                up = upload_text_to_github(remote, text, f"SPT V7 write-through {source}: {remote}")
+                uploads.append(up)
+                if up.get("ok"):
+                    new_hashes[remote] = digest
+                    result["uploaded_count"] += 1
             except Exception as exc:
                 uploads.append({"ok": False, "path": remote, "message": str(exc)})
         result["uploads"] = uploads
         result["ok"] = bool(uploads) and all(bool(u.get("ok")) for u in uploads)
+        status["file_hashes"] = new_hashes
     except Exception as exc:
         result.update({"ok": False, "message": f"GitHub write-through unavailable: {exc}"})
 
     try:
-        status = _read_json(STATUS_PATH)
         status.update(result)
         _write_json(STATUS_PATH, status)
     except Exception:

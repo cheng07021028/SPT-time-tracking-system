@@ -974,3 +974,166 @@ def migrate_legacy_table_settings_to_master(*, write: bool = False) -> dict[str,
         "column_count": len(direct.get("column_settings") or {}),
         "write": False,
     }
+
+
+# ===== V3.75 / V7 performance patch: cached latest settings + targeted GitHub upload =====
+# 不改資料路徑、不改 UI、不刪功能。只減少重複讀 JSON 與重複上傳所有 mirror 檔。
+_V375_DIRECT_CACHE = {"sig": None, "payload": None}
+
+
+def _v375_file_sig(paths: list[Path]) -> tuple:
+    sig = []
+    for path in paths:
+        try:
+            if path.exists():
+                st = path.stat()
+                sig.append((str(path), int(st.st_mtime_ns), int(st.st_size)))
+            else:
+                sig.append((str(path), 0, 0))
+        except Exception:
+            sig.append((str(path), -1, -1))
+    return tuple(sig)
+
+
+# Keep original V370 loader available, then wrap it with a file-signature cache.
+_v375_uncached_load_all_direct_latest = _v370_load_all_direct_latest
+
+
+def _v370_load_all_direct_latest() -> dict[str, Any]:  # type: ignore[override]
+    paths = _v370_direct_paths()
+    sig = _v375_file_sig(paths)
+    try:
+        if _V375_DIRECT_CACHE.get("sig") == sig and isinstance(_V375_DIRECT_CACHE.get("payload"), dict):
+            # JSON round-trip is still cheaper than reading 10+ files repeatedly; it also protects callers from mutating cache.
+            return json.loads(json.dumps(_V375_DIRECT_CACHE["payload"], ensure_ascii=False, default=str))
+    except Exception:
+        pass
+    payload = _v375_uncached_load_all_direct_latest()
+    try:
+        _V375_DIRECT_CACHE["sig"] = sig
+        _V375_DIRECT_CACHE["payload"] = json.loads(json.dumps(payload, ensure_ascii=False, default=str))
+    except Exception:
+        pass
+    return payload
+
+
+def _v375_changed_table_files(key: str) -> list[Path]:
+    module_code = _v366_module_code_for_key(key)
+    files = [
+        _V366_STATE_FILE,
+        _V366_MODULE_FILES.get(module_code, _V366_MODULE_FILES["ui"]),
+        _V370_MODULE_SETTINGS_FILES.get(module_code, _V370_MODULE_SETTINGS_FILES["ui"]),
+    ]
+    if module_code == "13":
+        files.append(_V370_13_SYSTEM_SETTINGS_FILE)
+    # ui shard is the global safety mirror; keep it, but avoid reuploading every other module.
+    files.append(_V366_MODULE_FILES["ui"])
+    files.append(_V370_MODULE_SETTINGS_FILES["ui"])
+    seen: set[str] = set()
+    out: list[Path] = []
+    for f in files:
+        if not f:
+            continue
+        s = str(f)
+        if s not in seen:
+            seen.add(s)
+            out.append(f)
+    return out
+
+
+def _v375_all_column_files() -> list[Path]:
+    # Column settings are global by design, but V7 write-through skips unchanged content.
+    files = [_V366_STATE_FILE, *_V366_MODULE_FILES.values(), *_V370_MODULE_SETTINGS_FILES.values(), _V370_13_SYSTEM_SETTINGS_FILE]
+    seen: set[str] = set()
+    out: list[Path] = []
+    for f in files:
+        s = str(f)
+        if s not in seen:
+            seen.add(s)
+            out.append(f)
+    return out
+
+
+def _v374_write_through_table_files(source: str = "table_settings_saved", paths: list[Path] | None = None) -> dict[str, Any]:  # type: ignore[override]
+    """V7: upload only affected latest files; unchanged files are skipped by write-through service."""
+    try:
+        from services.permanent_write_through_service import github_write_through_files
+        return github_write_through_files(paths or _v375_all_column_files(), source=source)
+    except Exception as exc:
+        return {"ok": False, "message": str(exc), "source": source}
+
+
+def load_table_settings(table_key: Any) -> dict[str, Any]:  # type: ignore[override]
+    key = canonical_table_key(table_key)
+    payload = _v370_load_all_direct_latest()
+    settings = payload.get("table_settings") if isinstance(payload.get("table_settings"), dict) else {}
+    data = settings.get(key) if isinstance(settings, dict) else {}
+    if not isinstance(data, dict):
+        data = {}
+    return {
+        "table_key": key,
+        "widths": _normalize_widths(data.get("widths", {})),
+        "order": _normalize_order(data.get("order", [])),
+        "sort": data.get("sort", {}) if isinstance(data.get("sort"), dict) else {},
+    }
+
+
+def save_table_settings(table_key: Any, *, widths: dict[str, int] | None = None, order: Iterable[str] | None = None, sort: dict[str, Any] | None = None, reason: str = "table_settings_saved") -> dict[str, Any]:  # type: ignore[override]
+    key = canonical_table_key(table_key)
+    payload = _v370_load_all_direct_latest()
+    table_settings = payload.get("table_settings") if isinstance(payload.get("table_settings"), dict) else {}
+    cur = table_settings.get(key) if isinstance(table_settings.get(key), dict) else {}
+    if widths is not None:
+        cur["widths"] = _normalize_widths(widths)
+    if order is not None:
+        cur["order"] = _normalize_order(order)
+    if sort is not None:
+        cur["sort"] = dict(sort or {})
+    cur["updated_at"] = _v366_now_text()
+    cur["reason"] = reason
+    table_settings[key] = cur
+    payload["table_settings"] = table_settings
+    _v370_write_direct(payload, changed_key=key)
+    files = _v375_changed_table_files(key)
+    github_upload = _v374_write_through_table_files(source=reason, paths=files)
+    return {
+        "ok": True,
+        "mode": "v375_fast_targeted_write_through",
+        "key": key,
+        "reason": reason,
+        "github_upload": github_upload,
+        "files": [str(p) for p in files],
+    }
+
+
+def load_column_settings() -> dict[str, Any]:  # type: ignore[override]
+    payload = _v370_load_all_direct_latest()
+    data = payload.get("column_settings") if isinstance(payload.get("column_settings"), dict) else {}
+    return {canonical_table_key(k): v for k, v in dict(data or {}).items() if isinstance(v, dict)}
+
+
+def save_column_settings(settings: dict[str, Any], *, reason: str = "column_settings_saved") -> dict[str, Any]:  # type: ignore[override]
+    payload = _v370_load_all_direct_latest()
+    normalized: dict[str, Any] = {}
+    for k, v in dict(settings or {}).items():
+        if isinstance(v, dict):
+            item = dict(v)
+            item["updated_at"] = item.get("updated_at") or _v366_now_text()
+            item["reason"] = reason
+            normalized[canonical_table_key(k)] = item
+    payload["column_settings"] = normalized
+    _v370_write_direct(payload)
+    files = _v375_all_column_files()
+    github_upload = _v374_write_through_table_files(source=reason, paths=files)
+    return {"ok": True, "mode": "v375_fast_targeted_write_through", "table_count": len(normalized), "reason": reason, "file_count": len(files), "github_upload": github_upload}
+
+
+def migrate_legacy_table_settings_to_master(*, write: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    direct = _v370_load_all_direct_latest()
+    return {
+        "ok": True,
+        "mode": "v375_cached_direct_latest_no_load_migration",
+        "table_count": len(direct.get("table_settings") or {}),
+        "column_count": len(direct.get("column_settings") or {}),
+        "write": False,
+    }

@@ -992,3 +992,118 @@ def query_one(sql: str, params: Iterable[Any] | None = None) -> dict | None:
     with _open_connection() as conn:
         row = conn.execute(sql, tuple(params)).fetchone()
         return dict(row) if row else None
+
+
+# ===== V7 read/save speed patch =====
+# 不改路徑、不改資料表、不改功能；只減少 Streamlit rerun 造成的重複 SELECT 與 SQLite 開銷。
+try:
+    _QUERY_CACHE_TTL_SEC = max(float(globals().get("_QUERY_CACHE_TTL_SEC", 10.0)), 45.0)
+    _QUERY_CACHE_MAX_ITEMS = max(int(globals().get("_QUERY_CACHE_MAX_ITEMS", 120)), 300)
+except Exception:
+    pass
+
+_QUERY_ONE_CACHE: dict[tuple[str, tuple[Any, ...]], tuple[float, dict | None]] = {}
+
+
+def _v7_cache_get_df(key: tuple[str, tuple[Any, ...]], now_ts: float):
+    try:
+        cached = _QUERY_CACHE.get(key)
+        if cached and now_ts - cached[0] <= _QUERY_CACHE_TTL_SEC:
+            # shallow copy is enough for pandas display flows and much faster on large tables.
+            return cached[1].copy(deep=False)
+    except Exception:
+        pass
+    return None
+
+
+def _v7_cache_put_df(key: tuple[str, tuple[Any, ...]], now_ts: float, df: pd.DataFrame) -> None:
+    try:
+        if len(_QUERY_CACHE) >= _QUERY_CACHE_MAX_ITEMS:
+            oldest = min(_QUERY_CACHE.items(), key=lambda kv: kv[1][0])[0]
+            _QUERY_CACHE.pop(oldest, None)
+        _QUERY_CACHE[key] = (now_ts, df.copy(deep=False))
+    except Exception:
+        pass
+
+
+def clear_query_cache() -> None:  # type: ignore[override]
+    try:
+        _QUERY_CACHE.clear()
+    except Exception:
+        pass
+    try:
+        _QUERY_ONE_CACHE.clear()
+    except Exception:
+        pass
+
+
+def query_df(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:  # type: ignore[override]
+    ensure_database()
+    if _should_run_data_guard(sql):
+        ensure_data_guard_restore()
+    if params is None:
+        params = ()
+    cacheable = _is_select_sql(sql)
+    key = _query_cache_key(sql, params)
+    now_ts = time.time()
+    if cacheable:
+        hit = _v7_cache_get_df(key, now_ts)
+        if hit is not None:
+            return hit
+    try:
+        with _open_connection() as conn:
+            df = pd.read_sql_query(sql, conn, params=tuple(params))
+    except Exception as exc:
+        # Keep V4 self-repair behavior if present.
+        try:
+            _repair_database_after_error(exc)
+            with _open_connection() as conn:
+                df = pd.read_sql_query(sql, conn, params=tuple(params))
+        except Exception:
+            raise exc
+    if cacheable:
+        _v7_cache_put_df(key, now_ts, df)
+    return df
+
+
+def query_one(sql: str, params: Iterable[Any] | None = None) -> dict | None:  # type: ignore[override]
+    ensure_database()
+    if _should_run_data_guard(sql):
+        ensure_data_guard_restore()
+    if params is None:
+        params = ()
+    cacheable = _is_select_sql(sql)
+    key = _query_cache_key(sql, params)
+    now_ts = time.time()
+    if cacheable:
+        cached = _QUERY_ONE_CACHE.get(key)
+        if cached and now_ts - cached[0] <= _QUERY_CACHE_TTL_SEC:
+            return dict(cached[1]) if isinstance(cached[1], dict) else None
+    with _open_connection() as conn:
+        row = conn.execute(sql, tuple(params)).fetchone()
+        out = dict(row) if row else None
+    if cacheable:
+        try:
+            if len(_QUERY_ONE_CACHE) >= _QUERY_CACHE_MAX_ITEMS:
+                oldest = min(_QUERY_ONE_CACHE.items(), key=lambda kv: kv[1][0])[0]
+                _QUERY_ONE_CACHE.pop(oldest, None)
+            _QUERY_ONE_CACHE[key] = (now_ts, dict(out) if isinstance(out, dict) else None)
+        except Exception:
+            pass
+    return out
+
+
+def _open_connection() -> sqlite3.Connection:  # type: ignore[override]
+    DB_DIR.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=20)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA busy_timeout=12000")
+        conn.execute("PRAGMA temp_store=MEMORY")
+        conn.execute("PRAGMA cache_size=-30000")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        # WAL improves read/write concurrency on Streamlit reruns. Ignore if filesystem does not support it.
+        conn.execute("PRAGMA journal_mode=WAL")
+    except Exception:
+        pass
+    return conn
