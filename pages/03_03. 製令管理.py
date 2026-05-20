@@ -678,9 +678,12 @@ with tab2:
         parsed = parse_pasted_work_orders(source_df.to_csv(sep="\t", index=False))[0] if not source_df.empty else ensure_cols(pd.DataFrame())
         st.success(f"已解析 {len(parsed)} 筆製令資料。")
         st.dataframe(parsed[["work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active"]], use_container_width=True, height=300)
-        if st.button("▣ 確認匯入 Excel 製令 / Import Excel Work Orders", type="primary", use_container_width=True, key="wo_excel_import_confirm_v243", disabled=not st.session_state.get("v253_work_order_edit_enabled", False)):
+        st.caption("V17：Excel 匯入可直接確認儲存，不再被『製令清單編輯』的啟動/停止編輯狀態鎖住。")
+        confirm_wo_import = st.checkbox("我確認要匯入並儲存這批 Excel 製令 / Confirm Excel import", key="v17_confirm_excel_work_order_import")
+        if st.button("▣ 確認匯入 Excel 製令 / Import Excel Work Orders", type="primary", use_container_width=True, key="wo_excel_import_confirm_v243", disabled=(not confirm_wo_import or parsed.empty)):
             result = save_work_orders(parsed)
             reload_data()
+            st.session_state["v253_work_order_edit_enabled"] = False
             st.success(f"Excel 匯入完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
             rerun()
 

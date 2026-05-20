@@ -16,26 +16,32 @@ from .log_service import write_log
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PERMANENT_STORE_DIR = PROJECT_ROOT / "data" / "permanent_store"
 PERSISTENT_MODULES_DIR = PERMANENT_STORE_DIR / "persistent_modules"
+LEGACY_PERSISTENT_MODULES_DIR = PROJECT_ROOT / "data" / "persistent_modules"
 
 
 def _load_persistent_module_rows(module_code: str, table_name: str) -> list[dict]:
-    """Load rows from data/permanent_store/persistent_modules as a fast non-destructive fallback.
+    """Load latest master rows quickly.
 
-    模組更新後如果 SQLite 暫時為空，但 data/permanent_store/persistent_modules 仍有資料，
-    01｜工時紀錄不應誤判成 03/04 沒資料。這裡只在讀取為空時使用，
-    並回補到 SQLite，避免其他頁面/下拉選單讀不到主檔。
+    正式優先讀 data/permanent_store。若舊專案尚未完成資料搬移，才用
+    data/persistent_modules 作一次 read-through fallback，避免 01 頁誤判
+    「請先匯入 03/04」。這裡不掃 history、不做 GitHub 同步。
     """
-    try:
-        module_dir = PERSISTENT_MODULES_DIR / module_code
-        file_path = module_dir / f"{module_code}_records.json"
-        if not file_path.exists():
-            return []
-        payload = json.loads(file_path.read_text(encoding="utf-8"))
-        tables = payload.get("tables", {}) if isinstance(payload, dict) else {}
-        rows = tables.get(table_name, [])
-        return rows if isinstance(rows, list) else []
-    except Exception:
-        return []
+    for base in (PERSISTENT_MODULES_DIR, LEGACY_PERSISTENT_MODULES_DIR):
+        try:
+            file_path = base / module_code / f"{module_code}_records.json"
+            if not file_path.exists():
+                continue
+            payload = json.loads(file_path.read_text(encoding="utf-8"))
+            rows = _extract_fast_rows(payload, table_name) if '_extract_fast_rows' in globals() else []
+            if rows:
+                return rows
+            tables = payload.get("tables", {}) if isinstance(payload, dict) else {}
+            rows = tables.get(table_name, [])
+            if isinstance(rows, list) and rows:
+                return rows
+        except Exception:
+            continue
+    return []
 
 
 def _restore_work_orders_from_persistent() -> int:
@@ -96,21 +102,36 @@ def _fast_latest_rows(table_name: str) -> list[dict]:
     mod, fname = _MASTER_LATEST_MAP.get(table_name, ("", ""))
     if not mod:
         return []
-    path = PERSISTENT_MODULES_DIR / mod / fname
-    try:
-        mtime = path.stat().st_mtime
-    except Exception:
-        return []
-    cache = _FAST_MASTER_JSON_CACHE.get(str(path))
-    if cache and cache[0] == mtime:
-        return cache[1]
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        rows = _extract_fast_rows(payload, table_name)
-        _FAST_MASTER_JSON_CACHE[str(path)] = (mtime, rows)
-        return rows
-    except Exception:
-        return []
+
+    # 正式路徑優先；若使用者尚未完成資料搬移，允許舊路徑 read-through。
+    # 不掃 history，避免各模組開啟延遲。
+    candidates = [
+        PERSISTENT_MODULES_DIR / mod / fname,
+        LEGACY_PERSISTENT_MODULES_DIR / mod / fname,
+    ]
+    best_rows: list[dict] = []
+    best_mtime = -1.0
+    for path in candidates:
+        try:
+            mtime = path.stat().st_mtime
+        except Exception:
+            continue
+        cache = _FAST_MASTER_JSON_CACHE.get(str(path))
+        if cache and cache[0] == mtime:
+            rows = cache[1]
+        else:
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                rows = _extract_fast_rows(payload, table_name)
+                _FAST_MASTER_JSON_CACHE[str(path)] = (mtime, rows)
+            except Exception:
+                rows = []
+        if rows and (not best_rows or path.parts[-3] == "permanent_store" or mtime > best_mtime):
+            best_rows = rows
+            best_mtime = mtime
+            if str(path).replace('\\','/').endswith(f"permanent_store/persistent_modules/{mod}/{fname}"):
+                break
+    return best_rows
 
 
 def _row_count_sql(table_name: str) -> int:

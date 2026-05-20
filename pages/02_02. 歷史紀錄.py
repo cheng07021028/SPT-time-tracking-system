@@ -1121,6 +1121,16 @@ with tab1:
             editor_version_key = "history_editor_version"
             if editor_version_key not in st.session_state:
                 st.session_state[editor_version_key] = 0
+            # V17：Streamlit 不允許 widget 建立後再改同 key session_state。
+            # 刪除成功後的重設值改成在 multiselect 建立前套用。
+            _pending_remaining = st.session_state.pop("_spt_history_pending_remaining_ids", None)
+            if _pending_remaining is not None:
+                try:
+                    _pending_remaining = [int(x) for x in _pending_remaining]
+                except Exception:
+                    _pending_remaining = []
+                st.session_state[history_select_key] = _pending_remaining
+                st.session_state[stable_select_key] = _pending_remaining
             _all_history_ids = [int(x) for x in edit_df["id"].dropna().tolist()] if "id" in edit_df.columns else []
             _selected_history_ids = set(int(x) for x in st.session_state.get(history_select_key, []) if int(x) in set(_all_history_ids))
             hc1, hc2, hc3 = st.columns([1, 1, 3])
@@ -1207,8 +1217,10 @@ with tab1:
                     else:
                         count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
                         remaining = [x for x in st.session_state.get(history_select_key, []) if int(x) not in set(delete_ids)]
+                        # V17：不要在 stable_select_key multiselect 建立後直接改同 key；
+                        # 先暫存，下一輪 rerun 在 widget 建立前套用。
                         st.session_state[history_select_key] = remaining
-                        st.session_state[stable_select_key] = remaining
+                        st.session_state["_spt_history_pending_remaining_ids"] = remaining
                         _add_history_result("success", f"已刪除 {count} 筆歷史紀錄。", append=False)
                         st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                         rerun()

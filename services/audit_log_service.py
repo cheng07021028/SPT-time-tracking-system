@@ -319,30 +319,41 @@ login_log_stats = get_login_log_stats
 
 
 def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:
-    """Delete login logs and immediately refresh permanent files.
+    """Delete login logs by date range and make the cleared state authoritative.
 
-    V11 fixes Clear Login Logs no-op by deleting all known login-log tables,
-    including auth_login_logs, and uploading the latest permanent JSON when
-    GitHub write-through is available.
+    V17 修正：部分資料表日期欄位格式不一致時，date(COALESCE(...)) 可能比對不到，
+    造成畫面顯示清除成功但實際 rowcount=0。這裡會依各表可用欄位建立較寬鬆
+    條件，並在清除後立即覆寫 latest 記憶檔，避免 Reboot 又從舊檔還原。
     """
     ensure_login_logs_table()
     conn = get_connection()
     cur = conn.cursor()
     deleted = 0
-    date_exprs = {
-        "login_logs": "date(COALESCE(login_time, created_at))",
-        "security_login_logs": "date(COALESCE(login_time, created_at))",
-        "auth_login_logs": "date(COALESCE(login_at, login_time, created_at))",
+
+    def _cols(table: str) -> set[str]:
+        try:
+            return {str(r[1]) for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        except Exception:
+            return set()
+
+    table_date_cols = {
+        "login_logs": ["login_time", "created_at", "logout_time"],
+        "security_login_logs": ["login_time", "created_at", "logout_time"],
+        "auth_login_logs": ["login_at", "login_time", "created_at"],
     }
-    for table, expr in date_exprs.items():
+    for table, wanted_cols in table_date_cols.items():
         try:
             if table != "login_logs" and not _table_exists(conn, table):
                 continue
-            cur.execute(f"""
-                DELETE FROM {table}
-                WHERE {expr} >= date(?)
-                  AND {expr} <= date(?)
-            """, (str(start_date), str(end_date)))
+            cols = [c for c in wanted_cols if c in _cols(table)]
+            if not cols:
+                continue
+            exprs = [f"date(substr(COALESCE({c}, ''), 1, 10)) BETWEEN date(?) AND date(?)" for c in cols]
+            where_sql = " OR ".join(exprs)
+            params: list[str] = []
+            for _ in cols:
+                params.extend([str(start_date), str(end_date)])
+            cur.execute(f"DELETE FROM {table} WHERE {where_sql}", tuple(params))
             deleted += int(cur.rowcount if cur.rowcount is not None else 0)
         except Exception:
             continue
@@ -352,13 +363,12 @@ def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:
         export_audit_logs_to_permanent_file(create_history=True, merge_existing=False)
         try:
             from services.permanent_write_through_service import github_write_through_files
-            github_write_through_files([AUDIT_STATE_PATH, MODULE_RECORDS_PATH, MODULE_SETTINGS_PATH], source="v11_clear_login_logs")
+            github_write_through_files([AUDIT_STATE_PATH, MODULE_RECORDS_PATH, MODULE_SETTINGS_PATH], source="v17_clear_login_logs", force=True)
         except Exception:
             pass
     except Exception:
         pass
     return deleted
-
 
 clear_login_logs_by_date_range = delete_login_logs_by_date_range
 delete_audit_logs_by_date_range = delete_login_logs_by_date_range
