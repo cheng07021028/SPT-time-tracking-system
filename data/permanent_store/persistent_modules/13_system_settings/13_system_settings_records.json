@@ -1,7 +1,7 @@
 {
   "version": "V3.73-direct-latest-like-03-04-final",
-  "exported_at": "2026-05-20 14:08:05",
-  "reason": "13_system_settings_page_apply",
+  "exported_at": "2026-05-20 14:14:28",
+  "reason": "save_process_categories_v373",
   "module_key": "13_system_settings",
   "module_code": "13_system_settings",
   "module_name_zh": "系統設定",
@@ -11,22 +11,22 @@
   "tables": {
     "process_categories": [
       {
-        "id": 1,
-        "category_name": "全部 / 通用",
-        "is_active": 1,
-        "sort_order": 1,
-        "note": "所有類別共用工段",
-        "created_at": "2026-05-20 14:03:46",
-        "updated_at": "2026-05-20 14:08:00"
-      },
-      {
-        "id": 2,
+        "id": 10,
         "category_name": "222",
         "is_active": 1,
         "sort_order": 2,
         "note": "",
-        "created_at": "2026-05-20 14:08:00",
-        "updated_at": "2026-05-20 14:08:00"
+        "created_at": "2026-05-20 14:14:28",
+        "updated_at": "2026-05-20 14:14:28"
+      },
+      {
+        "id": 1,
+        "category_name": "全部 / 通用",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-20 14:03:46",
+        "updated_at": "2026-05-20 14:14:28"
       }
     ],
     "process_category_options": [
