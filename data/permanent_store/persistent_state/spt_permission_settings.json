@@ -1,6 +1,6 @@
 {
   "version": "V11-account-master-authoritative",
-  "exported_at": "2026-05-20 15:20:48",
+  "exported_at": "2026-05-20 15:21:09",
   "reason": "auth_users_saved_v11",
   "module_key": "10_permissions",
   "module_code": "10_permissions",
@@ -24,7 +24,7 @@
         "last_login_at": "2026-05-20 14:32:16",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
       },
       {
         "id": 2,
@@ -40,7 +40,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
       },
       {
         "id": 3,
@@ -56,7 +56,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
       },
       {
         "id": 4,
@@ -72,7 +72,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
       },
       {
         "id": 5,
@@ -88,7 +88,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
       },
       {
         "id": 6,
@@ -104,7 +104,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
       },
       {
         "id": 15,
@@ -120,7 +120,23 @@
         "last_login_at": null,
         "note": "",
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 16,
+        "username": "AAA",
+        "password_hash": "pbkdf2_sha256$21cd6962bf5f6a736fadc1f638e56983$3466aa0e9ae0a785a4e72a902aa985289c9eda46e5cdf57ad9730536ef16c25d",
+        "password_hint": "由權限管理頁建立",
+        "employee_id": "",
+        "display_name": "AAA",
+        "email": "",
+        "role_code": "operator",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "note": "",
+        "created_at": "2026-05-20 15:21:09",
+        "updated_at": "2026-05-20 15:21:09"
       }
     ],
     "auth_account_permissions": [
@@ -1670,6 +1686,227 @@
         "can_restore": 0,
         "can_manage": 0,
         "updated_at": "2026-05-18 15:25:08"
+      },
+      {
+        "id": 508,
+        "username": "AAA",
+        "module_code": "01",
+        "module_name_zh": "工時紀錄",
+        "module_name_en": "Time Recording",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 509,
+        "username": "AAA",
+        "module_code": "02",
+        "module_name_zh": "歷史紀錄",
+        "module_name_en": "History Records",
+        "can_view": 1,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 510,
+        "username": "AAA",
+        "module_code": "03",
+        "module_name_zh": "製令管理",
+        "module_name_en": "Work Order Management",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 511,
+        "username": "AAA",
+        "module_code": "04",
+        "module_name_zh": "人員名單",
+        "module_name_en": "Employee Master",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 512,
+        "username": "AAA",
+        "module_code": "05",
+        "module_name_zh": "製令工時分析",
+        "module_name_en": "Work Order Time Analysis",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 513,
+        "username": "AAA",
+        "module_code": "06",
+        "module_name_zh": "LOG查詢",
+        "module_name_en": "Log Inquiry",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 514,
+        "username": "AAA",
+        "module_code": "07",
+        "module_name_zh": "今日未紀錄名單",
+        "module_name_en": "Missing Records Today",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 515,
+        "username": "AAA",
+        "module_code": "08",
+        "module_name_zh": "人員每日工時",
+        "module_name_en": "Daily Employee Hours",
+        "can_view": 1,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 516,
+        "username": "AAA",
+        "module_code": "09",
+        "module_name_zh": "資料永久保存與備份",
+        "module_name_en": "Permanent Backup",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 517,
+        "username": "AAA",
+        "module_code": "10",
+        "module_name_zh": "權限管理",
+        "module_name_en": "Permission Management",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 518,
+        "username": "AAA",
+        "module_code": "11",
+        "module_name_zh": "登入紀錄",
+        "module_name_en": "Login Logs",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 519,
+        "username": "AAA",
+        "module_code": "12",
+        "module_name_zh": "模組永久紀錄中心",
+        "module_name_en": "Module Permanent Records",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 520,
+        "username": "AAA",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-20 15:21:09"
       }
     ],
     "auth_security_settings": [
@@ -1698,7 +1935,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-20 14:32:16",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
       },
       {
         "id": 20,
@@ -1711,7 +1948,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
       },
       {
         "id": 21,
@@ -1724,7 +1961,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
       },
       {
         "id": 22,
@@ -1737,7 +1974,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
       },
       {
         "id": 23,
@@ -1750,7 +1987,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
       },
       {
         "id": 24,
@@ -1763,7 +2000,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
       },
       {
         "id": 25,
@@ -1776,69 +2013,88 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-20 15:20:48"
+        "updated_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 33,
+        "username": "AAA",
+        "password_hash": "pbkdf2_sha256$21cd6962bf5f6a736fadc1f638e56983$3466aa0e9ae0a785a4e72a902aa985289c9eda46e5cdf57ad9730536ef16c25d",
+        "employee_id": "",
+        "display_name": "AAA",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-20 15:21:09",
+        "updated_at": "2026-05-20 15:21:09"
       }
     ],
     "security_user_roles": [
       {
-        "id": 26,
+        "id": 33,
+        "username": "AAA",
+        "role_code": "operator",
+        "created_at": "2026-05-20 15:21:09"
+      },
+      {
+        "id": 34,
         "username": "Ethan",
         "role_code": "admin",
-        "created_at": "2026-05-20 15:20:48"
+        "created_at": "2026-05-20 15:21:09"
       },
       {
-        "id": 27,
+        "id": 35,
         "username": "admin",
         "role_code": "admin",
-        "created_at": "2026-05-20 15:20:48"
+        "created_at": "2026-05-20 15:21:09"
       },
       {
-        "id": 28,
+        "id": 36,
         "username": "auditor",
         "role_code": "auditor",
-        "created_at": "2026-05-20 15:20:48"
+        "created_at": "2026-05-20 15:21:09"
       },
       {
-        "id": 29,
+        "id": 37,
         "username": "leader",
         "role_code": "leader",
-        "created_at": "2026-05-20 15:20:48"
+        "created_at": "2026-05-20 15:21:09"
       },
       {
-        "id": 30,
+        "id": 38,
         "username": "manager",
         "role_code": "manager",
-        "created_at": "2026-05-20 15:20:48"
+        "created_at": "2026-05-20 15:21:09"
       },
       {
-        "id": 31,
+        "id": 39,
         "username": "operator",
         "role_code": "operator",
-        "created_at": "2026-05-20 15:20:48"
+        "created_at": "2026-05-20 15:21:09"
       },
       {
-        "id": 32,
+        "id": 40,
         "username": "viewer",
         "role_code": "viewer",
-        "created_at": "2026-05-20 15:20:48"
+        "created_at": "2026-05-20 15:21:09"
       }
     ],
     "security_settings": []
   },
   "table_counts": {
-    "auth_users": 7,
-    "auth_account_permissions": 91,
+    "auth_users": 8,
+    "auth_account_permissions": 104,
     "auth_security_settings": 2,
-    "security_users": 7,
-    "security_user_roles": 7,
+    "security_users": 8,
+    "security_user_roles": 8,
     "security_settings": 0
   },
   "counts": {
-    "auth_users": 7,
-    "auth_account_permissions": 91,
+    "auth_users": 8,
+    "auth_account_permissions": 104,
     "auth_security_settings": 2,
-    "security_users": 7,
-    "security_user_roles": 7,
+    "security_users": 8,
+    "security_user_roles": 8,
     "security_settings": 0
   }
 }
