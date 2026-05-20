@@ -1102,135 +1102,162 @@ with tab1:
         st.info("目前帳號只有查詢權限；若需修改或刪除歷史紀錄，請由管理員在權限管理開放 02 歷史紀錄的編輯/刪除權限。")
         _render_history_view_table(df, "history_records", height=520)
     else:
+        # V21：歷史明細編輯按鈕改為 callback + 非 form 送出，避免 Streamlit widget state
+        # 與 st.form / data_editor 暫存互相卡住，造成「啟動、停止、全選、儲存、刪除」看起來都無作用。
         edit_key = "history_edit_enabled"
+        editor_version_key = "history_editor_version"
+        history_delete_select_key = "_spt_select_history_records_delete_ids"
+        history_recalc_select_key = "_spt_select_history_records_recalc_ids"
+
         if edit_key not in st.session_state:
             st.session_state[edit_key] = False
-        ec1, ec2, ec3 = st.columns([1, 1, 2])
-        if ec1.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, key="history_enable_edit"):
+        if editor_version_key not in st.session_state:
+            st.session_state[editor_version_key] = 0
+        if history_delete_select_key not in st.session_state:
+            st.session_state[history_delete_select_key] = []
+        if history_recalc_select_key not in st.session_state:
+            st.session_state[history_recalc_select_key] = []
+
+        edit_df_base = df.copy()
+        _all_history_ids = [int(x) for x in edit_df_base["id"].dropna().tolist()] if "id" in edit_df_base.columns else []
+        _all_history_id_set = set(_all_history_ids)
+
+        def _bump_history_editor() -> None:
+            st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+
+        def _enable_history_edit() -> None:
             st.session_state[edit_key] = True
-            rerun()
-        if ec2.button("◌ 停止編輯 / Stop Edit", use_container_width=True, key="history_stop_edit"):
+            _bump_history_editor()
+
+        def _stop_history_edit() -> None:
             st.session_state[edit_key] = False
-            rerun()
-        ec3.info("編輯啟動後可修改資料；勾選『刪除』後可整列刪除。刪除需具備 can_delete 權限。")
+            st.session_state[history_delete_select_key] = []
+            st.session_state[history_recalc_select_key] = []
+            _bump_history_editor()
+
+        def _select_all_delete() -> None:
+            st.session_state[history_delete_select_key] = list(_all_history_ids)
+            _bump_history_editor()
+
+        def _clear_delete() -> None:
+            st.session_state[history_delete_select_key] = []
+            _bump_history_editor()
+
+        def _select_all_recalc() -> None:
+            st.session_state[history_recalc_select_key] = list(_all_history_ids)
+            _bump_history_editor()
+
+        def _clear_recalc() -> None:
+            st.session_state[history_recalc_select_key] = []
+            _bump_history_editor()
+
+        ec1, ec2, ec3 = st.columns([1, 1, 2])
+        ec1.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, key="history_enable_edit_v21", on_click=_enable_history_edit)
+        ec2.button("◌ 停止編輯 / Stop Edit", use_container_width=True, key="history_stop_edit_v21", on_click=_stop_history_edit)
+        ec3.info("編輯啟動後可修改資料；『刪除』與『重算』為不同勾選欄。儲存編輯不需要勾選。")
 
         if st.session_state[edit_key]:
             edit_df = df.copy()
-            # V19：歷史明細的「勾選全部 / 取消全部」必須依動作用途分開。
-            # 刪除與重新計算不可共用同一個勾選欄，避免使用者按全選後不知道會套用到哪個功能。
-            history_delete_select_key = "_spt_select_history_records_delete_ids"
-            history_recalc_select_key = "_spt_select_history_records_recalc_ids"
-            editor_version_key = "history_editor_version"
-            if editor_version_key not in st.session_state:
-                st.session_state[editor_version_key] = 0
-            _all_history_ids = [int(x) for x in edit_df["id"].dropna().tolist()] if "id" in edit_df.columns else []
-            _all_history_id_set = set(_all_history_ids)
-
-            _selected_delete_ids = set(
-                int(x) for x in st.session_state.get(history_delete_select_key, []) if int(x) in _all_history_id_set
-            )
-            _selected_recalc_ids = set(
-                int(x) for x in st.session_state.get(history_recalc_select_key, []) if int(x) in _all_history_id_set
-            )
 
             hc1, hc2, hc3, hc4 = st.columns(4)
-            if hc1.button("◈ 全選刪除 / Select Delete", use_container_width=True, key="history_select_all_delete_rows"):
-                st.session_state[history_delete_select_key] = _all_history_ids
-                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                rerun()
-            if hc2.button("◌ 取消刪除 / Clear Delete", use_container_width=True, key="history_clear_delete_rows"):
-                st.session_state[history_delete_select_key] = []
-                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                rerun()
-            if hc3.button("◈ 全選重算 / Select Recalc", use_container_width=True, key="history_select_all_recalc_rows"):
-                st.session_state[history_recalc_select_key] = _all_history_ids
-                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                rerun()
-            if hc4.button("◌ 取消重算 / Clear Recalc", use_container_width=True, key="history_clear_recalc_rows"):
-                st.session_state[history_recalc_select_key] = []
-                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                rerun()
+            hc1.button("◈ 全選刪除 / Select Delete", use_container_width=True, key="history_select_all_delete_rows_v21", on_click=_select_all_delete)
+            hc2.button("◌ 取消刪除 / Clear Delete", use_container_width=True, key="history_clear_delete_rows_v21", on_click=_clear_delete)
+            hc3.button("◈ 全選重算 / Select Recalc", use_container_width=True, key="history_select_all_recalc_rows_v21", on_click=_select_all_recalc)
+            hc4.button("◌ 取消重算 / Clear Recalc", use_container_width=True, key="history_clear_recalc_rows_v21", on_click=_clear_recalc)
 
             st.caption("刪除與重新計算使用不同勾選欄：『刪除』只給刪除整列用；『重算』只給重新計算工時用。儲存編輯不需要勾選。")
 
-            def _id_selected(value, selected_ids):
+            def _safe_int_id(value):
                 try:
                     if str(value).strip() in {"", "nan", "None"}:
-                        return False
-                    return int(value) in selected_ids
+                        return None
+                    return int(value)
                 except Exception:
-                    return False
+                    return None
+
+            _selected_delete_ids = set(
+                x for x in (_safe_int_id(v) for v in st.session_state.get(history_delete_select_key, []))
+                if x is not None and x in _all_history_id_set
+            )
+            _selected_recalc_ids = set(
+                x for x in (_safe_int_id(v) for v in st.session_state.get(history_recalc_select_key, []))
+                if x is not None and x in _all_history_id_set
+            )
 
             if "刪除" not in edit_df.columns:
-                edit_df.insert(0, "刪除", edit_df["id"].map(lambda x: _id_selected(x, _selected_delete_ids)) if "id" in edit_df.columns else False)
+                edit_df.insert(0, "刪除", edit_df["id"].map(lambda x: _safe_int_id(x) in _selected_delete_ids) if "id" in edit_df.columns else False)
             else:
-                edit_df["刪除"] = edit_df["id"].map(lambda x: _id_selected(x, _selected_delete_ids)) if "id" in edit_df.columns else False
+                edit_df["刪除"] = edit_df["id"].map(lambda x: _safe_int_id(x) in _selected_delete_ids) if "id" in edit_df.columns else False
             if "重算" not in edit_df.columns:
-                edit_df.insert(1, "重算", edit_df["id"].map(lambda x: _id_selected(x, _selected_recalc_ids)) if "id" in edit_df.columns else False)
+                edit_df.insert(1, "重算", edit_df["id"].map(lambda x: _safe_int_id(x) in _selected_recalc_ids) if "id" in edit_df.columns else False)
             else:
-                edit_df["重算"] = edit_df["id"].map(lambda x: _id_selected(x, _selected_recalc_ids)) if "id" in edit_df.columns else False
+                edit_df["重算"] = edit_df["id"].map(lambda x: _safe_int_id(x) in _selected_recalc_ids) if "id" in edit_df.columns else False
 
-            # 全選/取消全選後必須換新 data_editor key，否則 Streamlit 會沿用舊 widget 暫存，看起來按鈕無作用。
-            editor_key = f"history_editor_{st.session_state[editor_version_key]}"
-            st.info("表格內輸入或勾選不會立即重算；確認執行後會重新載入表格，顯示最新日期、時間與工時小計。")
-            with st.form("history_records_commit_form", clear_on_submit=False):
-                edited = render_table(edit_df, "history_records", editable=True, disabled=["id", "record_key", "created_at", "updated_at"], key=editor_key, height=560)
-                history_action = st.radio(
-                    "確認後執行動作",
-                    ["儲存編輯", "重新計算勾選紀錄工時", "刪除勾選整列紀錄"],
-                    horizontal=True,
-                    key="history_action",
-                )
-                submitted_history = st.form_submit_button("⚡ 確認執行 / Confirm", type="primary", use_container_width=True)
+            editor_key = f"history_editor_v21_{st.session_state[editor_version_key]}"
+            st.info("表格內輸入或勾選不會立即重算；按下方動作按鈕後會寫入最新資料並重新載入。")
+            edited = render_table(
+                edit_df,
+                "history_records",
+                editable=True,
+                disabled=["id", "record_key", "created_at", "updated_at"],
+                key=editor_key,
+                height=560,
+            )
 
-            if submitted_history and edited is not None:
+            if edited is None:
+                edited = edit_df.copy()
+
+            ac1, ac2, ac3 = st.columns(3)
+            save_clicked = ac1.button("💾 儲存編輯 / Save Edits", type="primary", use_container_width=True, key="history_save_edits_v21")
+            recalc_clicked = ac2.button("↻ 重新計算重算勾選 / Recalculate Selected", use_container_width=True, key="history_recalc_selected_v21")
+            delete_clicked = ac3.button("🗑 刪除刪除勾選 / Delete Selected", use_container_width=True, key="history_delete_selected_v21")
+
+            if save_clicked or recalc_clicked or delete_clicked:
                 try:
                     delete_rows = edited[edited["刪除"].astype(bool)] if "刪除" in edited.columns else pd.DataFrame()
-                    delete_ids = sorted(set(int(x) for x in delete_rows["id"].dropna().tolist()))
+                    delete_ids = sorted(set(int(x) for x in delete_rows["id"].dropna().tolist())) if "id" in delete_rows.columns else []
                 except Exception:
                     delete_ids = []
                 try:
                     recalc_rows = edited[edited["重算"].astype(bool)] if "重算" in edited.columns else pd.DataFrame()
-                    recalc_ids = sorted(set(int(x) for x in recalc_rows["id"].dropna().tolist()))
+                    recalc_ids = sorted(set(int(x) for x in recalc_rows["id"].dropna().tolist())) if "id" in recalc_rows.columns else []
                 except Exception:
                     recalc_ids = []
 
-                # 保留目前勾選狀態，直到使用者取消、刪除成功或離開頁面。
                 st.session_state[history_delete_select_key] = delete_ids
                 st.session_state[history_recalc_select_key] = recalc_ids
 
-                if history_action == "儲存編輯":
+                if save_clicked:
                     save_df = edited.drop(columns=["刪除", "重算"], errors="ignore")
                     count = save_time_records(save_df)
                     _add_history_result("success", f"已儲存 {count} 筆歷史紀錄。", append=False)
-                    st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                    _bump_history_editor()
                     rerun()
-                elif history_action == "重新計算勾選紀錄工時":
+                elif recalc_clicked:
                     if not recalc_ids:
-                        _add_history_result("warning", "請先在『重算』勾選欄勾選要重新計算的紀錄，再按確認執行。", append=False)
+                        _add_history_result("warning", "請先在『重算』勾選欄勾選要重新計算的紀錄。", append=False)
                         rerun()
                     else:
-                        # 若管理員剛修改開始/結束時間戳，先儲存並同步日期/時間欄位，再重新計算。
                         save_df = edited.drop(columns=["刪除", "重算"], errors="ignore")
                         save_time_records(save_df, recalc_edited_timestamps=True)
                         count = recalculate_time_records(recalc_ids)
                         _add_history_result("success", f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時。", append=False)
-                        st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                        _bump_history_editor()
                         rerun()
-                else:
+                elif delete_clicked:
                     if not can_delete:
                         _add_history_result("error", "權限不足：你沒有刪除歷史紀錄權限。", append=False)
                         rerun()
                     elif not delete_ids:
-                        _add_history_result("warning", "請先在『刪除』勾選欄勾選要刪除的紀錄，再按確認執行。", append=False)
+                        _add_history_result("warning", "請先在『刪除』勾選欄勾選要刪除的紀錄。", append=False)
                         rerun()
                     else:
                         count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
                         delete_set = set(delete_ids)
-                        st.session_state[history_delete_select_key] = [x for x in st.session_state.get(history_delete_select_key, []) if int(x) not in delete_set]
-                        st.session_state[history_recalc_select_key] = [x for x in st.session_state.get(history_recalc_select_key, []) if int(x) not in delete_set]
+                        st.session_state[history_delete_select_key] = [x for x in st.session_state.get(history_delete_select_key, []) if _safe_int_id(x) not in delete_set]
+                        st.session_state[history_recalc_select_key] = [x for x in st.session_state.get(history_recalc_select_key, []) if _safe_int_id(x) not in delete_set]
                         _add_history_result("success", f"已刪除 {count} 筆歷史紀錄。", append=False)
-                        st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                        _bump_history_editor()
                         rerun()
         else:
             _render_history_view_table(df, "history_records", height=520)
