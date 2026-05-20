@@ -1,15 +1,15 @@
 {
-  "version": "V3.04-master-data-guard",
-  "exported_at": "2026-05-20 15:44:52",
-  "source": "crud_table_service",
+  "version": "V1.48",
+  "exported_at": "2026-05-20 16:17:01",
+  "source": "db_service_write",
   "module_key": "04_employees",
-  "module_code": "04_employees",
+  "module_code": "04",
   "module_name_zh": "人員名單",
   "module_name_en": "Employees",
   "tables": {
     "employees": [
       {
-        "id": 84,
+        "id": 1,
         "employee_id": "B257",
         "employee_name": "彭紹恩",
         "department": "製造二課",
@@ -18,11 +18,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:04",
+        "updated_at": "2026-05-20 16:12:04"
       },
       {
-        "id": 83,
+        "id": 2,
         "employee_id": "B259",
         "employee_name": "鄧文誠",
         "department": "製造二課",
@@ -31,11 +31,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 82,
+        "id": 3,
         "employee_id": "B258",
         "employee_name": "羅仕君",
         "department": "製造一課",
@@ -44,11 +44,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 81,
+        "id": 4,
         "employee_id": "B249",
         "employee_name": "劉翰霖",
         "department": "製造二課",
@@ -57,11 +57,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 80,
+        "id": 5,
         "employee_id": "B256",
         "employee_name": "莊翔宇",
         "department": "製造二課",
@@ -70,11 +70,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 79,
+        "id": 6,
         "employee_id": "B255",
         "employee_name": "郭建佑",
         "department": "製造二課",
@@ -83,11 +83,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 78,
+        "id": 7,
         "employee_id": "B254",
         "employee_name": "陳展榮",
         "department": "製造二課",
@@ -96,11 +96,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 77,
+        "id": 8,
         "employee_id": "B253",
         "employee_name": "呂定樺",
         "department": "製造二課",
@@ -109,11 +109,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 76,
+        "id": 9,
         "employee_id": "B252",
         "employee_name": "吳家穎",
         "department": "製造二課",
@@ -122,11 +122,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 75,
+        "id": 10,
         "employee_id": "B251",
         "employee_name": "胡昌叡",
         "department": "製造二課",
@@ -135,11 +135,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 74,
+        "id": 11,
         "employee_id": "B250",
         "employee_name": "劉順榮",
         "department": "製造二課",
@@ -148,11 +148,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 73,
+        "id": 12,
         "employee_id": "B248",
         "employee_name": "佘銘訓",
         "department": "製造一課",
@@ -161,11 +161,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 72,
+        "id": 13,
         "employee_id": "B247",
         "employee_name": "劉家瑋",
         "department": "製造二課",
@@ -174,11 +174,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 71,
+        "id": 14,
         "employee_id": "B246",
         "employee_name": "湯詠棋",
         "department": "製造二課",
@@ -187,11 +187,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 70,
+        "id": 15,
         "employee_id": "B245",
         "employee_name": "張維宏",
         "department": "製造二課",
@@ -200,11 +200,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 69,
+        "id": 16,
         "employee_id": "B244",
         "employee_name": "范耀文",
         "department": "製造二課",
@@ -213,11 +213,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 68,
+        "id": 17,
         "employee_id": "B243",
         "employee_name": "周美琪",
         "department": "製造二課",
@@ -226,11 +226,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 67,
+        "id": 18,
         "employee_id": "B230",
         "employee_name": "姜智翔",
         "department": "製造二課",
@@ -239,11 +239,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 66,
+        "id": 19,
         "employee_id": "B229",
         "employee_name": "姚奕舟",
         "department": "製造二課",
@@ -252,11 +252,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 65,
+        "id": 20,
         "employee_id": "B168",
         "employee_name": "洪敏強",
         "department": "製造二課",
@@ -265,11 +265,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 64,
+        "id": 21,
         "employee_id": "B155",
         "employee_name": "趙健浩",
         "department": "製造二課",
@@ -278,11 +278,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 63,
+        "id": 22,
         "employee_id": "B235",
         "employee_name": "徐聖淇",
         "department": "製造一課",
@@ -291,11 +291,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 62,
+        "id": 23,
         "employee_id": "B228",
         "employee_name": "溫翠茹",
         "department": "製造一課",
@@ -304,11 +304,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 61,
+        "id": 24,
         "employee_id": "B226",
         "employee_name": "周政龍",
         "department": "製造一課",
@@ -317,11 +317,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 60,
+        "id": 25,
         "employee_id": "B210",
         "employee_name": "黃承淮",
         "department": "製造一課",
@@ -330,11 +330,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 59,
+        "id": 26,
         "employee_id": "B227",
         "employee_name": "潘信成",
         "department": "製造一課",
@@ -343,11 +343,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 58,
+        "id": 27,
         "employee_id": "B204",
         "employee_name": "周棟榮",
         "department": "製造一課",
@@ -356,11 +356,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 57,
+        "id": 28,
         "employee_id": "B203",
         "employee_name": "蕭桓惟",
         "department": "製造一課",
@@ -369,11 +369,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 56,
+        "id": 29,
         "employee_id": "B190",
         "employee_name": "黃瑞翎",
         "department": "製造一課",
@@ -382,11 +382,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 55,
+        "id": 30,
         "employee_id": "B189",
         "employee_name": "羅文發",
         "department": "製造一課",
@@ -395,11 +395,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 54,
+        "id": 31,
         "employee_id": "B177",
         "employee_name": "羅章淳",
         "department": "製造一課",
@@ -408,11 +408,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 53,
+        "id": 32,
         "employee_id": "B135",
         "employee_name": "鍾明志",
         "department": "製造一課",
@@ -421,11 +421,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 52,
+        "id": 33,
         "employee_id": "B126",
         "employee_name": "戴鎰祥",
         "department": "製造一課",
@@ -434,11 +434,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 51,
+        "id": 34,
         "employee_id": "B052",
         "employee_name": "張傑威",
         "department": "製造一課",
@@ -447,11 +447,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 50,
+        "id": 35,
         "employee_id": "B051",
         "employee_name": "陳紫晴",
         "department": "製造一課",
@@ -460,11 +460,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 49,
+        "id": 36,
         "employee_id": "B031",
         "employee_name": "廖紫攸",
         "department": "製造二課",
@@ -473,11 +473,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 48,
+        "id": 37,
         "employee_id": "B030",
         "employee_name": "沈啓頤",
         "department": "製造二課",
@@ -486,11 +486,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 47,
+        "id": 38,
         "employee_id": "B002",
         "employee_name": "張文品",
         "department": "製造二課",
@@ -499,11 +499,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 46,
+        "id": 39,
         "employee_id": "SPT250",
         "employee_name": "鄭至賢",
         "department": "製造一課",
@@ -512,11 +512,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 45,
+        "id": 40,
         "employee_id": "SPT245",
         "employee_name": "傑米",
         "department": "製造一課",
@@ -525,11 +525,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 44,
+        "id": 41,
         "employee_id": "SPT244",
         "employee_name": "費南",
         "department": "製造一課",
@@ -538,11 +538,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 43,
+        "id": 42,
         "employee_id": "SPT243",
         "employee_name": "羅丹",
         "department": "製造一課",
@@ -551,11 +551,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 42,
+        "id": 43,
         "employee_id": "SPT242",
         "employee_name": "保羅",
         "department": "製造一課",
@@ -564,11 +564,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 41,
+        "id": 44,
         "employee_id": "SPT241",
         "employee_name": "達文",
         "department": "製造一課",
@@ -577,11 +577,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 40,
+        "id": 45,
         "employee_id": "SPT240",
         "employee_name": "吉爾",
         "department": "製造一課",
@@ -590,11 +590,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 39,
+        "id": 46,
         "employee_id": "SPT239",
         "employee_name": "麥可",
         "department": "製造一課",
@@ -603,11 +603,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 38,
+        "id": 47,
         "employee_id": "SPT231",
         "employee_name": "陳建勳",
         "department": "製造一課",
@@ -616,11 +616,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 37,
+        "id": 48,
         "employee_id": "SPT230",
         "employee_name": "梁志宏",
         "department": "製造一課",
@@ -629,11 +629,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 36,
+        "id": 49,
         "employee_id": "SPT228",
         "employee_name": "王添慶",
         "department": "製造一課",
@@ -642,11 +642,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 35,
+        "id": 50,
         "employee_id": "SPT227",
         "employee_name": "張佳銓",
         "department": "製造一課",
@@ -655,11 +655,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 34,
+        "id": 51,
         "employee_id": "SPT220",
         "employee_name": "劉韋廷",
         "department": "製造一課",
@@ -668,11 +668,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 33,
+        "id": 52,
         "employee_id": "SPT208",
         "employee_name": "邱珍娜",
         "department": "製造一課",
@@ -681,11 +681,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 32,
+        "id": 53,
         "employee_id": "SPT199",
         "employee_name": "龍斯愷",
         "department": "製造一課",
@@ -694,11 +694,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 31,
+        "id": 54,
         "employee_id": "SPT196",
         "employee_name": "黃建堃",
         "department": "製造一課",
@@ -707,11 +707,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 30,
+        "id": 55,
         "employee_id": "SPT195",
         "employee_name": "姜治銘",
         "department": "製造一課",
@@ -720,11 +720,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 29,
+        "id": 56,
         "employee_id": "SPT193",
         "employee_name": "呂昰儒",
         "department": "製造一課",
@@ -733,11 +733,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 28,
+        "id": 57,
         "employee_id": "SPT183",
         "employee_name": "蕭詩瓊",
         "department": "製造一課",
@@ -746,11 +746,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 27,
+        "id": 58,
         "employee_id": "SPT174",
         "employee_name": "龍才華",
         "department": "製造一課",
@@ -759,11 +759,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 26,
+        "id": 59,
         "employee_id": "SPT172",
         "employee_name": "胡瑄芸",
         "department": "製造一課",
@@ -772,11 +772,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 25,
+        "id": 60,
         "employee_id": "SPT160",
         "employee_name": "邱信維",
         "department": "製造一課",
@@ -785,11 +785,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 24,
+        "id": 61,
         "employee_id": "SPT158",
         "employee_name": "劉定澤",
         "department": "製造一課",
@@ -798,11 +798,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 23,
+        "id": 62,
         "employee_id": "SPT151",
         "employee_name": "鄭智鍵",
         "department": "製造一課",
@@ -811,11 +811,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 22,
+        "id": 63,
         "employee_id": "SPT150",
         "employee_name": "李守益",
         "department": "製造一課",
@@ -824,11 +824,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 21,
+        "id": 64,
         "employee_id": "SPT149",
         "employee_name": "江金福",
         "department": "製造一課",
@@ -837,11 +837,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 20,
+        "id": 65,
         "employee_id": "SPT148",
         "employee_name": "羅立昕",
         "department": "製造一課",
@@ -850,11 +850,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 19,
+        "id": 66,
         "employee_id": "SPT145",
         "employee_name": "潘威捷",
         "department": "製造一課",
@@ -863,11 +863,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 18,
+        "id": 67,
         "employee_id": "SPT105",
         "employee_name": "劉秀鳳",
         "department": "製造一課",
@@ -876,11 +876,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 17,
+        "id": 68,
         "employee_id": "SPT138",
         "employee_name": "蘇雍盛",
         "department": "製造二課",
@@ -889,11 +889,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 16,
+        "id": 69,
         "employee_id": "SPT121",
         "employee_name": "徐兆生",
         "department": "製造一課",
@@ -902,11 +902,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 15,
+        "id": 70,
         "employee_id": "SPT092",
         "employee_name": "林昶志",
         "department": "製造一課",
@@ -915,11 +915,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 14,
+        "id": 71,
         "employee_id": "SPT091",
         "employee_name": "魏瑄毅",
         "department": "製造一課",
@@ -928,11 +928,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 13,
+        "id": 72,
         "employee_id": "SPT089",
         "employee_name": "陳凱彥",
         "department": "製造一課",
@@ -941,11 +941,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 12,
+        "id": 73,
         "employee_id": "SPT088",
         "employee_name": "林建安",
         "department": "製造一課",
@@ -954,11 +954,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 11,
+        "id": 74,
         "employee_id": "SPT087",
         "employee_name": "牟育玄",
         "department": "製造一課",
@@ -967,11 +967,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 10,
+        "id": 75,
         "employee_id": "SPT084",
         "employee_name": "陳育信",
         "department": "製造二課",
@@ -980,11 +980,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 9,
+        "id": 76,
         "employee_id": "SPT077",
         "employee_name": "謝宛庭",
         "department": "製造一課",
@@ -993,11 +993,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 8,
+        "id": 77,
         "employee_id": "SPT063",
         "employee_name": "劉志偉",
         "department": "製造一課",
@@ -1006,11 +1006,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 7,
+        "id": 78,
         "employee_id": "SPT059",
         "employee_name": "蘇萬紘",
         "department": "製造一課",
@@ -1019,11 +1019,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 6,
+        "id": 79,
         "employee_id": "SPT048",
         "employee_name": "李俊霖",
         "department": "製造二課",
@@ -1032,11 +1032,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 5,
+        "id": 80,
         "employee_id": "SPT034",
         "employee_name": "陳長彥",
         "department": "製造一課",
@@ -1045,11 +1045,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 4,
+        "id": 81,
         "employee_id": "SPT031",
         "employee_name": "吳政昌",
         "department": "製造一課",
@@ -1058,11 +1058,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 3,
+        "id": 82,
         "employee_id": "SPT024",
         "employee_name": "陳德文",
         "department": "製造一課",
@@ -1071,11 +1071,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 2,
+        "id": 83,
         "employee_id": "SPT015",
         "employee_name": "陳文山",
         "department": "製造二課",
@@ -1084,11 +1084,11 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       },
       {
-        "id": 1,
+        "id": 84,
         "employee_id": "spt142",
         "employee_name": "黃沂澂",
         "department": "製造部",
@@ -1097,15 +1097,12 @@
         "is_in_factory": 1,
         "is_today_attendance": 1,
         "note": "",
-        "created_at": "2026-05-20 15:44:52",
-        "updated_at": "2026-05-20 15:44:52"
+        "created_at": "2026-05-20 16:12:06",
+        "updated_at": "2026-05-20 16:12:06"
       }
     ]
   },
   "table_counts": {
-    "employees": 84
-  },
-  "counts": {
     "employees": 84
   }
 }
