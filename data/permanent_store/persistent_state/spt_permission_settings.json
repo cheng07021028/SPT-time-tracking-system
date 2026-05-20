@@ -1,7 +1,7 @@
 {
-  "version": "V3.73-direct-latest-like-03-04-final",
-  "exported_at": "2026-05-20 14:35:19",
-  "reason": "auth_users_deleted_v9",
+  "version": "V11-account-master-authoritative",
+  "exported_at": "2026-05-20 15:00:17",
+  "reason": "auth_users_saved_v11",
   "module_key": "10_permissions",
   "module_code": "10_permissions",
   "module_name_zh": "權限管理",
@@ -24,7 +24,7 @@
         "last_login_at": "2026-05-20 14:32:16",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       },
       {
         "id": 2,
@@ -40,7 +40,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       },
       {
         "id": 3,
@@ -56,7 +56,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       },
       {
         "id": 4,
@@ -72,7 +72,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       },
       {
         "id": 5,
@@ -88,7 +88,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       },
       {
         "id": 6,
@@ -104,7 +104,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       },
       {
         "id": 15,
@@ -120,7 +120,7 @@
         "last_login_at": null,
         "note": "",
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       }
     ],
     "auth_account_permissions": [
@@ -1698,7 +1698,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-20 14:32:16",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       },
       {
         "id": 20,
@@ -1711,7 +1711,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       },
       {
         "id": 21,
@@ -1724,7 +1724,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       },
       {
         "id": 22,
@@ -1737,7 +1737,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       },
       {
         "id": 23,
@@ -1750,7 +1750,7 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       },
       {
         "id": 24,
@@ -1763,10 +1763,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       },
       {
-        "id": 27,
+        "id": 25,
         "username": "Ethan",
         "password_hash": "pbkdf2_sha256$4a2137fb90480f1b82a4721549f178ff$e85de92dedccb2791d7c297a55882100182babccdb5fd0485b63bfa5ac24bca0",
         "employee_id": "SPT142",
@@ -1776,51 +1776,51 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-20 14:35:15"
+        "updated_at": "2026-05-20 15:00:17"
       }
     ],
     "security_user_roles": [
       {
-        "id": 34,
+        "id": 26,
         "username": "Ethan",
         "role_code": "admin",
-        "created_at": "2026-05-20 14:35:15"
+        "created_at": "2026-05-20 15:00:17"
       },
       {
-        "id": 35,
+        "id": 27,
         "username": "admin",
         "role_code": "admin",
-        "created_at": "2026-05-20 14:35:15"
+        "created_at": "2026-05-20 15:00:17"
       },
       {
-        "id": 36,
+        "id": 28,
         "username": "auditor",
         "role_code": "auditor",
-        "created_at": "2026-05-20 14:35:15"
+        "created_at": "2026-05-20 15:00:17"
       },
       {
-        "id": 37,
+        "id": 29,
         "username": "leader",
         "role_code": "leader",
-        "created_at": "2026-05-20 14:35:15"
+        "created_at": "2026-05-20 15:00:17"
       },
       {
-        "id": 38,
+        "id": 30,
         "username": "manager",
         "role_code": "manager",
-        "created_at": "2026-05-20 14:35:15"
+        "created_at": "2026-05-20 15:00:17"
       },
       {
-        "id": 39,
+        "id": 31,
         "username": "operator",
         "role_code": "operator",
-        "created_at": "2026-05-20 14:35:15"
+        "created_at": "2026-05-20 15:00:17"
       },
       {
-        "id": 40,
+        "id": 32,
         "username": "viewer",
         "role_code": "viewer",
-        "created_at": "2026-05-20 14:35:15"
+        "created_at": "2026-05-20 15:00:17"
       }
     ],
     "security_settings": []
