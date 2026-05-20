@@ -1,7 +1,7 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-20 13:48:34",
-  "source": "crud_table_service_save_employees",
+  "exported_at": "2026-05-20 13:50:44",
+  "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
   "module_name_zh": "LOG查詢",
@@ -9,96 +9,19 @@
   "tables": {
     "system_logs": [
       {
-        "id": 1,
-        "log_time": "2026-05-19 12:07:46",
-        "user_name": "SYSTEM",
-        "action_type": "AUTO_INIT_DATABASE",
-        "target_table": "ALL",
-        "target_id": "",
-        "message": "自動初始化資料庫完成",
-        "detail": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
-        "level": "INFO"
-      },
-      {
-        "id": 2,
-        "log_time": "2026-05-20 13:44:52",
-        "user_name": "streamlit_user",
-        "action_type": "RESTORE_EMPLOYEES",
-        "target_table": "employees",
-        "target_id": "",
-        "message": "從永久 JSON 救援 employees",
-        "detail": "restored=74, source=/mount/src/spt-time-tracking-system/data/permanent_store/persistent_modules/04_employees/04_employees_records.json",
-        "level": "INFO"
-      },
-      {
-        "id": 3,
-        "log_time": "2026-05-20 13:45:10",
-        "user_name": "streamlit_user",
-        "action_type": "SAVE_EMPLOYEES",
-        "target_table": "employees",
-        "target_id": "",
-        "message": "儲存人員名單",
-        "detail": "inserted=0, updated=1, deleted=0, skipped=0",
-        "level": "INFO"
-      },
-      {
-        "id": 6,
-        "log_time": "2026-05-20 13:46:49",
-        "user_name": "appuser",
-        "action_type": "START_WORK",
-        "target_table": "time_records",
-        "target_id": "1",
-        "message": "沈啟頤 開始 21M0241-02 / 前置鈑金",
-        "detail": "",
-        "level": "INFO"
-      },
-      {
-        "id": 7,
-        "log_time": "2026-05-20 13:47:08",
-        "user_name": "appuser",
-        "action_type": "START_WORK",
-        "target_table": "time_records",
-        "target_id": "2",
-        "message": "張文品 開始 21M0241-02 / 前置鈑金",
-        "detail": "",
-        "level": "INFO"
-      },
-      {
-        "id": 8,
-        "log_time": "2026-05-20 13:47:34",
-        "user_name": "streamlit_user",
-        "action_type": "SAVE_WORK_ORDERS",
-        "target_table": "work_orders",
-        "target_id": "",
-        "message": "儲存製令清單",
-        "detail": "inserted=0, updated=600, deleted=3, skipped=0",
-        "level": "INFO"
-      },
-      {
-        "id": 9,
-        "log_time": "2026-05-20 13:48:28",
-        "user_name": "streamlit_user",
-        "action_type": "SAVE_EMPLOYEES",
-        "target_table": "employees",
-        "target_id": "",
-        "message": "儲存人員名單",
-        "detail": "inserted=0, updated=74, deleted=0, skipped=0",
-        "level": "INFO"
-      },
-      {
-        "id": 10,
-        "log_time": "2026-05-20 13:48:34",
-        "user_name": "streamlit_user",
-        "action_type": "SAVE_EMPLOYEES",
-        "target_table": "employees",
-        "target_id": "",
-        "message": "儲存人員名單",
-        "detail": "inserted=1, updated=74, deleted=0, skipped=0",
-        "level": "INFO"
+        "id": 11,
+        "log_time": "2026-05-20 13:50:09",
+        "user_name": "admin",
+        "action_type": "DELETE_LOG_RANGE",
+        "target_table": "system_logs",
+        "target_id": "2026-05-13~2026-05-20",
+        "message": "刪除 LOG 日期區間：2026-05-13 ~ 2026-05-20，刪除筆數：8",
+        "detail": "deleted_count=8",
+        "level": "WARN"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 8
+    "system_logs": 1
   }
 }
