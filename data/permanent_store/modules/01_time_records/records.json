@@ -2,41 +2,12 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-20 23:57:57",
-  "exported_at": "2026-05-20 23:57:57",
+  "updated_at": "2026-05-21 00:02:04",
+  "exported_at": "2026-05-21 00:02:04",
   "reason": "delete_time_records_01_v33",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
-      {
-        "id": 6,
-        "record_key": "B002|21M0241-01|CCCC|2026-05-20 18:53:55|e99ba155",
-        "status": "作業中",
-        "work_order": "21M0241-01",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "CCCC",
-        "employee_id": "B002",
-        "employee_name": "張文品",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-20 18:53:55",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
-        "start_date": "2026-05-20",
-        "start_time": "18:53:55",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": "00:00:00",
-        "assembly_location": "竹東",
-        "group_key": "B002|CCCC|2026-05-20",
-        "is_group_work": false,
-        "source": "streamlit",
-        "created_at": "2026-05-20 18:53:55",
-        "updated_at": "2026-05-20 18:53:55",
-        "department": "製造二課",
-        "title": "派遣部 _德興"
-      },
       {
         "id": 5,
         "record_key": "B030|21M0241-02|配電|2026-05-15 08:41:33|fe0efd51",
@@ -186,6 +157,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 6
+    "time_records": 5
   }
 }
