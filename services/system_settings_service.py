@@ -2472,14 +2472,45 @@ def _v373_s_atomic_write(path: Path, payload: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
+def _v373_s_payload_stamp(data: dict[str, Any], path: Path) -> float:
+    """Return comparable timestamp for permanent payload selection.
+
+    V3.74: ZIP/extract mtime can be identical on Streamlit Cloud, so choosing
+    the first file is unsafe.  Use exported_at/updated_at first, mtime second.
+    """
+    for key in ("exported_at", "updated_at", "saved_at"):
+        text = str(data.get(key) or "").strip()
+        if text:
+            try:
+                return datetime.fromisoformat(text.replace("/", "-")).timestamp()
+            except Exception:
+                try:
+                    return datetime.strptime(text[:19].replace("/", "-"), "%Y-%m-%d %H:%M:%S").timestamp()
+                except Exception:
+                    pass
+    try:
+        return path.stat().st_mtime if path.exists() else 0.0
+    except Exception:
+        return 0.0
+
+
 def _v373_s_latest_payload() -> dict[str, Any]:
-    # Fixed latest is authoritative. Compat/state/config are only migration fallback when latest is absent.
+    """Pick the newest valid system-settings payload, not the first file.
+
+    Some repos still contain an older 13_system_settings_records.json beside a
+    newer system_settings.json/config file.  On reboot, the older file used to
+    win and restored the previous category/process settings.
+    """
+    candidates: list[tuple[float, str, dict[str, Any]]] = []
     for path in [_V373_SYSTEM_LATEST_FILE, _V373_SYSTEM_COMPAT_FILE, _V373_SYSTEM_STATE_FILE, _V373_SYSTEM_CONFIG_FILE]:
         data = _v373_s_read_json(path)
         tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
         if isinstance(tables, dict) and any(k in tables for k in ["process_categories", "process_category_options", "process_options", "rest_periods", "app_settings"]):
-            return data
-    return {}
+            candidates.append((_v373_s_payload_stamp(data, path), str(path), data))
+    if not candidates:
+        return {}
+    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    return candidates[0][2]
 
 
 def _v373_s_schema_only() -> None:
@@ -2628,7 +2659,10 @@ def _v373_restore_system_once_if_needed() -> None:
                 return
         except Exception:
             pass
-    restore_system_settings_from_permanent(force=False)
+    # V3.74: On Streamlit Cloud reboot, SQLite may be non-empty but stale
+    # because the repo contains an older DB.  JSON permanent_store is the
+    # authority, so restore it once per session regardless of DB row count.
+    restore_system_settings_from_permanent(force=True)
     if st is not None:
         try:
             st.session_state[_V373_SYSTEM_RESTORE_KEY] = True
@@ -2696,10 +2730,17 @@ def export_system_settings_permanent(reason: str = "system_settings_changed", wr
             "app_settings": 0 if app is None else len(app),
         },
     }
-    for path in [_V373_SYSTEM_LATEST_FILE, _V373_SYSTEM_COMPAT_FILE, _V373_SYSTEM_STATE_FILE, _V373_SYSTEM_CONFIG_FILE]:
+    files = [_V373_SYSTEM_LATEST_FILE, _V373_SYSTEM_COMPAT_FILE, _V373_SYSTEM_STATE_FILE, _V373_SYSTEM_CONFIG_FILE]
+    for path in files:
         _v373_s_atomic_write(path, payload)
+    github_upload = {"ok": True, "skipped": True, "message": "write-through not attempted"}
+    try:
+        from services.permanent_write_through_service import github_write_through_files
+        github_upload = github_write_through_files(files, source=reason)
+    except Exception as exc:
+        github_upload = {"ok": False, "message": str(exc)}
     _clear_settings_cache()
-    return {"ok": True, "mode": "v373_direct_latest_like_03_04_final", "files": [str(_V373_SYSTEM_LATEST_FILE), str(_V373_SYSTEM_COMPAT_FILE), str(_V373_SYSTEM_STATE_FILE), str(_V373_SYSTEM_CONFIG_FILE)], "table_counts": payload["table_counts"]}
+    return {"ok": True, "mode": "v374_authoritative_json_restore", "files": [str(p) for p in files], "table_counts": payload["table_counts"], "github_upload": github_upload}
 
 
 def load_process_categories_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]

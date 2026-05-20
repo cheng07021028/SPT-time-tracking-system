@@ -453,6 +453,21 @@ def _v366_write_direct(all_payload: dict[str, Any], changed_key: str | None = No
         pass
 
 
+
+
+def _v374_write_through_table_files(source: str = "table_settings_saved") -> dict[str, Any]:
+    """Upload table/column setting latest files immediately after user save.
+
+    Without this, Streamlit Cloud reboot reloads the repository copy and column
+    order can revert even though the local container file changed.
+    """
+    try:
+        from services.permanent_write_through_service import github_write_through_files
+        return github_write_through_files(_v370_direct_paths(), source=source)
+    except Exception as exc:
+        return {"ok": False, "message": str(exc), "source": source}
+
+
 def load_table_settings(table_key: Any) -> dict[str, Any]:  # type: ignore[override]
     key = canonical_table_key(table_key)
     payload = _v366_load_all_direct()
@@ -868,6 +883,21 @@ def _v370_write_direct(all_payload: dict[str, Any], changed_key: str | None = No
         pass
 
 
+
+
+def _v374_write_through_table_files(source: str = "table_settings_saved") -> dict[str, Any]:
+    """Upload table/column setting latest files immediately after user save.
+
+    Without this, Streamlit Cloud reboot reloads the repository copy and column
+    order can revert even though the local container file changed.
+    """
+    try:
+        from services.permanent_write_through_service import github_write_through_files
+        return github_write_through_files(_v370_direct_paths(), source=source)
+    except Exception as exc:
+        return {"ok": False, "message": str(exc), "source": source}
+
+
 def load_table_settings(table_key: Any) -> dict[str, Any]:  # type: ignore[override]
     key = canonical_table_key(table_key)
     payload = _v370_load_all_direct_latest()
@@ -899,11 +929,13 @@ def save_table_settings(table_key: Any, *, widths: dict[str, int] | None = None,
     table_settings[key] = cur
     payload["table_settings"] = table_settings
     _v370_write_direct(payload, changed_key=key)
+    github_upload = _v374_write_through_table_files(source=reason)
     return {
         "ok": True,
-        "mode": "v370_direct_latest_settings_file",
+        "mode": "v374_direct_latest_settings_write_through",
         "key": key,
         "reason": reason,
+        "github_upload": github_upload,
         "files": [
             str(_V366_STATE_FILE),
             str(_V366_MODULE_FILES[_v366_module_code_for_key(key)]),
@@ -929,7 +961,8 @@ def save_column_settings(settings: dict[str, Any], *, reason: str = "column_sett
             normalized[canonical_table_key(k)] = item
     payload["column_settings"] = normalized
     _v370_write_direct(payload)
-    return {"ok": True, "mode": "v370_direct_latest_settings_file", "table_count": len(normalized), "reason": reason, "file": str(_V366_STATE_FILE)}
+    github_upload = _v374_write_through_table_files(source=reason)
+    return {"ok": True, "mode": "v374_direct_latest_settings_write_through", "table_count": len(normalized), "reason": reason, "file": str(_V366_STATE_FILE), "github_upload": github_upload}
 
 
 def migrate_legacy_table_settings_to_master(*, write: bool = False) -> dict[str, Any]:  # type: ignore[override]

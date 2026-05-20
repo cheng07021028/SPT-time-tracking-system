@@ -2784,14 +2784,41 @@ def _v373_p_atomic_write(path: Path, payload: dict) -> None:
     tmp.replace(path)
 
 
+def _v373_p_payload_stamp(data: dict, path: Path) -> float:
+    """Return comparable timestamp for permanent permission payload selection."""
+    for key in ("exported_at", "updated_at", "saved_at"):
+        text = str(data.get(key) or "").strip()
+        if text:
+            try:
+                return datetime.fromisoformat(text.replace("/", "-")).timestamp()
+            except Exception:
+                try:
+                    return datetime.strptime(text[:19].replace("/", "-"), "%Y-%m-%d %H:%M:%S").timestamp()
+                except Exception:
+                    pass
+    try:
+        return path.stat().st_mtime if path.exists() else 0.0
+    except Exception:
+        return 0.0
+
+
 def _v373_p_latest_payload() -> dict:
-    # Fixed latest is authoritative. Compat/state are only migration fallback when latest is absent.
+    """Pick newest valid permission payload, not the first candidate.
+
+    This fixes the case where 10_permissions_records.json still contains an
+    older account master while 10_permissions_settings.json contains the latest
+    deletion/edit.  Reboot must restore the newest exported_at payload.
+    """
+    candidates: list[tuple[float, str, dict]] = []
     for path in [_V373_PERMISSION_LATEST_FILE, _V373_PERMISSION_COMPAT_FILE, _V373_PERMISSION_STATE_FILE]:
         data = _v373_p_read_json(path)
         tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
         if isinstance(tables, dict) and isinstance(tables.get("auth_users"), list):
-            return data
-    return {}
+            candidates.append((_v373_p_payload_stamp(data, path), str(path), data))
+    if not candidates:
+        return {}
+    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    return candidates[0][2]
 
 
 def _v373_p_schema_only() -> None:
@@ -2897,17 +2924,18 @@ def restore_permission_settings_from_permanent_files(force: bool = False) -> dic
         conn.commit()
     finally:
         conn.close()
-    try:
-        sync_auth_users_to_runtime_security()
-    except Exception:
-        pass
-    clear_permission_runtime_cache()
+    # Mark before runtime sync to prevent recursive restore through init_permission_tables().
     if st is not None:
         try:
             st.session_state[_V373_PERMISSION_RESTORE_KEY] = True
         except Exception:
             pass
-    return {"ok": True, "mode": "v373_direct_latest_like_03_04", "source": str(_V373_PERMISSION_LATEST_FILE), "restored": restored}
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    clear_permission_runtime_cache()
+    return {"ok": True, "mode": "v374_authoritative_json_restore", "source": str(_V373_PERMISSION_LATEST_FILE), "restored": restored}
 
 
 def _v373_restore_permission_once_if_needed() -> None:
@@ -2917,8 +2945,10 @@ def _v373_restore_permission_once_if_needed() -> None:
                 return
         except Exception:
             pass
-    # Same spirit as 03/04: rescue DB only when it is empty/default-only.
-    restore_permission_settings_from_permanent_files(force=False)
+    # V3.74: On Streamlit Cloud reboot, SQLite from GitHub can be non-empty
+    # but stale.  The newest permanent JSON is authoritative, so restore once
+    # per session even when auth_users already has rows.
+    restore_permission_settings_from_permanent_files(force=True)
     if st is not None:
         try:
             st.session_state[_V373_PERMISSION_RESTORE_KEY] = True
@@ -2930,6 +2960,8 @@ def init_permission_tables(force: bool = False) -> None:  # type: ignore[overrid
     _v373_p_schema_only()
     if force:
         restore_permission_settings_from_permanent_files(force=True)
+    else:
+        _v373_restore_permission_once_if_needed()
 
 
 init_auth_tables = init_permission_tables
@@ -2967,10 +2999,17 @@ def _v373_permission_payload_from_db(reason: str = "permission_settings_saved") 
 
 def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
     payload = _v373_permission_payload_from_db(reason)
-    for path in [_V373_PERMISSION_LATEST_FILE, _V373_PERMISSION_COMPAT_FILE, _V373_PERMISSION_STATE_FILE]:
+    files = [_V373_PERMISSION_LATEST_FILE, _V373_PERMISSION_COMPAT_FILE, _V373_PERMISSION_STATE_FILE]
+    for path in files:
         _v373_p_atomic_write(path, payload)
+    github_upload = {"ok": True, "skipped": True, "message": "write-through not attempted"}
+    try:
+        from services.permanent_write_through_service import github_write_through_files
+        github_upload = github_write_through_files(files, source=reason)
+    except Exception as exc:
+        github_upload = {"ok": False, "message": str(exc)}
     clear_permission_runtime_cache()
-    return {"ok": True, "mode": "v373_direct_latest_like_03_04_final", "files": [str(_V373_PERMISSION_LATEST_FILE), str(_V373_PERMISSION_COMPAT_FILE), str(_V373_PERMISSION_STATE_FILE)], "table_counts": payload.get("table_counts", {})}
+    return {"ok": True, "mode": "v374_authoritative_json_restore", "files": [str(p) for p in files], "table_counts": payload.get("table_counts", {}), "github_upload": github_upload}
 
 
 def get_users() -> List[dict]:  # type: ignore[override]
