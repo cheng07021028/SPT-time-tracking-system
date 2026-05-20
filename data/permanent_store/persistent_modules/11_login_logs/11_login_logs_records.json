@@ -1,7 +1,7 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-20 13:47:34",
-  "source": "crud_table_service_save_work_orders",
+  "exported_at": "2026-05-20 13:50:44",
+  "source": "db_service_write",
   "module_key": "11_login_logs",
   "module_code": "11",
   "module_name_zh": "登入紀錄",
@@ -638,11 +638,41 @@
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-15 11:23:39"
+      },
+      {
+        "id": 43,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "11_login_logs",
+        "login_time": "2026-05-20 13:50:34",
+        "logout_time": null,
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "",
+        "created_at": "2026-05-20 13:50:34"
+      },
+      {
+        "id": 44,
+        "username": null,
+        "display_name": null,
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置自動登出",
+        "module_code": "",
+        "login_time": "2026-05-15 11:15:13",
+        "logout_time": "2026-05-15 11:15:13",
+        "idle_minutes": 1.22,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 11:15:13"
       }
     ]
   },
   "table_counts": {
     "auth_login_logs": 0,
-    "login_logs": 42
+    "login_logs": 44
   }
 }
