@@ -9,7 +9,7 @@ import streamlit as st
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access, check_permission
 from services.crud_table_service import load_employees, save_employees
-from services.db_service import query_df
+from services.time_record_service import load_records
 from services.table_ui_service import render_table
 
 st.set_page_config(page_title="07. 今日未紀錄名單", page_icon="⟁️", layout="wide")
@@ -141,21 +141,41 @@ else:
 st.divider()
 st.subheader("今日未紀錄名單 / Missing Today")
 today = today_date().strftime("%Y-%m-%d")
-df = query_df(
-    """
-    SELECT e.employee_id, e.employee_name, e.department, e.title, e.is_in_factory, e.is_today_attendance,
-           MAX(t.start_timestamp) AS last_start_time,
-           COUNT(t.id) AS today_record_count
-    FROM employees e
-    LEFT JOIN time_records t
-      ON e.employee_id=t.employee_id AND t.start_date=?
-    WHERE e.is_active=1 AND e.is_in_factory=1 AND e.is_today_attendance=1
-    GROUP BY e.employee_id, e.employee_name, e.department, e.title, e.is_in_factory, e.is_today_attendance
-    HAVING COUNT(t.id)=0
-    ORDER BY e.employee_id
-    """,
-    (today,),
-)
+# V29: 直接使用權威檔資料計算，不再依賴 SQLite 查詢延遲。
+emp_df = ensure_cols(load_employees())
+rec_df = load_records(start_date=today, end_date=today)
+if rec_df is None:
+    rec_df = pd.DataFrame()
+base = emp_df.copy()
+for col in ["is_active", "is_in_factory", "is_today_attendance"]:
+    if col not in base.columns:
+        base[col] = False
+    base[col] = base[col].astype(str).str.lower().str.strip().isin(["1", "true", "yes", "y", "是", "啟用", "在廠", "出勤"]) | (base[col] == 1) | (base[col] == True)
+base = base[(base["is_active"]) & (base["is_in_factory"]) & (base["is_today_attendance"])]
+if not rec_df.empty and "employee_id" in rec_df.columns:
+    today_recs = rec_df.copy()
+    if "start_date" in today_recs.columns:
+        today_recs = today_recs[today_recs["start_date"].astype(str) == today]
+    elif "work_date" in today_recs.columns:
+        today_recs = today_recs[today_recs["work_date"].astype(str) == today]
+    grp = today_recs.groupby("employee_id", dropna=False).agg(
+        last_start_time=("start_timestamp", "max") if "start_timestamp" in today_recs.columns else ("employee_id", "size"),
+        today_record_count=("employee_id", "size"),
+    ).reset_index()
+    df = base.merge(grp, on="employee_id", how="left")
+else:
+    df = base.copy()
+    df["last_start_time"] = ""
+    df["today_record_count"] = 0
+if "today_record_count" not in df.columns:
+    df["today_record_count"] = 0
+df["today_record_count"] = df["today_record_count"].fillna(0).astype(int)
+df = df[df["today_record_count"] == 0].sort_values("employee_id", kind="stable").reset_index(drop=True)
+show_cols = ["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]
+for c in show_cols:
+    if c not in df.columns:
+        df[c] = ""
+df = df[show_cols]
 
 st.metric("今日未紀錄人數 / Missing Records", f"{len(df):,}")
 render_table(df, "missing_today_v202", editable=False, height=460)

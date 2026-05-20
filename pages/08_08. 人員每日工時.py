@@ -6,7 +6,9 @@ import plotly.express as px
 
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access
-from services.db_service import query_df
+from services.crud_table_service import load_employees
+from services.time_record_service import load_records
+import pandas as pd
 from services.table_ui_service import render_table
 from services.duration_service import hours_to_hms
 from services.timezone_service import today_date
@@ -51,18 +53,15 @@ def _contains_filter(series, keyword: str):
     return series.fillna("").astype(str).str.lower().str.contains(keyword, na=False)
 
 
-# 先讀取單位選項，供篩選使用。只查人員主檔，不觸發工時計算。
-department_options_df = query_df(
-    """
-    SELECT DISTINCT COALESCE(department, '') AS department
-    FROM employees
-    WHERE is_active=1
-    ORDER BY department
-    """
-)
-department_options = [
-    str(v) for v in department_options_df.get("department", []).tolist() if str(v).strip()
-]
+# V29: 先讀權威檔的人員主檔，不再依賴 SQLite 查詢延遲。
+_employees_authority_df = load_employees()
+if _employees_authority_df is None:
+    _employees_authority_df = pd.DataFrame()
+for _c in ["is_active", "is_in_factory", "is_today_attendance"]:
+    if _c not in _employees_authority_df.columns:
+        _employees_authority_df[_c] = False
+_active_mask = _employees_authority_df["is_active"].astype(str).str.lower().str.strip().isin(["1", "true", "yes", "y", "是", "啟用"]) | (_employees_authority_df["is_active"] == 1) | (_employees_authority_df["is_active"] == True)
+department_options = sorted([str(v) for v in _employees_authority_df.loc[_active_mask, "department"].fillna("").tolist() if str(v).strip()]) if "department" in _employees_authority_df.columns else []
 
 st.info("V1.99：本頁已加入正式篩選功能；輸入工號、姓名、單位等條件後，按「套用篩選」才會查詢，避免每打一個字就運算。")
 
@@ -122,21 +121,42 @@ show_only_no_record = bool(st.session_state.get("daily_hours_no_record_only", Fa
 
 d = selected.strftime("%Y-%m-%d")
 
-base_df = query_df(
-    """
-    SELECT e.employee_id, e.employee_name, e.department, e.title,
-           COALESCE(SUM(t.work_hours), 0) AS total_hours,
-           COUNT(t.id) AS record_count,
-           SUM(CASE WHEN t.end_timestamp IS NULL THEN 1 ELSE 0 END) AS active_count
-    FROM employees e
-    LEFT JOIN time_records t
-      ON e.employee_id=t.employee_id AND t.start_date=?
-    WHERE e.is_active=1 AND e.is_in_factory=1 AND e.is_today_attendance=1
-    GROUP BY e.employee_id, e.employee_name, e.department, e.title
-    ORDER BY total_hours ASC, e.employee_id
-    """,
-    (d,),
-)
+# V29: 使用權威檔人員與工時資料即時計算，避免 SQLite 快取延遲造成資料錯誤。
+emp = _employees_authority_df.copy()
+for _c in ["is_active", "is_in_factory", "is_today_attendance"]:
+    if _c not in emp.columns:
+        emp[_c] = False
+    emp[_c] = emp[_c].astype(str).str.lower().str.strip().isin(["1", "true", "yes", "y", "是", "啟用", "在廠", "出勤"]) | (emp[_c] == 1) | (emp[_c] == True)
+emp = emp[(emp["is_active"]) & (emp["is_in_factory"]) & (emp["is_today_attendance"])]
+records = load_records(start_date=d, end_date=d)
+if records is None:
+    records = pd.DataFrame()
+if not records.empty:
+    rec = records.copy()
+    if "start_date" in rec.columns:
+        rec = rec[rec["start_date"].astype(str) == d]
+    elif "work_date" in rec.columns:
+        rec = rec[rec["work_date"].astype(str) == d]
+    if "work_hours" not in rec.columns:
+        rec["work_hours"] = 0
+    rec["work_hours"] = pd.to_numeric(rec["work_hours"], errors="coerce").fillna(0)
+    rec["is_active_record"] = rec.get("end_timestamp", pd.Series([""] * len(rec))).fillna("").astype(str).str.strip().eq("") if "end_timestamp" in rec.columns else False
+    grp = rec.groupby("employee_id", dropna=False).agg(
+        total_hours=("work_hours", "sum"),
+        record_count=("employee_id", "size"),
+        active_count=("is_active_record", "sum"),
+    ).reset_index()
+    base_df = emp.merge(grp, on="employee_id", how="left")
+else:
+    base_df = emp.copy()
+    base_df["total_hours"] = 0
+    base_df["record_count"] = 0
+    base_df["active_count"] = 0
+for _c in ["total_hours", "record_count", "active_count"]:
+    if _c not in base_df.columns:
+        base_df[_c] = 0
+    base_df[_c] = pd.to_numeric(base_df[_c], errors="coerce").fillna(0)
+base_df = base_df.sort_values(["total_hours", "employee_id"], kind="stable").reset_index(drop=True)
 
 if not base_df.empty:
     base_df["status"] = base_df.apply(

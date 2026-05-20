@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
-"""SPT V28 Permanent Authority Service
+"""SPT V29 Permanent Authority Service.
 
-唯一資料權威層：
-- 每個模組只允許 data/permanent_store/modules/<module_key>/records.json 作為正式資料檔。
-- 每個模組只允許 data/permanent_store/modules/<module_key>/settings.json 作為正式設定檔。
-- SQLite 只能當快取；history 只能當備份；預設資料只能在完全沒有權威檔時建立。
-- 儲存後盡量 GitHub write-through，並做遠端讀回驗證。
-
-本服務設計為可漸進導入：舊檔只在第一次 canonical 檔不存在時遷移，之後不再讀舊檔。
+正式資料規則：
+- 每個模組只有 data/permanent_store/modules/<module_key>/records.json 是 records 權威檔。
+- 每個模組只有 data/permanent_store/modules/<module_key>/settings.json 是 settings 權威檔。
+- SQLite 只作快取；history 只作備份；預設資料只能在權威檔不存在時建立。
+- 開頁只讀 canonical 權威檔，不掃 history、不做 GitHub 同步，避免載入超時。
+- 儲存才寫 canonical，並嘗試 GitHub write-through + 遠端讀回驗證。
 """
 from __future__ import annotations
 
@@ -16,8 +15,8 @@ import hashlib
 import json
 import os
 import shutil
+import sqlite3
 import time
-import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime
@@ -33,6 +32,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 AUTH_ROOT = PROJECT_ROOT / "data" / "permanent_store" / "modules"
 BACKUP_ROOT = PROJECT_ROOT / "data" / "permanent_store" / "history" / "modules"
 MANIFEST_PATH = PROJECT_ROOT / "data" / "permanent_store" / "authority_manifest.json"
+DB_PATH = PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
 
 MODULES: dict[str, dict[str, Any]] = {
     "01_time_records": {"tables": ["time_records"]},
@@ -54,6 +54,7 @@ MODULES: dict[str, dict[str, Any]] = {
 _CACHE: dict[tuple[str, str], tuple[float, str, dict[str, Any]]] = {}
 _UPLOAD_HASH: dict[str, str] = {}
 
+
 def now_text() -> str:
     try:
         from services.timezone_service import now_text as _nt  # type: ignore
@@ -61,8 +62,10 @@ def now_text() -> str:
     except Exception:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+
 def _stamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
+
 
 def _read_secret(name: str, default: str = "") -> str:
     try:
@@ -74,6 +77,7 @@ def _read_secret(name: str, default: str = "") -> str:
         pass
     return os.environ.get(name, default).strip()
 
+
 def github_config() -> dict[str, str]:
     return {
         "token": _read_secret("GITHUB_TOKEN"),
@@ -81,27 +85,35 @@ def github_config() -> dict[str, str]:
         "branch": _read_secret("GITHUB_BRANCH", "main"),
     }
 
+
 def module_dir(module_key: str) -> Path:
     return AUTH_ROOT / str(module_key)
 
+
 def canonical_path(module_key: str, kind: str) -> Path:
-    kind = "settings" if str(kind).lower().startswith("set") else "records"
-    return module_dir(module_key) / f"{kind}.json"
+    k = "settings" if str(kind).lower().startswith("set") else "records"
+    return module_dir(module_key) / f"{k}.json"
+
 
 def ensure_dirs() -> None:
     AUTH_ROOT.mkdir(parents=True, exist_ok=True)
     BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
 
+
 def _json_default(v: Any) -> Any:
     try:
         import pandas as pd  # type: ignore
-        if pd.isna(v): return ""
+        if pd.isna(v):
+            return ""
     except Exception:
         pass
     if hasattr(v, "item"):
-        try: return v.item()
-        except Exception: pass
+        try:
+            return v.item()
+        except Exception:
+            pass
     return str(v)
+
 
 def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -110,6 +122,7 @@ def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     tmp.write_text(txt, encoding="utf-8")
     os.replace(tmp, path)
     _CACHE.pop((str(path), "json"), None)
+
 
 def read_json(path: Path) -> dict[str, Any]:
     try:
@@ -127,28 +140,96 @@ def read_json(path: Path) -> dict[str, Any]:
         pass
     return {}
 
-def normalize_payload(module_key: str, kind: str, payload: dict[str, Any] | None = None, *, reason: str = "authority_normalize") -> dict[str, Any]:
-    payload = payload if isinstance(payload, dict) else {}
+
+def _clean_rows(rows: Any) -> list[dict[str, Any]]:
+    if not isinstance(rows, list):
+        return []
+    return [dict(r) for r in rows if isinstance(r, dict)]
+
+
+def _normalize_tables_for_module(module_key: str, tables: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    out: dict[str, list[dict[str, Any]]] = {str(k): _clean_rows(v) for k, v in (tables or {}).items() if isinstance(k, str)}
+    if module_key == "13_system_settings":
+        # 舊版只有 process_options，但新版 01 需要 category + process 連動。
+        if not out.get("process_category_options") and out.get("process_options"):
+            rows = []
+            for i, r in enumerate(out.get("process_options", []), 1):
+                x = dict(r)
+                x.setdefault("id", i)
+                x.setdefault("category_name", "全部 / 通用")
+                rows.append(x)
+            out["process_category_options"] = rows
+        if not out.get("process_categories"):
+            names = []
+            for r in out.get("process_category_options", []):
+                n = str(r.get("category_name", "") or "").strip() or "全部 / 通用"
+                if n not in names:
+                    names.append(n)
+            out["process_categories"] = [
+                {"id": i + 1, "category_name": n, "is_active": 1, "sort_order": i + 1, "note": "", "created_at": "", "updated_at": ""}
+                for i, n in enumerate(names or ["全部 / 通用"])
+            ]
+        # Compatibility mirror.
+        if out.get("process_category_options"):
+            out["process_options"] = list(out["process_category_options"])
+    expected = set(MODULES.get(module_key, {}).get("tables", []) or [])
+    if expected:
+        out = {k: v for k, v in out.items() if k in expected}
+    return out
+
+
+def _extract_tables(payload: dict[str, Any], module_key: str) -> dict[str, list[dict[str, Any]]]:
+    if not isinstance(payload, dict):
+        return {}
+    tables = payload.get("tables")
+    if isinstance(tables, dict):
+        return _normalize_tables_for_module(module_key, tables)
+    for key in ("records", "data", "rows"):
+        rows = payload.get(key)
+        if isinstance(rows, list):
+            default_table = (MODULES.get(module_key, {}).get("tables") or ["records"])[0]
+            return _normalize_tables_for_module(module_key, {default_table: rows})
+    return {}
+
+
+def _table_counts(tables: dict[str, list[dict[str, Any]]]) -> dict[str, int]:
+    return {k: len(v) for k, v in tables.items() if isinstance(v, list)}
+
+
+def _total_rows(payload: dict[str, Any]) -> int:
     tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    return sum(len(v) for v in tables.values() if isinstance(v, list))
+
+
+def normalize_payload(module_key: str, kind: str, payload: dict[str, Any] | None = None, *, reason: str = "authority_normalize", empty_authoritative: bool = False) -> dict[str, Any]:
+    payload = payload if isinstance(payload, dict) else {}
+    tables = _extract_tables(payload, module_key)
     settings = payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
     return {
-        "authority_schema": "SPT-PermanentAuthority-V28",
+        "authority_schema": "SPT-PermanentAuthority-V29",
         "module_key": module_key,
-        "kind": "settings" if kind == "settings" else "records",
+        "kind": "settings" if str(kind).startswith("set") else "records",
         "updated_at": now_text(),
-        "exported_at": payload.get("exported_at") or payload.get("updated_at") or now_text(),
+        "exported_at": payload.get("exported_at") or payload.get("updated_at") or payload.get("saved_at") or now_text(),
         "reason": reason,
+        "empty_authoritative": bool(empty_authoritative),
         "tables": tables,
         "settings": settings,
-        "table_counts": {k: len(v) for k, v in tables.items() if isinstance(v, list)},
+        "table_counts": _table_counts(tables),
     }
+
 
 def _legacy_candidates(module_key: str, kind: str) -> list[Path]:
     stem = "settings" if kind == "settings" else "records"
     names = [f"{module_key}_{stem}.json"]
-    if module_key == "13_system_settings": names += ["system_settings.json", "13_system_settings_table_column_settings.json"]
-    if module_key == "10_permissions": names += ["security_settings.json", "10_permissions_table_column_settings.json"]
-    if module_key == "ui_table_settings": names += ["table_persistence.json", "table_column_settings.json", "table_ui_settings.json", "ui_table_settings_settings.json"]
+    # 重要：舊版常把正式 tables 存在 settings/config/state 檔；records 與 settings 都要納入一次性遷移候選。
+    names += [f"{module_key}_records.json", f"{module_key}_settings.json"]
+    if module_key == "13_system_settings":
+        names += ["spt_system_settings.json", "system_settings.json", "13_system_settings_records.json", "13_system_settings_settings.json"]
+    if module_key == "10_permissions":
+        names += ["spt_permission_settings.json", "spt_user_persistent_settings.json", "10_permissions_records.json", "10_permissions_settings.json"]
+    if module_key == "ui_table_settings":
+        names += ["table_persistence.json", "table_column_settings.json", "table_ui_settings.json", "spt_table_persistence.json", "spt_table_column_settings.json"]
     roots = [
         PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / module_key,
         PROJECT_ROOT / "data" / "persistent_modules" / module_key,
@@ -157,68 +238,151 @@ def _legacy_candidates(module_key: str, kind: str) -> list[Path]:
         PROJECT_ROOT / "data" / "permanent_store" / "config",
         PROJECT_ROOT / "data" / "config",
     ]
-    extra_state = {
-        "10_permissions": ["spt_permission_settings.json", "spt_user_persistent_settings.json", "spt_module_settings.json", "spt_security_settings.json"],
-        "13_system_settings": ["spt_system_settings.json", "spt_module_settings.json"],
-        "ui_table_settings": ["spt_table_persistence.json", "spt_table_column_settings.json", "spt_table_ui_settings.json", "spt_user_persistent_settings.json"],
-    }.get(module_key, [])
     out: list[Path] = []
+    seen: set[str] = set()
     for root in roots:
         for n in names:
             p = root / n
-            if p.exists(): out.append(p)
-        for n in extra_state:
-            p = root / n
-            if p.exists(): out.append(p)
-    # Do not read history as authority. History remains backup only.
+            if p.exists() and str(p.resolve()) not in seen:
+                seen.add(str(p.resolve()))
+                out.append(p)
     return out
 
-def _payload_score(path: Path, payload: dict[str, Any]) -> tuple[str, float, int]:
-    t = str(payload.get("updated_at") or payload.get("exported_at") or payload.get("export_time") or "")
-    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
-    rows = sum(len(v) for v in tables.values() if isinstance(v, list))
-    try: mt = path.stat().st_mtime
-    except Exception: mt = 0.0
+
+def _db_payload(module_key: str) -> dict[str, Any]:
+    tables = MODULES.get(module_key, {}).get("tables", [])
+    if not DB_PATH.exists() or not tables:
+        return {}
+    out: dict[str, list[dict[str, Any]]] = {}
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        for t in tables:
+            try:
+                exists = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (t,)).fetchone()
+                if not exists:
+                    continue
+                out[t] = [dict(r) for r in conn.execute(f'SELECT * FROM "{t}"').fetchall()]
+            except Exception:
+                continue
+        conn.close()
+    except Exception:
+        try:
+            conn.close()  # type: ignore
+        except Exception:
+            pass
+    if not out:
+        return {}
+    return normalize_payload(module_key, "records", {"tables": out, "exported_at": "0000-DB-CACHE"}, reason="migrated_from_sqlite_cache")
+
+
+def _payload_score(path_label: str, payload: dict[str, Any]) -> tuple[str, float, int]:
+    t = str(payload.get("exported_at") or payload.get("updated_at") or payload.get("saved_at") or "")
+    rows = _total_rows(payload)
+    mt = 0.0
+    try:
+        p = Path(path_label)
+        if p.exists():
+            mt = p.stat().st_mtime
+    except Exception:
+        pass
     return (t, mt, rows)
 
-def migrate_once(module_key: str, kind: str) -> dict[str, Any]:
-    path = canonical_path(module_key, kind)
-    if path.exists():
-        return read_json(path)
-    ensure_dirs()
-    best_path: Path | None = None
-    best_payload: dict[str, Any] = {}
+
+def _best_legacy_payload(module_key: str, kind: str) -> dict[str, Any]:
+    best: dict[str, Any] = {}
     best_score = ("", 0.0, -1)
+    best_source = "empty"
     for p in _legacy_candidates(module_key, kind):
         data = read_json(p)
-        if not data: continue
-        score = _payload_score(p, data)
+        if not data:
+            continue
+        payload = normalize_payload(module_key, kind, data, reason=f"migrated_from_{p.relative_to(PROJECT_ROOT)}")
+        score = _payload_score(str(p), payload)
         if score > best_score:
-            best_score, best_path, best_payload = score, p, data
-    payload = normalize_payload(module_key, kind, best_payload, reason=f"migrated_from_{best_path.relative_to(PROJECT_ROOT) if best_path else 'empty'}")
+            best = payload; best_score = score; best_source = str(p.relative_to(PROJECT_ROOT))
+    if kind == "records":
+        dbp = _db_payload(module_key)
+        if dbp:
+            score = _payload_score("sqlite", dbp)
+            # DB is cache, so use it only if no legacy latest has rows, or it has more rows than empty canonical.
+            if score[2] > best_score[2] and best_score[2] <= 0:
+                best = dbp; best_score = score; best_source = "sqlite_cache"
+    if best:
+        best["reason"] = f"migrated_from_{best_source}"
+    return best
+
+
+def _needs_repair(payload: dict[str, Any], module_key: str, kind: str) -> bool:
+    if not payload:
+        return True
+    if payload.get("empty_authoritative"):
+        return False
+    # V28 初版可能已建立空 canonical，造成後續不再遷移舊 latest；V29 允許空 canonical 修復一次。
+    if _total_rows(payload) <= 0 and kind == "records":
+        # 權限/系統設定/主檔不應在有舊 latest 或 DB 的情況下保持空檔。
+        if module_key in {"10_permissions", "13_system_settings", "03_work_orders", "04_employees", "01_time_records", "02_history"}:
+            return True
+    return False
+
+
+def migrate_once(module_key: str, kind: str) -> dict[str, Any]:
+    ensure_dirs()
+    kind = "settings" if str(kind).lower().startswith("set") else "records"
+    path = canonical_path(module_key, kind)
+    cur = read_json(path) if path.exists() else {}
+    if path.exists() and not _needs_repair(cur, module_key, kind):
+        return cur
+    legacy = _best_legacy_payload(module_key, kind)
+    if legacy and (not cur or _total_rows(legacy) > _total_rows(cur) or _total_rows(cur) == 0):
+        payload = normalize_payload(module_key, kind, legacy, reason=legacy.get("reason", "migrated_v29"))
+    elif cur:
+        payload = normalize_payload(module_key, kind, cur, reason=cur.get("reason", "canonical_normalized_v29"))
+    else:
+        payload = normalize_payload(module_key, kind, {}, reason="empty_canonical_created_v29")
     atomic_write_json(path, payload)
     return payload
 
+
 def load_authority(module_key: str, kind: str = "records") -> dict[str, Any]:
     ensure_dirs()
-    kind = "settings" if str(kind).lower().startswith("set") else "records"
-    return migrate_once(module_key, kind)
+    return migrate_once(str(module_key), "settings" if str(kind).lower().startswith("set") else "records")
+
 
 def load_tables(module_key: str, kind: str = "records") -> dict[str, list[dict[str, Any]]]:
     payload = load_authority(module_key, kind)
     tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
-    return {str(k): list(v) for k, v in tables.items() if isinstance(v, list)}
+    return {str(k): _clean_rows(v) for k, v in tables.items()}
+
 
 def _backup_current(module_key: str, kind: str) -> None:
     p = canonical_path(module_key, kind)
     if p.exists():
         b = BACKUP_ROOT / module_key / kind / f"{kind}_{_stamp()}.json"
         b.parent.mkdir(parents=True, exist_ok=True)
-        try: shutil.copy2(p, b)
-        except Exception: pass
+        try:
+            shutil.copy2(p, b)
+        except Exception:
+            pass
+
 
 def _remote_path(path: Path) -> str:
     return str(path.relative_to(PROJECT_ROOT)).replace(os.sep, "/")
+
+
+def _github_get_content(rel: str) -> dict[str, Any]:
+    cfg = github_config()
+    if not cfg["token"] or not cfg["repo"]:
+        return {}
+    api = f"https://api.github.com/repos/{cfg['repo']}/contents/{urllib.parse.quote(rel)}?ref={urllib.parse.quote(cfg['branch'])}"
+    headers = {"Authorization": f"Bearer {cfg['token']}", "Accept": "application/vnd.github+json", "User-Agent": "SPT-TimeTracking-V29"}
+    try:
+        req = urllib.request.Request(api, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=12) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except Exception:
+        return {}
+
 
 def github_put_file(path: Path, content: str, message: str) -> dict[str, Any]:
     cfg = github_config()
@@ -227,34 +391,39 @@ def github_put_file(path: Path, content: str, message: str) -> dict[str, Any]:
     sha = hashlib.sha256(content.encode("utf-8")).hexdigest()
     rel = _remote_path(path)
     if _UPLOAD_HASH.get(rel) == sha:
-        return {"ok": True, "skipped": True, "reason": "unchanged", "path": rel}
-    api = f"https://api.github.com/repos/{cfg['repo']}/contents/{urllib.parse.quote(rel)}?ref={urllib.parse.quote(cfg['branch'])}"
-    headers = {"Authorization": f"Bearer {cfg['token']}", "Accept": "application/vnd.github+json", "User-Agent": "SPT-TimeTracking-V28"}
-    old_sha = None
+        return {"ok": True, "skipped": True, "reason": "unchanged", "path": rel, "verified": True}
+    current = _github_get_content(rel)
+    old_sha = current.get("sha")
+    headers = {"Authorization": f"Bearer {cfg['token']}", "Accept": "application/vnd.github+json", "User-Agent": "SPT-TimeTracking-V29", "Content-Type": "application/json"}
+    body: dict[str, Any] = {"message": message, "content": base64.b64encode(content.encode("utf-8")).decode("ascii"), "branch": cfg["branch"]}
+    if old_sha:
+        body["sha"] = old_sha
+    api = f"https://api.github.com/repos/{cfg['repo']}/contents/{urllib.parse.quote(rel)}"
     try:
-        req = urllib.request.Request(api, headers=headers, method="GET")
-        with urllib.request.urlopen(req, timeout=12) as r:
-            old_sha = json.loads(r.read().decode("utf-8")).get("sha")
-    except Exception:
-        old_sha = None
-    body = {"message": message, "content": base64.b64encode(content.encode("utf-8")).decode("ascii"), "branch": cfg["branch"]}
-    if old_sha: body["sha"] = old_sha
-    try:
-        req = urllib.request.Request(api.split("?ref=")[0], data=json.dumps(body).encode("utf-8"), headers={**headers, "Content-Type":"application/json"}, method="PUT")
-        with urllib.request.urlopen(req, timeout=20) as r:
+        req = urllib.request.Request(api, data=json.dumps(body).encode("utf-8"), headers=headers, method="PUT")
+        with urllib.request.urlopen(req, timeout=25) as r:
             res = json.loads(r.read().decode("utf-8"))
-        # verify by reading back sha / content sha
+        # verify by reading back content SHA from GitHub.
+        verified = False
+        back = _github_get_content(rel)
+        try:
+            raw = base64.b64decode(str(back.get("content", "")).encode("ascii")).decode("utf-8")
+            verified = hashlib.sha256(raw.encode("utf-8")).hexdigest() == sha
+        except Exception:
+            verified = bool(back.get("sha"))
         _UPLOAD_HASH[rel] = sha
-        return {"ok": True, "path": rel, "commit": (res.get("commit") or {}).get("sha", "")}
+        return {"ok": True, "path": rel, "commit": (res.get("commit") or {}).get("sha", ""), "verified": verified}
     except Exception as exc:
-        return {"ok": False, "path": rel, "error": str(exc)[:300]}
+        return {"ok": False, "path": rel, "error": str(exc)[:300], "verified": False}
+
 
 def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:
     ensure_dirs()
     out: dict[str, Any] = {"ok": True, "module_key": module_key, "files": [], "github": []}
     if records is not None:
         kind = "records"; p = canonical_path(module_key, kind); _backup_current(module_key, kind)
-        payload = normalize_payload(module_key, kind, {"tables": records}, reason=reason)
+        empty_auth = _table_counts(records) == {} or sum(_table_counts(records).values()) == 0
+        payload = normalize_payload(module_key, kind, {"tables": records}, reason=reason, empty_authoritative=empty_auth)
         atomic_write_json(p, payload); out["files"].append(str(p))
         if github:
             out["github"].append(github_put_file(p, p.read_text(encoding="utf-8"), f"SPT authority {module_key} records: {reason}"))
@@ -267,17 +436,21 @@ def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] 
     _write_manifest()
     return out
 
+
 def update_tables(module_key: str, updates: dict[str, list[dict[str, Any]]], *, reason: str = "update_tables", github: bool = True) -> dict[str, Any]:
     cur = load_tables(module_key, "records")
-    cur.update({k: list(v) for k, v in updates.items()})
+    cur.update({k: _clean_rows(v) for k, v in updates.items()})
     return save_authority(module_key, records=cur, reason=reason, github=github)
+
 
 def load_settings(module_key: str) -> dict[str, Any]:
     payload = load_authority(module_key, "settings")
     return payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
 
+
 def save_settings(module_key: str, settings: dict[str, Any], *, reason: str = "save_settings", github: bool = True) -> dict[str, Any]:
     return save_authority(module_key, settings=settings, reason=reason, github=github)
+
 
 def df_from_table(module_key: str, table: str, *, columns: Iterable[str] | None = None, active_col: str | None = None, active_only: bool = False):
     import pandas as pd
@@ -285,36 +458,59 @@ def df_from_table(module_key: str, table: str, *, columns: Iterable[str] | None 
     df = pd.DataFrame(rows)
     cols = list(columns or [])
     for c in cols:
-        if c not in df.columns: df[c] = ""
-    if cols: df = df[cols]
+        if c not in df.columns:
+            df[c] = ""
+    if cols:
+        df = df[cols]
     if active_only and active_col and active_col in df.columns:
         s = df[active_col].astype(str).str.lower().str.strip()
-        df = df[s.isin(["1","true","yes","y","是","啟用","在廠","出勤"]) | (df[active_col] == 1) | (df[active_col] == True)]
+        df = df[s.isin(["1", "true", "yes", "y", "是", "啟用", "在廠", "出勤"]) | (df[active_col] == 1) | (df[active_col] == True)]
     return df.copy()
 
+
 def table_from_df(df) -> list[dict[str, Any]]:
-    if df is None: return []
+    if df is None:
+        return []
     try:
         work = df.copy().fillna("")
         return [dict(r) for _, r in work.iterrows()]
     except Exception:
         return []
 
+
+def preload_authority(module_keys: Iterable[str] | None = None) -> dict[str, Any]:
+    """Lightweight preload after login/page open: only stat+read canonical files, no GitHub, no history scan."""
+    keys = list(module_keys or MODULES.keys())
+    result: dict[str, Any] = {"ok": True, "modules": {}}
+    for k in keys:
+        try:
+            rec = load_authority(k, "records")
+            sett = load_authority(k, "settings")
+            result["modules"][k] = {"records": rec.get("table_counts", {}), "settings": sett.get("table_counts", {})}
+        except Exception as exc:
+            result["ok"] = False
+            result["modules"][k] = {"error": str(exc)[:200]}
+    return result
+
+
 def _write_manifest() -> None:
     ensure_dirs()
     items = []
-    for module_dir in sorted(AUTH_ROOT.glob("*")):
-        if not module_dir.is_dir(): continue
-        item = {"module_key": module_dir.name}
+    for d in sorted(AUTH_ROOT.glob("*")):
+        if not d.is_dir():
+            continue
+        item: dict[str, Any] = {"module_key": d.name}
         for k in ["records", "settings"]:
-            p = module_dir / f"{k}.json"
-            item[k] = {"exists": p.exists(), "path": str(p.relative_to(PROJECT_ROOT)).replace(os.sep,"/")}
+            p = d / f"{k}.json"
+            item[k] = {"exists": p.exists(), "path": str(p.relative_to(PROJECT_ROOT)).replace(os.sep, "/")}
             if p.exists():
                 payload = read_json(p)
                 item[k]["updated_at"] = payload.get("updated_at") or payload.get("exported_at")
                 item[k]["table_counts"] = payload.get("table_counts", {})
+                item[k]["empty_authoritative"] = payload.get("empty_authoritative", False)
         items.append(item)
-    atomic_write_json(MANIFEST_PATH, {"authority_schema":"SPT-PermanentAuthority-V28", "updated_at": now_text(), "modules": items})
+    atomic_write_json(MANIFEST_PATH, {"authority_schema": "SPT-PermanentAuthority-V29", "updated_at": now_text(), "modules": items})
+
 
 def authority_health() -> dict[str, Any]:
     _write_manifest()
