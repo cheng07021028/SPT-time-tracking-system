@@ -331,6 +331,8 @@ def _refresh_after_apply(message: str, *edit_mode_keys: str) -> None:
         if k:
             st.session_state[k] = False
     _clear_editor_state(
+        "system_process_categories_editor_v334",
+        "system_category_apply_action_v334",
         "system_process_options_editor_v192",
         "system_process_apply_action_v192",
         "system_rest_periods_editor_v192",

@@ -3170,3 +3170,88 @@ def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[overr
 
 check_permission = has_permission
 # ===== V3.73 FINAL DIRECT-LATEST PERMISSION PATCH END =====
+
+# ===== V9 PERMISSION DELETE + STARTUP SPEED PATCH =====
+# 1) 內部權限還原不觸發 GitHub write-through，避免登入/開頁變慢。
+# 2) 帳號刪除改為強制同步 auth/security 兩套表與永久檔，避免畫面勾選刪除但 Reboot 又回來。
+try:
+    _v9_prev_restore_permission_settings_from_permanent_files = restore_permission_settings_from_permanent_files
+    def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+        try:
+            from services.db_service import suspend_after_write_sync
+            with suspend_after_write_sync("permission_restore_v9"):
+                return _v9_prev_restore_permission_settings_from_permanent_files(force=force)
+        except Exception:
+            return _v9_prev_restore_permission_settings_from_permanent_files(force=force)
+except Exception:
+    pass
+
+
+def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
+    _v373_p_schema_only()
+    targets: list[str] = []
+    for u in usernames or []:
+        text = str(u or "").strip()
+        if not text or text.lower() == "admin":
+            continue
+        if text not in targets:
+            targets.append(text)
+    if not targets:
+        return 0
+
+    conn = connect_db()
+    cur = conn.cursor()
+    deleted = 0
+    try:
+        try:
+            _ensure_legacy_security_tables(cur)
+        except Exception:
+            pass
+        for u in targets:
+            # Delete permission rows first to avoid orphan permissions and stale restore.
+            for sql in [
+                "DELETE FROM auth_account_permissions WHERE username=?",
+                "DELETE FROM security_module_permissions WHERE username=?",
+                "DELETE FROM security_user_roles WHERE username=?",
+            ]:
+                try:
+                    cur.execute(sql, (u,))
+                except Exception:
+                    pass
+
+            row_deleted = 0
+            for sql in [
+                "DELETE FROM auth_users WHERE username=?",
+                "DELETE FROM security_users WHERE username=?",
+            ]:
+                try:
+                    cur.execute(sql, (u,))
+                    row_deleted += max(int(cur.rowcount or 0), 0)
+                except Exception:
+                    pass
+            if row_deleted > 0:
+                deleted += 1
+        conn.commit()
+    finally:
+        conn.close()
+
+    clear_permission_runtime_cache()
+    if deleted:
+        export_result = export_permission_settings_permanently("auth_users_deleted_v9")
+        # Force upload the exact permission permanent files.  This prevents Reboot App
+        # from restoring a deleted account from GitHub's previous JSON.
+        try:
+            files = []
+            for path in [_V373_PERMISSION_LATEST_FILE, _V373_PERMISSION_SETTINGS_FILE, _V373_PERMISSION_STATE_FILE, _V373_PERMISSION_SECURITY_FILE]:
+                try:
+                    if path.exists():
+                        files.append(path)
+                except Exception:
+                    pass
+            if files:
+                from services.permanent_write_through_service import github_write_through_files
+                github_write_through_files(files, source="auth_users_deleted_v9", force=True)
+        except Exception:
+            pass
+    return deleted
+# ===== V9 PERMISSION DELETE + STARTUP SPEED PATCH END =====

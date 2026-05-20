@@ -502,7 +502,23 @@ with tab_accounts:
                 st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
                 st.rerun()
 
-        st.warning("V1.76：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。")
+        # V9：除 data_editor 勾選刪除外，另外提供穩定刪除選擇器。
+        # 原因：部分 Streamlit 版本在 form + data_editor checkbox 組合下，勾選畫面有變，
+        # 但 submitted dataframe / widget delta 沒有完整帶回，造成「看起來有勾選，實際刪除 0 筆」。
+        delete_options = [
+            str(x).strip() for x in st.session_state["v133_users_df"].get("帳號 / Username", pd.Series(dtype=str)).tolist()
+            if str(x).strip() and str(x).strip().lower() != "admin"
+        ]
+        st.multiselect(
+            "穩定刪除選擇 / Stable Delete Selector（可搭配左側刪除欄使用；admin 不可刪）",
+            options=delete_options,
+            default=[x for x in st.session_state.get("v9_direct_delete_usernames", []) if x in delete_options],
+            key="v9_direct_delete_usernames",
+            disabled=not account_edit_enabled,
+            help="如果表格內刪除勾選沒有生效，請直接在這裡選帳號，再按下方『套用並儲存』。",
+        )
+
+        st.warning("V1.76/V9：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。")
 
         # V1.71：帳號總表使用 st.form 包住 data_editor。
         # 原因：Streamlit 一般 data_editor 每次切換儲存格、勾選、下拉或其他元件互動都可能 rerun，
@@ -553,7 +569,9 @@ with tab_accounts:
 
         if submitted_accounts:
             df = edited_users.copy()
-            to_delete = _selected_delete_usernames(df, account_editor_key)
+            table_delete = _selected_delete_usernames(df, account_editor_key)
+            direct_delete = [str(x).strip() for x in st.session_state.get("v9_direct_delete_usernames", []) if str(x).strip()]
+            to_delete = sorted({x for x in (table_delete + direct_delete) if x and x.lower() != "admin"})
             if to_delete:
                 save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy()
             else:
@@ -561,11 +579,14 @@ with tab_accounts:
             result = save_users(_users_to_service_rows(save_df))
             deleted = delete_users(to_delete)
             if to_delete and deleted == 0:
-                st.warning("已偵測到刪除勾選，但未刪除任何帳號；admin 系統帳號不可刪除，其他帳號請確認帳號欄位是否有效。")
+                st.warning("已偵測到刪除帳號，但未刪除任何帳號；admin 系統帳號不可刪除，其他帳號請確認帳號欄位是否有效。")
+            elif to_delete:
+                st.info("已刪除帳號 / Deleted accounts：" + "、".join(to_delete))
             st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
             if result.get("skipped"):
                 st.warning("；".join(result["skipped"]))
             st.session_state.pop("v133_users_df", None)
+            st.session_state.pop("v9_direct_delete_usernames", None)
             st.session_state["v166_account_edit_enabled"] = False
             st.rerun()
 

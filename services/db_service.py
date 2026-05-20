@@ -1107,3 +1107,85 @@ def _open_connection() -> sqlite3.Connection:  # type: ignore[override]
     except Exception:
         pass
     return conn
+
+# ===== V9 STARTUP SPEED PATCH: suppress write-through during internal restore/seed =====
+# 目的：開啟 01/13/10 等頁面時，系統可能會執行「從 permanent_store 還原到 SQLite」的內部補表動作。
+# 這些動作不是使用者手動儲存，不應觸發 GitHub write-through，否則開頁會卡 1~3 分鐘以上。
+from contextlib import contextmanager as _v9_contextmanager
+
+_V9_SUPPRESS_AFTER_WRITE_DEPTH = 0
+_V9_SUPPRESS_AFTER_WRITE_REASON = ""
+
+@_v9_contextmanager
+def suspend_after_write_sync(reason: str = "internal_restore"):
+    """Temporarily disable expensive after-write export/GitHub sync.
+
+    Use only for internal restore/schema/seed flows. User-initiated saves still use
+    the normal durable path, so permanent-store behavior is not weakened.
+    """
+    global _V9_SUPPRESS_AFTER_WRITE_DEPTH, _V9_SUPPRESS_AFTER_WRITE_REASON
+    _V9_SUPPRESS_AFTER_WRITE_DEPTH += 1
+    old_reason = _V9_SUPPRESS_AFTER_WRITE_REASON
+    _V9_SUPPRESS_AFTER_WRITE_REASON = str(reason or "internal_restore")
+    try:
+        yield
+    finally:
+        _V9_SUPPRESS_AFTER_WRITE_DEPTH = max(0, _V9_SUPPRESS_AFTER_WRITE_DEPTH - 1)
+        _V9_SUPPRESS_AFTER_WRITE_REASON = old_reason
+
+
+def is_after_write_sync_suspended() -> bool:
+    try:
+        return int(_V9_SUPPRESS_AFTER_WRITE_DEPTH) > 0
+    except Exception:
+        return False
+
+
+def execute(sql: str, params: Iterable[Any] | None = None) -> int:  # type: ignore[override]
+    ensure_database()
+    if _should_run_data_guard(sql):
+        ensure_data_guard_restore()
+    if params is None:
+        params = ()
+    try:
+        with _open_connection() as conn:
+            cur = conn.execute(sql, tuple(params))
+            conn.commit()
+            last_id = cur.lastrowid
+    except Exception as exc:
+        if not _is_repairable_database_error(exc):
+            raise
+        repaired = _repair_database_after_error(exc)
+        if not repaired.get("ok"):
+            raise
+        with _open_connection() as conn:
+            cur = conn.execute(sql, tuple(params))
+            conn.commit()
+            last_id = cur.lastrowid
+    clear_query_cache()
+    if _should_after_write_sync(sql) and not is_after_write_sync_suspended():
+        _after_write(sql)
+    return int(last_id or 0)
+
+
+def executemany(sql: str, rows: list[Iterable[Any]]) -> None:  # type: ignore[override]
+    ensure_database()
+    if _should_run_data_guard(sql):
+        ensure_data_guard_restore()
+    try:
+        with _open_connection() as conn:
+            conn.executemany(sql, rows)
+            conn.commit()
+    except Exception as exc:
+        if not _is_repairable_database_error(exc):
+            raise
+        repaired = _repair_database_after_error(exc)
+        if not repaired.get("ok"):
+            raise
+        with _open_connection() as conn:
+            conn.executemany(sql, rows)
+            conn.commit()
+    clear_query_cache()
+    if _should_after_write_sync(sql) and not is_after_write_sync_suspended():
+        _after_write(sql)
+# ===== V9 STARTUP SPEED PATCH END =====

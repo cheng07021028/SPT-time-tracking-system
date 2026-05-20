@@ -2925,3 +2925,74 @@ def save_default_process_model(type_name: str) -> str:  # type: ignore[override]
 def get_process_options_by_model(type_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
     return get_process_options_by_category(type_name, include_common=False)
 # ===== V3.73 FINAL DIRECT-LATEST SYSTEM SETTINGS PATCH END =====
+
+# ===== V9 STARTUP SPEED PATCH =====
+# 13 系統設定/01 工時紀錄啟動時會把 permanent_store 最新設定還原到 SQLite。
+# 這是內部讀取還原，不是使用者儲存；禁止觸發昂貴的 GitHub write-through。
+try:
+    _v9_prev_restore_system_settings_from_permanent = restore_system_settings_from_permanent
+    def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+        try:
+            from services.db_service import suspend_after_write_sync
+            with suspend_after_write_sync("system_settings_restore_v9"):
+                return _v9_prev_restore_system_settings_from_permanent(force=force)
+        except Exception:
+            return _v9_prev_restore_system_settings_from_permanent(force=force)
+except Exception:
+    pass
+# ===== V9 STARTUP SPEED PATCH END =====
+
+
+# ===== V10 CATEGORY ACTIVE/STABLE APPLY PATCH START =====
+# 修正 13.系統設定「類別與工段名稱設定」新增類別後，
+# 按下確認套用會從預設類別下拉消失、但啟動編輯又看得到的狀況。
+# 根因通常是 data_editor 新增列的 is_active 預設值被 Streamlit 當成 False，
+# 導致新類別已存入但被視為停用，所以 active_only=True 的預設類別選單不顯示。
+def save_process_categories_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    _v373_s_schema_only()
+    if df is None:
+        return 0
+    now = _now(); count = 0
+    work = df.copy().drop(columns=["刪除", "delete", "selected"], errors="ignore").fillna("")
+    for idx, (_, r) in enumerate(work.iterrows(), start=1):
+        name = _norm_category_name(_row_get(r, "category_name", "category", "類別", "類別 / Category", default=""))
+        if not name:
+            continue
+        rid = str(_row_get(r, "id", default="") or "").strip()
+        # 新增類別預設啟用。既有類別才尊重使用者停用設定。
+        raw_active = _row_get(r, "is_active", "啟用", "啟用 / Active", default=(True if not rid else True))
+        is_active = 1 if not rid else _v373_active(raw_active, default=1)
+        try:
+            sort_order = int(float(_row_get(r, "sort_order", "排序", "排序 / Sort", default=idx) or idx))
+        except Exception:
+            sort_order = idx
+        note = str(_row_get(r, "note", "備註", "備註 / Note", default="") or "").strip()
+        old_name = ""
+        if rid:
+            try:
+                old_row = query_one("SELECT category_name FROM process_categories WHERE id=?", (int(float(rid)),)) or {}
+                old_name = _norm_category_name(old_row.get("category_name")) if old_row else ""
+            except Exception:
+                old_name = ""
+        if rid:
+            try:
+                execute("UPDATE process_categories SET category_name=?, is_active=?, sort_order=?, note=?, updated_at=? WHERE id=?", (name, is_active, sort_order, note, now, int(float(rid))))
+                if old_name and old_name != name:
+                    execute("UPDATE process_category_options SET category_name=?, updated_at=? WHERE category_name=?", (name, now, old_name))
+                count += 1
+                continue
+            except Exception:
+                pass
+        execute(
+            """
+            INSERT INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(category_name) DO UPDATE SET is_active=excluded.is_active, sort_order=excluded.sort_order, note=excluded.note, updated_at=excluded.updated_at
+            """,
+            (name, is_active, sort_order, note, now, now),
+        )
+        count += 1
+    _clear_settings_cache()
+    export_system_settings_permanent("save_process_categories_v10_active_default", write_history=False)
+    return count
+# ===== V10 CATEGORY ACTIVE/STABLE APPLY PATCH END =====
