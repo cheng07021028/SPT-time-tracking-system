@@ -585,13 +585,22 @@ if can_manage and st.session_state.get(cat_edit_key, False):
     )
     if isinstance(edited_cat, pd.DataFrame):
         st.session_state[cat_draft_key] = edited_cat.copy()
-    cat_action = st.radio(
-        "確認後執行動作",
-        ["套用並永久儲存類別設定", "刪除勾選類別"],
-        horizontal=True,
-        key="system_category_apply_action_v334",
+    st.markdown("**確認後執行動作 / Confirm Action**")
+    cat_apply_col, cat_delete_col = st.columns(2)
+    cat_apply_clicked = cat_apply_col.button(
+        "◈ 套用並永久儲存類別 / Save Categories",
+        type="primary",
+        use_container_width=True,
+        key="system_category_save_button_v73",
     )
-    cat_submitted = st.button("▣ 確認套用類別 / Apply Categories", type="primary", use_container_width=True, key="system_category_apply_button_v58")
+    cat_delete_clicked = cat_delete_col.button(
+        "◉ 刪除勾選類別 / Delete Selected",
+        type="primary",
+        use_container_width=True,
+        key="system_category_delete_button_v73",
+    )
+    cat_submitted = bool(cat_apply_clicked or cat_delete_clicked)
+    cat_action = "套用並永久儲存類別設定" if cat_apply_clicked else ("刪除勾選類別" if cat_delete_clicked else "")
     if cat_submitted:
         edited_cat = st.session_state.get(cat_draft_key, edited_cat)
         if edited_cat is None:
@@ -681,13 +690,22 @@ if can_manage and st.session_state.get(proc_edit_key, False):
     )
     if isinstance(edited_proc, pd.DataFrame):
         st.session_state[proc_draft_key] = edited_proc.copy()
-    action = st.radio(
-        "確認後執行動作",
-        ["套用並永久儲存工段名稱設定", "刪除勾選工段"],
-        horizontal=True,
-        key="system_process_apply_action_v192",
+    st.markdown("**確認後執行動作 / Confirm Action**")
+    proc_apply_col, proc_delete_col = st.columns(2)
+    proc_apply_clicked = proc_apply_col.button(
+        "◈ 套用並永久儲存工段 / Save Processes",
+        type="primary",
+        use_container_width=True,
+        key="system_process_save_button_v73",
     )
-    submitted = st.button("▣ 確認套用 / Apply", type="primary", use_container_width=True, key="system_process_apply_button_v58")
+    proc_delete_clicked = proc_delete_col.button(
+        "◉ 刪除勾選工段 / Delete Selected",
+        type="primary",
+        use_container_width=True,
+        key="system_process_delete_button_v73",
+    )
+    submitted = bool(proc_apply_clicked or proc_delete_clicked)
+    action = "套用並永久儲存工段名稱設定" if proc_apply_clicked else ("刪除勾選工段" if proc_delete_clicked else "")
 
     if submitted:
         edited_proc = st.session_state.get(proc_draft_key, edited_proc)
@@ -753,13 +771,22 @@ if can_manage and st.session_state.get(rest_edit_key, False):
     )
     if isinstance(edited_rest, pd.DataFrame):
         st.session_state[rest_draft_key] = edited_rest.copy()
-    action = st.radio(
-        "確認後執行動作",
-        ["套用並永久儲存休息時間設定", "刪除勾選休息時間"],
-        horizontal=True,
-        key="system_rest_apply_action_v192",
+    st.markdown("**確認後執行動作 / Confirm Action**")
+    rest_apply_col, rest_delete_col = st.columns(2)
+    rest_apply_clicked = rest_apply_col.button(
+        "◈ 套用並永久儲存休息時間 / Save Rest Periods",
+        type="primary",
+        use_container_width=True,
+        key="system_rest_save_button_v73",
     )
-    submitted = st.button("▣ 確認套用 / Apply", type="primary", use_container_width=True, key="system_rest_apply_button_v58")
+    rest_delete_clicked = rest_delete_col.button(
+        "◉ 刪除勾選休息時間 / Delete Selected",
+        type="primary",
+        use_container_width=True,
+        key="system_rest_delete_button_v73",
+    )
+    submitted = bool(rest_apply_clicked or rest_delete_clicked)
+    action = "套用並永久儲存休息時間設定" if rest_apply_clicked else ("刪除勾選休息時間" if rest_delete_clicked else "")
 
     if submitted:
         edited_rest = st.session_state.get(rest_draft_key, edited_rest)

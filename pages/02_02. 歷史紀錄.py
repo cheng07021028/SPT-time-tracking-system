@@ -1197,18 +1197,35 @@ with tab1:
             )
             if isinstance(edited, pd.DataFrame):
                 st.session_state[history_draft_key] = edited.copy()
-            history_action = st.radio(
-                "確認後執行動作",
-                ["儲存編輯", "重新計算勾選紀錄工時", "刪除勾選整列紀錄"],
-                horizontal=True,
-                key="history_action_v27",
-            )
-            submitted_history = st.button(
-                "▣ 確認執行 / Confirm",
+            st.markdown("**確認後執行動作 / Confirm Action**")
+            hist_save_col, hist_recalc_col, hist_delete_col = st.columns([1.1, 1.7, 1.2])
+            history_save_clicked = hist_save_col.button(
+                "◈ 儲存編輯 / Save",
                 type="primary",
                 use_container_width=True,
-                key="history_records_confirm_v58",
+                key="history_records_save_button_v73",
             )
+            history_recalc_clicked = hist_recalc_col.button(
+                "◇ 重算勾選工時 / Recalc Selected",
+                type="primary",
+                use_container_width=True,
+                key="history_records_recalc_button_v73",
+            )
+            history_delete_clicked = hist_delete_col.button(
+                "◉ 刪除勾選整列 / Delete Selected",
+                type="primary",
+                use_container_width=True,
+                key="history_records_delete_button_v73",
+            )
+            submitted_history = bool(history_save_clicked or history_recalc_clicked or history_delete_clicked)
+            if history_save_clicked:
+                history_action = "儲存編輯"
+            elif history_recalc_clicked:
+                history_action = "重新計算勾選紀錄工時"
+            elif history_delete_clicked:
+                history_action = "刪除勾選整列紀錄"
+            else:
+                history_action = ""
 
             if submitted_history:
                 edited = st.session_state.get(history_draft_key, edited)

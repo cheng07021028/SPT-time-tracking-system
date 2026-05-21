@@ -237,13 +237,32 @@ if is_admin:
                     key=editor_key,
                     height=460,
                 )
-                admin_action = st.radio(
-                    "確認後執行動作",
-                    ["僅儲存修改", "重新計算勾選紀錄工時並同步 02 歷史紀錄", "刪除勾選整列紀錄"],
-                    horizontal=True,
-                    key="today_records_admin_action",
+                st.markdown("**確認後執行動作 / Confirm Action**")
+                act_save_col, act_recalc_col, act_delete_col = st.columns([1.1, 1.8, 1.2])
+                save_admin_clicked = act_save_col.form_submit_button(
+                    "◈ 僅儲存修改 / Save",
+                    type="primary",
+                    use_container_width=True,
                 )
-                submitted_admin = st.form_submit_button("⚡ 確認執行 / Confirm", type="primary", use_container_width=True)
+                recalc_admin_clicked = act_recalc_col.form_submit_button(
+                    "◇ 重算勾選工時並同步 02 / Recalc Selected",
+                    type="primary",
+                    use_container_width=True,
+                )
+                delete_admin_clicked = act_delete_col.form_submit_button(
+                    "◉ 刪除勾選整列 / Delete Selected",
+                    type="primary",
+                    use_container_width=True,
+                )
+                submitted_admin = bool(save_admin_clicked or recalc_admin_clicked or delete_admin_clicked)
+                if save_admin_clicked:
+                    admin_action = "僅儲存修改"
+                elif recalc_admin_clicked:
+                    admin_action = "重新計算勾選紀錄工時並同步 02 歷史紀錄"
+                elif delete_admin_clicked:
+                    admin_action = "刪除勾選整列紀錄"
+                else:
+                    admin_action = ""
 
             if submitted_admin and edited_admin is not None:
                 delete_ids = []
