@@ -2,9 +2,6 @@
 from __future__ import annotations
 
 from io import StringIO
-import json
-import sqlite3
-from pathlib import Path
 import pandas as pd
 import streamlit as st
 
@@ -173,141 +170,25 @@ def _blank_user_row() -> dict:
     }
 
 
-
-
-def _v45_boolish(value) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return False
-    text = str(value).strip().lower()
-    if text in {"1", "true", "yes", "y", "on", "啟用", "是"}:
-        return True
-    if text in {"0", "false", "no", "n", "off", "停用", "否", "", "nan", "none"}:
-        return False
-    try:
-        return float(text) != 0
-    except Exception:
-        return False
-
-def _v45_project_root() -> Path:
-    return Path(__file__).resolve().parents[1]
-
-
-def _v45_parse_users_payload(payload) -> list[dict]:
-    """Extract auth user rows from all known permanent formats.
-
-    V45: account editor must never open empty when the authority JSON still
-    contains users.  The page therefore reads the canonical authority file
-    directly first, then falls back to legacy latest files, then service/SQLite.
-    """
-    if not isinstance(payload, dict):
-        if isinstance(payload, list):
-            return [r for r in payload if isinstance(r, dict)]
-        return []
-    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
-    for key in ("auth_users", "security_users", "users", "records", "data"):
-        rows = tables.get(key) if key in tables else payload.get(key)
-        if isinstance(rows, list):
-            return [r for r in rows if isinstance(r, dict)]
-    return []
-
-
-def _v45_read_json_users(path: Path) -> tuple[str, list[dict]]:
-    try:
-        if not path.exists() or not path.is_file():
-            return "", []
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        rows = _v45_parse_users_payload(payload)
-        stamp = ""
-        if isinstance(payload, dict):
-            stamp = str(payload.get("updated_at") or payload.get("exported_at") or payload.get("created_at") or "")
-        return stamp, rows
-    except Exception:
-        return "", []
-
-
-def _v45_read_sqlite_users() -> list[dict]:
-    try:
-        db_path = _v45_project_root() / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
-        if not db_path.exists():
-            db_path = _v45_project_root() / "data" / "database" / "spt_time_tracking.db"
-        if not db_path.exists():
-            return []
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        try:
-            rows = conn.execute("SELECT * FROM auth_users ORDER BY username").fetchall()
-        except Exception:
-            rows = conn.execute("SELECT * FROM security_users ORDER BY username").fetchall()
-        finally:
-            conn.close()
-        return [dict(r) for r in rows]
-    except Exception:
-        return []
-
-
-def _v45_best_account_rows() -> tuple[list[dict], str]:
-    root = _v45_project_root()
-    candidates: list[tuple[int, str, str, list[dict]]] = []
-
-    # Canonical authority files first.  These are the only files that should be
-    # considered authoritative after V28/V29.
-    json_paths = [
-        root / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json",
-        root / "data" / "permanent_store" / "persistent_state" / "spt_permission_settings.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
-        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-    ]
-    for idx, path in enumerate(json_paths):
-        stamp, rows = _v45_read_json_users(path)
-        rows = [r for r in rows if str(r.get("username") or "").strip()]
-        if rows:
-            # Prefer earlier canonical paths; use row count as secondary signal.
-            candidates.append((1000 - idx * 10 + min(len(rows), 50), stamp, str(path.relative_to(root)), rows))
-
-    try:
-        svc_rows = [r for r in get_users() if isinstance(r, dict) and str(r.get("username") or "").strip()]
-        if svc_rows:
-            candidates.append((500 + min(len(svc_rows), 50), "service", "permission_service.get_users", svc_rows))
-    except Exception:
-        pass
-
-    sql_rows = [r for r in _v45_read_sqlite_users() if str(r.get("username") or "").strip()]
-    if sql_rows:
-        candidates.append((400 + min(len(sql_rows), 50), "sqlite", "sqlite.auth_users", sql_rows))
-
-    if not candidates:
-        return [], "empty"
-
-    # Highest authority score wins.  This intentionally avoids letting a blank
-    # service response wipe the visible account list.
-    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
-    return candidates[0][3], candidates[0][2]
-
-
 def _users_for_editor() -> pd.DataFrame:
-    rows, source = _v45_best_account_rows()
-    raw = pd.DataFrame(rows)
-    st.session_state["v45_account_source"] = source
-    st.session_state["v45_account_source_rows"] = int(len(raw))
+    raw = pd.DataFrame(get_users())
     if raw.empty:
         return pd.DataFrame([_blank_user_row()]).iloc[0:0]
     out = pd.DataFrame()
     out["刪除 / Delete"] = False
-    out["帳號 / Username"] = raw.get("username", "").fillna("").astype(str) if "username" in raw else ""
-    out["密碼狀態 / Password Status"] = raw.get("password_display", "********") if "password_display" in raw else "********"
-    out["新密碼 / New Password"] = raw.get("new_password", "") if "new_password" in raw else ""
-    out["工號 / Employee ID"] = raw.get("employee_id", "") if "employee_id" in raw else ""
-    out["姓名 / Display Name"] = raw.get("display_name", raw.get("name", "")) if ("display_name" in raw or "name" in raw) else ""
-    out["Email"] = raw.get("email", "") if "email" in raw else ""
-    out["角色 / Role"] = raw.get("role_code", raw.get("role", "operator")) if ("role_code" in raw or "role" in raw) else "operator"
-    out["啟用 / Active"] = raw.get("is_active", 1).fillna(1).map(_v45_boolish) if "is_active" in raw else True
-    out["強制改密碼 / Force Change"] = raw.get("force_password_change", 0).fillna(0).map(_v45_boolish) if "force_password_change" in raw else False
-    out["備註 / Note"] = raw.get("note", "") if "note" in raw else ""
-    out["最後登入 / Last Login"] = raw.get("last_login_at", "") if "last_login_at" in raw else ""
-    out["更新時間 / Updated At"] = raw.get("updated_at", "") if "updated_at" in raw else ""
-    return out.reset_index(drop=True)
+    out["帳號 / Username"] = raw.get("username", "")
+    out["密碼狀態 / Password Status"] = raw.get("password_display", "********")
+    out["新密碼 / New Password"] = raw.get("new_password", "")
+    out["工號 / Employee ID"] = raw.get("employee_id", "")
+    out["姓名 / Display Name"] = raw.get("display_name", "")
+    out["Email"] = raw.get("email", "")
+    out["角色 / Role"] = raw.get("role_code", "operator")
+    out["啟用 / Active"] = raw.get("is_active", 1).fillna(1).astype(bool) if "is_active" in raw else True
+    out["強制改密碼 / Force Change"] = raw.get("force_password_change", 0).fillna(0).astype(bool) if "force_password_change" in raw else False
+    out["備註 / Note"] = raw.get("note", "")
+    out["最後登入 / Last Login"] = raw.get("last_login_at", "")
+    out["更新時間 / Updated At"] = raw.get("updated_at", "")
+    return out
 
 
 def _password_from_editor_row(r: pd.Series) -> str:
@@ -496,196 +377,6 @@ def _permission_summary(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-
-def _v37_clear_widget_state(prefix: str) -> None:
-    # Clear stale data_editor/form widget state. Without this, a Select All button can
-    # set values to True, then the old editor delta immediately writes them back to False.
-    for k in list(st.session_state.keys()):
-        if str(k).startswith(prefix):
-            try:
-                del st.session_state[k]
-            except Exception:
-                pass
-
-def _v40_account_delete_true_count(df: pd.DataFrame) -> int:
-    try:
-        return int(_to_bool_series(df, "刪除 / Delete").sum())
-    except Exception:
-        return 0
-
-
-def _v44_sync_delete_visual(df: pd.DataFrame) -> pd.DataFrame:
-    """Keep a read-only visual delete marker in sync with the checkbox column.
-
-    Some Streamlit/Glide builds visually repaint checkbox cells one render behind,
-    especially when the table is inside a themed dark container.  The authoritative
-    data is still the boolean `刪除 / Delete` draft column, but this marker makes the
-    selected state visible even if the checkbox glyph is covered by the editor layer.
-    """
-    if df is None or not isinstance(df, pd.DataFrame):
-        return df
-    out = df.copy(deep=True)
-    if "刪除 / Delete" not in out.columns:
-        out.insert(0, "刪除 / Delete", False)
-    mask = _to_bool_series(out, "刪除 / Delete")
-    out["刪除狀態 / Delete Mark"] = mask.map(lambda v: "☑ 已選 / Selected" if bool(v) else "☐ 未選 / Clear")
-    return out
-
-
-def _v46_sync_delete_visual_box(df: pd.DataFrame) -> pd.DataFrame:
-    """V46 visual-state hardening for the account delete selector.
-
-    The Streamlit data_editor checkbox glyph can be visually covered or rendered one
-    rerun behind under the dark HUD theme.  The boolean column remains the authority,
-    but the user-facing control is rendered as a Unicode box selector, which is
-    stable across browsers and themes:
-
-        ☐ 未勾選 / 0
-        ☑ 已勾選 / 1
-
-    The actual save/delete logic still reads the hidden/authority boolean column
-    `刪除 / Delete` after converting this visual selector back to bool.
-    """
-    if df is None or not isinstance(df, pd.DataFrame):
-        return df
-    out = _v44_sync_delete_visual(df).copy(deep=True)
-    mask = _to_bool_series(out, "刪除 / Delete")
-    out["刪除方框 / Delete Box"] = mask.map(lambda v: "☑ 已勾選 / 1" if bool(v) else "☐ 未勾選 / 0")
-    return out
-
-
-def _v46_apply_delete_box_to_bool(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert visual delete selectors back into the boolean delete column."""
-    if df is None or not isinstance(df, pd.DataFrame):
-        return df
-    out = df.copy(deep=True)
-    if "刪除選擇 / Delete Select" in out.columns:
-        out["刪除 / Delete"] = out["刪除選擇 / Delete Select"].map(lambda v: _as_bool_value(v, default=False))
-    elif "刪除方框 / Delete Box" in out.columns:
-        out["刪除 / Delete"] = out["刪除方框 / Delete Box"].astype(str).str.contains("☑|已勾選|已選|1|true|True|TRUE", regex=True, na=False)
-    elif "刪除 / Delete" in out.columns:
-        out["刪除 / Delete"] = _to_bool_series(out, "刪除 / Delete")
-    else:
-        out.insert(0, "刪除 / Delete", False)
-    return _v47_sync_delete_numeric_visual(out)
-
-
-def _v47_sync_delete_numeric_visual(df: pd.DataFrame) -> pd.DataFrame:
-    """V47: use a plain 0/1 editable column as the visible selector.
-
-    Streamlit's checkbox glyph can be hidden by the data_editor/theme rendering
-    layer.  A numeric 0/1 column is rendered as normal text/input, so it remains
-    visible and still gives an unambiguous selection state:
-
-        0 = not selected
-        1 = selected for deletion
-
-    The hidden authority column remains `刪除 / Delete`; save/delete logic converts
-    the 0/1 column back to bool before saving.
-    """
-    if df is None or not isinstance(df, pd.DataFrame):
-        return df
-    out = _v46_sync_delete_visual_box(df).copy(deep=True)
-    mask = _to_bool_series(out, "刪除 / Delete")
-    out["刪除選擇 / Delete Select"] = mask.astype(int)
-    out["刪除顯示 / Delete Display"] = mask.map(lambda v: "1｜刪除" if bool(v) else "0｜保留")
-    return out
-
-
-def _v47_apply_numeric_visual_to_bool(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or not isinstance(df, pd.DataFrame):
-        return df
-    out = df.copy(deep=True)
-    if "刪除選擇 / Delete Select" in out.columns:
-        out["刪除 / Delete"] = out["刪除選擇 / Delete Select"].map(lambda v: _as_bool_value(v, default=False))
-    return _v47_sync_delete_numeric_visual(out)
-
-
-def _v44_strip_visual_columns(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or not isinstance(df, pd.DataFrame):
-        return df
-    return df.drop(columns=["刪除狀態 / Delete Mark", "刪除方框 / Delete Box", "刪除選擇 / Delete Select", "刪除顯示 / Delete Display"], errors="ignore")
-
-
-def _v37_touch_account_editor() -> None:
-    """Rotate account data_editor key after external button actions.
-
-    Root cause fixed in V40:
-    - External buttons changed st.session_state["v133_users_df"].
-    - The old data_editor/form widget state then overwrote the changed draft.
-    - Previous V37 helper accidentally called itself recursively.
-
-    This helper clears stale widget state and increments editor revision before the
-    next data_editor is created, so checkbox 0/1 changes become the source of
-    truth for the next render.
-    """
-    _v37_clear_widget_state("v171_account_password_editor_")
-    try:
-        st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
-    except Exception:
-        st.session_state["v235_account_editor_rev"] = 1
-    st.session_state["v37_account_bulk_just_applied"] = True
-    st.session_state["v40_account_last_action"] = "touch_editor"
-
-# V27: stable account/permission callbacks.
-# Important: Enable Edit must NOT reload old JSON/SQLite data over the current
-# visible account table. It copies the currently displayed authoritative list
-# into the editable draft and rotates the editor key so bulk checkbox buttons
-# show the 0/1 changes immediately.
-def _v25_account_set_edit(enabled: bool) -> None:
-    st.session_state["v166_account_edit_enabled"] = bool(enabled)
-    if enabled:
-        # Do not reload old records over an existing visible draft.
-        if "v133_users_df" not in st.session_state or not isinstance(st.session_state.get("v133_users_df"), pd.DataFrame):
-            st.session_state["v133_users_df"] = _users_for_editor()
-        st.session_state["v40_account_last_action"] = "enable_edit"
-    else:
-        # Stop edit intentionally discards unsaved draft and reloads saved authority.
-        st.session_state["v133_users_df"] = _users_for_editor()
-        st.session_state["v40_account_last_action"] = "disable_edit_reload_saved"
-        st.session_state["v43_account_use_draft_for_save"] = False
-    _v37_touch_account_editor()
-
-
-def _v25_account_add_blank() -> None:
-    df = st.session_state.get("v133_users_df")
-    if df is None or not isinstance(df, pd.DataFrame):
-        df = _users_for_editor()
-    st.session_state["v133_users_df"] = pd.concat([pd.DataFrame([_blank_user_row()]), df.copy()], ignore_index=True)
-    st.session_state["v40_account_last_action"] = "add_blank"
-    st.session_state["v43_account_use_draft_for_save"] = True
-    _v37_touch_account_editor()
-
-
-def _v25_account_delete_flag(flag: bool) -> None:
-    df = st.session_state.get("v133_users_df")
-    if df is None or not isinstance(df, pd.DataFrame):
-        df = _users_for_editor()
-    df = df.copy(deep=True).reset_index(drop=True)
-    if "刪除 / Delete" not in df.columns:
-        df.insert(0, "刪除 / Delete", False)
-    df["刪除 / Delete"] = bool(flag)
-    st.session_state["v133_users_df"] = _v47_sync_delete_numeric_visual(df)
-    st.session_state["v40_account_last_action"] = "select_delete_all" if flag else "clear_delete_all"
-    st.session_state["v40_account_last_delete_true"] = _v40_account_delete_true_count(df)
-    # V43: keep the button-updated draft authoritative until the next explicit save/reload/stop-edit.
-    # This prevents a stale data_editor echo from becoming the saved source after Select/Clear.
-    st.session_state["v43_account_use_draft_for_save"] = True
-    _v37_touch_account_editor()
-
-
-def _v25_account_reload() -> None:
-    st.session_state["v133_users_df"] = _users_for_editor()
-    st.session_state["v40_account_last_action"] = "reload_saved"
-    st.session_state["v43_account_use_draft_for_save"] = False
-    _v37_touch_account_editor()
-
-
-def _v25_permission_quick(action: str) -> None:
-    st.session_state["v25_permission_quick_action"] = str(action or "")
-    st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
-
-
 tab_accounts, tab_perm, tab_sec = st.tabs([
     "帳號密碼總表 / Account Password Master",
     "帳號模組權限 / Account Module Permissions",
@@ -705,9 +396,14 @@ with tab_accounts:
     _edit_on = bool(st.session_state.get("v166_account_edit_enabled", False))
     c_edit1, c_edit2, c_edit3 = st.columns([1.2, 1.2, 3])
     with c_edit1:
-        st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=_edit_on, key="v25_enable_account_edit_top", on_click=_v25_account_set_edit, args=(True,))
+        if st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=_edit_on, key="v169_enable_account_edit_top"):
+            st.session_state["v166_account_edit_enabled"] = True
+            st.rerun()
     with c_edit2:
-        st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not _edit_on, key="v25_disable_account_edit_top", on_click=_v25_account_set_edit, args=(False,))
+        if st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not _edit_on, key="v169_disable_account_edit_top"):
+            st.session_state["v166_account_edit_enabled"] = False
+            st.session_state["v133_users_df"] = _users_for_editor()
+            st.rerun()
     with c_edit3:
         if _edit_on:
             st.success("目前：已啟動編輯。修改後請按儲存才會正式寫入。")
@@ -718,176 +414,130 @@ with tab_accounts:
         st.session_state["v133_users_df"] = _users_for_editor()
 
     with account_tab_edit:
-        st.markdown("### 新增帳號專用表單 / Stable Add User Form")
-        st.caption("建議新增帳號先使用此表單；送出後會直接寫入資料庫，不會因表格 rerun 造成資料消失。")
-        with st.form("v175_create_account_form", clear_on_submit=True):
-            f1, f2, f3, f4 = st.columns([1.2, 1.2, 1.2, 1.2])
-            with f1:
-                new_username = st.text_input("帳號 / Username", key="v175_new_username", disabled=not _edit_on)
-                new_emp_id = st.text_input("工號 / Employee ID", key="v175_new_employee_id", disabled=not _edit_on)
-            with f2:
-                new_password = st.text_input("新密碼 / New Password", type="password", key="v175_new_password", disabled=not _edit_on)
-                new_name = st.text_input("姓名 / Display Name", key="v175_new_display_name", disabled=not _edit_on)
-            with f3:
-                new_email = st.text_input("Email", key="v175_new_email", disabled=not _edit_on)
-                new_role = st.selectbox("角色 / Role", ROLE_OPTIONS, index=ROLE_OPTIONS.index("operator"), key="v175_new_role", disabled=not _edit_on)
-            with f4:
-                new_active = st.checkbox("啟用 / Active", value=True, key="v175_new_active", disabled=not _edit_on)
-                new_force_change = st.checkbox("強制改密碼 / Force Change", value=False, key="v175_new_force_change", disabled=not _edit_on)
-            new_note = st.text_input("備註 / Note", key="v175_new_note", disabled=not _edit_on)
-            submit_new_user = st.form_submit_button("⊕ 建立帳號 / Create User", type="primary", use_container_width=True, disabled=not _edit_on)
-
-        if submit_new_user:
-            username = str(new_username or "").strip()
-            password = str(new_password or "").strip()
-            display_name = str(new_name or "").strip() or username
-            if not username:
-                st.error("請輸入帳號 / Username is required")
-            elif not password:
-                st.error("新增帳號必須輸入新密碼 / New password is required for new account")
-            else:
-                result = save_users([{
-                    "username": username,
-                    "new_password": password,
-                    "employee_id": str(new_emp_id or "").strip(),
-                    "display_name": display_name,
-                    "email": str(new_email or "").strip(),
-                    "role_code": str(new_role or "operator").strip() or "operator",
-                    "is_active": bool(new_active),
-                    "force_password_change": bool(new_force_change),
-                    "note": str(new_note or "").strip(),
-                }])
-                if result.get("saved", 0) > 0:
-                    st.success(f"帳號已建立 / Account created：{username}")
-                    st.session_state["v133_users_df"] = _users_for_editor()
-                    try:
-                        from services.column_settings_service import clear_editor_draft
-                        clear_editor_draft("account")
-                    except Exception:
-                        pass
-                    st.rerun()
-                if result.get("skipped"):
-                    st.warning("；".join(result.get("skipped", [])))
-
-
         st.markdown("### 帳號清單編輯 / Editable Account Master")
-        st.caption("V48：刪除選擇不再依賴 data_editor checkbox 方框，改由穩定的『待刪除帳號清單』控制；表格只顯示文字狀態，避免 checkbox 視覺層被覆蓋。")
+        st.caption("V49：此區已刪除舊的 form + checkbox 勾選流程，改成重寫版：刪除選擇獨立在表格外，表格只負責帳號欄位編輯。")
 
-        if "v166_account_edit_enabled" not in st.session_state:
-            st.session_state["v166_account_edit_enabled"] = False
-        account_edit_enabled = bool(st.session_state.get("v166_account_edit_enabled", False))
-        st.session_state.setdefault("v235_account_editor_rev", 0)
-        st.session_state.setdefault("v48_delete_usernames", [])
+        def _v49_reset_account_editor_from_source() -> None:
+            st.session_state["v133_users_df"] = _users_for_editor().copy(deep=True)
+            st.session_state["v49_account_delete_targets"] = []
+            st.session_state["v49_account_editor_rev"] = int(st.session_state.get("v49_account_editor_rev", 0)) + 1
+            st.session_state["v49_last_action"] = "reload_from_source"
 
-        def _v48_usernames_from_df(df: pd.DataFrame) -> list[str]:
-            if not isinstance(df, pd.DataFrame) or df.empty or "帳號 / Username" not in df.columns:
+        def _v49_current_account_draft() -> pd.DataFrame:
+            if "v133_users_df" not in st.session_state or not isinstance(st.session_state.get("v133_users_df"), pd.DataFrame):
+                st.session_state["v133_users_df"] = _users_for_editor().copy(deep=True)
+            df = st.session_state["v133_users_df"].copy(deep=True)
+            for col, default in {
+                "帳號 / Username": "",
+                "密碼狀態 / Password Status": "********",
+                "新密碼 / New Password": "",
+                "工號 / Employee ID": "",
+                "姓名 / Display Name": "",
+                "Email": "",
+                "角色 / Role": "operator",
+                "啟用 / Active": True,
+                "強制改密碼 / Force Change": False,
+                "備註 / Note": "",
+                "最後登入 / Last Login": "",
+                "更新時間 / Updated At": "",
+            }.items():
+                if col not in df.columns:
+                    df[col] = default
+            # V49：刪除選擇不再放在 data_editor 裡，避免 checkbox 視覺層被 Streamlit 舊狀態覆蓋。
+            if "刪除 / Delete" in df.columns:
+                df = df.drop(columns=["刪除 / Delete"])
+            return df.reset_index(drop=True)
+
+        def _v49_usernames_from_df(df: pd.DataFrame) -> list[str]:
+            if df is None or df.empty or "帳號 / Username" not in df.columns:
                 return []
-            return [str(v).strip() for v in df["帳號 / Username"].fillna("").astype(str).tolist() if str(v).strip()]
+            vals = []
+            for v in df["帳號 / Username"].fillna("").astype(str).str.strip().tolist():
+                if v and v not in vals:
+                    vals.append(v)
+            return vals
 
-        def _v48_set_delete_selection(usernames: list[str]) -> None:
-            cleaned = sorted({str(u).strip() for u in usernames if str(u).strip()})
-            st.session_state["v48_delete_usernames"] = cleaned
-            df = st.session_state.get("v133_users_df")
-            if isinstance(df, pd.DataFrame):
-                df = df.copy(deep=True)
-                if "帳號 / Username" in df.columns:
-                    df["刪除 / Delete"] = df["帳號 / Username"].fillna("").astype(str).str.strip().isin(set(cleaned))
-                st.session_state["v133_users_df"] = df
-            st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
-            st.session_state["v48_last_delete_count"] = len(cleaned)
-            st.session_state["v48_last_action"] = "set_delete_selection"
+        def _v49_set_delete_targets(targets: list[str], action: str) -> None:
+            current_names = set(_v49_usernames_from_df(_v49_current_account_draft()))
+            st.session_state["v49_account_delete_targets"] = [str(x).strip() for x in targets if str(x).strip() in current_names]
+            st.session_state["v49_last_action"] = action
 
-        def _v48_prepare_display_df(df: pd.DataFrame, selected: list[str]) -> pd.DataFrame:
-            out = df.copy(deep=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()
-            selected_set = {str(u).strip() for u in selected if str(u).strip()}
-            if "帳號 / Username" in out.columns:
-                uname = out["帳號 / Username"].fillna("").astype(str).str.strip()
-                out["刪除 / Delete"] = uname.isin(selected_set)
-            else:
-                out["刪除 / Delete"] = False
-            out["刪除顯示 / Delete Display"] = out["刪除 / Delete"].map(lambda v: "1｜刪除" if bool(v) else "0｜保留")
-            out["刪除文字 / Delete Text"] = out["刪除 / Delete"].map(lambda v: "待刪除" if bool(v) else "保留")
+        def _v49_prepare_editor_display(df: pd.DataFrame, delete_targets: list[str]) -> pd.DataFrame:
+            out = df.copy(deep=True)
+            target_set = {str(x).strip() for x in delete_targets}
+            names = out.get("帳號 / Username", pd.Series([""] * len(out))).fillna("").astype(str).str.strip()
+            out.insert(0, "刪除狀態 / Delete Status", ["1｜刪除" if n in target_set else "0｜保留" for n in names])
             return out
 
-        def _v48_strip_visual_columns(df: pd.DataFrame) -> pd.DataFrame:
-            out = df.copy(deep=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()
-            for c in [
-                "刪除顯示 / Delete Display",
-                "刪除文字 / Delete Text",
-                "刪除方框 / Delete Box",
-                "刪除狀態 / Delete Mark",
-                "刪除選擇 / Delete Select",
-            ]:
-                if c in out.columns:
-                    out = out.drop(columns=[c])
-            return out
+        st.session_state.setdefault("v49_account_editor_rev", 0)
+        st.session_state.setdefault("v49_account_delete_targets", [])
+        st.session_state.setdefault("v49_last_action", "init")
+        account_edit_enabled = bool(st.session_state.get("v166_account_edit_enabled", False))
+
+        if "v133_users_df" not in st.session_state:
+            st.session_state["v133_users_df"] = _users_for_editor().copy(deep=True)
+
+        draft_df = _v49_current_account_draft()
+        usernames = _v49_usernames_from_df(draft_df)
+        delete_targets = [x for x in st.session_state.get("v49_account_delete_targets", []) if x in set(usernames)]
+        st.session_state["v49_account_delete_targets"] = delete_targets
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            if st.button("⊕ 新增帳號 / Add User", use_container_width=True, disabled=not account_edit_enabled, key="v48_account_add_user_row"):
-                base_df = st.session_state.get("v133_users_df", _users_for_editor())
-                st.session_state["v133_users_df"] = pd.concat([base_df, pd.DataFrame([_blank_user_row()])], ignore_index=True)
-                st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
-                st.session_state["v48_last_action"] = "add_user"
+            if st.button("⊕ 新增空白帳號 / Add Blank User", use_container_width=True, disabled=not account_edit_enabled, key="v49_add_user_row"):
+                df = _v49_current_account_draft()
+                blank = _blank_user_row()
+                blank.pop("刪除 / Delete", None)
+                st.session_state["v133_users_df"] = pd.concat([df, pd.DataFrame([blank])], ignore_index=True)
+                st.session_state["v49_account_editor_rev"] = int(st.session_state.get("v49_account_editor_rev", 0)) + 1
+                st.session_state["v49_last_action"] = "add_blank_user"
                 st.rerun()
         with c2:
-            if st.button("⊖ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled, key="v48_account_select_delete"):
-                _v48_set_delete_selection(_v48_usernames_from_df(st.session_state.get("v133_users_df")))
+            if st.button("⊖ 刪除全選 / Select All Delete", use_container_width=True, disabled=not account_edit_enabled or not usernames, key="v49_select_all_delete"):
+                _v49_set_delete_targets(usernames, "select_all_delete")
                 st.rerun()
         with c3:
-            if st.button("◌ 刪除欄取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled, key="v48_account_clear_delete"):
-                _v48_set_delete_selection([])
+            if st.button("◌ 刪除取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled, key="v49_clear_delete"):
+                _v49_set_delete_targets([], "clear_delete")
                 st.rerun()
         with c4:
-            if st.button("⟳ 重新載入 / Reload", use_container_width=True, key="v48_account_reload"):
-                st.session_state["v133_users_df"] = _users_for_editor()
-                st.session_state["v48_delete_usernames"] = []
-                st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
-                st.session_state["v48_last_action"] = "reload"
+            if st.button("⟳ 重新載入 / Reload", use_container_width=True, key="v49_reload_account_editor"):
+                _v49_reset_account_editor_from_source()
                 st.rerun()
 
-        st.warning("V48：刪除判定改由上方按鈕與『待刪除帳號清單』控制，不再依賴 data_editor checkbox 方框。密碼欄可直接輸入；******** 代表維持原密碼。")
-
-        draft_df = st.session_state.get("v133_users_df")
-        if not isinstance(draft_df, pd.DataFrame):
-            draft_df = _users_for_editor()
-            st.session_state["v133_users_df"] = draft_df
-
-        all_usernames = _v48_usernames_from_df(draft_df)
-        current_selected = [u for u in st.session_state.get("v48_delete_usernames", []) if u in set(all_usernames)]
-        # 這個 multiselect 是刪除選擇的唯一視覺與資料來源；不使用 checkbox 方框，避免 Streamlit 顯示層覆蓋。
-        selected_from_multiselect = st.multiselect(
-            "待刪除帳號清單 / Accounts Marked for Delete",
-            options=all_usernames,
-            default=current_selected,
+        st.markdown("#### 待刪除帳號清單 / Accounts Marked for Delete")
+        st.caption("V49：刪除選擇已移出 data_editor，不再依賴 checkbox 方框顯示；這個清單才是刪除權威來源。")
+        selected_delete_targets = st.multiselect(
+            "選擇要刪除的帳號 / Select accounts to delete",
+            options=usernames,
+            default=delete_targets,
             disabled=not account_edit_enabled,
-            key=f"v48_delete_multiselect_{st.session_state.get('v235_account_editor_rev', 0)}",
-            help="V48：此欄為刪除選擇的權威來源。全選/取消按鈕會同步更新這裡；儲存時依這裡刪除帳號。",
+            key="v49_account_delete_targets_widget",
         )
-        if set(selected_from_multiselect) != set(current_selected):
-            _v48_set_delete_selection(selected_from_multiselect)
-            st.rerun()
+        if selected_delete_targets != st.session_state.get("v49_account_delete_targets", []):
+            st.session_state["v49_account_delete_targets"] = list(selected_delete_targets)
+            st.session_state["v49_last_action"] = "manual_delete_select"
+            delete_targets = list(selected_delete_targets)
+        else:
+            delete_targets = st.session_state.get("v49_account_delete_targets", [])
 
-        account_editor_key = f"v48_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
-        render_df = _v48_prepare_display_df(st.session_state["v133_users_df"], st.session_state.get("v48_delete_usernames", []))
-        account_cols = list(render_df.columns)
-        account_order = [
-            "刪除顯示 / Delete Display",
-            "刪除文字 / Delete Text",
-        ] + [c for c in account_cols if c not in {"刪除 / Delete", "刪除顯示 / Delete Display", "刪除文字 / Delete Text", "刪除方框 / Delete Box", "刪除狀態 / Delete Mark", "刪除選擇 / Delete Select"}]
-
-        edited_users = st.data_editor(
-            render_df.copy(deep=True),
-            key=account_editor_key,
+        display_df = _v49_prepare_editor_display(_v49_current_account_draft(), delete_targets)
+        editor_key = f"v49_account_editor_{st.session_state.get('v49_account_editor_rev', 0)}"
+        edited_display_df = st.data_editor(
+            display_df,
+            key=editor_key,
             use_container_width=True,
             num_rows="fixed",
             hide_index=True,
             disabled=not account_edit_enabled,
-            height=360,
-            column_order=[c for c in account_order if c in account_cols],
+            height=390,
+            column_order=[c for c in [
+                "刪除狀態 / Delete Status", "帳號 / Username", "密碼狀態 / Password Status", "新密碼 / New Password",
+                "工號 / Employee ID", "姓名 / Display Name", "Email", "角色 / Role", "啟用 / Active",
+                "強制改密碼 / Force Change", "備註 / Note", "最後登入 / Last Login", "更新時間 / Updated At"
+            ] if c in display_df.columns],
             column_config={
-                "刪除顯示 / Delete Display": st.column_config.TextColumn("刪除顯示 / Delete Display", disabled=True, help="穩定文字顯示；真正刪除選擇由上方『待刪除帳號清單』控制。"),
-                "刪除文字 / Delete Text": st.column_config.TextColumn("刪除文字 / Delete Text", disabled=True),
+                "刪除狀態 / Delete Status": st.column_config.TextColumn("刪除狀態 / Delete Status", disabled=True, help="0=保留，1=刪除；正式刪除依上方待刪除帳號清單判斷。"),
                 "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
                 "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
                 "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
@@ -903,36 +553,30 @@ with tab_accounts:
             },
         )
 
-        # 手動修改帳號資料時，持續更新草稿；刪除選擇仍由 multiselect / button 權威控制。
-        if account_edit_enabled and isinstance(edited_users, pd.DataFrame):
-            next_draft = _v48_strip_visual_columns(edited_users)
-            selected_set = set(st.session_state.get("v48_delete_usernames", []))
-            if "帳號 / Username" in next_draft.columns:
-                next_draft["刪除 / Delete"] = next_draft["帳號 / Username"].fillna("").astype(str).str.strip().isin(selected_set)
-            st.session_state["v133_users_df"] = next_draft.copy(deep=True)
+        # V49：只有非批次刪除欄位的帳號欄位編輯，才回寫草稿。刪除選擇永遠以上方 multiselect 為準。
+        edited_for_draft = edited_display_df.copy(deep=True)
+        if "刪除狀態 / Delete Status" in edited_for_draft.columns:
+            edited_for_draft = edited_for_draft.drop(columns=["刪除狀態 / Delete Status"])
+        st.session_state["v133_users_df"] = edited_for_draft.copy(deep=True)
 
-        selected_delete = [u for u in st.session_state.get("v48_delete_usernames", []) if u in set(_v48_usernames_from_df(st.session_state.get("v133_users_df")))]
-        active_count = int(_to_bool_series(st.session_state.get("v133_users_df", pd.DataFrame()), "啟用 / Active").sum()) if isinstance(st.session_state.get("v133_users_df"), pd.DataFrame) else 0
-        delete_count = len(selected_delete)
-        new_password_count = int(sum(1 for _, _row in st.session_state.get("v133_users_df", pd.DataFrame()).iterrows() if _password_from_editor_row(_row))) if isinstance(st.session_state.get("v133_users_df"), pd.DataFrame) else 0
+        active_count = int(_to_bool_series(edited_for_draft, "啟用 / Active", True).sum()) if not edited_for_draft.empty else 0
+        delete_count = len(delete_targets)
+        new_password_count = int(sum(1 for _, _row in edited_for_draft.iterrows() if _password_from_editor_row(_row))) if not edited_for_draft.empty else 0
         m1, m2, m3 = st.columns(3)
         m1.metric("啟用帳號 / Active", active_count)
         m2.metric("待刪除 / Pending Delete", delete_count)
         m3.metric("密碼異動 / Password Changes", new_password_count)
 
-        with st.expander("V48 按鈕狀態診斷 / Button State Diagnostics", expanded=False):
-            _diag_df = st.session_state.get("v133_users_df")
-            st.write({
+        with st.expander("V49 狀態診斷 / V49 State Diagnostics", expanded=False):
+            st.json({
                 "page_file": __file__,
-                "edit_enabled": bool(st.session_state.get("v166_account_edit_enabled", False)),
-                "editor_rev": int(st.session_state.get("v235_account_editor_rev", 0)),
-                "draft_rows": len(_diag_df) if isinstance(_diag_df, pd.DataFrame) else 0,
-                "delete_selection_count": len(selected_delete),
-                "delete_selection": selected_delete,
-                "last_action": st.session_state.get("v48_last_action", ""),
-                "account_source": st.session_state.get("v45_account_source", ""),
-                "account_source_rows": st.session_state.get("v45_account_source_rows", ""),
-                "v48_mode": "delete-selection-outside-data-editor-no-checkbox-visual-dependency",
+                "mode": "v49_rewritten_account_editor_no_checkbox_delete",
+                "edit_enabled": account_edit_enabled,
+                "editor_key": editor_key,
+                "draft_rows": int(len(st.session_state.get("v133_users_df", []))),
+                "delete_targets_count": int(len(delete_targets)),
+                "delete_targets": delete_targets,
+                "last_action": st.session_state.get("v49_last_action", ""),
             })
 
         submitted_accounts = st.button(
@@ -940,27 +584,24 @@ with tab_accounts:
             type="primary",
             use_container_width=True,
             disabled=not account_edit_enabled,
-            key="v48_apply_save_account_master",
+            key="v49_apply_save_account_master",
         )
 
         if submitted_accounts:
-            df = _v48_strip_visual_columns(st.session_state.get("v133_users_df", edited_users).copy())
-            to_delete = [u for u in st.session_state.get("v48_delete_usernames", []) if u]
-            if to_delete and "帳號 / Username" in df.columns:
-                save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(set(to_delete))].copy()
-            else:
-                save_df = df.copy()
+            df = st.session_state.get("v133_users_df", pd.DataFrame()).copy(deep=True)
+            if "刪除狀態 / Delete Status" in df.columns:
+                df = df.drop(columns=["刪除狀態 / Delete Status"])
+            delete_set = {str(x).strip() for x in st.session_state.get("v49_account_delete_targets", []) if str(x).strip()}
+            save_df = df.loc[~df["帳號 / Username"].fillna("").astype(str).str.strip().isin(delete_set)].copy() if not df.empty else df
             result = save_users(_users_to_service_rows(save_df))
-            deleted = delete_users(to_delete)
-            if to_delete and deleted == 0:
-                st.warning("已偵測到刪除選擇，但未刪除任何帳號；admin 系統帳號不可刪除，其他帳號請確認帳號欄位是否有效。")
-            st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
+            deleted = delete_users(sorted(delete_set)) if delete_set else 0
+            st.success(f"帳號已儲存：{result.get('saved', 0)} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
             if result.get("skipped"):
                 st.warning("；".join(result["skipped"]))
             st.session_state.pop("v133_users_df", None)
-            st.session_state["v48_delete_usernames"] = []
+            st.session_state["v49_account_delete_targets"] = []
             st.session_state["v166_account_edit_enabled"] = False
-            st.session_state["v48_last_action"] = "saved_accounts"
+            st.session_state["v49_last_action"] = "saved"
             st.rerun()
 
     with account_tab_excel:
@@ -1052,21 +693,25 @@ with tab_perm:
     st.markdown("#### 快速勾選 / Quick Toggle")
     b1, b2, b3, b4, b5 = st.columns(5)
     with b1:
-        st.button("◈ 可進入全選 / Select View", use_container_width=True, key="v25_perm_select_view", on_click=_v25_permission_quick, args=("can_view:on",))
+        if st.button("◈ 可進入全選 / Select View", use_container_width=True):
+            view_df["can_view"] = True
+            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b2:
-        st.button("◌ 可進入取消 / Clear View", use_container_width=True, key="v25_perm_clear_view", on_click=_v25_permission_quick, args=("can_view:off",))
+        if st.button("◌ 可進入取消 / Clear View", use_container_width=True):
+            view_df["can_view"] = False
+            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b3:
-        st.button("◈ 編輯全選 / Select Edit", use_container_width=True, key="v25_perm_select_edit", on_click=_v25_permission_quick, args=("can_edit:on",))
+        if st.button("◈ 編輯全選 / Select Edit", use_container_width=True):
+            view_df["can_edit"] = True
+            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b4:
-        st.button("⟰ 匯出全選 / Select Export", use_container_width=True, key="v25_perm_select_export", on_click=_v25_permission_quick, args=("can_export:on",))
+        if st.button("⟰ 匯出全選 / Select Export", use_container_width=True):
+            view_df["can_export"] = True
+            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     with b5:
-        st.button("⛨ 管理全選 / Select Manage", use_container_width=True, key="v25_perm_select_manage", on_click=_v25_permission_quick, args=("can_manage:on",))
-    _v25_perm_action = st.session_state.pop("v25_permission_quick_action", None)
-    if _v25_perm_action and ":" in _v25_perm_action:
-        _col, _mode = _v25_perm_action.split(":", 1)
-        if _col in ACTION_COLS and _col in view_df.columns:
-            view_df[_col] = (_mode == "on")
-
+        if st.button("⛨ 管理全選 / Select Manage", use_container_width=True):
+            view_df["can_manage"] = True
+            st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
     base_cols = ["username", "display_name", "role_code", "module_code", "module_name_zh", "module_name_en"]
     col_cfg = {
         "username": st.column_config.TextColumn("帳號 / Username", disabled=True),
