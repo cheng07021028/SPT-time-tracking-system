@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-21 22:36:42",
+  "exported_at": "2026-05-21 22:40:13",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 1,
@@ -13,7 +13,7 @@
     "employees": 0,
     "login_logs": 42,
     "process_categories": 1,
-    "process_category_options": 0,
+    "process_category_options": 17,
     "process_options": 17,
     "rest_periods": 5,
     "security_login_logs": 1,
@@ -22,10 +22,11 @@
     "security_settings": 2,
     "security_user_roles": 9,
     "security_users": 9,
-    "system_logs": 94,
+    "system_logs": 116,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
+    "table_ui_settings": 0,
     "time_records": 1,
     "work_orders": 0
   },
@@ -2827,7 +2828,178 @@
         "updated_at": "2026-05-21 22:36:35"
       }
     ],
-    "process_category_options": [],
+    "process_category_options": [
+      {
+        "id": 1,
+        "category_name": "全部 / 通用",
+        "process_name": "前置鈑金",
+        "is_active": 1,
+        "sort_order": 1,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 2,
+        "category_name": "全部 / 通用",
+        "process_name": "LP改造",
+        "is_active": 1,
+        "sort_order": 2,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 3,
+        "category_name": "全部 / 通用",
+        "process_name": "骨架組立",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 4,
+        "category_name": "全部 / 通用",
+        "process_name": "配電",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 5,
+        "category_name": "全部 / 通用",
+        "process_name": "模組",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 6,
+        "category_name": "全部 / 通用",
+        "process_name": "水平",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 7,
+        "category_name": "全部 / 通用",
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 8,
+        "category_name": "全部 / 通用",
+        "process_name": "清潔",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 9,
+        "category_name": "全部 / 通用",
+        "process_name": "收機",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 10,
+        "category_name": "全部 / 通用",
+        "process_name": "包機",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 11,
+        "category_name": "全部 / 通用",
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 12,
+        "category_name": "全部 / 通用",
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 13,
+        "category_name": "全部 / 通用",
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 13,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 14,
+        "category_name": "全部 / 通用",
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 15,
+        "category_name": "全部 / 通用",
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 16,
+        "category_name": "全部 / 通用",
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      },
+      {
+        "id": 17,
+        "category_name": "全部 / 通用",
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "系統預設工段，可於 13 系統設定修改",
+        "created_at": "2026-05-21 22:36:35",
+        "updated_at": "2026-05-21 22:36:35"
+      }
+    ],
     "process_options": [
       {
         "id": 1,
@@ -5732,6 +5904,248 @@
         "message": "UPDATE security_users",
         "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE username=?",
         "level": "INFO"
+      },
+      {
+        "id": 95,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name,is_active,sort_order,note,created_at,updated_at) VALUES (?,1,1,'系統預設類別',?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 96,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 97,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 98,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 99,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 100,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 101,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 102,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 103,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 104,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 105,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 106,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 107,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 108,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 109,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 110,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 111,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 112,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "INSERT OR IGNORE INTO process_category_options(category_name,process_name,is_active,sort_order,note,created_at,updated_at) VALUES (?, ?, 1, ?, '系統預設工段，可於 13 系統設定修改', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 113,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 114,
+        "log_time": "2026-05-21 22:37:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 115,
+        "log_time": "2026-05-21 22:37:22",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 116,
+        "log_time": "2026-05-21 22:37:22",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
       }
     ],
     "system_settings": [
@@ -5774,6 +6188,7 @@
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
+    "table_ui_settings": [],
     "time_records": [
       {
         "id": 9,
