@@ -143,7 +143,29 @@ def _from_editor_df(df: pd.DataFrame) -> pd.DataFrame:
     return ensure_cols(df)
 
 
+def _commit_current_editor_widget_state() -> None:
+    """V67: commit data_editor widget delta into this page draft before any buttons/KPI read it.
+
+    Streamlit reruns top-to-bottom.  Buttons above the table can run before the
+    editor return value is copied back to STATE_KEY, so checkbox/text edits may
+    appear to disappear.  This only synchronizes the in-memory draft; it does not
+    save business data or change any other feature.
+    """
+    try:
+        from services.data_editor_state_service import commit_editor_widget_state_to_session
+        commit_editor_widget_state_to_session(
+            state_key=STATE_KEY,
+            editor_key=_editor_key(),
+            to_editor_df=_to_editor_df,
+            from_editor_df=_from_editor_df,
+            ensure_df=ensure_cols,
+        )
+    except Exception:
+        pass
+
+
 def _current_internal_df() -> pd.DataFrame:
+    _commit_current_editor_widget_state()
     return ensure_cols(st.session_state.get(STATE_KEY, pd.DataFrame()))
 
 
@@ -694,7 +716,7 @@ with tab1:
             "assembly_location": "", "customer": "", "note": "", "is_active": True,
             "created_at": "", "updated_at": ""
         }])
-        st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
+        st.session_state[STATE_KEY] = pd.concat([blank, _current_internal_df()], ignore_index=True)
         _refresh_editor_widget()
         rerun()
     if c2.button("☑ 啟用全選 / Active All", use_container_width=True, disabled=not work_order_edit_enabled, key="v64_work_order_active_all_on"):
@@ -718,6 +740,7 @@ with tab1:
     dl2.download_button("⟰ 下載製令匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_製令匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
     st.info("V64：批次按鈕已改為重新指定整份暫存表；啟用全選 / 啟用取消 / 刪除全選 / 刪除取消會立即刷新 checkbox 與 KPI，不再被舊 data_editor 草稿蓋回。")
+    _commit_current_editor_widget_state()
     st.session_state[STATE_KEY] = _current_internal_df()
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
     edited = st.data_editor(
@@ -797,7 +820,7 @@ with tab3:
 
             a1, a2 = st.columns(2)
             if a1.button("⊕ 加入清單編輯 / Add to Editor", type="secondary", use_container_width=True, key="add_pasted_work_orders_to_editor_v138", disabled=not st.session_state.get("v253_work_order_edit_enabled", False)):
-                st.session_state[STATE_KEY] = pd.concat([parsed, st.session_state[STATE_KEY]], ignore_index=True)
+                st.session_state[STATE_KEY] = pd.concat([parsed, _current_internal_df()], ignore_index=True)
                 st.success("已加入『製令清單編輯』頁，請切回第一個頁籤確認後按儲存。")
 
             if a2.button("▣ 直接儲存貼上資料 / Save Pasted Work Orders", type="primary", use_container_width=True, key="save_pasted_work_orders_v138", disabled=not st.session_state.get("v253_work_order_edit_enabled", False)):

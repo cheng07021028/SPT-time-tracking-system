@@ -104,6 +104,21 @@ def _from_editor_df(df: pd.DataFrame) -> pd.DataFrame:
     return ensure_cols(work)
 
 
+def _commit_current_editor_widget_state() -> None:
+    """V67: commit data_editor widget delta into this page draft before buttons/KPI read it."""
+    try:
+        from services.data_editor_state_service import commit_editor_widget_state_to_session
+        commit_editor_widget_state_to_session(
+            state_key=STATE_KEY,
+            editor_key=editor_key(),
+            to_editor_df=_to_editor_df,
+            from_editor_df=_from_editor_df,
+            ensure_df=ensure_cols,
+        )
+    except Exception:
+        pass
+
+
 def reload_employees() -> None:
     st.session_state[STATE_KEY] = ensure_cols(load_employees())
     st.session_state[EDITOR_REV_KEY] = int(st.session_state.get(EDITOR_REV_KEY, 0)) + 1
@@ -134,6 +149,7 @@ def touch_editor() -> None:
 
 
 def _current_internal_df() -> pd.DataFrame:
+    _commit_current_editor_widget_state()
     return ensure_cols(st.session_state.get(STATE_KEY, pd.DataFrame()))
 
 
@@ -248,6 +264,7 @@ else:
     c8.caption("批次按鈕只改畫面暫存，按儲存後才寫入。")
 
     editor_key = f"today_attendance_editor_v202_{st.session_state.get(EDITOR_REV_KEY, 0)}"
+    _commit_current_editor_widget_state()
     st.session_state[STATE_KEY] = ensure_cols(st.session_state[STATE_KEY])
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
     edited = st.data_editor(

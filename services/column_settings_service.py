@@ -843,12 +843,42 @@ def install_column_settings_patch() -> None:
             else:
                 kwargs.pop("column_order", None)
             draft_df = _get_editor_draft(table_id, df)
+            # V67: synchronize Streamlit's widget delta before rendering.  This keeps
+            # checkbox/text edits from disappearing when another widget triggers a
+            # rerun before the page has copied the returned dataframe into its own
+            # session_state draft.
+            widget_key = kwargs.get("key")
+            try:
+                from services.data_editor_state_service import apply_data_editor_widget_state
+                if widget_key:
+                    draft_df = apply_data_editor_widget_state(draft_df, st.session_state.get(widget_key))
+                    _set_editor_draft(table_id, draft_df)
+            except Exception:
+                pass
+            if widget_key and not kwargs.get("on_change"):
+                def _spt_v67_commit_editor_delta(_table_id=table_id, _widget_key=widget_key, _fallback_df=draft_df.copy()):
+                    try:
+                        from services.data_editor_state_service import apply_data_editor_widget_state
+                        current = st.session_state.get(f"_spt_editor_draft::{_table_id}")
+                        if not isinstance(current, pd.DataFrame):
+                            current = _fallback_df.copy()
+                        committed = apply_data_editor_widget_state(current, st.session_state.get(_widget_key))
+                        st.session_state[f"_spt_editor_draft::{_table_id}"] = committed.copy()
+                    except Exception:
+                        pass
+                kwargs["on_change"] = _spt_v67_commit_editor_delta
             try:
                 edited = original_data_editor(draft_df, *args, **kwargs)
             except TypeError:
                 kwargs.pop("column_order", None)
                 edited = original_data_editor(draft_df, *args, **kwargs)
             merged = _merge_hidden_back(draft_df, edited)
+            try:
+                from services.data_editor_state_service import apply_data_editor_widget_state
+                if widget_key:
+                    merged = apply_data_editor_widget_state(merged, st.session_state.get(widget_key))
+            except Exception:
+                pass
             _set_editor_draft(table_id, merged)
             return merged
         edited = original_data_editor(data, *args, **kwargs)
