@@ -389,8 +389,19 @@ def _v37_clear_widget_state(prefix: str) -> None:
                 pass
 
 def _v37_touch_account_editor() -> None:
+    """Rotate the Account Master editor safely after bulk actions.
+
+    This function must never call itself.  The previous V50 file accidentally
+    did so and caused RecursionError before Streamlit could render the page.
+    """
     _v37_clear_widget_state("v171_account_password_editor_")
-    _v37_touch_account_editor()
+    _v37_clear_widget_state("v171_account_master_edit_form")
+    _v37_clear_widget_state("v49_account_table_editor_")
+    _v37_clear_widget_state("v50_account_table_editor_")
+    try:
+        st.session_state["v37_account_editor_rev"] = int(st.session_state.get("v37_account_editor_rev", 0)) + 1
+    except Exception:
+        st.session_state["v37_account_editor_rev"] = 1
     st.session_state["v37_account_bulk_just_applied"] = True
 
 # V27: stable account/permission callbacks.
@@ -523,184 +534,90 @@ with tab_accounts:
 
 
         st.markdown("### 帳號清單編輯 / Editable Account Master")
-        st.caption("V50：帳號清單編輯已刪除舊 form + 表格內刪除 checkbox 程式碼，改用表格外『待刪除帳號清單』作為唯一刪除依據。")
 
-        V50_DRAFT_KEY = "v50_account_master_draft_df"
-        V50_DELETE_KEY = "v50_account_master_delete_usernames"
-        V50_EDIT_KEY = "v50_account_master_edit_enabled"
-        V50_REV_KEY = "v50_account_master_editor_rev"
-        V50_LAST_KEY = "v50_account_master_last_action"
-        V50_DELETE_COLS = ["刪除 / Delete", "刪除選擇 / Delete Select", "刪除顯示 / Delete Display", "刪除方框 / Delete Box", "刪除狀態 / Delete Mark"]
-
-        def _v50_rerun():
-            try:
-                st.rerun()
-            except Exception:
-                try:
-                    st.experimental_rerun()
-                except Exception:
-                    pass
-
-        def _v50_clean_df(df):
-            if df is None or not isinstance(df, pd.DataFrame):
-                df = _users_for_editor()
-            df = df.copy(deep=True)
-            for c in V50_DELETE_COLS:
-                if c in df.columns:
-                    df = df.drop(columns=[c])
-            cols = ["帳號 / Username", "密碼狀態 / Password Status", "新密碼 / New Password", "工號 / Employee ID", "姓名 / Display Name", "Email", "角色 / Role", "啟用 / Active", "強制改密碼 / Force Change", "備註 / Note", "最後登入 / Last Login", "更新時間 / Updated At"]
-            for c in cols:
-                if c not in df.columns:
-                    if c == "啟用 / Active":
-                        df[c] = True
-                    elif c == "強制改密碼 / Force Change":
-                        df[c] = False
-                    elif c == "角色 / Role":
-                        df[c] = "operator"
-                    elif c == "密碼狀態 / Password Status":
-                        df[c] = "********"
-                    else:
-                        df[c] = ""
-            df = df[cols + [c for c in df.columns if c not in cols]].copy()
-            df["帳號 / Username"] = df["帳號 / Username"].astype(str).str.strip()
-            df = df.loc[df["帳號 / Username"] != ""].drop_duplicates(subset=["帳號 / Username"], keep="first")
-            df["啟用 / Active"] = df["啟用 / Active"].map(lambda v: _as_bool_value(v, True))
-            df["強制改密碼 / Force Change"] = df["強制改密碼 / Force Change"].map(lambda v: _as_bool_value(v, False))
-            return df.reset_index(drop=True)
-
-        def _v50_load(force=False):
-            if not force and isinstance(st.session_state.get(V50_DRAFT_KEY), pd.DataFrame):
-                return _v50_clean_df(st.session_state[V50_DRAFT_KEY])
-            df = _users_for_editor()
-            df = _v50_clean_df(df)
-            st.session_state[V50_DRAFT_KEY] = df.copy(deep=True)
-            st.session_state["v133_users_df"] = df.copy(deep=True)
-            return df
-
-        def _v50_touch(action):
-            st.session_state[V50_REV_KEY] = int(st.session_state.get(V50_REV_KEY, 0)) + 1
-            st.session_state[V50_LAST_KEY] = action
-
-        def _v50_set_edit(flag):
-            st.session_state[V50_EDIT_KEY] = bool(flag)
-            st.session_state["v166_account_edit_enabled"] = bool(flag)
-            if flag:
-                st.session_state[V50_DRAFT_KEY] = _v50_load(False)
-            else:
-                st.session_state[V50_DRAFT_KEY] = _v50_load(True)
-                st.session_state[V50_DELETE_KEY] = []
-            _v50_touch("enable_edit" if flag else "stop_edit")
-            _v50_rerun()
-
-        def _v50_reload():
-            st.session_state[V50_DRAFT_KEY] = _v50_load(True)
-            st.session_state[V50_DELETE_KEY] = []
-            _v50_touch("reload")
-            _v50_rerun()
-
-        def _v50_add_blank():
-            df = _v50_load(False)
-            row = _blank_user_row()
-            for c in V50_DELETE_COLS:
-                row.pop(c, None)
-            df = pd.concat([pd.DataFrame([row]), df], ignore_index=True)
-            df = _v50_clean_df(df)
-            st.session_state[V50_DRAFT_KEY] = df.copy(deep=True)
-            st.session_state["v133_users_df"] = df.copy(deep=True)
-            _v50_touch("add_blank")
-            _v50_rerun()
-
-        st.session_state.setdefault(V50_EDIT_KEY, bool(st.session_state.get("v166_account_edit_enabled", False)))
-        st.session_state.setdefault(V50_REV_KEY, 0)
-        st.session_state.setdefault(V50_DELETE_KEY, [])
-        st.session_state["v166_account_edit_enabled"] = bool(st.session_state.get(V50_EDIT_KEY, False))
-        edit_on = bool(st.session_state.get(V50_EDIT_KEY, False))
-        df_v50 = _v50_load(False)
-        names_v50 = [str(x).strip() for x in df_v50["帳號 / Username"].tolist() if str(x).strip()]
-        st.session_state[V50_DELETE_KEY] = [x for x in st.session_state.get(V50_DELETE_KEY, []) if x in names_v50]
+        # V1.74：啟動/停止編輯只保留頁面上方唯一一組，避免帳號總表區重複顯示。
+        if "v166_account_edit_enabled" not in st.session_state:
+            st.session_state["v166_account_edit_enabled"] = False
+        account_edit_enabled = bool(st.session_state.get("v166_account_edit_enabled", False))
+        st.session_state.setdefault("v235_account_editor_rev", 0)
 
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            if st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=edit_on, key="v50_enable_edit"):
-                _v50_set_edit(True)
+            st.button("⊕ 新增帳號 / Add User", use_container_width=True, disabled=not account_edit_enabled, key="v25_account_add_user_row", on_click=_v25_account_add_blank)
         with c2:
-            if st.button("◌ 停止編輯 / Stop Edit", use_container_width=True, disabled=not edit_on, key="v50_stop_edit"):
-                _v50_set_edit(False)
+            st.button("⊖ 刪除欄全選 / Select Delete", use_container_width=True, disabled=not account_edit_enabled, key="v25_account_select_delete", on_click=_v25_account_delete_flag, args=(True,))
         with c3:
-            if st.button("⊕ 新增帳號 / Add User", use_container_width=True, disabled=not edit_on, key="v50_add_user"):
-                _v50_add_blank()
+            st.button("◌ 刪除欄取消 / Clear Delete", use_container_width=True, disabled=not account_edit_enabled, key="v25_account_clear_delete", on_click=_v25_account_delete_flag, args=(False,))
         with c4:
-            if st.button("⟳ 重新載入 / Reload", use_container_width=True, key="v50_reload"):
-                _v50_reload()
+            st.button("⟳ 重新載入 / Reload", use_container_width=True, key="v25_account_reload", on_click=_v25_account_reload)
 
-        if edit_on:
-            st.success("目前：已啟動編輯。刪除不再使用表格內 checkbox，請用下方待刪除帳號清單。")
-        else:
-            st.info("目前：唯讀保護。請先啟動編輯。")
+        st.warning("V1.76：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。")
 
-        dc1, dc2 = st.columns(2)
-        with dc1:
-            if st.button("⊖ 刪除全選 / Select All Delete", use_container_width=True, disabled=not edit_on or not names_v50, key="v50_delete_all"):
-                st.session_state[V50_DELETE_KEY] = list(names_v50)
-                _v50_touch("select_delete_all")
-                _v50_rerun()
-        with dc2:
-            if st.button("◌ 刪除取消 / Clear Delete", use_container_width=True, disabled=not edit_on, key="v50_delete_clear"):
-                st.session_state[V50_DELETE_KEY] = []
-                _v50_touch("clear_delete_all")
-                _v50_rerun()
+        # V1.71：帳號總表使用 st.form 包住 data_editor。
+        # 原因：Streamlit 一般 data_editor 每次切換儲存格、勾選、下拉或其他元件互動都可能 rerun，
+        # 導致尚未儲存的編輯草稿被資料庫原始資料重建覆蓋。
+        # 放入 form 後，編輯期間不 rerun，只有按下 form_submit_button 才送出整張表。
+        with st.form("v171_account_master_edit_form", clear_on_submit=False):
+            account_editor_key = f"v171_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
+            edited_users = st.data_editor(
+                st.session_state["v133_users_df"], key=account_editor_key, use_container_width=True,
+                num_rows="fixed", hide_index=True,
+                disabled=not account_edit_enabled,
+                height=360,
+                column_order=[c for c in ["刪除 / Delete"] + list(st.session_state["v133_users_df"].columns) if c in list(st.session_state["v133_users_df"].columns)],
+                column_config={
+                    "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
+                    "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
+                    "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
+                    "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
+                    "工號 / Employee ID": st.column_config.TextColumn("工號 / Employee ID"),
+                    "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
+                    "Email": st.column_config.TextColumn("Email"),
+                    "角色 / Role": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
+                    "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active"),
+                    "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
+                    "備註 / Note": st.column_config.TextColumn("備註 / Note"),
+                    "最後登入 / Last Login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
+                    "更新時間 / Updated At": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
+                },
+            )
 
-        selector_key = f"v50_delete_selector_{st.session_state.get(V50_REV_KEY, 0)}"
-        selected_delete = st.multiselect("待刪除帳號清單 / Accounts Marked for Delete", options=names_v50, default=st.session_state.get(V50_DELETE_KEY, []), key=selector_key, disabled=not edit_on)
-        st.session_state[V50_DELETE_KEY] = list(selected_delete)
+            active_count = int(_to_bool_series(edited_users, "啟用 / Active").sum())
+            delete_count = int(_to_bool_series(edited_users, "刪除 / Delete").sum())
+            new_password_count = int(sum(1 for _, _row in edited_users.iterrows() if _password_from_editor_row(_row)))
+            m1, m2, m3 = st.columns(3)
+            m1.metric("啟用帳號 / Active", active_count)
+            m2.metric("待刪除 / Pending Delete", delete_count)
+            m3.metric("密碼異動 / Password Changes", new_password_count)
+            submitted_accounts = st.form_submit_button(
+                "▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master",
+                type="primary",
+                use_container_width=True,
+                disabled=not account_edit_enabled,
+            )
 
-        display = df_v50.copy(deep=True)
-        display["刪除狀態 / Delete State"] = display["帳號 / Username"].map(lambda u: "1｜刪除" if u in set(selected_delete) else "0｜保留")
-        order = [c for c in ["刪除狀態 / Delete State", "帳號 / Username", "密碼狀態 / Password Status", "新密碼 / New Password", "工號 / Employee ID", "姓名 / Display Name", "Email", "角色 / Role", "啟用 / Active", "強制改密碼 / Force Change", "備註 / Note", "最後登入 / Last Login", "更新時間 / Updated At"] if c in display.columns]
-        edited = st.data_editor(display, key=f"v50_account_editor_{st.session_state.get(V50_REV_KEY, 0)}", use_container_width=True, num_rows="fixed", hide_index=True, disabled=not edit_on, height=380, column_order=order, column_config={
-            "刪除狀態 / Delete State": st.column_config.TextColumn("刪除狀態 / Delete State", disabled=True),
-            "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
-            "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）"),
-            "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password"),
-            "工號 / Employee ID": st.column_config.TextColumn("工號 / Employee ID"),
-            "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
-            "Email": st.column_config.TextColumn("Email"),
-            "角色 / Role": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
-            "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active"),
-            "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
-            "備註 / Note": st.column_config.TextColumn("備註 / Note"),
-            "最後登入 / Last Login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
-            "更新時間 / Updated At": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
-        })
-        clean = _v50_clean_df(edited)
-        if edit_on:
-            st.session_state[V50_DRAFT_KEY] = clean.copy(deep=True)
-            st.session_state["v133_users_df"] = clean.copy(deep=True)
+        if account_edit_enabled and not st.session_state.pop("v37_account_bulk_just_applied", False):
+            # Keep normal manual edits, but do not let a stale data_editor/form return value
+            # undo a bulk button result in the same rerun.
+            st.session_state["v133_users_df"] = edited_users.copy()
 
-        m1, m2, m3 = st.columns(3)
-        m1.metric("啟用帳號 / Active", int(_to_bool_series(clean, "啟用 / Active", True).sum()) if len(clean) else 0)
-        m2.metric("待刪除 / Pending Delete", len(selected_delete))
-        m3.metric("密碼異動 / Password Changes", int(sum(1 for _, row in clean.iterrows() if _password_from_editor_row(row))) if len(clean) else 0)
-
-        with st.expander("V50 診斷 / Diagnostics", expanded=False):
-            st.json({"page_file": __file__, "edit_enabled": edit_on, "rows": int(len(clean)), "delete_selected_count": int(len(selected_delete)), "delete_selected": list(selected_delete), "last_action": st.session_state.get(V50_LAST_KEY, ""), "v50_mode": "full-rewrite-no-form-no-delete-checkbox"})
-
-        if st.button("▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master", type="primary", use_container_width=True, disabled=not edit_on, key="v50_save"):
-            df_save = _v50_clean_df(st.session_state.get(V50_DRAFT_KEY, clean))
-            to_delete = [u for u in st.session_state.get(V50_DELETE_KEY, []) if u in set(df_save["帳號 / Username"].astype(str).str.strip())]
-            save_df = df_save.loc[~df_save["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy() if to_delete else df_save.copy()
+        if submitted_accounts:
+            df = edited_users.copy()
+            to_delete = _selected_delete_usernames(df, account_editor_key)
+            if to_delete:
+                save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy()
+            else:
+                save_df = df.copy()
             result = save_users(_users_to_service_rows(save_df))
             deleted = delete_users(to_delete)
-            st.success(f"帳號已儲存：{result.get('saved', 0)} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
+            if to_delete and deleted == 0:
+                st.warning("已偵測到刪除勾選，但未刪除任何帳號；admin 系統帳號不可刪除，其他帳號請確認帳號欄位是否有效。")
+            st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
             if result.get("skipped"):
-                st.warning("；".join(result.get("skipped", [])))
-            st.session_state.pop(V50_DRAFT_KEY, None)
-            st.session_state["v133_users_df"] = _users_for_editor()
-            st.session_state[V50_DELETE_KEY] = []
-            st.session_state[V50_EDIT_KEY] = False
+                st.warning("；".join(result["skipped"]))
+            st.session_state.pop("v133_users_df", None)
             st.session_state["v166_account_edit_enabled"] = False
-            _v50_touch("save")
-            _v50_rerun()
+            st.rerun()
 
     with account_tab_excel:
         st.markdown("### Excel 匯入帳號密碼設定 / Import Account Password Settings")
