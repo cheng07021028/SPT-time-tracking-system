@@ -1806,3 +1806,194 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
             pass
     return count
 # ===================== END V75 FINAL 01/02 live-history sync + SQLite-first read =====================
+
+
+
+# ======================= V76 HARD 01/02 LIVE SYNC FIX =======================
+# 目的：修正 01 工時紀錄新增/暫停/完工/下班後，02 歷史紀錄仍看不到新紀錄的問題。
+# 原因：先前部分流程仍可能讀到 query cache / 舊 authority JSON / 舊 wrapper。
+# 原則：
+# 1) 01/02 共用 SQLite time_records 作為即時來源。
+# 2) 02 歷史紀錄 load_records 直接讀 SQLite，不再經過可能讀舊 JSON 的 wrapper。
+# 3) 01 每次 start_work / finish_work 後，直接用 SQLite 全表刷新 01_time_records + 02_history 權威檔。
+# 4) 一般作業同步不打 GitHub，避免 01 頁面慢；管理員儲存/重算/刪除/匯入才允許 github=True。
+
+def _v76_direct_sqlite_time_records_df() -> pd.DataFrame:
+    """Read live time_records directly from SQLite, bypassing cached query_df wrappers."""
+    try:
+        from services.db_service import ensure_database as _ensure_database
+        _ensure_database()
+    except Exception:
+        pass
+    try:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(DB_PATH, timeout=15) as conn:
+            conn.row_factory = sqlite3.Row
+            try:
+                conn.execute("PRAGMA busy_timeout=8000")
+            except Exception:
+                pass
+            try:
+                rows = conn.execute("SELECT * FROM time_records ORDER BY id DESC").fetchall()
+            except sqlite3.OperationalError as exc:
+                # 舊 DB 尚未建立 time_records 時，不讓頁面崩潰。
+                if "no such table" in str(exc).lower():
+                    return pd.DataFrame()
+                raise
+            return pd.DataFrame([dict(r) for r in rows])
+    except Exception as exc:
+        try:
+            write_log("V76_DIRECT_SQLITE_READ_ERROR", f"直接讀取 time_records 失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        return pd.DataFrame()
+
+
+def _v76_filter_records_df(df: pd.DataFrame, start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    if start_date:
+        if "start_date" in out.columns:
+            out = out[out["start_date"].astype(str) >= str(start_date)]
+        elif "work_date" in out.columns:
+            out = out[out["work_date"].astype(str) >= str(start_date)]
+    if end_date:
+        if "start_date" in out.columns:
+            out = out[out["start_date"].astype(str) <= str(end_date)]
+        elif "work_date" in out.columns:
+            out = out[out["work_date"].astype(str) <= str(end_date)]
+    if employee_id and "employee_id" in out.columns:
+        out = out[out["employee_id"].astype(str) == str(employee_id)]
+    if work_order and "work_order" in out.columns:
+        out = out[out["work_order"].astype(str) == str(work_order)]
+    try:
+        if "id" in out.columns:
+            out["_v76_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values("_v76_sort_id", ascending=False).drop(columns=["_v76_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v76_rows_from_sqlite() -> list[dict]:
+    df = _v76_direct_sqlite_time_records_df()
+    if df is None or df.empty:
+        return []
+    # 權威檔存放時用 id 遞增較容易人工檢查；畫面 load 再用 id DESC。
+    try:
+        if "id" in df.columns:
+            df = df.assign(_v76_id=pd.to_numeric(df["id"], errors="coerce")).sort_values("_v76_id").drop(columns=["_v76_id"], errors="ignore")
+    except Exception:
+        pass
+    return _v75_table_rows_from_df(df)
+
+
+def sync_time_records_01_02_now(reason: str = "v76_manual_sync", *, github: bool = False) -> int:
+    """Public helper: sync live SQLite time_records into both 01 and 02 authority files."""
+    rows = _v76_rows_from_sqlite()
+    try:
+        _v75_write_legacy_time_record_files(rows, reason=reason)
+    except Exception:
+        pass
+    try:
+        if _v28_update_tables is not None:
+            try:
+                _v28_update_tables("01_time_records", {"time_records": rows}, reason=f"{reason}_01", github=False)
+            except TypeError:
+                _v28_update_tables("01_time_records", {"time_records": rows}, reason=f"{reason}_01")
+            try:
+                _v28_update_tables("02_history", {"time_records": rows}, reason=f"{reason}_02", github=bool(github))
+            except TypeError:
+                _v28_update_tables("02_history", {"time_records": rows}, reason=f"{reason}_02")
+    except Exception as exc:
+        try:
+            write_log("V76_01_02_SYNC_ERROR", f"01/02 權威同步失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(len(rows))
+
+
+# Preserve the latest working implementations, then layer a direct SQLite sync/read on top.
+_v76_prev_start_work = start_work
+_v76_prev_finish_work = finish_work
+_v76_prev_save_time_records = save_time_records
+_v76_prev_recalculate_time_records = recalculate_time_records
+_v76_prev_delete_time_records = delete_time_records
+_v76_prev_import_time_records = import_time_records
+_v76_prev_load_records = load_records
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    rid = _v76_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old)
+    if rid:
+        # 01 新增開始紀錄後，02 歷史紀錄立即可讀；不打 GitHub，避免慢。
+        sync_time_records_01_02_now("start_work_v76_live_to_history", github=False)
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    count = _v76_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group)
+    if count:
+        # 暫停/完工/下班後，02 立即同步結束時間、狀態、扣休後工時。
+        sync_time_records_01_02_now("finish_work_v76_live_to_history", github=False)
+    return count
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    n = _v76_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps)
+    if n:
+        sync_time_records_01_02_now("save_time_records_v76", github=True)
+    return n
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    n = _v76_prev_recalculate_time_records(record_ids)
+    if n:
+        sync_time_records_01_02_now("recalculate_time_records_v76", github=True)
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    n = _v76_prev_delete_time_records(record_ids, reason=reason)
+    # 不論回傳刪除幾筆，都以 SQLite 現況覆蓋 01/02，避免刪除列復活。
+    sync_time_records_01_02_now("delete_time_records_v76", github=True)
+    return n
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    result = _v76_prev_import_time_records(df, recalc=recalc, source=source)
+    try:
+        changed = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
+    except Exception:
+        changed = 0
+    if changed:
+        sync_time_records_01_02_now("import_time_records_v76", github=True)
+    return result
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """02 歷史紀錄即時讀取 SQLite。只有 SQLite 空表時才 fallback 權威檔。"""
+    try:
+        ensure_time_records_available("load_records_v76_sqlite_first")
+    except Exception:
+        pass
+    live_df = _v76_direct_sqlite_time_records_df()
+    if live_df is not None and not live_df.empty:
+        return _v76_filter_records_df(live_df, start_date, end_date, employee_id, work_order)
+    # SQLite 沒資料才讀權威檔，避免 01 剛新增後 02 還讀舊 JSON。
+    try:
+        auth_df = _v75_load_records_from_authority(start_date, end_date, employee_id, work_order)
+        if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+            return auth_df.reset_index(drop=True)
+    except Exception:
+        pass
+    try:
+        return _v76_prev_load_records(start_date, end_date, employee_id, work_order)
+    except Exception:
+        return pd.DataFrame()
+# ===================== END V76 HARD 01/02 LIVE SYNC FIX =====================
