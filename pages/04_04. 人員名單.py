@@ -39,19 +39,7 @@ def _editor_key() -> str:
     return f"employees_data_editor_v253_{st.session_state[EDITOR_VERSION_KEY]}"
 
 
-def _v37_clear_widget_state(*tokens: str) -> None:
-    # V38: clear old data_editor/form widget state before rotating key.
-    clean_tokens = [str(x) for x in tokens if str(x)]
-    for k in list(st.session_state.keys()):
-        sk = str(k)
-        if any(tok in sk for tok in clean_tokens):
-            try:
-                del st.session_state[k]
-            except Exception:
-                pass
-
 def _refresh_editor_widget() -> None:
-    _v37_clear_widget_state("employees_data_editor_v253_", "employees_commit_form")
     st.session_state[EDITOR_VERSION_KEY] = int(st.session_state.get(EDITOR_VERSION_KEY, 0)) + 1
 
 COLS = [
@@ -242,59 +230,6 @@ def reload_data():
     st.session_state[STATE_KEY] = ensure_cols(df)
 
 
-# V27: button callbacks must be defined before widgets are created.
-# These callbacks update the dataframe stored in session_state and then rotate
-# the data_editor key, so Streamlit immediately shows the checkbox changes.
-def _v25_emp_set_edit(enabled: bool) -> None:
-    st.session_state["v253_employee_edit_enabled"] = bool(enabled)
-    if not enabled:
-        reload_data()
-    elif STATE_KEY not in st.session_state:
-        reload_data()
-    _refresh_editor_widget()
-    rerun()
-
-
-def _v25_emp_batch(action: str) -> None:
-    df = st.session_state.get(STATE_KEY)
-    if df is None or not isinstance(df, pd.DataFrame):
-        reload_data()
-        df = st.session_state.get(STATE_KEY, pd.DataFrame())
-    df = ensure_cols(df.copy())
-    if action == "add":
-        blank = pd.DataFrame([{
-            "_delete": False, "id": "", "employee_id": "", "employee_name": "",
-            "department": "", "title": "", "is_active": True,
-            "is_in_factory": True, "is_today_attendance": True, "note": "",
-            "created_at": "", "updated_at": "",
-        }])
-        df = pd.concat([blank, df], ignore_index=True)
-    elif action == "delete_on":
-        df["_delete"] = True
-    elif action == "delete_off":
-        df["_delete"] = False
-    elif action == "active_on":
-        df["is_active"] = True
-    elif action == "active_off":
-        df["is_active"] = False
-    elif action == "factory_on":
-        df["is_in_factory"] = True
-    elif action == "factory_off":
-        df["is_in_factory"] = False
-    elif action == "today_on":
-        df["is_today_attendance"] = True
-    elif action == "today_off":
-        df["is_today_attendance"] = False
-    elif action == "reload":
-        reload_data()
-        _refresh_editor_widget()
-        rerun()
-        return
-    st.session_state[STATE_KEY] = ensure_cols(df)
-    _refresh_editor_widget()
-    rerun()
-
-
 if STATE_KEY not in st.session_state:
     reload_data()
 
@@ -309,9 +244,16 @@ with tab1:
     employee_edit_enabled = bool(st.session_state.get("v253_employee_edit_enabled", False))
     ec1, ec2, ec3 = st.columns([1.2, 1.2, 3])
     with ec1:
-        st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=employee_edit_enabled, key="v25_enable_employee_edit", on_click=_v25_emp_set_edit, args=(True,))
+        if st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=employee_edit_enabled, key="v253_enable_employee_edit"):
+            st.session_state["v253_employee_edit_enabled"] = True
+            _refresh_editor_widget()
+            rerun()
     with ec2:
-        st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not employee_edit_enabled, key="v25_disable_employee_edit", on_click=_v25_emp_set_edit, args=(False,))
+        if st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not employee_edit_enabled, key="v253_disable_employee_edit"):
+            st.session_state["v253_employee_edit_enabled"] = False
+            reload_data()
+            _refresh_editor_widget()
+            rerun()
     with ec3:
         if employee_edit_enabled:
             st.success("目前：已啟動編輯。修改後請按儲存才會正式寫入。")
@@ -319,18 +261,53 @@ with tab1:
             st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上人員名單。")
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.button("⊕ 新增空白列", use_container_width=True, disabled=not employee_edit_enabled, key="v25_emp_add_blank", on_click=_v25_emp_batch, args=("add",))
-    c2.button("⊖ 刪除欄全選", use_container_width=True, disabled=not employee_edit_enabled, key="v25_emp_delete_all_on", on_click=_v25_emp_batch, args=("delete_on",))
-    c3.button("◌ 刪除欄取消", use_container_width=True, disabled=not employee_edit_enabled, key="v25_emp_delete_all_off", on_click=_v25_emp_batch, args=("delete_off",))
-    c4.button("◈ 啟用全選", use_container_width=True, disabled=not employee_edit_enabled, key="v25_emp_active_all_on", on_click=_v25_emp_batch, args=("active_on",))
-    c5.button("◌ 啟用全取消", use_container_width=True, disabled=not employee_edit_enabled, key="v25_emp_active_all_off", on_click=_v25_emp_batch, args=("active_off",))
-    c6.button("⟳ 重新載入", use_container_width=True, key="v25_emp_reload", on_click=_v25_emp_batch, args=("reload",))
+    if c1.button("⊕ 新增空白列", use_container_width=True, disabled=not employee_edit_enabled):
+        blank = pd.DataFrame([{
+            "_delete": False, "id": "", "employee_id": "", "employee_name": "",
+            "department": "", "title": "", "is_active": True, "is_in_factory": True,
+            "is_today_attendance": True, "note": "", "created_at": "", "updated_at": ""
+        }])
+        st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
+        _refresh_editor_widget()
+        rerun()
+    if c2.button("⊖ 刪除欄全選", use_container_width=True, disabled=not employee_edit_enabled):
+        st.session_state[STATE_KEY]["_delete"] = True
+        _refresh_editor_widget()
+        rerun()
+    if c3.button("◌ 刪除欄取消", use_container_width=True, disabled=not employee_edit_enabled):
+        st.session_state[STATE_KEY]["_delete"] = False
+        _refresh_editor_widget()
+        rerun()
+    if c4.button("◈ 啟用全選", use_container_width=True, disabled=not employee_edit_enabled):
+        st.session_state[STATE_KEY]["is_active"] = True
+        _refresh_editor_widget()
+        rerun()
+    if c5.button("◌ 啟用全取消", use_container_width=True, disabled=not employee_edit_enabled):
+        st.session_state[STATE_KEY]["is_active"] = False
+        _refresh_editor_widget()
+        rerun()
+    if c6.button("⟳ 重新載入", use_container_width=True):
+        reload_data()
+        _refresh_editor_widget()
+        rerun()
 
     b1, b2, b3, b4 = st.columns(4)
-    b1.button("⬡ 在廠全選", use_container_width=True, disabled=not employee_edit_enabled, key="v25_emp_factory_all_on", on_click=_v25_emp_batch, args=("factory_on",))
-    b2.button("⬡ 在廠全取消", use_container_width=True, disabled=not employee_edit_enabled, key="v25_emp_factory_all_off", on_click=_v25_emp_batch, args=("factory_off",))
-    b3.button("⧖ 今日出勤全選", use_container_width=True, disabled=not employee_edit_enabled, key="v25_emp_today_all_on", on_click=_v25_emp_batch, args=("today_on",))
-    b4.button("⧖ 今日出勤全取消", use_container_width=True, disabled=not employee_edit_enabled, key="v25_emp_today_all_off", on_click=_v25_emp_batch, args=("today_off",))
+    if b1.button("⬡ 在廠全選", use_container_width=True, disabled=not employee_edit_enabled):
+        st.session_state[STATE_KEY]["is_in_factory"] = True
+        _refresh_editor_widget()
+        rerun()
+    if b2.button("⬡ 在廠全取消", use_container_width=True, disabled=not employee_edit_enabled):
+        st.session_state[STATE_KEY]["is_in_factory"] = False
+        _refresh_editor_widget()
+        rerun()
+    if b3.button("⧖ 今日出勤全選", use_container_width=True, disabled=not employee_edit_enabled):
+        st.session_state[STATE_KEY]["is_today_attendance"] = True
+        _refresh_editor_widget()
+        rerun()
+    if b4.button("⧖ 今日出勤全取消", use_container_width=True, disabled=not employee_edit_enabled):
+        st.session_state[STATE_KEY]["is_today_attendance"] = False
+        _refresh_editor_widget()
+        rerun()
 
     st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。工號 / Employee ID、姓名 / Name 為必填。")
     e1, e2 = st.columns(2)
@@ -338,33 +315,39 @@ with tab1:
     tpl = pd.DataFrame(columns=["工號", "姓名", "單位", "職稱", "啟用", "在廠", "今日出勤", "備註"])
     e2.download_button("⟰ 下載人員匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_人員匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-    st.info("V1.89：人員清單已改成確認後才儲存。表格內輸入、勾選、換格不會立即觸發存檔或整頁重算。")
-    with st.form("employees_commit_form", clear_on_submit=False):
-        edited = st.data_editor(
-            st.session_state[STATE_KEY],
-            hide_index=True,
-            use_container_width=True,
-            num_rows="dynamic",
-            height=560,
-            column_order=COLS,
-            column_config={
-                "_delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small"),
-                "id": st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
-                "employee_id": st.column_config.TextColumn("工號 / Employee ID", required=True, width="medium"),
-                "employee_name": st.column_config.TextColumn("姓名 / Name", required=True, width="medium"),
-                "department": st.column_config.TextColumn("單位 / Department", width="medium"),
-                "title": st.column_config.TextColumn("職稱 / Title", width="medium"),
-                "is_active": st.column_config.CheckboxColumn("啟用 / Active", width="small"),
-                "is_in_factory": st.column_config.CheckboxColumn("在廠 / In Factory", width="small"),
-                "is_today_attendance": st.column_config.CheckboxColumn("今日出勤 / Today", width="small"),
-                "note": st.column_config.TextColumn("備註 / Note", width="large"),
-                "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
-                "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
-            },
-            key=_editor_key(),
-            disabled=not employee_edit_enabled,
-        )
-        submitted_employees = st.form_submit_button("▣ 確認儲存人員清單 / Save Employees", type="primary", use_container_width=True, disabled=not employee_edit_enabled)
+    st.info("V57：人員表格已移除 st.form 包覆；全選/取消會直接更新同一份暫存表格並刷新 editor key，避免 checkbox 顯示被舊 widget 狀態蓋回。")
+    _draft_employees = ensure_cols(st.session_state[STATE_KEY].copy())
+    for _col in ["_delete", "is_active", "is_in_factory", "is_today_attendance"]:
+        if _col in _draft_employees.columns:
+            _draft_employees[_col] = _draft_employees[_col].fillna(False).astype(bool)
+    st.session_state[STATE_KEY] = _draft_employees
+    edited = st.data_editor(
+        st.session_state[STATE_KEY],
+        hide_index=True,
+        use_container_width=True,
+        num_rows="dynamic",
+        height=560,
+        column_order=COLS,
+        column_config={
+            "_delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small"),
+            "id": st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
+            "employee_id": st.column_config.TextColumn("工號 / Employee ID", required=True, width="medium"),
+            "employee_name": st.column_config.TextColumn("姓名 / Name", required=True, width="medium"),
+            "department": st.column_config.TextColumn("單位 / Department", width="medium"),
+            "title": st.column_config.TextColumn("職稱 / Title", width="medium"),
+            "is_active": st.column_config.CheckboxColumn("啟用 / Active", width="small"),
+            "is_in_factory": st.column_config.CheckboxColumn("在廠 / In Factory", width="small"),
+            "is_today_attendance": st.column_config.CheckboxColumn("今日出勤 / Today", width="small"),
+            "note": st.column_config.TextColumn("備註 / Note", width="large"),
+            "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
+            "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
+        },
+        key=_editor_key(),
+        disabled=not employee_edit_enabled,
+    )
+    if employee_edit_enabled and isinstance(edited, pd.DataFrame):
+        st.session_state[STATE_KEY] = ensure_cols(edited.copy())
+    submitted_employees = st.button("▣ 確認儲存人員清單 / Save Employees", type="primary", use_container_width=True, disabled=not employee_edit_enabled, key="v57_save_employees")
 
     if submitted_employees:
         st.session_state[STATE_KEY] = ensure_cols(edited)

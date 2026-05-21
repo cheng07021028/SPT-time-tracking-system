@@ -55,19 +55,7 @@ def _editor_key() -> str:
     return f"work_orders_data_editor_v253_{st.session_state[EDITOR_VERSION_KEY]}"
 
 
-def _v37_clear_widget_state(*tokens: str) -> None:
-    # V38: remove stale data_editor/form widget state by token containment.
-    clean_tokens = [str(x) for x in tokens if str(x)]
-    for k in list(st.session_state.keys()):
-        sk = str(k)
-        if any(tok in sk for tok in clean_tokens):
-            try:
-                del st.session_state[k]
-            except Exception:
-                pass
-
 def _refresh_editor_widget() -> None:
-    _v37_clear_widget_state("work_orders_data_editor_v253_", "work_orders_commit_form")
     st.session_state[EDITOR_VERSION_KEY] = int(st.session_state.get(EDITOR_VERSION_KEY, 0)) + 1
 
 
@@ -235,48 +223,6 @@ def reload_data():
     df = load_work_orders()
     df.insert(0, "_delete", False)
     st.session_state[STATE_KEY] = ensure_cols(df)
-
-
-# V25: Stable callback actions for Streamlit buttons.
-# Reason: some Streamlit versions/pages can lose the transient return value of st.button
-# after data_editor/form reruns.  These callbacks mutate session_state before repaint.
-def _v25_wo_set_edit(enabled: bool) -> None:
-    st.session_state["v253_work_order_edit_enabled"] = bool(enabled)
-    if not enabled:
-        reload_data()
-    _refresh_editor_widget()
-    rerun()
-
-
-def _v25_wo_batch(action: str) -> None:
-    df = st.session_state.get(STATE_KEY)
-    if df is None or not isinstance(df, pd.DataFrame):
-        reload_data()
-        df = st.session_state.get(STATE_KEY, pd.DataFrame())
-    df = ensure_cols(df.copy())
-    if action == "add":
-        blank = pd.DataFrame([{
-            "_delete": False, "id": "", "work_order": "", "part_no": "", "type_name": "",
-            "assembly_location": "", "customer": "", "note": "", "is_active": True,
-            "created_at": "", "updated_at": ""
-        }])
-        df = pd.concat([blank, df], ignore_index=True)
-    elif action == "active_on":
-        df["is_active"] = True
-    elif action == "active_off":
-        df["is_active"] = False
-    elif action == "delete_on":
-        df["_delete"] = True
-    elif action == "delete_off":
-        df["_delete"] = False
-    elif action == "reload":
-        reload_data()
-        _refresh_editor_widget()
-        rerun()
-        return
-    st.session_state[STATE_KEY] = ensure_cols(df)
-    _refresh_editor_widget()
-    rerun()
 
 
 def render_work_order_summary(df: pd.DataFrame):
@@ -631,9 +577,16 @@ with tab1:
     work_order_edit_enabled = bool(st.session_state.get("v253_work_order_edit_enabled", False))
     ec1, ec2, ec3 = st.columns([1.2, 1.2, 3])
     with ec1:
-        st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=work_order_edit_enabled, key="v25_enable_work_order_edit", on_click=_v25_wo_set_edit, args=(True,))
+        if st.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, disabled=work_order_edit_enabled, key="v253_enable_work_order_edit"):
+            st.session_state["v253_work_order_edit_enabled"] = True
+            _refresh_editor_widget()
+            rerun()
     with ec2:
-        st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not work_order_edit_enabled, key="v25_disable_work_order_edit", on_click=_v25_wo_set_edit, args=(False,))
+        if st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not work_order_edit_enabled, key="v253_disable_work_order_edit"):
+            st.session_state["v253_work_order_edit_enabled"] = False
+            reload_data()
+            _refresh_editor_widget()
+            rerun()
     with ec3:
         if work_order_edit_enabled:
             st.success("目前：已啟動編輯。修改後請按儲存才會正式寫入。")
@@ -641,12 +594,35 @@ with tab1:
             st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上製令。")
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.button("⊕ 新增空白列", use_container_width=True, disabled=not work_order_edit_enabled, key="v25_wo_add_blank", on_click=_v25_wo_batch, args=("add",))
-    c2.button("◈ 啟用全選", use_container_width=True, disabled=not work_order_edit_enabled, key="v25_wo_active_all_on", on_click=_v25_wo_batch, args=("active_on",))
-    c3.button("◌ 啟用全取消", use_container_width=True, disabled=not work_order_edit_enabled, key="v25_wo_active_all_off", on_click=_v25_wo_batch, args=("active_off",))
-    c4.button("⊖ 刪除欄全選", use_container_width=True, disabled=not work_order_edit_enabled, key="v25_wo_delete_all_on", on_click=_v25_wo_batch, args=("delete_on",))
-    c5.button("◌ 刪除欄取消", use_container_width=True, disabled=not work_order_edit_enabled, key="v25_wo_delete_all_off", on_click=_v25_wo_batch, args=("delete_off",))
-    c6.button("⟳ 重新載入", use_container_width=True, key="v25_wo_reload", on_click=_v25_wo_batch, args=("reload",))
+    if c1.button("⊕ 新增空白列", use_container_width=True, disabled=not work_order_edit_enabled):
+        blank = pd.DataFrame([{
+            "_delete": False, "id": "", "work_order": "", "part_no": "", "type_name": "",
+            "assembly_location": "", "customer": "", "note": "", "is_active": True,
+            "created_at": "", "updated_at": ""
+        }])
+        st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
+        _refresh_editor_widget()
+        rerun()
+    if c2.button("◈ 啟用全選", use_container_width=True, disabled=not work_order_edit_enabled):
+        st.session_state[STATE_KEY]["is_active"] = True
+        _refresh_editor_widget()
+        rerun()
+    if c3.button("◌ 啟用全取消", use_container_width=True, disabled=not work_order_edit_enabled):
+        st.session_state[STATE_KEY]["is_active"] = False
+        _refresh_editor_widget()
+        rerun()
+    if c4.button("⊖ 刪除欄全選", use_container_width=True, disabled=not work_order_edit_enabled):
+        st.session_state[STATE_KEY]["_delete"] = True
+        _refresh_editor_widget()
+        rerun()
+    if c5.button("◌ 刪除欄取消", use_container_width=True, disabled=not work_order_edit_enabled):
+        st.session_state[STATE_KEY]["_delete"] = False
+        _refresh_editor_widget()
+        rerun()
+    if c6.button("⟳ 重新載入", use_container_width=True):
+        reload_data()
+        _refresh_editor_widget()
+        rerun()
 
     st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。製令 / Work Order 為必填。")
     cur_export_df = load_work_orders()
@@ -655,32 +631,38 @@ with tab1:
     tpl = pd.DataFrame(columns=["製令", "P/N", "機型", "組立地點", "客戶", "備註", "啟用"])
     dl2.download_button("⟰ 下載製令匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_製令匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-    st.info("V2.53：批次按鈕會即時刷新編輯表格；表格內輸入、勾選、換格不會立即觸發存檔或整頁重算。")
-    with st.form("work_orders_commit_form", clear_on_submit=False):
-        edited = st.data_editor(
-            st.session_state[STATE_KEY],
-            hide_index=True,
-            use_container_width=True,
-            num_rows="dynamic",
-            height=560,
-            column_order=COLS,
-            column_config={
-                "_delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small"),
-                "id": st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
-                "work_order": st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
-                "part_no": st.column_config.TextColumn("P/N / Part No.", width="medium"),
-                "type_name": st.column_config.TextColumn("機型 / Type", width="large"),
-                "assembly_location": st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
-                "customer": st.column_config.TextColumn("客戶 / Customer", width="medium"),
-                "note": st.column_config.TextColumn("備註 / Note", width="large"),
-                "is_active": st.column_config.CheckboxColumn("啟用 / Active", width="small"),
-                "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
-                "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
-            },
-            key=_editor_key(),
-            disabled=not work_order_edit_enabled,
-        )
-        submitted_work_orders = st.form_submit_button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True, disabled=not work_order_edit_enabled)
+    st.info("V57：製令表格已移除 st.form 包覆；全選/取消會直接更新同一份暫存表格並刷新 editor key，避免 checkbox 顯示被舊 widget 狀態蓋回。")
+    _draft_work_orders = ensure_cols(st.session_state[STATE_KEY].copy())
+    for _col in ["_delete", "is_active"]:
+        if _col in _draft_work_orders.columns:
+            _draft_work_orders[_col] = _draft_work_orders[_col].fillna(False).astype(bool)
+    st.session_state[STATE_KEY] = _draft_work_orders
+    edited = st.data_editor(
+        st.session_state[STATE_KEY],
+        hide_index=True,
+        use_container_width=True,
+        num_rows="dynamic",
+        height=560,
+        column_order=COLS,
+        column_config={
+            "_delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small"),
+            "id": st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
+            "work_order": st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
+            "part_no": st.column_config.TextColumn("P/N / Part No.", width="medium"),
+            "type_name": st.column_config.TextColumn("機型 / Type", width="large"),
+            "assembly_location": st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
+            "customer": st.column_config.TextColumn("客戶 / Customer", width="medium"),
+            "note": st.column_config.TextColumn("備註 / Note", width="large"),
+            "is_active": st.column_config.CheckboxColumn("啟用 / Active", width="small"),
+            "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
+            "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
+        },
+        key=_editor_key(),
+        disabled=not work_order_edit_enabled,
+    )
+    if work_order_edit_enabled and isinstance(edited, pd.DataFrame):
+        st.session_state[STATE_KEY] = ensure_cols(edited.copy())
+    submitted_work_orders = st.button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True, disabled=not work_order_edit_enabled, key="v57_save_work_orders")
 
     if submitted_work_orders:
         st.session_state[STATE_KEY] = ensure_cols(edited)

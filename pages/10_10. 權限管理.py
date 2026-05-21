@@ -19,12 +19,18 @@ from services.permission_service import (
     save_account_permissions,
     save_security_settings,
     save_users,
+    restore_default_accounts_once_v57,
 )
 
 apply_theme()
 require_module_access("10_permissions", "can_manage")
 render_header("10 | 權限管理", "帳號密碼總表、帳號匯入、帳號貼上、帳號級模組權限 / Account & Permission Management")
 init_permission_tables()
+try:
+    # V57：補回原始六個預設帳號（只新增缺少帳號，不覆蓋已存在帳號資料）
+    restore_default_accounts_once_v57()
+except Exception:
+    pass
 
 st.caption("V1.78 loaded｜權限管理頁已受 can_manage 管制；帳號、權限、安全設定會永久保存到 GitHub 設定檔。")
 

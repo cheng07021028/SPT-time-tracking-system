@@ -3133,114 +3133,37 @@ check_permission = has_permission
 # ===== V3.73 FINAL DIRECT-LATEST PERMISSION PATCH END =====
 
 
-
-
-# ========================= V28 Permanent Authority Overrides =========================
-# 權限管理：帳號權限讀寫以 10_permissions/records.json 為唯一權威；SQLite 僅為快取。
-try:
-    from services.permanent_authority_service import load_tables as _v28_load_tables, update_tables as _v28_update_tables
-except Exception:
-    _v28_load_tables = _v28_update_tables = None  # type: ignore
-
-def _v28_perm_tables() -> dict:
-    if _v28_load_tables is not None:
-        return _v28_load_tables("10_permissions")
-    return {}
-
-def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
-    # Only ensure schema. Never seed defaults over authority file.
-    try: _v373_p_schema_only()
-    except Exception: pass
-
-init_auth_tables = init_permission_tables
-
-def get_users() -> List[dict]:  # type: ignore[override]
-    rows = _v28_perm_tables().get("auth_users", [])
-    out: list[dict] = []
-    for r in rows:
-        if not isinstance(r, dict): continue
-        x = dict(r)
-        x["password_display"] = "********"
-        x.setdefault("new_password", "")
-        out.append(x)
-    return sorted(out, key=lambda r: str(r.get("username", "")))
-
-def _v28_replace_table_in_auth(table: str, rows: list[dict]) -> None:
-    try:
-        conn = connect_db(); cur = conn.cursor()
-        cur.execute(f'DELETE FROM "{table}"')
-        for row in rows:
-            if not isinstance(row, dict) or not row: continue
-            clean = {str(k): v for k, v in row.items() if str(k).strip() and str(k) not in {"password_display", "new_password"}}
-            if not clean: continue
-            cols = list(clean.keys())
-            cur.execute(f'INSERT INTO "{table}" ({",".join([chr(34)+c+chr(34) for c in cols])}) VALUES ({",".join(["?"]*len(cols))})', [clean[c] for c in cols])
-        conn.commit(); conn.close()
-    except Exception:
-        try: conn.close()  # type: ignore
-        except Exception: pass
-
-def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
-    # Authoritative replacement: the editor's current full list is the truth.
-    tables = _v28_perm_tables()
-    old_by_user = {str(r.get("username", "")).strip(): r for r in tables.get("auth_users", []) if isinstance(r, dict)}
-    out: list[dict] = []
-    skipped: list[str] = []
-    for r in list(rows or []):
-        if not isinstance(r, dict): continue
-        username = str(r.get("username", "")).strip()
-        if not username: continue
-        old = dict(old_by_user.get(username, {}))
-        x = old.copy()
-        for k in ["employee_id", "display_name", "email", "role_code", "is_active", "force_password_change", "note"]:
-            if k in r: x[k] = r.get(k)
-        x["username"] = username
-        x.setdefault("display_name", username)
-        x.setdefault("role_code", "operator")
-        x.setdefault("created_at", now_text())
-        x["updated_at"] = now_text()
-        new_password = str(r.get("new_password", "") or "").strip()
-        if new_password and new_password != "********":
-            x["password_hash"] = hash_password(new_password)
-        elif not x.get("password_hash"):
-            skipped.append(f"{username} 未設定密碼")
+# ===== V57 RESTORE DEFAULT ACCOUNTS ONCE PATCH START =====
+def restore_default_accounts_once_v57() -> dict:
+    """補回原始六個預設帳號。只新增缺少帳號，不覆蓋既有帳號資料。"""
+    _v373_p_schema_only()
+    existing = {str(u.get("username", "")).strip().lower() for u in get_users() if isinstance(u, dict)}
+    rows = []
+    for username, pwd, display_name, email, role_code, active in DEFAULT_USERS:
+        if str(username).strip().lower() in existing:
             continue
-        out.append(x)
-    tables["auth_users"] = out
-    # Remove permissions for deleted users.
-    usernames = {str(r.get("username", "")).strip() for r in out}
-    for t in ["auth_account_permissions", "security_user_roles", "security_module_permissions"]:
-        if isinstance(tables.get(t), list):
-            tables[t] = [r for r in tables[t] if str(r.get("username", "")).strip() in usernames]
-    if _v28_update_tables is not None:
-        _v28_update_tables("10_permissions", tables, reason="save_users_authoritative_v28")
-    _v28_replace_table_in_auth("auth_users", out)
+        rows.append({
+            "username": username,
+            "new_password": pwd,
+            "employee_id": "",
+            "display_name": display_name,
+            "email": email,
+            "role_code": role_code,
+            "is_active": bool(active),
+            "force_password_change": False,
+            "note": "V57 restore default account only",
+        })
+    if not rows:
+        return {"restored": 0, "usernames": []}
+    result = save_users(rows)
+    try:
+        sync_user_permissions_from_roles([r["username"] for r in rows], reason="v57_restore_default_accounts")
+    except Exception:
+        pass
     clear_permission_runtime_cache()
-    return {"saved": len(out), "skipped": skipped, "mode": "v28_authoritative_replace"}
-
-def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
-    targets = {str(u).strip() for u in usernames or [] if str(u).strip() and str(u).strip().lower() != "admin"}
-    if not targets: return 0
-    tables = _v28_perm_tables()
-    before = len(tables.get("auth_users", []))
-    tables["auth_users"] = [r for r in tables.get("auth_users", []) if str(r.get("username", "")).strip() not in targets]
-    for t in ["auth_account_permissions", "security_user_roles", "security_module_permissions"]:
-        if isinstance(tables.get(t), list): tables[t] = [r for r in tables[t] if str(r.get("username", "")).strip() not in targets]
-    if _v28_update_tables is not None:
-        _v28_update_tables("10_permissions", tables, reason="delete_users_authoritative_v28")
-    for t in ["auth_users", "auth_account_permissions", "security_user_roles", "security_module_permissions"]:
-        try:
-            conn = connect_db(); cur = conn.cursor()
-            for u in targets: cur.execute(f'DELETE FROM "{t}" WHERE username=?', (u,))
-            conn.commit(); conn.close()
-        except Exception:
-            try: conn.close()  # type: ignore
-            except Exception: pass
-    clear_permission_runtime_cache()
-    return max(0, before - len(tables.get("auth_users", [])))
-
-def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
-    tables = _v28_perm_tables()
-    if _v28_update_tables is not None:
-        return _v28_update_tables("10_permissions", tables, reason=reason)
-    return {"ok": False, "reason": "authority_service_unavailable"}
+    try:
+        export_permission_settings_permanently("v57_restore_default_accounts")
+    except Exception:
+        pass
+    return {"restored": int(result.get("saved", 0) or 0), "usernames": [r["username"] for r in rows]}
+# ===== V57 RESTORE DEFAULT ACCOUNTS ONCE PATCH END =====
