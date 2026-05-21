@@ -991,3 +991,202 @@ def save_column_settings(settings: dict[str, Any], *, reason: str = "column_sett
     if _v28_save_settings is not None:
         return _v28_save_settings("ui_table_settings", settings or {}, reason=reason)
     return {"ok": False}
+
+
+# ========================= V72 Stable Table Persistence Fix =========================
+# 修正 V28 末端覆寫造成的問題：
+# - 01 工時紀錄欄位順序 / 欄寬設定儲存後，Reboot App 讀不到而恢復預設。
+# - save_table_settings 末端使用 raw key，load 時 canonical key 對不上。
+# - now_text 未匯入時可能讓設定儲存失敗。
+# 這裡重新覆寫最後生效的 load/save，回到 canonical key + fixed latest authority settings。
+
+
+def _v72_now_text() -> str:
+    try:
+        from services.timezone_service import now_text as _nt
+        return _nt()
+    except Exception:
+        try:
+            return _v366_now_text()
+        except Exception:
+            import time as _t
+            return _t.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v72_table_module(table_key: Any) -> str:
+    k = canonical_table_key(table_key)
+    low = k.lower()
+    raw = str(table_key or "").lower()
+    text = f"{low} {raw}"
+    if low.startswith("01.") or "time_records.main" in text or "today_records" in text:
+        return "01_time_records"
+    if low.startswith("02.") or "history" in text or "歷史" in text:
+        return "02_history"
+    if low.startswith("03.") or "work_order" in text or "work_orders" in text or "製令" in text:
+        return "03_work_orders"
+    if low.startswith("04.") or "employee" in text or "employees" in text or "人員" in text:
+        return "04_employees"
+    if low.startswith("05.") or "analysis" in text:
+        return "05_analysis"
+    if low.startswith("07.") or "missing" in text or "attendance" in text:
+        return "07_missing_records"
+    if low.startswith("08.") or "daily" in text:
+        return "08_daily_hours"
+    if low.startswith("10.") or "permission" in text or "account" in text:
+        return "10_permissions"
+    if low.startswith("13.") or "system_settings" in text or "rest_period" in text:
+        return "13_system_settings"
+    return "ui_table_settings"
+
+
+def _v72_all_settings_payload() -> dict[str, Any]:
+    try:
+        payload = _v370_load_all_direct_latest()
+        if isinstance(payload, dict):
+            return payload
+    except Exception:
+        pass
+    try:
+        return _v366_load_all_direct()
+    except Exception:
+        return {"table_settings": {}, "column_settings": {}}
+
+
+def _v72_load_authority_settings(module_key: str) -> dict[str, Any]:
+    try:
+        from services.permanent_authority_service import load_settings as _pa_load_settings
+        data = _pa_load_settings(module_key) or {}
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _v72_save_authority_settings(module_key: str, settings: dict[str, Any], reason: str) -> dict[str, Any]:
+    try:
+        from services.permanent_authority_service import save_settings as _pa_save_settings
+        # GitHub write-through remains enabled, but V72 permanent_authority_service makes it short and non-blocking on verify.
+        return _pa_save_settings(module_key, settings or {}, reason=reason, github=True)
+    except TypeError:
+        try:
+            from services.permanent_authority_service import save_settings as _pa_save_settings
+            return _pa_save_settings(module_key, settings or {}, reason=reason)
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)[:200]}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:200]}
+
+
+def _v72_merge_authority_into_payload(payload: dict[str, Any], module_key: str) -> dict[str, Any]:
+    out = dict(payload or {})
+    out.setdefault("table_settings", {})
+    out.setdefault("column_settings", {})
+    # module-specific authority settings first
+    for mk in ["ui_table_settings", module_key]:
+        data = _v72_load_authority_settings(mk)
+        tset = data.get("table_settings") if isinstance(data.get("table_settings"), dict) else {}
+        cset = data.get("column_settings") if isinstance(data.get("column_settings"), dict) else {}
+        for k, v in dict(tset or {}).items():
+            if isinstance(v, dict):
+                out["table_settings"][canonical_table_key(k)] = v
+        for k, v in dict(cset or {}).items():
+            if isinstance(v, dict):
+                out["column_settings"][canonical_table_key(k)] = v
+    return out
+
+
+def load_table_settings(table_key: Any) -> dict[str, Any]:  # type: ignore[override]
+    key = canonical_table_key(table_key)
+    module = _v72_table_module(key)
+    payload = _v72_merge_authority_into_payload(_v72_all_settings_payload(), module)
+    settings = payload.get("table_settings") if isinstance(payload.get("table_settings"), dict) else {}
+    data = settings.get(key) or settings.get(str(table_key)) or {}
+    if not isinstance(data, dict):
+        data = {}
+    return {
+        "table_key": key,
+        "widths": _normalize_widths(data.get("widths", {})),
+        "order": _normalize_order(data.get("order", [])),
+        "sort": data.get("sort", {}) if isinstance(data.get("sort"), dict) else {},
+        "updated_at": str(data.get("updated_at") or ""),
+    }
+
+
+def save_table_settings(table_key: Any, *, widths: dict[str, int] | None = None, order: Iterable[str] | None = None, sort: dict[str, Any] | None = None, reason: str = "table_settings_saved") -> dict[str, Any]:  # type: ignore[override]
+    key = canonical_table_key(table_key)
+    module = _v72_table_module(key)
+    payload = _v72_merge_authority_into_payload(_v72_all_settings_payload(), module)
+    table_settings = payload.get("table_settings") if isinstance(payload.get("table_settings"), dict) else {}
+    cur = dict(table_settings.get(key) if isinstance(table_settings.get(key), dict) else {})
+    if widths is not None:
+        cur["widths"] = _normalize_widths(widths)
+    if order is not None:
+        cur["order"] = _normalize_order(order)
+    if sort is not None:
+        cur["sort"] = dict(sort or {})
+    cur["updated_at"] = _v72_now_text()
+    cur["reason"] = reason
+    table_settings[key] = cur
+    payload["table_settings"] = table_settings
+    try:
+        _v370_write_direct(payload, changed_key=key)
+    except Exception:
+        try:
+            _v366_write_direct(payload, changed_key=key)
+        except Exception:
+            pass
+
+    # Save exact shard to module authority settings and full mirror to UI settings.
+    module_settings = _v72_load_authority_settings(module)
+    module_settings.setdefault("table_settings", {})
+    module_settings.setdefault("column_settings", {})
+    module_settings["table_settings"][key] = cur
+    res_module = _v72_save_authority_settings(module, module_settings, reason=f"{reason}_v72_{key}")
+
+    ui_settings = _v72_load_authority_settings("ui_table_settings")
+    ui_settings.setdefault("table_settings", {})
+    ui_settings.setdefault("column_settings", {})
+    ui_settings["table_settings"][key] = cur
+    _v72_save_authority_settings("ui_table_settings", ui_settings, reason=f"{reason}_v72_ui_mirror")
+    return {"ok": True, "mode": "v72_stable_table_persistence", "key": key, "module": module, "authority": res_module}
+
+
+def load_column_settings() -> dict[str, Any]:  # type: ignore[override]
+    payload = _v72_merge_authority_into_payload(_v72_all_settings_payload(), "ui_table_settings")
+    data = payload.get("column_settings") if isinstance(payload.get("column_settings"), dict) else {}
+    return {canonical_table_key(k): v for k, v in dict(data or {}).items() if isinstance(v, dict)}
+
+
+def save_column_settings(settings: dict[str, Any], *, reason: str = "column_settings_saved") -> dict[str, Any]:  # type: ignore[override]
+    payload = _v72_all_settings_payload()
+    normalized: dict[str, Any] = {}
+    for k, v in dict(settings or {}).items():
+        if isinstance(v, dict):
+            item = dict(v)
+            item["updated_at"] = item.get("updated_at") or _v72_now_text()
+            item["reason"] = reason
+            normalized[canonical_table_key(k)] = item
+    payload["column_settings"] = normalized
+    try:
+        _v370_write_direct(payload)
+    except Exception:
+        try:
+            _v366_write_direct(payload)
+        except Exception:
+            pass
+    ui_settings = _v72_load_authority_settings("ui_table_settings")
+    ui_settings["column_settings"] = normalized
+    ui_settings.setdefault("table_settings", payload.get("table_settings") if isinstance(payload.get("table_settings"), dict) else {})
+    res = _v72_save_authority_settings("ui_table_settings", ui_settings, reason=f"{reason}_v72")
+    return {"ok": True, "mode": "v72_stable_column_persistence", "table_count": len(normalized), "authority": res}
+
+
+def migrate_legacy_table_settings_to_master(*, write: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    payload = _v72_all_settings_payload()
+    return {
+        "ok": True,
+        "mode": "v72_stable_no_load_migration",
+        "table_count": len(payload.get("table_settings") or {}),
+        "column_count": len(payload.get("column_settings") or {}),
+        "write": False,
+    }
+# ======================= END V72 Stable Table Persistence Fix =======================

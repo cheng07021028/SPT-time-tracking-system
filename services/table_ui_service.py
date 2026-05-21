@@ -1516,3 +1516,51 @@ def render_table(
         num_rows=num_rows,
     )
 # ===== END V3.70 readonly ID display repair =====
+
+
+# ========================= V72 Table UI Speed and Reboot Persistence Guard =========================
+# 不改表格內容邏輯，只減少欄寬設定工具的 inspect.stack 成本，並確保儲存後立即清掉寬度/順序快取。
+
+def _width_settings_instance_key(table_key: str, title: str) -> str:  # type: ignore[override]
+    try:
+        import sys
+        frame = sys._getframe(1)
+        depth = 0
+        caller = "unknown"
+        while frame is not None and depth < 10:
+            filename = str(frame.f_code.co_filename).replace("\\", "/")
+            if "/site-packages/" not in filename and not filename.endswith("table_ui_service.py"):
+                caller = f"{Path(filename).stem}_{frame.f_lineno}"
+                break
+            frame = frame.f_back
+            depth += 1
+    except Exception:
+        caller = "unknown"
+    return _safe_widget_key_part(f"{table_key}_{title}_{caller}")
+
+
+def _v72_clear_table_ui_cache(table_key: str) -> None:
+    try:
+        keys = []
+        try:
+            keys = _v369_key_candidates(table_key)
+        except Exception:
+            keys = [str(table_key)]
+        for k in keys:
+            st.session_state.pop(f"_spt_width_cache_{k}", None)
+    except Exception:
+        pass
+
+
+_v72_prev_save_widths = save_widths
+_v72_prev_save_column_order = save_column_order
+
+def save_widths(table_key: str, widths: dict[str, int]) -> None:  # type: ignore[override]
+    _v72_prev_save_widths(table_key, widths)
+    _v72_clear_table_ui_cache(table_key)
+
+
+def save_column_order(table_key: str, order: Iterable[str]) -> None:  # type: ignore[override]
+    _v72_prev_save_column_order(table_key, order)
+    _v72_clear_table_ui_cache(table_key)
+# ======================= END V72 Table UI Speed and Reboot Persistence Guard =======================

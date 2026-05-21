@@ -515,3 +515,184 @@ def _write_manifest() -> None:
 def authority_health() -> dict[str, Any]:
     _write_manifest()
     return read_json(MANIFEST_PATH)
+
+
+# ========================= V72 Fast Local-First Authority Save =========================
+# 目的：所有模組按下「套用 / 確認 / 存檔」時，不再被 GitHub 讀回驗證與重複上傳拖慢。
+# 原則：
+# 1. 本機 canonical 權威檔仍立即寫入，功能與 Reboot App 本機狀態不受影響。
+# 2. GitHub 仍會 write-through，但改為短逾時、SHA 快取、不做第二次讀回驗證。
+# 3. 內容未變更時不寫 history、不打 GitHub API。
+# 4. 任何 GitHub 失敗不得讓頁面或儲存流程崩潰。
+
+_GITHUB_SHA_CACHE_V72: dict[str, str] = {}
+
+
+def _v72_sha_text(text: str) -> str:
+    try:
+        return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
+    except Exception:
+        return ""
+
+
+def _v72_read_text_safe(path: Path) -> str:
+    try:
+        if path.exists():
+            return path.read_text(encoding="utf-8")
+    except Exception:
+        pass
+    return ""
+
+
+def _v72_payload_text(payload: dict[str, Any]) -> str:
+    try:
+        return json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default)
+    except Exception:
+        return json.dumps(payload, ensure_ascii=False, indent=2, default=str)
+
+
+def _v72_github_timeout_get() -> float:
+    try:
+        return float(os.environ.get("SPT_GITHUB_GET_TIMEOUT", "5") or 5)
+    except Exception:
+        return 5.0
+
+
+def _v72_github_timeout_put() -> float:
+    try:
+        return float(os.environ.get("SPT_GITHUB_PUT_TIMEOUT", "8") or 8)
+    except Exception:
+        return 8.0
+
+
+def _github_get_content(rel: str) -> dict[str, Any]:  # type: ignore[override]
+    """V72: short-timeout GitHub metadata read; used only to get current SHA."""
+    cfg = github_config()
+    if not cfg.get("token") or not cfg.get("repo"):
+        return {}
+    api = f"https://api.github.com/repos/{cfg['repo']}/contents/{urllib.parse.quote(rel)}?ref={urllib.parse.quote(cfg['branch'])}"
+    headers = {
+        "Authorization": f"Bearer {cfg['token']}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "SPT-TimeTracking-V72",
+    }
+    try:
+        req = urllib.request.Request(api, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=_v72_github_timeout_get()) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except Exception:
+        return {}
+
+
+def github_put_file(path: Path, content: str, message: str) -> dict[str, Any]:  # type: ignore[override]
+    """V72: GitHub write-through optimized for Streamlit save buttons.
+
+    GitHub Contents API needs the current file SHA for updates. We cache the SHA after
+    a successful PUT, skip uploads when the same content was already uploaded in this
+    Python process, and avoid the old second read-back verification that caused long waits.
+    """
+    cfg = github_config()
+    rel = _remote_path(path)
+    if not cfg.get("token") or not cfg.get("repo"):
+        return {"ok": False, "skipped": True, "reason": "missing_github_config", "path": rel, "verified": False}
+
+    content = content or ""
+    content_sha = _v72_sha_text(content)
+    if _UPLOAD_HASH.get(rel) == content_sha:
+        return {"ok": True, "skipped": True, "reason": "unchanged_in_process", "path": rel, "verified": True, "mode": "v72_fast"}
+
+    old_sha = _GITHUB_SHA_CACHE_V72.get(rel, "")
+    if not old_sha:
+        current = _github_get_content(rel)
+        old_sha = str(current.get("sha") or "")
+        if old_sha:
+            _GITHUB_SHA_CACHE_V72[rel] = old_sha
+
+    headers = {
+        "Authorization": f"Bearer {cfg['token']}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "SPT-TimeTracking-V72",
+        "Content-Type": "application/json",
+    }
+    body: dict[str, Any] = {
+        "message": message,
+        "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
+        "branch": cfg["branch"],
+    }
+    if old_sha:
+        body["sha"] = old_sha
+    api = f"https://api.github.com/repos/{cfg['repo']}/contents/{urllib.parse.quote(rel)}"
+    try:
+        req = urllib.request.Request(api, data=json.dumps(body).encode("utf-8"), headers=headers, method="PUT")
+        with urllib.request.urlopen(req, timeout=_v72_github_timeout_put()) as r:
+            res = json.loads(r.read().decode("utf-8"))
+        new_sha = str(((res.get("content") or {}).get("sha")) or ((res.get("commit") or {}).get("sha")) or "")
+        if new_sha:
+            _GITHUB_SHA_CACHE_V72[rel] = new_sha
+        _UPLOAD_HASH[rel] = content_sha
+        return {"ok": True, "path": rel, "commit": (res.get("commit") or {}).get("sha", ""), "verified": True, "mode": "v72_fast"}
+    except Exception as exc:
+        return {"ok": False, "path": rel, "error": str(exc)[:300], "verified": False, "mode": "v72_fast"}
+
+
+def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    """V72: local-first save with unchanged-content skip and fast GitHub write-through."""
+    ensure_dirs()
+    out: dict[str, Any] = {"ok": True, "module_key": module_key, "files": [], "github": [], "mode": "v72_fast_local_first"}
+
+    if records is not None:
+        kind = "records"
+        p = canonical_path(module_key, kind)
+        empty_auth = _table_counts(records) == {} or sum(_table_counts(records).values()) == 0
+        payload = normalize_payload(module_key, kind, {"tables": records}, reason=reason, empty_authoritative=empty_auth)
+        new_text = _v72_payload_text(payload)
+        old_text = _v72_read_text_safe(p)
+        changed = _v72_sha_text(new_text) != _v72_sha_text(old_text)
+        if changed:
+            _backup_current(module_key, kind)
+            atomic_write_json(p, payload)
+        out["files"].append(str(p))
+        out["changed_records"] = bool(changed)
+        if github and changed:
+            out["github"].append(github_put_file(p, p.read_text(encoding="utf-8"), f"SPT authority {module_key} records: {reason}"))
+        elif github and not changed:
+            out["github"].append({"ok": True, "skipped": True, "reason": "unchanged_local", "path": _remote_path(p), "mode": "v72_fast"})
+
+    if settings is not None:
+        kind = "settings"
+        p = canonical_path(module_key, kind)
+        payload = normalize_payload(
+            module_key,
+            kind,
+            {"settings": settings, "tables": settings.get("tables", {}) if isinstance(settings, dict) else {}},
+            reason=reason,
+        )
+        new_text = _v72_payload_text(payload)
+        old_text = _v72_read_text_safe(p)
+        changed = _v72_sha_text(new_text) != _v72_sha_text(old_text)
+        if changed:
+            _backup_current(module_key, kind)
+            atomic_write_json(p, payload)
+        out["files"].append(str(p))
+        out["changed_settings"] = bool(changed)
+        if github and changed:
+            out["github"].append(github_put_file(p, p.read_text(encoding="utf-8"), f"SPT authority {module_key} settings: {reason}"))
+        elif github and not changed:
+            out["github"].append({"ok": True, "skipped": True, "reason": "unchanged_local", "path": _remote_path(p), "mode": "v72_fast"})
+
+    try:
+        _write_manifest()
+    except Exception:
+        pass
+    return out
+
+
+def update_tables(module_key: str, updates: dict[str, list[dict[str, Any]]], *, reason: str = "update_tables", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    cur = load_tables(module_key, "records")
+    cur.update({k: _clean_rows(v) for k, v in (updates or {}).items()})
+    return save_authority(module_key, records=cur, reason=reason, github=github)
+
+
+def save_settings(module_key: str, settings: dict[str, Any], *, reason: str = "save_settings", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    return save_authority(module_key, settings=settings or {}, reason=reason, github=github)
+# ======================= END V72 Fast Local-First Authority Save =======================
