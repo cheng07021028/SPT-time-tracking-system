@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-21 17:59:03",
-  "exported_at": "2026-05-21 17:59:03",
+  "updated_at": "2026-05-21 18:01:27",
+  "exported_at": "2026-05-21 18:01:27",
   "reason": "v367_column_settings_saved",
   "empty_authoritative": false,
   "tables": {},
@@ -1216,6 +1216,94 @@
           "visible": true,
           "width": "medium",
           "order": 9
+        }
+      }
+    },
+    "employees_data_editor_v253": {
+      "columns": {
+        "刪除 / Delete": {
+          "source": "刪除 / Delete",
+          "label": "刪除 / Delete / 刪除 / Delete",
+          "visible": true,
+          "width": "medium",
+          "order": -999
+        },
+        "ID / ID": {
+          "source": "ID / ID",
+          "label": "ID / ID / ID / ID",
+          "visible": true,
+          "width": "medium",
+          "order": 0
+        },
+        "工號 / Employee ID": {
+          "source": "工號 / Employee ID",
+          "label": "工號 / Employee ID / 工號 / Employee ID",
+          "visible": true,
+          "width": "medium",
+          "order": 1
+        },
+        "姓名 / Name": {
+          "source": "姓名 / Name",
+          "label": "姓名 / Name / 姓名 / Name",
+          "visible": true,
+          "width": "medium",
+          "order": 2
+        },
+        "單位 / Department": {
+          "source": "單位 / Department",
+          "label": "單位 / Department / 單位 / Department",
+          "visible": true,
+          "width": "medium",
+          "order": 3
+        },
+        "職稱 / Title": {
+          "source": "職稱 / Title",
+          "label": "職稱 / Title / 職稱 / Title",
+          "visible": true,
+          "width": "medium",
+          "order": 4
+        },
+        "啟用 / Active": {
+          "source": "啟用 / Active",
+          "label": "啟用 / Active / 啟用 / Active",
+          "visible": true,
+          "width": "medium",
+          "order": 5
+        },
+        "在廠 / In Factory": {
+          "source": "在廠 / In Factory",
+          "label": "在廠 / In Factory / 在廠 / In Factory",
+          "visible": true,
+          "width": "medium",
+          "order": 6
+        },
+        "今日出勤 / Today Attendance": {
+          "source": "今日出勤 / Today Attendance",
+          "label": "今日出勤 / Today Attendance / 今日出勤 / Today Attendance",
+          "visible": true,
+          "width": "medium",
+          "order": 7
+        },
+        "備註 / Note": {
+          "source": "備註 / Note",
+          "label": "備註 / Note / 備註 / Note",
+          "visible": true,
+          "width": "medium",
+          "order": 8
+        },
+        "建立時間 / Created At": {
+          "source": "建立時間 / Created At",
+          "label": "建立時間 / Created At / 建立時間 / Created At",
+          "visible": true,
+          "width": "medium",
+          "order": 9
+        },
+        "更新時間 / Updated At": {
+          "source": "更新時間 / Updated At",
+          "label": "更新時間 / Updated At / 更新時間 / Updated At",
+          "visible": true,
+          "width": "medium",
+          "order": 10
         }
       }
     }
