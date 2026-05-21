@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-21 18:53:59",
+  "exported_at": "2026-05-21 22:00:04",
   "source": "db_service_write",
   "module_key": "01_time_records",
   "module_code": "01",
@@ -9,57 +9,48 @@
   "tables": {
     "table_column_settings": [],
     "table_sort_settings": [],
-    "table_ui_settings": [
-      {
-        "table_key": "01.time_records.main",
-        "widths_json": "{\"id\": 70, \"record_key\": 280, \"status\": 140, \"work_order\": 150, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 190, \"remark\": 260, \"start_date\": 140, \"start_time\": 140, \"end_date\": 140, \"end_time\": 140, \"work_hours\": 140, \"assembly_location\": 140, \"group_key\": 140, \"is_group_work\": 180, \"source\": 140, \"created_at\": 180, \"updated_at\": 180}",
-        "order_json": "[\"id\", \"employee_name\", \"employee_id\", \"status\", \"work_order\", \"part_no\", \"type_name\", \"process_name\", \"start_action\", \"start_timestamp\", \"end_action\", \"end_timestamp\", \"remark\", \"start_date\", \"start_time\", \"end_date\", \"end_time\", \"work_hours\", \"assembly_location\", \"group_key\", \"is_group_work\", \"source\", \"created_at\", \"record_key\", \"updated_at\"]",
-        "updated_at": "2026-05-21 10:53:32"
-      }
-    ],
     "system_settings": [
       {
         "setting_key": "company_name",
         "setting_value": "超慧科技",
         "note": "公司名稱",
-        "updated_at": "2026-05-21 18:39:35"
+        "updated_at": "2026-05-21 21:56:30"
       },
       {
         "setting_key": "system_name",
         "setting_value": "製造部智慧工時紀錄系統",
         "note": "系統名稱",
-        "updated_at": "2026-05-21 18:39:35"
+        "updated_at": "2026-05-21 21:56:30"
       },
       {
         "setting_key": "standard_work_start",
         "setting_value": "09:00",
         "note": "標準上班時間",
-        "updated_at": "2026-05-21 18:39:35"
+        "updated_at": "2026-05-21 21:56:30"
       },
       {
         "setting_key": "standard_work_end",
         "setting_value": "18:00",
         "note": "標準下班時間",
-        "updated_at": "2026-05-21 18:39:35"
+        "updated_at": "2026-05-21 21:56:30"
       },
       {
         "setting_key": "daily_expected_hours_min",
         "setting_value": "7.0",
         "note": "每日最低合理工時",
-        "updated_at": "2026-05-21 18:39:35"
+        "updated_at": "2026-05-21 21:56:30"
       },
       {
         "setting_key": "daily_expected_hours_max",
         "setting_value": "7.5",
         "note": "每日最高合理工時",
-        "updated_at": "2026-05-21 18:39:35"
+        "updated_at": "2026-05-21 21:56:30"
       }
     ]
   },
   "table_counts": {
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "table_ui_settings": 1,
     "system_settings": 6
   }
 }
