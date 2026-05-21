@@ -96,47 +96,209 @@ init_audit_log_table = ensure_login_logs_table
 init_login_logs = ensure_login_logs_table
 
 
+
+# ===== V74 LOGIN-ONLY NORMALIZATION / BAD ROW GUARD =====
+# Page 11 is an audit page.  It must display only authentication/session events,
+# never time-record/work-order rows that accidentally entered a generic log table.
+_LOGIN_EVENT_TYPES = {
+    "LOGIN", "LOGOUT", "AUTO_LOGOUT", "POST_RECORD_LOGOUT",
+    "SESSION_TIMEOUT", "ACCESS_DENIED", "PERMISSION_DENIED",
+    "LOGIN_FAIL", "AUTH_FAIL", "PASSWORD_CHANGE", "PASSWORD_RESET",
+}
+_LOGIN_RESULT_VALUES = {"SUCCESS", "FAIL", "FAILED", "DENIED", "ERROR", "WARNING", "INFO", "OK"}
+_BAD_LOGIN_ROW_MARKERS = {
+    "work_order", "part_no", "process_name", "start_time", "end_time",
+    "record_key", "employee_id", "work_hours", "duration_hours",
+}
+
+
+def _txt(value: Any) -> str:
+    if value is None:
+        return ""
+    try:
+        if pd is not None and pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    return str(value).strip()
+
+
+def _norm_token(value: Any) -> str:
+    s = _txt(value).upper().strip()
+    s = s.replace("-", "_").replace(" ", "_")
+    return s
+
+
+def _normalise_event_type(value: Any) -> str:
+    s = _norm_token(value)
+    aliases = {
+        "LOG_IN": "LOGIN",
+        "SIGN_IN": "LOGIN",
+        "LOGIN_SUCCESS": "LOGIN",
+        "登入": "LOGIN",
+        "登入成功": "LOGIN",
+        "LOGIN_FAILED": "LOGIN_FAIL",
+        "LOGIN_FAILURE": "LOGIN_FAIL",
+        "登入失敗": "LOGIN_FAIL",
+        "LOG_OUT": "LOGOUT",
+        "SIGN_OUT": "LOGOUT",
+        "登出": "LOGOUT",
+        "IDLE_LOGOUT": "AUTO_LOGOUT",
+        "閒置登出": "AUTO_LOGOUT",
+        "權限不足": "ACCESS_DENIED",
+        "拒絕存取": "ACCESS_DENIED",
+    }
+    return aliases.get(s, s)
+
+
+def _normalise_result(value: Any) -> str:
+    s = _norm_token(value)
+    aliases = {
+        "成功": "SUCCESS",
+        "OKAY": "SUCCESS",
+        "PASS": "SUCCESS",
+        "PASSED": "SUCCESS",
+        "失敗": "FAIL",
+        "FAILED": "FAIL",
+        "FAILURE": "FAIL",
+        "錯誤": "ERROR",
+        "拒絕": "DENIED",
+    }
+    return aliases.get(s, s)
+
+
+def _looks_like_time_record_payload(row: Dict[str, Any]) -> bool:
+    keys = {str(k).lower() for k in (row or {}).keys()}
+    if keys & _BAD_LOGIN_ROW_MARKERS:
+        return True
+    # Some corrupted rows were shifted into login columns:
+    # username=record_key, event_type=part no, result=model, message=name.
+    username = _txt(row.get("username"))
+    event = _txt(row.get("event_type"))
+    result = _txt(row.get("result"))
+    if "|" in username:
+        return True
+    if event and (event.startswith("4TR") or event.startswith("9M") or event.startswith("25M") or event.startswith("26M")):
+        return True
+    if result and any(x in result.upper() for x in ("PORT", "EFEM", "SORTER", "RSC", "NTB")):
+        return True
+    return False
+
+
+def _canonical_login_row(source: str, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Return a clean login/session log row, or None for non-login garbage."""
+    if not isinstance(row, dict):
+        return None
+    d = dict(row)
+    if _looks_like_time_record_payload(d):
+        return None
+
+    event_type = _normalise_event_type(d.get("event_type") or d.get("event") or d.get("action"))
+    result = _normalise_result(d.get("result") or d.get("status") or "SUCCESS")
+    username = _txt(d.get("username") or d.get("user_name") or d.get("account") or d.get("帳號"))
+    display_name = _txt(d.get("display_name") or d.get("name") or d.get("display") or d.get("姓名"))
+    module_code = _txt(d.get("module_code") or d.get("module") or d.get("module_name") or d.get("模組"))
+    message = _txt(d.get("message") or d.get("msg") or d.get("note") or d.get("訊息"))
+    login_time = _txt(d.get("login_time") or d.get("event_time") or d.get("login_at") or d.get("created_at") or d.get("log_time"))
+    logout_time = _txt(d.get("logout_time") or d.get("logout_at"))
+    created_at = _txt(d.get("created_at") or d.get("event_time") or d.get("login_time") or d.get("login_at") or d.get("log_time"))
+
+    if not username or len(username) > 80 or "|" in username:
+        return None
+    if not event_type or event_type not in _LOGIN_EVENT_TYPES:
+        return None
+    if result and result not in _LOGIN_RESULT_VALUES:
+        return None
+    if not (login_time or created_at or logout_time):
+        return None
+
+    idle_minutes = d.get("idle_minutes")
+    if idle_minutes in (None, "") and d.get("idle_seconds") not in (None, ""):
+        try:
+            idle_minutes = round(float(d.get("idle_seconds")) / 60, 2)
+        except Exception:
+            idle_minutes = None
+
+    return {
+        "id": d.get("id"),
+        "source": source or _txt(d.get("source")) or "login_logs",
+        "username": username,
+        "display_name": display_name,
+        "event_type": event_type,
+        "result": result or "SUCCESS",
+        "message": message,
+        "module_code": module_code,
+        "login_time": login_time or created_at or logout_time,
+        "logout_time": logout_time,
+        "idle_minutes": idle_minutes,
+        "ip_address": _txt(d.get("ip_address") or d.get("ip") or ""),
+        "user_agent": _txt(d.get("user_agent") or d.get("device") or ""),
+        "created_at": created_at or login_time or logout_time,
+    }
+
+
+def _valid_login_rows(source: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for r in rows or []:
+        clean = _canonical_login_row(source, r)
+        if clean is not None:
+            out.append(clean)
+    return out
+
+
+def _auth_login_rows(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
+    """Read 10.Permission auth_login_logs as the primary login source when present."""
+    if not _table_exists(conn, "auth_login_logs"):
+        return []
+    rows = conn.execute("SELECT * FROM auth_login_logs ORDER BY id DESC").fetchall()
+    return _valid_login_rows("auth_login_logs", [dict(r) for r in rows])
+
+
+def _prune_invalid_primary_login_rows() -> int:
+    """Delete only clearly invalid rows from login_logs, then export clean state.
+
+    This protects Page 11 from old generic table dumps without touching real
+    security_login_logs/auth_login_logs rows.
+    """
+    removed = 0
+    try:
+        conn = get_connection()
+        if not _table_exists(conn, "login_logs"):
+            conn.close()
+            return 0
+        rows = conn.execute("SELECT rowid AS _rowid_, * FROM login_logs").fetchall()
+        bad_ids = []
+        for r in rows:
+            d = dict(r)
+            clean = _canonical_login_row("login_logs", d)
+            if clean is None:
+                bad_ids.append(d.get("_rowid_"))
+        if bad_ids:
+            conn.executemany("DELETE FROM login_logs WHERE rowid=?", [(x,) for x in bad_ids])
+            removed = len(bad_ids)
+            conn.commit()
+        conn.close()
+    except Exception:
+        try:
+            conn.close()  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return removed
+# ===== V74 LOGIN-ONLY NORMALIZATION / BAD ROW GUARD END =====
+
+
 def _security_login_rows(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
     """Read legacy security_login_logs rows if that table exists."""
     if not _table_exists(conn, "security_login_logs"):
         return []
     rows = conn.execute("SELECT * FROM security_login_logs ORDER BY id DESC").fetchall()
-    out: List[Dict[str, Any]] = []
-    for r in rows:
-        d = dict(r)
-        idle_seconds = d.get("idle_seconds")
-        try:
-            idle_minutes = round(float(idle_seconds) / 60, 2) if idle_seconds not in (None, "") else None
-        except Exception:
-            idle_minutes = None
-        out.append({
-            "id": f"S{d.get('id')}",
-            "source": "security_login_logs",
-            "username": d.get("username"),
-            "display_name": d.get("display_name"),
-            "event_type": d.get("event_type"),
-            "result": d.get("result"),
-            "message": d.get("message"),
-            "module_code": d.get("module_code"),
-            "login_time": d.get("login_time") or d.get("created_at"),
-            "logout_time": d.get("logout_time"),
-            "idle_minutes": idle_minutes,
-            "ip_address": "",
-            "user_agent": d.get("user_agent"),
-            "created_at": d.get("created_at"),
-        })
-    return out
+    return _valid_login_rows("security_login_logs", [dict(r) for r in rows])
 
 
 def _primary_login_rows(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
     ensure_login_logs_table()
     rows = conn.execute("SELECT * FROM login_logs ORDER BY id DESC").fetchall()
-    out: List[Dict[str, Any]] = []
-    for r in rows:
-        d = dict(r)
-        d["source"] = "login_logs"
-        out.append(d)
-    return out
+    return _valid_login_rows("login_logs", [dict(r) for r in rows])
 
 
 def record_login_log(
@@ -279,12 +441,16 @@ def load_login_logs(start_date: Optional[str] = None, end_date: Optional[str] = 
                     limit: int = 1000, event_types: Optional[List[str]] = None,
                     results: Optional[List[str]] = None, include_legacy: bool = True, **kwargs: Any):
     ensure_login_logs_table()
+    # Clean only obviously bad rows that entered login_logs from non-login tables.
+    _prune_invalid_primary_login_rows()
     conn = get_connection()
     records = _primary_login_rows(conn)
     if include_legacy:
-        # include legacy security_login_logs in search even before migration
+        # Include both current security_service table and older permission_service table.
         records.extend(_security_login_rows(conn))
+        records.extend(_auth_login_rows(conn))
     conn.close()
+    records = _merge_record_sets(records)
     records = _filter_records(records, start_date, end_date, keyword, event_types, results)
     records.sort(key=lambda r: str(r.get("login_time") or r.get("created_at") or ""), reverse=True)
     if limit:
@@ -292,7 +458,6 @@ def load_login_logs(start_date: Optional[str] = None, end_date: Optional[str] = 
     if pd is not None:
         return pd.DataFrame(records)
     return records
-
 
 get_login_logs = load_login_logs
 query_login_logs = load_login_logs
@@ -308,12 +473,15 @@ def get_login_log_stats(start_date: Optional[str] = None, end_date: Optional[str
     logs = load_login_logs(start_date=start_date, end_date=end_date, keyword=keyword, limit=100000)
     if pd is not None and hasattr(logs, "empty"):
         total = int(len(logs))
-        success = int((logs.get("result", "") == "SUCCESS").sum()) if total else 0
+        if total:
+            result_s = logs.get("result", "").astype(str).str.upper()
+            success = int(result_s.isin(["SUCCESS", "OK", "INFO"]).sum())
+        else:
+            success = 0
         return {"records": total, "success": success, "failed": total - success}
     total = len(logs)
-    success = sum(1 for r in logs if r.get("result") == "SUCCESS")
+    success = sum(1 for r in logs if _normalise_result(r.get("result")) in {"SUCCESS", "OK", "INFO"})
     return {"records": total, "success": success, "failed": total - success}
-
 
 login_log_stats = get_login_log_stats
 
@@ -449,12 +617,16 @@ def _extract_login_records_from_payload(payload: Any) -> List[Dict[str, Any]]:
             rows = tables.get(table_name, [])
             if isinstance(rows, list):
                 out.extend(_normalise_backup_row(table_name, r) for r in rows if isinstance(r, dict))
-    # de-duplicate while preserving chronological content
+    # de-duplicate while preserving chronological content, and discard any
+    # records that are not real login/session events.
     merged: Dict[str, Dict[str, Any]] = {}
     for r in out:
-        key = _login_record_key(r)
+        clean = _canonical_login_row(str(r.get("source") or "login_logs"), r)
+        if clean is None:
+            continue
+        key = _login_record_key(clean)
         if key.strip("|"):
-            merged[key] = r
+            merged[key] = clean
     return list(merged.values())
 
 
@@ -536,13 +708,11 @@ def _merge_record_sets(*sets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def _db_login_count(include_legacy: bool = True) -> int:
-    ensure_login_logs_table()
-    conn = get_connection()
-    total = int(conn.execute("SELECT COUNT(*) FROM login_logs").fetchone()[0])
-    if include_legacy and _table_exists(conn, "security_login_logs"):
-        total += int(conn.execute("SELECT COUNT(*) FROM security_login_logs").fetchone()[0])
-    conn.close()
-    return total
+    try:
+        logs = load_login_logs(limit=100000, include_legacy=include_legacy)
+        return int(len(logs))
+    except Exception:
+        return 0
 
 
 def restore_audit_logs_from_permanent_file(path: Optional[str] = None, merge: bool = False) -> Dict[str, Any]:
@@ -721,8 +891,14 @@ get_login_log_permanent_status = get_audit_permanent_status
 def bootstrap_audit_log_service() -> Dict[str, Any]:
     ensure_login_logs_table()
     _ensure_dirs()
+    removed = _prune_invalid_primary_login_rows()
     restore_res = _auto_restore_if_db_lacks_permanent_records()
-    return {"ok": True, "message": "audit_log_service ready", "count": count_login_logs(include_legacy=True), "restore": restore_res}
+    if removed:
+        try:
+            export_audit_logs_to_permanent_file(create_history=False, merge_existing=False)
+        except Exception:
+            pass
+    return {"ok": True, "message": "audit_log_service ready", "count": count_login_logs(include_legacy=True), "restore": restore_res, "removed_invalid_login_rows": removed}
 
 
 # ===== V16 ROBUST LOGIN LOG DELETE =====

@@ -38,7 +38,13 @@ try:
 except Exception:
     pass
 
-bootstrap_audit_log_service()
+bootstrap_info = bootstrap_audit_log_service()
+try:
+    removed_bad = int(bootstrap_info.get("removed_invalid_login_rows", 0) or 0)
+    if removed_bad:
+        st.info(f"已自動排除 {removed_bad} 筆非登入紀錄資料，登入紀錄只顯示帳號登入 / 登出 / 權限安全事件。")
+except Exception:
+    pass
 with st.expander("⧠ 使用說明 / User Guide", expanded=False):
     st.markdown("""
 - 本頁讀取兩種登入紀錄來源：新版 `login_logs` 與舊版 `security_login_logs`。
@@ -107,23 +113,36 @@ if isinstance(logs, list):
 if logs.empty:
     st.info("查無登入紀錄 / No login logs")
 else:
+    # V74：登入紀錄頁只顯示登入 / 登出 / 權限安全事件欄位。
+    # 避免把其他模組資料表欄位誤顯示成帳號、事件、訊息。
+    raw_cols = [
+        "id", "username", "display_name", "event_type", "result",
+        "login_time", "logout_time", "idle_minutes", "module_code",
+        "message", "source", "ip_address", "user_agent", "created_at",
+    ]
+    logs = logs.loc[:, ~pd.Index(logs.columns).duplicated()].copy()
+    for c in raw_cols:
+        if c not in logs.columns:
+            logs[c] = ""
+    show = logs[raw_cols].copy()
+    show.insert(0, "序號 / No.", range(1, len(show) + 1))
     rename = {
-        "id": "ID / ID",
-        "source": "來源 / Source",
+        "id": "資料ID / Data ID",
         "username": "帳號 / Username",
         "display_name": "姓名 / Name",
         "event_type": "事件 / Event",
         "result": "結果 / Result",
-        "message": "訊息 / Message",
-        "module_code": "模組代碼 / Module Code",
         "login_time": "登入時間 / Login Time",
         "logout_time": "登出時間 / Logout Time",
         "idle_minutes": "閒置分鐘 / Idle Minutes",
+        "module_code": "模組 / Module",
+        "message": "訊息 / Message",
+        "source": "來源 / Source",
         "ip_address": "IP / IP",
         "user_agent": "裝置 / User Agent",
         "created_at": "建立時間 / Created At",
     }
-    show = logs.rename(columns=rename)
+    show = show.rename(columns=rename)
     st.dataframe(show, use_container_width=True, hide_index=True, height=420)
     st.download_button(
         "⬇️ 匯出登入紀錄 CSV / Export CSV",
