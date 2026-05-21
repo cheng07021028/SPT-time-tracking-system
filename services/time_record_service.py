@@ -462,17 +462,41 @@ def _current_reset_timestamp() -> str | None:
     return None
 
 
+def _safe_app_setting_value(setting_key: str) -> str | None:
+    """Read a lightweight app setting without breaking page load when schema is absent.
+
+    V3.04 hotfix:
+    Some deployed databases were created before the app_settings table existed.
+    01｜工時紀錄 calls this while rendering, so a missing table must be created
+    or safely treated as no setting instead of crashing the page.
+    """
+    key = str(setting_key or "").strip()
+    if not key:
+        return None
+    try:
+        _ensure_app_settings_table()
+        row = query_one("SELECT setting_value FROM app_settings WHERE setting_key=?", (key,)) or {}
+        val = row.get("setting_value")
+        return str(val).strip() if val else None
+    except sqlite3.OperationalError:
+        # Startup-safe fallback: if the DB/table is still being repaired, do not
+        # block 01 page rendering. The setting simply behaves as unset.
+        try:
+            _ensure_app_settings_table()
+        except Exception:
+            pass
+        return None
+    except Exception:
+        return None
+
+
 def _manual_refresh_timestamp() -> str | None:
-    row = query_one("SELECT setting_value FROM app_settings WHERE setting_key='live_page_manual_refresh_timestamp'") or {}
-    val = row.get("setting_value")
-    return str(val).strip() if val else None
+    return _safe_app_setting_value("live_page_manual_refresh_timestamp")
 
 
 def _restore_hidden_reset_key() -> str | None:
     """Return the reset-cutoff key for which admin has restored hidden rows."""
-    row = query_one("SELECT setting_value FROM app_settings WHERE setting_key='live_page_restore_hidden_reset_key'") or {}
-    val = row.get("setting_value")
-    return str(val).strip() if val else None
+    return _safe_app_setting_value("live_page_restore_hidden_reset_key")
 
 
 def _effective_refresh_cutoff_for_now() -> str | None:
@@ -595,6 +619,7 @@ def today_records(include_finished: bool = True, unfinished_only: bool = False) 
     )
 
 def _ensure_app_settings_table() -> None:
+    """Ensure the lightweight app_settings table exists and has required columns."""
     execute(
         """
         CREATE TABLE IF NOT EXISTS app_settings (
@@ -605,6 +630,17 @@ def _ensure_app_settings_table() -> None:
         )
         """
     )
+    # Compatibility: older deployments may already have app_settings with fewer
+    # columns. Add optional columns without touching existing values.
+    try:
+        info = query_df("PRAGMA table_info(app_settings)")
+        cols = set(info.get("name", pd.Series(dtype=str)).astype(str).tolist()) if isinstance(info, pd.DataFrame) else set()
+        if "note" not in cols:
+            execute("ALTER TABLE app_settings ADD COLUMN note TEXT")
+        if "updated_at" not in cols:
+            execute("ALTER TABLE app_settings ADD COLUMN updated_at TEXT")
+    except Exception:
+        pass
 
 
 def _upsert_app_setting(key: str, value: str, note: str) -> None:
