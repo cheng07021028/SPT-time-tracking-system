@@ -43,7 +43,11 @@ DISPLAY_COLUMNS = {
     "updated_at": "更新時間 / Updated At",
 }
 DISPLAY_TO_INTERNAL = {v: k for k, v in DISPLAY_COLUMNS.items()}
-EDITOR_COLS = [DISPLAY_COLUMNS[c] for c in COLS]
+DISPLAY_ROW_NO = "序號 / No."
+# V66：07 頁不再把 SQLite id 直接當成畫面主鍵顯示。
+# 人員永久檔若來自 JSON / GitHub，id 可能為 None；實際儲存會以 employee_id 做 UPSERT，
+# 所以畫面改顯示穩定序號，避免出現整欄 None 被誤判為缺資料或按鈕失效。
+EDITOR_COLS = [DISPLAY_ROW_NO] + [DISPLAY_COLUMNS[c] for c in COLS if c != "id"]
 BOOL_INTERNAL_COLS = ["is_active", "is_in_factory", "is_today_attendance"]
 
 
@@ -84,11 +88,20 @@ def ensure_cols(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _to_editor_df(df: pd.DataFrame) -> pd.DataFrame:
-    return ensure_cols(df).rename(columns=DISPLAY_COLUMNS)[EDITOR_COLS]
+    work = ensure_cols(df)
+    view = work.rename(columns=DISPLAY_COLUMNS)
+    view.insert(0, DISPLAY_ROW_NO, range(1, len(view) + 1))
+    return view[EDITOR_COLS]
 
 
 def _from_editor_df(df: pd.DataFrame) -> pd.DataFrame:
-    return ensure_cols(df)
+    work = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    if DISPLAY_ROW_NO in work.columns:
+        work = work.drop(columns=[DISPLAY_ROW_NO], errors="ignore")
+    # 07 的畫面不顯示 id；回存前補回空 id，save_employees 會用 employee_id 做更新/新增。
+    if DISPLAY_COLUMNS["id"] not in work.columns and "id" not in work.columns:
+        work["id"] = ""
+    return ensure_cols(work)
 
 
 def reload_employees() -> None:
@@ -207,7 +220,7 @@ if STATE_KEY not in st.session_state:
 can_edit = check_permission("07_missing", "can_edit") or check_permission("04_employees", "can_edit")
 
 st.subheader("今日出勤名單編輯 / Today Attendance Editor")
-st.info("V65：已修正批次按鈕誤刪暫存 STATE_KEY 的問題；今日未紀錄名單改用人員權威檔與工時權威檔計算，不再依賴 SQLite 快取。")
+st.info("V66：今日出勤表格改用『序號 / No.』取代空白 SQLite ID；批次按鈕仍只改畫面暫存，按儲存後才寫入正式人員資料。")
 
 if not can_edit:
     st.warning("目前帳號沒有今日出勤 / 人員名單編輯權限，只能查看資料。")
@@ -242,10 +255,10 @@ else:
         hide_index=True,
         use_container_width=True,
         height=460,
-        disabled=[DISPLAY_COLUMNS[c] for c in ["id", "employee_id", "employee_name", "department", "title", "note", "created_at", "updated_at"]],
+        disabled=[DISPLAY_ROW_NO] + [DISPLAY_COLUMNS[c] for c in ["employee_id", "employee_name", "department", "title", "note", "created_at", "updated_at"]],
         column_order=EDITOR_COLS,
         column_config={
-            DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", width="small"),
+            DISPLAY_ROW_NO: st.column_config.NumberColumn("序號 / No.", width="small"),
             DISPLAY_COLUMNS["employee_id"]: st.column_config.TextColumn("工號 / Employee ID", width="medium"),
             DISPLAY_COLUMNS["employee_name"]: st.column_config.TextColumn("姓名 / Name", width="medium"),
             DISPLAY_COLUMNS["department"]: st.column_config.TextColumn("單位 / Department", width="medium"),
@@ -278,5 +291,5 @@ current_attendance_df = _current_internal_df() if STATE_KEY in st.session_state 
 df = _build_missing_today_df(current_attendance_df, today)
 
 st.metric("今日未紀錄人數 / Missing Records", f"{len(df):,}")
-st.caption("V65：此區依目前畫面暫存的『啟用 / 在廠 / 今日出勤』狀態，加上今日工時權威檔即時計算；按儲存後會寫入正式人員資料。")
+st.caption("V66：此區依目前畫面暫存的『啟用 / 在廠 / 今日出勤』狀態，加上今日工時權威檔即時計算；ID 為空不影響判斷，實際主鍵使用工號。")
 render_table(df, "missing_today_v202", editable=False, height=460)
