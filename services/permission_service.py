@@ -3444,3 +3444,439 @@ def save_security_settings(values: dict) -> None:  # type: ignore[override]
 
 check_permission = has_permission
 # ===================== END V79 PERMISSION REBOOT PERSISTENCE HARD FIX =====================
+
+# ===================== BEGIN V81 PERMISSION DELETE + REBOOT PERSISTENCE HARD FIX =====================
+# V81：修正 10 權限管理 Reboot App 後讀回舊紀錄，以及刪除帳號時
+# sqlite3.DatabaseError 造成整頁中斷的問題。
+# 原則：
+# 1. 不再讓舊 persistent_modules 或預設種子資料覆蓋目前管理員已儲存內容。
+# 2. 權限資料同時寫入正式權威路徑 data/permanent_store/modules/10_permissions。
+# 3. 刪除帳號採防呆交易；權限子表刪除失敗時不讓頁面崩潰，仍優先刪主帳號並寫入永久檔。
+# 4. 禁止把空的 auth_users 事故資料寫成永久權威檔，避免 Reboot 後帳號全消失或回復舊資料。
+
+_V81_PERMISSION_RESTORE_KEY = "_v81_permission_permanent_restored"
+_V81_PERMISSION_TABLES = [
+    "auth_users",
+    "auth_account_permissions",
+    "auth_security_settings",
+    "security_users",
+    "security_user_roles",
+    "security_settings",
+]
+_V81_PERMISSION_FILES = [
+    PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "settings.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "security_settings.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_permission_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
+    PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_settings.json",
+]
+
+
+def _v81_now_text() -> str:
+    try:
+        return now_text()
+    except Exception:
+        from datetime import datetime as _dt
+        return _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v81_read_json(path: Path) -> dict:
+    try:
+        if path.exists() and path.is_file() and path.stat().st_size > 2:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            return payload if isinstance(payload, dict) else {}
+    except Exception:
+        pass
+    return {}
+
+
+def _v81_write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    # validate before replace
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v81_parse_ts(value: object) -> float:
+    text = str(value or "").strip()
+    if not text:
+        return 0.0
+    try:
+        import pandas as _pd
+        ts = _pd.to_datetime(text, errors="coerce")
+        if _pd.notna(ts):
+            return float(ts.timestamp())
+    except Exception:
+        pass
+    # common compact form: 20260519_190656
+    try:
+        from datetime import datetime as _dt
+        for fmt in ("%Y%m%d_%H%M%S", "%Y%m%d%H%M%S", "%Y-%m-%d %H:%M:%S"):
+            try:
+                return _dt.strptime(text[:15] if fmt == "%Y%m%d_%H%M%S" else text[:14], fmt).timestamp()
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return 0.0
+
+
+def _v81_payload_time(payload: dict, path: Path) -> float:
+    values = [payload.get("updated_at"), payload.get("exported_at"), payload.get("saved_at")]
+    parsed = max(_v81_parse_ts(v) for v in values)
+    try:
+        return max(parsed, float(path.stat().st_mtime))
+    except Exception:
+        return parsed
+
+
+def _v81_payload_tables(payload: dict) -> dict:
+    tables = payload.get("tables")
+    return tables if isinstance(tables, dict) else {}
+
+
+def _v81_is_valid_permission_payload(payload: dict) -> bool:
+    tables = _v81_payload_tables(payload)
+    users = tables.get("auth_users")
+    # auth_users 不可為空；空資料多半是舊版誤匯出，不可拿來 Reboot 還原。
+    if not isinstance(users, list) or len(users) <= 0:
+        return False
+    for row in users:
+        if isinstance(row, dict) and str(row.get("username") or "").strip():
+            return True
+    return False
+
+
+def _v81_latest_permission_payload() -> dict:
+    candidates: list[tuple[float, int, str, dict]] = []
+    for path in _V81_PERMISSION_FILES:
+        payload = _v81_read_json(path)
+        if not _v81_is_valid_permission_payload(payload):
+            continue
+        tables = _v81_payload_tables(payload)
+        users = tables.get("auth_users", []) if isinstance(tables.get("auth_users"), list) else []
+        # 新格式正式權威路徑優先，避免舊 persistent_modules 蓋回。
+        path_priority = 1 if "data/permanent_store/modules/10_permissions" in str(path).replace("\\", "/") else 0
+        candidates.append((_v81_payload_time(payload, path), path_priority, str(path), payload))
+    if not candidates:
+        return {}
+    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    return candidates[0][3]
+
+
+def _v81_fetch_table(conn: sqlite3.Connection, table: str) -> list[dict]:
+    try:
+        return [dict(r) for r in conn.execute(f'SELECT * FROM "{table}"').fetchall()]
+    except Exception:
+        return []
+
+
+def _v81_make_payload_from_db(reason: str = "permission_settings_saved_v81") -> dict:
+    try:
+        init_permission_tables()
+    except Exception:
+        pass
+    conn = connect_db()
+    try:
+        tables = {t: _v81_fetch_table(conn, t) for t in _V81_PERMISSION_TABLES}
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    return {
+        "authority_schema": "SPT-PermissionAuthority-V81",
+        "version": "V81-permission-delete-reboot-persistence-fix",
+        "updated_at": _v81_now_text(),
+        "exported_at": _v81_now_text(),
+        "reason": reason,
+        "module_key": "10_permissions",
+        "module_code": "10",
+        "module_name_zh": "權限管理",
+        "module_name_en": "Permission Management",
+        "source": "permission_service_v81",
+        "description": "10 權限管理正式永久權威檔。修正 Reboot App 回復舊紀錄與刪除帳號 DatabaseError。",
+        "tables": tables,
+        "table_counts": {k: len(v) for k, v in tables.items()},
+        "counts": {k: len(v) for k, v in tables.items()},
+    }
+
+
+def export_permission_settings_permanently(reason: str = "permission_settings_saved_v81") -> dict:  # type: ignore[override]
+    payload = _v81_make_payload_from_db(reason)
+    users = _v81_payload_tables(payload).get("auth_users", [])
+    if not isinstance(users, list) or len(users) <= 0:
+        # 避免 DB 暫時讀取失敗時，把空帳號表寫成永久權威資料。
+        return {
+            "ok": False,
+            "mode": "v81_permission_export_guard",
+            "message": "已阻止空的 auth_users 覆蓋永久權限設定。",
+            "table_counts": payload.get("table_counts", {}),
+        }
+    written: list[str] = []
+    errors: list[str] = []
+    for path in _V81_PERMISSION_FILES:
+        try:
+            _v81_write_json(path, payload)
+            written.append(str(path))
+        except Exception as e:
+            errors.append(f"{path}: {e}")
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    if st is not None:
+        try:
+            st.session_state[_V81_PERMISSION_RESTORE_KEY] = True
+            st.session_state["v81_permission_last_export"] = payload.get("exported_at")
+        except Exception:
+            pass
+    return {
+        "ok": len(written) > 0,
+        "mode": "v81_permission_permanent_store_hard_fix",
+        "files": written,
+        "errors": errors,
+        "table_counts": payload.get("table_counts", {}),
+    }
+
+
+def _v81_replace_table(cur: sqlite3.Cursor, table: str, rows: list[dict]) -> int:
+    try:
+        cur.execute(f'DELETE FROM "{table}"')
+    except Exception:
+        return 0
+    n = 0
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        clean = {str(k): v for k, v in row.items() if str(k).strip()}
+        if not clean:
+            continue
+        cols = list(clean.keys())
+        placeholders = ",".join(["?"] * len(cols))
+        col_sql = ",".join([f'"{c}"' for c in cols])
+        try:
+            cur.execute(f'INSERT INTO "{table}" ({col_sql}) VALUES ({placeholders})', [clean[c] for c in cols])
+            n += 1
+        except Exception:
+            continue
+    return n
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    payload = _v81_latest_permission_payload()
+    if not payload:
+        return {"ok": False, "mode": "v81_permission_restore", "message": "找不到有效權限永久檔，已略過還原。"}
+    tables = _v81_payload_tables(payload)
+    conn = connect_db()
+    cur = conn.cursor()
+    restored: dict[str, int] = {}
+    try:
+        try:
+            init_permission_tables()
+        except Exception:
+            pass
+        try:
+            _ensure_legacy_security_tables(cur)
+            _ensure_security_setting_tables(cur)
+        except Exception:
+            pass
+        for table in _V81_PERMISSION_TABLES:
+            rows = tables.get(table, []) if isinstance(tables.get(table), list) else []
+            restored[table] = _v81_replace_table(cur, table, rows)
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    if st is not None:
+        try:
+            st.session_state[_V81_PERMISSION_RESTORE_KEY] = True
+            st.session_state["v81_permission_restore_source_version"] = payload.get("version")
+        except Exception:
+            pass
+    return {"ok": True, "mode": "v81_permission_restore", "restored": restored, "source_version": payload.get("version"), "source_time": payload.get("exported_at") or payload.get("updated_at")}
+
+
+def _v81_restore_permission_once() -> None:
+    if st is not None:
+        try:
+            if st.session_state.get(_V81_PERMISSION_RESTORE_KEY):
+                return
+        except Exception:
+            pass
+    restore_permission_settings_from_permanent_files(force=True)
+    if st is not None:
+        try:
+            st.session_state[_V81_PERMISSION_RESTORE_KEY] = True
+        except Exception:
+            pass
+
+
+def _v81_safe_delete_from_table(table: str, username: str) -> int:
+    conn = connect_db()
+    cur = conn.cursor()
+    try:
+        cur.execute(f'DELETE FROM "{table}" WHERE lower(username)=lower(?)', (username,))
+        count = max(int(cur.rowcount or 0), 0)
+        conn.commit()
+        return count
+    except sqlite3.DatabaseError:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        # 子表刪除錯誤不可中斷整個帳號刪除流程；先略過，主帳號刪除後殘留權限不會生效。
+        return 0
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return 0
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _v81_delete_auth_user(username: str) -> int:
+    conn = connect_db()
+    cur = conn.cursor()
+    try:
+        cur.execute('DELETE FROM "auth_users" WHERE lower(username)=lower(?) AND lower(username)<>"admin"', (username,))
+        count = max(int(cur.rowcount or 0), 0)
+        conn.commit()
+        return count
+    except sqlite3.DatabaseError:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return 0
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return 0
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
+    try:
+        init_permission_tables()
+    except Exception:
+        pass
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for u in usernames or []:
+        name = str(u or "").strip()
+        low = name.lower()
+        if not name or low == "admin" or low in seen:
+            continue
+        seen.add(low)
+        cleaned.append(name)
+    if not cleaned:
+        return 0
+    deleted = 0
+    for username in cleaned:
+        # 先刪子表；若子表 DB 異常，不能讓頁面崩潰。
+        _v81_safe_delete_from_table("auth_account_permissions", username)
+        try:
+            _v81_safe_delete_from_table("security_user_roles", username)
+        except Exception:
+            pass
+        try:
+            _v81_safe_delete_from_table("security_users", username)
+        except Exception:
+            pass
+        deleted += _v81_delete_auth_user(username)
+    try:
+        # 確保剩餘帳號仍有權限列；若子表曾刪失敗，這裡會補足現有帳號該有的列。
+        ensure_permissions_for_all_users(force=True)
+    except Exception:
+        pass
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    export_permission_settings_permanently("auth_users_deleted_v81")
+    return deleted
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    _v81_restore_permission_once()
+    if "_v79_prev_get_users" in globals() and callable(_v79_prev_get_users):
+        return _v79_prev_get_users()
+    return []
+
+
+def get_account_permissions() -> List[dict]:  # type: ignore[override]
+    _v81_restore_permission_once()
+    if "_v79_prev_get_account_permissions" in globals() and callable(_v79_prev_get_account_permissions):
+        return _v79_prev_get_account_permissions()
+    return []
+
+
+def get_security_settings() -> dict:  # type: ignore[override]
+    _v81_restore_permission_once()
+    if "_v79_prev_get_security_settings" in globals() and callable(_v79_prev_get_security_settings):
+        return _v79_prev_get_security_settings()
+    return {}
+
+
+def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
+    # 儲存前不可 restore，避免把畫面上的新設定覆蓋掉。
+    if "_v79_prev_save_users" in globals() and callable(_v79_prev_save_users):
+        result = _v79_prev_save_users(rows)
+    else:
+        result = {"saved": 0, "skipped": []}
+    export_result = export_permission_settings_permanently("auth_users_saved_v81")
+    if isinstance(result, dict):
+        result["permanent_save"] = export_result
+    return result
+
+
+def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
+    if "_v79_prev_save_account_permissions" in globals() and callable(_v79_prev_save_account_permissions):
+        count = int(_v79_prev_save_account_permissions(rows) or 0)
+    else:
+        count = 0
+    export_permission_settings_permanently("account_permissions_saved_v81")
+    return count
+
+
+def save_security_settings(values: dict) -> None:  # type: ignore[override]
+    if "_v79_prev_save_security_settings" in globals() and callable(_v79_prev_save_security_settings):
+        _v79_prev_save_security_settings(values)
+    export_permission_settings_permanently("security_settings_saved_v81")
+
+
+check_permission = has_permission
+# ===================== END V81 PERMISSION DELETE + REBOOT PERSISTENCE HARD FIX =====================
