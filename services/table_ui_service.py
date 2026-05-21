@@ -63,14 +63,6 @@ COLUMN_LABELS: dict[str, str] = {
     "last_start_time": "最後開始時間 / Last Start",
     "count": "筆數 / Count",
     "avg_hours": "平均工時 / Avg Time",
-    "刪除": "刪除 / Delete",
-    "重算": "重算 / Recalc",
-    "刪除 / Delete": "刪除 / Delete",
-    "重算 / Recalc": "重算 / Recalc",
-    "啟用 / Active": "啟用 / Active",
-    "在廠 / In Factory": "在廠 / In Factory",
-    "今日出勤 / Today Attendance": "今日出勤 / Today Attendance",
-    "ID / ID": "ID / ID",
 }
 
 DEFAULT_WIDTHS: dict[str, int] = {
@@ -90,33 +82,14 @@ DEFAULT_WIDTHS: dict[str, int] = {
     "detail": 420,
     "created_at": 180,
     "updated_at": 180,
-    # V63：checkbox 欄位標題採中英雙語，寬度太小會只看到「刪除 [」或文字被截斷。
-    # 這裡把常用 checkbox 欄位拉寬，視覺與 10｜權限管理一致。
-    "刪除": 160,
-    "刪除 / Delete": 160,
-    "重算": 160,
-    "重算 / Recalc": 160,
-    "is_active": 150,
-    "啟用 / Active": 150,
-    "is_in_factory": 170,
-    "在廠 / In Factory": 170,
-    "is_today_attendance": 210,
-    "今日出勤 / Today Attendance": 210,
-    "is_group_work": 180,
 }
 
 
-BOOLEAN_COLUMNS = {"is_active", "is_in_factory", "is_today_attendance", "is_group_work", "刪除", "刪除 / Delete", "重算", "重算 / Recalc", "啟用 / Active", "在廠 / In Factory", "今日出勤 / Today Attendance", "delete", "selected"}
-NUMBER_COLUMNS = {"id", "ID / ID", "record_count", "active_count", "today_record_count", "count", "sort_order", "order", "display_order"}
+BOOLEAN_COLUMNS = {"is_active", "is_in_factory", "is_today_attendance", "is_group_work", "刪除", "delete", "selected"}
+NUMBER_COLUMNS = {"id", "record_count", "active_count", "today_record_count", "count", "sort_order", "order", "display_order"}
 
 
 def _to_bool_value(value) -> bool:
-    """V63：比 bool(value) 更安全的 checkbox 解析。
-
-    先前任何非空字串都會被 bool(value) 當成 True，容易讓顯示欄、文字欄、
-    舊草稿或標題文字在 checkbox 欄位中被誤判成已勾選，造成「待刪除全部變 605」
-    這類顯示落差。
-    """
     if isinstance(value, bool):
         return value
     if value is None:
@@ -126,17 +99,12 @@ def _to_bool_value(value) -> bool:
             return False
     except Exception:
         pass
-    if isinstance(value, (int, float)):
-        try:
-            return bool(int(value))
-        except Exception:
-            return False
     text = str(value).strip().lower()
-    if text in {"1", "true", "yes", "y", "on", "checked", "☑", "✅", "啟用", "在廠", "出勤", "是", "勾選", "delete", "recalc"}:
+    if text in {"1", "true", "yes", "y", "on", "啟用", "是", "勾選"}:
         return True
-    if text in {"0", "false", "no", "n", "off", "unchecked", "☐", "□", "停用", "不在", "未出勤", "否", "不刪除", "", "none", "nan", "<na>"}:
+    if text in {"0", "false", "no", "n", "off", "停用", "否", ""}:
         return False
-    return False
+    return bool(value)
 
 
 def _prepare_display_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -418,15 +386,7 @@ def restore_table_ui_settings_from_permanent(force: bool = False) -> dict[str, A
 
 
 def label_for(col: str) -> str:
-    s = str(col)
-    if s in COLUMN_LABELS:
-        return COLUMN_LABELS[s]
-    # If a caller already passes a bilingual display label, keep it as-is.
-    # This prevents headers like 「刪除 / Delete / 刪除 / Delete」 and keeps
-    # table buttons/editors consistent with 10｜權限管理.
-    if " / " in s:
-        return s
-    return f"{s} / {s}"
+    return COLUMN_LABELS.get(col, f"{col} / {col}")
 
 
 def ensure_table_ui_schema() -> None:
@@ -552,8 +512,6 @@ def _column_config(col: str, width: int | None = None, series: pd.Series | None 
     w = int(width or DEFAULT_WIDTHS.get(col, 140))
     col_name = str(col)
     if col_name in BOOLEAN_COLUMNS:
-        # V63：即使永久欄寬曾保存為 70/90，也避免中英 checkbox 標題被切掉。
-        w = max(w, int(DEFAULT_WIDTHS.get(col_name, 150)), 150)
         return st.column_config.CheckboxColumn(label, width=w)
     if col_name in {"work_hours", "total_hours", "avg_hours"}:
         return st.column_config.TextColumn(label, width=w)
@@ -1320,3 +1278,181 @@ def ensure_table_ui_schema() -> None:  # type: ignore[override]
 def export_table_ui_settings_permanent(reason: str = "table_ui_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
     # V367: 此函式可能被頁面當作「確保永久設定」呼叫；避免在進頁時寫多個 mirror。
     return {"ok": True, "mode": "v367_direct_persistence_no_export_needed", "reason": reason}
+
+
+# ===== V3.69 definitive table width save/apply repair =====
+# 修正重點：欄寬設定 / Column Width Settings 按下「儲存欄位設定」後，
+# 必須立即套用到目前表格，並永久寫入唯一主設定與 SQLite 相容快取。
+# 不新增畫面、不改業務資料，只覆蓋欄寬/欄位順序讀寫核心。
+
+def _v369_key_candidates(table_key: str) -> list[str]:
+    raw = str(table_key or "").strip()
+    keys: list[str] = []
+    try:
+        ck = _v360_key(raw)
+        if ck:
+            keys.append(str(ck))
+    except Exception:
+        pass
+    if raw and raw not in keys:
+        keys.append(raw)
+    return keys or ["unknown.table"]
+
+
+def _v369_normalize_widths(widths: Any) -> dict[str, int]:
+    out: dict[str, int] = {}
+    if not isinstance(widths, dict):
+        return out
+    for k, v in widths.items():
+        try:
+            iv = int(float(v))
+            if iv > 0:
+                out[str(k)] = max(60, min(700, iv))
+        except Exception:
+            pass
+    return out
+
+
+def _v369_normalize_order(order: Any) -> list[str]:
+    if isinstance(order, str):
+        try:
+            parsed = json.loads(order)
+            order = parsed if isinstance(parsed, list) else [x.strip() for x in order.splitlines() if x.strip()]
+        except Exception:
+            order = [x.strip() for x in order.splitlines() if x.strip()]
+    try:
+        values = list(order or [])
+    except Exception:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in values:
+        s = str(item).strip()
+        if s and s not in seen:
+            out.append(s)
+            seen.add(s)
+    return out
+
+
+def _v369_load_table_settings_direct(key: str) -> dict[str, Any]:
+    try:
+        from services.table_persistence_service import load_table_settings
+        data = load_table_settings(key)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _v369_sqlite_get(table_key: str) -> dict[str, Any]:
+    try:
+        row = query_one("SELECT widths_json, order_json FROM table_ui_settings WHERE table_key=?", (table_key,)) or {}
+        widths = json.loads(row.get("widths_json") or "{}") if row else {}
+        order = json.loads(row.get("order_json") or "[]") if row else []
+        return {"widths": _v369_normalize_widths(widths), "order": _v369_normalize_order(order)}
+    except Exception:
+        return {"widths": {}, "order": []}
+
+
+def _v369_sqlite_put(table_key: str, *, widths: dict[str, int] | None = None, order: list[str] | None = None) -> None:
+    try:
+        _v346_ensure_table_ui_schema_basic()
+        current = _v369_sqlite_get(table_key)
+        final_widths = _v369_normalize_widths(widths if widths is not None else current.get("widths", {}))
+        final_order = _v369_normalize_order(order if order is not None else current.get("order", []))
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, datetime('now','localtime'))
+            ON CONFLICT(table_key) DO UPDATE SET
+                widths_json=excluded.widths_json,
+                order_json=excluded.order_json,
+                updated_at=excluded.updated_at
+            """,
+            (str(table_key), json.dumps(final_widths, ensure_ascii=False), json.dumps(final_order, ensure_ascii=False)),
+        )
+    except Exception:
+        pass
+
+
+def load_widths(table_key: str) -> dict[str, int]:  # type: ignore[override]
+    try:
+        ensure_table_ui_schema()
+    except Exception:
+        pass
+    for key in _v369_key_candidates(table_key):
+        data = _v369_load_table_settings_direct(key)
+        widths = _v369_normalize_widths(data.get("widths", {}) if isinstance(data, dict) else {})
+        if widths:
+            return widths
+    for key in _v369_key_candidates(table_key):
+        widths = _v369_sqlite_get(key).get("widths", {})
+        if widths:
+            return _v369_normalize_widths(widths)
+    return {}
+
+
+def save_widths(table_key: str, widths: dict[str, int]) -> None:  # type: ignore[override]
+    norm = _v369_normalize_widths(widths)
+    keys = _v369_key_candidates(table_key)
+    primary = keys[0]
+    try:
+        from services.table_persistence_service import save_table_settings
+        save_table_settings(primary, widths=norm, reason="v369_save_widths")
+    except Exception:
+        pass
+    for key in keys:
+        _v369_sqlite_put(key, widths=norm)
+        try:
+            st.session_state[f"_spt_width_cache_{key}"] = {"ts": time.time(), "data": dict(norm)}
+        except Exception:
+            pass
+
+
+def load_column_order(table_key: str) -> list[str]:  # type: ignore[override]
+    try:
+        ensure_table_ui_schema()
+    except Exception:
+        pass
+    for key in _v369_key_candidates(table_key):
+        data = _v369_load_table_settings_direct(key)
+        order = _v369_normalize_order(data.get("order", []) if isinstance(data, dict) else [])
+        if order:
+            return order
+    for key in _v369_key_candidates(table_key):
+        order = _v369_sqlite_get(key).get("order", [])
+        if order:
+            return _v369_normalize_order(order)
+    return []
+
+
+def save_column_order(table_key: str, order: Iterable[str]) -> None:  # type: ignore[override]
+    cols = _v369_normalize_order(order)
+    keys = _v369_key_candidates(table_key)
+    primary = keys[0]
+    try:
+        from services.table_persistence_service import save_table_settings
+        save_table_settings(primary, order=cols, reason="v369_save_column_order")
+    except Exception:
+        pass
+    for key in keys:
+        _v369_sqlite_put(key, order=cols)
+
+
+def build_column_config(table_key: str, df: pd.DataFrame) -> dict:  # type: ignore[override]
+    widths = load_widths(table_key)
+    cfg = {}
+    for col in df.columns:
+        c = str(col)
+        cfg[col] = _column_config(c, widths.get(c), df[col] if col in df.columns else None)
+    return cfg
+
+
+def apply_column_order(table_key: str, df: pd.DataFrame) -> pd.DataFrame:  # type: ignore[override]
+    if df is None or df.empty:
+        return df
+    order = load_column_order(table_key)
+    if not order:
+        return df
+    ordered = [c for c in order if c in df.columns]
+    rest = [c for c in df.columns if c not in ordered]
+    return df[ordered + rest] if ordered else df

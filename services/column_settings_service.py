@@ -843,7 +843,7 @@ def install_column_settings_patch() -> None:
             else:
                 kwargs.pop("column_order", None)
             draft_df = _get_editor_draft(table_id, df)
-            # V67: synchronize Streamlit's widget delta before rendering.  This keeps
+            # V68: synchronize Streamlit's widget delta before rendering without callbacks.  This keeps
             # checkbox/text edits from disappearing when another widget triggers a
             # rerun before the page has copied the returned dataframe into its own
             # session_state draft.
@@ -855,18 +855,14 @@ def install_column_settings_patch() -> None:
                     _set_editor_draft(table_id, draft_df)
             except Exception:
                 pass
-            if widget_key and not kwargs.get("on_change"):
-                def _spt_v67_commit_editor_delta(_table_id=table_id, _widget_key=widget_key, _fallback_df=draft_df.copy()):
-                    try:
-                        from services.data_editor_state_service import apply_data_editor_widget_state
-                        current = st.session_state.get(f"_spt_editor_draft::{_table_id}")
-                        if not isinstance(current, pd.DataFrame):
-                            current = _fallback_df.copy()
-                        committed = apply_data_editor_widget_state(current, st.session_state.get(_widget_key))
-                        st.session_state[f"_spt_editor_draft::{_table_id}"] = committed.copy()
-                    except Exception:
-                        pass
-                kwargs["on_change"] = _spt_v67_commit_editor_delta
+            # V69: Never pass a data_editor callback through the global wrapper.
+            # Reason: many legacy pages render st.data_editor inside st.form.
+            # Streamlit allows callbacks only on st.form_submit_button within a form;
+            # passing any on_change to data_editor raises StreamlitInvalidFormCallbackError.
+            # The table-draft synchronization is handled by reading widget delta
+            # before and after rendering, so removing the callback does not affect
+            # cell/checkbox state preservation.
+            kwargs.pop("on_change", None)
             try:
                 edited = original_data_editor(draft_df, *args, **kwargs)
             except TypeError:
