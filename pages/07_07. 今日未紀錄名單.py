@@ -9,7 +9,7 @@ import streamlit as st
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access, check_permission
 from services.crud_table_service import load_employees, save_employees
-from services.db_service import query_df
+from services.time_record_service import load_records
 from services.table_ui_service import render_table
 
 st.set_page_config(page_title="07. 今日未紀錄名單", page_icon="⟁️", layout="wide")
@@ -97,12 +97,16 @@ def reload_employees() -> None:
 
 
 def touch_editor() -> None:
-    # V63：清除 Streamlit widget state + 全域 column_settings_service 草稿，
-    # 避免批次按鈕已改暫存資料，但 data_editor 仍顯示舊 checkbox。
+    # V65：只清除 data_editor widget 本身，不可把 STATE_KEY / REV / IGNORE 一起刪掉。
+    # V64 的條件包含「today_attendance_editor」字串，會誤刪 v202_today_attendance_editor，
+    # 導致批次按鈕剛改完暫存資料又被 reload_employees() 蓋回，看起來像按鈕無作用。
+    protected_keys = {STATE_KEY, EDITOR_REV_KEY, EDITOR_IGNORE_RETURN_KEY}
     try:
         for _k0 in list(st.session_state.keys()):
             sk = str(_k0)
-            if sk.startswith("today_attendance_editor_v202_") or "today_attendance_editor" in sk:
+            if sk in protected_keys:
+                continue
+            if sk.startswith("today_attendance_editor_v202_"):
                 st.session_state.pop(_k0, None)
     except Exception:
         pass
@@ -121,7 +125,7 @@ def _current_internal_df() -> pd.DataFrame:
 
 
 def _bulk_set_bool_column(col: str, value: bool) -> None:
-    """V64: 批次按鈕重新指定整份 DataFrame，避免 in-place 修改被 data_editor 舊草稿覆蓋。"""
+    """V65: 批次按鈕重新指定整份 DataFrame，避免 in-place 修改被 data_editor 舊草稿覆蓋。"""
     df = _current_internal_df().copy()
     if col not in df.columns:
         df[col] = False
@@ -131,13 +135,79 @@ def _bulk_set_bool_column(col: str, value: bool) -> None:
     rerun()
 
 
+def _date_text_series(df: pd.DataFrame) -> pd.Series:
+    if df is None or df.empty:
+        return pd.Series(dtype=str)
+    if "start_date" in df.columns:
+        return pd.to_datetime(df["start_date"], errors="coerce").dt.strftime("%Y-%m-%d")
+    if "work_date" in df.columns:
+        return pd.to_datetime(df["work_date"], errors="coerce").dt.strftime("%Y-%m-%d")
+    if "start_timestamp" in df.columns:
+        return pd.to_datetime(df["start_timestamp"], errors="coerce").dt.strftime("%Y-%m-%d")
+    return pd.Series([""] * len(df), index=df.index, dtype=str)
+
+
+def _build_missing_today_df(employee_df: pd.DataFrame, target_date: str) -> pd.DataFrame:
+    # V65：今日未紀錄名單改用 04 人員權威檔 + 02/01 工時權威檔即時計算。
+    # 不再查 SQLite employees 快取，避免 Reboot / GitHub 永久檔已更新但 SQLite 快取未同步，造成缺勤人數誤顯示 0。
+    emp = ensure_cols(employee_df)
+    if emp.empty:
+        return pd.DataFrame(columns=[
+            "employee_id", "employee_name", "department", "title",
+            "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count",
+        ])
+    for c in BOOL_INTERNAL_COLS:
+        emp[c] = emp[c].map(_to_bool_value).fillna(False).astype(bool)
+    emp = emp[(emp["is_active"]) & (emp["is_in_factory"]) & (emp["is_today_attendance"])].copy()
+    emp["employee_id"] = emp["employee_id"].fillna("").astype(str).str.strip()
+    emp = emp[emp["employee_id"] != ""].copy()
+    if emp.empty:
+        out = emp.copy()
+        out["last_start_time"] = ""
+        out["today_record_count"] = 0
+        return out[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]]
+
+    try:
+        rec = load_records(start_date=target_date, end_date=target_date)
+    except Exception:
+        rec = pd.DataFrame()
+    if rec is None or not isinstance(rec, pd.DataFrame) or rec.empty or "employee_id" not in rec.columns:
+        emp["last_start_time"] = ""
+        emp["today_record_count"] = 0
+        return emp[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
+
+    rec = rec.copy()
+    rec["employee_id"] = rec["employee_id"].fillna("").astype(str).str.strip()
+    rec["__record_date"] = _date_text_series(rec)
+    rec = rec[(rec["employee_id"] != "") & (rec["__record_date"] == str(target_date))].copy()
+    if rec.empty:
+        emp["last_start_time"] = ""
+        emp["today_record_count"] = 0
+        return emp[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
+
+    if "start_timestamp" not in rec.columns:
+        if "start_time" in rec.columns:
+            rec["start_timestamp"] = rec["start_time"]
+        else:
+            rec["start_timestamp"] = ""
+    grp = rec.groupby("employee_id", dropna=False).agg(
+        last_start_time=("start_timestamp", "max"),
+        today_record_count=("employee_id", "size"),
+    ).reset_index()
+    out = emp.merge(grp, on="employee_id", how="left")
+    out["today_record_count"] = pd.to_numeric(out["today_record_count"], errors="coerce").fillna(0).astype(int)
+    out["last_start_time"] = out["last_start_time"].fillna("").astype(str)
+    out = out[out["today_record_count"] == 0].copy()
+    return out[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
+
+
 if STATE_KEY not in st.session_state:
     reload_employees()
 
 can_edit = check_permission("07_missing", "can_edit") or check_permission("04_employees", "can_edit")
 
 st.subheader("今日出勤名單編輯 / Today Attendance Editor")
-st.info("V64：本頁直接維護『啟用 / 在廠 / 今日出勤』狀態；批次按鈕會重新指定整份暫存表並刷新 data_editor，checkbox 顯示與暫存資料保持一致。")
+st.info("V65：已修正批次按鈕誤刪暫存 STATE_KEY 的問題；今日未紀錄名單改用人員權威檔與工時權威檔計算，不再依賴 SQLite 快取。")
 
 if not can_edit:
     st.warning("目前帳號沒有今日出勤 / 人員名單編輯權限，只能查看資料。")
@@ -204,21 +274,9 @@ else:
 st.divider()
 st.subheader("今日未紀錄名單 / Missing Today")
 today = today_date().strftime("%Y-%m-%d")
-df = query_df(
-    """
-    SELECT e.employee_id, e.employee_name, e.department, e.title, e.is_in_factory, e.is_today_attendance,
-           MAX(t.start_timestamp) AS last_start_time,
-           COUNT(t.id) AS today_record_count
-    FROM employees e
-    LEFT JOIN time_records t
-      ON e.employee_id=t.employee_id AND t.start_date=?
-    WHERE e.is_active=1 AND e.is_in_factory=1 AND e.is_today_attendance=1
-    GROUP BY e.employee_id, e.employee_name, e.department, e.title, e.is_in_factory, e.is_today_attendance
-    HAVING COUNT(t.id)=0
-    ORDER BY e.employee_id
-    """,
-    (today,),
-)
+current_attendance_df = _current_internal_df() if STATE_KEY in st.session_state else ensure_cols(load_employees())
+df = _build_missing_today_df(current_attendance_df, today)
 
 st.metric("今日未紀錄人數 / Missing Records", f"{len(df):,}")
+st.caption("V65：此區依目前畫面暫存的『啟用 / 在廠 / 今日出勤』狀態，加上今日工時權威檔即時計算；按儲存後會寫入正式人員資料。")
 render_table(df, "missing_today_v202", editable=False, height=460)
