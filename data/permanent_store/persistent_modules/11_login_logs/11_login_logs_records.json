@@ -1,13 +1,13 @@
 {
   "version": "V1.50",
-  "exported_at": "2026-05-21 22:15:42",
+  "exported_at": "2026-05-21 22:17:31",
   "source": "audit_log_service",
   "module_key": "11_login_logs",
   "module_code": "11_login_logs",
   "module_name_zh": "登入紀錄",
   "module_name_en": "Login Logs",
   "table": "login_logs",
-  "count": 42,
+  "count": 43,
   "records": [
     {
       "id": 43,
@@ -18,12 +18,28 @@
       "result": "SUCCESS",
       "message": "roles=admin",
       "module_code": "11_login_logs",
-      "login_time": "2026-05-21 22:15:42",
+      "login_time": "2026-05-21 22:17:31",
       "logout_time": "",
       "idle_minutes": null,
       "ip_address": "",
       "user_agent": "",
-      "created_at": "2026-05-21 22:15:42"
+      "created_at": "2026-05-21 22:17:31"
+    },
+    {
+      "id": 1,
+      "source": "security_login_logs",
+      "username": "admin",
+      "display_name": "系統管理員",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "message": "role=admin",
+      "module_code": "",
+      "login_time": "2026-05-21 22:17:26",
+      "logout_time": "",
+      "idle_minutes": null,
+      "ip_address": "",
+      "user_agent": "streamlit",
+      "created_at": "2026-05-21 22:17:26"
     },
     {
       "id": 42,
@@ -693,12 +709,28 @@
         "result": "SUCCESS",
         "message": "roles=admin",
         "module_code": "11_login_logs",
-        "login_time": "2026-05-21 22:15:42",
+        "login_time": "2026-05-21 22:17:31",
         "logout_time": "",
         "idle_minutes": null,
         "ip_address": "",
         "user_agent": "",
-        "created_at": "2026-05-21 22:15:42"
+        "created_at": "2026-05-21 22:17:31"
+      },
+      {
+        "id": 1,
+        "source": "security_login_logs",
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=admin",
+        "module_code": "",
+        "login_time": "2026-05-21 22:17:26",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-21 22:17:26"
       },
       {
         "id": 42,
@@ -1359,6 +1391,6 @@
     ]
   },
   "table_counts": {
-    "login_logs": 42
+    "login_logs": 43
   }
 }
