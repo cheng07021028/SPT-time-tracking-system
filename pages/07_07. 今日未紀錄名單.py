@@ -116,13 +116,28 @@ def touch_editor() -> None:
     st.session_state[EDITOR_REV_KEY] = int(st.session_state.get(EDITOR_REV_KEY, 0)) + 1
 
 
+def _current_internal_df() -> pd.DataFrame:
+    return ensure_cols(st.session_state.get(STATE_KEY, pd.DataFrame()))
+
+
+def _bulk_set_bool_column(col: str, value: bool) -> None:
+    """V64: 批次按鈕重新指定整份 DataFrame，避免 in-place 修改被 data_editor 舊草稿覆蓋。"""
+    df = _current_internal_df().copy()
+    if col not in df.columns:
+        df[col] = False
+    df[col] = bool(value)
+    st.session_state[STATE_KEY] = ensure_cols(df)
+    touch_editor()
+    rerun()
+
+
 if STATE_KEY not in st.session_state:
     reload_employees()
 
 can_edit = check_permission("07_missing", "can_edit") or check_permission("04_employees", "can_edit")
 
 st.subheader("今日出勤名單編輯 / Today Attendance Editor")
-st.info("V63：本頁直接維護『在廠』與『今日出勤』狀態；批次按鈕會同步刷新 data_editor 草稿，checkbox 顯示與暫存資料保持一致。")
+st.info("V64：本頁直接維護『啟用 / 在廠 / 今日出勤』狀態；批次按鈕會重新指定整份暫存表並刷新 data_editor，checkbox 顯示與暫存資料保持一致。")
 
 if not can_edit:
     st.warning("目前帳號沒有今日出勤 / 人員名單編輯權限，只能查看資料。")
@@ -130,32 +145,20 @@ if not can_edit:
     render_table(view_df, "today_attendance_readonly_v202", editable=False, height=460)
 else:
     c1, c2, c3, c4 = st.columns(4)
-    if c1.button("☑ 在廠全選 / Factory All", use_container_width=True, key="v202_today_factory_all_on"):
-        st.session_state[STATE_KEY]["is_in_factory"] = True
-        touch_editor()
-        rerun()
-    if c2.button("☐ 在廠取消 / Clear Factory", use_container_width=True, key="v202_today_factory_all_off"):
-        st.session_state[STATE_KEY]["is_in_factory"] = False
-        touch_editor()
-        rerun()
-    if c3.button("☑ 今日出勤全選 / Attendance All", use_container_width=True, key="v202_today_attendance_all_on"):
-        st.session_state[STATE_KEY]["is_today_attendance"] = True
-        touch_editor()
-        rerun()
-    if c4.button("☐ 今日出勤取消 / Clear Attendance", use_container_width=True, key="v202_today_attendance_all_off"):
-        st.session_state[STATE_KEY]["is_today_attendance"] = False
-        touch_editor()
-        rerun()
+    if c1.button("☑ 在廠全選 / Factory All", use_container_width=True, key="v64_today_factory_all_on"):
+        _bulk_set_bool_column("is_in_factory", True)
+    if c2.button("☐ 在廠取消 / Clear Factory", use_container_width=True, key="v64_today_factory_all_off"):
+        _bulk_set_bool_column("is_in_factory", False)
+    if c3.button("☑ 今日出勤全選 / Attendance All", use_container_width=True, key="v64_today_attendance_all_on"):
+        _bulk_set_bool_column("is_today_attendance", True)
+    if c4.button("☐ 今日出勤取消 / Clear Attendance", use_container_width=True, key="v64_today_attendance_all_off"):
+        _bulk_set_bool_column("is_today_attendance", False)
 
     c5, c6, c7, c8 = st.columns(4)
-    if c5.button("☑ 啟用全選 / Active All", use_container_width=True, key="v202_today_active_all_on"):
-        st.session_state[STATE_KEY]["is_active"] = True
-        touch_editor()
-        rerun()
-    if c6.button("☐ 啟用取消 / Inactive All", use_container_width=True, key="v202_today_active_all_off"):
-        st.session_state[STATE_KEY]["is_active"] = False
-        touch_editor()
-        rerun()
+    if c5.button("☑ 啟用全選 / Active All", use_container_width=True, key="v64_today_active_all_on"):
+        _bulk_set_bool_column("is_active", True)
+    if c6.button("☐ 啟用取消 / Inactive All", use_container_width=True, key="v64_today_active_all_off"):
+        _bulk_set_bool_column("is_active", False)
     if c7.button("⟳ 重新載入 / Reload", use_container_width=True, key="v202_today_reload"):
         reload_employees()
         rerun()

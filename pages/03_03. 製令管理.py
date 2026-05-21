@@ -147,6 +147,17 @@ def _current_internal_df() -> pd.DataFrame:
     return ensure_cols(st.session_state.get(STATE_KEY, pd.DataFrame()))
 
 
+def _bulk_set_bool_column(col: str, value: bool) -> None:
+    """V64: 批次按鈕必須重新指定整份 DataFrame，避免只做 in-place 修改時 Streamlit session_state / data_editor 舊草稿把畫面蓋回。"""
+    df = _current_internal_df().copy()
+    if col not in df.columns:
+        df[col] = False
+    df[col] = bool(value)
+    st.session_state[STATE_KEY] = ensure_cols(df)
+    _refresh_editor_widget()
+    rerun()
+
+
 def _normalize_text(v):
     if pd.isna(v):
         return ""
@@ -686,22 +697,14 @@ with tab1:
         st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
         _refresh_editor_widget()
         rerun()
-    if c2.button("☑ 啟用全選 / Active All", use_container_width=True, disabled=not work_order_edit_enabled):
-        st.session_state[STATE_KEY]["is_active"] = True
-        _refresh_editor_widget()
-        rerun()
-    if c3.button("☐ 啟用取消 / Inactive All", use_container_width=True, disabled=not work_order_edit_enabled):
-        st.session_state[STATE_KEY]["is_active"] = False
-        _refresh_editor_widget()
-        rerun()
-    if c4.button("☑ 刪除全選 / Select Delete", use_container_width=True, disabled=not work_order_edit_enabled):
-        st.session_state[STATE_KEY]["_delete"] = True
-        _refresh_editor_widget()
-        rerun()
-    if c5.button("☐ 刪除取消 / Clear Delete", use_container_width=True, disabled=not work_order_edit_enabled):
-        st.session_state[STATE_KEY]["_delete"] = False
-        _refresh_editor_widget()
-        rerun()
+    if c2.button("☑ 啟用全選 / Active All", use_container_width=True, disabled=not work_order_edit_enabled, key="v64_work_order_active_all_on"):
+        _bulk_set_bool_column("is_active", True)
+    if c3.button("☐ 啟用取消 / Inactive All", use_container_width=True, disabled=not work_order_edit_enabled, key="v64_work_order_active_all_off"):
+        _bulk_set_bool_column("is_active", False)
+    if c4.button("☑ 刪除全選 / Select Delete", use_container_width=True, disabled=not work_order_edit_enabled, key="v64_work_order_delete_all_on"):
+        _bulk_set_bool_column("_delete", True)
+    if c5.button("☐ 刪除取消 / Clear Delete", use_container_width=True, disabled=not work_order_edit_enabled, key="v64_work_order_delete_all_off"):
+        _bulk_set_bool_column("_delete", False)
     if c6.button("⟳ 重新載入 / Reload", use_container_width=True):
         reload_data()
         _refresh_editor_widget()
@@ -714,7 +717,7 @@ with tab1:
     tpl = pd.DataFrame(columns=["製令", "P/N", "機型", "組立地點", "客戶", "備註", "啟用"])
     dl2.download_button("⟰ 下載製令匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_製令匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-    st.info("V63：批次按鈕已同步清除全域 data_editor 草稿；按鈕執行後 checkbox 畫面會與 10｜權限管理一致刷新，不再出現 KPI 已變但表格未變的顯示落差。")
+    st.info("V64：批次按鈕已改為重新指定整份暫存表；啟用全選 / 啟用取消 / 刪除全選 / 刪除取消會立即刷新 checkbox 與 KPI，不再被舊 data_editor 草稿蓋回。")
     st.session_state[STATE_KEY] = _current_internal_df()
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
     edited = st.data_editor(

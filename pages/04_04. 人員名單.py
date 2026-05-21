@@ -144,6 +144,17 @@ def _current_internal_df() -> pd.DataFrame:
     return ensure_cols(st.session_state.get(STATE_KEY, pd.DataFrame()))
 
 
+def _bulk_set_bool_column(col: str, value: bool) -> None:
+    """V64: 批次按鈕重新指定整份 DataFrame，避免 in-place 修改被 data_editor 舊草稿覆蓋。"""
+    df = _current_internal_df().copy()
+    if col not in df.columns:
+        df[col] = False
+    df[col] = bool(value)
+    st.session_state[STATE_KEY] = ensure_cols(df)
+    _refresh_editor_widget()
+    rerun()
+
+
 def _normalize_text(v):
     if pd.isna(v):
         return ""
@@ -353,44 +364,28 @@ with tab1:
         st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
         _refresh_editor_widget()
         rerun()
-    if c2.button("☑ 刪除全選 / Select Delete", use_container_width=True, disabled=not employee_edit_enabled):
-        st.session_state[STATE_KEY]["_delete"] = True
-        _refresh_editor_widget()
-        rerun()
-    if c3.button("☐ 刪除取消 / Clear Delete", use_container_width=True, disabled=not employee_edit_enabled):
-        st.session_state[STATE_KEY]["_delete"] = False
-        _refresh_editor_widget()
-        rerun()
-    if c4.button("☑ 啟用全選 / Active All", use_container_width=True, disabled=not employee_edit_enabled):
-        st.session_state[STATE_KEY]["is_active"] = True
-        _refresh_editor_widget()
-        rerun()
-    if c5.button("☐ 啟用取消 / Inactive All", use_container_width=True, disabled=not employee_edit_enabled):
-        st.session_state[STATE_KEY]["is_active"] = False
-        _refresh_editor_widget()
-        rerun()
+    if c2.button("☑ 刪除全選 / Select Delete", use_container_width=True, disabled=not employee_edit_enabled, key="v64_employee_delete_all_on"):
+        _bulk_set_bool_column("_delete", True)
+    if c3.button("☐ 刪除取消 / Clear Delete", use_container_width=True, disabled=not employee_edit_enabled, key="v64_employee_delete_all_off"):
+        _bulk_set_bool_column("_delete", False)
+    if c4.button("☑ 啟用全選 / Active All", use_container_width=True, disabled=not employee_edit_enabled, key="v64_employee_active_all_on"):
+        _bulk_set_bool_column("is_active", True)
+    if c5.button("☐ 啟用取消 / Inactive All", use_container_width=True, disabled=not employee_edit_enabled, key="v64_employee_active_all_off"):
+        _bulk_set_bool_column("is_active", False)
     if c6.button("⟳ 重新載入 / Reload", use_container_width=True):
         reload_data()
         _refresh_editor_widget()
         rerun()
 
     b1, b2, b3, b4 = st.columns(4)
-    if b1.button("☑ 在廠全選 / Factory All", use_container_width=True, disabled=not employee_edit_enabled):
-        st.session_state[STATE_KEY]["is_in_factory"] = True
-        _refresh_editor_widget()
-        rerun()
-    if b2.button("☐ 在廠取消 / Clear Factory", use_container_width=True, disabled=not employee_edit_enabled):
-        st.session_state[STATE_KEY]["is_in_factory"] = False
-        _refresh_editor_widget()
-        rerun()
-    if b3.button("☑ 今日出勤全選 / Attendance All", use_container_width=True, disabled=not employee_edit_enabled):
-        st.session_state[STATE_KEY]["is_today_attendance"] = True
-        _refresh_editor_widget()
-        rerun()
-    if b4.button("☐ 今日出勤取消 / Clear Attendance", use_container_width=True, disabled=not employee_edit_enabled):
-        st.session_state[STATE_KEY]["is_today_attendance"] = False
-        _refresh_editor_widget()
-        rerun()
+    if b1.button("☑ 在廠全選 / Factory All", use_container_width=True, disabled=not employee_edit_enabled, key="v64_employee_factory_all_on"):
+        _bulk_set_bool_column("is_in_factory", True)
+    if b2.button("☐ 在廠取消 / Clear Factory", use_container_width=True, disabled=not employee_edit_enabled, key="v64_employee_factory_all_off"):
+        _bulk_set_bool_column("is_in_factory", False)
+    if b3.button("☑ 今日出勤全選 / Attendance All", use_container_width=True, disabled=not employee_edit_enabled, key="v64_employee_attendance_all_on"):
+        _bulk_set_bool_column("is_today_attendance", True)
+    if b4.button("☐ 今日出勤取消 / Clear Attendance", use_container_width=True, disabled=not employee_edit_enabled, key="v64_employee_attendance_all_off"):
+        _bulk_set_bool_column("is_today_attendance", False)
 
     st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。工號 / Employee ID、姓名 / Name 為必填。")
     e1, e2 = st.columns(2)
@@ -398,7 +393,7 @@ with tab1:
     tpl = pd.DataFrame(columns=["工號", "姓名", "單位", "職稱", "啟用", "在廠", "今日出勤", "備註"])
     e2.download_button("⟰ 下載人員匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_人員匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-    st.info("V63：批次按鈕已同步清除全域 data_editor 草稿；checkbox 顯示會跟 10｜權限管理一致刷新，不再被舊畫面狀態蓋回。")
+    st.info("V64：批次按鈕已改為重新指定整份暫存表；刪除 / 啟用 / 在廠 / 今日出勤全選與取消會立即刷新 checkbox，不再被舊 data_editor 草稿蓋回。")
     st.session_state[STATE_KEY] = _current_internal_df()
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
     edited = st.data_editor(
