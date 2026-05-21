@@ -1,15 +1,120 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-21 18:53:59",
+  "exported_at": "2026-05-21 19:37:24",
   "source": "db_service_write",
   "module_key": "11_login_logs",
   "module_code": "11",
   "module_name_zh": "登入紀錄",
   "module_name_en": "Login Logs",
   "tables": {
-    "auth_login_logs": []
+    "auth_login_logs": [
+      {
+        "id": 1,
+        "username": "B002|21M0241-01|前置鈑金|2026-05-15 05:09:51|acea9984",
+        "display_name": "暫停",
+        "event_time": "21M0241-01",
+        "event_type": "4TRSC020-004-02",
+        "result": "NTB 3 PORT",
+        "module_code": "前置鈑金",
+        "module_name": "B002",
+        "message": "張文品",
+        "ip_address": "開始",
+        "user_agent": "2026-05-15 05:09:51"
+      },
+      {
+        "id": 2,
+        "username": "B002|21M0241-04|前置鈑金|2026-05-15 05:10:22|c0d42c63",
+        "display_name": "暫停",
+        "event_time": "21M0241-04",
+        "event_type": "4TRSC020-004-02",
+        "result": "NTB 3 PORT",
+        "module_code": "前置鈑金",
+        "module_name": "B002",
+        "message": "張文品",
+        "ip_address": "開始",
+        "user_agent": "2026-05-15 05:10:22"
+      },
+      {
+        "id": 3,
+        "username": "B030|21M0241-03|骨架組立|2026-05-15 06:12:20|61a24c01",
+        "display_name": "完工",
+        "event_time": "21M0241-03",
+        "event_type": "4TRSC020-004-02",
+        "result": "NTB 3 PORT",
+        "module_code": "骨架組立",
+        "module_name": "B030",
+        "message": "沈啟頤",
+        "ip_address": "開始",
+        "user_agent": "2026-05-15 06:12:20"
+      },
+      {
+        "id": 4,
+        "username": "B052|21M0241-04|前置鈑金|2026-05-15 07:38:16|9971c6aa",
+        "display_name": "作業中",
+        "event_time": "21M0241-04",
+        "event_type": "4TRSC020-004-02",
+        "result": "NTB 3 PORT",
+        "module_code": "前置鈑金",
+        "module_name": "B052",
+        "message": "張傑威",
+        "ip_address": "開始",
+        "user_agent": "2026-05-15 07:38:16"
+      },
+      {
+        "id": 5,
+        "username": "B030|21M0241-02|配電|2026-05-15 08:41:33|fe0efd51",
+        "display_name": "作業中",
+        "event_time": "21M0241-02",
+        "event_type": "4TRSC020-004-02",
+        "result": "NTB 3 PORT",
+        "module_code": "配電",
+        "module_name": "B030",
+        "message": "沈啟頤",
+        "ip_address": "開始",
+        "user_agent": "2026-05-15 08:41:33"
+      },
+      {
+        "id": 6,
+        "username": "B002|21M0241-01|CCCC|2026-05-20 18:53:55|e99ba155",
+        "display_name": "作業中",
+        "event_time": "21M0241-01",
+        "event_type": "4TRSC020-004-02",
+        "result": "NTB 3 PORT",
+        "module_code": "CCCC",
+        "module_name": "B002",
+        "message": "張文品",
+        "ip_address": "開始",
+        "user_agent": "2026-05-20 18:53:55"
+      },
+      {
+        "id": 7,
+        "username": "B002|21M0241-01|前置鈑金|2026-05-20 19:15:36|5883caca",
+        "display_name": "暫停",
+        "event_time": "21M0241-01",
+        "event_type": "4TRSC020-004-02",
+        "result": "NTB 3 PORT",
+        "module_code": "前置鈑金",
+        "module_name": "B002",
+        "message": "張文品",
+        "ip_address": "開始",
+        "user_agent": "2026-05-20 19:15:36"
+      },
+      {
+        "id": 8,
+        "username": "B002|21M0241-01|ABC|2026-05-20 19:16:08|781883a6",
+        "display_name": "作業中",
+        "event_time": "21M0241-01",
+        "event_type": "4TRSC020-004-02",
+        "result": "NTB 3 PORT",
+        "module_code": "ABC",
+        "module_name": "B002",
+        "message": "張文品",
+        "ip_address": "開始",
+        "user_agent": "2026-05-20 19:16:08"
+      }
+    ]
   },
   "table_counts": {
-    "auth_login_logs": 0
+    "auth_login_logs": 8
   }
 }
