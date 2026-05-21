@@ -431,6 +431,7 @@ def _v25_account_set_edit(enabled: bool) -> None:
         # Stop edit intentionally discards unsaved draft and reloads saved authority.
         st.session_state["v133_users_df"] = _users_for_editor()
         st.session_state["v40_account_last_action"] = "disable_edit_reload_saved"
+        st.session_state["v43_account_use_draft_for_save"] = False
     _v37_touch_account_editor()
 
 
@@ -440,6 +441,7 @@ def _v25_account_add_blank() -> None:
         df = _users_for_editor()
     st.session_state["v133_users_df"] = pd.concat([pd.DataFrame([_blank_user_row()]), df.copy()], ignore_index=True)
     st.session_state["v40_account_last_action"] = "add_blank"
+    st.session_state["v43_account_use_draft_for_save"] = True
     _v37_touch_account_editor()
 
 
@@ -454,12 +456,16 @@ def _v25_account_delete_flag(flag: bool) -> None:
     st.session_state["v133_users_df"] = df
     st.session_state["v40_account_last_action"] = "select_delete_all" if flag else "clear_delete_all"
     st.session_state["v40_account_last_delete_true"] = _v40_account_delete_true_count(df)
+    # V43: keep the button-updated draft authoritative until the next explicit save/reload/stop-edit.
+    # This prevents a stale data_editor echo from becoming the saved source after Select/Clear.
+    st.session_state["v43_account_use_draft_for_save"] = True
     _v37_touch_account_editor()
 
 
 def _v25_account_reload() -> None:
     st.session_state["v133_users_df"] = _users_for_editor()
     st.session_state["v40_account_last_action"] = "reload_saved"
+    st.session_state["v43_account_use_draft_for_save"] = False
     _v37_touch_account_editor()
 
 
@@ -572,24 +578,6 @@ with tab_accounts:
 
         st.warning("V1.76：密碼欄可直接輸入。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。")
 
-        # V40 diagnostic panel: use this when buttons appear to revert immediately.
-        with st.expander("V40 按鈕狀態診斷 / Button State Diagnostics", expanded=False):
-            _diag_df = st.session_state.get("v133_users_df")
-            _diag_rows = len(_diag_df) if isinstance(_diag_df, pd.DataFrame) else 0
-            _diag_delete_true = _v40_account_delete_true_count(_diag_df) if isinstance(_diag_df, pd.DataFrame) else 0
-            st.write({
-                "page_file": __file__,
-                "edit_enabled": bool(st.session_state.get("v166_account_edit_enabled", False)),
-                "editor_rev": int(st.session_state.get("v235_account_editor_rev", 0)),
-                "draft_rows": _diag_rows,
-                "draft_delete_true_count": _diag_delete_true,
-                "last_action": st.session_state.get("v40_account_last_action", ""),
-                "last_delete_true_count": st.session_state.get("v40_account_last_delete_true", ""),
-                "bulk_guard_active": bool(st.session_state.get("v37_account_bulk_just_applied", False)),
-                "visible_delete_true_count": st.session_state.get("v42_account_visible_delete_true", ""),
-                "v42_mode": "draft-authority-no-render-overwrite",
-            })
-
         # V42：帳號總表不放入 st.form，且 data_editor 回傳值不得每輪覆蓋草稿。
         # 原因：外部「全選 / 取消」按鈕已經成功把 draft 改成 True，
         # 但 st.form 內的 data_editor 會保留上一輪未送出的 widget 狀態，
@@ -655,6 +643,25 @@ with tab_accounts:
         # table edits. This is the key difference from V41.
         st.session_state["v42_account_visible_delete_true"] = delete_count
 
+        # V43 diagnostic is rendered AFTER data_editor, so visible_delete_true_count is no longer one rerun behind.
+        with st.expander("V43 按鈕狀態診斷 / Button State Diagnostics", expanded=False):
+            _diag_df = st.session_state.get("v133_users_df")
+            _diag_rows = len(_diag_df) if isinstance(_diag_df, pd.DataFrame) else 0
+            _diag_delete_true = _v40_account_delete_true_count(_diag_df) if isinstance(_diag_df, pd.DataFrame) else 0
+            st.write({
+                "page_file": __file__,
+                "edit_enabled": bool(st.session_state.get("v166_account_edit_enabled", False)),
+                "editor_rev": int(st.session_state.get("v235_account_editor_rev", 0)),
+                "draft_rows": _diag_rows,
+                "draft_delete_true_count": _diag_delete_true,
+                "last_action": st.session_state.get("v40_account_last_action", ""),
+                "last_delete_true_count": st.session_state.get("v40_account_last_delete_true", ""),
+                "bulk_guard_active": bool(st.session_state.get("v37_account_bulk_just_applied", False)),
+                "visible_delete_true_count": delete_count,
+                "use_draft_for_save": bool(st.session_state.get("v43_account_use_draft_for_save", False)),
+                "v43_mode": "diagnostic-after-editor-and-draft-save-guard",
+            })
+
         submitted_accounts = st.button(
             "▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master",
             type="primary",
@@ -664,7 +671,13 @@ with tab_accounts:
         )
 
         if submitted_accounts:
-            df = edited_users.copy()
+            # V43: when the last explicit action was a bulk checkbox operation,
+            # the session draft is the authoritative save source.  data_editor can
+            # still return a stale echo in some Streamlit builds.
+            if bool(st.session_state.get("v43_account_use_draft_for_save", False)) and isinstance(st.session_state.get("v133_users_df"), pd.DataFrame):
+                df = st.session_state["v133_users_df"].copy(deep=True)
+            else:
+                df = edited_users.copy()
             to_delete = _selected_delete_usernames(df, account_editor_key)
             if to_delete:
                 save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy()
@@ -679,6 +692,7 @@ with tab_accounts:
                 st.warning("；".join(result["skipped"]))
             st.session_state.pop("v133_users_df", None)
             st.session_state["v166_account_edit_enabled"] = False
+            st.session_state["v43_account_use_draft_for_save"] = False
             st.session_state["v40_account_last_action"] = "saved_accounts"
             st.rerun()
 
