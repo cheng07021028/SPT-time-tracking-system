@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-21 22:04:58",
-  "exported_at": "2026-05-21 22:04:58",
+  "updated_at": "2026-05-21 22:05:06",
+  "exported_at": "2026-05-21 22:05:06",
   "reason": "delete_time_records_02_v33",
   "empty_authoritative": false,
   "tables": {
@@ -115,38 +115,11 @@
         "source": "streamlit",
         "created_at": "2026-05-20 19:15:36",
         "updated_at": "2026-05-20 19:16:08"
-      },
-      {
-        "id": 8,
-        "record_key": "B002|21M0241-01|ABC|2026-05-20 19:16:08|781883a6",
-        "status": "作業中",
-        "work_order": "21M0241-01",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "ABC",
-        "employee_id": "B002",
-        "employee_name": "張文品",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-20 19:16:08",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
-        "start_date": "2026-05-20",
-        "start_time": "19:16:08",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "B002|ABC|2026-05-20",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-20 19:16:08",
-        "updated_at": "2026-05-20 19:16:08"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 5
+    "time_records": 4
   }
 }
