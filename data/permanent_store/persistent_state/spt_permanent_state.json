@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-21 23:30:07",
+  "exported_at": "2026-05-21 23:54:22",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 4,
@@ -19,7 +19,7 @@
     "security_login_logs": 1,
     "security_module_permissions": 78,
     "security_roles": 6,
-    "security_settings": 0,
+    "security_settings": 2,
     "security_user_roles": 9,
     "security_users": 9,
     "system_logs": 94,
@@ -2049,10 +2049,10 @@
         "role_code": "admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-21 22:36:30",
+        "last_login_at": "2026-05-21 23:54:19",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-21 22:36:30"
+        "updated_at": "2026-05-21 23:54:19"
       },
       {
         "id": 2,
@@ -2823,8 +2823,8 @@
         "is_active": 1,
         "sort_order": 1,
         "note": "系統預設類別",
-        "created_at": "2026-05-21 23:30:07",
-        "updated_at": "2026-05-21 23:30:07"
+        "created_at": "2026-05-21 23:54:22",
+        "updated_at": "2026-05-21 23:54:22"
       }
     ],
     "process_category_options": [],
@@ -2835,8 +2835,8 @@
         "is_active": 1,
         "sort_order": 1,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 2,
@@ -2844,8 +2844,8 @@
         "is_active": 1,
         "sort_order": 2,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 3,
@@ -2853,8 +2853,8 @@
         "is_active": 1,
         "sort_order": 3,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 4,
@@ -2862,8 +2862,8 @@
         "is_active": 1,
         "sort_order": 4,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 5,
@@ -2871,8 +2871,8 @@
         "is_active": 1,
         "sort_order": 5,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 6,
@@ -2880,8 +2880,8 @@
         "is_active": 1,
         "sort_order": 6,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 7,
@@ -2889,8 +2889,8 @@
         "is_active": 1,
         "sort_order": 7,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 8,
@@ -2898,8 +2898,8 @@
         "is_active": 1,
         "sort_order": 8,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 9,
@@ -2907,8 +2907,8 @@
         "is_active": 1,
         "sort_order": 9,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 10,
@@ -2916,8 +2916,8 @@
         "is_active": 1,
         "sort_order": 10,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 11,
@@ -2925,8 +2925,8 @@
         "is_active": 1,
         "sort_order": 11,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 12,
@@ -2934,8 +2934,8 @@
         "is_active": 1,
         "sort_order": 12,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 13,
@@ -2943,8 +2943,8 @@
         "is_active": 1,
         "sort_order": 13,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 14,
@@ -2952,8 +2952,8 @@
         "is_active": 1,
         "sort_order": 14,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 15,
@@ -2961,8 +2961,8 @@
         "is_active": 1,
         "sort_order": 15,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 16,
@@ -2970,8 +2970,8 @@
         "is_active": 1,
         "sort_order": 16,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 17,
@@ -2979,8 +2979,8 @@
         "is_active": 1,
         "sort_order": 17,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       }
     ],
     "rest_periods": [
@@ -3034,11 +3034,11 @@
         "result": "SUCCESS",
         "message": "role=admin",
         "module_code": "",
-        "login_time": "2026-05-21 23:29:57",
+        "login_time": "2026-05-21 23:54:19",
         "logout_time": null,
         "idle_seconds": null,
         "user_agent": "streamlit",
-        "created_at": "2026-05-21 23:29:57"
+        "created_at": "2026-05-21 23:54:19"
       }
     ],
     "security_module_permissions": [
@@ -3058,7 +3058,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 2,
@@ -3076,7 +3076,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 3,
@@ -3094,7 +3094,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 4,
@@ -3112,7 +3112,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 5,
@@ -3130,7 +3130,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 6,
@@ -3148,7 +3148,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 7,
@@ -3166,7 +3166,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 8,
@@ -3184,7 +3184,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 9,
@@ -3202,7 +3202,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 10,
@@ -3220,7 +3220,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 11,
@@ -3238,7 +3238,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 12,
@@ -3256,7 +3256,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 13,
@@ -3274,7 +3274,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 14,
@@ -3292,7 +3292,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 15,
@@ -3310,7 +3310,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 16,
@@ -3328,7 +3328,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 17,
@@ -3346,7 +3346,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 18,
@@ -3364,7 +3364,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 19,
@@ -3382,7 +3382,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 20,
@@ -3400,7 +3400,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 21,
@@ -3418,7 +3418,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 22,
@@ -3436,7 +3436,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 23,
@@ -3454,7 +3454,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 24,
@@ -3472,7 +3472,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 25,
@@ -3490,7 +3490,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 26,
@@ -3508,7 +3508,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 27,
@@ -3526,7 +3526,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 28,
@@ -3544,7 +3544,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 29,
@@ -3562,7 +3562,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 30,
@@ -3580,7 +3580,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 31,
@@ -3598,7 +3598,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 32,
@@ -3616,7 +3616,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 33,
@@ -3634,7 +3634,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 34,
@@ -3652,7 +3652,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 35,
@@ -3670,7 +3670,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 36,
@@ -3688,7 +3688,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 37,
@@ -3706,7 +3706,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 38,
@@ -3724,7 +3724,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 39,
@@ -3742,7 +3742,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 40,
@@ -3760,7 +3760,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 41,
@@ -3778,7 +3778,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 42,
@@ -3796,7 +3796,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 43,
@@ -3814,7 +3814,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 44,
@@ -3832,7 +3832,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 45,
@@ -3850,7 +3850,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 46,
@@ -3868,7 +3868,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 47,
@@ -3886,7 +3886,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 48,
@@ -3904,7 +3904,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 49,
@@ -3922,7 +3922,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 50,
@@ -3940,7 +3940,7 @@
         "can_backup": 1,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 51,
@@ -3958,7 +3958,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 52,
@@ -3976,7 +3976,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 53,
@@ -3994,7 +3994,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 54,
@@ -4012,7 +4012,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 55,
@@ -4030,7 +4030,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 56,
@@ -4048,7 +4048,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 57,
@@ -4066,7 +4066,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 58,
@@ -4084,7 +4084,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 59,
@@ -4102,7 +4102,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 60,
@@ -4120,7 +4120,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 61,
@@ -4138,7 +4138,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 62,
@@ -4156,7 +4156,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 63,
@@ -4174,7 +4174,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 64,
@@ -4192,7 +4192,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 65,
@@ -4210,7 +4210,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 66,
@@ -4228,7 +4228,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 67,
@@ -4246,7 +4246,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 68,
@@ -4264,7 +4264,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 69,
@@ -4282,7 +4282,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 70,
@@ -4300,7 +4300,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 71,
@@ -4318,7 +4318,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 72,
@@ -4336,7 +4336,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 73,
@@ -4354,7 +4354,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 74,
@@ -4372,7 +4372,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 75,
@@ -4390,7 +4390,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 76,
@@ -4408,7 +4408,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 77,
@@ -4426,7 +4426,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 78,
@@ -4444,7 +4444,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       }
     ],
     "security_roles": [
@@ -4455,8 +4455,8 @@
         "role_name_en": "System Admin",
         "description": "System Admin",
         "is_system_role": 1,
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 2,
@@ -4465,8 +4465,8 @@
         "role_name_en": "Manufacturing Manager",
         "description": "Manufacturing Manager",
         "is_system_role": 1,
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 3,
@@ -4475,8 +4475,8 @@
         "role_name_en": "Line Leader",
         "description": "Line Leader",
         "is_system_role": 1,
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 4,
@@ -4485,8 +4485,8 @@
         "role_name_en": "Operator",
         "description": "Operator",
         "is_system_role": 1,
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 5,
@@ -4495,8 +4495,8 @@
         "role_name_en": "Viewer",
         "description": "Viewer",
         "is_system_role": 1,
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "id": 6,
@@ -4505,70 +4505,83 @@
         "role_name_en": "Auditor",
         "description": "Auditor",
         "is_system_role": 1,
-        "created_at": "2026-05-21 23:29:49",
-        "updated_at": "2026-05-21 23:29:49"
+        "created_at": "2026-05-21 23:54:03",
+        "updated_at": "2026-05-21 23:54:03"
       }
     ],
-    "security_settings": [],
+    "security_settings": [
+      {
+        "setting_key": "idle_timeout_minutes",
+        "setting_value": "15",
+        "note": "V1.69 synchronized security setting",
+        "updated_at": "2026-05-15 11:23:50"
+      },
+      {
+        "setting_key": "ask_continue_after_record",
+        "setting_value": "1",
+        "note": "V1.69 synchronized security setting",
+        "updated_at": "2026-05-15 11:23:50"
+      }
+    ],
     "security_user_roles": [
       {
-        "id": 34,
+        "id": 10,
         "username": "admin",
         "role_code": "admin",
-        "created_at": "2026-05-21 23:29:59"
+        "created_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 35,
+        "id": 11,
         "username": "manager",
         "role_code": "manager",
-        "created_at": "2026-05-21 23:29:59"
+        "created_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 36,
+        "id": 12,
         "username": "leader",
         "role_code": "leader",
-        "created_at": "2026-05-21 23:29:59"
+        "created_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 37,
+        "id": 13,
         "username": "operator",
         "role_code": "operator",
-        "created_at": "2026-05-21 23:29:59"
+        "created_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 38,
+        "id": 14,
         "username": "viewer",
         "role_code": "viewer",
-        "created_at": "2026-05-21 23:29:59"
+        "created_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 39,
+        "id": 15,
         "username": "auditor",
         "role_code": "auditor",
-        "created_at": "2026-05-21 23:29:59"
+        "created_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 40,
+        "id": 16,
         "username": "spt142",
         "role_code": "operator",
-        "created_at": "2026-05-21 23:29:59"
+        "created_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 41,
+        "id": 17,
         "username": "B211",
         "role_code": "operator",
-        "created_at": "2026-05-21 23:29:59"
+        "created_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 42,
+        "id": 18,
         "username": "Ethan",
         "role_code": "admin",
-        "created_at": "2026-05-21 23:29:59"
+        "created_at": "2026-05-19 17:35:07"
       }
     ],
     "security_users": [
       {
-        "id": 28,
+        "id": 1,
         "username": "admin",
         "password_hash": "pbkdf2_sha256$3a6f3a7befa0885e8c08cc2eb15a9859$4c37ee557e8e94cd84ddf1e2c31156cdb5fed35b9880b147e7e72302444f72ee",
         "employee_id": "nan",
@@ -4576,12 +4589,12 @@
         "email": "Admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-21 22:36:30",
+        "last_login_at": "2026-05-21 23:54:19",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-21 23:29:59"
+        "updated_at": "2026-05-21 23:54:19"
       },
       {
-        "id": 29,
+        "id": 2,
         "username": "manager",
         "password_hash": "pbkdf2_sha256$10ba828719f2b82390101445bbcf4386$f6814b12a67e894cc25729467ebeb5b931c0a2e962c9be78011f0a7c96bed7ec",
         "employee_id": "nan",
@@ -4591,10 +4604,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-21 23:29:59"
+        "updated_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 30,
+        "id": 3,
         "username": "leader",
         "password_hash": "pbkdf2_sha256$820402735ad1b2eea21d45fe0dde7d92$61071ad17632fe72811f7954a9f0285315dc41cc9ad744a0f91696a25d427cbf",
         "employee_id": "nan",
@@ -4604,10 +4617,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-21 23:29:59"
+        "updated_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 31,
+        "id": 4,
         "username": "operator",
         "password_hash": "pbkdf2_sha256$4d4520bfc0e2c72ba9b6139d26256b67$8b16d1dc77c04c2a285e5e1f21ec03dccc169bf0db45f2c1612d80ecd0b7dc40",
         "employee_id": "nan",
@@ -4617,10 +4630,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-21 23:29:59"
+        "updated_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 32,
+        "id": 5,
         "username": "viewer",
         "password_hash": "pbkdf2_sha256$205d2b7f07efb7edb59124464db1b85c$496673a805306de4f438898de0dc6178c71b9a83cd2b10242fa20f3bef738859",
         "employee_id": "nan",
@@ -4630,10 +4643,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-21 23:29:59"
+        "updated_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 33,
+        "id": 6,
         "username": "auditor",
         "password_hash": "pbkdf2_sha256$f0810956eb383df03a679f2fc23e5bd0$11465b9812094ab5ff80cc844dbf555a2b107fc534cd7bd9f46db3122d43425d",
         "employee_id": "nan",
@@ -4643,10 +4656,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-21 23:29:59"
+        "updated_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 34,
+        "id": 7,
         "username": "spt142",
         "password_hash": "pbkdf2_sha256$767f80cda95ff0103ed131ffe8f43d95$77c112f466cb74aa5de47ce378f2e30b3a3360228948301569e8c1cd894df5d9",
         "employee_id": "",
@@ -4656,10 +4669,10 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:18:26",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-21 23:29:59"
+        "updated_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 35,
+        "id": 8,
         "username": "B211",
         "password_hash": "pbkdf2_sha256$80bd0fbcd7f99be462a491ef162f8803$fb7e693d3fb4e38b3738297e723e7026fe406e31ea35a42f207fab1ce914f09c",
         "employee_id": "",
@@ -4669,10 +4682,10 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:21:46",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-21 23:29:59"
+        "updated_at": "2026-05-19 17:35:07"
       },
       {
-        "id": 36,
+        "id": 9,
         "username": "Ethan",
         "password_hash": "pbkdf2_sha256$4a2137fb90480f1b82a4721549f178ff$e85de92dedccb2791d7c297a55882100182babccdb5fd0485b63bfa5ac24bca0",
         "employee_id": "SPT142",
@@ -4682,13 +4695,13 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-21 23:29:59"
+        "updated_at": "2026-05-19 17:35:07"
       }
     ],
     "system_logs": [
       {
         "id": 1,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "SYSTEM",
         "action_type": "AUTO_INIT_DATABASE",
         "target_table": "ALL",
@@ -4699,7 +4712,7 @@
       },
       {
         "id": 2,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_roles",
@@ -4710,7 +4723,7 @@
       },
       {
         "id": 3,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_roles",
@@ -4721,7 +4734,7 @@
       },
       {
         "id": 4,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_roles",
@@ -4732,7 +4745,7 @@
       },
       {
         "id": 5,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_roles",
@@ -4743,7 +4756,7 @@
       },
       {
         "id": 6,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_roles",
@@ -4754,7 +4767,7 @@
       },
       {
         "id": 7,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_roles",
@@ -4765,7 +4778,7 @@
       },
       {
         "id": 8,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4776,7 +4789,7 @@
       },
       {
         "id": 9,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4787,7 +4800,7 @@
       },
       {
         "id": 10,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4798,7 +4811,7 @@
       },
       {
         "id": 11,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4809,7 +4822,7 @@
       },
       {
         "id": 12,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4820,7 +4833,7 @@
       },
       {
         "id": 13,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4831,7 +4844,7 @@
       },
       {
         "id": 14,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4842,7 +4855,7 @@
       },
       {
         "id": 15,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4853,7 +4866,7 @@
       },
       {
         "id": 16,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4864,7 +4877,7 @@
       },
       {
         "id": 17,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4875,7 +4888,7 @@
       },
       {
         "id": 18,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4886,7 +4899,7 @@
       },
       {
         "id": 19,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4897,7 +4910,7 @@
       },
       {
         "id": 20,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4908,7 +4921,7 @@
       },
       {
         "id": 21,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4919,7 +4932,7 @@
       },
       {
         "id": 22,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4930,7 +4943,7 @@
       },
       {
         "id": 23,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4941,7 +4954,7 @@
       },
       {
         "id": 24,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4952,7 +4965,7 @@
       },
       {
         "id": 25,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4963,7 +4976,7 @@
       },
       {
         "id": 26,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4974,7 +4987,7 @@
       },
       {
         "id": 27,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4985,7 +4998,7 @@
       },
       {
         "id": 28,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4996,7 +5009,7 @@
       },
       {
         "id": 29,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5007,7 +5020,7 @@
       },
       {
         "id": 30,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5018,7 +5031,7 @@
       },
       {
         "id": 31,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5029,7 +5042,7 @@
       },
       {
         "id": 32,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5040,7 +5053,7 @@
       },
       {
         "id": 33,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5051,7 +5064,7 @@
       },
       {
         "id": 34,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5062,7 +5075,7 @@
       },
       {
         "id": 35,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5073,7 +5086,7 @@
       },
       {
         "id": 36,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5084,7 +5097,7 @@
       },
       {
         "id": 37,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5095,7 +5108,7 @@
       },
       {
         "id": 38,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5106,7 +5119,7 @@
       },
       {
         "id": 39,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5117,7 +5130,7 @@
       },
       {
         "id": 40,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5128,7 +5141,7 @@
       },
       {
         "id": 41,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5139,7 +5152,7 @@
       },
       {
         "id": 42,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5150,7 +5163,7 @@
       },
       {
         "id": 43,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5161,7 +5174,7 @@
       },
       {
         "id": 44,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5172,7 +5185,7 @@
       },
       {
         "id": 45,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5183,7 +5196,7 @@
       },
       {
         "id": 46,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5194,7 +5207,7 @@
       },
       {
         "id": 47,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5205,7 +5218,7 @@
       },
       {
         "id": 48,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5216,7 +5229,7 @@
       },
       {
         "id": 49,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5227,7 +5240,7 @@
       },
       {
         "id": 50,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5238,7 +5251,7 @@
       },
       {
         "id": 51,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5249,7 +5262,7 @@
       },
       {
         "id": 52,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5260,7 +5273,7 @@
       },
       {
         "id": 53,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5271,7 +5284,7 @@
       },
       {
         "id": 54,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5282,7 +5295,7 @@
       },
       {
         "id": 55,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5293,7 +5306,7 @@
       },
       {
         "id": 56,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5304,7 +5317,7 @@
       },
       {
         "id": 57,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5315,7 +5328,7 @@
       },
       {
         "id": 58,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5326,7 +5339,7 @@
       },
       {
         "id": 59,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5337,7 +5350,7 @@
       },
       {
         "id": 60,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5348,7 +5361,7 @@
       },
       {
         "id": 61,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5359,7 +5372,7 @@
       },
       {
         "id": 62,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5370,7 +5383,7 @@
       },
       {
         "id": 63,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5381,7 +5394,7 @@
       },
       {
         "id": 64,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5392,7 +5405,7 @@
       },
       {
         "id": 65,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5403,7 +5416,7 @@
       },
       {
         "id": 66,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5414,7 +5427,7 @@
       },
       {
         "id": 67,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5425,7 +5438,7 @@
       },
       {
         "id": 68,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5436,7 +5449,7 @@
       },
       {
         "id": 69,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5447,7 +5460,7 @@
       },
       {
         "id": 70,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5458,7 +5471,7 @@
       },
       {
         "id": 71,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5469,7 +5482,7 @@
       },
       {
         "id": 72,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5480,7 +5493,7 @@
       },
       {
         "id": 73,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5491,7 +5504,7 @@
       },
       {
         "id": 74,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5502,7 +5515,7 @@
       },
       {
         "id": 75,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5513,7 +5526,7 @@
       },
       {
         "id": 76,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5524,7 +5537,7 @@
       },
       {
         "id": 77,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5535,7 +5548,7 @@
       },
       {
         "id": 78,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5546,7 +5559,7 @@
       },
       {
         "id": 79,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5557,7 +5570,7 @@
       },
       {
         "id": 80,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5568,7 +5581,7 @@
       },
       {
         "id": 81,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5579,7 +5592,7 @@
       },
       {
         "id": 82,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5590,7 +5603,7 @@
       },
       {
         "id": 83,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5601,7 +5614,7 @@
       },
       {
         "id": 84,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5612,7 +5625,7 @@
       },
       {
         "id": 85,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5623,7 +5636,7 @@
       },
       {
         "id": 86,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_user_roles",
@@ -5634,7 +5647,7 @@
       },
       {
         "id": 87,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_user_roles",
@@ -5645,7 +5658,7 @@
       },
       {
         "id": 88,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_user_roles",
@@ -5656,7 +5669,7 @@
       },
       {
         "id": 89,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_user_roles",
@@ -5667,7 +5680,7 @@
       },
       {
         "id": 90,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_user_roles",
@@ -5678,7 +5691,7 @@
       },
       {
         "id": 91,
-        "log_time": "2026-05-21 23:29:49",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_user_roles",
@@ -5689,7 +5702,7 @@
       },
       {
         "id": 92,
-        "log_time": "2026-05-21 23:29:50",
+        "log_time": "2026-05-21 23:54:03",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_settings",
@@ -5700,7 +5713,7 @@
       },
       {
         "id": 93,
-        "log_time": "2026-05-21 23:29:57",
+        "log_time": "2026-05-21 23:54:19",
         "user_name": "admin",
         "action_type": "UPDATE",
         "target_table": "auth_users",
@@ -5711,7 +5724,7 @@
       },
       {
         "id": 94,
-        "log_time": "2026-05-21 23:29:57",
+        "log_time": "2026-05-21 23:54:19",
         "user_name": "admin",
         "action_type": "UPDATE",
         "target_table": "security_users",
@@ -5726,37 +5739,37 @@
         "setting_key": "company_name",
         "setting_value": "超慧科技",
         "note": "公司名稱",
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "setting_key": "system_name",
         "setting_value": "製造部智慧工時紀錄系統",
         "note": "系統名稱",
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "setting_key": "standard_work_start",
         "setting_value": "09:00",
         "note": "標準上班時間",
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "setting_key": "standard_work_end",
         "setting_value": "18:00",
         "note": "標準下班時間",
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "setting_key": "daily_expected_hours_min",
         "setting_value": "7.0",
         "note": "每日最低合理工時",
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       },
       {
         "setting_key": "daily_expected_hours_max",
         "setting_value": "7.5",
         "note": "每日最高合理工時",
-        "updated_at": "2026-05-21 23:29:49"
+        "updated_at": "2026-05-21 23:54:03"
       }
     ],
     "table_column_settings": [],
