@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-21 14:20:12",
-  "exported_at": "2026-05-21 14:20:12",
+  "updated_at": "2026-05-21 15:13:28",
+  "exported_at": "2026-05-21 15:13:28",
   "reason": "save_users_authoritative_v28",
   "empty_authoritative": false,
   "tables": {
@@ -18,8 +18,21 @@
         "note": "",
         "username": "q3",
         "created_at": "2026-05-21 14:20:12",
-        "updated_at": "2026-05-21 14:20:12",
+        "updated_at": "2026-05-21 15:13:28",
         "password_hash": "pbkdf2_sha256$e7216c5966c10ba526b947efccb45331$ce318b165db1ad1133efde91fe87195f54b8cdf43b8a8f41f8216c540bbd4f0d"
+      },
+      {
+        "employee_id": "wer",
+        "display_name": "24",
+        "email": "",
+        "role_code": "operator",
+        "is_active": true,
+        "force_password_change": false,
+        "note": "",
+        "username": "eqrwtr",
+        "created_at": "2026-05-21 15:13:28",
+        "updated_at": "2026-05-21 15:13:28",
+        "password_hash": "pbkdf2_sha256$73d0b224ecd855d7cfb63f5b30a1c4a2$2cd1d66f108cce295fea3313a66eebd6217ce6bfacd569809151217cb54b6b21"
       }
     ],
     "auth_account_permissions": [],
@@ -40,7 +53,7 @@
   },
   "settings": {},
   "table_counts": {
-    "auth_users": 1,
+    "auth_users": 2,
     "auth_account_permissions": 0,
     "auth_security_settings": 2
   }
