@@ -2195,3 +2195,178 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
         _v77_sync_time_records_local("import_time_records_v77_fast_local")
     return result
 # ===================== END V77 01 FAST PAGE + ADMIN ACTION HARD FIX =====================
+
+# ======================= V79 01 PAGE FAST DISPLAY + STRICT LOCAL SYNC =======================
+# Purpose:
+# - 01 page should not spend a long time on every click/rerun.
+# - Today Records and Admin Maintenance must show the same current SQLite data.
+# - 01 -> 02 sync remains immediate, but normal 01 operations do not call GitHub or heavy legacy wrappers.
+
+_V79_TODAY_CACHE: dict[tuple, tuple[float, pd.DataFrame]] = {}
+_V79_TODAY_CACHE_TTL = 1.2
+
+
+def _v79_clear_fast_caches() -> None:
+    try:
+        _V79_TODAY_CACHE.clear()
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        _V77_APP_SETTING_CACHE.clear()  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def _v79_rows_from_sqlite() -> list[dict]:
+    try:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(DB_PATH, timeout=8) as conn:
+            conn.row_factory = sqlite3.Row
+            try:
+                conn.execute("PRAGMA busy_timeout=5000")
+            except Exception:
+                pass
+            rows = conn.execute("SELECT * FROM time_records ORDER BY id").fetchall()
+            return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+
+def _v79_atomic_json(path, payload: dict) -> None:
+    from pathlib import Path as _Path
+    import json as _json
+    p = _Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(p.suffix + ".tmp")
+    tmp.write_text(_json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    _json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(p)
+
+
+def _v79_write_0102_latest_files(rows: list[dict], reason: str) -> None:
+    """Write only fixed latest files. No history scan, no GitHub, no heavy module wrapper."""
+    try:
+        from pathlib import Path as _Path
+        project = _Path(__file__).resolve().parents[1]
+        payload = {
+            "version": "V79_TIME_RECORDS_FAST_LATEST",
+            "updated_at": _now(),
+            "reason": reason,
+            "tables": {"time_records": rows},
+            "table_counts": {"time_records": len(rows)},
+            "description": "01/02 shared time_records latest mirror. SQLite is the runtime authority; these files prevent reboot restore from using stale records.",
+        }
+        targets = [
+            project / "data" / "permanent_store" / "persistent_modules" / "01_time_records" / "01_time_records_records.json",
+            project / "data" / "permanent_store" / "persistent_modules" / "02_history" / "02_history_records.json",
+            project / "data" / "permanent_store" / "persistent_state" / "time_records_latest.json",
+            # compatibility for older restore guards still reading pre-permanent_store paths
+            project / "data" / "persistent_modules" / "01_time_records" / "01_time_records_records.json",
+            project / "data" / "persistent_modules" / "02_history" / "02_history_records.json",
+            project / "data" / "persistent_state" / "time_records_latest.json",
+        ]
+        for t in targets:
+            _v79_atomic_json(t, payload)
+    except Exception as exc:
+        try:
+            write_log("V79_TIME_RECORD_LATEST_WRITE_ERROR", f"01/02 latest mirror failed: {exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+
+
+def _v79_sync_time_records_fast(reason: str = "v79_fast_sync") -> int:
+    rows = _v79_rows_from_sqlite()
+    _v79_write_0102_latest_files(rows, reason)
+    _v79_clear_fast_caches()
+    try:
+        # Lightweight pending marker only; avoids GitHub API during 01 clicks.
+        mark_data_changed("01/02 工時紀錄已變更，已寫入本機最新永久檔。", "time_records")
+    except Exception:
+        pass
+    return int(len(rows))
+
+
+_v79_base_today_records = today_records
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """V79 cached fast 01 display. Cache is cleared after any time-record mutation."""
+    import time as _time
+    key = (bool(include_finished), bool(unfinished_only), _business_cycle_start_date(), _live_page_cutoff_timestamp() or "")
+    now = _time.time()
+    cached = _V79_TODAY_CACHE.get(key)
+    if cached and (now - float(cached[0])) <= _V79_TODAY_CACHE_TTL:
+        return cached[1].copy()
+    df = _v79_base_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+    if not isinstance(df, pd.DataFrame):
+        df = pd.DataFrame()
+    _V79_TODAY_CACHE[key] = (now, df.copy())
+    return df.reset_index(drop=True)
+
+
+def sync_time_records_01_02_now(reason: str = "v79_manual_sync", *, github: bool = False) -> int:  # type: ignore[override]
+    # github argument intentionally ignored on 01 realtime path to keep page responsive.
+    return _v79_sync_time_records_fast(reason)
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    base = globals().get("_v75_final_original_start_work") or globals().get("_v76_prev_start_work")
+    rid = base(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) if callable(base) else 0
+    if rid:
+        _v79_sync_time_records_fast("start_work_v79_fast")
+    return int(rid or 0)
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    base = globals().get("_v75_final_original_finish_work") or globals().get("_v76_prev_finish_work")
+    count = base(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) if callable(base) else 0
+    if count:
+        _v79_sync_time_records_fast("finish_work_v79_fast")
+    return int(count or 0)
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    base = globals().get("_v75_base_save_time_records") or globals().get("_original_v28_save_time_records")
+    n = base(df, recalc_edited_timestamps=recalc_edited_timestamps) if callable(base) else 0
+    if n:
+        _v79_sync_time_records_fast("save_time_records_v79_fast")
+    return int(n or 0)
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    base = globals().get("_v75_base_recalculate_time_records") or globals().get("_v70_original_recalculate_time_records")
+    count = base(record_ids) if callable(base) else 0
+    if count:
+        _v79_sync_time_records_fast("recalculate_time_records_v79_fast")
+    return int(count or 0)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = _v75_normalize_ids(record_ids) if "_v75_normalize_ids" in globals() else [int(x) for x in record_ids or [] if str(x).strip()]
+    if not ids:
+        return 0
+    if "_v75_delete_sqlite_first" in globals():
+        deleted = _v75_delete_sqlite_first(ids, reason)
+    else:
+        placeholders = ",".join(["?"] * len(ids))
+        execute(f"DELETE FROM time_records WHERE id IN ({placeholders})", tuple(ids))
+        deleted = len(ids)
+    _v79_sync_time_records_fast("delete_time_records_v79_fast")
+    return int(deleted or 0)
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    base = globals().get("_v75_base_import_time_records") or globals().get("_v70_original_import_time_records")
+    result = base(df, recalc=recalc, source=source) if callable(base) else {"inserted": 0, "updated": 0}
+    try:
+        changed = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
+    except Exception:
+        changed = 0
+    if changed:
+        _v79_sync_time_records_fast("import_time_records_v79_fast")
+    return result
+# ===================== END V79 01 PAGE FAST DISPLAY + STRICT LOCAL SYNC =====================

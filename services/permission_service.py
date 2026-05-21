@@ -3167,3 +3167,280 @@ def restore_default_accounts_once_v57() -> dict:
         pass
     return {"restored": int(result.get("saved", 0) or 0), "usernames": [r["username"] for r in rows]}
 # ===== V57 RESTORE DEFAULT ACCOUNTS ONCE PATCH END =====
+
+# ======================= V79 PERMISSION REBOOT PERSISTENCE HARD FIX =======================
+# Root cause fixed here:
+# Earlier permission_service used data/database + data/persistent_modules paths, while the
+# project's real permanent store is data/permanent_store/database and
+# data/permanent_store/persistent_modules. After Reboot App, 10 permissions could be
+# recreated from defaults instead of the last saved permission latest file.
+
+try:
+    from services import db_service as _v79_db_service
+    DB_PATH = _v79_db_service.DB_PATH  # type: ignore[assignment]
+except Exception:
+    DB_PATH = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"  # type: ignore[assignment]
+
+_V79_OLD_PERMISSION_DB_PATH = PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
+_V79_PERMISSION_DB_PATH = DB_PATH
+_V79_PERMISSION_RESTORE_KEY = "_v79_permission_permanent_restored"
+_V79_PERMISSION_TABLES = [
+    "auth_users", "auth_account_permissions", "auth_security_settings",
+    "security_users", "security_user_roles", "security_settings",
+]
+_V79_PERMISSION_FILES = [
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "security_settings.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_permission_settings.json",
+    # compatibility with earlier generated files
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
+    PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_settings.json",
+]
+
+
+def connect_db() -> sqlite3.Connection:  # type: ignore[override]
+    _V79_PERMISSION_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(_V79_PERMISSION_DB_PATH, timeout=10)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA busy_timeout=8000")
+    except Exception:
+        pass
+    return conn
+
+
+def _v79_p_read_json(path: Path) -> dict:
+    try:
+        if path.exists() and path.is_file() and path.stat().st_size > 2:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _v79_p_atomic_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v79_payload_timestamp(payload: dict) -> str:
+    for k in ["exported_at", "updated_at", "saved_at"]:
+        v = str(payload.get(k) or "").strip()
+        if v:
+            return v
+    return ""
+
+
+def _v79_payload_score(payload: dict, path: Path) -> tuple[str, float, int]:
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    auth_count = len(tables.get("auth_users", []) or []) if isinstance(tables, dict) else 0
+    try:
+        mtime = path.stat().st_mtime
+    except Exception:
+        mtime = 0.0
+    return (_v79_payload_timestamp(payload), mtime, auth_count)
+
+
+def _v79_permission_latest_payload() -> dict:
+    candidates: list[tuple[tuple[str, float, int], dict]] = []
+    for path in _V79_PERMISSION_FILES:
+        payload = _v79_p_read_json(path)
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        if isinstance(tables, dict) and isinstance(tables.get("auth_users"), list):
+            candidates.append((_v79_payload_score(payload, path), payload))
+    if not candidates:
+        return {}
+    # Pick newest timestamp/mtime. This allows migration from the old wrong path if it is newer.
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return candidates[0][1]
+
+
+def _v79_fetch_table(conn: sqlite3.Connection, table: str) -> list[dict]:
+    try:
+        return [dict(r) for r in conn.execute(f'SELECT * FROM "{table}"').fetchall()]
+    except Exception:
+        return []
+
+
+def _v79_replace_table(cur: sqlite3.Cursor, table: str, rows: list[dict]) -> int:
+    try:
+        cur.execute(f'DELETE FROM "{table}"')
+    except Exception:
+        return 0
+    n = 0
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        clean = {str(k): v for k, v in row.items() if str(k).strip()}
+        if not clean:
+            continue
+        cols = list(clean.keys())
+        placeholders = ",".join(["?"] * len(cols))
+        col_sql = ",".join([f'"{c}"' for c in cols])
+        try:
+            cur.execute(f'INSERT INTO "{table}" ({col_sql}) VALUES ({placeholders})', [clean[c] for c in cols])
+            n += 1
+        except Exception:
+            continue
+    return n
+
+
+def _v79_payload_from_current_db(reason: str = "permission_settings_saved") -> dict:
+    _v373_p_schema_only() if "_v373_p_schema_only" in globals() else None
+    conn = connect_db()
+    try:
+        tables = {t: _v79_fetch_table(conn, t) for t in _V79_PERMISSION_TABLES}
+    finally:
+        conn.close()
+    return {
+        "version": "V79-permission-permanent-store-path-fix",
+        "exported_at": now_text(),
+        "reason": reason,
+        "module_key": "10_permissions",
+        "module_code": "10_permissions",
+        "module_name_zh": "權限管理",
+        "module_name_en": "Permission Management",
+        "source": "permission_service_v79",
+        "description": "10 權限管理固定 latest JSON；讀寫 data/permanent_store，並相容舊 data/persistent_modules。Reboot App 後不再恢復原始設定。",
+        "tables": tables,
+        "table_counts": {k: len(v) for k, v in tables.items()},
+        "counts": {k: len(v) for k, v in tables.items()},
+    }
+
+
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
+    payload = _v79_payload_from_current_db(reason)
+    written = []
+    for path in _V79_PERMISSION_FILES:
+        # write records/settings/state files. security_settings.json can also hold full payload safely.
+        _v79_p_atomic_json(path, payload)
+        written.append(str(path))
+    clear_permission_runtime_cache()
+    return {"ok": True, "mode": "v79_permanent_store_path_fix", "files": written, "table_counts": payload.get("table_counts", {})}
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    _v373_p_schema_only() if "_v373_p_schema_only" in globals() else None
+    payload = _v79_permission_latest_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    if not isinstance(tables, dict) or not isinstance(tables.get("auth_users"), list):
+        return {"ok": False, "mode": "v79_permanent_store_path_fix", "message": "no latest permission payload"}
+    conn = connect_db(); cur = conn.cursor(); restored = {}
+    try:
+        try:
+            _ensure_legacy_security_tables(cur)
+            _ensure_security_setting_tables(cur)
+        except Exception:
+            pass
+        for table in _V79_PERMISSION_TABLES:
+            rows = tables.get(table, []) if isinstance(tables.get(table), list) else []
+            restored[table] = _v79_replace_table(cur, table, rows)
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    clear_permission_runtime_cache()
+    if st is not None:
+        try:
+            st.session_state[_V79_PERMISSION_RESTORE_KEY] = True
+        except Exception:
+            pass
+    return {"ok": True, "mode": "v79_permanent_store_path_fix", "restored": restored, "source_version": payload.get("version")}
+
+
+def _v79_restore_permission_once() -> None:
+    if st is not None:
+        try:
+            if st.session_state.get(_V79_PERMISSION_RESTORE_KEY):
+                return
+        except Exception:
+            pass
+    # Always restore once per session from fixed latest. This prevents default seeded DB from winning after Reboot.
+    restore_permission_settings_from_permanent_files(force=True)
+    if st is not None:
+        try:
+            st.session_state[_V79_PERMISSION_RESTORE_KEY] = True
+        except Exception:
+            pass
+
+
+_v79_prev_get_users = get_users
+_v79_prev_get_account_permissions = get_account_permissions
+try:
+    _v79_prev_get_security_settings = get_security_settings  # type: ignore[name-defined]
+except Exception:
+    _v79_prev_get_security_settings = None
+_v79_prev_save_users = save_users
+_v79_prev_delete_users = delete_users
+_v79_prev_save_account_permissions = save_account_permissions
+try:
+    _v79_prev_save_security_settings = save_security_settings  # type: ignore[name-defined]
+except Exception:
+    _v79_prev_save_security_settings = None
+
+
+def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
+    _v373_p_schema_only() if "_v373_p_schema_only" in globals() else None
+    if force:
+        restore_permission_settings_from_permanent_files(force=True)
+
+
+init_auth_tables = init_permission_tables
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    _v79_restore_permission_once()
+    return _v79_prev_get_users()
+
+
+def get_account_permissions() -> List[dict]:  # type: ignore[override]
+    _v79_restore_permission_once()
+    return _v79_prev_get_account_permissions()
+
+
+def get_security_settings() -> dict:  # type: ignore[override]
+    _v79_restore_permission_once()
+    if callable(_v79_prev_get_security_settings):
+        return _v79_prev_get_security_settings()
+    return {}
+
+
+def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
+    # Do not restore over the user's in-page edited rows immediately before saving.
+    result = _v79_prev_save_users(rows)
+    export_result = export_permission_settings_permanently("auth_users_saved_v79")
+    if isinstance(result, dict):
+        result["permanent_save"] = export_result
+    return result
+
+
+def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
+    deleted = int(_v79_prev_delete_users(usernames) or 0)
+    export_permission_settings_permanently("auth_users_deleted_v79")
+    return deleted
+
+
+def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
+    count = int(_v79_prev_save_account_permissions(rows) or 0)
+    export_permission_settings_permanently("account_permissions_saved_v79")
+    return count
+
+
+def save_security_settings(values: dict) -> None:  # type: ignore[override]
+    if callable(_v79_prev_save_security_settings):
+        _v79_prev_save_security_settings(values)
+    export_permission_settings_permanently("security_settings_saved_v79")
+
+
+check_permission = has_permission
+# ===================== END V79 PERMISSION REBOOT PERSISTENCE HARD FIX =====================
