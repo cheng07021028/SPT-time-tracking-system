@@ -1997,3 +1997,201 @@ def load_records(start_date: str | None = None, end_date: str | None = None, emp
     except Exception:
         return pd.DataFrame()
 # ===================== END V76 HARD 01/02 LIVE SYNC FIX =====================
+
+# ======================= V77 01 FAST PAGE + ADMIN ACTION HARD FIX =======================
+# 目的：
+# 1) 01 工時紀錄每次點選都重跑很久：避免 start/finish/save/delete 走多層舊 wrapper 重複同步與 GitHub 寫入。
+# 2) 管理員維護區全選/取消/刪除：由 pages/01 以真實 id 欄位修正，本層確保刪除後不被舊權威檔救回。
+# 3) 01 -> 02 歷史紀錄：仍以 SQLite time_records 為即時來源，並同步 01/02 本機權威檔；不在一般點擊時打 GitHub。
+
+_V77_APP_SETTING_CACHE: dict[str, tuple[float, str | None]] = {}
+_V77_SETTING_TTL_SECONDS = 8.0
+
+
+def _safe_app_setting_value(setting_key: str) -> str | None:  # type: ignore[override]
+    """Cached lightweight app setting reader for 01 page reruns."""
+    key = str(setting_key or "").strip()
+    if not key:
+        return None
+    try:
+        import time as _time
+        now = _time.time()
+        cached = _V77_APP_SETTING_CACHE.get(key)
+        if cached and (now - float(cached[0])) <= _V77_SETTING_TTL_SECONDS:
+            return cached[1]
+        _ensure_app_settings_table()
+        row = query_one("SELECT setting_value FROM app_settings WHERE setting_key=?", (key,)) or {}
+        val = row.get("setting_value")
+        out = str(val).strip() if val else None
+        _V77_APP_SETTING_CACHE[key] = (now, out)
+        return out
+    except sqlite3.OperationalError:
+        try:
+            _ensure_app_settings_table()
+        except Exception:
+            pass
+        return None
+    except Exception:
+        return None
+
+
+def _v77_direct_query_df(sql: str, params: tuple = ()) -> pd.DataFrame:
+    try:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(DB_PATH, timeout=8) as conn:
+            conn.row_factory = sqlite3.Row
+            try:
+                conn.execute("PRAGMA busy_timeout=5000")
+            except Exception:
+                pass
+            rows = conn.execute(sql, tuple(params or ())).fetchall()
+            return pd.DataFrame([dict(r) for r in rows])
+    except sqlite3.OperationalError as exc:
+        if "no such table" in str(exc).lower():
+            return pd.DataFrame()
+        raise
+    except Exception:
+        return pd.DataFrame()
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """Fast 01 live records read. Same business rule, fewer wrappers/cache layers."""
+    cycle_start = _business_cycle_start_date()
+    unfinished_where = _unfinished_live_where()
+    if unfinished_only:
+        return _v77_direct_query_df(f"SELECT * FROM time_records WHERE {unfinished_where} ORDER BY id DESC")
+    cutoff = _live_page_cutoff_timestamp()
+    if cutoff:
+        return _v77_direct_query_df(
+            f"""
+            SELECT * FROM time_records
+            WHERE
+                ({unfinished_where})
+                OR (
+                    start_date>=?
+                    AND NOT (
+                        (
+                            COALESCE(status,'')<>'作業中'
+                            OR (end_timestamp IS NOT NULL AND TRIM(COALESCE(end_timestamp,''))<>'' AND LOWER(TRIM(COALESCE(end_timestamp,'')))<>'none')
+                            OR CAST(COALESCE(work_hours, 0) AS REAL) > 0
+                        )
+                        AND COALESCE(NULLIF(TRIM(COALESCE(end_timestamp,'')), ''), updated_at, start_timestamp, created_at, '') <= ?
+                    )
+                )
+            ORDER BY id DESC
+            """,
+            (cycle_start, cutoff),
+        )
+    return _v77_direct_query_df(
+        f"""
+        SELECT * FROM time_records
+        WHERE start_date>=? OR ({unfinished_where})
+        ORDER BY id DESC
+        """,
+        (cycle_start,),
+    )
+
+
+def _v77_sync_time_records_local(reason: str = "v77_sync") -> int:
+    """Local-first 01/02 sync. No GitHub API during 01 page interactions."""
+    rows = _v76_rows_from_sqlite() if "_v76_rows_from_sqlite" in globals() else []
+    try:
+        _v75_write_legacy_time_record_files(rows, reason=reason)
+    except Exception:
+        pass
+    try:
+        if _v28_update_tables is not None:
+            try:
+                _v28_update_tables("01_time_records", {"time_records": rows}, reason=f"{reason}_01", github=False)
+            except TypeError:
+                _v28_update_tables("01_time_records", {"time_records": rows}, reason=f"{reason}_01")
+            try:
+                _v28_update_tables("02_history", {"time_records": rows}, reason=f"{reason}_02", github=False)
+            except TypeError:
+                _v28_update_tables("02_history", {"time_records": rows}, reason=f"{reason}_02")
+    except Exception as exc:
+        try:
+            write_log("V77_01_02_LOCAL_SYNC_ERROR", f"01/02 本機權威同步失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        _V77_APP_SETTING_CACHE.clear()
+    except Exception:
+        pass
+    return int(len(rows))
+
+
+# Use SQL/business implementations captured before V75/V76 wrapper layers, then sync once.
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    base = globals().get("_v75_final_original_start_work") or globals().get("_v76_prev_start_work")
+    rid = base(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) if callable(base) else 0
+    if rid:
+        _v77_sync_time_records_local("start_work_v77_fast_local")
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    base = globals().get("_v75_final_original_finish_work") or globals().get("_v76_prev_finish_work")
+    count = base(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) if callable(base) else 0
+    if count:
+        _v77_sync_time_records_local("finish_work_v77_fast_local")
+    return count
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    base = globals().get("_v75_base_save_time_records") or globals().get("_original_v28_save_time_records")
+    n = base(df, recalc_edited_timestamps=recalc_edited_timestamps) if callable(base) else 0
+    if n:
+        synced = _v77_sync_time_records_local("save_time_records_v77_fast_local")
+        try:
+            write_log("SYNC_TIME_RECORDS_01_02", f"人工儲存後已同步 01/02 本機權威檔；儲存 {n} 筆，同步 {synced} 筆。", "time_records")
+        except Exception:
+            pass
+    return int(n or 0)
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    base = globals().get("_v75_base_recalculate_time_records") or globals().get("_v70_original_recalculate_time_records")
+    count = base(record_ids) if callable(base) else 0
+    if count:
+        synced = _v77_sync_time_records_local("recalculate_time_records_v77_fast_local")
+        try:
+            write_log("SYNC_RECALC_TIME_RECORDS_01_02", f"重新計算工時已扣除 13 系統設定休息時間；重算 {count} 筆，同步 {synced} 筆。", "time_records")
+        except Exception:
+            pass
+    return int(count or 0)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = _v75_normalize_ids(record_ids) if "_v75_normalize_ids" in globals() else [int(x) for x in record_ids or []]
+    if not ids:
+        return 0
+    if "_v75_delete_sqlite_first" in globals():
+        deleted = _v75_delete_sqlite_first(ids, reason)
+    else:
+        placeholders = ",".join(["?"] * len(ids))
+        execute(f"DELETE FROM time_records WHERE id IN ({placeholders})", tuple(ids))
+        deleted = len(ids)
+    synced = _v77_sync_time_records_local("delete_time_records_v77_fast_local")
+    try:
+        write_log("DELETE_TIME_RECORDS", f"{reason}：已刪除 {deleted} 筆，01/02 本機權威檔已同步 {synced} 筆。", "time_records")
+    except Exception:
+        pass
+    return int(deleted or 0)
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    base = globals().get("_v75_base_import_time_records") or globals().get("_v70_original_import_time_records")
+    result = base(df, recalc=recalc, source=source) if callable(base) else {"inserted": 0, "updated": 0}
+    try:
+        changed = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
+    except Exception:
+        changed = 0
+    if changed:
+        _v77_sync_time_records_local("import_time_records_v77_fast_local")
+    return result
+# ===================== END V77 01 FAST PAGE + ADMIN ACTION HARD FIX =====================
