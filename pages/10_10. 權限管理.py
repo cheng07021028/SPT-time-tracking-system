@@ -586,9 +586,11 @@ with tab_accounts:
                 "last_action": st.session_state.get("v40_account_last_action", ""),
                 "last_delete_true_count": st.session_state.get("v40_account_last_delete_true", ""),
                 "bulk_guard_active": bool(st.session_state.get("v37_account_bulk_just_applied", False)),
+                "visible_delete_true_count": st.session_state.get("v42_account_visible_delete_true", ""),
+                "v42_mode": "draft-authority-no-render-overwrite",
             })
 
-        # V41：帳號總表不再放入 st.form。
+        # V42：帳號總表不放入 st.form，且 data_editor 回傳值不得每輪覆蓋草稿。
         # 原因：外部「全選 / 取消」按鈕已經成功把 draft 改成 True，
         # 但 st.form 內的 data_editor 會保留上一輪未送出的 widget 狀態，
         # 導致畫面重新渲染時又把勾選顯示成 False。
@@ -623,6 +625,22 @@ with tab_accounts:
             },
         )
 
+        # V42: final protection against data_editor echo overwriting bulk button results.
+        # Root cause from V40/V41 diagnostics:
+        # - The bulk button correctly changes st.session_state["v133_users_df"].
+        # - Some Streamlit data_editor builds still return the previous widget value
+        #   during the next rerun, even with a rotated key.
+        # - If we write that return value back to the draft, the checkbox immediately
+        #   appears to revert from True back to False.
+        # V42 therefore treats the session draft as the authority after any bulk
+        # action. Manual table edits are still saved from edited_users when the
+        # user presses the save button, but ordinary renders no longer overwrite
+        # the draft on every rerun.
+        _bulk_render = bool(st.session_state.pop("v37_account_bulk_just_applied", False))
+        if _bulk_render and account_edit_enabled:
+            edited_users = st.session_state["v133_users_df"].copy(deep=True)
+            st.session_state["v40_account_last_action"] = "bulk_render_protected_v42"
+
         active_count = int(_to_bool_series(edited_users, "啟用 / Active").sum())
         delete_count = int(_to_bool_series(edited_users, "刪除 / Delete").sum())
         new_password_count = int(sum(1 for _, _row in edited_users.iterrows() if _password_from_editor_row(_row)))
@@ -631,13 +649,11 @@ with tab_accounts:
         m2.metric("待刪除 / Pending Delete", delete_count)
         m3.metric("密碼異動 / Password Changes", new_password_count)
 
-        if account_edit_enabled and not st.session_state.pop("v37_account_bulk_just_applied", False):
-            # Normal manual edits are accepted as the draft.
-            st.session_state["v133_users_df"] = edited_users.copy(deep=True)
-        elif account_edit_enabled:
-            # A bulk button has just updated the draft and rotated the editor key.
-            # Do not let the editor's stale return value overwrite that draft.
-            st.session_state["v40_account_last_action"] = "bulk_render_protected"
+        # Important: do not assign edited_users back to v133_users_df on every
+        # rerun. It can be a stale widget echo. The draft is changed only by
+        # explicit buttons; the save button uses edited_users directly for manual
+        # table edits. This is the key difference from V41.
+        st.session_state["v42_account_visible_delete_true"] = delete_count
 
         submitted_accounts = st.button(
             "▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master",
