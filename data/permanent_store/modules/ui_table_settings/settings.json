@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-21 14:16:25",
-  "exported_at": "2026-05-21 14:16:25",
+  "updated_at": "2026-05-21 14:42:53",
+  "exported_at": "2026-05-21 14:42:53",
   "reason": "v367_column_settings_saved",
   "empty_authoritative": false,
   "tables": {},
@@ -847,6 +847,101 @@
       }
     },
     "10.permissions.account_master": {
+      "columns": {
+        "刪除 / Delete": {
+          "source": "刪除 / Delete",
+          "label": "刪除 / Delete / 刪除 / Delete",
+          "visible": true,
+          "width": "medium",
+          "order": -999
+        },
+        "帳號 / Username": {
+          "source": "帳號 / Username",
+          "label": "帳號 / Username / 帳號 / Username",
+          "visible": true,
+          "width": "medium",
+          "order": 0
+        },
+        "密碼狀態 / Password Status": {
+          "source": "密碼狀態 / Password Status",
+          "label": "密碼狀態 / Password Status / 密碼狀態 / Password Status",
+          "visible": true,
+          "width": "medium",
+          "order": 1
+        },
+        "新密碼 / New Password": {
+          "source": "新密碼 / New Password",
+          "label": "新密碼 / New Password / 新密碼 / New Password",
+          "visible": true,
+          "width": "medium",
+          "order": 2
+        },
+        "工號 / Employee ID": {
+          "source": "工號 / Employee ID",
+          "label": "工號 / Employee ID / 工號 / Employee ID",
+          "visible": true,
+          "width": "medium",
+          "order": 3
+        },
+        "姓名 / Display Name": {
+          "source": "姓名 / Display Name",
+          "label": "姓名 / Display Name / 姓名 / Display Name",
+          "visible": true,
+          "width": "medium",
+          "order": 4
+        },
+        "Email": {
+          "source": "Email",
+          "label": "Email / Email",
+          "visible": true,
+          "width": "medium",
+          "order": 5
+        },
+        "角色 / Role": {
+          "source": "角色 / Role",
+          "label": "角色 / Role / 角色 / Role",
+          "visible": true,
+          "width": "medium",
+          "order": 6
+        },
+        "啟用 / Active": {
+          "source": "啟用 / Active",
+          "label": "啟用 / Active / 啟用 / Active",
+          "visible": true,
+          "width": "medium",
+          "order": 7
+        },
+        "強制改密碼 / Force Change": {
+          "source": "強制改密碼 / Force Change",
+          "label": "強制改密碼 / Force Change / 強制改密碼 / Force Change",
+          "visible": true,
+          "width": "medium",
+          "order": 8
+        },
+        "備註 / Note": {
+          "source": "備註 / Note",
+          "label": "備註 / Note / 備註 / Note",
+          "visible": true,
+          "width": "medium",
+          "order": 9
+        },
+        "最後登入 / Last Login": {
+          "source": "最後登入 / Last Login",
+          "label": "最後登入 / Last Login / 最後登入 / Last Login",
+          "visible": true,
+          "width": "medium",
+          "order": 10
+        },
+        "更新時間 / Updated At": {
+          "source": "更新時間 / Updated At",
+          "label": "更新時間 / Updated At / 更新時間 / Updated At",
+          "visible": true,
+          "width": "medium",
+          "order": 11
+        }
+      }
+    },
+    "v53_account_editor": {
       "columns": {
         "刪除 / Delete": {
           "source": "刪除 / Delete",
