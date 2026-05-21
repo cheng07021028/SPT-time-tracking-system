@@ -588,53 +588,64 @@ with tab_accounts:
                 "bulk_guard_active": bool(st.session_state.get("v37_account_bulk_just_applied", False)),
             })
 
-        # V1.71：帳號總表使用 st.form 包住 data_editor。
-        # 原因：Streamlit 一般 data_editor 每次切換儲存格、勾選、下拉或其他元件互動都可能 rerun，
-        # 導致尚未儲存的編輯草稿被資料庫原始資料重建覆蓋。
-        # 放入 form 後，編輯期間不 rerun，只有按下 form_submit_button 才送出整張表。
-        with st.form("v171_account_master_edit_form", clear_on_submit=False):
-            account_editor_key = f"v171_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
-            edited_users = st.data_editor(
-                st.session_state["v133_users_df"], key=account_editor_key, use_container_width=True,
-                num_rows="fixed", hide_index=True,
-                disabled=not account_edit_enabled,
-                height=360,
-                column_order=[c for c in ["刪除 / Delete"] + list(st.session_state["v133_users_df"].columns) if c in list(st.session_state["v133_users_df"].columns)],
-                column_config={
-                    "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
-                    "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
-                    "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
-                    "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
-                    "工號 / Employee ID": st.column_config.TextColumn("工號 / Employee ID"),
-                    "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
-                    "Email": st.column_config.TextColumn("Email"),
-                    "角色 / Role": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
-                    "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active"),
-                    "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
-                    "備註 / Note": st.column_config.TextColumn("備註 / Note"),
-                    "最後登入 / Last Login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
-                    "更新時間 / Updated At": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
-                },
-            )
+        # V41：帳號總表不再放入 st.form。
+        # 原因：外部「全選 / 取消」按鈕已經成功把 draft 改成 True，
+        # 但 st.form 內的 data_editor 會保留上一輪未送出的 widget 狀態，
+        # 導致畫面重新渲染時又把勾選顯示成 False。
+        # V41 改成 data_editor + 一般 st.button，並在批次按鈕後旋轉 editor key，
+        # 讓 draft 內容成為下一輪畫面的唯一來源。
+        account_editor_key = f"v171_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
+        _account_cols = list(st.session_state["v133_users_df"].columns)
+        _account_order = ["刪除 / Delete"] + [c for c in _account_cols if c != "刪除 / Delete"]
+        edited_users = st.data_editor(
+            st.session_state["v133_users_df"].copy(deep=True),
+            key=account_editor_key,
+            use_container_width=True,
+            num_rows="fixed",
+            hide_index=True,
+            disabled=not account_edit_enabled,
+            height=360,
+            column_order=[c for c in _account_order if c in _account_cols],
+            column_config={
+                "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
+                "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
+                "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
+                "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
+                "工號 / Employee ID": st.column_config.TextColumn("工號 / Employee ID"),
+                "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
+                "Email": st.column_config.TextColumn("Email"),
+                "角色 / Role": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
+                "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active"),
+                "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
+                "備註 / Note": st.column_config.TextColumn("備註 / Note"),
+                "最後登入 / Last Login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
+                "更新時間 / Updated At": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
+            },
+        )
 
-            active_count = int(_to_bool_series(edited_users, "啟用 / Active").sum())
-            delete_count = int(_to_bool_series(edited_users, "刪除 / Delete").sum())
-            new_password_count = int(sum(1 for _, _row in edited_users.iterrows() if _password_from_editor_row(_row)))
-            m1, m2, m3 = st.columns(3)
-            m1.metric("啟用帳號 / Active", active_count)
-            m2.metric("待刪除 / Pending Delete", delete_count)
-            m3.metric("密碼異動 / Password Changes", new_password_count)
-            submitted_accounts = st.form_submit_button(
-                "▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master",
-                type="primary",
-                use_container_width=True,
-                disabled=not account_edit_enabled,
-            )
+        active_count = int(_to_bool_series(edited_users, "啟用 / Active").sum())
+        delete_count = int(_to_bool_series(edited_users, "刪除 / Delete").sum())
+        new_password_count = int(sum(1 for _, _row in edited_users.iterrows() if _password_from_editor_row(_row)))
+        m1, m2, m3 = st.columns(3)
+        m1.metric("啟用帳號 / Active", active_count)
+        m2.metric("待刪除 / Pending Delete", delete_count)
+        m3.metric("密碼異動 / Password Changes", new_password_count)
 
         if account_edit_enabled and not st.session_state.pop("v37_account_bulk_just_applied", False):
-            # Keep normal manual edits, but do not let a stale data_editor/form return value
-            # undo a bulk button result in the same rerun.
-            st.session_state["v133_users_df"] = edited_users.copy()
+            # Normal manual edits are accepted as the draft.
+            st.session_state["v133_users_df"] = edited_users.copy(deep=True)
+        elif account_edit_enabled:
+            # A bulk button has just updated the draft and rotated the editor key.
+            # Do not let the editor's stale return value overwrite that draft.
+            st.session_state["v40_account_last_action"] = "bulk_render_protected"
+
+        submitted_accounts = st.button(
+            "▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master",
+            type="primary",
+            use_container_width=True,
+            disabled=not account_edit_enabled,
+            key="v41_apply_save_account_master",
+        )
 
         if submitted_accounts:
             df = edited_users.copy()
