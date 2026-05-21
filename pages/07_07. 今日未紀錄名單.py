@@ -85,10 +85,13 @@ def _v25_today_batch(action: str) -> None:
         df["is_active"] = False
     elif action == "reload":
         reload_employees()
+        touch_editor()
+        rerun()
         return
     st.session_state[STATE_KEY] = ensure_cols(df)
     st.session_state["v37_today_bulk_just_applied"] = True
     touch_editor()
+    rerun()
 
 
 if STATE_KEY not in st.session_state:

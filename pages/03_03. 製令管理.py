@@ -55,18 +55,19 @@ def _editor_key() -> str:
     return f"work_orders_data_editor_v253_{st.session_state[EDITOR_VERSION_KEY]}"
 
 
-def _v37_clear_widget_state(prefix: str) -> None:
-    # Streamlit data_editor/form can keep an old widget delta and overwrite a bulk button update.
-    # Remove old editor widget state before rotating to a new key so checkbox 0/1 changes remain visible.
+def _v37_clear_widget_state(*tokens: str) -> None:
+    # V38: remove stale data_editor/form widget state by token containment.
+    clean_tokens = [str(x) for x in tokens if str(x)]
     for k in list(st.session_state.keys()):
-        if str(k).startswith(prefix):
+        sk = str(k)
+        if any(tok in sk for tok in clean_tokens):
             try:
                 del st.session_state[k]
             except Exception:
                 pass
 
 def _refresh_editor_widget() -> None:
-    _v37_clear_widget_state("work_orders_data_editor_v253_")
+    _v37_clear_widget_state("work_orders_data_editor_v253_", "work_orders_commit_form")
     st.session_state[EDITOR_VERSION_KEY] = int(st.session_state.get(EDITOR_VERSION_KEY, 0)) + 1
 
 
@@ -244,6 +245,7 @@ def _v25_wo_set_edit(enabled: bool) -> None:
     if not enabled:
         reload_data()
     _refresh_editor_widget()
+    rerun()
 
 
 def _v25_wo_batch(action: str) -> None:
@@ -269,9 +271,12 @@ def _v25_wo_batch(action: str) -> None:
         df["_delete"] = False
     elif action == "reload":
         reload_data()
+        _refresh_editor_widget()
+        rerun()
         return
     st.session_state[STATE_KEY] = ensure_cols(df)
     _refresh_editor_widget()
+    rerun()
 
 
 def render_work_order_summary(df: pd.DataFrame):

@@ -1118,18 +1118,20 @@ with tab1:
             except Exception:
                 return []
 
-        def _history_clear_widget_state(prefix: str) -> None:
-            # Clear previous data_editor/form widget state so Select All/Clear buttons
-            # immediately render the intended checkbox state.
+        def _history_clear_widget_state(*tokens: str) -> None:
+            # V38: Clear stale data_editor/form widget state by token containment, not only prefix.
+            # Streamlit forms can keep a hidden delta that writes checkbox True back to False after rerun.
+            clean_tokens = [str(x) for x in tokens if str(x)]
             for k in list(st.session_state.keys()):
-                if str(k).startswith(prefix):
+                sk = str(k)
+                if any(tok in sk for tok in clean_tokens):
                     try:
                         del st.session_state[k]
                     except Exception:
                         pass
 
         def _history_refresh_editor() -> None:
-            _history_clear_widget_state("history_editor_v27_")
+            _history_clear_widget_state("history_editor_v27_", "history_records_commit_form_v27")
             st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
 
         def _history_set_edit(enabled: bool) -> None:
@@ -1138,11 +1140,13 @@ with tab1:
                 st.session_state[delete_select_key] = []
                 st.session_state[recalc_select_key] = []
             _history_refresh_editor()
+            rerun()
 
         def _history_select(kind: str, select_all: bool) -> None:
             key = delete_select_key if kind == "delete" else recalc_select_key
             st.session_state[key] = _history_all_ids() if select_all else []
             _history_refresh_editor()
+            rerun()
 
         ec1, ec2, ec3 = st.columns([1, 1, 2])
         ec1.button("◇ 啟動編輯 / Enable Edit", use_container_width=True, key="history_enable_edit_v27", disabled=bool(st.session_state[edit_key]), on_click=_history_set_edit, args=(True,))

@@ -39,17 +39,19 @@ def _editor_key() -> str:
     return f"employees_data_editor_v253_{st.session_state[EDITOR_VERSION_KEY]}"
 
 
-def _v37_clear_widget_state(prefix: str) -> None:
-    # Clear old data_editor/form widget state before rotating key.
+def _v37_clear_widget_state(*tokens: str) -> None:
+    # V38: clear old data_editor/form widget state before rotating key.
+    clean_tokens = [str(x) for x in tokens if str(x)]
     for k in list(st.session_state.keys()):
-        if str(k).startswith(prefix):
+        sk = str(k)
+        if any(tok in sk for tok in clean_tokens):
             try:
                 del st.session_state[k]
             except Exception:
                 pass
 
 def _refresh_editor_widget() -> None:
-    _v37_clear_widget_state("employees_data_editor_v253_")
+    _v37_clear_widget_state("employees_data_editor_v253_", "employees_commit_form")
     st.session_state[EDITOR_VERSION_KEY] = int(st.session_state.get(EDITOR_VERSION_KEY, 0)) + 1
 
 COLS = [
@@ -250,6 +252,7 @@ def _v25_emp_set_edit(enabled: bool) -> None:
     elif STATE_KEY not in st.session_state:
         reload_data()
     _refresh_editor_widget()
+    rerun()
 
 
 def _v25_emp_batch(action: str) -> None:
@@ -285,9 +288,11 @@ def _v25_emp_batch(action: str) -> None:
     elif action == "reload":
         reload_data()
         _refresh_editor_widget()
+        rerun()
         return
     st.session_state[STATE_KEY] = ensure_cols(df)
     _refresh_editor_widget()
+    rerun()
 
 
 if STATE_KEY not in st.session_state:

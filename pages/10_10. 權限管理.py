@@ -378,19 +378,21 @@ def _permission_summary(df: pd.DataFrame) -> pd.DataFrame:
 
 
 
-def _v37_clear_widget_state(prefix: str) -> None:
-    # Clear stale data_editor/form widget state. Without this, a Select All button can
+def _v37_clear_widget_state(*tokens: str) -> None:
+    # V38: clear stale data_editor/form widget state. Without this, a Select All button can
     # set values to True, then the old editor delta immediately writes them back to False.
+    clean_tokens = [str(x) for x in tokens if str(x)]
     for k in list(st.session_state.keys()):
-        if str(k).startswith(prefix):
+        sk = str(k)
+        if any(tok in sk for tok in clean_tokens):
             try:
                 del st.session_state[k]
             except Exception:
                 pass
 
 def _v37_touch_account_editor() -> None:
-    _v37_clear_widget_state("v171_account_password_editor_")
-    _v37_touch_account_editor()
+    _v37_clear_widget_state("v171_account_password_editor_", "v171_account_master_edit_form")
+    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
     st.session_state["v37_account_bulk_just_applied"] = True
 
 # V27: stable account/permission callbacks.
@@ -406,6 +408,7 @@ def _v25_account_set_edit(enabled: bool) -> None:
     else:
         st.session_state["v133_users_df"] = _users_for_editor()
     _v37_touch_account_editor()
+    st.rerun()
 
 
 def _v25_account_add_blank() -> None:
@@ -414,6 +417,7 @@ def _v25_account_add_blank() -> None:
         df = _users_for_editor()
     st.session_state["v133_users_df"] = pd.concat([pd.DataFrame([_blank_user_row()]), df.copy()], ignore_index=True)
     _v37_touch_account_editor()
+    st.rerun()
 
 
 def _v25_account_delete_flag(flag: bool) -> None:
@@ -426,16 +430,19 @@ def _v25_account_delete_flag(flag: bool) -> None:
     df["刪除 / Delete"] = bool(flag)
     st.session_state["v133_users_df"] = df
     _v37_touch_account_editor()
+    st.rerun()
 
 
 def _v25_account_reload() -> None:
     st.session_state["v133_users_df"] = _users_for_editor()
-    st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
+    _v37_touch_account_editor()
+    st.rerun()
 
 
 def _v25_permission_quick(action: str) -> None:
     st.session_state["v25_permission_quick_action"] = str(action or "")
     st.session_state["v235_permission_editor_rev"] = int(st.session_state.get("v235_permission_editor_rev", 0)) + 1
+    st.rerun()
 
 
 tab_accounts, tab_perm, tab_sec = st.tabs([
