@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-21 13:31:20",
-  "exported_at": "2026-05-21 13:31:20",
+  "updated_at": "2026-05-21 13:40:37",
+  "exported_at": "2026-05-21 13:40:37",
   "reason": "v367_column_settings_saved",
   "empty_authoritative": false,
   "tables": {},
@@ -939,33 +939,19 @@
           "width": "medium",
           "order": 11
         },
-        "刪除狀態 / Delete Mark": {
-          "source": "刪除狀態 / Delete Mark",
-          "label": "刪除狀態 / Delete Mark / 刪除狀態 / Delete Mark",
-          "visible": true,
-          "width": "medium",
-          "order": 12
-        },
-        "刪除方框 / Delete Box": {
-          "source": "刪除方框 / Delete Box",
-          "label": "刪除方框 / Delete Box / 刪除方框 / Delete Box",
-          "visible": true,
-          "width": "medium",
-          "order": 13
-        },
-        "刪除選擇 / Delete Select": {
-          "source": "刪除選擇 / Delete Select",
-          "label": "刪除選擇 / Delete Select / 刪除選擇 / Delete Select",
-          "visible": true,
-          "width": "medium",
-          "order": 14
-        },
         "刪除顯示 / Delete Display": {
           "source": "刪除顯示 / Delete Display",
           "label": "刪除顯示 / Delete Display / 刪除顯示 / Delete Display",
           "visible": true,
           "width": "medium",
-          "order": 15
+          "order": 13
+        },
+        "刪除文字 / Delete Text": {
+          "source": "刪除文字 / Delete Text",
+          "label": "刪除文字 / Delete Text / 刪除文字 / Delete Text",
+          "visible": true,
+          "width": "medium",
+          "order": 12
         }
       }
     }
