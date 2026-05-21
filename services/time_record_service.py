@@ -1449,3 +1449,360 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
             pass
     return result
 # ======================= END V70 01/02 shared records sync hardening =======================
+
+
+# ========================= V75 01 admin save/delete persistence stabilization =========================
+# 目的：修正 01 工時紀錄管理員維護區「刪除後又出現 / 儲存後被暫存資料蓋回 / Reboot 後 01-02 不同步」。
+# 原則：SQLite 是目前畫面即時資料；每次真正儲存、重算、刪除後，再把 SQLite 全量同步到 01/02 權威檔與舊永久檔。
+
+def _v75_json_default(v):
+    try:
+        if pd.isna(v):
+            return ""
+    except Exception:
+        pass
+    if hasattr(v, "item"):
+        try:
+            return v.item()
+        except Exception:
+            pass
+    if isinstance(v, (datetime, date)):
+        return v.strftime("%Y-%m-%d %H:%M:%S") if isinstance(v, datetime) else v.strftime("%Y-%m-%d")
+    return str(v)
+
+
+def _v75_table_rows_from_df(df: pd.DataFrame) -> list[dict]:
+    if df is None or df.empty:
+        return []
+    try:
+        if _v28_table_from_df is not None:
+            return _v28_table_from_df(df)
+    except Exception:
+        pass
+    try:
+        return [dict(r) for _, r in df.fillna("").iterrows()]
+    except Exception:
+        return []
+
+
+def _v75_atomic_json(path, payload: dict) -> None:
+    try:
+        import json, os
+        from pathlib import Path
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=_v75_json_default), encoding="utf-8")
+        os.replace(tmp, path)
+    except Exception:
+        pass
+
+
+def _v75_write_legacy_time_record_files(rows: list[dict], reason: str = "v75_sync") -> None:
+    """Mirror shared time_records into legacy permanent locations used by older restore guards."""
+    try:
+        from pathlib import Path
+        project = Path(__file__).resolve().parents[1]
+        payload = {
+            "version": "V75_TIME_RECORDS_SYNC",
+            "updated_at": _now(),
+            "reason": reason,
+            "tables": {"time_records": rows},
+            "table_counts": {"time_records": len(rows)},
+        }
+        targets = [
+            project / "data" / "permanent_store" / "persistent_modules" / "01_time_records" / "01_time_records_records.json",
+            project / "data" / "permanent_store" / "persistent_modules" / "02_history" / "02_history_records.json",
+            project / "data" / "persistent_modules" / "01_time_records" / "01_time_records_records.json",
+            project / "data" / "persistent_modules" / "02_history" / "02_history_records.json",
+            project / "data" / "persistent_state" / "time_records_latest.json",
+        ]
+        for t in targets:
+            _v75_atomic_json(t, payload)
+    except Exception:
+        pass
+
+
+def _v75_sync_time_records_authority_from_sqlite(reason: str = "v75_sync_time_records") -> int:
+    """Fast shared 01/02 authority sync after real SQLite mutations.
+
+    01 and 02 share one business table.  To reduce button wait time, 01 is saved
+    local-only and 02 performs the GitHub write-through.  Legacy mirror files are
+    also written so older restore guards do not revive deleted rows.
+    """
+    try:
+        full_df = query_df("SELECT * FROM time_records ORDER BY id")
+    except Exception:
+        full_df = pd.DataFrame()
+    rows = _v75_table_rows_from_df(full_df)
+    _v75_write_legacy_time_record_files(rows, reason=reason)
+    try:
+        if _v28_update_tables is not None:
+            try:
+                _v28_update_tables("01_time_records", {"time_records": rows}, reason=f"{reason}_01", github=False)
+            except TypeError:
+                _v28_update_tables("01_time_records", {"time_records": rows}, reason=f"{reason}_01")
+            try:
+                _v28_update_tables("02_history", {"time_records": rows}, reason=f"{reason}_02", github=True)
+            except TypeError:
+                _v28_update_tables("02_history", {"time_records": rows}, reason=f"{reason}_02")
+    except Exception as exc:
+        try:
+            write_log("TIME_RECORD_AUTHORITY_SYNC_ERROR", f"V75 01/02 權威同步失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(len(rows))
+
+
+def _v75_normalize_ids(record_ids) -> list[int]:
+    out: list[int] = []
+    for rid in record_ids or []:
+        try:
+            i = int(float(str(rid).strip()))
+            if i > 0 and i not in out:
+                out.append(i)
+        except Exception:
+            continue
+    return out
+
+
+def _v75_delete_sqlite_first(record_ids: list[int], reason: str) -> int:
+    ids = _v75_normalize_ids(record_ids)
+    if not ids:
+        return 0
+    now = _now()
+    user_name = _audit_user_name()
+    deleted = 0
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA busy_timeout=8000")
+        conn.execute("BEGIN")
+        for rid in ids:
+            rec = conn.execute("SELECT * FROM time_records WHERE id=?", (rid,)).fetchone()
+            rec_dict = dict(rec) if rec else {}
+            cur = conn.execute("DELETE FROM time_records WHERE id=?", (rid,))
+            if cur.rowcount and cur.rowcount > 0:
+                deleted += int(cur.rowcount)
+            conn.execute(
+                """
+                INSERT INTO system_logs
+                (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    now,
+                    user_name,
+                    "DELETE_TIME_RECORD",
+                    "time_records",
+                    str(rid),
+                    f"{reason}：#{rid} {rec_dict.get('employee_id','')} {rec_dict.get('employee_name','')} {rec_dict.get('work_order','')} {rec_dict.get('process_name','')}",
+                    str(rec_dict)[:3000],
+                    "WARN",
+                ),
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return deleted
+
+
+# Use the original SQL implementations when possible to avoid older authority-first wrappers writing stale data back.
+_v75_base_save_time_records = globals().get("_original_v28_save_time_records", save_time_records)
+_v75_base_recalculate_time_records = globals().get("_v70_original_recalculate_time_records", recalculate_time_records)
+_v75_base_import_time_records = globals().get("_v70_original_import_time_records", import_time_records)
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    n = _v75_base_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps)
+    if n:
+        synced = _v75_sync_time_records_authority_from_sqlite("save_time_records_v75")
+        try:
+            write_log("SYNC_TIME_RECORDS_01_02", f"人工儲存後已同步 01/02 權威檔；儲存 {n} 筆，同步 {synced} 筆。", "time_records")
+        except Exception:
+            pass
+    return n
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    count = _v75_base_recalculate_time_records(record_ids)
+    if count:
+        synced = _v75_sync_time_records_authority_from_sqlite("recalculate_time_records_v75")
+        try:
+            write_log("SYNC_RECALC_TIME_RECORDS_01_02", f"重新計算工時已扣除 13 系統設定休息時間；重算 {count} 筆，同步 {synced} 筆。", "time_records")
+        except Exception:
+            pass
+    return count
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    result = _v75_base_import_time_records(df, recalc=recalc, source=source)
+    try:
+        changed = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
+    except Exception:
+        changed = 0
+    if changed:
+        _v75_sync_time_records_authority_from_sqlite("import_time_records_v75")
+    return result
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = _v75_normalize_ids(record_ids)
+    if not ids:
+        return 0
+    deleted = _v75_delete_sqlite_first(ids, reason)
+    # Whether SQLite reports rows deleted or not, sync the current SQLite table to
+    # both authority files. This prevents stale authority JSON from resurrecting
+    # rows that the user just deleted from the live table.
+    synced = _v75_sync_time_records_authority_from_sqlite("delete_time_records_v75")
+    try:
+        mark_data_changed(f"已刪除工時紀錄 {deleted} 筆；01/02 權威檔同步 {synced} 筆。", "DELETE time_records V75")
+    except Exception:
+        pass
+    try:
+        write_log("DELETE_TIME_RECORDS", f"{reason}：已刪除 {deleted} 筆，01/02 權威檔已同步 {synced} 筆。", "time_records")
+    except Exception:
+        pass
+    return int(deleted)
+# ======================= END V75 01 admin save/delete persistence stabilization =======================
+
+# ======================= V75 FINAL 01/02 live-history sync + SQLite-first read =======================
+# 修正重點：
+# 1) 01 開始/暫停/下班/完工後，02 歷史紀錄立即可讀到同一份 SQLite 資料。
+# 2) 02 讀取不再優先讀可能過期的 02_history JSON；SQLite 有資料時以 SQLite 為準。
+# 3) 管理員儲存、重算、刪除後同步 01/02 權威檔與舊永久檔，避免刪除後又被舊暫存救回。
+# 4) 開始/結束作業只做本機權威同步，不打 GitHub，避免一般作業按鈕變慢。
+
+_v75_final_original_start_work = start_work
+_v75_final_original_finish_work = finish_work
+_v75_final_original_load_records = globals().get("_original_v28_load_records", load_records)
+
+
+def _v75_apply_load_filters(df: pd.DataFrame, start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    if start_date:
+        if "start_date" in out.columns:
+            out = out[out["start_date"].astype(str) >= str(start_date)]
+        elif "work_date" in out.columns:
+            out = out[out["work_date"].astype(str) >= str(start_date)]
+    if end_date:
+        if "start_date" in out.columns:
+            out = out[out["start_date"].astype(str) <= str(end_date)]
+        elif "work_date" in out.columns:
+            out = out[out["work_date"].astype(str) <= str(end_date)]
+    if employee_id and "employee_id" in out.columns:
+        out = out[out["employee_id"].astype(str) == str(employee_id)]
+    if work_order and "work_order" in out.columns:
+        out = out[out["work_order"].astype(str) == str(work_order)]
+    try:
+        if "id" in out.columns:
+            out["_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values("_sort_id", ascending=False).drop(columns=["_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v75_sqlite_has_any_time_records() -> bool:
+    try:
+        row = query_one("SELECT COUNT(*) AS n FROM time_records") or {}
+        return int(row.get("n") or 0) > 0
+    except Exception:
+        return False
+
+
+def _v75_load_records_from_authority(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:
+    try:
+        if _v28_df_from_table is not None:
+            df = _v28_df_from_table("02_history", "time_records")
+            return _v75_apply_load_filters(df, start_date, end_date, employee_id, work_order)
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """SQLite-first history read for 01/02 shared time records.
+
+    When SQLite contains rows, it is the live source of truth.  Authority JSON is
+    used only as a reboot/empty-database fallback.  This prevents 02 history from
+    showing stale JSON after 01 just recorded a new start/end action.
+    """
+    try:
+        ensure_time_records_available("load_records_v75_final")
+    except Exception:
+        pass
+    try:
+        df = _v75_final_original_load_records(start_date, end_date, employee_id, work_order)
+        if isinstance(df, pd.DataFrame) and (not df.empty or _v75_sqlite_has_any_time_records()):
+            return df.reset_index(drop=True)
+    except Exception:
+        pass
+    return _v75_load_records_from_authority(start_date, end_date, employee_id, work_order)
+
+
+def _v75_sync_time_records_authority_from_sqlite_fast(reason: str = "v75_final_sync", *, github: bool = False) -> int:
+    """Sync current SQLite table to 01/02 authority files.
+
+    github=False is used for normal start/end actions to keep 01 fast.  Admin
+    save/recalc/delete may pass github=True through the older V75 sync wrapper.
+    """
+    try:
+        full_df = query_df("SELECT * FROM time_records ORDER BY id")
+    except Exception:
+        full_df = pd.DataFrame()
+    rows = _v75_table_rows_from_df(full_df)
+    _v75_write_legacy_time_record_files(rows, reason=reason)
+    try:
+        if _v28_update_tables is not None:
+            try:
+                _v28_update_tables("01_time_records", {"time_records": rows}, reason=f"{reason}_01", github=False)
+            except TypeError:
+                _v28_update_tables("01_time_records", {"time_records": rows}, reason=f"{reason}_01")
+            try:
+                _v28_update_tables("02_history", {"time_records": rows}, reason=f"{reason}_02", github=bool(github))
+            except TypeError:
+                _v28_update_tables("02_history", {"time_records": rows}, reason=f"{reason}_02")
+    except Exception as exc:
+        try:
+            write_log("TIME_RECORD_AUTHORITY_SYNC_ERROR", f"V75 final 01/02 權威同步失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(len(rows))
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    rid = _v75_final_original_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old)
+    # 01 新紀錄後立即同步到 02 可讀來源，但不打 GitHub，避免一般作業卡住。
+    if rid:
+        try:
+            _v75_sync_time_records_authority_from_sqlite_fast("start_work_v75_final", github=False)
+        except Exception:
+            pass
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    count = _v75_final_original_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group)
+    # 暫停 / 下班 / 完工後，02 歷史紀錄立即讀到結束時間與扣休後工時。
+    if count:
+        try:
+            _v75_sync_time_records_authority_from_sqlite_fast("finish_work_v75_final", github=False)
+        except Exception:
+            pass
+    return count
+# ===================== END V75 FINAL 01/02 live-history sync + SQLite-first read =====================

@@ -211,22 +211,93 @@ if is_admin:
             editor_version_key = "today_records_admin_editor_version"
             if editor_version_key not in st.session_state:
                 st.session_state[editor_version_key] = 0
-            _all_admin_ids = [int(x) for x in admin_df["id"].dropna().tolist()] if "id" in admin_df.columns else []
-            _selected_admin_ids = set(int(x) for x in st.session_state.get(admin_select_key, []) if int(x) in set(_all_admin_ids))
+            def _safe_int_id(v):
+                try:
+                    if pd.isna(v):
+                        return None
+                except Exception:
+                    pass
+                try:
+                    return int(float(str(v).strip()))
+                except Exception:
+                    return None
+
+            def _safe_bool_cell(v):
+                if isinstance(v, bool):
+                    return v
+                try:
+                    if pd.isna(v):
+                        return False
+                except Exception:
+                    pass
+                s = str(v).strip().lower()
+                if s in {"1", "true", "yes", "y", "on", "是", "勾選", "checked"}:
+                    return True
+                if s in {"0", "false", "no", "n", "off", "否", "", "none", "nan"}:
+                    return False
+                return bool(v)
+
+            def _clear_today_admin_editor_state():
+                # V75：只清本維護表格的 data_editor 草稿，不清其他模組狀態。
+                # 原本全選/取消已改 session_state，但全域 data_editor draft 仍保留舊 checkbox，
+                # 所以畫面看起來像兩個按鈕沒有作用。
+                tokens = (
+                    "today_records_admin_editor_",
+                    "today_records_admin_maintenance",
+                    "01.time_records.admin_maintenance",
+                )
+                for k in list(st.session_state.keys()):
+                    sk = str(k)
+                    if sk in {admin_select_key, editor_version_key}:
+                        continue
+                    if sk.startswith("today_records_admin_editor_") or any(t in sk for t in tokens):
+                        try:
+                            st.session_state.pop(k, None)
+                        except Exception:
+                            pass
+                try:
+                    from services.column_settings_service import clear_editor_draft
+                    clear_editor_draft("today_records_admin_editor")
+                    clear_editor_draft("today_records_admin_maintenance")
+                    clear_editor_draft("01.time_records.admin_maintenance")
+                except Exception:
+                    pass
+
+            def _set_today_admin_selected(ids):
+                clean_ids = []
+                for x in ids or []:
+                    ix = _safe_int_id(x)
+                    if ix is not None:
+                        clean_ids.append(ix)
+                st.session_state[admin_select_key] = clean_ids
+                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                _clear_today_admin_editor_state()
+                st.rerun()
+
+            _all_admin_ids = []
+            if "id" in admin_df.columns:
+                _all_admin_ids = [x for x in [_safe_int_id(v) for v in admin_df["id"].tolist()] if x is not None]
+            _all_admin_id_set = set(_all_admin_ids)
+            _selected_admin_ids = set()
+            for x in st.session_state.get(admin_select_key, []) or []:
+                ix = _safe_int_id(x)
+                if ix is not None and ix in _all_admin_id_set:
+                    _selected_admin_ids.add(ix)
+
             sc1, sc2, sc3 = st.columns([1, 1, 3])
             if sc1.button("◈ 勾選全部紀錄 / Select All", use_container_width=True, key="today_admin_select_all_rows"):
-                st.session_state[admin_select_key] = _all_admin_ids
-                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                st.rerun()
+                _set_today_admin_selected(_all_admin_ids)
             if sc2.button("◌ 取消全部勾選 / Clear All", use_container_width=True, key="today_admin_clear_all_rows"):
-                st.session_state[admin_select_key] = []
-                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                st.rerun()
+                _set_today_admin_selected([])
             sc3.caption("勾選會保留到你手動取消、刪除成功或離開本頁；不會因重新計算後自動清空。")
-            _selected_admin_ids = set(int(x) for x in st.session_state.get(admin_select_key, []) if int(x) in set(_all_admin_ids))
-            admin_df.insert(0, "刪除", admin_df["id"].map(lambda x: int(x) in _selected_admin_ids if str(x).strip() not in {"", "nan", "None"} else False) if "id" in admin_df.columns else False)
-            # V2.34：全選/取消全選後必須換新 data_editor key，否則 Streamlit 會沿用舊 widget 暫存，看起來按鈕無作用。
-            editor_key = f"today_records_admin_editor_{st.session_state[editor_version_key]}"
+
+            # V75：刪除欄值直接由後端選取清單重建，避免 data_editor 舊草稿覆蓋批次按鈕結果。
+            if "id" in admin_df.columns:
+                admin_df.insert(0, "刪除", [_safe_int_id(x) in _selected_admin_ids for x in admin_df["id"].tolist()])
+            else:
+                admin_df.insert(0, "刪除", False)
+            selection_sig = f"{len(_selected_admin_ids)}_{sum(_selected_admin_ids) if _selected_admin_ids else 0}"
+            editor_key = f"today_records_admin_editor_{st.session_state[editor_version_key]}_{selection_sig}"
             st.info("V2.28：確認執行後會重新載入表格，畫面會同步顯示最新日期、時間與工時小計。")
             with st.form("today_records_admin_commit_form", clear_on_submit=False):
                 edited_admin = render_table(
@@ -265,19 +336,24 @@ if is_admin:
                     admin_action = ""
 
             if submitted_admin and edited_admin is not None:
-                delete_ids = []
+                ui_delete_ids = []
                 try:
-                    delete_rows = edited_admin[edited_admin["刪除"].astype(bool)]
-                    delete_ids = [int(x) for x in delete_rows["id"].dropna().tolist()]
+                    delete_mask = edited_admin["刪除"].map(_safe_bool_cell) if "刪除" in edited_admin.columns else pd.Series(False, index=edited_admin.index)
+                    delete_rows = edited_admin[delete_mask]
+                    ui_delete_ids = [int(x) for x in delete_rows["id"].dropna().tolist()]
                 except Exception:
-                    delete_ids = []
-                # V2.32：保留目前勾選狀態，直到使用者取消、刪除成功或離開頁面。
+                    ui_delete_ids = []
+                session_delete_ids = [x for x in st.session_state.get(admin_select_key, []) if _safe_int_id(x) in _all_admin_id_set]
+                # V75：批次全選/取消以 session 選取清單為準；手動勾選則以表格回傳為準。
+                # 這可避免 data_editor 舊草稿尚未刷新時，按鈕已執行但確認動作取不到勾選列。
+                delete_ids = ui_delete_ids or session_delete_ids
                 st.session_state[admin_select_key] = delete_ids
 
                 if admin_action == "僅儲存修改":
                     save_df = edited_admin.drop(columns=["刪除"], errors="ignore")
                     count = save_time_records(save_df)
                     st.success(f"已由管理員存檔修改 {count} 筆今日工時紀錄。")
+                    _clear_today_admin_editor_state()
                     st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                     st.rerun()
                 elif admin_action == "重新計算勾選紀錄工時並同步 02 歷史紀錄":
@@ -289,6 +365,7 @@ if is_admin:
                         save_time_records(save_df, recalc_edited_timestamps=True)
                         count = recalculate_time_records(delete_ids)
                         st.success(f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時，同步更新到 02 歷史紀錄。")
+                        _clear_today_admin_editor_state()
                         st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                         st.rerun()
                 else:
@@ -299,5 +376,6 @@ if is_admin:
                         remaining = [x for x in st.session_state.get(admin_select_key, []) if int(x) not in set(delete_ids)]
                         st.session_state[admin_select_key] = remaining
                         st.success(f"已由管理員刪除 {count} 筆今日工時紀錄。")
+                        _clear_today_admin_editor_state()
                         st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                         st.rerun()
