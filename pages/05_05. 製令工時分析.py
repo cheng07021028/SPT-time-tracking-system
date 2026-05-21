@@ -468,7 +468,7 @@ with tab5:
     st.caption("此處編輯的是分析來源明細，儲存後會影響歷史紀錄與後續統計。工時欄位以 00:00:00 顯示，需調整時請改開始/結束時間後重新計算。")
     detail_limit = int(filters.get("detail_limit", 1000) or 1000)
     detail_df = df.head(detail_limit).drop(columns=["work_time_text"], errors="ignore")
-    st.info("V58：明細編輯改為與 10｜權限管理相同按鈕模式；表格內修改只進入畫面暫存，按下確認儲存才正式寫入。")
+    st.info("V63：明細編輯與 10｜權限管理同模式；儲存後會清除全域 data_editor 草稿，避免畫面殘留舊資料。")
     analysis_detail_draft_key = "analysis_detail_records_draft_v58"
     edited = render_table(
         detail_df,
@@ -492,5 +492,11 @@ with tab5:
             st.warning("找不到可儲存的分析明細內容，請重新載入後再試。")
             st.stop()
         count = save_time_records(edited)
+        try:
+            from services.column_settings_service import clear_editor_draft
+            clear_editor_draft("analysis_detail_editor")
+            clear_editor_draft("analysis_detail_records")
+        except Exception:
+            pass
         st.success(f"已儲存 {count} 筆明細。")
         st.rerun()

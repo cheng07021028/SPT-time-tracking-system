@@ -85,13 +85,23 @@ def _bool_from_any(v, default=True):
         return True
     return default
 
-def _normalize_delete_column(df: pd.DataFrame, delete_col: str = "刪除") -> pd.DataFrame:
+SYSTEM_DELETE_COL = "刪除 / Delete"
+
+def _normalize_delete_column(df: pd.DataFrame, delete_col: str = SYSTEM_DELETE_COL) -> pd.DataFrame:
     out = df.copy()
+    out = out.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore") if delete_col != "刪除" else out
     if delete_col not in out.columns:
         out.insert(0, delete_col, False)
     else:
         out[delete_col] = out[delete_col].fillna(False).astype(bool)
     return out
+
+
+def _delete_mask(df: pd.DataFrame) -> pd.Series:
+    col = SYSTEM_DELETE_COL if SYSTEM_DELETE_COL in df.columns else ("刪除" if "刪除" in df.columns else "")
+    if not col:
+        return pd.Series(False, index=df.index)
+    return df[col].fillna(False).astype(bool)
 
 
 
@@ -234,8 +244,19 @@ def _clear_editor_state(*keys: str) -> None:
     prefixes = tuple(str(k) for k in keys if k)
     for k in list(st.session_state.keys()):
         sk = str(k)
-        if sk in prefixes or any(sk.startswith(p) for p in prefixes):
+        if sk in prefixes or any(sk.startswith(p) for p in prefixes) or any(p in sk for p in prefixes):
             st.session_state.pop(k, None)
+    # V63：同步清除全域 column_settings_service 的編輯草稿。
+    # 否則 13 系統設定按套用/刪除後，DB 已更新但 data_editor 還可能顯示舊草稿。
+    try:
+        from services.column_settings_service import clear_editor_draft
+        for p in prefixes:
+            clear_editor_draft(p)
+        clear_editor_draft("system_process_categories")
+        clear_editor_draft("system_process_options")
+        clear_editor_draft("system_rest_periods")
+    except Exception:
+        pass
 
 
 def _refresh_after_apply(message: str, *edit_mode_keys: str) -> None:
@@ -551,7 +572,7 @@ if can_manage:
     cc2.caption("新增：啟動編輯後，在表格最下方新增列。")
 
 if can_manage and st.session_state.get(cat_edit_key, False):
-    st.info("V58：類別表格改為與 10｜權限管理相同按鈕模式；表格不再包 st.form，按鈕直接套用目前畫面暫存。")
+    st.info("V63：類別表格與 10｜權限管理同模式；套用/刪除後會清除全域 data_editor 草稿，避免畫面殘留舊 checkbox 狀態。")
     cat_draft_key = "system_process_categories_draft_v58"
     edited_cat = render_table(
         cat_view,
@@ -577,13 +598,13 @@ if can_manage and st.session_state.get(cat_edit_key, False):
             st.warning("找不到可套用的類別表格內容，請重新載入後再試。")
             st.stop()
         if cat_action == "套用並永久儲存類別設定":
-            save_df = edited_cat.drop(columns=["刪除"], errors="ignore")
+            save_df = edited_cat.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore")
             count = save_process_categories_df(save_df)
             _export_permanent_settings(f"已套用類別設定 {count} 筆")
             _refresh_after_apply(f"已套用類別設定 {count} 筆，畫面已重新整理。", cat_edit_key)
         else:
             try:
-                ids = [int(float(x)) for x in edited_cat[edited_cat["刪除"].astype(bool)]["id"].dropna().tolist()]
+                ids = [int(float(x)) for x in edited_cat[_delete_mask(edited_cat)]["id"].dropna().tolist()]
             except Exception:
                 ids = []
             if not ids:
@@ -593,7 +614,7 @@ if can_manage and st.session_state.get(cat_edit_key, False):
                 _export_permanent_settings(f"已刪除類別設定 {count} 筆")
                 _refresh_after_apply(f"已刪除類別設定 {count} 筆，畫面已重新整理。", cat_edit_key)
 else:
-    render_table(cat_view.drop(columns=["刪除"], errors="ignore"), "system_process_categories", editable=False, height=260)
+    render_table(cat_view.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore"), "system_process_categories", editable=False, height=260)
 
 st.markdown("#### 類別對應工段設定 / Category-specific Process Options")
 all_category_choices = load_process_category_choices(include_common=True)
@@ -647,7 +668,7 @@ if can_manage:
     c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
 
 if can_manage and st.session_state.get(proc_edit_key, False):
-    st.info("V58：工段表格改為與 10｜權限管理相同按鈕模式；可新增、修改、勾選刪除，按下確認才永久保存與套用到 01 工時紀錄。")
+    st.info("V63：工段表格與 10｜權限管理同模式；套用/刪除後會清除全域 data_editor 草稿，避免畫面殘留舊 checkbox 狀態。")
     proc_draft_key = "system_process_options_draft_v58"
     edited_proc = render_table(
         proc_view,
@@ -674,7 +695,7 @@ if can_manage and st.session_state.get(proc_edit_key, False):
             st.warning("找不到可套用的工段表格內容，請重新載入後再試。")
             st.stop()
         if action == "套用並永久儲存工段名稱設定":
-            save_df = edited_proc.drop(columns=["刪除"], errors="ignore")
+            save_df = edited_proc.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore")
             if "category_name" not in save_df.columns:
                 save_df.insert(1, "category_name", filter_category or "全部 / 通用")
             save_df["category_name"] = save_df["category_name"].fillna("").astype(str).replace({"": filter_category or "全部 / 通用"})
@@ -683,7 +704,7 @@ if can_manage and st.session_state.get(proc_edit_key, False):
             _refresh_after_apply(f"已套用工段名稱設定 {count} 筆，畫面已重新整理。", proc_edit_key)
         else:
             try:
-                ids = [int(float(x)) for x in edited_proc[edited_proc["刪除"].astype(bool)]["id"].dropna().tolist()]
+                ids = [int(float(x)) for x in edited_proc[_delete_mask(edited_proc)]["id"].dropna().tolist()]
             except Exception:
                 ids = []
             if not ids:
@@ -693,7 +714,7 @@ if can_manage and st.session_state.get(proc_edit_key, False):
                 _export_permanent_settings(f"已刪除工段名稱設定 {count} 筆")
                 _refresh_after_apply(f"已刪除工段名稱設定 {count} 筆，畫面已重新整理。", proc_edit_key)
 else:
-    render_table(proc_view.drop(columns=["刪除"], errors="ignore"), "system_process_options", editable=False, height=420)
+    render_table(proc_view.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore"), "system_process_options", editable=False, height=420)
 
 st.divider()
 
@@ -719,7 +740,7 @@ if can_manage:
     c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
 
 if can_manage and st.session_state.get(rest_edit_key, False):
-    st.info("V58：休息時間表格改為與 10｜權限管理相同按鈕模式；可新增、修改、勾選刪除，按下確認才永久保存並套用到工時計算。")
+    st.info("V63：休息時間表格與 10｜權限管理同模式；套用/刪除後會清除全域 data_editor 草稿，避免畫面殘留舊 checkbox 狀態。")
     rest_draft_key = "system_rest_periods_draft_v58"
     edited_rest = render_table(
         rest_view,
@@ -746,13 +767,13 @@ if can_manage and st.session_state.get(rest_edit_key, False):
             st.warning("找不到可套用的休息時間表格內容，請重新載入後再試。")
             st.stop()
         if action == "套用並永久儲存休息時間設定":
-            save_df = edited_rest.drop(columns=["刪除"], errors="ignore")
+            save_df = edited_rest.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore")
             count = save_rest_periods_df(save_df)
             _export_permanent_settings(f"已套用休息時間設定 {count} 筆")
             _refresh_after_apply(f"已套用休息時間設定 {count} 筆，畫面已重新整理。", rest_edit_key)
         else:
             try:
-                ids = [int(float(x)) for x in edited_rest[edited_rest["刪除"].astype(bool)]["id"].dropna().tolist()]
+                ids = [int(float(x)) for x in edited_rest[_delete_mask(edited_rest)]["id"].dropna().tolist()]
             except Exception:
                 ids = []
             if not ids:
@@ -762,7 +783,7 @@ if can_manage and st.session_state.get(rest_edit_key, False):
                 _export_permanent_settings(f"已刪除休息時間設定 {count} 筆")
                 _refresh_after_apply(f"已刪除休息時間設定 {count} 筆，畫面已重新整理。", rest_edit_key)
 else:
-    render_table(rest_view.drop(columns=["刪除"], errors="ignore"), "system_rest_periods", editable=False, height=360)
+    render_table(rest_view.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore"), "system_rest_periods", editable=False, height=360)
 
 st.divider()
 st.success("設定套用後的串接：01｜工時紀錄工段下拉選單立即讀取啟用工段；工時計算與 02｜歷史紀錄重新計算會使用啟用中的休息時間。")

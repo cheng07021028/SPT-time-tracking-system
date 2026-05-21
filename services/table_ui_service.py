@@ -63,6 +63,14 @@ COLUMN_LABELS: dict[str, str] = {
     "last_start_time": "最後開始時間 / Last Start",
     "count": "筆數 / Count",
     "avg_hours": "平均工時 / Avg Time",
+    "刪除": "刪除 / Delete",
+    "重算": "重算 / Recalc",
+    "刪除 / Delete": "刪除 / Delete",
+    "重算 / Recalc": "重算 / Recalc",
+    "啟用 / Active": "啟用 / Active",
+    "在廠 / In Factory": "在廠 / In Factory",
+    "今日出勤 / Today Attendance": "今日出勤 / Today Attendance",
+    "ID / ID": "ID / ID",
 }
 
 DEFAULT_WIDTHS: dict[str, int] = {
@@ -82,14 +90,33 @@ DEFAULT_WIDTHS: dict[str, int] = {
     "detail": 420,
     "created_at": 180,
     "updated_at": 180,
+    # V63：checkbox 欄位標題採中英雙語，寬度太小會只看到「刪除 [」或文字被截斷。
+    # 這裡把常用 checkbox 欄位拉寬，視覺與 10｜權限管理一致。
+    "刪除": 160,
+    "刪除 / Delete": 160,
+    "重算": 160,
+    "重算 / Recalc": 160,
+    "is_active": 150,
+    "啟用 / Active": 150,
+    "is_in_factory": 170,
+    "在廠 / In Factory": 170,
+    "is_today_attendance": 210,
+    "今日出勤 / Today Attendance": 210,
+    "is_group_work": 180,
 }
 
 
-BOOLEAN_COLUMNS = {"is_active", "is_in_factory", "is_today_attendance", "is_group_work", "刪除", "delete", "selected"}
-NUMBER_COLUMNS = {"id", "record_count", "active_count", "today_record_count", "count", "sort_order", "order", "display_order"}
+BOOLEAN_COLUMNS = {"is_active", "is_in_factory", "is_today_attendance", "is_group_work", "刪除", "刪除 / Delete", "重算", "重算 / Recalc", "啟用 / Active", "在廠 / In Factory", "今日出勤 / Today Attendance", "delete", "selected"}
+NUMBER_COLUMNS = {"id", "ID / ID", "record_count", "active_count", "today_record_count", "count", "sort_order", "order", "display_order"}
 
 
 def _to_bool_value(value) -> bool:
+    """V63：比 bool(value) 更安全的 checkbox 解析。
+
+    先前任何非空字串都會被 bool(value) 當成 True，容易讓顯示欄、文字欄、
+    舊草稿或標題文字在 checkbox 欄位中被誤判成已勾選，造成「待刪除全部變 605」
+    這類顯示落差。
+    """
     if isinstance(value, bool):
         return value
     if value is None:
@@ -99,12 +126,17 @@ def _to_bool_value(value) -> bool:
             return False
     except Exception:
         pass
+    if isinstance(value, (int, float)):
+        try:
+            return bool(int(value))
+        except Exception:
+            return False
     text = str(value).strip().lower()
-    if text in {"1", "true", "yes", "y", "on", "啟用", "是", "勾選"}:
+    if text in {"1", "true", "yes", "y", "on", "checked", "☑", "✅", "啟用", "在廠", "出勤", "是", "勾選", "delete", "recalc"}:
         return True
-    if text in {"0", "false", "no", "n", "off", "停用", "否", ""}:
+    if text in {"0", "false", "no", "n", "off", "unchecked", "☐", "□", "停用", "不在", "未出勤", "否", "不刪除", "", "none", "nan", "<na>"}:
         return False
-    return bool(value)
+    return False
 
 
 def _prepare_display_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -386,7 +418,15 @@ def restore_table_ui_settings_from_permanent(force: bool = False) -> dict[str, A
 
 
 def label_for(col: str) -> str:
-    return COLUMN_LABELS.get(col, f"{col} / {col}")
+    s = str(col)
+    if s in COLUMN_LABELS:
+        return COLUMN_LABELS[s]
+    # If a caller already passes a bilingual display label, keep it as-is.
+    # This prevents headers like 「刪除 / Delete / 刪除 / Delete」 and keeps
+    # table buttons/editors consistent with 10｜權限管理.
+    if " / " in s:
+        return s
+    return f"{s} / {s}"
 
 
 def ensure_table_ui_schema() -> None:
@@ -512,6 +552,8 @@ def _column_config(col: str, width: int | None = None, series: pd.Series | None 
     w = int(width or DEFAULT_WIDTHS.get(col, 140))
     col_name = str(col)
     if col_name in BOOLEAN_COLUMNS:
+        # V63：即使永久欄寬曾保存為 70/90，也避免中英 checkbox 標題被切掉。
+        w = max(w, int(DEFAULT_WIDTHS.get(col_name, 150)), 150)
         return st.column_config.CheckboxColumn(label, width=w)
     if col_name in {"work_hours", "total_hours", "avg_hours"}:
         return st.column_config.TextColumn(label, width=w)

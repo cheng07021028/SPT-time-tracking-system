@@ -1131,7 +1131,13 @@ with tab1:
                         pass
 
         def _history_refresh_editor() -> None:
-            _history_clear_widget_state("history_editor_v27_", "history_records_commit_form_v27")
+            _history_clear_widget_state("history_editor_v27_", "history_records_commit_form_v27", "history_records")
+            try:
+                from services.column_settings_service import clear_editor_draft
+                clear_editor_draft("history_editor")
+                clear_editor_draft("history_records")
+            except Exception:
+                pass
             st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
 
         def _history_set_edit(enabled: bool) -> None:
@@ -1154,6 +1160,8 @@ with tab1:
         ec3.info("編輯啟動後可修改資料；『刪除』與『重算』分開勾選。儲存編輯不需要勾選。")
 
         if st.session_state[edit_key]:
+            delete_col_label = "刪除 / Delete"
+            recalc_col_label = "重算 / Recalc"
             edit_df = df.copy()
             all_ids = _history_all_ids()
             all_id_set = set(all_ids)
@@ -1172,18 +1180,13 @@ with tab1:
                 except Exception:
                     return False
 
-            if "刪除" in edit_df.columns:
-                edit_df["刪除"] = edit_df["id"].map(lambda x: _id_in_state(x, delete_ids_state)) if "id" in edit_df.columns else False
-            else:
-                edit_df.insert(0, "刪除", edit_df["id"].map(lambda x: _id_in_state(x, delete_ids_state)) if "id" in edit_df.columns else False)
-            if "重算" in edit_df.columns:
-                edit_df["重算"] = edit_df["id"].map(lambda x: _id_in_state(x, recalc_ids_state)) if "id" in edit_df.columns else False
-            else:
-                edit_df.insert(1, "重算", edit_df["id"].map(lambda x: _id_in_state(x, recalc_ids_state)) if "id" in edit_df.columns else False)
+            edit_df = edit_df.drop(columns=["刪除", "重算", delete_col_label, recalc_col_label], errors="ignore")
+            edit_df.insert(0, delete_col_label, edit_df["id"].map(lambda x: _id_in_state(x, delete_ids_state)) if "id" in edit_df.columns else False)
+            edit_df.insert(1, recalc_col_label, edit_df["id"].map(lambda x: _id_in_state(x, recalc_ids_state)) if "id" in edit_df.columns else False)
 
             editor_key = f"history_editor_v27_{st.session_state[editor_version_key]}"
             history_draft_key = "history_records_edited_draft_v58"
-            st.info("V58：歷史紀錄表格改為與 10｜權限管理相同按鈕模式；不再包 st.form，批次按鈕會直接更新同一份畫面暫存並刷新 editor key。")
+            st.info("V63：歷史紀錄表格與 10｜權限管理同模式；批次按鈕會清除全域 data_editor 草稿，避免 KPI 與 checkbox 畫面不同步。")
             edited = render_table(
                 edit_df,
                 "history_records",
@@ -1221,13 +1224,13 @@ with tab1:
                     except Exception:
                         return []
 
-                delete_ids = sorted(set(_checked_ids(edited, "刪除")))
-                recalc_ids = sorted(set(_checked_ids(edited, "重算")))
+                delete_ids = sorted(set(_checked_ids(edited, delete_col_label)))
+                recalc_ids = sorted(set(_checked_ids(edited, recalc_col_label)))
                 st.session_state[delete_select_key] = delete_ids
                 st.session_state[recalc_select_key] = recalc_ids
 
                 if history_action == "儲存編輯":
-                    save_df = edited.drop(columns=["刪除", "重算"], errors="ignore")
+                    save_df = edited.drop(columns=[delete_col_label, recalc_col_label, "刪除", "重算"], errors="ignore")
                     count = save_time_records(save_df)
                     _add_history_result("success", f"已儲存 {count} 筆歷史紀錄。", append=False)
                     _history_refresh_editor()
@@ -1237,7 +1240,7 @@ with tab1:
                         _add_history_result("warning", "請先在『重算』欄勾選要重新計算的紀錄，再按確認執行。", append=False)
                         rerun()
                     else:
-                        save_df = edited.drop(columns=["刪除", "重算"], errors="ignore")
+                        save_df = edited.drop(columns=[delete_col_label, recalc_col_label, "刪除", "重算"], errors="ignore")
                         save_time_records(save_df, recalc_edited_timestamps=True)
                         count = recalculate_time_records(recalc_ids)
                         _add_history_result("success", f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時。", append=False)

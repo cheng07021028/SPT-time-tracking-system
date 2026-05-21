@@ -46,7 +46,28 @@ render_header("03｜製令管理", "Excel 匯入、貼上資料、手動新增�
 
 STATE_KEY = "v138_work_orders_editor"
 EDITOR_VERSION_KEY = "v253_work_orders_editor_version"
+EDITOR_IGNORE_RETURN_KEY = "v263_work_orders_ignore_next_editor_return"
 COLS = ["_delete", "id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
+
+# V61：表格實際欄名也改成與 10｜權限管理相同的中英雙語欄名。
+# 內部儲存仍維持 canonical 欄位，避免影響其他模組串接。
+DISPLAY_COLUMNS = {
+    "_delete": "刪除 / Delete",
+    "id": "ID / ID",
+    "work_order": "製令 / Work Order",
+    "part_no": "P/N / Part No.",
+    "type_name": "機型 / Type",
+    "assembly_location": "組立地點 / Assembly Location",
+    "customer": "客戶 / Customer",
+    "note": "備註 / Note",
+    "is_active": "啟用 / Active",
+    "created_at": "建立時間 / Created At",
+    "updated_at": "更新時間 / Updated At",
+}
+DISPLAY_TO_INTERNAL = {v: k for k, v in DISPLAY_COLUMNS.items()}
+EDITOR_COLS = [DISPLAY_COLUMNS[c] for c in COLS]
+BOOL_INTERNAL_COLS = ["_delete", "is_active"]
+BOOL_DISPLAY_COLS = [DISPLAY_COLUMNS[c] for c in BOOL_INTERNAL_COLS]
 
 
 def _editor_key() -> str:
@@ -56,6 +77,23 @@ def _editor_key() -> str:
 
 
 def _refresh_editor_widget() -> None:
+    # V63：與 10｜權限管理同樣清除全域 column_settings_service 的 data_editor 草稿。
+    # 原因：全域 wrapper 會用 _spt_editor_draft 保存舊畫面，若只換 key，
+    # 仍可能出現「按鈕已執行、KPI 已更新，但 checkbox 畫面沒跟著變」的顯示問題。
+    try:
+        for _k0 in list(st.session_state.keys()):
+            sk = str(_k0)
+            if sk.startswith("work_orders_data_editor_v253_") or "work_orders_data_editor" in sk:
+                st.session_state.pop(_k0, None)
+    except Exception:
+        pass
+    try:
+        from services.column_settings_service import clear_editor_draft
+        clear_editor_draft("work_orders_data_editor")
+        clear_editor_draft("work_orders")
+    except Exception:
+        pass
+    st.session_state[EDITOR_IGNORE_RETURN_KEY] = True
     st.session_state[EDITOR_VERSION_KEY] = int(st.session_state.get(EDITOR_VERSION_KEY, 0)) + 1
 
 
@@ -67,10 +105,46 @@ def rerun():
 
 
 def ensure_cols(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    # Accept both internal columns and bilingual editor columns, then normalize back.
+    df = df.rename(columns={c: DISPLAY_TO_INTERNAL.get(c, c) for c in df.columns})
     for c in COLS:
         if c not in df.columns:
             df[c] = False if c in ["_delete", "is_active"] else ""
+    for c in BOOL_INTERNAL_COLS:
+        df[c] = df[c].map(_to_bool_value).fillna(False).astype(bool) if c in df.columns else False
     return df[COLS]
+
+
+def _to_bool_value(v) -> bool:
+    if isinstance(v, bool):
+        return v
+    if v is None:
+        return False
+    try:
+        if pd.isna(v):
+            return False
+    except Exception:
+        pass
+    text = str(v).strip().lower()
+    if text in {"1", "true", "yes", "y", "on", "啟用", "是", "勾選"}:
+        return True
+    if text in {"0", "false", "no", "n", "off", "停用", "否", ""}:
+        return False
+    return bool(v)
+
+
+def _to_editor_df(df: pd.DataFrame) -> pd.DataFrame:
+    work = ensure_cols(df)
+    return work.rename(columns=DISPLAY_COLUMNS)[EDITOR_COLS]
+
+
+def _from_editor_df(df: pd.DataFrame) -> pd.DataFrame:
+    return ensure_cols(df)
+
+
+def _current_internal_df() -> pd.DataFrame:
+    return ensure_cols(st.session_state.get(STATE_KEY, pd.DataFrame()))
 
 
 def _normalize_text(v):
@@ -101,10 +175,19 @@ def _normalize_header_name(v) -> str:
 
 
 def _is_truthy(v) -> bool:
+    if isinstance(v, bool):
+        return v
+    try:
+        if pd.isna(v):
+            return False
+    except Exception:
+        pass
     text = _normalize_text(v).lower()
-    if text in ["", "0", "false", "否", "n", "no", "停用", "disabled", "inactive"]:
+    if text in ["", "0", "false", "否", "n", "no", "off", "unchecked", "☐", "□", "停用", "離職", "不在", "未出勤", "disabled", "inactive", "none", "nan"]:
         return False
-    return True
+    if text in ["1", "true", "是", "y", "yes", "on", "checked", "☑", "✅", "啟用", "在廠", "出勤", "勾選"]:
+        return True
+    return False
 
 
 def _find_col(source: pd.DataFrame, aliases: list[str]):
@@ -631,46 +714,47 @@ with tab1:
     tpl = pd.DataFrame(columns=["製令", "P/N", "機型", "組立地點", "客戶", "備註", "啟用"])
     dl2.download_button("⟰ 下載製令匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_製令匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-    st.info("V57：製令表格已移除 st.form 包覆；全選/取消會直接更新同一份暫存表格並刷新 editor key，避免 checkbox 顯示被舊 widget 狀態蓋回。")
-    _draft_work_orders = ensure_cols(st.session_state[STATE_KEY].copy())
-    for _col in ["_delete", "is_active"]:
-        if _col in _draft_work_orders.columns:
-            _draft_work_orders[_col] = _draft_work_orders[_col].fillna(False).astype(bool)
-    st.session_state[STATE_KEY] = _draft_work_orders
+    st.info("V63：批次按鈕已同步清除全域 data_editor 草稿；按鈕執行後 checkbox 畫面會與 10｜權限管理一致刷新，不再出現 KPI 已變但表格未變的顯示落差。")
+    st.session_state[STATE_KEY] = _current_internal_df()
+    editor_df = _to_editor_df(st.session_state[STATE_KEY])
     edited = st.data_editor(
-        st.session_state[STATE_KEY],
+        editor_df,
         hide_index=True,
         use_container_width=True,
         num_rows="dynamic",
         height=560,
-        column_order=COLS,
+        column_order=EDITOR_COLS,
         column_config={
-            "_delete": st.column_config.CheckboxColumn("刪除 / Delete", width="small"),
-            "id": st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
-            "work_order": st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
-            "part_no": st.column_config.TextColumn("P/N / Part No.", width="medium"),
-            "type_name": st.column_config.TextColumn("機型 / Type", width="large"),
-            "assembly_location": st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
-            "customer": st.column_config.TextColumn("客戶 / Customer", width="medium"),
-            "note": st.column_config.TextColumn("備註 / Note", width="large"),
-            "is_active": st.column_config.CheckboxColumn("啟用 / Active", width="small"),
-            "created_at": st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
-            "updated_at": st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
+            DISPLAY_COLUMNS["_delete"]: st.column_config.CheckboxColumn("刪除 / Delete", width="medium"),
+            DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
+            DISPLAY_COLUMNS["work_order"]: st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
+            DISPLAY_COLUMNS["part_no"]: st.column_config.TextColumn("P/N / Part No.", width="medium"),
+            DISPLAY_COLUMNS["type_name"]: st.column_config.TextColumn("機型 / Type", width="large"),
+            DISPLAY_COLUMNS["assembly_location"]: st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
+            DISPLAY_COLUMNS["customer"]: st.column_config.TextColumn("客戶 / Customer", width="medium"),
+            DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
+            DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
+            DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
+            DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
         },
         key=_editor_key(),
         disabled=not work_order_edit_enabled,
     )
-    if work_order_edit_enabled and isinstance(edited, pd.DataFrame):
-        st.session_state[STATE_KEY] = ensure_cols(edited.copy())
-    submitted_work_orders = st.button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True, disabled=not work_order_edit_enabled, key="v57_save_work_orders")
+    ignore_editor_return = bool(st.session_state.pop(EDITOR_IGNORE_RETURN_KEY, False))
+    if work_order_edit_enabled and isinstance(edited, pd.DataFrame) and not ignore_editor_return:
+        st.session_state[STATE_KEY] = _from_editor_df(edited.copy())
+    submitted_work_orders = st.button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True, disabled=not work_order_edit_enabled, key="v61_save_work_orders")
 
     if submitted_work_orders:
-        st.session_state[STATE_KEY] = ensure_cols(edited)
-        result = save_work_orders(st.session_state[STATE_KEY])
+        current_df = _current_internal_df()
+        delete_mask = current_df["_delete"].map(_to_bool_value).fillna(False).astype(bool)
+        deleted_count = int(delete_mask.sum())
+        save_df = current_df.loc[~delete_mask].drop(columns=["_delete"], errors="ignore").copy()
+        result = save_work_orders(save_df)
         reload_data()
         _refresh_editor_widget()
         st.session_state["v253_work_order_edit_enabled"] = False
-        st.success(f"儲存完成：新增/覆寫 {result['inserted']}，更新 {result['updated']}，刪除 {result['deleted']}，略過 {result['skipped']}")
+        st.success(f"儲存完成：目前保留/更新 {len(save_df)} 筆，刪除 {deleted_count} 筆，略過 {result.get('skipped', 0)} 筆。")
         rerun()
 
 with tab2:
