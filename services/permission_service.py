@@ -3880,3 +3880,345 @@ def save_security_settings(values: dict) -> None:  # type: ignore[override]
 
 check_permission = has_permission
 # ===================== END V81 PERMISSION DELETE + REBOOT PERSISTENCE HARD FIX =====================
+
+# ===================== BEGIN V82 SINGLE AUTHORITY PERMISSION STORE =====================
+# V82：10. 權限管理改成和 01. 工時紀錄同概念：只讀/只寫同一個正式權威檔。
+# 權威檔：data/permanent_store/modules/10_permissions/records.json
+# 不再從 persistent_modules、persistent_state、舊相容路徑、history 檔還原；避免 Reboot App 後被舊資料覆蓋。
+
+_V82_PERMISSION_RESTORE_KEY = "_v82_permission_authority_restored"
+_V82_PERMISSION_AUTHORITY_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json"
+_V82_PERMISSION_TABLES = [
+    "auth_users",
+    "auth_account_permissions",
+    "auth_security_settings",
+    "security_users",
+    "security_user_roles",
+    "security_settings",
+]
+
+
+def _v82_now_text() -> str:
+    try:
+        return now_text()
+    except Exception:
+        from datetime import datetime as _dt
+        return _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v82_read_authority_payload() -> dict:
+    try:
+        if _V82_PERMISSION_AUTHORITY_FILE.exists() and _V82_PERMISSION_AUTHORITY_FILE.stat().st_size > 2:
+            payload = json.loads(_V82_PERMISSION_AUTHORITY_FILE.read_text(encoding="utf-8"))
+            return payload if isinstance(payload, dict) else {}
+    except Exception:
+        pass
+    return {}
+
+
+def _v82_write_authority_payload(payload: dict) -> None:
+    _V82_PERMISSION_AUTHORITY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = _V82_PERMISSION_AUTHORITY_FILE.with_suffix(_V82_PERMISSION_AUTHORITY_FILE.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(_V82_PERMISSION_AUTHORITY_FILE)
+
+
+def _v82_tables_from_payload(payload: dict) -> dict:
+    tables = payload.get("tables") if isinstance(payload, dict) else None
+    return tables if isinstance(tables, dict) else {}
+
+
+def _v82_valid_authority_payload(payload: dict) -> bool:
+    tables = _v82_tables_from_payload(payload)
+    users = tables.get("auth_users")
+    if not isinstance(users, list) or not users:
+        return False
+    return any(isinstance(r, dict) and str(r.get("username") or "").strip() for r in users)
+
+
+def _v82_fetch_table_rows(cur: sqlite3.Cursor, table: str) -> list[dict]:
+    try:
+        rows = cur.execute(f'SELECT * FROM "{table}"').fetchall()
+        out = []
+        for r in rows:
+            try:
+                out.append(dict(r))
+            except Exception:
+                # sqlite row_factory 若不是 Row，改用欄名組 dict
+                cols = [d[0] for d in cur.description or []]
+                out.append({c: r[i] for i, c in enumerate(cols)})
+        return out
+    except Exception:
+        return []
+
+
+def _v82_make_authority_payload_from_db(reason: str = "permission_authority_saved_v82") -> dict:
+    conn = connect_db()
+    try:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        try:
+            init_permission_tables()
+        except Exception:
+            pass
+        try:
+            _ensure_legacy_security_tables(cur)
+            _ensure_security_setting_tables(cur)
+        except Exception:
+            pass
+        tables = {table: _v82_fetch_table_rows(cur, table) for table in _V82_PERMISSION_TABLES}
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    return {
+        "version": "v82_single_authority",
+        "module_code": "10_permissions",
+        "module_name_zh": "10. 權限管理",
+        "module_name_en": "Permission Management",
+        "authority_file": str(_V82_PERMISSION_AUTHORITY_FILE.relative_to(PROJECT_ROOT)).replace("\\", "/"),
+        "saved_reason": reason,
+        "updated_at": _v82_now_text(),
+        "source": "permission_service_v82_single_authority",
+        "description": "10 權限管理唯一正式權威檔；讀寫同一檔，不再讀寫其他舊永久檔。",
+        "tables": tables,
+        "table_counts": {k: len(v) for k, v in tables.items()},
+    }
+
+
+def export_permission_settings_permanently(reason: str = "permission_authority_saved_v82") -> dict:  # type: ignore[override]
+    payload = _v82_make_authority_payload_from_db(reason)
+    if not _v82_valid_authority_payload(payload):
+        return {
+            "ok": False,
+            "mode": "v82_single_authority_guard",
+            "message": "已阻止空的 auth_users 覆蓋 10 權限管理唯一權威檔。",
+            "authority_file": str(_V82_PERMISSION_AUTHORITY_FILE),
+            "table_counts": payload.get("table_counts", {}),
+        }
+    try:
+        _v82_write_authority_payload(payload)
+        try:
+            clear_permission_runtime_cache()
+        except Exception:
+            pass
+        if st is not None:
+            try:
+                st.session_state[_V82_PERMISSION_RESTORE_KEY] = True
+                st.session_state["v82_permission_authority_file"] = str(_V82_PERMISSION_AUTHORITY_FILE)
+                st.session_state["v82_permission_last_export"] = payload.get("updated_at")
+            except Exception:
+                pass
+        return {
+            "ok": True,
+            "mode": "v82_single_authority_export",
+            "file": str(_V82_PERMISSION_AUTHORITY_FILE),
+            "files": [str(_V82_PERMISSION_AUTHORITY_FILE)],
+            "table_counts": payload.get("table_counts", {}),
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "mode": "v82_single_authority_export_error",
+            "file": str(_V82_PERMISSION_AUTHORITY_FILE),
+            "error": str(e),
+            "table_counts": payload.get("table_counts", {}),
+        }
+
+
+def _v82_replace_table(cur: sqlite3.Cursor, table: str, rows: list[dict]) -> int:
+    try:
+        cur.execute(f'DELETE FROM "{table}"')
+    except Exception:
+        return 0
+    count = 0
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        clean = {str(k): v for k, v in row.items() if str(k).strip()}
+        if not clean:
+            continue
+        cols = list(clean.keys())
+        col_sql = ",".join([f'"{c}"' for c in cols])
+        placeholders = ",".join(["?"] * len(cols))
+        try:
+            cur.execute(f'INSERT INTO "{table}" ({col_sql}) VALUES ({placeholders})', [clean[c] for c in cols])
+            count += 1
+        except Exception:
+            continue
+    return count
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    payload = _v82_read_authority_payload()
+    if not _v82_valid_authority_payload(payload):
+        return {
+            "ok": False,
+            "mode": "v82_single_authority_restore",
+            "message": "尚未建立 10 權限管理唯一權威檔；已略過舊路徑還原，避免讀回舊紀錄。",
+            "authority_file": str(_V82_PERMISSION_AUTHORITY_FILE),
+        }
+    tables = _v82_tables_from_payload(payload)
+    conn = connect_db()
+    cur = conn.cursor()
+    restored: dict[str, int] = {}
+    try:
+        try:
+            init_permission_tables()
+        except Exception:
+            pass
+        try:
+            _ensure_legacy_security_tables(cur)
+            _ensure_security_setting_tables(cur)
+        except Exception:
+            pass
+        for table in _V82_PERMISSION_TABLES:
+            rows = tables.get(table, []) if isinstance(tables.get(table), list) else []
+            restored[table] = _v82_replace_table(cur, table, rows)
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    if st is not None:
+        try:
+            st.session_state[_V82_PERMISSION_RESTORE_KEY] = True
+            st.session_state["v82_permission_restore_source"] = str(_V82_PERMISSION_AUTHORITY_FILE)
+        except Exception:
+            pass
+    return {
+        "ok": True,
+        "mode": "v82_single_authority_restore",
+        "restored": restored,
+        "authority_file": str(_V82_PERMISSION_AUTHORITY_FILE),
+        "source_time": payload.get("updated_at"),
+    }
+
+
+def _v82_restore_permission_once() -> None:
+    if st is not None:
+        try:
+            if st.session_state.get(_V82_PERMISSION_RESTORE_KEY):
+                return
+        except Exception:
+            pass
+    restore_permission_settings_from_permanent_files(force=True)
+    if st is not None:
+        try:
+            st.session_state[_V82_PERMISSION_RESTORE_KEY] = True
+        except Exception:
+            pass
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    _v82_restore_permission_once()
+    if "_v79_prev_get_users" in globals() and callable(_v79_prev_get_users):
+        return _v79_prev_get_users()
+    return []
+
+
+def get_account_permissions() -> List[dict]:  # type: ignore[override]
+    _v82_restore_permission_once()
+    if "_v79_prev_get_account_permissions" in globals() and callable(_v79_prev_get_account_permissions):
+        return _v79_prev_get_account_permissions()
+    return []
+
+
+def get_security_settings() -> dict:  # type: ignore[override]
+    _v82_restore_permission_once()
+    if "_v79_prev_get_security_settings" in globals() and callable(_v79_prev_get_security_settings):
+        return _v79_prev_get_security_settings()
+    return {}
+
+
+def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
+    # 儲存時不先 restore，避免把畫面新資料蓋掉；寫完只輸出唯一權威檔。
+    if "_v79_prev_save_users" in globals() and callable(_v79_prev_save_users):
+        result = _v79_prev_save_users(rows)
+    else:
+        result = {"saved": 0, "skipped": []}
+    export_result = export_permission_settings_permanently("auth_users_saved_v82_single_authority")
+    if isinstance(result, dict):
+        result["authority_save"] = export_result
+    return result
+
+
+def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
+    if "_v79_prev_save_account_permissions" in globals() and callable(_v79_prev_save_account_permissions):
+        count = int(_v79_prev_save_account_permissions(rows) or 0)
+    else:
+        count = 0
+    export_permission_settings_permanently("account_permissions_saved_v82_single_authority")
+    return count
+
+
+def save_security_settings(values: dict) -> None:  # type: ignore[override]
+    if "_v79_prev_save_security_settings" in globals() and callable(_v79_prev_save_security_settings):
+        _v79_prev_save_security_settings(values)
+    export_permission_settings_permanently("security_settings_saved_v82_single_authority")
+
+
+def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
+    # 沿用 V81 防呆刪除，但刪完只寫唯一權威檔。
+    try:
+        init_permission_tables()
+    except Exception:
+        pass
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for u in usernames or []:
+        name = str(u or "").strip()
+        low = name.lower()
+        if not name or low == "admin" or low in seen:
+            continue
+        seen.add(low)
+        cleaned.append(name)
+    if not cleaned:
+        return 0
+    deleted = 0
+    for username in cleaned:
+        try:
+            _v81_safe_delete_from_table("auth_account_permissions", username)
+        except Exception:
+            pass
+        try:
+            _v81_safe_delete_from_table("security_user_roles", username)
+        except Exception:
+            pass
+        try:
+            _v81_safe_delete_from_table("security_users", username)
+        except Exception:
+            pass
+        try:
+            deleted += _v81_delete_auth_user(username)
+        except Exception:
+            pass
+    try:
+        ensure_permissions_for_all_users(force=True)
+    except Exception:
+        pass
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    export_permission_settings_permanently("auth_users_deleted_v82_single_authority")
+    return deleted
+
+
+check_permission = has_permission
+# ===================== END V82 SINGLE AUTHORITY PERMISSION STORE =====================
