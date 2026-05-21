@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-21 21:52:07",
-  "exported_at": "2026-05-21 21:52:07",
-  "reason": "recalculate_time_records_v70_02",
+  "updated_at": "2026-05-21 21:52:43",
+  "exported_at": "2026-05-21 21:52:43",
+  "reason": "save_time_records_v70_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -33,7 +33,7 @@
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-15 05:09:51",
-        "updated_at": "2026-05-21 21:52:06"
+        "updated_at": "2026-05-21 21:52:42"
       },
       {
         "id": 2,
@@ -60,7 +60,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 05:10:22",
-        "updated_at": "2026-05-21 21:52:06"
+        "updated_at": "2026-05-21 21:52:42"
       },
       {
         "id": 3,
@@ -87,7 +87,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 06:12:20",
-        "updated_at": "2026-05-21 21:52:06"
+        "updated_at": "2026-05-21 21:52:42"
       },
       {
         "id": 4,
@@ -114,7 +114,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 07:38:16",
-        "updated_at": "2026-05-21 21:51:24"
+        "updated_at": "2026-05-21 21:52:42"
       },
       {
         "id": 5,
@@ -141,7 +141,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-15 08:41:33",
-        "updated_at": "2026-05-21 21:51:24"
+        "updated_at": "2026-05-21 21:52:42"
       },
       {
         "id": 6,
@@ -168,7 +168,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-20 18:53:55",
-        "updated_at": "2026-05-21 21:51:24"
+        "updated_at": "2026-05-21 21:52:42"
       },
       {
         "id": 7,
@@ -183,19 +183,19 @@
         "start_action": "開始",
         "start_timestamp": "2026-05-20 09:00:00",
         "end_action": "暫停",
-        "end_timestamp": "2026-05-21 18:00:00",
+        "end_timestamp": "2026-05-20 18:00:00",
         "remark": "系統自動暫停：同一人員切換不同工段或不同日期作業",
         "start_date": "2026-05-20",
         "start_time": "09:00:00",
-        "end_date": "2026-05-21",
+        "end_date": "2026-05-20",
         "end_time": "18:00:00",
-        "work_hours": 29.25,
+        "work_hours": 7.5,
         "assembly_location": "竹東",
         "group_key": "B002|前置鈑金|2026-05-20",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-20 19:15:36",
-        "updated_at": "2026-05-21 21:52:06"
+        "updated_at": "2026-05-21 21:52:42"
       },
       {
         "id": 8,
@@ -222,7 +222,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-20 19:16:08",
-        "updated_at": "2026-05-21 21:51:24"
+        "updated_at": "2026-05-21 21:52:42"
       }
     ]
   },
