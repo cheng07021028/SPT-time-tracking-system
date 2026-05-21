@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 from io import StringIO
+import json
+import sqlite3
+from pathlib import Path
 import pandas as pd
 import streamlit as st
 
@@ -170,25 +173,141 @@ def _blank_user_row() -> dict:
     }
 
 
+
+
+def _v45_boolish(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "y", "on", "啟用", "是"}:
+        return True
+    if text in {"0", "false", "no", "n", "off", "停用", "否", "", "nan", "none"}:
+        return False
+    try:
+        return float(text) != 0
+    except Exception:
+        return False
+
+def _v45_project_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _v45_parse_users_payload(payload) -> list[dict]:
+    """Extract auth user rows from all known permanent formats.
+
+    V45: account editor must never open empty when the authority JSON still
+    contains users.  The page therefore reads the canonical authority file
+    directly first, then falls back to legacy latest files, then service/SQLite.
+    """
+    if not isinstance(payload, dict):
+        if isinstance(payload, list):
+            return [r for r in payload if isinstance(r, dict)]
+        return []
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    for key in ("auth_users", "security_users", "users", "records", "data"):
+        rows = tables.get(key) if key in tables else payload.get(key)
+        if isinstance(rows, list):
+            return [r for r in rows if isinstance(r, dict)]
+    return []
+
+
+def _v45_read_json_users(path: Path) -> tuple[str, list[dict]]:
+    try:
+        if not path.exists() or not path.is_file():
+            return "", []
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        rows = _v45_parse_users_payload(payload)
+        stamp = ""
+        if isinstance(payload, dict):
+            stamp = str(payload.get("updated_at") or payload.get("exported_at") or payload.get("created_at") or "")
+        return stamp, rows
+    except Exception:
+        return "", []
+
+
+def _v45_read_sqlite_users() -> list[dict]:
+    try:
+        db_path = _v45_project_root() / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
+        if not db_path.exists():
+            db_path = _v45_project_root() / "data" / "database" / "spt_time_tracking.db"
+        if not db_path.exists():
+            return []
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute("SELECT * FROM auth_users ORDER BY username").fetchall()
+        except Exception:
+            rows = conn.execute("SELECT * FROM security_users ORDER BY username").fetchall()
+        finally:
+            conn.close()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+
+def _v45_best_account_rows() -> tuple[list[dict], str]:
+    root = _v45_project_root()
+    candidates: list[tuple[int, str, str, list[dict]]] = []
+
+    # Canonical authority files first.  These are the only files that should be
+    # considered authoritative after V28/V29.
+    json_paths = [
+        root / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json",
+        root / "data" / "permanent_store" / "persistent_state" / "spt_permission_settings.json",
+        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+        root / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+    ]
+    for idx, path in enumerate(json_paths):
+        stamp, rows = _v45_read_json_users(path)
+        rows = [r for r in rows if str(r.get("username") or "").strip()]
+        if rows:
+            # Prefer earlier canonical paths; use row count as secondary signal.
+            candidates.append((1000 - idx * 10 + min(len(rows), 50), stamp, str(path.relative_to(root)), rows))
+
+    try:
+        svc_rows = [r for r in get_users() if isinstance(r, dict) and str(r.get("username") or "").strip()]
+        if svc_rows:
+            candidates.append((500 + min(len(svc_rows), 50), "service", "permission_service.get_users", svc_rows))
+    except Exception:
+        pass
+
+    sql_rows = [r for r in _v45_read_sqlite_users() if str(r.get("username") or "").strip()]
+    if sql_rows:
+        candidates.append((400 + min(len(sql_rows), 50), "sqlite", "sqlite.auth_users", sql_rows))
+
+    if not candidates:
+        return [], "empty"
+
+    # Highest authority score wins.  This intentionally avoids letting a blank
+    # service response wipe the visible account list.
+    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    return candidates[0][3], candidates[0][2]
+
+
 def _users_for_editor() -> pd.DataFrame:
-    raw = pd.DataFrame(get_users())
+    rows, source = _v45_best_account_rows()
+    raw = pd.DataFrame(rows)
+    st.session_state["v45_account_source"] = source
+    st.session_state["v45_account_source_rows"] = int(len(raw))
     if raw.empty:
         return pd.DataFrame([_blank_user_row()]).iloc[0:0]
     out = pd.DataFrame()
     out["刪除 / Delete"] = False
-    out["帳號 / Username"] = raw.get("username", "")
-    out["密碼狀態 / Password Status"] = raw.get("password_display", "********")
-    out["新密碼 / New Password"] = raw.get("new_password", "")
-    out["工號 / Employee ID"] = raw.get("employee_id", "")
-    out["姓名 / Display Name"] = raw.get("display_name", "")
-    out["Email"] = raw.get("email", "")
-    out["角色 / Role"] = raw.get("role_code", "operator")
-    out["啟用 / Active"] = raw.get("is_active", 1).fillna(1).astype(bool) if "is_active" in raw else True
-    out["強制改密碼 / Force Change"] = raw.get("force_password_change", 0).fillna(0).astype(bool) if "force_password_change" in raw else False
-    out["備註 / Note"] = raw.get("note", "")
-    out["最後登入 / Last Login"] = raw.get("last_login_at", "")
-    out["更新時間 / Updated At"] = raw.get("updated_at", "")
-    return out
+    out["帳號 / Username"] = raw.get("username", "").fillna("").astype(str) if "username" in raw else ""
+    out["密碼狀態 / Password Status"] = raw.get("password_display", "********") if "password_display" in raw else "********"
+    out["新密碼 / New Password"] = raw.get("new_password", "") if "new_password" in raw else ""
+    out["工號 / Employee ID"] = raw.get("employee_id", "") if "employee_id" in raw else ""
+    out["姓名 / Display Name"] = raw.get("display_name", raw.get("name", "")) if ("display_name" in raw or "name" in raw) else ""
+    out["Email"] = raw.get("email", "") if "email" in raw else ""
+    out["角色 / Role"] = raw.get("role_code", raw.get("role", "operator")) if ("role_code" in raw or "role" in raw) else "operator"
+    out["啟用 / Active"] = raw.get("is_active", 1).fillna(1).map(_v45_boolish) if "is_active" in raw else True
+    out["強制改密碼 / Force Change"] = raw.get("force_password_change", 0).fillna(0).map(_v45_boolish) if "force_password_change" in raw else False
+    out["備註 / Note"] = raw.get("note", "") if "note" in raw else ""
+    out["最後登入 / Last Login"] = raw.get("last_login_at", "") if "last_login_at" in raw else ""
+    out["更新時間 / Updated At"] = raw.get("updated_at", "") if "updated_at" in raw else ""
+    return out.reset_index(drop=True)
 
 
 def _password_from_editor_row(r: pd.Series) -> str:
@@ -583,7 +702,7 @@ with tab_accounts:
 
 
         st.markdown("### 帳號清單編輯 / Editable Account Master")
-        st.caption("V44：若 Streamlit 表格核取方塊視覺延遲，請以『刪除狀態 / Delete Mark』欄與下方 Pending Delete 指標為準；儲存仍以 draft 權威資料判定。")
+        st.caption("V45：帳號清單先直接讀唯一權威檔；若服務快取空白，不再讓帳號表開成 empty。刪除狀態仍以 draft 權威資料判定。")
 
         # V1.74：啟動/停止編輯只保留頁面上方唯一一組，避免帳號總表區重複顯示。
         if "v166_account_edit_enabled" not in st.session_state:
@@ -689,7 +808,9 @@ with tab_accounts:
                 "visible_delete_true_count": delete_count,
                 "visual_mark_selected_count": int((_render_users_df.get("刪除狀態 / Delete Mark", pd.Series(dtype=str)).astype(str).str.contains("已選", na=False)).sum()) if isinstance(_render_users_df, pd.DataFrame) else 0,
                 "use_draft_for_save": bool(st.session_state.get("v43_account_use_draft_for_save", False)),
-                "v44_mode": "delete-visual-marker-and-draft-authority",
+                "account_source": st.session_state.get("v45_account_source", ""),
+                "account_source_rows": st.session_state.get("v45_account_source_rows", ""),
+                "v45_mode": "authority-loader-plus-delete-visual-marker",
             })
 
         submitted_accounts = st.button(
