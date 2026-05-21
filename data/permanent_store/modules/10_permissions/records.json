@@ -2,12 +2,26 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-21 14:18:03",
-  "exported_at": "2026-05-21 14:18:03",
-  "reason": "delete_users_authoritative_v28",
+  "updated_at": "2026-05-21 14:18:27",
+  "exported_at": "2026-05-21 14:18:27",
+  "reason": "save_users_authoritative_v28",
   "empty_authoritative": false,
   "tables": {
-    "auth_users": [],
+    "auth_users": [
+      {
+        "employee_id": "13",
+        "display_name": "132",
+        "email": "",
+        "role_code": "operator",
+        "is_active": true,
+        "force_password_change": false,
+        "note": "",
+        "username": "321",
+        "created_at": "2026-05-21 14:18:27",
+        "updated_at": "2026-05-21 14:18:27",
+        "password_hash": "pbkdf2_sha256$fd5937f89e1373005d4762a6871f88a3$646bfdda94dea3bd66550839f5be4076998a6cc716aa062f654eeea5103000bf"
+      }
+    ],
     "auth_account_permissions": [],
     "auth_security_settings": [
       {
@@ -26,7 +40,7 @@
   },
   "settings": {},
   "table_counts": {
-    "auth_users": 0,
+    "auth_users": 1,
     "auth_account_permissions": 0,
     "auth_security_settings": 2
   }
