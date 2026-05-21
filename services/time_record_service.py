@@ -1336,3 +1336,80 @@ def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工
             pass
     return final_deleted
 # ======================= END V33 HISTORY DELETE SQLITE HOTFIX =======================
+
+
+# ========================= V70 01/02 shared records sync hardening =========================
+# 目的：01 工時紀錄與 02 歷史紀錄共用同一份 time_records 權威資料。
+# 修正舊版 save_time_records 只用「目前畫面/篩選後 dataframe」寫權威檔，可能讓未顯示資料被覆蓋的風險。
+# 也補上重新計算工時後，將 SQLite 最新結果同步寫回 01/02 權威檔，確保 Reboot 後不回復舊工時。
+
+def _v70_sync_time_records_authority_from_sqlite(reason: str = "v70_sync_time_records") -> int:
+    try:
+        full_df = query_df("SELECT * FROM time_records ORDER BY id")
+    except Exception:
+        full_df = pd.DataFrame()
+    if full_df is None or full_df.empty:
+        return 0
+    try:
+        rows = _v28_table_from_df(full_df) if _v28_table_from_df is not None else full_df.fillna("").to_dict(orient="records")
+        if _v28_update_tables is not None:
+            _v28_update_tables("01_time_records", {"time_records": rows}, reason=f"{reason}_01")
+            _v28_update_tables("02_history", {"time_records": rows}, reason=f"{reason}_02")
+        try:
+            mark_data_changed(f"01/02 工時紀錄權威檔已同步 {len(rows)} 筆。", f"V70 {reason}")
+        except Exception:
+            pass
+        return int(len(rows))
+    except Exception as exc:
+        try:
+            write_log("TIME_RECORD_AUTHORITY_SYNC_ERROR", f"01/02 權威檔同步失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        return 0
+
+
+# 覆寫 V28 save_time_records：仍先用原始 SQL 更新選取列，再以 SQLite 全量資料同步 01/02 權威檔。
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    n = _original_v28_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps)
+    if n:
+        synced = _v70_sync_time_records_authority_from_sqlite("save_time_records_v70")
+        try:
+            write_log("SYNC_TIME_RECORDS_01_02", f"人工儲存後已同步 01/02 權威檔，共 {synced} 筆。", "time_records")
+        except Exception:
+            pass
+    return n
+
+
+_v70_original_recalculate_time_records = recalculate_time_records
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    count = _v70_original_recalculate_time_records(record_ids)
+    if count:
+        synced = _v70_sync_time_records_authority_from_sqlite("recalculate_time_records_v70")
+        try:
+            write_log(
+                "SYNC_RECALC_TIME_RECORDS_01_02",
+                f"重新計算工時已扣除 13 系統設定休息時間，並同步 01/02 權威檔；重算 {count} 筆，同步 {synced} 筆。",
+                "time_records",
+            )
+        except Exception:
+            pass
+    return count
+
+
+_v70_original_import_time_records = import_time_records
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    result = _v70_original_import_time_records(df, recalc=recalc, source=source)
+    try:
+        changed = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
+    except Exception:
+        changed = 0
+    if changed:
+        synced = _v70_sync_time_records_authority_from_sqlite("import_time_records_v70")
+        try:
+            write_log("SYNC_IMPORT_TIME_RECORDS_01_02", f"匯入後已同步 01/02 權威檔，共 {synced} 筆。", "time_records")
+        except Exception:
+            pass
+    return result
+# ======================= END V70 01/02 shared records sync hardening =======================

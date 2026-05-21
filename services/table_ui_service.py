@@ -1456,3 +1456,63 @@ def apply_column_order(table_key: str, df: pd.DataFrame) -> pd.DataFrame:  # typ
     ordered = [c for c in order if c in df.columns]
     rest = [c for c in df.columns if c not in ordered]
     return df[ordered + rest] if ordered else df
+
+
+# ===== V3.70 readonly ID display repair =====
+# 目的：解決 05/08/13 等唯讀表格中 id 欄位因永久 JSON / GitHub 還原沒有 SQLite 自動流水號，
+# 畫面顯示整欄 None 的問題。這只改「顯示用 dataframe」，不寫回資料、不改業務主鍵。
+
+def _v370_is_blank_id_value(value: Any) -> bool:
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    s = str(value).strip()
+    return s == "" or s.lower() in {"none", "nan", "nat", "<na>", "null"}
+
+
+def _v370_fill_readonly_id_for_display(df: pd.DataFrame, editable: bool) -> pd.DataFrame:
+    if editable or df is None or df.empty:
+        return df
+    out = df.copy()
+    for col in ("id", "ID / ID"):
+        if col not in out.columns:
+            continue
+        vals = []
+        for i, value in enumerate(out[col].tolist(), 1):
+            vals.append(i if _v370_is_blank_id_value(value) else value)
+        out[col] = vals
+    return out
+
+
+_v370_previous_render_table = render_table
+
+def render_table(
+    df: pd.DataFrame,
+    table_key: str,
+    *,
+    editable: bool = False,
+    disabled: Iterable[str] | None = None,
+    key: str | None = None,
+    height: int | None = None,
+    num_rows: str = "fixed",
+) -> pd.DataFrame | None:  # type: ignore[override]
+    # 只在唯讀顯示時補序號，避免資料來源缺少 SQLite id 時畫面出現 None。
+    # 可編輯模式仍保留真實 id，讓新增資料由儲存流程產生主鍵，不用假 id 造成覆蓋錯誤。
+    display_source = _v370_fill_readonly_id_for_display(df, editable=editable) if isinstance(df, pd.DataFrame) else df
+    safe_disabled = list(disabled or [])
+    if editable:
+        for c in ("id", "ID / ID"):
+            if isinstance(df, pd.DataFrame) and c in df.columns and c not in safe_disabled:
+                safe_disabled.append(c)
+    return _v370_previous_render_table(
+        display_source,
+        table_key,
+        editable=editable,
+        disabled=safe_disabled,
+        key=key,
+        height=height,
+        num_rows=num_rows,
+    )
+# ===== END V3.70 readonly ID display repair =====
