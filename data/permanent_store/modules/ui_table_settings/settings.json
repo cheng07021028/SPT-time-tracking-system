@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-20 23:32:58",
-  "exported_at": "2026-05-20 23:32:58",
+  "updated_at": "2026-05-21 12:00:56",
+  "exported_at": "2026-05-21 12:00:56",
   "reason": "v367_column_settings_saved",
   "empty_authoritative": false,
   "tables": {},
@@ -938,6 +938,13 @@
           "visible": true,
           "width": "medium",
           "order": 11
+        },
+        "刪除狀態 / Delete Mark": {
+          "source": "刪除狀態 / Delete Mark",
+          "label": "刪除狀態 / Delete Mark / 刪除狀態 / Delete Mark",
+          "visible": true,
+          "width": "medium",
+          "order": 12
         }
       }
     }
