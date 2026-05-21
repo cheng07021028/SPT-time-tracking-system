@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "settings",
-  "updated_at": "2026-05-21 22:47:11",
-  "exported_at": "2026-05-21 22:47:11",
-  "reason": "v369_save_widths_v72_01.time_records.main",
+  "updated_at": "2026-05-21 22:47:15",
+  "exported_at": "2026-05-21 22:47:15",
+  "reason": "v369_save_column_order_v72_01.time_records.main",
   "empty_authoritative": false,
   "tables": {},
   "settings": {
@@ -37,8 +37,35 @@
           "created_at": 180,
           "updated_at": 180
         },
-        "updated_at": "2026-05-21 22:47:11",
-        "reason": "v369_save_widths"
+        "updated_at": "2026-05-21 22:47:15",
+        "reason": "v369_save_column_order",
+        "order": [
+          "id",
+          "employee_id",
+          "employee_name",
+          "status",
+          "work_order",
+          "part_no",
+          "type_name",
+          "process_name",
+          "start_action",
+          "start_timestamp",
+          "end_action",
+          "end_timestamp",
+          "remark",
+          "start_date",
+          "start_time",
+          "end_date",
+          "end_time",
+          "work_hours",
+          "assembly_location",
+          "group_key",
+          "is_group_work",
+          "source",
+          "created_at",
+          "record_key",
+          "updated_at"
+        ]
       }
     },
     "column_settings": {}
