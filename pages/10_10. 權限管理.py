@@ -395,6 +395,30 @@ def _v40_account_delete_true_count(df: pd.DataFrame) -> int:
         return 0
 
 
+def _v44_sync_delete_visual(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep a read-only visual delete marker in sync with the checkbox column.
+
+    Some Streamlit/Glide builds visually repaint checkbox cells one render behind,
+    especially when the table is inside a themed dark container.  The authoritative
+    data is still the boolean `刪除 / Delete` draft column, but this marker makes the
+    selected state visible even if the checkbox glyph is covered by the editor layer.
+    """
+    if df is None or not isinstance(df, pd.DataFrame):
+        return df
+    out = df.copy(deep=True)
+    if "刪除 / Delete" not in out.columns:
+        out.insert(0, "刪除 / Delete", False)
+    mask = _to_bool_series(out, "刪除 / Delete")
+    out["刪除狀態 / Delete Mark"] = mask.map(lambda v: "☑ 已選 / Selected" if bool(v) else "☐ 未選 / Clear")
+    return out
+
+
+def _v44_strip_visual_columns(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame):
+        return df
+    return df.drop(columns=["刪除狀態 / Delete Mark"], errors="ignore")
+
+
 def _v37_touch_account_editor() -> None:
     """Rotate account data_editor key after external button actions.
 
@@ -453,7 +477,7 @@ def _v25_account_delete_flag(flag: bool) -> None:
     if "刪除 / Delete" not in df.columns:
         df.insert(0, "刪除 / Delete", False)
     df["刪除 / Delete"] = bool(flag)
-    st.session_state["v133_users_df"] = df
+    st.session_state["v133_users_df"] = _v44_sync_delete_visual(df)
     st.session_state["v40_account_last_action"] = "select_delete_all" if flag else "clear_delete_all"
     st.session_state["v40_account_last_delete_true"] = _v40_account_delete_true_count(df)
     # V43: keep the button-updated draft authoritative until the next explicit save/reload/stop-edit.
@@ -559,6 +583,7 @@ with tab_accounts:
 
 
         st.markdown("### 帳號清單編輯 / Editable Account Master")
+        st.caption("V44：若 Streamlit 表格核取方塊視覺延遲，請以『刪除狀態 / Delete Mark』欄與下方 Pending Delete 指標為準；儲存仍以 draft 權威資料判定。")
 
         # V1.74：啟動/停止編輯只保留頁面上方唯一一組，避免帳號總表區重複顯示。
         if "v166_account_edit_enabled" not in st.session_state:
@@ -585,10 +610,12 @@ with tab_accounts:
         # V41 改成 data_editor + 一般 st.button，並在批次按鈕後旋轉 editor key，
         # 讓 draft 內容成為下一輪畫面的唯一來源。
         account_editor_key = f"v171_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
-        _account_cols = list(st.session_state["v133_users_df"].columns)
-        _account_order = ["刪除 / Delete"] + [c for c in _account_cols if c != "刪除 / Delete"]
+        st.session_state["v133_users_df"] = _v44_sync_delete_visual(st.session_state["v133_users_df"])
+        _render_users_df = _v44_sync_delete_visual(st.session_state["v133_users_df"])
+        _account_cols = list(_render_users_df.columns)
+        _account_order = ["刪除 / Delete", "刪除狀態 / Delete Mark"] + [c for c in _account_cols if c not in {"刪除 / Delete", "刪除狀態 / Delete Mark"}]
         edited_users = st.data_editor(
-            st.session_state["v133_users_df"].copy(deep=True),
+            _render_users_df.copy(deep=True),
             key=account_editor_key,
             use_container_width=True,
             num_rows="fixed",
@@ -598,6 +625,7 @@ with tab_accounts:
             column_order=[c for c in _account_order if c in _account_cols],
             column_config={
                 "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
+                "刪除狀態 / Delete Mark": st.column_config.TextColumn("刪除狀態 / Delete Mark", disabled=True),
                 "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
                 "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
                 "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
@@ -626,8 +654,9 @@ with tab_accounts:
         # the draft on every rerun.
         _bulk_render = bool(st.session_state.pop("v37_account_bulk_just_applied", False))
         if _bulk_render and account_edit_enabled:
+            st.session_state["v133_users_df"] = _v44_sync_delete_visual(st.session_state["v133_users_df"])
             edited_users = st.session_state["v133_users_df"].copy(deep=True)
-            st.session_state["v40_account_last_action"] = "bulk_render_protected_v42"
+            st.session_state["v40_account_last_action"] = "bulk_render_protected_v44"
 
         active_count = int(_to_bool_series(edited_users, "啟用 / Active").sum())
         delete_count = int(_to_bool_series(edited_users, "刪除 / Delete").sum())
@@ -658,8 +687,9 @@ with tab_accounts:
                 "last_delete_true_count": st.session_state.get("v40_account_last_delete_true", ""),
                 "bulk_guard_active": bool(st.session_state.get("v37_account_bulk_just_applied", False)),
                 "visible_delete_true_count": delete_count,
+                "visual_mark_selected_count": int((_render_users_df.get("刪除狀態 / Delete Mark", pd.Series(dtype=str)).astype(str).str.contains("已選", na=False)).sum()) if isinstance(_render_users_df, pd.DataFrame) else 0,
                 "use_draft_for_save": bool(st.session_state.get("v43_account_use_draft_for_save", False)),
-                "v43_mode": "diagnostic-after-editor-and-draft-save-guard",
+                "v44_mode": "delete-visual-marker-and-draft-authority",
             })
 
         submitted_accounts = st.button(
@@ -675,9 +705,9 @@ with tab_accounts:
             # the session draft is the authoritative save source.  data_editor can
             # still return a stale echo in some Streamlit builds.
             if bool(st.session_state.get("v43_account_use_draft_for_save", False)) and isinstance(st.session_state.get("v133_users_df"), pd.DataFrame):
-                df = st.session_state["v133_users_df"].copy(deep=True)
+                df = _v44_strip_visual_columns(st.session_state["v133_users_df"].copy(deep=True))
             else:
-                df = edited_users.copy()
+                df = _v44_strip_visual_columns(edited_users.copy())
             to_delete = _selected_delete_usernames(df, account_editor_key)
             if to_delete:
                 save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy()
