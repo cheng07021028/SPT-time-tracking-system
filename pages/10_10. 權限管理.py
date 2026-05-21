@@ -390,100 +390,234 @@ with tab_accounts:
         "帳號清單編輯 / Account Editor", "Excel 匯入 / Excel Import", "貼上資料 / Paste Data"
     ])
 
-    # V53：帳號清單編輯標準版。
-    # 重點：刪除全選 / 刪除取消 / 啟用全選 / 啟用取消，全部只改同一份草稿 DataFrame。
-    # data_editor 不再包在 form 裡，避免 form 的舊 widget 狀態把按鈕更新後的勾選狀態蓋回去。
+    # V54：帳號清單編輯正常 checkbox 穩定版。
+    # 參考 8_股神推薦紀錄的 sticky checkbox 架構：
+    # 1) checkbox 勾選狀態不再只相信 data_editor 當輪回傳值。
+    # 2) 以「帳號 / Username」作為 row id，將刪除 / 啟用勾選狀態存到 session_state sticky 清單。
+    # 3) data_editor 建立前先套用 sticky；data_editor on_change 再把使用者單擊寫回 sticky。
+    # 4) 全選 / 取消按鈕只改 sticky + draft，並旋轉 editor key，避免舊 widget state 蓋回去。
     if "v166_account_edit_enabled" not in st.session_state:
         st.session_state["v166_account_edit_enabled"] = False
-    st.session_state.setdefault("v53_account_editor_rev", 0)
+    st.session_state.setdefault("v54_account_editor_rev", 0)
 
-    def _v53_normalize_account_draft(df: pd.DataFrame | None) -> pd.DataFrame:
+    V54_DRAFT_KEY = "v133_users_df"
+    V54_ROW_KEY = "__v54_row_key"
+    V54_CHECKBOX_COLS = ["刪除 / Delete", "啟用 / Active", "強制改密碼 / Force Change"]
+
+    def _v54_safe_str(value) -> str:
+        if value is None:
+            return ""
+        try:
+            if pd.isna(value):
+                return ""
+        except Exception:
+            pass
+        return str(value).strip()
+
+    def _v54_bool(value, default: bool = False) -> bool:
+        return _as_bool_value(value, default=default)
+
+    def _v54_sticky_key(col: str) -> str:
+        safe = col.replace(" ", "_").replace("/", "_")
+        return f"v54_account_sticky_{safe}_row_keys"
+
+    def _v54_ensure_row_keys(df: pd.DataFrame | None) -> pd.DataFrame:
         if df is None or not isinstance(df, pd.DataFrame):
             df = pd.DataFrame()
-        if df.empty:
-            df = _users_for_editor()
         df = df.copy()
+        if df.empty:
+            df = _users_for_editor().copy()
         for col, default in _blank_user_row().items():
             if col not in df.columns:
                 df[col] = default
-        df["刪除 / Delete"] = _to_bool_series(df, "刪除 / Delete", False)
-        df["啟用 / Active"] = _to_bool_series(df, "啟用 / Active", True)
-        df["強制改密碼 / Force Change"] = _to_bool_series(df, "強制改密碼 / Force Change", False)
-        for col in ["帳號 / Username", "密碼狀態 / Password Status", "新密碼 / New Password", "工號 / Employee ID", "姓名 / Display Name", "Email", "角色 / Role", "備註 / Note", "最後登入 / Last Login", "更新時間 / Updated At"]:
-            if col in df.columns:
-                df[col] = df[col].fillna("").astype(str)
-        df["角色 / Role"] = df["角色 / Role"].apply(_normalize_role)
-        preferred = list(_blank_user_row().keys())
-        extra = [c for c in df.columns if c not in preferred]
-        return df[preferred + extra].reset_index(drop=True)
+        if V54_ROW_KEY not in df.columns:
+            keys = []
+            used = set()
+            for i, row in df.reset_index(drop=True).iterrows():
+                username = _v54_safe_str(row.get("帳號 / Username"))
+                key = f"user:{username.lower()}" if username else f"new:{i}:{st.session_state.get('v54_account_editor_rev', 0)}"
+                base = key
+                n = 1
+                while key in used:
+                    n += 1
+                    key = f"{base}:{n}"
+                used.add(key)
+                keys.append(key)
+            df[V54_ROW_KEY] = keys
+        for col in V54_CHECKBOX_COLS:
+            if col not in df.columns:
+                df[col] = False
+            default = True if col == "啟用 / Active" else False
+            df[col] = df[col].map(lambda v, d=default: _v54_bool(v, d)).astype(bool)
+        return df.reset_index(drop=True)
 
-    def _v53_set_account_draft(df: pd.DataFrame | None) -> None:
-        st.session_state["v133_users_df"] = _v53_normalize_account_draft(df)
+    def _v54_init_sticky_from_df(df: pd.DataFrame, overwrite: bool = False) -> None:
+        df = _v54_ensure_row_keys(df)
+        for col in V54_CHECKBOX_COLS:
+            key = _v54_sticky_key(col)
+            if overwrite or key not in st.session_state:
+                selected = df.loc[df[col].map(lambda v: _v54_bool(v, False)), V54_ROW_KEY].astype(str).tolist()
+                st.session_state[key] = selected
 
-    def _v53_get_account_draft() -> pd.DataFrame:
-        if "v133_users_df" not in st.session_state:
-            _v53_set_account_draft(_users_for_editor())
-        else:
-            _v53_set_account_draft(st.session_state.get("v133_users_df"))
-        return st.session_state["v133_users_df"].copy()
+    def _v54_apply_sticky(df: pd.DataFrame | None) -> pd.DataFrame:
+        df = _v54_ensure_row_keys(df)
+        visible_keys = [_v54_safe_str(x) for x in df[V54_ROW_KEY].tolist()]
+        visible_set = set(visible_keys)
+        for col in V54_CHECKBOX_COLS:
+            sk = _v54_sticky_key(col)
+            if sk not in st.session_state:
+                _v54_init_sticky_from_df(df, overwrite=False)
+            selected = {_v54_safe_str(x) for x in st.session_state.get(sk, []) if _v54_safe_str(x)}
+            selected = {x for x in selected if x in visible_set}
+            st.session_state[sk] = [x for x in visible_keys if x in selected]
+            df[col] = df[V54_ROW_KEY].astype(str).map(lambda x, s=selected: _v54_safe_str(x) in s).astype(bool)
+        return df.reset_index(drop=True)
 
-    def _v53_touch_account_editor() -> None:
-        st.session_state["v53_account_editor_rev"] = int(st.session_state.get("v53_account_editor_rev", 0)) + 1
-        # 清除舊 data_editor widget key，避免舊畫面狀態覆蓋新的 True / False。
+    def _v54_set_account_draft(df: pd.DataFrame | None, *, keep_sticky: bool = True) -> pd.DataFrame:
+        df = _v54_ensure_row_keys(df)
+        if not keep_sticky:
+            _v54_init_sticky_from_df(df, overwrite=True)
+        df = _v54_apply_sticky(df)
+        st.session_state[V54_DRAFT_KEY] = df.copy(deep=True)
+        return df
+
+    def _v54_get_account_draft() -> pd.DataFrame:
+        if V54_DRAFT_KEY not in st.session_state:
+            return _v54_set_account_draft(_users_for_editor(), keep_sticky=False)
+        return _v54_apply_sticky(st.session_state.get(V54_DRAFT_KEY)).copy(deep=True)
+
+    def _v54_clear_widget_state(prefix: str) -> None:
         for key in list(st.session_state.keys()):
-            if str(key).startswith("v53_account_editor_") or str(key).startswith("v171_account_password_editor_"):
+            if str(key).startswith(prefix):
                 try:
                     del st.session_state[key]
                 except Exception:
                     pass
 
-    def _v53_set_edit_mode(enabled: bool) -> None:
+    def _v54_touch_account_editor() -> None:
+        for prefix in [
+            "v53_account_editor_",
+            "v54_account_editor_",
+            "v171_account_password_editor_",
+            "v171_account_master_edit_form",
+        ]:
+            _v54_clear_widget_state(prefix)
+        st.session_state["v54_account_editor_rev"] = int(st.session_state.get("v54_account_editor_rev", 0) or 0) + 1
+
+    def _v54_set_edit_mode(enabled: bool) -> None:
         st.session_state["v166_account_edit_enabled"] = bool(enabled)
         if enabled:
-            # 啟動編輯只使用目前草稿；若沒有草稿才讀已儲存帳號，不重新用舊檔覆蓋現有草稿。
-            _v53_get_account_draft()
+            _v54_set_account_draft(_users_for_editor(), keep_sticky=False)
         else:
-            # 停止編輯代表放棄草稿，重新讀取目前已儲存權威資料。
-            _v53_set_account_draft(_users_for_editor())
-        _v53_touch_account_editor()
+            st.session_state.pop(V54_DRAFT_KEY, None)
+            for col in V54_CHECKBOX_COLS:
+                st.session_state.pop(_v54_sticky_key(col), None)
+        _v54_touch_account_editor()
         st.rerun()
 
-    def _v53_add_blank_account_row() -> None:
-        df = _v53_get_account_draft()
-        df = pd.concat([df, pd.DataFrame([_blank_user_row()])], ignore_index=True)
-        _v53_set_account_draft(df)
-        _v53_touch_account_editor()
+    def _v54_add_blank_account_row() -> None:
+        df = _v54_get_account_draft()
+        row = _blank_user_row()
+        row[V54_ROW_KEY] = f"new:{len(df)}:{int(st.session_state.get('v54_account_editor_rev', 0)) + 1}"
+        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+        _v54_set_account_draft(df, keep_sticky=True)
+        # 新增列預設啟用，其他 checkbox 預設不勾選。
+        active_key = _v54_sticky_key("啟用 / Active")
+        active_selected = {_v54_safe_str(x) for x in st.session_state.get(active_key, []) if _v54_safe_str(x)}
+        active_selected.add(row[V54_ROW_KEY])
+        st.session_state[active_key] = [x for x in df[V54_ROW_KEY].astype(str).tolist() if x in active_selected]
+        _v54_touch_account_editor()
         st.rerun()
 
-    def _v53_set_bool_column(col: str, value: bool) -> None:
-        df = _v53_get_account_draft()
+    def _v54_set_bool_column(col: str, value: bool) -> None:
+        df = _v54_get_account_draft()
         if col not in df.columns:
-            df[col] = value
+            df[col] = False
+        row_keys = [_v54_safe_str(x) for x in df[V54_ROW_KEY].astype(str).tolist() if _v54_safe_str(x)]
+        st.session_state[_v54_sticky_key(col)] = row_keys if value else []
         df[col] = bool(value)
-        _v53_set_account_draft(df)
-        _v53_touch_account_editor()
+        _v54_set_account_draft(df, keep_sticky=True)
+        _v54_touch_account_editor()
         st.rerun()
 
-    def _v53_reload_accounts() -> None:
-        _v53_set_account_draft(_users_for_editor())
-        _v53_touch_account_editor()
+    def _v54_reload_accounts() -> None:
+        _v54_set_account_draft(_users_for_editor(), keep_sticky=False)
+        _v54_touch_account_editor()
         st.rerun()
+
+    def _v54_account_editor_on_change(editor_key: str, row_map_key: str, checkbox_cols: list[str]) -> None:
+        # 參考 8_股神推薦紀錄：在 rerun 前把 edited_rows / edited_cells 寫進 sticky 清單。
+        try:
+            row_keys = [_v54_safe_str(x) for x in st.session_state.get(row_map_key, []) if _v54_safe_str(x)]
+            if not row_keys:
+                return
+            raw_state = st.session_state.get(editor_key, {})
+            if not isinstance(raw_state, dict):
+                return
+
+            def _apply(idx, col, val):
+                try:
+                    i = int(idx)
+                except Exception:
+                    return
+                if i < 0 or i >= len(row_keys) or col not in checkbox_cols:
+                    return
+                row_key = row_keys[i]
+                sk = _v54_sticky_key(col)
+                selected = {_v54_safe_str(x) for x in st.session_state.get(sk, []) if _v54_safe_str(x)}
+                if _v54_bool(val, False):
+                    selected.add(row_key)
+                else:
+                    selected.discard(row_key)
+                visible = set(row_keys)
+                st.session_state[sk] = [x for x in row_keys if x in selected and x in visible]
+
+            edited_rows = raw_state.get("edited_rows", {})
+            if isinstance(edited_rows, dict):
+                for raw_idx, changes in edited_rows.items():
+                    if not isinstance(changes, dict):
+                        continue
+                    for col in checkbox_cols:
+                        if col in changes:
+                            _apply(raw_idx, col, changes.get(col))
+
+            edited_cells = raw_state.get("edited_cells", {})
+            if isinstance(edited_cells, dict):
+                # 欄位索引依目前 column_order：Delete, Username, Password Status, New Password,
+                # Employee ID, Display Name, Email, Role, Active, Force Change, Note, Last Login, Updated At
+                index_col_map = {"0": "刪除 / Delete", "8": "啟用 / Active", "9": "強制改密碼 / Force Change"}
+                for raw_key, val in edited_cells.items():
+                    parts = str(raw_key).split(":")
+                    if not parts:
+                        continue
+                    row_idx = parts[0]
+                    col_token = parts[1] if len(parts) > 1 else ""
+                    if col_token in checkbox_cols:
+                        _apply(row_idx, col_token, val)
+                    elif col_token in index_col_map:
+                        _apply(row_idx, index_col_map[col_token], val)
+        except Exception:
+            return
+
+    def _v54_to_save_df(df: pd.DataFrame | None) -> pd.DataFrame:
+        df = _v54_apply_sticky(df)
+        return df.drop(columns=[V54_ROW_KEY], errors="ignore").copy()
 
     _edit_on = bool(st.session_state.get("v166_account_edit_enabled", False))
-    c_edit1, c_edit2, c_edit3 = st.columns([1.2, 1.2, 3])
+    c_edit1, c_edit2, c_edit3 = st.columns([1.1, 1.1, 2.6])
     with c_edit1:
-        if st.button("◇ 啟動編輯 / Enable Edit", width="stretch", disabled=_edit_on, key="v53_enable_account_edit_top"):
-            _v53_set_edit_mode(True)
+        if st.button("◇ 啟動編輯 / Enable Edit", width="stretch", disabled=_edit_on, key="v54_enable_account_edit_top"):
+            _v54_set_edit_mode(True)
     with c_edit2:
-        if st.button("◌ 停止編輯 / Stop Edit", width="stretch", disabled=not _edit_on, key="v53_disable_account_edit_top"):
-            _v53_set_edit_mode(False)
+        if st.button("◇ 停止編輯 / Stop Edit", width="stretch", disabled=not _edit_on, key="v54_disable_account_edit_top"):
+            _v54_set_edit_mode(False)
     with c_edit3:
         if _edit_on:
             st.success("目前：已啟動編輯。修改後請按儲存才會正式寫入。")
         else:
             st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上帳號。")
 
-    _v53_get_account_draft()
+    _v54_get_account_draft()
 
     with account_tab_edit:
         st.markdown("### 新增帳號專用表單 / Stable Add User Form")
@@ -527,48 +661,54 @@ with tab_accounts:
                 }])
                 if result.get("saved", 0) > 0:
                     st.success(f"帳號已建立 / Account created：{username}")
-                    _v53_set_account_draft(_users_for_editor())
-                    _v53_touch_account_editor()
+                    _v54_set_account_draft(_users_for_editor(), keep_sticky=False)
+                    _v54_touch_account_editor()
                     st.rerun()
                 if result.get("skipped"):
                     st.warning("；".join(result.get("skipped", [])))
 
         st.markdown("### 帳號清單編輯 / Editable Account Master")
-        st.caption("V53：刪除全選、刪除取消、啟用全選、啟用取消已改成同一份草稿資料直接控制；不再使用 form 包住表格，避免勾選顯示被舊狀態覆蓋。")
+        st.caption("V54：採用 8_股神推薦紀錄同款 sticky checkbox 架構。全選 / 取消只改 sticky 狀態，表格建立前回填，避免 data_editor 舊狀態覆蓋。")
 
         account_edit_enabled = bool(st.session_state.get("v166_account_edit_enabled", False))
         b1, b2, b3, b4, b5, b6 = st.columns(6)
         with b1:
-            if st.button("⊕ 新增帳號 / Add", width="stretch", disabled=not account_edit_enabled, key="v53_add_user_row"):
-                _v53_add_blank_account_row()
+            if st.button("⊕ 新增帳號 / Add", width="stretch", disabled=not account_edit_enabled, key="v54_add_user_row"):
+                _v54_add_blank_account_row()
         with b2:
-            if st.button("☑ 刪除全選 / Select Delete", width="stretch", disabled=not account_edit_enabled, key="v53_select_delete_all"):
-                _v53_set_bool_column("刪除 / Delete", True)
+            if st.button("☑ 刪除全選 / Select Delete", width="stretch", disabled=not account_edit_enabled, key="v54_select_delete_all"):
+                _v54_set_bool_column("刪除 / Delete", True)
         with b3:
-            if st.button("☐ 刪除取消 / Clear Delete", width="stretch", disabled=not account_edit_enabled, key="v53_clear_delete_all"):
-                _v53_set_bool_column("刪除 / Delete", False)
+            if st.button("☐ 刪除取消 / Clear Delete", width="stretch", disabled=not account_edit_enabled, key="v54_clear_delete_all"):
+                _v54_set_bool_column("刪除 / Delete", False)
         with b4:
-            if st.button("☑ 啟用全選 / Active All", width="stretch", disabled=not account_edit_enabled, key="v53_select_active_all"):
-                _v53_set_bool_column("啟用 / Active", True)
+            if st.button("☑ 啟用全選 / Active All", width="stretch", disabled=not account_edit_enabled, key="v54_select_active_all"):
+                _v54_set_bool_column("啟用 / Active", True)
         with b5:
-            if st.button("☐ 啟用取消 / Inactive All", width="stretch", disabled=not account_edit_enabled, key="v53_clear_active_all"):
-                _v53_set_bool_column("啟用 / Active", False)
+            if st.button("☐ 啟用取消 / Inactive All", width="stretch", disabled=not account_edit_enabled, key="v54_clear_active_all"):
+                _v54_set_bool_column("啟用 / Active", False)
         with b6:
-            if st.button("⟳ 重新載入 / Reload", width="stretch", key="v53_reload_accounts"):
-                _v53_reload_accounts()
+            if st.button("⟳ 重新載入 / Reload", width="stretch", key="v54_reload_accounts"):
+                _v54_reload_accounts()
 
-        draft_df = _v53_get_account_draft()
-        account_editor_key = f"v53_account_editor_{st.session_state.get('v53_account_editor_rev', 0)}"
+        draft_df = _v54_get_account_draft()
+        account_editor_key = f"v54_account_editor_{st.session_state.get('v54_account_editor_rev', 0)}"
+        account_row_map_key = f"{account_editor_key}_row_key_map"
+        st.session_state[account_row_map_key] = [_v54_safe_str(x) for x in draft_df[V54_ROW_KEY].astype(str).tolist()]
+        display_df = draft_df.drop(columns=[], errors="ignore").copy()
         edited_users = st.data_editor(
-            draft_df,
+            display_df,
             key=account_editor_key,
+            on_change=_v54_account_editor_on_change,
+            args=(account_editor_key, account_row_map_key, V54_CHECKBOX_COLS),
             width="stretch",
             num_rows="fixed",
             hide_index=True,
             disabled=not account_edit_enabled,
             height=390,
-            column_order=[c for c in list(_blank_user_row().keys()) if c in draft_df.columns],
+            column_order=[c for c in list(_blank_user_row().keys()) if c in display_df.columns],
             column_config={
+                V54_ROW_KEY: None,
                 "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
                 "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
                 "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
@@ -586,9 +726,10 @@ with tab_accounts:
         )
 
         if account_edit_enabled:
-            _v53_set_account_draft(edited_users)
+            edited_users = _v54_apply_sticky(edited_users)
+            _v54_set_account_draft(edited_users, keep_sticky=True)
 
-        current_df = _v53_get_account_draft()
+        current_df = _v54_get_account_draft()
         active_count = int(_to_bool_series(current_df, "啟用 / Active").sum())
         delete_count = int(_to_bool_series(current_df, "刪除 / Delete").sum())
         new_password_count = int(sum(1 for _, _row in current_df.iterrows() if _password_from_editor_row(_row)))
@@ -597,8 +738,8 @@ with tab_accounts:
         m2.metric("待刪除 / Pending Delete", delete_count)
         m3.metric("密碼異動 / Password Changes", new_password_count)
 
-        if st.button("▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master", type="primary", width="stretch", disabled=not account_edit_enabled, key="v53_save_account_master"):
-            df = _v53_get_account_draft()
+        if st.button("▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master", type="primary", width="stretch", disabled=not account_edit_enabled, key="v54_save_account_master"):
+            df = _v54_to_save_df(_v54_get_account_draft())
             delete_mask = _to_bool_series(df, "刪除 / Delete", False)
             to_delete = sorted([str(v).strip() for v in df.loc[delete_mask, "帳號 / Username"].tolist() if str(v).strip()]) if "帳號 / Username" in df.columns else []
             save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy() if to_delete else df.copy()
@@ -609,21 +750,25 @@ with tab_accounts:
             st.success(f"帳號已儲存：{result.get('saved', 0)} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")
             if result.get("skipped"):
                 st.warning("；".join(result.get("skipped", [])))
-            st.session_state.pop("v133_users_df", None)
+            st.session_state.pop(V54_DRAFT_KEY, None)
+            for col in V54_CHECKBOX_COLS:
+                st.session_state.pop(_v54_sticky_key(col), None)
             st.session_state["v166_account_edit_enabled"] = False
-            _v53_touch_account_editor()
+            _v54_touch_account_editor()
             st.rerun()
 
-        with st.expander("V53 帳號按鈕診斷 / Button Diagnostics", expanded=False):
+        with st.expander("V54 帳號按鈕診斷 / Button Diagnostics", expanded=False):
             st.json({
                 "page_file": __file__,
                 "edit_enabled": account_edit_enabled,
                 "editor_key": account_editor_key,
-                "editor_rev": int(st.session_state.get("v53_account_editor_rev", 0)),
+                "editor_rev": int(st.session_state.get("v54_account_editor_rev", 0)),
                 "draft_rows": int(len(current_df)),
                 "delete_true_count": delete_count,
                 "active_true_count": active_count,
-                "mode": "v53-normal-checkbox-direct-draft",
+                "delete_sticky_count": len(st.session_state.get(_v54_sticky_key("刪除 / Delete"), [])),
+                "active_sticky_count": len(st.session_state.get(_v54_sticky_key("啟用 / Active"), [])),
+                "mode": "v54-sticky-checkbox-like-godpick-record",
             })
 
     with account_tab_excel:
