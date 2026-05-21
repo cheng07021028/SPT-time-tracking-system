@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-21 22:48:19",
+  "exported_at": "2026-05-21 22:52:18",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -1789,10 +1789,318 @@
         "message": "INSERT process_categories",
         "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
         "level": "INFO"
+      },
+      {
+        "id": 163,
+        "log_time": "2026-05-21 22:48:56",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 164,
+        "log_time": "2026-05-21 22:48:56",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 165,
+        "log_time": "2026-05-21 22:48:57",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 166,
+        "log_time": "2026-05-21 22:48:57",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 167,
+        "log_time": "2026-05-21 22:49:14",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 168,
+        "log_time": "2026-05-21 22:49:14",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 169,
+        "log_time": "2026-05-21 22:49:15",
+        "user_name": "system",
+        "action_type": "DELETE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "9",
+        "message": "01 工時紀錄管理員維護區刪除：#9 B002 張文品 21M0241-01 前置鈑金",
+        "detail": "{'id': 9, 'record_key': 'B002|21M0241-01|前置鈑金|2026-05-21 22:24:44|c10868ce', 'status': '作業中', 'work_order': '21M0241-01', 'part_no': '4TRSC020-004-02', 'type_name': 'NTB 3 PORT', 'process_name': '前置鈑金', 'employee_id': 'B002', 'employee_name': '張文品', 'start_action': '開始', 'start_timestamp': '2026-05-21 22:24:44', 'end_action': None, 'end_timestamp': None, 'remark': '', 'start_date': '2026-05-21', 'start_time': '22:24:44', 'end_date': None, 'end_time': None, 'work_hours': 0.0, 'assembly_location': '竹東', 'group_key': 'B002|前置鈑金|2026-05-21', 'is_group_work': 0, 'source': 'streamlit', 'created_at': '2026-05-21 22:24:44', 'updated_at': '2026-05-21 22:24:44'}",
+        "level": "WARN"
+      },
+      {
+        "id": 170,
+        "log_time": "2026-05-21 22:49:15",
+        "user_name": "appuser",
+        "action_type": "DELETE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01 工時紀錄管理員維護區刪除：已刪除 1 筆，01/02 本機權威檔已同步 0 筆。",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 171,
+        "log_time": "2026-05-21 22:49:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 172,
+        "log_time": "2026-05-21 22:49:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 173,
+        "log_time": "2026-05-21 22:49:23",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 174,
+        "log_time": "2026-05-21 22:49:23",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 175,
+        "log_time": "2026-05-21 22:49:37",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 176,
+        "log_time": "2026-05-21 22:49:37",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 177,
+        "log_time": "2026-05-21 22:49:37",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 178,
+        "log_time": "2026-05-21 22:49:37",
+        "user_name": "appuser",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "10",
+        "message": "張文品 開始 21M0241-01 / 前置鈑金",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 179,
+        "log_time": "2026-05-21 22:49:37",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 180,
+        "log_time": "2026-05-21 22:49:37",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 181,
+        "log_time": "2026-05-21 22:49:39",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 182,
+        "log_time": "2026-05-21 22:49:39",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 183,
+        "log_time": "2026-05-21 22:49:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 184,
+        "log_time": "2026-05-21 22:49:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 185,
+        "log_time": "2026-05-21 22:49:46",
+        "user_name": "appuser",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
+        "level": "INFO"
+      },
+      {
+        "id": 186,
+        "log_time": "2026-05-21 22:49:46",
+        "user_name": "appuser",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "10",
+        "message": "結束工時紀錄 #10，同步結束=1筆，狀態=完工，群組總工時=0.00，平均工時=0.00",
+        "detail": "10",
+        "level": "INFO"
+      },
+      {
+        "id": 187,
+        "log_time": "2026-05-21 22:49:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 188,
+        "log_time": "2026-05-21 22:49:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 189,
+        "log_time": "2026-05-21 22:49:48",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n        VALUES (?, 1, 0, '所有類別共用工段', ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 190,
+        "log_time": "2026-05-21 22:49:48",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "INSERT OR IGNORE INTO process_categories(category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, 1, 999, '', ?, ?)",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 162
+    "system_logs": 190
   }
 }
