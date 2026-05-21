@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-21 21:47:09",
-  "exported_at": "2026-05-21 21:47:09",
+  "updated_at": "2026-05-21 21:47:19",
+  "exported_at": "2026-05-21 21:47:19",
   "reason": "v367_column_settings_saved_v72",
   "empty_authoritative": false,
   "tables": {},
@@ -4094,7 +4094,7 @@
             "order": 7
           }
         },
-        "updated_at": "2026-05-21 21:47:09",
+        "updated_at": "2026-05-21 21:47:19",
         "reason": "v367_column_settings_saved"
       },
       "80435544260397582": {
@@ -5078,6 +5078,89 @@
           }
         },
         "updated_at": "2026-05-21 21:47:09",
+        "reason": "v367_column_settings_saved"
+      },
+      "work_orders_data_editor_v253": {
+        "columns": {
+          "刪除 / Delete": {
+            "source": "刪除 / Delete",
+            "label": "刪除 / Delete / 刪除 / Delete",
+            "visible": true,
+            "width": "medium",
+            "order": -999
+          },
+          "ID / ID": {
+            "source": "ID / ID",
+            "label": "ID / ID / ID / ID",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "製令 / Work Order": {
+            "source": "製令 / Work Order",
+            "label": "製令 / Work Order / 製令 / Work Order",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "P/N / Part No.": {
+            "source": "P/N / Part No.",
+            "label": "P/N / Part No. / P/N / Part No.",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "機型 / Type": {
+            "source": "機型 / Type",
+            "label": "機型 / Type / 機型 / Type",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "組立地點 / Assembly Location": {
+            "source": "組立地點 / Assembly Location",
+            "label": "組立地點 / Assembly Location / 組立地點 / Assembly Location",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "客戶 / Customer": {
+            "source": "客戶 / Customer",
+            "label": "客戶 / Customer / 客戶 / Customer",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "備註 / Note": {
+            "source": "備註 / Note",
+            "label": "備註 / Note / 備註 / Note",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "啟用 / Active": {
+            "source": "啟用 / Active",
+            "label": "啟用 / Active / 啟用 / Active",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "建立時間 / Created At": {
+            "source": "建立時間 / Created At",
+            "label": "建立時間 / Created At / 建立時間 / Created At",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "更新時間 / Updated At": {
+            "source": "更新時間 / Updated At",
+            "label": "更新時間 / Updated At / 更新時間 / Updated At",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          }
+        },
+        "updated_at": "2026-05-21 21:47:19",
         "reason": "v367_column_settings_saved"
       }
     },
