@@ -543,32 +543,39 @@ cat_edit_key = "_spt_13_category_edit_mode"
 if can_manage:
     cc1, cc2, cc3 = st.columns([1, 1, 4])
     if not st.session_state.get(cat_edit_key, False):
-        if cc1.button("◇ 啟動編輯類別", key="enable_category_edit", use_container_width=True):
+        if cc1.button("◇ 啟動編輯類別 / Enable Edit", key="enable_category_edit", use_container_width=True):
             _set_edit_mode(cat_edit_key, True)
     else:
-        if cc1.button("◌ 停止編輯類別", key="disable_category_edit", use_container_width=True):
+        if cc1.button("◌ 停止編輯類別 / Lock Edit", key="disable_category_edit", use_container_width=True):
             _set_edit_mode(cat_edit_key, False)
     cc2.caption("新增：啟動編輯後，在表格最下方新增列。")
 
 if can_manage and st.session_state.get(cat_edit_key, False):
-    with st.form("system_process_categories_apply_form", clear_on_submit=False):
-        edited_cat = render_table(
-            cat_view,
-            "system_process_categories",
-            editable=True,
-            disabled=["id", "created_at", "updated_at"],
-            key="system_process_categories_editor_v334",
-            height=300,
-            num_rows="dynamic",
-        )
-        cat_action = st.radio(
-            "確認後執行動作",
-            ["套用並永久儲存類別設定", "刪除勾選類別"],
-            horizontal=True,
-            key="system_category_apply_action_v334",
-        )
-        cat_submitted = st.form_submit_button("▣ 確認套用類別 / Apply Categories", type="primary", use_container_width=True)
-    if cat_submitted and edited_cat is not None:
+    st.info("V58：類別表格改為與 10｜權限管理相同按鈕模式；表格不再包 st.form，按鈕直接套用目前畫面暫存。")
+    cat_draft_key = "system_process_categories_draft_v58"
+    edited_cat = render_table(
+        cat_view,
+        "system_process_categories",
+        editable=True,
+        disabled=["id", "created_at", "updated_at"],
+        key="system_process_categories_editor_v334",
+        height=300,
+        num_rows="dynamic",
+    )
+    if isinstance(edited_cat, pd.DataFrame):
+        st.session_state[cat_draft_key] = edited_cat.copy()
+    cat_action = st.radio(
+        "確認後執行動作",
+        ["套用並永久儲存類別設定", "刪除勾選類別"],
+        horizontal=True,
+        key="system_category_apply_action_v334",
+    )
+    cat_submitted = st.button("▣ 確認套用類別 / Apply Categories", type="primary", use_container_width=True, key="system_category_apply_button_v58")
+    if cat_submitted:
+        edited_cat = st.session_state.get(cat_draft_key, edited_cat)
+        if edited_cat is None:
+            st.warning("找不到可套用的類別表格內容，請重新載入後再試。")
+            st.stop()
         if cat_action == "套用並永久儲存類別設定":
             save_df = edited_cat.drop(columns=["刪除"], errors="ignore")
             count = save_process_categories_df(save_df)
@@ -632,34 +639,40 @@ proc_edit_key = "_spt_13_process_edit_mode"
 if can_manage:
     c1, c2, c3 = st.columns([1, 1, 4])
     if not st.session_state.get(proc_edit_key, False):
-        if c1.button("◇ 啟動編輯工段", key="enable_process_edit", use_container_width=True):
+        if c1.button("◇ 啟動編輯工段 / Enable Edit", key="enable_process_edit", use_container_width=True):
             _set_edit_mode(proc_edit_key, True)
     else:
-        if c1.button("◌ 停止編輯工段", key="disable_process_edit", use_container_width=True):
+        if c1.button("◌ 停止編輯工段 / Lock Edit", key="disable_process_edit", use_container_width=True):
             _set_edit_mode(proc_edit_key, False)
     c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
 
 if can_manage and st.session_state.get(proc_edit_key, False):
-    st.info("目前為工段編輯模式：可新增、修改、勾選刪除。完成後請選擇動作並按『確認套用』，才會永久保存與套用到 01 工時紀錄。")
-    with st.form("system_process_options_apply_form", clear_on_submit=False):
-        edited_proc = render_table(
-            proc_view,
-            "system_process_options",
-            editable=True,
-            disabled=["id", "created_at", "updated_at"],
-            key="system_process_options_editor_v192",
-            height=430,
-            num_rows="dynamic",
-        )
-        action = st.radio(
-            "確認後執行動作",
-            ["套用並永久儲存工段名稱設定", "刪除勾選工段"],
-            horizontal=True,
-            key="system_process_apply_action_v192",
-        )
-        submitted = st.form_submit_button("▣ 確認套用 / Apply", type="primary", use_container_width=True)
+    st.info("V58：工段表格改為與 10｜權限管理相同按鈕模式；可新增、修改、勾選刪除，按下確認才永久保存與套用到 01 工時紀錄。")
+    proc_draft_key = "system_process_options_draft_v58"
+    edited_proc = render_table(
+        proc_view,
+        "system_process_options",
+        editable=True,
+        disabled=["id", "created_at", "updated_at"],
+        key="system_process_options_editor_v192",
+        height=430,
+        num_rows="dynamic",
+    )
+    if isinstance(edited_proc, pd.DataFrame):
+        st.session_state[proc_draft_key] = edited_proc.copy()
+    action = st.radio(
+        "確認後執行動作",
+        ["套用並永久儲存工段名稱設定", "刪除勾選工段"],
+        horizontal=True,
+        key="system_process_apply_action_v192",
+    )
+    submitted = st.button("▣ 確認套用 / Apply", type="primary", use_container_width=True, key="system_process_apply_button_v58")
 
-    if submitted and edited_proc is not None:
+    if submitted:
+        edited_proc = st.session_state.get(proc_draft_key, edited_proc)
+        if edited_proc is None:
+            st.warning("找不到可套用的工段表格內容，請重新載入後再試。")
+            st.stop()
         if action == "套用並永久儲存工段名稱設定":
             save_df = edited_proc.drop(columns=["刪除"], errors="ignore")
             if "category_name" not in save_df.columns:
@@ -698,34 +711,40 @@ rest_edit_key = "_spt_13_rest_edit_mode"
 if can_manage:
     c1, c2, c3 = st.columns([1, 1, 4])
     if not st.session_state.get(rest_edit_key, False):
-        if c1.button("◇ 啟動編輯休息時間", key="enable_rest_edit", use_container_width=True):
+        if c1.button("◇ 啟動編輯休息時間 / Enable Edit", key="enable_rest_edit", use_container_width=True):
             _set_edit_mode(rest_edit_key, True)
     else:
-        if c1.button("◌ 停止編輯休息時間", key="disable_rest_edit", use_container_width=True):
+        if c1.button("◌ 停止編輯休息時間 / Lock Edit", key="disable_rest_edit", use_container_width=True):
             _set_edit_mode(rest_edit_key, False)
     c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
 
 if can_manage and st.session_state.get(rest_edit_key, False):
-    st.info("目前為休息時間編輯模式：可新增、修改、勾選刪除。完成後請按『確認套用』，才會永久保存並套用到工時計算。")
-    with st.form("system_rest_periods_apply_form", clear_on_submit=False):
-        edited_rest = render_table(
-            rest_view,
-            "system_rest_periods",
-            editable=True,
-            disabled=["id"],
-            key="system_rest_periods_editor_v192",
-            height=360,
-            num_rows="dynamic",
-        )
-        action = st.radio(
-            "確認後執行動作",
-            ["套用並永久儲存休息時間設定", "刪除勾選休息時間"],
-            horizontal=True,
-            key="system_rest_apply_action_v192",
-        )
-        submitted = st.form_submit_button("▣ 確認套用 / Apply", type="primary", use_container_width=True)
+    st.info("V58：休息時間表格改為與 10｜權限管理相同按鈕模式；可新增、修改、勾選刪除，按下確認才永久保存並套用到工時計算。")
+    rest_draft_key = "system_rest_periods_draft_v58"
+    edited_rest = render_table(
+        rest_view,
+        "system_rest_periods",
+        editable=True,
+        disabled=["id"],
+        key="system_rest_periods_editor_v192",
+        height=360,
+        num_rows="dynamic",
+    )
+    if isinstance(edited_rest, pd.DataFrame):
+        st.session_state[rest_draft_key] = edited_rest.copy()
+    action = st.radio(
+        "確認後執行動作",
+        ["套用並永久儲存休息時間設定", "刪除勾選休息時間"],
+        horizontal=True,
+        key="system_rest_apply_action_v192",
+    )
+    submitted = st.button("▣ 確認套用 / Apply", type="primary", use_container_width=True, key="system_rest_apply_button_v58")
 
-    if submitted and edited_rest is not None:
+    if submitted:
+        edited_rest = st.session_state.get(rest_draft_key, edited_rest)
+        if edited_rest is None:
+            st.warning("找不到可套用的休息時間表格內容，請重新載入後再試。")
+            st.stop()
         if action == "套用並永久儲存休息時間設定":
             save_df = edited_rest.drop(columns=["刪除"], errors="ignore")
             count = save_rest_periods_df(save_df)

@@ -2124,3 +2124,186 @@ def render_dropdown_size_settings_panel():
 def render_dropdown_size_settings_panel_main_fallback():
     return
 # ===== V2.88 FAST BOOT GUARD END =====
+
+
+# ===== V2.89 PERMISSION BUTTON STANDARD GUARD START =====
+def apply_v289_permission_button_standard_guard():
+    """Force every Streamlit button/download/form-submit button to use the same
+    visual language as 10｜權限管理: light cyber button, dark readable text,
+    full-width friendly height, clear hover/disabled state, no clipped label.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+    st.markdown(
+        """
+        <style>
+        :root {
+            --spt-btn-bg-top: #f8fdff;
+            --spt-btn-bg-bottom: #d9f7ff;
+            --spt-btn-primary-top: #eaffff;
+            --spt-btn-primary-bottom: #bdf3ff;
+            --spt-btn-text: #031220;
+            --spt-btn-border: rgba(35, 230, 255, .96);
+            --spt-btn-glow: rgba(35, 230, 255, .30);
+            --spt-btn-hover-glow: rgba(35, 230, 255, .60);
+        }
+
+        /* All normal buttons, column buttons, form submit buttons and download buttons. */
+        div[data-testid="stButton"] > button,
+        .stButton > button,
+        div[data-testid="stDownloadButton"] > button,
+        .stDownloadButton > button,
+        div[data-testid="stFormSubmitButton"] > button,
+        div[data-testid="stFormSubmitButton"] button,
+        button[data-testid="baseButton-secondary"],
+        button[data-testid="baseButton-primary"],
+        button[kind="secondary"],
+        button[kind="primary"] {
+            min-height: 44px !important;
+            height: auto !important;
+            width: 100% !important;
+            padding: 8px 12px !important;
+            border-radius: 13px !important;
+            border: 1px solid var(--spt-btn-border) !important;
+            background: linear-gradient(180deg, var(--spt-btn-bg-top) 0%, var(--spt-btn-bg-bottom) 100%) !important;
+            color: var(--spt-btn-text) !important;
+            -webkit-text-fill-color: var(--spt-btn-text) !important;
+            font-size: 14.5px !important;
+            font-weight: 950 !important;
+            letter-spacing: .2px !important;
+            line-height: 1.28 !important;
+            text-align: center !important;
+            white-space: normal !important;
+            word-break: keep-all !important;
+            overflow: visible !important;
+            text-shadow: none !important;
+            box-shadow:
+                0 0 0 1px rgba(255,255,255,.72) inset,
+                0 0 0 2px rgba(35,230,255,.14) inset,
+                0 0 16px var(--spt-btn-glow) !important;
+            transition: transform .10s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease !important;
+        }
+
+        div[data-testid="stButton"] > button *,
+        .stButton > button *,
+        div[data-testid="stDownloadButton"] > button *,
+        .stDownloadButton > button *,
+        div[data-testid="stFormSubmitButton"] button *,
+        button[data-testid="baseButton-secondary"] *,
+        button[data-testid="baseButton-primary"] * {
+            color: var(--spt-btn-text) !important;
+            -webkit-text-fill-color: var(--spt-btn-text) !important;
+            font-weight: 950 !important;
+            text-shadow: none !important;
+        }
+
+        /* Primary buttons keep the same readable style, with slightly stronger cyan body. */
+        button[kind="primary"],
+        button[data-testid="baseButton-primary"],
+        div[data-testid="stFormSubmitButton"] button[kind="primary"] {
+            background: linear-gradient(180deg, var(--spt-btn-primary-top) 0%, var(--spt-btn-primary-bottom) 100%) !important;
+            border-color: #62f6ff !important;
+            box-shadow:
+                0 0 0 1px rgba(255,255,255,.86) inset,
+                0 0 0 2px rgba(35,230,255,.22) inset,
+                0 0 22px rgba(35,230,255,.42) !important;
+        }
+
+        div[data-testid="stButton"] > button:hover,
+        .stButton > button:hover,
+        div[data-testid="stDownloadButton"] > button:hover,
+        .stDownloadButton > button:hover,
+        div[data-testid="stFormSubmitButton"] button:hover,
+        button[data-testid="baseButton-secondary"]:hover,
+        button[data-testid="baseButton-primary"]:hover,
+        button[kind="secondary"]:hover,
+        button[kind="primary"]:hover {
+            background: linear-gradient(180deg, #ffffff 0%, #bdf4ff 100%) !important;
+            color: #020b14 !important;
+            -webkit-text-fill-color: #020b14 !important;
+            border-color: #8bfbff !important;
+            transform: translateY(-1px) !important;
+            box-shadow:
+                0 0 0 1px rgba(255,255,255,.94) inset,
+                0 0 0 2px rgba(35,230,255,.38) inset,
+                0 0 26px var(--spt-btn-hover-glow),
+                0 0 46px rgba(112,61,255,.18) !important;
+        }
+
+        div[data-testid="stButton"] > button:active,
+        .stButton > button:active,
+        div[data-testid="stDownloadButton"] > button:active,
+        .stDownloadButton > button:active,
+        div[data-testid="stFormSubmitButton"] button:active {
+            transform: translateY(0) scale(.995) !important;
+        }
+
+        div[data-testid="stButton"] > button:disabled,
+        .stButton > button:disabled,
+        div[data-testid="stDownloadButton"] > button:disabled,
+        .stDownloadButton > button:disabled,
+        div[data-testid="stFormSubmitButton"] button:disabled,
+        button:disabled {
+            background: linear-gradient(180deg, rgba(210,222,232,.78) 0%, rgba(175,194,208,.70) 100%) !important;
+            color: rgba(15,31,45,.68) !important;
+            -webkit-text-fill-color: rgba(15,31,45,.68) !important;
+            border-color: rgba(145,171,188,.70) !important;
+            box-shadow: 0 0 0 1px rgba(255,255,255,.48) inset !important;
+            opacity: .72 !important;
+            transform: none !important;
+            cursor: not-allowed !important;
+        }
+
+        /* Keep column groups compact and aligned like 10｜權限管理. */
+        div[data-testid="stHorizontalBlock"] div[data-testid="column"] .stButton,
+        div[data-testid="stHorizontalBlock"] div[data-testid="column"] [data-testid="stButton"],
+        div[data-testid="stHorizontalBlock"] div[data-testid="column"] .stDownloadButton,
+        div[data-testid="stHorizontalBlock"] div[data-testid="column"] [data-testid="stFormSubmitButton"] {
+            margin-top: 0 !important;
+            margin-bottom: 6px !important;
+            overflow: visible !important;
+        }
+
+        /* Older Streamlit sometimes clips buttons inside forms/expanders. */
+        div[data-testid="stForm"],
+        div[data-testid="stForm"] > div,
+        div[data-testid="stExpander"],
+        div[data-testid="stExpander"] > div {
+            overflow: visible !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v289_permission_button_standard_guard()
+except Exception:
+    pass
+
+for _spt_v289_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v289_func = globals().get(_spt_v289_name)
+    if callable(_spt_v289_func) and not getattr(_spt_v289_func, "_spt_v289_wrapped", False):
+        def _spt_v289_make_wrapper(_original):
+            def _spt_v289_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v289_permission_button_standard_guard()
+                except Exception:
+                    pass
+                return result
+            _spt_v289_wrapper._spt_v289_wrapped = True
+            return _spt_v289_wrapper
+        globals()[_spt_v289_name] = _spt_v289_make_wrapper(_spt_v289_func)
+# ===== V2.89 PERMISSION BUTTON STANDARD GUARD END =====

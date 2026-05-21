@@ -75,33 +75,33 @@ if not can_edit:
     render_table(view_df, "today_attendance_readonly_v202", editable=False, height=460)
 else:
     c1, c2, c3, c4 = st.columns(4)
-    if c1.button("⬡ 全選在廠", use_container_width=True, key="v202_today_factory_all_on"):
+    if c1.button("☑ 在廠全選 / Factory All", use_container_width=True, key="v202_today_factory_all_on"):
         st.session_state[STATE_KEY]["is_in_factory"] = True
         touch_editor()
         rerun()
-    if c2.button("⬡ 取消全選在廠", use_container_width=True, key="v202_today_factory_all_off"):
+    if c2.button("☐ 在廠取消 / Clear Factory", use_container_width=True, key="v202_today_factory_all_off"):
         st.session_state[STATE_KEY]["is_in_factory"] = False
         touch_editor()
         rerun()
-    if c3.button("⧖ 全選今日出勤", use_container_width=True, key="v202_today_attendance_all_on"):
+    if c3.button("☑ 今日出勤全選 / Attendance All", use_container_width=True, key="v202_today_attendance_all_on"):
         st.session_state[STATE_KEY]["is_today_attendance"] = True
         touch_editor()
         rerun()
-    if c4.button("⧖ 取消全選今日出勤", use_container_width=True, key="v202_today_attendance_all_off"):
+    if c4.button("☐ 今日出勤取消 / Clear Attendance", use_container_width=True, key="v202_today_attendance_all_off"):
         st.session_state[STATE_KEY]["is_today_attendance"] = False
         touch_editor()
         rerun()
 
     c5, c6, c7, c8 = st.columns(4)
-    if c5.button("◈ 啟用全選", use_container_width=True, key="v202_today_active_all_on"):
+    if c5.button("☑ 啟用全選 / Active All", use_container_width=True, key="v202_today_active_all_on"):
         st.session_state[STATE_KEY]["is_active"] = True
         touch_editor()
         rerun()
-    if c6.button("◌ 啟用全取消", use_container_width=True, key="v202_today_active_all_off"):
+    if c6.button("☐ 啟用取消 / Inactive All", use_container_width=True, key="v202_today_active_all_off"):
         st.session_state[STATE_KEY]["is_active"] = False
         touch_editor()
         rerun()
-    if c7.button("⟳ 重新載入", use_container_width=True, key="v202_today_reload"):
+    if c7.button("⟳ 重新載入 / Reload", use_container_width=True, key="v202_today_reload"):
         reload_employees()
         rerun()
     c8.caption("批次按鈕只改畫面暫存，按儲存後才寫入。")

@@ -1161,10 +1161,10 @@ with tab1:
             recalc_ids_state = set(int(x) for x in st.session_state.get(recalc_select_key, []) if int(x) in all_id_set)
 
             hc1, hc2, hc3, hc4 = st.columns(4)
-            hc1.button("⊖ 全選刪除 / Select Delete", use_container_width=True, key="history_select_delete_all_v27", on_click=_history_select, args=("delete", True))
-            hc2.button("◌ 取消刪除 / Clear Delete", use_container_width=True, key="history_clear_delete_all_v27", on_click=_history_select, args=("delete", False))
-            hc3.button("⊕ 全選重算 / Select Recalc", use_container_width=True, key="history_select_recalc_all_v27", on_click=_history_select, args=("recalc", True))
-            hc4.button("◌ 取消重算 / Clear Recalc", use_container_width=True, key="history_clear_recalc_all_v27", on_click=_history_select, args=("recalc", False))
+            hc1.button("☑ 刪除全選 / Select Delete", use_container_width=True, key="history_select_delete_all_v27", on_click=_history_select, args=("delete", True))
+            hc2.button("☐ 刪除取消 / Clear Delete", use_container_width=True, key="history_clear_delete_all_v27", on_click=_history_select, args=("delete", False))
+            hc3.button("☑ 重算全選 / Select Recalc", use_container_width=True, key="history_select_recalc_all_v27", on_click=_history_select, args=("recalc", True))
+            hc4.button("☐ 重算取消 / Clear Recalc", use_container_width=True, key="history_clear_recalc_all_v27", on_click=_history_select, args=("recalc", False))
 
             def _id_in_state(x, id_set: set[int]) -> bool:
                 try:
@@ -1182,18 +1182,36 @@ with tab1:
                 edit_df.insert(1, "重算", edit_df["id"].map(lambda x: _id_in_state(x, recalc_ids_state)) if "id" in edit_df.columns else False)
 
             editor_key = f"history_editor_v27_{st.session_state[editor_version_key]}"
-            st.info("批次按鈕會先改畫面勾選狀態；刪除、重算、儲存皆需按下方確認執行。")
-            with st.form("history_records_commit_form_v27", clear_on_submit=False):
-                edited = render_table(edit_df, "history_records", editable=True, disabled=["id", "record_key", "created_at", "updated_at"], key=editor_key, height=560)
-                history_action = st.radio(
-                    "確認後執行動作",
-                    ["儲存編輯", "重新計算勾選紀錄工時", "刪除勾選整列紀錄"],
-                    horizontal=True,
-                    key="history_action_v27",
-                )
-                submitted_history = st.form_submit_button("⚡ 確認執行 / Confirm", type="primary", use_container_width=True)
+            history_draft_key = "history_records_edited_draft_v58"
+            st.info("V58：歷史紀錄表格改為與 10｜權限管理相同按鈕模式；不再包 st.form，批次按鈕會直接更新同一份畫面暫存並刷新 editor key。")
+            edited = render_table(
+                edit_df,
+                "history_records",
+                editable=True,
+                disabled=["id", "record_key", "created_at", "updated_at"],
+                key=editor_key,
+                height=560,
+            )
+            if isinstance(edited, pd.DataFrame):
+                st.session_state[history_draft_key] = edited.copy()
+            history_action = st.radio(
+                "確認後執行動作",
+                ["儲存編輯", "重新計算勾選紀錄工時", "刪除勾選整列紀錄"],
+                horizontal=True,
+                key="history_action_v27",
+            )
+            submitted_history = st.button(
+                "▣ 確認執行 / Confirm",
+                type="primary",
+                use_container_width=True,
+                key="history_records_confirm_v58",
+            )
 
-            if submitted_history and edited is not None:
+            if submitted_history:
+                edited = st.session_state.get(history_draft_key, edited)
+                if edited is None:
+                    _add_history_result("warning", "找不到可儲存的歷史紀錄表格內容，請重新載入後再試。", append=False)
+                    rerun()
                 def _checked_ids(frame: pd.DataFrame, col: str) -> list[int]:
                     if frame is None or frame.empty or col not in frame.columns or "id" not in frame.columns:
                         return []

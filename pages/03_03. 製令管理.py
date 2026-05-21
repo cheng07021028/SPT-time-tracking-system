@@ -594,7 +594,7 @@ with tab1:
             st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上製令。")
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    if c1.button("⊕ 新增空白列", use_container_width=True, disabled=not work_order_edit_enabled):
+    if c1.button("⊕ 新增空白列 / Add Row", use_container_width=True, disabled=not work_order_edit_enabled):
         blank = pd.DataFrame([{
             "_delete": False, "id": "", "work_order": "", "part_no": "", "type_name": "",
             "assembly_location": "", "customer": "", "note": "", "is_active": True,
@@ -603,23 +603,23 @@ with tab1:
         st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
         _refresh_editor_widget()
         rerun()
-    if c2.button("◈ 啟用全選", use_container_width=True, disabled=not work_order_edit_enabled):
+    if c2.button("☑ 啟用全選 / Active All", use_container_width=True, disabled=not work_order_edit_enabled):
         st.session_state[STATE_KEY]["is_active"] = True
         _refresh_editor_widget()
         rerun()
-    if c3.button("◌ 啟用全取消", use_container_width=True, disabled=not work_order_edit_enabled):
+    if c3.button("☐ 啟用取消 / Inactive All", use_container_width=True, disabled=not work_order_edit_enabled):
         st.session_state[STATE_KEY]["is_active"] = False
         _refresh_editor_widget()
         rerun()
-    if c4.button("⊖ 刪除欄全選", use_container_width=True, disabled=not work_order_edit_enabled):
+    if c4.button("☑ 刪除全選 / Select Delete", use_container_width=True, disabled=not work_order_edit_enabled):
         st.session_state[STATE_KEY]["_delete"] = True
         _refresh_editor_widget()
         rerun()
-    if c5.button("◌ 刪除欄取消", use_container_width=True, disabled=not work_order_edit_enabled):
+    if c5.button("☐ 刪除取消 / Clear Delete", use_container_width=True, disabled=not work_order_edit_enabled):
         st.session_state[STATE_KEY]["_delete"] = False
         _refresh_editor_widget()
         rerun()
-    if c6.button("⟳ 重新載入", use_container_width=True):
+    if c6.button("⟳ 重新載入 / Reload", use_container_width=True):
         reload_data()
         _refresh_editor_widget()
         rerun()

@@ -468,11 +468,29 @@ with tab5:
     st.caption("此處編輯的是分析來源明細，儲存後會影響歷史紀錄與後續統計。工時欄位以 00:00:00 顯示，需調整時請改開始/結束時間後重新計算。")
     detail_limit = int(filters.get("detail_limit", 1000) or 1000)
     detail_df = df.head(detail_limit).drop(columns=["work_time_text"], errors="ignore")
-    st.info("明細編輯採確認後才儲存；表格內輸入不會立即寫入。")
-    with st.form("analysis_detail_commit_form", clear_on_submit=False):
-        edited = render_table(detail_df, "analysis_detail_records", editable=True, disabled=["id", "record_key", "created_at", "updated_at", "work_hours"], key="analysis_detail_editor", height=520)
-        submitted_analysis_detail = st.form_submit_button("💾 確認儲存分析明細 / Save Detail Records", type="primary", use_container_width=True)
-    if submitted_analysis_detail and edited is not None:
+    st.info("V58：明細編輯改為與 10｜權限管理相同按鈕模式；表格內修改只進入畫面暫存，按下確認儲存才正式寫入。")
+    analysis_detail_draft_key = "analysis_detail_records_draft_v58"
+    edited = render_table(
+        detail_df,
+        "analysis_detail_records",
+        editable=True,
+        disabled=["id", "record_key", "created_at", "updated_at", "work_hours"],
+        key="analysis_detail_editor_v58",
+        height=520,
+    )
+    if isinstance(edited, pd.DataFrame):
+        st.session_state[analysis_detail_draft_key] = edited.copy()
+    submitted_analysis_detail = st.button(
+        "▣ 確認儲存分析明細 / Save Detail Records",
+        type="primary",
+        use_container_width=True,
+        key="analysis_detail_save_button_v58",
+    )
+    if submitted_analysis_detail:
+        edited = st.session_state.get(analysis_detail_draft_key, edited)
+        if edited is None:
+            st.warning("找不到可儲存的分析明細內容，請重新載入後再試。")
+            st.stop()
         count = save_time_records(edited)
         st.success(f"已儲存 {count} 筆明細。")
         st.rerun()

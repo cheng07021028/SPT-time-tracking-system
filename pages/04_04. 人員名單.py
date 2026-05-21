@@ -261,7 +261,7 @@ with tab1:
             st.info("目前：唯讀保護。請先啟動編輯，再新增、修改、刪除、匯入或貼上人員名單。")
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    if c1.button("⊕ 新增空白列", use_container_width=True, disabled=not employee_edit_enabled):
+    if c1.button("⊕ 新增空白列 / Add Row", use_container_width=True, disabled=not employee_edit_enabled):
         blank = pd.DataFrame([{
             "_delete": False, "id": "", "employee_id": "", "employee_name": "",
             "department": "", "title": "", "is_active": True, "is_in_factory": True,
@@ -270,41 +270,41 @@ with tab1:
         st.session_state[STATE_KEY] = pd.concat([blank, st.session_state[STATE_KEY]], ignore_index=True)
         _refresh_editor_widget()
         rerun()
-    if c2.button("⊖ 刪除欄全選", use_container_width=True, disabled=not employee_edit_enabled):
+    if c2.button("☑ 刪除全選 / Select Delete", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["_delete"] = True
         _refresh_editor_widget()
         rerun()
-    if c3.button("◌ 刪除欄取消", use_container_width=True, disabled=not employee_edit_enabled):
+    if c3.button("☐ 刪除取消 / Clear Delete", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["_delete"] = False
         _refresh_editor_widget()
         rerun()
-    if c4.button("◈ 啟用全選", use_container_width=True, disabled=not employee_edit_enabled):
+    if c4.button("☑ 啟用全選 / Active All", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_active"] = True
         _refresh_editor_widget()
         rerun()
-    if c5.button("◌ 啟用全取消", use_container_width=True, disabled=not employee_edit_enabled):
+    if c5.button("☐ 啟用取消 / Inactive All", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_active"] = False
         _refresh_editor_widget()
         rerun()
-    if c6.button("⟳ 重新載入", use_container_width=True):
+    if c6.button("⟳ 重新載入 / Reload", use_container_width=True):
         reload_data()
         _refresh_editor_widget()
         rerun()
 
     b1, b2, b3, b4 = st.columns(4)
-    if b1.button("⬡ 在廠全選", use_container_width=True, disabled=not employee_edit_enabled):
+    if b1.button("☑ 在廠全選 / Factory All", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_in_factory"] = True
         _refresh_editor_widget()
         rerun()
-    if b2.button("⬡ 在廠全取消", use_container_width=True, disabled=not employee_edit_enabled):
+    if b2.button("☐ 在廠取消 / Clear Factory", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_in_factory"] = False
         _refresh_editor_widget()
         rerun()
-    if b3.button("⧖ 今日出勤全選", use_container_width=True, disabled=not employee_edit_enabled):
+    if b3.button("☑ 今日出勤全選 / Attendance All", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_today_attendance"] = True
         _refresh_editor_widget()
         rerun()
-    if b4.button("⧖ 今日出勤全取消", use_container_width=True, disabled=not employee_edit_enabled):
+    if b4.button("☐ 今日出勤取消 / Clear Attendance", use_container_width=True, disabled=not employee_edit_enabled):
         st.session_state[STATE_KEY]["is_today_attendance"] = False
         _refresh_editor_widget()
         rerun()
