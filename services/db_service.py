@@ -1477,14 +1477,41 @@ def _v24_should_audit_sql(sql: str | None) -> bool:
     return True
 
 
+
+
+def _v24_current_audit_user() -> str:
+    """Return Streamlit authenticated account for 06 LOG查詢.
+
+    The OS account on Streamlit Cloud is usually appuser/adminuser, which is not
+    useful for audit.  Prefer the login account stored by security_service.
+    """
+    try:
+        import streamlit as _v24_st
+        ss = getattr(_v24_st, 'session_state', {})
+        for key in ('auth_username', 'auth_user', 'username', 'current_username', 'login_username'):
+            value = str(ss.get(key, '') or '').strip()
+            if value and value.lower() not in {'none', 'nan', 'null'}:
+                return value
+        for key in ('current_user', 'user', 'auth_user_info'):
+            obj = ss.get(key)
+            if isinstance(obj, dict):
+                for sub_key in ('username', 'account', 'user', 'name'):
+                    value = str(obj.get(sub_key, '') or '').strip()
+                    if value and value.lower() not in {'none', 'nan', 'null'}:
+                        return value
+    except Exception:
+        pass
+    try:
+        return _v24_getpass.getuser()
+    except Exception:
+        return 'system'
+
+
 def _v24_audit_sql(sql: str | None, params: object = None, detail_prefix: str = '') -> None:
     if not _v24_should_audit_sql(sql):
         return
     action, table = _v24_sql_action_and_table(sql)
-    try:
-        user_name = _v24_getpass.getuser()
-    except Exception:
-        user_name = 'system'
+    user_name = _v24_current_audit_user()
     try:
         message = f'{action} {table}'.strip()
         detail = (detail_prefix + ' ' + str(sql or '')[:900]).strip()

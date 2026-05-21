@@ -14,7 +14,7 @@ from services.timezone_service import today_date
 st.set_page_config(page_title="06. LOG 查詢", page_icon="⧉", layout="wide")
 apply_theme()
 require_module_access("06_logs")
-render_header("06｜LOG 查詢", "系統操作、異常與資料異動紀錄查詢｜支援日期篩選與區間刪除")
+render_header("06｜LOG 查詢", "記錄哪個帳號、什麼時間、在哪個模組做了什麼動作｜支援日期篩選與區間刪除")
 
 
 def _default_filters() -> dict:
@@ -61,7 +61,7 @@ def _delete_logs_safely(start_date, end_date, username: str) -> int:
 if "log_query_filters" not in st.session_state:
     st.session_state["log_query_filters"] = _default_filters()
 
-st.markdown("### 查詢條件 / Query Filters")
+st.markdown("### 操作紀錄查詢 / Operation Log Search")
 with st.form("log_query_filter_form", clear_on_submit=False):
     f = st.session_state["log_query_filters"]
     c1, c2, c3 = st.columns([1, 1, 1])
@@ -70,7 +70,7 @@ with st.form("log_query_filter_form", clear_on_submit=False):
     limit = c3.number_input("讀取上限 / Limit", min_value=100, max_value=20000, value=int(f.get("limit", 1000)), step=100)
 
     c4, c5, c6 = st.columns([1, 1, 2])
-    action_type = c4.text_input("動作類型 / Action Type", value=str(f.get("action_type", "")))
+    action_type = c4.text_input("動作類型 / Action Type", value=str(f.get("action_type", "")), placeholder="例如：START_WORK、SAVE_TIME_RECORDS、INSERT、UPDATE、DELETE")
     levels = ["ALL", "INFO", "WARN", "ERROR", "FAIL", "SUCCESS"]
     current_level = str(f.get("level", "ALL"))
     level = c5.selectbox("等級 / Level", levels, index=levels.index(current_level) if current_level in levels else 0)
@@ -106,7 +106,13 @@ st.caption(
 )
 
 if not df.empty:
-    render_table(df, "system_logs", editable=False, height=620)
+    display_df = log_service.format_logs_for_display(df) if hasattr(log_service, "format_logs_for_display") else df
+    # 舊版已存在的 appuser/adminuser 紀錄無法反推真實帳號；V78 之後新產生的 LOG 會以登入帳號寫入。
+    if "帳號 / User" in display_df.columns:
+        legacy_count = int(display_df["帳號 / User"].astype(str).str.lower().isin(["appuser", "adminuser"]).sum())
+        if legacy_count > 0:
+            st.caption(f"注意：目前查詢內有 {legacy_count} 筆舊版 OS 帳號紀錄；V78 後新紀錄會寫入實際登入帳號。")
+    render_table(display_df, "system_logs", editable=False, height=620)
 else:
     st.info("此條件下尚無 LOG / No logs for current filters")
 
