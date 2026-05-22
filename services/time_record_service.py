@@ -4695,3 +4695,206 @@ def repair_time_record_active_cache_now(reason: str = "manual_v104_active_cache_
     return _v104_hydrate_sqlite_from_authority(active_only=False, reason=reason)
 
 # ===================== END V104 01 ACTIVE WORK AUTHORITY/SQLITE ALIGNMENT FIX =====================
+
+
+# ===================== V108 01 START/FINISH FAST ASYNC AUTHORITY UPLOAD =====================
+# 修正目的：
+# 1) V98 為了避免 Streamlit Cloud Reboot 後資料消失，在 01 開始/結束時同步 force upload GitHub。
+#    GitHub Contents API 偶發延遲時，會讓「開始作業」卡 1~2 分鐘。
+# 2) V108 改為「本機 canonical 權威檔立即寫入 + GitHub 背景合併上傳」。
+#    使用者按開始作業後先進入下一步，背景執行 01_time_records / 02_history 上傳。
+# 3) 不改 01 頁 UI、不改 10/11 權限/登入、不改刪除 tombstone、不改 01/02 同步規則。
+# 4) 管理員儲存/刪除/重算仍保留原先同步權威邏輯；本段只覆蓋高頻的 start_work / finish_work。
+
+try:
+    _v108_core_start_work = _v98_prev_start_work  # V97/V96 core: SQL insert + local authority upsert, no V98 force upload.
+except Exception:  # pragma: no cover
+    _v108_core_start_work = None
+
+try:
+    _v108_core_finish_work = _v98_prev_finish_work  # V96/V90 core: SQL finish + local authority upsert, no V98 force upload.
+except Exception:  # pragma: no cover
+    _v108_core_finish_work = None
+
+_v108_upload_state = {
+    "running": False,
+    "pending": False,
+    "reason": "",
+    "last_start": 0.0,
+    "last_finish": 0.0,
+    "last_error": "",
+}
+
+
+def _v108_log(level: str, message: str, record_id: int | str | None = None) -> None:
+    try:
+        write_log("V108_TIME_AUTH_ASYNC", message, "time_records", record_id or "", level=level)
+    except Exception:
+        pass
+
+
+def _v108_schedule_time_authority_upload(reason: str = "v108_async_time_authority_upload", *, delay_sec: float = 0.35) -> None:
+    """Coalesced background GitHub upload for 01/02 canonical authority files.
+
+    The local authority files are already updated before this function is called.
+    This function only publishes the latest local files to GitHub in a daemon thread
+    so high-frequency shop-floor actions do not wait for network round trips.
+    """
+    try:
+        import threading as _threading
+        import time as _time
+    except Exception:
+        return
+
+    def _worker() -> None:
+        # Small delay allows multiple rapid start/finish actions to collapse into one GitHub publish.
+        try:
+            _time.sleep(max(float(delay_sec or 0), 0.0))
+        except Exception:
+            pass
+        while True:
+            reason_now = ""
+            try:
+                reason_now = str(_v108_upload_state.get("reason") or reason or "v108_async_time_authority_upload")
+                _v108_upload_state["pending"] = False
+            except Exception:
+                reason_now = reason
+            try:
+                if "_v98_force_upload_time_authority" in globals():
+                    _v98_force_upload_time_authority(reason_now)
+                elif "_v98_sync_0102_from_sqlite" in globals():
+                    _v98_sync_0102_from_sqlite(reason_now, github=True)
+                _v108_upload_state["last_finish"] = _time.time()
+                _v108_upload_state["last_error"] = ""
+            except Exception as exc:
+                _v108_upload_state["last_error"] = str(exc)[:500]
+                _v108_log("ERROR", f"背景上傳 01/02 權威檔失敗：{exc}")
+            try:
+                if not bool(_v108_upload_state.get("pending")):
+                    _v108_upload_state["running"] = False
+                    return
+                # Another action arrived while uploading; wait briefly and upload newest local files once more.
+                _time.sleep(0.2)
+            except Exception:
+                _v108_upload_state["running"] = False
+                return
+
+    try:
+        _v108_upload_state["reason"] = str(reason or "v108_async_time_authority_upload")
+        _v108_upload_state["pending"] = True
+        if bool(_v108_upload_state.get("running")):
+            return
+        _v108_upload_state["running"] = True
+        _v108_upload_state["last_start"] = _time.time()
+        t = _threading.Thread(target=_worker, name="SPT-V108-TimeAuthorityUpload", daemon=True)
+        t.start()
+    except Exception as exc:
+        _v108_upload_state["running"] = False
+        _v108_upload_state["last_error"] = str(exc)[:500]
+        _v108_log("ERROR", f"啟動背景上傳 01/02 權威檔失敗：{exc}")
+
+
+def flush_time_record_authority_upload_now(reason: str = "manual_flush_time_authority_v108") -> bool:
+    """Optional diagnostic/manual helper: synchronously upload latest local 01/02 authority files."""
+    try:
+        if "_v98_force_upload_time_authority" in globals():
+            _v98_force_upload_time_authority(reason)
+            return True
+    except Exception as exc:
+        _v108_upload_state["last_error"] = str(exc)[:500]
+        _v108_log("ERROR", f"手動同步 01/02 權威檔失敗：{exc}")
+    return False
+
+
+def get_time_authority_upload_status() -> dict:
+    """Small status helper for diagnostics without forcing a GitHub call."""
+    try:
+        return dict(_v108_upload_state)
+    except Exception:
+        return {"running": False, "pending": False, "last_error": "status_unavailable"}
+
+
+def _v108_local_upsert_started_row(rid: int) -> None:
+    try:
+        row = _v98_rows_by_ids([rid]) if "_v98_rows_by_ids" in globals() else pd.DataFrame()
+        if isinstance(row, pd.DataFrame) and not row.empty:
+            if "record_key" in row.columns and "_v97_clear_reused_id_tombstone" in globals():
+                try:
+                    _v97_clear_reused_id_tombstone(int(rid), str(row.iloc[0].get("record_key") or ""))
+                except Exception:
+                    pass
+            if "_v96_upsert_rows_to_authority" in globals():
+                _v96_upsert_rows_to_authority(row, "start_work_v108_fast_local_upsert", github=False)
+        elif "_v98_sync_0102_from_sqlite" in globals():
+            _v98_sync_0102_from_sqlite("start_work_v108_fast_local_repair", github=False)
+    except Exception as exc:
+        _v108_log("ERROR", f"開始作業後本機 01/02 權威檔同步失敗：{exc}", rid)
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V108 fast path for 01 Start Work.
+
+    Synchronous path: SQLite business insert + local canonical authority write.
+    Asynchronous path: GitHub publish of latest 01/02 authority files.
+    """
+    core = _v108_core_start_work if callable(_v108_core_start_work) else None
+    if core is None:
+        # Last-resort fallback keeps app functional, but should not happen in current build.
+        core = _v98_prev_start_work if callable(globals().get("_v98_prev_start_work")) else None
+    if core is None:
+        raise RuntimeError("start_work core implementation is unavailable")
+    rid = int(core(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        _v108_local_upsert_started_row(rid)
+        try:
+            clear_today_records_fast_cache()
+        except Exception:
+            pass
+        try:
+            clear_query_cache()
+        except Exception:
+            pass
+        _v108_schedule_time_authority_upload("start_work_v108_async_publish")
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V108 fast path for 01 Finish Work.
+
+    Also avoids waiting for GitHub when ending/pause/complete/off-duty from 01.
+    """
+    try:
+        rid = int(float(str(record_id).strip()))
+    except Exception:
+        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+    try:
+        rec = query_one("SELECT * FROM time_records WHERE id=?", (rid,))
+        if not rec and "_v104_hydrate_sqlite_from_authority" in globals():
+            _v104_hydrate_sqlite_from_authority(active_only=False, reason="finish_work_v108_pre_hydrate")
+    except Exception:
+        pass
+    core = _v108_core_finish_work if callable(_v108_core_finish_work) else None
+    if core is None:
+        core = _v98_prev_finish_work if callable(globals().get("_v98_prev_finish_work")) else None
+    if core is None:
+        raise RuntimeError("finish_work core implementation is unavailable")
+    n = int(core(rid, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n:
+        try:
+            if "_v98_sync_0102_from_sqlite" in globals():
+                _v98_sync_0102_from_sqlite("finish_work_v108_fast_local_sync", github=False)
+        except Exception as exc:
+            _v108_log("ERROR", f"結束作業後本機 01/02 權威檔同步失敗：{exc}", rid)
+        try:
+            clear_today_records_fast_cache()
+        except Exception:
+            pass
+        try:
+            clear_query_cache()
+        except Exception:
+            pass
+        _v108_schedule_time_authority_upload("finish_work_v108_async_publish")
+    return n
+
+# =================== END V108 01 START/FINISH FAST ASYNC AUTHORITY UPLOAD =====================
+
