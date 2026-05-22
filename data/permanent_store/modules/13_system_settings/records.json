@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "13_system_settings",
   "kind": "records",
-  "updated_at": "2026-05-22 08:55:47",
-  "exported_at": "2026-05-22 08:55:47",
-  "reason": "save_process_options_v28",
+  "updated_at": "2026-05-22 08:56:21",
+  "exported_at": "2026-05-22 08:56:21",
+  "reason": "save_process_categories_v28",
   "empty_authoritative": false,
   "tables": {
     "process_categories": [
@@ -47,7 +47,7 @@
       {
         "id": "",
         "category_name": "GPTC",
-        "is_active": "",
+        "is_active": true,
         "sort_order": "",
         "note": "",
         "created_at": "",
@@ -56,7 +56,7 @@
       {
         "id": "",
         "category_name": "BWBS",
-        "is_active": "",
+        "is_active": true,
         "sort_order": "",
         "note": "",
         "created_at": "",
