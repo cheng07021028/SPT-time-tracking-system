@@ -504,3 +504,51 @@ def save_employees(df: pd.DataFrame) -> dict:  # type: ignore[override]
         _v28_update_tables("04_employees", {"employees": rows}, reason="crud_save_employees_v28")
     log_action("SAVE_EMPLOYEES", "employees", "V28 儲存人員清單", f"rows={len(rows)}")
     return {"inserted": 0, "updated": len(rows), "deleted": 0, "skipped": 0, "saved": len(rows)}
+
+
+# ========================= V84 CRUD SINGLE AUTHORITY SAVE =========================
+def _v84_crud_authority_exists(module_key: str) -> bool:
+    try:
+        from services.permanent_authority_service import authority_file_exists as _pa_exists
+        return bool(_pa_exists(module_key, "records"))
+    except Exception:
+        return False
+
+
+def load_work_orders() -> pd.DataFrame:  # type: ignore[override]
+    cols = ["id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
+    if _v28_df_from_table is not None and _v84_crud_authority_exists("03_work_orders"):
+        df = _v28_df_from_table("03_work_orders", "work_orders", columns=cols)
+        for c in cols:
+            if c not in df.columns:
+                df[c] = ""
+        return df[cols]
+    return pd.DataFrame(columns=cols)
+
+
+def load_employees() -> pd.DataFrame:  # type: ignore[override]
+    cols = ["id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at"]
+    if _v28_df_from_table is not None and _v84_crud_authority_exists("04_employees"):
+        df = _v28_df_from_table("04_employees", "employees", columns=cols)
+        for c in cols:
+            if c not in df.columns:
+                df[c] = ""
+        return df[cols]
+    return pd.DataFrame(columns=cols)
+
+
+def save_work_orders(df: pd.DataFrame) -> dict:  # type: ignore[override]
+    rows = _v28_table_from_df(df.drop(columns=["刪除 / Delete", "刪除", "_delete"], errors="ignore")) if _v28_table_from_df is not None else []
+    if _v28_update_tables is not None:
+        _v28_update_tables("03_work_orders", {"work_orders": rows}, reason="crud_save_work_orders_v84", github=True)
+    log_action("SAVE_WORK_ORDERS", "work_orders", "V84 canonical 儲存製令清單", f"rows={len(rows)}")
+    return {"inserted": 0, "updated": len(rows), "deleted": 0, "skipped": 0, "saved": len(rows)}
+
+
+def save_employees(df: pd.DataFrame) -> dict:  # type: ignore[override]
+    rows = _v28_table_from_df(df.drop(columns=["刪除 / Delete", "刪除", "_delete"], errors="ignore")) if _v28_table_from_df is not None else []
+    if _v28_update_tables is not None:
+        _v28_update_tables("04_employees", {"employees": rows}, reason="crud_save_employees_v84", github=True)
+    log_action("SAVE_EMPLOYEES", "employees", "V84 canonical 儲存人員清單", f"rows={len(rows)}")
+    return {"inserted": 0, "updated": len(rows), "deleted": 0, "skipped": 0, "saved": len(rows)}
+# ======================= END V84 CRUD SINGLE AUTHORITY SAVE =====================

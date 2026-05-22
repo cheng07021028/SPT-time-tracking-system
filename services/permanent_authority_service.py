@@ -696,3 +696,336 @@ def update_tables(module_key: str, updates: dict[str, list[dict[str, Any]]], *, 
 def save_settings(module_key: str, settings: dict[str, Any], *, reason: str = "save_settings", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
     return save_authority(module_key, settings=settings or {}, reason=reason, github=github)
 # ======================= END V72 Fast Local-First Authority Save =======================
+
+
+# ========================= V84 SINGLE CANONICAL AUTHORITY MODE =========================
+# 依 V28 已驗證方法回復並強化：每個模組只讀/寫 data/permanent_store/modules/<module_key>/<kind>.json。
+# - canonical 檔案存在時，絕不再從 SQLite、persistent_modules、persistent_state、history 或預設資料修復覆蓋。
+# - canonical 檔案不存在時，才做一次舊資料遷移，建立 canonical。
+# - save 只寫 canonical 本檔；不寫 history backup，不寫 manifest，不掃描舊路徑。
+# - GitHub write-through 仍只寫同一個 canonical repo path，避免 Reboot App 後恢復舊資料。
+
+def authority_file_exists(module_key: str, kind: str = "records") -> bool:
+    try:
+        return canonical_path(str(module_key), "settings" if str(kind).lower().startswith("set") else "records").exists()
+    except Exception:
+        return False
+
+
+def _v84_empty_payload(module_key: str, kind: str, reason: str = "empty_canonical_created_v84") -> dict[str, Any]:
+    return normalize_payload(str(module_key), "settings" if str(kind).lower().startswith("set") else "records", {}, reason=reason, empty_authoritative=True)
+
+
+def load_authority(module_key: str, kind: str = "records") -> dict[str, Any]:  # type: ignore[override]
+    """V84: read canonical only once it exists; no repair from old/DB/history."""
+    ensure_dirs()
+    module_key = str(module_key)
+    kind = "settings" if str(kind).lower().startswith("set") else "records"
+    p = canonical_path(module_key, kind)
+    if p.exists():
+        data = read_json(p)
+        # Return a normalized in-memory view, but do not rewrite or repair from any other source.
+        if data:
+            return normalize_payload(module_key, kind, data, reason=data.get("reason") or "canonical_loaded_v84", empty_authoritative=bool(data.get("empty_authoritative", False)))
+        return _v84_empty_payload(module_key, kind, reason="empty_or_invalid_canonical_loaded_v84")
+
+    # First-time only: if the canonical file does not exist, migrate one best legacy payload.
+    legacy = _best_legacy_payload(module_key, kind)
+    if legacy:
+        payload = normalize_payload(module_key, kind, legacy, reason=legacy.get("reason", "migrated_once_v84"), empty_authoritative=False)
+    else:
+        payload = _v84_empty_payload(module_key, kind)
+    atomic_write_json(p, payload)
+    return payload
+
+
+def load_tables(module_key: str, kind: str = "records") -> dict[str, list[dict[str, Any]]]:  # type: ignore[override]
+    payload = load_authority(module_key, kind)
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    return {str(k): _clean_rows(v) for k, v in tables.items()}
+
+
+def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    """V84: write only the canonical authority file(s). No legacy mirror/history/manifest writes."""
+    ensure_dirs()
+    module_key = str(module_key)
+    out: dict[str, Any] = {"ok": True, "module_key": module_key, "files": [], "github": [], "mode": "v84_single_canonical"}
+
+    if records is not None:
+        p = canonical_path(module_key, "records")
+        empty_auth = _table_counts(records) == {} or sum(_table_counts(records).values()) == 0
+        payload = normalize_payload(module_key, "records", {"tables": records}, reason=reason, empty_authoritative=empty_auth)
+        new_text = _v72_payload_text(payload) if "_v72_payload_text" in globals() else json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default)
+        old_text = _v72_read_text_safe(p) if "_v72_read_text_safe" in globals() else (p.read_text(encoding="utf-8") if p.exists() else "")
+        changed = (_v72_sha_text(new_text) if "_v72_sha_text" in globals() else hashlib.sha256(new_text.encode("utf-8")).hexdigest()) != (_v72_sha_text(old_text) if "_v72_sha_text" in globals() else hashlib.sha256(old_text.encode("utf-8")).hexdigest())
+        if changed:
+            atomic_write_json(p, payload)
+        out["files"].append(str(p))
+        out["changed_records"] = bool(changed)
+        if github and changed:
+            out["github"].append(github_put_file(p, p.read_text(encoding="utf-8"), f"SPT authority {module_key} records: {reason}"))
+        elif github:
+            out["github"].append({"ok": True, "skipped": True, "reason": "unchanged_single_canonical", "path": _remote_path(p), "mode": "v84_single_canonical"})
+
+    if settings is not None:
+        p = canonical_path(module_key, "settings")
+        payload = normalize_payload(module_key, "settings", {"settings": settings or {}, "tables": (settings or {}).get("tables", {}) if isinstance(settings, dict) else {}}, reason=reason)
+        new_text = _v72_payload_text(payload) if "_v72_payload_text" in globals() else json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default)
+        old_text = _v72_read_text_safe(p) if "_v72_read_text_safe" in globals() else (p.read_text(encoding="utf-8") if p.exists() else "")
+        changed = (_v72_sha_text(new_text) if "_v72_sha_text" in globals() else hashlib.sha256(new_text.encode("utf-8")).hexdigest()) != (_v72_sha_text(old_text) if "_v72_sha_text" in globals() else hashlib.sha256(old_text.encode("utf-8")).hexdigest())
+        if changed:
+            atomic_write_json(p, payload)
+        out["files"].append(str(p))
+        out["changed_settings"] = bool(changed)
+        if github and changed:
+            out["github"].append(github_put_file(p, p.read_text(encoding="utf-8"), f"SPT authority {module_key} settings: {reason}"))
+        elif github:
+            out["github"].append({"ok": True, "skipped": True, "reason": "unchanged_single_canonical", "path": _remote_path(p), "mode": "v84_single_canonical"})
+    return out
+
+
+def update_tables(module_key: str, updates: dict[str, list[dict[str, Any]]], *, reason: str = "update_tables", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    cur = load_tables(module_key, "records")
+    cur.update({str(k): _clean_rows(v) for k, v in (updates or {}).items()})
+    return save_authority(module_key, records=cur, reason=reason, github=github)
+
+
+def load_settings(module_key: str) -> dict[str, Any]:  # type: ignore[override]
+    payload = load_authority(module_key, "settings")
+    return payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
+
+
+def save_settings(module_key: str, settings: dict[str, Any], *, reason: str = "save_settings", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    return save_authority(module_key, settings=settings or {}, reason=reason, github=github)
+# ======================= END V84 SINGLE CANONICAL AUTHORITY MODE =====================
+
+
+# ========================= V84.1 PROMOTE MISPLACED CANONICAL SETTINGS TABLES =========================
+# 有些先前版本誤把 records 內容寫進 settings.json，導致 records.json 是空檔。
+# 這裡只在 records.json 已存在但為 0 筆、且同模組 settings.json 內有 tables 時，
+# 一次性把 settings.tables 搬回 records.json。搬回後仍只以 records.json 作資料權威。
+
+def _v841_promote_settings_tables_if_records_empty(module_key: str, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        if kind != "records" or _total_rows(payload) > 0:
+            return payload
+        sp = canonical_path(module_key, "settings")
+        if not sp.exists():
+            return payload
+        sdata = read_json(sp)
+        tables = _extract_tables(sdata, module_key)
+        if not tables or sum(len(v) for v in tables.values() if isinstance(v, list)) <= 0:
+            return payload
+        promoted = normalize_payload(module_key, "records", {"tables": tables}, reason="promoted_from_canonical_settings_tables_v84_1", empty_authoritative=False)
+        atomic_write_json(canonical_path(module_key, "records"), promoted)
+        return promoted
+    except Exception:
+        return payload
+
+
+def load_authority(module_key: str, kind: str = "records") -> dict[str, Any]:  # type: ignore[override]
+    ensure_dirs()
+    module_key = str(module_key)
+    kind = "settings" if str(kind).lower().startswith("set") else "records"
+    p = canonical_path(module_key, kind)
+    if p.exists():
+        data = read_json(p)
+        if data:
+            payload = normalize_payload(module_key, kind, data, reason=data.get("reason") or "canonical_loaded_v84_1", empty_authoritative=bool(data.get("empty_authoritative", False)))
+        else:
+            payload = _v84_empty_payload(module_key, kind, reason="empty_or_invalid_canonical_loaded_v84_1")
+        return _v841_promote_settings_tables_if_records_empty(module_key, kind, payload)
+
+    legacy = _best_legacy_payload(module_key, kind)
+    if legacy:
+        payload = normalize_payload(module_key, kind, legacy, reason=legacy.get("reason", "migrated_once_v84_1"), empty_authoritative=False)
+    else:
+        payload = _v84_empty_payload(module_key, kind, reason="empty_canonical_created_v84_1")
+    atomic_write_json(p, payload)
+    return payload
+
+
+def load_tables(module_key: str, kind: str = "records") -> dict[str, list[dict[str, Any]]]:  # type: ignore[override]
+    payload = load_authority(module_key, kind)
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    return {str(k): _clean_rows(v) for k, v in tables.items()}
+# ======================= END V84.1 PROMOTE MISPLACED CANONICAL SETTINGS TABLES =====================
+
+
+# ========================= V84.2 PRIMARY TABLE EMPTY PROMOTION =========================
+_V842_PRIMARY_TABLES = {
+    "01_time_records": ["time_records"],
+    "02_history": ["time_records"],
+    "03_work_orders": ["work_orders"],
+    "04_employees": ["employees"],
+    "10_permissions": ["auth_users"],
+    "11_login_logs": ["auth_login_logs", "login_logs", "security_login_logs"],
+    "13_system_settings": ["process_categories", "process_category_options", "rest_periods"],
+}
+
+
+def _v842_primary_empty(module_key: str, payload: dict[str, Any]) -> bool:
+    try:
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        primaries = _V842_PRIMARY_TABLES.get(module_key, [])
+        if not primaries:
+            return _total_rows(payload) <= 0
+        # If all expected primary tables are missing/empty, the records authority is functionally empty.
+        return all(len(tables.get(t, []) if isinstance(tables.get(t), list) else []) <= 0 for t in primaries)
+    except Exception:
+        return False
+
+
+def _v842_promote_settings_tables_if_primary_empty(module_key: str, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        if kind != "records" or not _v842_primary_empty(module_key, payload):
+            return payload
+        sp = canonical_path(module_key, "settings")
+        if not sp.exists():
+            return payload
+        sdata = read_json(sp)
+        tables = _extract_tables(sdata, module_key)
+        if not tables:
+            return payload
+        # Only promote if the settings file has at least one primary table with data.
+        primaries = _V842_PRIMARY_TABLES.get(module_key, [])
+        if primaries and all(len(tables.get(t, []) if isinstance(tables.get(t), list) else []) <= 0 for t in primaries):
+            return payload
+        if not primaries and sum(len(v) for v in tables.values() if isinstance(v, list)) <= 0:
+            return payload
+        promoted = normalize_payload(module_key, "records", {"tables": tables}, reason="promoted_from_canonical_settings_primary_empty_v84_2", empty_authoritative=False)
+        atomic_write_json(canonical_path(module_key, "records"), promoted)
+        return promoted
+    except Exception:
+        return payload
+
+
+def load_authority(module_key: str, kind: str = "records") -> dict[str, Any]:  # type: ignore[override]
+    ensure_dirs()
+    module_key = str(module_key)
+    kind = "settings" if str(kind).lower().startswith("set") else "records"
+    p = canonical_path(module_key, kind)
+    if p.exists():
+        data = read_json(p)
+        if data:
+            payload = normalize_payload(module_key, kind, data, reason=data.get("reason") or "canonical_loaded_v84_2", empty_authoritative=bool(data.get("empty_authoritative", False)))
+        else:
+            payload = _v84_empty_payload(module_key, kind, reason="empty_or_invalid_canonical_loaded_v84_2")
+        payload = _v841_promote_settings_tables_if_records_empty(module_key, kind, payload)
+        payload = _v842_promote_settings_tables_if_primary_empty(module_key, kind, payload)
+        return payload
+    legacy = _best_legacy_payload(module_key, kind)
+    if legacy:
+        payload = normalize_payload(module_key, kind, legacy, reason=legacy.get("reason", "migrated_once_v84_2"), empty_authoritative=False)
+    else:
+        payload = _v84_empty_payload(module_key, kind, reason="empty_canonical_created_v84_2")
+    atomic_write_json(p, payload)
+    return payload
+# ======================= END V84.2 PRIMARY TABLE EMPTY PROMOTION =====================
+
+
+# ========================= V84.3 DO NOT REVIVE FUTURE EMPTY CANONICAL FILES =========================
+# V84 之後若使用者真的把某模組刪成 0 筆，save_authority 會寫入 v84 reason。
+# 這種 0 筆是正式結果，不能再從 settings 舊資料復活。
+
+def _v843_allow_promote_from_settings(payload: dict[str, Any]) -> bool:
+    reason = str(payload.get("reason") or "").lower()
+    if "v84" in reason or "single_canonical" in reason:
+        return False
+    return True
+
+
+def _v842_promote_settings_tables_if_primary_empty(module_key: str, kind: str, payload: dict[str, Any]) -> dict[str, Any]:  # type: ignore[override]
+    try:
+        if kind != "records" or not _v842_primary_empty(module_key, payload):
+            return payload
+        if not _v843_allow_promote_from_settings(payload):
+            return payload
+        sp = canonical_path(module_key, "settings")
+        if not sp.exists():
+            return payload
+        sdata = read_json(sp)
+        tables = _extract_tables(sdata, module_key)
+        if not tables:
+            return payload
+        primaries = _V842_PRIMARY_TABLES.get(module_key, [])
+        if primaries and all(len(tables.get(t, []) if isinstance(tables.get(t), list) else []) <= 0 for t in primaries):
+            return payload
+        if not primaries and sum(len(v) for v in tables.values() if isinstance(v, list)) <= 0:
+            return payload
+        promoted = normalize_payload(module_key, "records", {"tables": tables}, reason="promoted_from_canonical_settings_primary_empty_v84_3", empty_authoritative=False)
+        atomic_write_json(canonical_path(module_key, "records"), promoted)
+        return promoted
+    except Exception:
+        return payload
+
+
+def load_authority(module_key: str, kind: str = "records") -> dict[str, Any]:  # type: ignore[override]
+    ensure_dirs()
+    module_key = str(module_key)
+    kind = "settings" if str(kind).lower().startswith("set") else "records"
+    p = canonical_path(module_key, kind)
+    if p.exists():
+        data = read_json(p)
+        if data:
+            payload = normalize_payload(module_key, kind, data, reason=data.get("reason") or "canonical_loaded_v84_3", empty_authoritative=bool(data.get("empty_authoritative", False)))
+        else:
+            payload = _v84_empty_payload(module_key, kind, reason="empty_or_invalid_canonical_loaded_v84_3")
+        if _v843_allow_promote_from_settings(payload):
+            payload = _v841_promote_settings_tables_if_records_empty(module_key, kind, payload)
+            payload = _v842_promote_settings_tables_if_primary_empty(module_key, kind, payload)
+        return payload
+    legacy = _best_legacy_payload(module_key, kind)
+    if legacy:
+        payload = normalize_payload(module_key, kind, legacy, reason=legacy.get("reason", "migrated_once_v84_3"), empty_authoritative=False)
+    else:
+        payload = _v84_empty_payload(module_key, kind, reason="empty_canonical_created_v84_3")
+    atomic_write_json(p, payload)
+    return payload
+# ======================= END V84.3 DO NOT REVIVE FUTURE EMPTY CANONICAL FILES =====================
+
+
+# ========================= V84.4 PROMOTE LEGACY ONLY FOR PRE-V84 BROKEN EMPTY PRIMARY =========================
+# 如果 records.json 已存在但主表為空，而且 reason 是 V84 之前的舊錯誤，允許最後一次從舊 latest/DB 遷移。
+# V84 之後寫出的空 records 會保留為正式空資料，不再復活舊檔。
+
+def _v844_promote_legacy_if_pre_v84_primary_empty(module_key: str, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        if kind != "records" or not _v842_primary_empty(module_key, payload) or not _v843_allow_promote_from_settings(payload):
+            return payload
+        legacy = _best_legacy_payload(module_key, kind)
+        if not legacy:
+            return payload
+        promoted = normalize_payload(module_key, kind, legacy, reason="promoted_from_legacy_pre_v84_primary_empty_v84_4", empty_authoritative=False)
+        if _v842_primary_empty(module_key, promoted):
+            return payload
+        atomic_write_json(canonical_path(module_key, kind), promoted)
+        return promoted
+    except Exception:
+        return payload
+
+
+def load_authority(module_key: str, kind: str = "records") -> dict[str, Any]:  # type: ignore[override]
+    ensure_dirs()
+    module_key = str(module_key)
+    kind = "settings" if str(kind).lower().startswith("set") else "records"
+    p = canonical_path(module_key, kind)
+    if p.exists():
+        data = read_json(p)
+        if data:
+            payload = normalize_payload(module_key, kind, data, reason=data.get("reason") or "canonical_loaded_v84_4", empty_authoritative=bool(data.get("empty_authoritative", False)))
+        else:
+            payload = _v84_empty_payload(module_key, kind, reason="empty_or_invalid_canonical_loaded_v84_4")
+        if _v843_allow_promote_from_settings(payload):
+            payload = _v841_promote_settings_tables_if_records_empty(module_key, kind, payload)
+            payload = _v842_promote_settings_tables_if_primary_empty(module_key, kind, payload)
+            payload = _v844_promote_legacy_if_pre_v84_primary_empty(module_key, kind, payload)
+        return payload
+    legacy = _best_legacy_payload(module_key, kind)
+    if legacy:
+        payload = normalize_payload(module_key, kind, legacy, reason=legacy.get("reason", "migrated_once_v84_4"), empty_authoritative=False)
+    else:
+        payload = _v84_empty_payload(module_key, kind, reason="empty_canonical_created_v84_4")
+    atomic_write_json(p, payload)
+    return payload
+# ======================= END V84.4 PROMOTE LEGACY ONLY FOR PRE-V84 BROKEN EMPTY PRIMARY =====================

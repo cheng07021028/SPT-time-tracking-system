@@ -505,3 +505,84 @@ def has_master_data_for_time_record_fast(employees=None, work_orders=None):
             "work_orders_count": int(len(wo_df)) if wo_df is not None and hasattr(wo_df, "__len__") else 0,
         }
     return has_emp, has_wo
+
+
+# ========================= V84 03/04 SINGLE AUTHORITY LOAD/SAVE =========================
+# canonical 檔存在時，即使為空也視為正式資料，不得 fallback SQLite 舊快取。
+
+def _v84_md_authority_exists(module_key: str) -> bool:
+    try:
+        from services.permanent_authority_service import authority_file_exists as _pa_exists
+        return bool(_pa_exists(module_key, "records"))
+    except Exception:
+        return False
+
+
+def load_work_orders(active_only: bool = True) -> pd.DataFrame:  # type: ignore[override]
+    cols = ["id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
+    if _v28_df_from_table is not None and _v84_md_authority_exists("03_work_orders"):
+        df = _v28_df_from_table("03_work_orders", "work_orders", columns=cols)
+        for c in cols:
+            if c not in df.columns:
+                df[c] = ""
+        if active_only and not df.empty:
+            mask = _v28_bool_series(df, "is_active")
+            if mask is not None:
+                df = df[mask]
+        return df[cols].sort_values("work_order", kind="stable").reset_index(drop=True) if not df.empty else df[cols]
+    return query_df("SELECT * FROM work_orders" + (" WHERE is_active=1" if active_only else "") + " ORDER BY work_order")
+
+
+def load_employees(active_only: bool = True, in_factory_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    cols = ["id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at"]
+    if _v28_df_from_table is not None and _v84_md_authority_exists("04_employees"):
+        df = _v28_df_from_table("04_employees", "employees", columns=cols)
+        for c in cols:
+            if c not in df.columns:
+                df[c] = ""
+        if active_only and not df.empty:
+            mask = _v28_bool_series(df, "is_active")
+            if mask is not None:
+                df = df[mask]
+        if in_factory_only and not df.empty:
+            mask = _v28_bool_series(df, "is_in_factory")
+            if mask is not None:
+                df = df[mask]
+        out = df[cols].sort_values("employee_id", kind="stable").reset_index(drop=True) if not df.empty else df[cols]
+        return _filter_employees_for_time_record(out)
+    sql = "SELECT * FROM employees WHERE 1=1"
+    if active_only:
+        sql += " AND is_active=1"
+    if in_factory_only:
+        sql += " AND is_in_factory=1"
+    sql += " ORDER BY employee_id"
+    return _filter_employees_for_time_record(query_df(sql))
+
+
+def save_work_orders_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    rows = _v28_table_from_df(df) if _v28_table_from_df is not None else []
+    if _v28_update_tables is not None:
+        _v28_update_tables("03_work_orders", {"work_orders": rows}, reason="save_work_orders_df_v84", github=True)
+    try:
+        execute("DELETE FROM work_orders")
+        for r in rows:
+            upsert_work_order(r)
+    except Exception:
+        pass
+    write_log("SAVE_WORK_ORDERS", f"V84 canonical 權威檔儲存製令 {len(rows)} 筆", "work_orders")
+    return len(rows)
+
+
+def save_employees_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    rows = _v28_table_from_df(df) if _v28_table_from_df is not None else []
+    if _v28_update_tables is not None:
+        _v28_update_tables("04_employees", {"employees": rows}, reason="save_employees_df_v84", github=True)
+    try:
+        execute("DELETE FROM employees")
+        for r in rows:
+            upsert_employee(r)
+    except Exception:
+        pass
+    write_log("SAVE_EMPLOYEES", f"V84 canonical 權威檔儲存人員 {len(rows)} 筆", "employees")
+    return len(rows)
+# ======================= END V84 03/04 SINGLE AUTHORITY LOAD/SAVE =====================

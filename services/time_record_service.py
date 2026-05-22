@@ -2370,3 +2370,204 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
         _v79_sync_time_records_fast("import_time_records_v79_fast")
     return result
 # ===================== END V79 01 PAGE FAST DISPLAY + STRICT LOCAL SYNC =====================
+
+
+# ========================= V84 01/02 SINGLE AUTHORITY SYNC =========================
+# 01 工時紀錄與 02 歷史紀錄：回復 V28 權威檔方式，但嚴格改成只讀/寫 canonical records.json。
+# 不再寫 persistent_modules / persistent_state 舊鏡像，避免刪除/修改後 Reboot 又被舊資料復活。
+
+def _v84_table_rows_from_df(df: pd.DataFrame) -> list[dict]:
+    try:
+        from services.permanent_authority_service import table_from_df as _pa_table_from_df
+        return _pa_table_from_df(df)
+    except Exception:
+        try:
+            return [dict(r) for _, r in df.fillna("").iterrows()]
+        except Exception:
+            return []
+
+
+def _v84_authority_file_exists(module_key: str, kind: str = "records") -> bool:
+    try:
+        from services.permanent_authority_service import authority_file_exists as _pa_exists
+        return bool(_pa_exists(module_key, kind))
+    except Exception:
+        try:
+            from services.permanent_authority_service import canonical_path as _pa_path
+            return bool(_pa_path(module_key, kind).exists())
+        except Exception:
+            return False
+
+
+def _v84_load_time_authority_df(module_key: str = "02_history") -> pd.DataFrame:
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df_from_table
+        df = _pa_df_from_table(module_key, "time_records")
+        if isinstance(df, pd.DataFrame):
+            return df.copy()
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v84_sync_time_records_canonical_from_sqlite(reason: str = "v84_time_sync", *, github: bool = True) -> int:
+    try:
+        full_df = query_df("SELECT * FROM time_records ORDER BY id")
+    except Exception:
+        full_df = pd.DataFrame()
+    rows = _v84_table_rows_from_df(full_df if isinstance(full_df, pd.DataFrame) else pd.DataFrame())
+    try:
+        from services.permanent_authority_service import save_authority as _pa_save_authority
+        # 01 與 02 都是正式 canonical 權威檔；只寫同一路徑，不再寫舊鏡像。
+        _pa_save_authority("01_time_records", records={"time_records": rows}, reason=f"{reason}_01", github=bool(github))
+        _pa_save_authority("02_history", records={"time_records": rows}, reason=f"{reason}_02", github=bool(github))
+    except Exception as exc:
+        try:
+            write_log("V84_TIME_AUTHORITY_SYNC_ERROR", f"01/02 canonical 權威檔同步失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        _v79_clear_fast_caches()  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return int(len(rows))
+
+
+def _v84_filter_records_df(df: pd.DataFrame, start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:
+    if df is None:
+        return pd.DataFrame()
+    out = df.copy()
+    if start_date:
+        col = "work_date" if "work_date" in out.columns else "start_date"
+        if col in out.columns:
+            out = out[out[col].astype(str) >= str(start_date)]
+    if end_date:
+        col = "work_date" if "work_date" in out.columns else "start_date"
+        if col in out.columns:
+            out = out[out[col].astype(str) <= str(end_date)]
+    if employee_id and "employee_id" in out.columns:
+        out = out[out["employee_id"].astype(str) == str(employee_id)]
+    if work_order and "work_order" in out.columns:
+        out = out[out["work_order"].astype(str) == str(work_order)]
+    if "id" in out.columns:
+        try:
+            out = out.sort_values("id", ascending=False, kind="stable")
+        except Exception:
+            pass
+    return out.reset_index(drop=True)
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    # 02 歷史紀錄只讀 02_history canonical。若檔案存在，即使空檔也代表正式資料，不得 fallback SQLite/舊檔。
+    if _v84_authority_file_exists("02_history", "records"):
+        return _v84_filter_records_df(_v84_load_time_authority_df("02_history"), start_date, end_date, employee_id, work_order)
+    base = globals().get("_original_v28_load_records") or globals().get("_v79_base_load_records")
+    if callable(base):
+        return base(start_date, end_date, employee_id, work_order)
+    return pd.DataFrame()
+
+
+def _v84_is_unfinished_df(df: pd.DataFrame) -> pd.Series:
+    if df is None or df.empty:
+        return pd.Series([], dtype=bool)
+    status = df.get("status", pd.Series("", index=df.index)).fillna("").astype(str).str.strip()
+    end_ts = df.get("end_timestamp", pd.Series("", index=df.index)).fillna("").astype(str).str.strip().str.lower()
+    return status.eq("作業中") & (end_ts.eq("") | end_ts.eq("none") | end_ts.eq("nan") | end_ts.eq("nat"))
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    # 01 今日工時紀錄只要 canonical 存在就從 01_time_records 讀；防止 SQLite 舊快取與管理員表不同步。
+    if not _v84_authority_file_exists("01_time_records", "records"):
+        base = globals().get("_v79_base_today_records")
+        return base(include_finished=include_finished, unfinished_only=unfinished_only) if callable(base) else pd.DataFrame()
+    df = _v84_load_time_authority_df("01_time_records")
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    unfinished = _v84_is_unfinished_df(out)
+    if unfinished_only:
+        out = out.loc[unfinished].copy()
+    else:
+        cycle_start = _business_cycle_start_date() if "_business_cycle_start_date" in globals() else today_text()
+        if "start_date" in out.columns:
+            current_cycle = out["start_date"].astype(str) >= str(cycle_start)
+            out = out.loc[current_cycle | unfinished].copy()
+    if "id" in out.columns:
+        try:
+            out["_id_sort"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values("_id_sort", ascending=False, kind="stable").drop(columns=["_id_sort"], errors="ignore")
+        except Exception:
+            pass
+    return out.reset_index(drop=True)
+
+
+# Save/mutate wrappers: execute business logic, then sync only canonical authority files.
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    base = globals().get("_v75_final_original_start_work") or globals().get("_v76_prev_start_work")
+    rid = base(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) if callable(base) else 0
+    if rid:
+        _v84_sync_time_records_canonical_from_sqlite("start_work_v84", github=True)
+    return int(rid or 0)
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    base = globals().get("_v75_final_original_finish_work") or globals().get("_v76_prev_finish_work")
+    count = base(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) if callable(base) else 0
+    if count:
+        _v84_sync_time_records_canonical_from_sqlite("finish_work_v84", github=True)
+    return int(count or 0)
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    base = globals().get("_v75_base_save_time_records") or globals().get("_original_v28_save_time_records")
+    n = base(df, recalc_edited_timestamps=recalc_edited_timestamps) if callable(base) else 0
+    if n:
+        _v84_sync_time_records_canonical_from_sqlite("save_time_records_v84", github=True)
+    return int(n or 0)
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    base = globals().get("_v75_base_recalculate_time_records") or globals().get("_v70_original_recalculate_time_records")
+    count = base(record_ids) if callable(base) else 0
+    if count:
+        _v84_sync_time_records_canonical_from_sqlite("recalculate_time_records_v84", github=True)
+    return int(count or 0)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = _v75_normalize_ids(record_ids) if "_v75_normalize_ids" in globals() else [int(float(str(x))) for x in record_ids or [] if str(x).strip()]
+    if not ids:
+        return 0
+    if "_v75_delete_sqlite_first" in globals():
+        deleted = _v75_delete_sqlite_first(ids, reason)
+    else:
+        placeholders = ",".join(["?"] * len(ids))
+        execute(f"DELETE FROM time_records WHERE id IN ({placeholders})", tuple(ids))
+        deleted = len(ids)
+    _v84_sync_time_records_canonical_from_sqlite("delete_time_records_v84", github=True)
+    try:
+        write_log("DELETE_TIME_RECORDS", f"{reason}：已刪除 {deleted} 筆，01/02 canonical 權威檔已同步。", "time_records")
+    except Exception:
+        pass
+    return int(deleted or 0)
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    base = globals().get("_v75_base_import_time_records") or globals().get("_v70_original_import_time_records")
+    result = base(df, recalc=recalc, source=source) if callable(base) else {"inserted": 0, "updated": 0}
+    try:
+        changed = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
+    except Exception:
+        changed = 0
+    if changed:
+        _v84_sync_time_records_canonical_from_sqlite("import_time_records_v84", github=True)
+    return result
+
+
+def sync_time_records_01_02_now(reason: str = "v84_manual_sync", *, github: bool = True) -> int:  # type: ignore[override]
+    return _v84_sync_time_records_canonical_from_sqlite(reason, github=github)
+# ======================= END V84 01/02 SINGLE AUTHORITY SYNC =====================
