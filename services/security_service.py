@@ -3152,3 +3152,215 @@ def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ign
     return True, "登入成功。"
 
 # ======================= END V105 CANONICAL LOGIN AUTHORITY FIX =======================
+
+
+# ===================== V106 FORCE PASSWORD CHANGE AUTHORITY UI FIX =====================
+# 修正：10｜權限管理勾選「強制改密碼」後，登入必須進入改密碼畫面，
+#       新密碼需寫回 10_permissions canonical 權威檔與 SQLite cache。
+
+_V106_PERMISSION_MODULE = "10_permissions"
+
+
+def _v106_row_bool(row: dict, *keys: str, default: bool = False) -> bool:
+    for k in keys:
+        if k in row:
+            return _v105_truthy(row.get(k), default) if "_v105_truthy" in globals() else bool(row.get(k))
+    return default
+
+
+def _v106_force_password_change_from_row(row: dict | None) -> bool:
+    if not row:
+        return False
+    return _v106_row_bool(
+        row,
+        "force_password_change",
+        "強制改密碼",
+        "強制改密碼 / Force Change",
+        "force_change",
+        "must_change_password",
+        default=False,
+    )
+
+
+def _v106_current_authority_user(username: str) -> tuple[dict | None, dict[str, list[dict]]]:
+    try:
+        if "_v105_find_authority_user" in globals():
+            return _v105_find_authority_user(username)
+    except Exception:
+        pass
+    return None, {}
+
+
+def _v106_update_password_in_authority(username: str, new_password: str) -> dict[str, Any]:
+    uname = str(username or "").strip()
+    if not uname:
+        return {"ok": False, "error": "missing_username"}
+    now = _now()
+    pwd_hash = hash_password(str(new_password or ""))
+    try:
+        from services.permanent_authority_service import load_tables, save_authority
+        tables = load_tables(_V106_PERMISSION_MODULE, "records")
+        if not isinstance(tables, dict):
+            tables = {}
+    except Exception:
+        tables = {}
+    changed = 0
+    for table_name in ("auth_users", "security_users"):
+        rows = tables.get(table_name, [])
+        if not isinstance(rows, list):
+            rows = []
+        for row in rows:
+            if str(row.get("username") or row.get("帳號") or row.get("帳號 / Username") or "").strip().lower() == uname.lower():
+                row["username"] = str(row.get("username") or row.get("帳號") or row.get("帳號 / Username") or uname).strip()
+                row["password_hash"] = pwd_hash
+                row["password_display"] = "********"
+                row["new_password"] = ""
+                row["password"] = ""
+                row["密碼"] = ""
+                row["密碼 / Password"] = ""
+                row["新密碼"] = ""
+                row["新密碼 / New Password"] = ""
+                row["force_password_change"] = 0
+                row["強制改密碼"] = False
+                row["強制改密碼 / Force Change"] = False
+                row["updated_at"] = now
+                changed += 1
+        tables[table_name] = rows
+    if changed <= 0:
+        # SQLite fallback row existed but canonical row did not. Create/repair auth_users authority row.
+        role = "operator"
+        display_name = uname
+        employee_id = ""
+        email = ""
+        try:
+            r = query_one("SELECT * FROM auth_users WHERE lower(username)=lower(?)", (uname.lower(),)) or {}
+            role = str(r.get("role_code") or role)
+            display_name = str(r.get("display_name") or display_name)
+            employee_id = str(r.get("employee_id") or "")
+            email = str(r.get("email") or "")
+        except Exception:
+            pass
+        rows = tables.get("auth_users", []) if isinstance(tables.get("auth_users"), list) else []
+        rows.append({
+            "username": uname,
+            "password_hash": pwd_hash,
+            "password_display": "********",
+            "employee_id": employee_id,
+            "display_name": display_name,
+            "email": email,
+            "role_code": role,
+            "is_active": 1,
+            "force_password_change": 0,
+            "note": "V106 force password change authority repair",
+            "created_at": now,
+            "updated_at": now,
+        })
+        tables["auth_users"] = rows
+        changed = 1
+    try:
+        from services.permanent_authority_service import save_authority
+        res = save_authority(_V106_PERMISSION_MODULE, records=tables, reason="v106_force_password_change", github=True)
+    except Exception as exc:
+        res = {"ok": False, "error": str(exc)[:300]}
+    try:
+        ensure_security_schema()
+        execute("UPDATE auth_users SET password_hash=?, force_password_change=0, updated_at=? WHERE lower(username)=lower(?)", (pwd_hash, now, uname.lower()))
+    except Exception:
+        pass
+    try:
+        execute("UPDATE security_users SET password_hash=?, force_password_change=0, updated_at=? WHERE lower(username)=lower(?)", (pwd_hash, now, uname.lower()))
+    except Exception:
+        pass
+    try:
+        clear_permission_cache(uname)
+    except Exception:
+        pass
+    return {"ok": bool(res.get("ok", True)), "changed": changed, "authority": res}
+
+
+try:
+    _v106_prev_authenticate = authenticate
+except Exception:
+    _v106_prev_authenticate = None
+
+
+def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
+    ok, msg = _v106_prev_authenticate(username, password) if callable(_v106_prev_authenticate) else (False, "帳號或密碼錯誤。")
+    if ok:
+        uname = str(st.session_state.get("auth_username") or username or "").strip()
+        row, _tables = _v106_current_authority_user(uname)
+        force_change = _v106_force_password_change_from_row(row)
+        if not force_change:
+            try:
+                dbrow = query_one("SELECT force_password_change FROM auth_users WHERE lower(username)=lower(?)", (uname.lower(),)) or query_one("SELECT force_password_change FROM security_users WHERE lower(username)=lower(?)", (uname.lower(),))
+                force_change = _v106_force_password_change_from_row(dict(dbrow or {}))
+            except Exception:
+                pass
+        st.session_state["auth_force_password_change"] = bool(force_change)
+        if force_change:
+            st.session_state["auth_force_password_change_username"] = uname
+            return True, "登入成功，請先變更密碼。"
+    return ok, msg
+
+
+def _v106_render_force_password_change() -> None:
+    uname = str(st.session_state.get("auth_username") or st.session_state.get("auth_force_password_change_username") or "").strip()
+    st.markdown("### 🔐 首次登入 / 強制變更密碼")
+    st.warning("此帳號已被 10｜權限管理設定為『強制改密碼』。完成變更前不能進入其他模組。")
+    with st.form("v106_force_password_change_form", clear_on_submit=False):
+        new_pwd = st.text_input("新密碼 / New Password", type="password")
+        confirm_pwd = st.text_input("確認新密碼 / Confirm New Password", type="password")
+        submitted = st.form_submit_button("儲存新密碼並繼續 / Save Password and Continue", type="primary", use_container_width=True)
+    if submitted:
+        if not new_pwd or not confirm_pwd:
+            st.error("請輸入新密碼並再次確認。")
+            st.stop()
+        if new_pwd != confirm_pwd:
+            st.error("兩次輸入的新密碼不一致。")
+            st.stop()
+        if len(new_pwd) < 4:
+            st.error("新密碼長度至少 4 碼。")
+            st.stop()
+        if new_pwd.strip().lower() == uname.lower():
+            st.error("新密碼不可與帳號相同。")
+            st.stop()
+        res = _v106_update_password_in_authority(uname, new_pwd)
+        if res.get("ok"):
+            st.session_state["auth_force_password_change"] = False
+            st.session_state.pop("auth_force_password_change_username", None)
+            log_security_event(uname, "PASSWORD_CHANGE", "SUCCESS", "force_password_change_completed", "10_permissions")
+            st.success("密碼已更新並寫入權威檔。")
+            st.rerun()
+        else:
+            st.error(f"密碼更新失敗，尚未寫入權威檔：{res.get('error') or res}")
+            st.stop()
+    st.stop()
+
+
+try:
+    _v106_prev_require_login = require_login
+except Exception:
+    _v106_prev_require_login = None
+
+
+def require_login(module_code: str = "") -> None:  # type: ignore[override]
+    ensure_security_schema()
+    if not st.session_state.get("auth_logged_in"):
+        render_login_form()
+        st.stop()
+    _check_idle_timeout()
+    if st.session_state.get("auth_force_password_change"):
+        _v106_render_force_password_change()
+    render_user_bar(module_code)
+
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    require_login(module_code)
+    if not check_permission(module_code, action):
+        log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
+        st.error("權限不足：你的帳號未被授權使用此模組或功能。")
+        st.stop()
+
+
+require_permission = require_module_access
+# =================== END V106 FORCE PASSWORD CHANGE AUTHORITY UI FIX ===================

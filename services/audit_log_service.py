@@ -1591,3 +1591,248 @@ clear_login_logs_by_date = delete_login_logs_by_date_range
 clear_login_logs = delete_login_logs_by_date_range
 clear_audit_logs_by_date = delete_login_logs_by_date_range
 # ===== V104 LOGIN LOG DATE CLEAR AUTHORITY HARDENING END =====
+
+
+# ===================== V106 LOGIN LOG DELETE TOMBSTONE AUTHORITY FIX =====================
+# 目的：11｜登入紀錄刪除後不可再從 SQLite cache、auth_login_logs、security_login_logs、
+#       persistent_modules 或舊 history 復活。
+# 做法：
+# 1) 清除時除了覆寫 canonical records.json，也建立 delete_state.json tombstone。
+# 2) 之後 load / stats / export 會先套用 tombstone，舊列即使從 legacy cache 回來也會被擋掉。
+# 3) tombstone 以 record key 為主，不會擋住刪除後新登入產生的新時間列。
+
+_V106_LOGIN_DELETE_STATE_PATH = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_logs" / "delete_state.json"
+try:
+    _v106_prev_load_login_logs = load_login_logs
+    _v106_prev_get_login_log_stats = get_login_log_stats
+    _v106_prev_delete_login_logs_by_date_range = delete_login_logs_by_date_range
+except Exception:
+    pass
+
+
+def _v106_read_delete_state() -> Dict[str, Any]:
+    try:
+        if _V106_LOGIN_DELETE_STATE_PATH.exists() and _V106_LOGIN_DELETE_STATE_PATH.stat().st_size > 0:
+            data = json.loads(_V106_LOGIN_DELETE_STATE_PATH.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        pass
+    return {}
+
+
+def _v106_write_delete_state(state: Dict[str, Any]) -> None:
+    try:
+        state = dict(state or {})
+        state.setdefault("authority_schema", "SPT-LoginLogsDeleteState-V106")
+        state["updated_at"] = _now()
+        _V106_LOGIN_DELETE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _V106_LOGIN_DELETE_STATE_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        tmp.replace(_V106_LOGIN_DELETE_STATE_PATH)
+        try:
+            from services.permanent_authority_service import github_put_file
+            github_put_file(_V106_LOGIN_DELETE_STATE_PATH, _V106_LOGIN_DELETE_STATE_PATH.read_text(encoding="utf-8"), "SPT authority 11_login_logs delete_state: v106")
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def _v106_tombstone_keys() -> set[str]:
+    state = _v106_read_delete_state()
+    keys = state.get("deleted_keys", [])
+    if not isinstance(keys, list):
+        keys = []
+    return {str(k) for k in keys if str(k).strip()}
+
+
+def _v106_apply_delete_tombstone(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    keys = _v106_tombstone_keys()
+    if not keys:
+        return records or []
+    out: List[Dict[str, Any]] = []
+    for row in records or []:
+        try:
+            k = _v103_record_key(row) if "_v103_record_key" in globals() else _login_record_key(row)
+        except Exception:
+            k = "|".join(str(row.get(x, "")) for x in ("username", "event_type", "result", "login_time", "created_at", "module_code", "message"))
+        if k not in keys:
+            out.append(row)
+    return out
+
+
+def _v106_all_raw_current_login_records(include_legacy: bool = True) -> List[Dict[str, Any]]:
+    # 讀取所有目前來源，但不套 tombstone，供刪除計算使用。
+    rows: List[Dict[str, Any]] = []
+    try:
+        if "_v103_read_authority_login_records" in globals():
+            rows.extend(_v103_read_authority_login_records())
+    except Exception:
+        pass
+    try:
+        if "_v103_db_login_records" in globals():
+            rows.extend(_v103_db_login_records(include_legacy=include_legacy))
+    except Exception:
+        pass
+    try:
+        if not rows and callable(globals().get("_v103_prev_load_login_logs")):
+            prev = _v103_prev_load_login_logs(limit=100000, include_legacy=include_legacy)  # type: ignore[name-defined]
+            rows.extend(_to_records(prev))
+    except Exception:
+        pass
+    try:
+        return _v103_merge_login_rows(rows) if "_v103_merge_login_rows" in globals() else _merge_record_sets(rows)
+    except Exception:
+        return rows
+
+
+def _v106_write_login_authority_hard(records: List[Dict[str, Any]], reason: str) -> Dict[str, Any]:
+    clean = _v106_apply_delete_tombstone(records or [])
+    try:
+        clean = _v103_merge_login_rows(clean) if "_v103_merge_login_rows" in globals() else _merge_record_sets(clean)
+    except Exception:
+        pass
+    try:
+        if "_v103_replace_db_with_login_records" in globals():
+            _v103_replace_db_with_login_records(clean)
+    except Exception:
+        pass
+    res: Dict[str, Any] = {"ok": True, "count": len(clean)}
+    try:
+        if "_v103_write_authority_login_records" in globals():
+            res = _v103_write_authority_login_records(clean, reason=reason)
+        elif "_v97_write_login_authority" in globals():
+            _v97_write_login_authority(clean, reason)
+    except Exception as exc:
+        res = {"ok": False, "error": str(exc)[:300], "count": len(clean)}
+    return res
+
+
+def load_login_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "",
+                    limit: int = 1000, event_types: Optional[List[str]] = None,
+                    results: Optional[List[str]] = None, include_legacy: bool = True, **kwargs: Any):  # type: ignore[override]
+    records = _v106_all_raw_current_login_records(include_legacy=include_legacy)
+    records = _v106_apply_delete_tombstone(records)
+    records = _filter_records(records, start_date, end_date, keyword, event_types, results)
+    records.sort(key=lambda r: str(r.get("login_time") or r.get("created_at") or ""), reverse=True)
+    if limit:
+        records = records[:int(limit)]
+    if pd is not None:
+        return pd.DataFrame(records)
+    return records
+
+
+def get_login_log_stats(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "") -> Dict[str, int]:  # type: ignore[override]
+    logs = load_login_logs(start_date=start_date, end_date=end_date, keyword=keyword, limit=100000)
+    if pd is not None and hasattr(logs, "empty"):
+        total = int(len(logs))
+        success = 0
+        if total:
+            result_s = logs.get("result", "").astype(str).str.upper()
+            success = int(result_s.isin(["SUCCESS", "OK", "INFO"]).sum())
+        return {"records": total, "success": success, "failed": total - success}
+    total = len(logs)
+    success = sum(1 for r in logs if _normalise_result(r.get("result")) in {"SUCCESS", "OK", "INFO"})
+    return {"records": total, "success": success, "failed": total - success}
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    start_d = _v104_parse_any_date(start_date) if "_v104_parse_any_date" in globals() else None
+    end_d = _v104_parse_any_date(end_date) if "_v104_parse_any_date" in globals() else None
+    if start_d is None or end_d is None:
+        return 0
+    if end_d < start_d:
+        start_d, end_d = end_d, start_d
+
+    before = _v106_all_raw_current_login_records(include_legacy=True)
+    old_state = _v106_read_delete_state()
+    deleted_keys = set(str(k) for k in old_state.get("deleted_keys", []) if str(k).strip()) if isinstance(old_state.get("deleted_keys", []), list) else set()
+    remaining: List[Dict[str, Any]] = []
+    deleted = 0
+    deleted_rows_preview: List[Dict[str, Any]] = []
+    for row in before or []:
+        rd = _v104_row_log_date(row) if "_v104_row_log_date" in globals() else None
+        try:
+            k = _v103_record_key(row) if "_v103_record_key" in globals() else _login_record_key(row)
+        except Exception:
+            k = "|".join(str(row.get(x, "")) for x in ("username", "event_type", "result", "login_time", "created_at", "module_code", "message"))
+        if rd is not None and start_d <= rd <= end_d:
+            deleted += 1
+            deleted_keys.add(str(k))
+            if len(deleted_rows_preview) < 30:
+                deleted_rows_preview.append({
+                    "username": row.get("username"),
+                    "event_type": row.get("event_type"),
+                    "result": row.get("result"),
+                    "login_time": row.get("login_time") or row.get("created_at"),
+                    "key": str(k),
+                })
+        else:
+            remaining.append(row)
+    try:
+        remaining = _v103_merge_login_rows(remaining) if "_v103_merge_login_rows" in globals() else _merge_record_sets(remaining)
+    except Exception:
+        pass
+
+    state = dict(old_state or {})
+    ranges = state.get("delete_ranges", []) if isinstance(state.get("delete_ranges"), list) else []
+    ranges.append({
+        "start_date": str(start_d),
+        "end_date": str(end_d),
+        "deleted_at": _now(),
+        "deleted_count": deleted,
+    })
+    state.update({
+        "authority_schema": "SPT-LoginLogsDeleteState-V106",
+        "module_key": "11_login_logs",
+        "updated_at": _now(),
+        "delete_ranges": ranges[-80:],
+        "deleted_keys": sorted(deleted_keys)[-50000:],
+        "last_deleted_count": deleted,
+        "last_deleted_rows_preview": deleted_rows_preview,
+    })
+    _v106_write_delete_state(state)
+    _v106_write_login_authority_hard(remaining, reason="v106_clear_login_logs_tombstone_authority")
+    return int(deleted)
+
+
+def get_audit_permanent_status() -> Dict[str, Any]:  # type: ignore[override]
+    records = _v106_apply_delete_tombstone(_v103_read_authority_login_records() if "_v103_read_authority_login_records" in globals() else [])
+    path = _V103_LOGIN_AUTHORITY_PATH if "_V103_LOGIN_AUTHORITY_PATH" in globals() else _V97_LOGIN_AUTHORITY_PATH
+    payload = _read_json_file(path) if path.exists() else {}
+    delete_state = _v106_read_delete_state()
+    return {
+        "exists": path.exists(),
+        "path": str(path),
+        "size": path.stat().st_size if path.exists() else 0,
+        "count": len(records),
+        "exported_at": str(payload.get("exported_at") or payload.get("updated_at") or "") if isinstance(payload, dict) else "",
+        "db_count": len(_v106_apply_delete_tombstone(_v103_db_login_records(include_legacy=True))) if "_v103_db_login_records" in globals() else 0,
+        "authority_schema": str(payload.get("authority_schema", "")) if isinstance(payload, dict) else "",
+        "delete_state_path": str(_V106_LOGIN_DELETE_STATE_PATH),
+        "delete_state_exists": _V106_LOGIN_DELETE_STATE_PATH.exists(),
+        "deleted_keys": len(delete_state.get("deleted_keys", []) or []),
+        "last_deleted_count": int(delete_state.get("last_deleted_count", 0) or 0),
+    }
+
+
+def export_audit_logs_to_permanent_file(create_history: bool = True, merge_existing: bool = True) -> Dict[str, Any]:  # type: ignore[override]
+    records = _to_records(load_login_logs(limit=100000, include_legacy=True))
+    return _v106_write_login_authority_hard(records, reason="v106_export_login_logs_tombstone_filtered")
+
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+delete_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+clear_audit_logs_by_date = delete_login_logs_by_date_range
+get_login_logs = load_login_logs
+query_login_logs = load_login_logs
+load_audit_logs = load_login_logs
+login_log_stats = get_login_log_stats
+audit_permanent_status = get_audit_permanent_status
+get_audit_state_status = get_audit_permanent_status
+login_log_state_status = get_audit_permanent_status
+get_login_log_permanent_status = get_audit_permanent_status
+# =================== END V106 LOGIN LOG DELETE TOMBSTONE AUTHORITY FIX ===================
