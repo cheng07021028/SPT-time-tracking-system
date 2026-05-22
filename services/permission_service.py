@@ -3168,51 +3168,99 @@ def restore_default_accounts_once_v57() -> dict:
     return {"restored": int(result.get("saved", 0) or 0), "usernames": [r["username"] for r in rows]}
 # ===== V57 RESTORE DEFAULT ACCOUNTS ONCE PATCH END =====
 
-# ======================= V79 PERMISSION REBOOT PERSISTENCE HARD FIX =======================
-# Root cause fixed here:
-# Earlier permission_service used data/database + data/persistent_modules paths, while the
-# project's real permanent store is data/permanent_store/database and
-# data/permanent_store/persistent_modules. After Reboot App, 10 permissions could be
-# recreated from defaults instead of the last saved permission latest file.
 
-try:
-    from services import db_service as _v79_db_service
-    DB_PATH = _v79_db_service.DB_PATH  # type: ignore[assignment]
-except Exception:
-    DB_PATH = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"  # type: ignore[assignment]
+# ===== V91 SINGLE CANONICAL AUTHORITY PATCH START =====
+# 目的：10. 權限管理只讀寫同一個正式權威檔，避免 Reboot App 後又被
+# persistent_modules / persistent_state / history / SQLite 暫存或預設帳號覆蓋。
+# 唯一權威檔：data/permanent_store/modules/10_permissions/records.json
+from typing import Any as _V91Any
 
-_V79_OLD_PERMISSION_DB_PATH = PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
-_V79_PERMISSION_DB_PATH = DB_PATH
-_V79_PERMISSION_RESTORE_KEY = "_v79_permission_permanent_restored"
-_V79_PERMISSION_TABLES = [
-    "auth_users", "auth_account_permissions", "auth_security_settings",
-    "security_users", "security_user_roles", "security_settings",
-]
-_V79_PERMISSION_FILES = [
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "security_settings.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_permission_settings.json",
-    # compatibility with earlier generated files
-    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
-    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
-    PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_settings.json",
+_V91_PERMISSION_AUTHORITY_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json"
+_V91_PERMISSION_RESTORED = False
+_V91_PERMISSION_RESTORE_SESSION_KEY = "_v91_permission_single_authority_restored"
+_V91_AUTH_TABLES = [
+    "auth_users",
+    "auth_account_permissions",
+    "auth_security_settings",
+    "security_users",
+    "security_user_roles",
+    "security_settings",
 ]
 
 
-def connect_db() -> sqlite3.Connection:  # type: ignore[override]
-    _V79_PERMISSION_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(_V79_PERMISSION_DB_PATH, timeout=10)
-    conn.row_factory = sqlite3.Row
+def _v91_schema_only() -> None:
+    """只建立/補齊權限相關 schema，不做任何舊檔還原。"""
     try:
-        conn.execute("PRAGMA busy_timeout=8000")
+        _v373_p_schema_only()  # type: ignore[name-defined]
+        return
     except Exception:
         pass
-    return conn
+    try:
+        conn = connect_db(); cur = conn.cursor()
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS auth_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            password_hint TEXT,
+            employee_id TEXT,
+            display_name TEXT,
+            email TEXT,
+            role_code TEXT DEFAULT 'operator',
+            is_active INTEGER DEFAULT 1,
+            force_password_change INTEGER DEFAULT 0,
+            last_login_at TEXT,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS auth_account_permissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            module_code TEXT NOT NULL,
+            module_name_zh TEXT,
+            module_name_en TEXT,
+            can_view INTEGER DEFAULT 0,
+            can_create INTEGER DEFAULT 0,
+            can_edit INTEGER DEFAULT 0,
+            can_delete INTEGER DEFAULT 0,
+            can_import INTEGER DEFAULT 0,
+            can_export INTEGER DEFAULT 0,
+            can_backup INTEGER DEFAULT 0,
+            can_restore INTEGER DEFAULT 0,
+            can_manage INTEGER DEFAULT 0,
+            updated_at TEXT,
+            UNIQUE(username, module_code)
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS auth_security_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT,
+            note TEXT,
+            updated_at TEXT
+        )
+        """)
+        try:
+            _migrate_permission_schema_columns(cur)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        try:
+            _ensure_legacy_security_tables(cur)  # type: ignore[name-defined]
+            _ensure_security_setting_tables(cur)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        conn.commit(); conn.close()
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
-def _v79_p_read_json(path: Path) -> dict:
+def _v91_read_json(path: Path) -> dict:
     try:
         if path.exists() and path.is_file() and path.stat().st_size > 2:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -3222,861 +3270,134 @@ def _v79_p_read_json(path: Path) -> dict:
     return {}
 
 
-def _v79_p_atomic_json(path: Path, payload: dict) -> None:
+def _v91_atomic_write(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    # 寫入前驗證，避免半檔/壞檔成為權威檔。
     json.loads(tmp.read_text(encoding="utf-8"))
     tmp.replace(path)
 
 
-def _v79_payload_timestamp(payload: dict) -> str:
-    for k in ["exported_at", "updated_at", "saved_at"]:
-        v = str(payload.get(k) or "").strip()
-        if v:
-            return v
-    return ""
-
-
-def _v79_payload_score(payload: dict, path: Path) -> tuple[str, float, int]:
-    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
-    auth_count = len(tables.get("auth_users", []) or []) if isinstance(tables, dict) else 0
+def _v91_bool(v: _V91Any, default: bool = False) -> int:
     try:
-        mtime = path.stat().st_mtime
-    except Exception:
-        mtime = 0.0
-    return (_v79_payload_timestamp(payload), mtime, auth_count)
-
-
-def _v79_permission_latest_payload() -> dict:
-    candidates: list[tuple[tuple[str, float, int], dict]] = []
-    for path in _V79_PERMISSION_FILES:
-        payload = _v79_p_read_json(path)
-        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
-        if isinstance(tables, dict) and isinstance(tables.get("auth_users"), list):
-            candidates.append((_v79_payload_score(payload, path), payload))
-    if not candidates:
-        return {}
-    # Pick newest timestamp/mtime. This allows migration from the old wrong path if it is newer.
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    return candidates[0][1]
-
-
-def _v79_fetch_table(conn: sqlite3.Connection, table: str) -> list[dict]:
-    try:
-        return [dict(r) for r in conn.execute(f'SELECT * FROM "{table}"').fetchall()]
-    except Exception:
-        return []
-
-
-def _v79_replace_table(cur: sqlite3.Cursor, table: str, rows: list[dict]) -> int:
-    try:
-        cur.execute(f'DELETE FROM "{table}"')
-    except Exception:
-        return 0
-    n = 0
-    for row in rows or []:
-        if not isinstance(row, dict):
-            continue
-        clean = {str(k): v for k, v in row.items() if str(k).strip()}
-        if not clean:
-            continue
-        cols = list(clean.keys())
-        placeholders = ",".join(["?"] * len(cols))
-        col_sql = ",".join([f'"{c}"' for c in cols])
-        try:
-            cur.execute(f'INSERT INTO "{table}" ({col_sql}) VALUES ({placeholders})', [clean[c] for c in cols])
-            n += 1
-        except Exception:
-            continue
-    return n
-
-
-def _v79_payload_from_current_db(reason: str = "permission_settings_saved") -> dict:
-    _v373_p_schema_only() if "_v373_p_schema_only" in globals() else None
-    conn = connect_db()
-    try:
-        tables = {t: _v79_fetch_table(conn, t) for t in _V79_PERMISSION_TABLES}
-    finally:
-        conn.close()
-    return {
-        "version": "V79-permission-permanent-store-path-fix",
-        "exported_at": now_text(),
-        "reason": reason,
-        "module_key": "10_permissions",
-        "module_code": "10_permissions",
-        "module_name_zh": "權限管理",
-        "module_name_en": "Permission Management",
-        "source": "permission_service_v79",
-        "description": "10 權限管理固定 latest JSON；讀寫 data/permanent_store，並相容舊 data/persistent_modules。Reboot App 後不再恢復原始設定。",
-        "tables": tables,
-        "table_counts": {k: len(v) for k, v in tables.items()},
-        "counts": {k: len(v) for k, v in tables.items()},
-    }
-
-
-def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
-    payload = _v79_payload_from_current_db(reason)
-    written = []
-    for path in _V79_PERMISSION_FILES:
-        # write records/settings/state files. security_settings.json can also hold full payload safely.
-        _v79_p_atomic_json(path, payload)
-        written.append(str(path))
-    clear_permission_runtime_cache()
-    return {"ok": True, "mode": "v79_permanent_store_path_fix", "files": written, "table_counts": payload.get("table_counts", {})}
-
-
-def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
-    _v373_p_schema_only() if "_v373_p_schema_only" in globals() else None
-    payload = _v79_permission_latest_payload()
-    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
-    if not isinstance(tables, dict) or not isinstance(tables.get("auth_users"), list):
-        return {"ok": False, "mode": "v79_permanent_store_path_fix", "message": "no latest permission payload"}
-    conn = connect_db(); cur = conn.cursor(); restored = {}
-    try:
-        try:
-            _ensure_legacy_security_tables(cur)
-            _ensure_security_setting_tables(cur)
-        except Exception:
-            pass
-        for table in _V79_PERMISSION_TABLES:
-            rows = tables.get(table, []) if isinstance(tables.get(table), list) else []
-            restored[table] = _v79_replace_table(cur, table, rows)
-        conn.commit()
-    finally:
-        conn.close()
-    try:
-        sync_auth_users_to_runtime_security()
+        return int(_truthy(v, default))  # type: ignore[name-defined]
     except Exception:
         pass
-    clear_permission_runtime_cache()
-    if st is not None:
-        try:
-            st.session_state[_V79_PERMISSION_RESTORE_KEY] = True
-        except Exception:
-            pass
-    return {"ok": True, "mode": "v79_permanent_store_path_fix", "restored": restored, "source_version": payload.get("version")}
-
-
-def _v79_restore_permission_once() -> None:
-    if st is not None:
-        try:
-            if st.session_state.get(_V79_PERMISSION_RESTORE_KEY):
-                return
-        except Exception:
-            pass
-    # Always restore once per session from fixed latest. This prevents default seeded DB from winning after Reboot.
-    restore_permission_settings_from_permanent_files(force=True)
-    if st is not None:
-        try:
-            st.session_state[_V79_PERMISSION_RESTORE_KEY] = True
-        except Exception:
-            pass
-
-
-_v79_prev_get_users = get_users
-_v79_prev_get_account_permissions = get_account_permissions
-try:
-    _v79_prev_get_security_settings = get_security_settings  # type: ignore[name-defined]
-except Exception:
-    _v79_prev_get_security_settings = None
-_v79_prev_save_users = save_users
-_v79_prev_delete_users = delete_users
-_v79_prev_save_account_permissions = save_account_permissions
-try:
-    _v79_prev_save_security_settings = save_security_settings  # type: ignore[name-defined]
-except Exception:
-    _v79_prev_save_security_settings = None
-
-
-def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
-    _v373_p_schema_only() if "_v373_p_schema_only" in globals() else None
-    if force:
-        restore_permission_settings_from_permanent_files(force=True)
-
-
-init_auth_tables = init_permission_tables
-
-
-def get_users() -> List[dict]:  # type: ignore[override]
-    _v79_restore_permission_once()
-    return _v79_prev_get_users()
-
-
-def get_account_permissions() -> List[dict]:  # type: ignore[override]
-    _v79_restore_permission_once()
-    return _v79_prev_get_account_permissions()
-
-
-def get_security_settings() -> dict:  # type: ignore[override]
-    _v79_restore_permission_once()
-    if callable(_v79_prev_get_security_settings):
-        return _v79_prev_get_security_settings()
-    return {}
-
-
-def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
-    # Do not restore over the user's in-page edited rows immediately before saving.
-    result = _v79_prev_save_users(rows)
-    export_result = export_permission_settings_permanently("auth_users_saved_v79")
-    if isinstance(result, dict):
-        result["permanent_save"] = export_result
-    return result
-
-
-def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
-    deleted = int(_v79_prev_delete_users(usernames) or 0)
-    export_permission_settings_permanently("auth_users_deleted_v79")
-    return deleted
-
-
-def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
-    count = int(_v79_prev_save_account_permissions(rows) or 0)
-    export_permission_settings_permanently("account_permissions_saved_v79")
-    return count
-
-
-def save_security_settings(values: dict) -> None:  # type: ignore[override]
-    if callable(_v79_prev_save_security_settings):
-        _v79_prev_save_security_settings(values)
-    export_permission_settings_permanently("security_settings_saved_v79")
-
-
-check_permission = has_permission
-# ===================== END V79 PERMISSION REBOOT PERSISTENCE HARD FIX =====================
-
-# ===================== BEGIN V81 PERMISSION DELETE + REBOOT PERSISTENCE HARD FIX =====================
-# V81：修正 10 權限管理 Reboot App 後讀回舊紀錄，以及刪除帳號時
-# sqlite3.DatabaseError 造成整頁中斷的問題。
-# 原則：
-# 1. 不再讓舊 persistent_modules 或預設種子資料覆蓋目前管理員已儲存內容。
-# 2. 權限資料同時寫入正式權威路徑 data/permanent_store/modules/10_permissions。
-# 3. 刪除帳號採防呆交易；權限子表刪除失敗時不讓頁面崩潰，仍優先刪主帳號並寫入永久檔。
-# 4. 禁止把空的 auth_users 事故資料寫成永久權威檔，避免 Reboot 後帳號全消失或回復舊資料。
-
-_V81_PERMISSION_RESTORE_KEY = "_v81_permission_permanent_restored"
-_V81_PERMISSION_TABLES = [
-    "auth_users",
-    "auth_account_permissions",
-    "auth_security_settings",
-    "security_users",
-    "security_user_roles",
-    "security_settings",
-]
-_V81_PERMISSION_FILES = [
-    PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "settings.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "security_settings.json",
-    PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_permission_settings.json",
-    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
-    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
-    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
-    PROJECT_ROOT / "data" / "persistent_state" / "spt_permission_settings.json",
-]
-
-
-def _v81_now_text() -> str:
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s in {"1", "true", "yes", "y", "on", "啟用", "是", "v", "✓", "checked"}:
+            return 1
+        if s in {"0", "false", "no", "n", "off", "停用", "否", "", "none", "nan"}:
+            return 0
     try:
-        return now_text()
+        return 1 if bool(v) else 0
     except Exception:
-        from datetime import datetime as _dt
-        return _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+        return 1 if default else 0
 
 
-def _v81_read_json(path: Path) -> dict:
+def _v91_fetch_table(conn: sqlite3.Connection, table: str) -> list[dict]:
     try:
-        if path.exists() and path.is_file() and path.stat().st_size > 2:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-            return payload if isinstance(payload, dict) else {}
-    except Exception:
-        pass
-    return {}
-
-
-def _v81_write_json(path: Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-    # validate before replace
-    json.loads(tmp.read_text(encoding="utf-8"))
-    tmp.replace(path)
-
-
-def _v81_parse_ts(value: object) -> float:
-    text = str(value or "").strip()
-    if not text:
-        return 0.0
-    try:
-        import pandas as _pd
-        ts = _pd.to_datetime(text, errors="coerce")
-        if _pd.notna(ts):
-            return float(ts.timestamp())
-    except Exception:
-        pass
-    # common compact form: 20260519_190656
-    try:
-        from datetime import datetime as _dt
-        for fmt in ("%Y%m%d_%H%M%S", "%Y%m%d%H%M%S", "%Y-%m-%d %H:%M:%S"):
-            try:
-                return _dt.strptime(text[:15] if fmt == "%Y%m%d_%H%M%S" else text[:14], fmt).timestamp()
-            except Exception:
-                continue
-    except Exception:
-        pass
-    return 0.0
-
-
-def _v81_payload_time(payload: dict, path: Path) -> float:
-    values = [payload.get("updated_at"), payload.get("exported_at"), payload.get("saved_at")]
-    parsed = max(_v81_parse_ts(v) for v in values)
-    try:
-        return max(parsed, float(path.stat().st_mtime))
-    except Exception:
-        return parsed
-
-
-def _v81_payload_tables(payload: dict) -> dict:
-    tables = payload.get("tables")
-    return tables if isinstance(tables, dict) else {}
-
-
-def _v81_is_valid_permission_payload(payload: dict) -> bool:
-    tables = _v81_payload_tables(payload)
-    users = tables.get("auth_users")
-    # auth_users 不可為空；空資料多半是舊版誤匯出，不可拿來 Reboot 還原。
-    if not isinstance(users, list) or len(users) <= 0:
-        return False
-    for row in users:
-        if isinstance(row, dict) and str(row.get("username") or "").strip():
-            return True
-    return False
-
-
-def _v81_latest_permission_payload() -> dict:
-    candidates: list[tuple[float, int, str, dict]] = []
-    for path in _V81_PERMISSION_FILES:
-        payload = _v81_read_json(path)
-        if not _v81_is_valid_permission_payload(payload):
-            continue
-        tables = _v81_payload_tables(payload)
-        users = tables.get("auth_users", []) if isinstance(tables.get("auth_users"), list) else []
-        # 新格式正式權威路徑優先，避免舊 persistent_modules 蓋回。
-        path_priority = 1 if "data/permanent_store/modules/10_permissions" in str(path).replace("\\", "/") else 0
-        candidates.append((_v81_payload_time(payload, path), path_priority, str(path), payload))
-    if not candidates:
-        return {}
-    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
-    return candidates[0][3]
-
-
-def _v81_fetch_table(conn: sqlite3.Connection, table: str) -> list[dict]:
-    try:
-        return [dict(r) for r in conn.execute(f'SELECT * FROM "{table}"').fetchall()]
-    except Exception:
-        return []
-
-
-def _v81_make_payload_from_db(reason: str = "permission_settings_saved_v81") -> dict:
-    try:
-        init_permission_tables()
-    except Exception:
-        pass
-    conn = connect_db()
-    try:
-        tables = {t: _v81_fetch_table(conn, t) for t in _V81_PERMISSION_TABLES}
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-    return {
-        "authority_schema": "SPT-PermissionAuthority-V81",
-        "version": "V81-permission-delete-reboot-persistence-fix",
-        "updated_at": _v81_now_text(),
-        "exported_at": _v81_now_text(),
-        "reason": reason,
-        "module_key": "10_permissions",
-        "module_code": "10",
-        "module_name_zh": "權限管理",
-        "module_name_en": "Permission Management",
-        "source": "permission_service_v81",
-        "description": "10 權限管理正式永久權威檔。修正 Reboot App 回復舊紀錄與刪除帳號 DatabaseError。",
-        "tables": tables,
-        "table_counts": {k: len(v) for k, v in tables.items()},
-        "counts": {k: len(v) for k, v in tables.items()},
-    }
-
-
-def export_permission_settings_permanently(reason: str = "permission_settings_saved_v81") -> dict:  # type: ignore[override]
-    payload = _v81_make_payload_from_db(reason)
-    users = _v81_payload_tables(payload).get("auth_users", [])
-    if not isinstance(users, list) or len(users) <= 0:
-        # 避免 DB 暫時讀取失敗時，把空帳號表寫成永久權威資料。
-        return {
-            "ok": False,
-            "mode": "v81_permission_export_guard",
-            "message": "已阻止空的 auth_users 覆蓋永久權限設定。",
-            "table_counts": payload.get("table_counts", {}),
-        }
-    written: list[str] = []
-    errors: list[str] = []
-    for path in _V81_PERMISSION_FILES:
-        try:
-            _v81_write_json(path, payload)
-            written.append(str(path))
-        except Exception as e:
-            errors.append(f"{path}: {e}")
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    if st is not None:
-        try:
-            st.session_state[_V81_PERMISSION_RESTORE_KEY] = True
-            st.session_state["v81_permission_last_export"] = payload.get("exported_at")
-        except Exception:
-            pass
-    return {
-        "ok": len(written) > 0,
-        "mode": "v81_permission_permanent_store_hard_fix",
-        "files": written,
-        "errors": errors,
-        "table_counts": payload.get("table_counts", {}),
-    }
-
-
-def _v81_replace_table(cur: sqlite3.Cursor, table: str, rows: list[dict]) -> int:
-    try:
-        cur.execute(f'DELETE FROM "{table}"')
-    except Exception:
-        return 0
-    n = 0
-    for row in rows or []:
-        if not isinstance(row, dict):
-            continue
-        clean = {str(k): v for k, v in row.items() if str(k).strip()}
-        if not clean:
-            continue
-        cols = list(clean.keys())
-        placeholders = ",".join(["?"] * len(cols))
-        col_sql = ",".join([f'"{c}"' for c in cols])
-        try:
-            cur.execute(f'INSERT INTO "{table}" ({col_sql}) VALUES ({placeholders})', [clean[c] for c in cols])
-            n += 1
-        except Exception:
-            continue
-    return n
-
-
-def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
-    payload = _v81_latest_permission_payload()
-    if not payload:
-        return {"ok": False, "mode": "v81_permission_restore", "message": "找不到有效權限永久檔，已略過還原。"}
-    tables = _v81_payload_tables(payload)
-    conn = connect_db()
-    cur = conn.cursor()
-    restored: dict[str, int] = {}
-    try:
-        try:
-            init_permission_tables()
-        except Exception:
-            pass
-        try:
-            _ensure_legacy_security_tables(cur)
-            _ensure_security_setting_tables(cur)
-        except Exception:
-            pass
-        for table in _V81_PERMISSION_TABLES:
-            rows = tables.get(table, []) if isinstance(tables.get(table), list) else []
-            restored[table] = _v81_replace_table(cur, table, rows)
-        conn.commit()
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-    try:
-        sync_auth_users_to_runtime_security()
-    except Exception:
-        pass
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    if st is not None:
-        try:
-            st.session_state[_V81_PERMISSION_RESTORE_KEY] = True
-            st.session_state["v81_permission_restore_source_version"] = payload.get("version")
-        except Exception:
-            pass
-    return {"ok": True, "mode": "v81_permission_restore", "restored": restored, "source_version": payload.get("version"), "source_time": payload.get("exported_at") or payload.get("updated_at")}
-
-
-def _v81_restore_permission_once() -> None:
-    if st is not None:
-        try:
-            if st.session_state.get(_V81_PERMISSION_RESTORE_KEY):
-                return
-        except Exception:
-            pass
-    restore_permission_settings_from_permanent_files(force=True)
-    if st is not None:
-        try:
-            st.session_state[_V81_PERMISSION_RESTORE_KEY] = True
-        except Exception:
-            pass
-
-
-def _v81_safe_delete_from_table(table: str, username: str) -> int:
-    conn = connect_db()
-    cur = conn.cursor()
-    try:
-        cur.execute(f'DELETE FROM "{table}" WHERE lower(username)=lower(?)', (username,))
-        count = max(int(cur.rowcount or 0), 0)
-        conn.commit()
-        return count
-    except sqlite3.DatabaseError:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-        # 子表刪除錯誤不可中斷整個帳號刪除流程；先略過，主帳號刪除後殘留權限不會生效。
-        return 0
-    except Exception:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-        return 0
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-
-def _v81_delete_auth_user(username: str) -> int:
-    conn = connect_db()
-    cur = conn.cursor()
-    try:
-        cur.execute('DELETE FROM "auth_users" WHERE lower(username)=lower(?) AND lower(username)<>"admin"', (username,))
-        count = max(int(cur.rowcount or 0), 0)
-        conn.commit()
-        return count
-    except sqlite3.DatabaseError:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-        return 0
-    except Exception:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-        return 0
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-
-def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
-    try:
-        init_permission_tables()
-    except Exception:
-        pass
-    cleaned: list[str] = []
-    seen: set[str] = set()
-    for u in usernames or []:
-        name = str(u or "").strip()
-        low = name.lower()
-        if not name or low == "admin" or low in seen:
-            continue
-        seen.add(low)
-        cleaned.append(name)
-    if not cleaned:
-        return 0
-    deleted = 0
-    for username in cleaned:
-        # 先刪子表；若子表 DB 異常，不能讓頁面崩潰。
-        _v81_safe_delete_from_table("auth_account_permissions", username)
-        try:
-            _v81_safe_delete_from_table("security_user_roles", username)
-        except Exception:
-            pass
-        try:
-            _v81_safe_delete_from_table("security_users", username)
-        except Exception:
-            pass
-        deleted += _v81_delete_auth_user(username)
-    try:
-        # 確保剩餘帳號仍有權限列；若子表曾刪失敗，這裡會補足現有帳號該有的列。
-        ensure_permissions_for_all_users(force=True)
-    except Exception:
-        pass
-    try:
-        sync_auth_users_to_runtime_security()
-    except Exception:
-        pass
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    export_permission_settings_permanently("auth_users_deleted_v81")
-    return deleted
-
-
-def get_users() -> List[dict]:  # type: ignore[override]
-    _v81_restore_permission_once()
-    if "_v79_prev_get_users" in globals() and callable(_v79_prev_get_users):
-        return _v79_prev_get_users()
-    return []
-
-
-def get_account_permissions() -> List[dict]:  # type: ignore[override]
-    _v81_restore_permission_once()
-    if "_v79_prev_get_account_permissions" in globals() and callable(_v79_prev_get_account_permissions):
-        return _v79_prev_get_account_permissions()
-    return []
-
-
-def get_security_settings() -> dict:  # type: ignore[override]
-    _v81_restore_permission_once()
-    if "_v79_prev_get_security_settings" in globals() and callable(_v79_prev_get_security_settings):
-        return _v79_prev_get_security_settings()
-    return {}
-
-
-def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
-    # 儲存前不可 restore，避免把畫面上的新設定覆蓋掉。
-    if "_v79_prev_save_users" in globals() and callable(_v79_prev_save_users):
-        result = _v79_prev_save_users(rows)
-    else:
-        result = {"saved": 0, "skipped": []}
-    export_result = export_permission_settings_permanently("auth_users_saved_v81")
-    if isinstance(result, dict):
-        result["permanent_save"] = export_result
-    return result
-
-
-def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
-    if "_v79_prev_save_account_permissions" in globals() and callable(_v79_prev_save_account_permissions):
-        count = int(_v79_prev_save_account_permissions(rows) or 0)
-    else:
-        count = 0
-    export_permission_settings_permanently("account_permissions_saved_v81")
-    return count
-
-
-def save_security_settings(values: dict) -> None:  # type: ignore[override]
-    if "_v79_prev_save_security_settings" in globals() and callable(_v79_prev_save_security_settings):
-        _v79_prev_save_security_settings(values)
-    export_permission_settings_permanently("security_settings_saved_v81")
-
-
-check_permission = has_permission
-# ===================== END V81 PERMISSION DELETE + REBOOT PERSISTENCE HARD FIX =====================
-
-# ===================== BEGIN V82 SINGLE AUTHORITY PERMISSION STORE =====================
-# V82：10. 權限管理改成和 01. 工時紀錄同概念：只讀/只寫同一個正式權威檔。
-# 權威檔：data/permanent_store/modules/10_permissions/records.json
-# 不再從 persistent_modules、persistent_state、舊相容路徑、history 檔還原；避免 Reboot App 後被舊資料覆蓋。
-
-_V82_PERMISSION_RESTORE_KEY = "_v82_permission_authority_restored"
-_V82_PERMISSION_AUTHORITY_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json"
-_V82_PERMISSION_TABLES = [
-    "auth_users",
-    "auth_account_permissions",
-    "auth_security_settings",
-    "security_users",
-    "security_user_roles",
-    "security_settings",
-]
-
-
-def _v82_now_text() -> str:
-    try:
-        return now_text()
-    except Exception:
-        from datetime import datetime as _dt
-        return _dt.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
-def _v82_read_authority_payload() -> dict:
-    try:
-        if _V82_PERMISSION_AUTHORITY_FILE.exists() and _V82_PERMISSION_AUTHORITY_FILE.stat().st_size > 2:
-            payload = json.loads(_V82_PERMISSION_AUTHORITY_FILE.read_text(encoding="utf-8"))
-            return payload if isinstance(payload, dict) else {}
-    except Exception:
-        pass
-    return {}
-
-
-def _v82_write_authority_payload(payload: dict) -> None:
-    _V82_PERMISSION_AUTHORITY_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = _V82_PERMISSION_AUTHORITY_FILE.with_suffix(_V82_PERMISSION_AUTHORITY_FILE.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-    json.loads(tmp.read_text(encoding="utf-8"))
-    tmp.replace(_V82_PERMISSION_AUTHORITY_FILE)
-
-
-def _v82_tables_from_payload(payload: dict) -> dict:
-    tables = payload.get("tables") if isinstance(payload, dict) else None
-    return tables if isinstance(tables, dict) else {}
-
-
-def _v82_valid_authority_payload(payload: dict) -> bool:
-    tables = _v82_tables_from_payload(payload)
-    users = tables.get("auth_users")
-    if not isinstance(users, list) or not users:
-        return False
-    return any(isinstance(r, dict) and str(r.get("username") or "").strip() for r in users)
-
-
-def _v82_fetch_table_rows(cur: sqlite3.Cursor, table: str) -> list[dict]:
-    try:
-        rows = cur.execute(f'SELECT * FROM "{table}"').fetchall()
+        rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
         out = []
         for r in rows:
-            try:
-                out.append(dict(r))
-            except Exception:
-                # sqlite row_factory 若不是 Row，改用欄名組 dict
-                cols = [d[0] for d in cur.description or []]
-                out.append({c: r[i] for i, c in enumerate(cols)})
+            d = dict(r)
+            # id 是 SQLite 流水號，權威檔不依賴它；保留也可，但移除可避免跨環境衝突。
+            d.pop("id", None)
+            out.append(d)
         return out
     except Exception:
         return []
 
 
-def _v82_make_authority_payload_from_db(reason: str = "permission_authority_saved_v82") -> dict:
+def _v91_payload_from_db(reason: str = "permission_saved") -> dict:
+    _v91_schema_only()
     conn = connect_db()
     try:
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        try:
-            init_permission_tables()
-        except Exception:
-            pass
-        try:
-            _ensure_legacy_security_tables(cur)
-            _ensure_security_setting_tables(cur)
-        except Exception:
-            pass
-        tables = {table: _v82_fetch_table_rows(cur, table) for table in _V82_PERMISSION_TABLES}
+        tables = {name: _v91_fetch_table(conn, name) for name in _V91_AUTH_TABLES}
     finally:
         try:
             conn.close()
         except Exception:
             pass
     return {
-        "version": "v82_single_authority",
+        "version": "V91-single-canonical-permission-authority",
+        "module_key": "10_permissions",
         "module_code": "10_permissions",
-        "module_name_zh": "10. 權限管理",
+        "module_name_zh": "權限管理",
         "module_name_en": "Permission Management",
-        "authority_file": str(_V82_PERMISSION_AUTHORITY_FILE.relative_to(PROJECT_ROOT)).replace("\\", "/"),
-        "saved_reason": reason,
-        "updated_at": _v82_now_text(),
-        "source": "permission_service_v82_single_authority",
-        "description": "10 權限管理唯一正式權威檔；讀寫同一檔，不再讀寫其他舊永久檔。",
+        "authority_file": "data/permanent_store/modules/10_permissions/records.json",
+        "source": "permission_service_v91",
+        "reason": reason,
+        "exported_at": now_text(),
+        "description": "10 權限管理唯一權威檔。讀寫都只使用此 records.json，不讀不寫 persistent_modules / persistent_state / history。",
         "tables": tables,
         "table_counts": {k: len(v) for k, v in tables.items()},
     }
 
 
-def export_permission_settings_permanently(reason: str = "permission_authority_saved_v82") -> dict:  # type: ignore[override]
-    payload = _v82_make_authority_payload_from_db(reason)
-    if not _v82_valid_authority_payload(payload):
-        return {
-            "ok": False,
-            "mode": "v82_single_authority_guard",
-            "message": "已阻止空的 auth_users 覆蓋 10 權限管理唯一權威檔。",
-            "authority_file": str(_V82_PERMISSION_AUTHORITY_FILE),
-            "table_counts": payload.get("table_counts", {}),
-        }
+def _v91_authority_payload() -> dict:
+    data = _v91_read_json(_V91_PERMISSION_AUTHORITY_FILE)
+    tables = data.get("tables") if isinstance(data.get("tables"), dict) else {}
+    if isinstance(tables, dict) and isinstance(tables.get("auth_users"), list):
+        return data
+    return {}
+
+
+def _v91_table_columns(cur: sqlite3.Cursor, table: str) -> set[str]:
     try:
-        _v82_write_authority_payload(payload)
-        try:
-            clear_permission_runtime_cache()
-        except Exception:
-            pass
-        if st is not None:
-            try:
-                st.session_state[_V82_PERMISSION_RESTORE_KEY] = True
-                st.session_state["v82_permission_authority_file"] = str(_V82_PERMISSION_AUTHORITY_FILE)
-                st.session_state["v82_permission_last_export"] = payload.get("updated_at")
-            except Exception:
-                pass
-        return {
-            "ok": True,
-            "mode": "v82_single_authority_export",
-            "file": str(_V82_PERMISSION_AUTHORITY_FILE),
-            "files": [str(_V82_PERMISSION_AUTHORITY_FILE)],
-            "table_counts": payload.get("table_counts", {}),
-        }
-    except Exception as e:
-        return {
-            "ok": False,
-            "mode": "v82_single_authority_export_error",
-            "file": str(_V82_PERMISSION_AUTHORITY_FILE),
-            "error": str(e),
-            "table_counts": payload.get("table_counts", {}),
-        }
+        return {str(r[1]) for r in cur.execute(f'PRAGMA table_info("{table}")').fetchall()}
+    except Exception:
+        return set()
 
 
-def _v82_replace_table(cur: sqlite3.Cursor, table: str, rows: list[dict]) -> int:
+def _v91_replace_table(cur: sqlite3.Cursor, table: str, rows: list[dict]) -> int:
+    cols_available = _v91_table_columns(cur, table)
+    if not cols_available:
+        return 0
     try:
         cur.execute(f'DELETE FROM "{table}"')
     except Exception:
         return 0
-    count = 0
+    inserted = 0
     for row in rows or []:
         if not isinstance(row, dict):
             continue
-        clean = {str(k): v for k, v in row.items() if str(k).strip()}
+        clean = {}
+        for k, v in row.items():
+            key = str(k).strip()
+            if not key or key == "id" or key not in cols_available:
+                continue
+            clean[key] = v
         if not clean:
             continue
-        cols = list(clean.keys())
-        col_sql = ",".join([f'"{c}"' for c in cols])
-        placeholders = ",".join(["?"] * len(cols))
+        col_sql = ",".join([f'"{c}"' for c in clean.keys()])
+        placeholders = ",".join(["?"] * len(clean))
         try:
-            cur.execute(f'INSERT INTO "{table}" ({col_sql}) VALUES ({placeholders})', [clean[c] for c in cols])
-            count += 1
+            cur.execute(f'INSERT INTO "{table}" ({col_sql}) VALUES ({placeholders})', list(clean.values()))
+            inserted += 1
         except Exception:
             continue
-    return count
+    return inserted
 
 
-def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
-    payload = _v82_read_authority_payload()
-    if not _v82_valid_authority_payload(payload):
-        return {
-            "ok": False,
-            "mode": "v82_single_authority_restore",
-            "message": "尚未建立 10 權限管理唯一權威檔；已略過舊路徑還原，避免讀回舊紀錄。",
-            "authority_file": str(_V82_PERMISSION_AUTHORITY_FILE),
-        }
-    tables = _v82_tables_from_payload(payload)
-    conn = connect_db()
-    cur = conn.cursor()
-    restored: dict[str, int] = {}
+def _v91_restore_from_authority(force: bool = True) -> dict:
+    """從唯一權威檔覆蓋 SQLite 快取。只讀 records.json。"""
+    _v91_schema_only()
+    payload = _v91_authority_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    if not isinstance(tables, dict) or not isinstance(tables.get("auth_users"), list):
+        return {"ok": False, "mode": "v91_single_authority", "message": "authority_file_missing_or_invalid", "source": str(_V91_PERMISSION_AUTHORITY_FILE)}
+    conn = connect_db(); cur = conn.cursor(); restored = {}
     try:
         try:
-            init_permission_tables()
+            _ensure_legacy_security_tables(cur)  # type: ignore[name-defined]
+            _ensure_security_setting_tables(cur)  # type: ignore[name-defined]
         except Exception:
             pass
-        try:
-            _ensure_legacy_security_tables(cur)
-            _ensure_security_setting_tables(cur)
-        except Exception:
-            pass
-        for table in _V82_PERMISSION_TABLES:
+        for table in _V91_AUTH_TABLES:
             rows = tables.get(table, []) if isinstance(tables.get(table), list) else []
-            restored[table] = _v82_replace_table(cur, table, rows)
+            restored[table] = _v91_replace_table(cur, table, rows)
         conn.commit()
     finally:
         try:
@@ -4087,278 +3408,135 @@ def restore_permission_settings_from_permanent_files(force: bool = False) -> dic
         sync_auth_users_to_runtime_security()
     except Exception:
         pass
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    if st is not None:
-        try:
-            st.session_state[_V82_PERMISSION_RESTORE_KEY] = True
-            st.session_state["v82_permission_restore_source"] = str(_V82_PERMISSION_AUTHORITY_FILE)
-        except Exception:
-            pass
-    return {
-        "ok": True,
-        "mode": "v82_single_authority_restore",
-        "restored": restored,
-        "authority_file": str(_V82_PERMISSION_AUTHORITY_FILE),
-        "source_time": payload.get("updated_at"),
-    }
+    clear_permission_runtime_cache()
+    return {"ok": True, "mode": "v91_single_authority", "source": str(_V91_PERMISSION_AUTHORITY_FILE), "restored": restored}
 
 
-def _v82_restore_permission_once() -> None:
+def _v91_restore_once_if_needed() -> None:
+    global _V91_PERMISSION_RESTORED
+    if _V91_PERMISSION_RESTORED:
+        return
     if st is not None:
         try:
-            if st.session_state.get(_V82_PERMISSION_RESTORE_KEY):
+            if st.session_state.get(_V91_PERMISSION_RESTORE_SESSION_KEY):
+                _V91_PERMISSION_RESTORED = True
                 return
         except Exception:
             pass
-    restore_permission_settings_from_permanent_files(force=True)
+    # Reboot 後以權威檔為準；若權威檔不存在，不讀任何舊檔。
+    _v91_restore_from_authority(force=True)
+    _V91_PERMISSION_RESTORED = True
     if st is not None:
         try:
-            st.session_state[_V82_PERMISSION_RESTORE_KEY] = True
+            st.session_state[_V91_PERMISSION_RESTORE_SESSION_KEY] = True
         except Exception:
             pass
 
 
-def get_users() -> List[dict]:  # type: ignore[override]
-    _v82_restore_permission_once()
-    if "_v79_prev_get_users" in globals() and callable(_v79_prev_get_users):
-        return _v79_prev_get_users()
-    return []
+def _v91_export_authority(reason: str = "permission_saved") -> dict:
+    payload = _v91_payload_from_db(reason)
+    # 防止暫時性 DB 異常把空帳號寫成權威檔；admin 應至少存在。
+    auth_users = payload.get("tables", {}).get("auth_users", []) if isinstance(payload.get("tables"), dict) else []
+    if not isinstance(auth_users, list) or len(auth_users) == 0:
+        return {"ok": False, "mode": "v91_single_authority", "blocked": True, "message": "blocked_empty_auth_users", "file": str(_V91_PERMISSION_AUTHORITY_FILE)}
+    _v91_atomic_write(_V91_PERMISSION_AUTHORITY_FILE, payload)
+    clear_permission_runtime_cache()
+    return {"ok": True, "mode": "v91_single_authority", "file": str(_V91_PERMISSION_AUTHORITY_FILE), "table_counts": payload.get("table_counts", {})}
 
 
-def get_account_permissions() -> List[dict]:  # type: ignore[override]
-    _v82_restore_permission_once()
-    if "_v79_prev_get_account_permissions" in globals() and callable(_v79_prev_get_account_permissions):
-        return _v79_prev_get_account_permissions()
-    return []
-
-
-def get_security_settings() -> dict:  # type: ignore[override]
-    _v82_restore_permission_once()
-    if "_v79_prev_get_security_settings" in globals() and callable(_v79_prev_get_security_settings):
-        return _v79_prev_get_security_settings()
-    return {}
-
-
-def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
-    # 儲存時不先 restore，避免把畫面新資料蓋掉；寫完只輸出唯一權威檔。
-    if "_v79_prev_save_users" in globals() and callable(_v79_prev_save_users):
-        result = _v79_prev_save_users(rows)
+def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
+    """V91：只建 schema；Reboot/首次權限檢查時只從唯一權威檔還原。"""
+    _v91_schema_only()
+    if force:
+        _v91_restore_from_authority(force=True)
     else:
-        result = {"saved": 0, "skipped": []}
-    export_result = export_permission_settings_permanently("auth_users_saved_v82_single_authority")
-    if isinstance(result, dict):
-        result["authority_save"] = export_result
-    return result
+        _v91_restore_once_if_needed()
 
 
-def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
-    if "_v79_prev_save_account_permissions" in globals() and callable(_v79_prev_save_account_permissions):
-        count = int(_v79_prev_save_account_permissions(rows) or 0)
-    else:
-        count = 0
-    export_permission_settings_permanently("account_permissions_saved_v82_single_authority")
-    return count
+init_auth_tables = init_permission_tables
 
 
-def save_security_settings(values: dict) -> None:  # type: ignore[override]
-    if "_v79_prev_save_security_settings" in globals() and callable(_v79_prev_save_security_settings):
-        _v79_prev_save_security_settings(values)
-    export_permission_settings_permanently("security_settings_saved_v82_single_authority")
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    """V91：保留舊函式名稱，但只讀唯一權威檔。"""
+    return _v91_restore_from_authority(force=True)
 
 
-def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
-    # 沿用 V81 防呆刪除，但刪完只寫唯一權威檔。
-    try:
-        init_permission_tables()
-    except Exception:
-        pass
-    cleaned: list[str] = []
-    seen: set[str] = set()
-    for u in usernames or []:
-        name = str(u or "").strip()
-        low = name.lower()
-        if not name or low == "admin" or low in seen:
-            continue
-        seen.add(low)
-        cleaned.append(name)
-    if not cleaned:
-        return 0
-    deleted = 0
-    for username in cleaned:
-        try:
-            _v81_safe_delete_from_table("auth_account_permissions", username)
-        except Exception:
-            pass
-        try:
-            _v81_safe_delete_from_table("security_user_roles", username)
-        except Exception:
-            pass
-        try:
-            _v81_safe_delete_from_table("security_users", username)
-        except Exception:
-            pass
-        try:
-            deleted += _v81_delete_auth_user(username)
-        except Exception:
-            pass
-    try:
-        ensure_permissions_for_all_users(force=True)
-    except Exception:
-        pass
-    try:
-        sync_auth_users_to_runtime_security()
-    except Exception:
-        pass
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    export_permission_settings_permanently("auth_users_deleted_v82_single_authority")
-    return deleted
-
-
-check_permission = has_permission
-# ===================== END V82 SINGLE AUTHORITY PERMISSION STORE =====================
-
-
-# ========================= V84 10 PERMISSIONS SINGLE AUTHORITY HARD FIX =========================
-# 10 權限管理：只讀寫 data/permanent_store/modules/10_permissions/records.json。
-# 儲存/刪除/套用權限後立即透過 permanent_authority_service 寫同一個 canonical 檔與 GitHub 同一路徑。
-# 頁面原本呼叫 restore_default_accounts_once_v57()，這裡覆寫成 no-op，避免刪除帳號又被預設帳號補回。
-_V84_PERMISSION_MODULE = "10_permissions"
-_V84_PERMISSION_TABLES = [
-    "auth_users",
-    "auth_account_permissions",
-    "auth_security_settings",
-    "security_users",
-    "security_user_roles",
-    "security_settings",
-]
-_V84_PERMISSION_RESTORE_KEY = "_v84_permission_single_authority_restored"
-
-
-def _v84_perm_tables_from_authority() -> dict:
-    try:
-        from services.permanent_authority_service import load_tables as _pa_load_tables
-        return _pa_load_tables(_V84_PERMISSION_MODULE, "records")
-    except Exception:
-        return {}
-
-
-def _v84_perm_rows_from_db() -> dict:
-    try:
-        # Use the schema-only initializer if available to avoid restore/default side effects.
-        if "_prev_v366_init_permission_tables" in globals() and callable(_prev_v366_init_permission_tables):
-            _prev_v366_init_permission_tables(force=False)
-        else:
-            init_permission_tables()
-    except Exception:
-        pass
-    tables: dict[str, list[dict]] = {}
-    conn = connect_db()
-    try:
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        try:
-            _ensure_legacy_security_tables(cur)
-            _ensure_security_setting_tables(cur)
-        except Exception:
-            pass
-        for table in _V84_PERMISSION_TABLES:
-            try:
-                rows = cur.execute(f'SELECT * FROM "{table}"').fetchall()
-                tables[table] = [dict(r) for r in rows]
-            except Exception:
-                tables[table] = []
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-    return tables
-
-
-def _v84_perm_has_users(tables: dict) -> bool:
-    users = tables.get("auth_users") if isinstance(tables, dict) else None
-    return isinstance(users, list) and any(isinstance(r, dict) and str(r.get("username") or "").strip() for r in users)
-
-
-def _v84_replace_table(cur: sqlite3.Cursor, table: str, rows: list[dict]) -> int:
-    try:
-        cur.execute(f'DELETE FROM "{table}"')
-    except Exception:
-        return 0
-    count = 0
-    for row in rows or []:
-        if not isinstance(row, dict):
-            continue
-        clean = {str(k): v for k, v in row.items() if str(k).strip()}
-        if not clean:
-            continue
-        cols = list(clean.keys())
-        try:
-            cur.execute(
-                f'INSERT INTO "{table}" ({",".join([f"\"{c}\"" for c in cols])}) VALUES ({",".join(["?"] * len(cols))})',
-                [clean[c] for c in cols],
-            )
-            count += 1
-        except Exception:
-            continue
-    return count
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
+    """V91：保留舊函式名稱，但只寫唯一權威檔。"""
+    return _v91_export_authority(reason)
 
 
 def restore_default_accounts_once_v57() -> dict:  # type: ignore[override]
-    return {"ok": True, "skipped": True, "mode": "v84_no_default_restore", "message": "V84：10 權限管理以唯一權威檔為準，不再自動補回預設帳號。"}
+    """V91：禁止自動補回預設六帳號。10 頁仍會呼叫此函式，但它必須是 no-op。"""
+    return {"restored": 0, "usernames": [], "mode": "v91_disabled_default_restore"}
 
 
-def export_permission_settings_permanently(reason: str = "permission_saved_v84_single_authority") -> dict:  # type: ignore[override]
-    tables = _v84_perm_rows_from_db()
-    if not _v84_perm_has_users(tables):
-        return {"ok": False, "mode": "v84_guard", "message": "已阻止空 auth_users 覆蓋 10 權限管理 canonical 權威檔。", "table_counts": {k: len(v) for k, v in tables.items()}}
-    try:
-        from services.permanent_authority_service import save_authority as _pa_save_authority
-        res = _pa_save_authority(_V84_PERMISSION_MODULE, records=tables, reason=reason, github=True)
-    except Exception as exc:
-        res = {"ok": False, "error": str(exc), "mode": "v84_permission_save_error"}
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    if st is not None:
-        try:
-            st.session_state[_V84_PERMISSION_RESTORE_KEY] = True
-            st.session_state["v84_permission_last_export"] = now_text()
-        except Exception:
-            pass
-    return res
-
-
-def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
-    tables = _v84_perm_tables_from_authority()
-    if not _v84_perm_has_users(tables):
-        return {"ok": False, "mode": "v84_restore", "message": "10 權限管理 canonical 權威檔尚無有效 auth_users；不讀舊檔、不補預設帳號。"}
-    try:
-        if "_prev_v366_init_permission_tables" in globals() and callable(_prev_v366_init_permission_tables):
-            _prev_v366_init_permission_tables(force=False)
-        else:
-            init_permission_tables()
-    except Exception:
-        pass
+def get_users() -> List[dict]:  # type: ignore[override]
+    init_permission_tables(force=False)
     conn = connect_db()
-    restored: dict[str, int] = {}
     try:
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
+        rows = conn.execute("""
+            SELECT id, username,
+                   '********' AS password_display,
+                   '' AS new_password,
+                   employee_id, display_name, email, role_code,
+                   is_active, force_password_change, last_login_at, note, created_at, updated_at
+            FROM auth_users
+            ORDER BY username
+        """).fetchall()
+        return [dict(r) for r in rows]
+    finally:
         try:
-            _ensure_legacy_security_tables(cur)
-            _ensure_security_setting_tables(cur)
+            conn.close()
         except Exception:
             pass
-        for table in _V84_PERMISSION_TABLES:
-            restored[table] = _v84_replace_table(cur, table, tables.get(table, []))
+
+
+def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
+    init_permission_tables(force=False)
+    input_rows = list(rows or [])
+    conn = connect_db(); cur = conn.cursor()
+    saved = 0; skipped: list[str] = []; role_sync_users: list[str] = []; saved_usernames: list[str] = []
+    try:
+        for r in input_rows:
+            if not isinstance(r, dict):
+                continue
+            username = str(r.get("username", "")).strip()
+            if not username:
+                continue
+            display_name = str(r.get("display_name") or r.get("姓名 / Display Name") or "").strip() or username
+            role_code = str(r.get("role_code") or r.get("角色 / Role") or "operator").strip() or "operator"
+            new_password = str(r.get("new_password") or r.get("密碼 / Password") or r.get("新密碼 / New Password") or "").strip()
+            employee_id = str(r.get("employee_id") or r.get("工號 / Employee ID") or "").strip()
+            email = str(r.get("email") or r.get("Email") or "").strip()
+            note = str(r.get("note") or r.get("備註 / Note") or "").strip()
+            is_active = _v91_bool(r.get("is_active", r.get("啟用 / Active", True)), True)
+            force_change = _v91_bool(r.get("force_password_change", r.get("強制改密碼 / Force Change", False)), False)
+            exists = cur.execute("SELECT username, role_code FROM auth_users WHERE username=?", (username,)).fetchone()
+            if exists:
+                old_role = str(exists["role_code"] or "operator").strip() or "operator"
+                cur.execute("""
+                    UPDATE auth_users
+                    SET employee_id=?, display_name=?, email=?, role_code=?, is_active=?,
+                        force_password_change=?, note=?, updated_at=?
+                    WHERE username=?
+                """, (employee_id, display_name, email, role_code, is_active, force_change, note, now_text(), username))
+                if new_password:
+                    cur.execute("UPDATE auth_users SET password_hash=?, password_hint=?, updated_at=? WHERE username=?", (hash_password(new_password), "由權限管理頁更新", now_text(), username))
+                if old_role != role_code:
+                    role_sync_users.append(username)
+            else:
+                if not new_password:
+                    skipped.append(f"{username} 未設定新密碼 / new password required")
+                    continue
+                cur.execute("""
+                    INSERT INTO auth_users
+                    (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,note,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                """, (username, hash_password(new_password), "由權限管理頁建立", employee_id, display_name, email, role_code, is_active, force_change, note, now_text(), now_text()))
+                role_sync_users.append(username)
+            saved += 1
+            saved_usernames.append(username)
         conn.commit()
     finally:
         try:
@@ -4366,134 +3544,180 @@ def restore_permission_settings_from_permanent_files(force: bool = False) -> dic
         except Exception:
             pass
     try:
-        sync_auth_users_to_runtime_security()
+        ensure_permissions_for_all_users(force=True)
+        if role_sync_users:
+            sync_user_permissions_from_roles(role_sync_users, reason="v91_account_role_changed")
+        if saved_usernames:
+            sync_auth_users_to_runtime_security(saved_usernames)
     except Exception:
         pass
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    if st is not None:
-        try:
-            st.session_state[_V84_PERMISSION_RESTORE_KEY] = True
-        except Exception:
-            pass
-    return {"ok": True, "mode": "v84_restore_single_authority", "restored": restored}
-
-
-def _v84_restore_permission_once() -> None:
-    if st is not None:
-        try:
-            if st.session_state.get(_V84_PERMISSION_RESTORE_KEY):
-                return
-        except Exception:
-            pass
-    restore_permission_settings_from_permanent_files(force=True)
-    if st is not None:
-        try:
-            st.session_state[_V84_PERMISSION_RESTORE_KEY] = True
-        except Exception:
-            pass
-
-
-def get_users() -> List[dict]:  # type: ignore[override]
-    _v84_restore_permission_once()
-    if "_v79_prev_get_users" in globals() and callable(_v79_prev_get_users):
-        return _v79_prev_get_users()
-    return []
-
-
-def get_account_permissions() -> List[dict]:  # type: ignore[override]
-    _v84_restore_permission_once()
-    if "_v79_prev_get_account_permissions" in globals() and callable(_v79_prev_get_account_permissions):
-        return _v79_prev_get_account_permissions()
-    return []
-
-
-def get_security_settings() -> dict:  # type: ignore[override]
-    _v84_restore_permission_once()
-    if "_v79_prev_get_security_settings" in globals() and callable(_v79_prev_get_security_settings):
-        return _v79_prev_get_security_settings()
-    return {}
-
-
-def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
-    if "_v79_prev_save_users" in globals() and callable(_v79_prev_save_users):
-        result = _v79_prev_save_users(rows)
-    else:
-        result = {"saved": 0, "skipped": []}
-    export_result = export_permission_settings_permanently("auth_users_saved_v84_single_authority")
-    if isinstance(result, dict):
-        result["authority_save"] = export_result
-    return result
-
-
-def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
-    if "_v79_prev_save_account_permissions" in globals() and callable(_v79_prev_save_account_permissions):
-        count = int(_v79_prev_save_account_permissions(rows) or 0)
-    else:
-        count = 0
-    export_permission_settings_permanently("account_permissions_saved_v84_single_authority")
-    return count
-
-
-def save_security_settings(values: dict) -> None:  # type: ignore[override]
-    if "_v79_prev_save_security_settings" in globals() and callable(_v79_prev_save_security_settings):
-        _v79_prev_save_security_settings(values)
-    export_permission_settings_permanently("security_settings_saved_v84_single_authority")
+    clear_permission_runtime_cache()
+    export_result = _v91_export_authority("auth_users_saved_v91")
+    return {"saved": saved, "skipped": skipped, "role_synced_users": sorted(set(role_sync_users)), "permanent_save": export_result}
 
 
 def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
-    cleaned: list[str] = []
-    seen: set[str] = set()
+    init_permission_tables(force=False)
+    targets = []
+    seen = set()
     for u in usernames or []:
         name = str(u or "").strip()
-        low = name.lower()
-        if not name or low == "admin" or low in seen:
+        if not name or name.lower() == "admin" or name.lower() in seen:
             continue
-        seen.add(low)
-        cleaned.append(name)
-    if not cleaned:
+        seen.add(name.lower()); targets.append(name)
+    if not targets:
         return 0
+    conn = connect_db(); cur = conn.cursor(); deleted = 0
     try:
-        if "_prev_v366_init_permission_tables" in globals() and callable(_prev_v366_init_permission_tables):
-            _prev_v366_init_permission_tables(force=False)
-        else:
-            init_permission_tables()
-    except Exception:
-        pass
-    deleted = 0
-    for username in cleaned:
         try:
-            _v81_safe_delete_from_table("auth_account_permissions", username)
+            _ensure_legacy_security_tables(cur)  # type: ignore[name-defined]
         except Exception:
             pass
+        for u in targets:
+            existed = cur.execute("SELECT COUNT(*) AS c FROM auth_users WHERE username=?", (u,)).fetchone()
+            existed_count = int(existed["c"] if existed is not None else 0)
+            for sql in [
+                "DELETE FROM auth_account_permissions WHERE username=?",
+                "DELETE FROM security_user_roles WHERE username=?",
+                "DELETE FROM security_users WHERE username=?",
+                "DELETE FROM auth_users WHERE username=?",
+            ]:
+                try:
+                    cur.execute(sql, (u,))
+                except Exception:
+                    pass
+            deleted += existed_count
+        conn.commit()
+    finally:
         try:
-            _v81_safe_delete_from_table("security_user_roles", username)
+            conn.close()
         except Exception:
             pass
+    clear_permission_runtime_cache()
+    if deleted:
+        _v91_export_authority("auth_users_deleted_v91")
+    return deleted
+
+
+def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
+    init_permission_tables(force=False)
+    conn = connect_db(); cur = conn.cursor(); count = 0
+    try:
+        for r in rows or []:
+            if not isinstance(r, dict):
+                continue
+            username = str(r.get("username", "")).strip()
+            module_code = str(r.get("module_code", "")).strip().zfill(2)
+            if not username or not module_code:
+                continue
+            module_info = next((m for m in MODULES if m["module_code"] == module_code), None)
+            module_name_zh = str(r.get("module_name_zh") or (module_info or {}).get("module_name_zh") or "").strip()
+            module_name_en = str(r.get("module_name_en") or (module_info or {}).get("module_name_en") or "").strip()
+            vals = {k: _v91_bool(r.get(k, False), False) for k, _, _ in ACTIONS}
+            cur.execute("""
+                INSERT INTO auth_account_permissions
+                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(username,module_code) DO UPDATE SET
+                    module_name_zh=excluded.module_name_zh, module_name_en=excluded.module_name_en,
+                    can_view=excluded.can_view, can_create=excluded.can_create, can_edit=excluded.can_edit,
+                    can_delete=excluded.can_delete, can_import=excluded.can_import, can_export=excluded.can_export,
+                    can_backup=excluded.can_backup, can_restore=excluded.can_restore, can_manage=excluded.can_manage,
+                    updated_at=excluded.updated_at
+            """, (username, module_code, module_name_zh, module_name_en,
+                  vals["can_view"], vals["can_create"], vals["can_edit"], vals["can_delete"], vals["can_import"], vals["can_export"], vals["can_backup"], vals["can_restore"], vals["can_manage"], now_text()))
+            count += 1
+        conn.commit()
+    finally:
         try:
-            _v81_safe_delete_from_table("security_users", username)
+            conn.close()
         except Exception:
             pass
+    clear_permission_runtime_cache()
+    _v91_export_authority("account_permissions_saved_v91")
+    return count
+
+
+def get_account_permissions() -> List[dict]:  # type: ignore[override]
+    init_permission_tables(force=False)
+    conn = connect_db()
+    try:
+        rows = conn.execute("""
+            SELECT p.username, u.display_name, u.role_code, p.module_code, p.module_name_zh, p.module_name_en,
+                   p.can_view, p.can_create, p.can_edit, p.can_delete, p.can_import, p.can_export,
+                   p.can_backup, p.can_restore, p.can_manage, p.updated_at
+            FROM auth_account_permissions p
+            LEFT JOIN auth_users u ON u.username = p.username
+            ORDER BY p.username, CAST(p.module_code AS INTEGER)
+        """).fetchall()
+        return [dict(r) for r in rows]
+    finally:
         try:
-            deleted += _v81_delete_auth_user(username)
+            conn.close()
         except Exception:
             pass
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    init_permission_tables(force=False)
+    merged = get_security_settings()
+    merged.update({str(k): str(v) for k, v in (settings or {}).items()})
+    conn = connect_db(); cur = conn.cursor()
     try:
-        ensure_permissions_for_all_users(force=True)
-    except Exception:
-        pass
+        try:
+            _ensure_security_setting_tables(cur)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        for k, v in merged.items():
+            cur.execute("""
+                INSERT INTO auth_security_settings(setting_key, setting_value, note, updated_at)
+                VALUES (?,?,?,?)
+                ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value, updated_at=excluded.updated_at
+            """, (str(k), str(v), "V91 single authority security setting", now_text()))
+            try:
+                cur.execute("""
+                    INSERT INTO security_settings(setting_key, setting_value, note, updated_at)
+                    VALUES (?,?,?,?)
+                    ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value, updated_at=excluded.updated_at
+                """, (str(k), str(v), "V91 single authority security setting", now_text()))
+            except Exception:
+                pass
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    clear_permission_runtime_cache()
+    _v91_export_authority("security_settings_saved_v91")
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    init_permission_tables(force=False)
+    result: Dict[str, str] = {
+        "idle_timeout_minutes": "15",
+        "ask_continue_after_record": "1",
+        "post_record_action": "ask_continue",
+    }
+    conn = connect_db(); cur = conn.cursor()
     try:
-        sync_auth_users_to_runtime_security()
-    except Exception:
-        pass
-    try:
-        clear_permission_runtime_cache()
-    except Exception:
-        pass
-    export_permission_settings_permanently("auth_users_deleted_v84_single_authority")
-    return int(deleted or 0)
+        try:
+            _ensure_security_setting_tables(cur)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        for table in ["auth_security_settings", "security_settings"]:
+            try:
+                for r in cur.execute(f"SELECT setting_key, setting_value FROM {table}").fetchall():
+                    result[str(r["setting_key"])] = str(r["setting_value"])
+            except Exception:
+                pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    return result
+
 
 check_permission = has_permission
-# ======================= END V84 10 PERMISSIONS SINGLE AUTHORITY HARD FIX =====================
+# ===== V91 SINGLE CANONICAL AUTHORITY PATCH END =====
