@@ -2744,3 +2744,483 @@ def sync_time_records_01_02_now(reason: str = "v86_manual_sync", *, github: bool
     clear_today_records_fast_cache()
     return _v86_fast_sync_time_authority(reason, github=github)
 # ===================== END V86 01 FAST LOAD / SYNC OVERRIDE =====================
+
+# ======================= V89 02 HISTORY STRICT AUTHORITY-FIRST =======================
+# 修正目的：
+# 1. 02 歷史紀錄刪除後，不得再因 SQLite 舊快取 / 舊 wrapper / 編輯存檔而復活。
+# 2. 02 的讀、寫、刪除、重算均以 canonical 權威檔為準：
+#    data/permanent_store/modules/02_history/records.json
+# 3. 01/02 共用 time_records，因此 02 修改完成後同步寫入 01_time_records canonical，
+#    SQLite 僅作快取，並由 canonical 覆蓋快取，避免舊資料救回。
+
+try:
+    _v89_prev_start_work = start_work
+except Exception:
+    _v89_prev_start_work = None
+try:
+    _v89_prev_finish_work = finish_work
+except Exception:
+    _v89_prev_finish_work = None
+try:
+    _v89_prev_import_time_records = import_time_records
+except Exception:
+    _v89_prev_import_time_records = None
+try:
+    _v89_prev_today_records = today_records
+except Exception:
+    _v89_prev_today_records = None
+
+_V89_CHECKBOX_COLS = {
+    "刪除", "重算", "刪除 / Delete", "重算 / Recalc", "選取", "Select", "selected",
+    "__selected__", "_selected", "_row_selected", "Delete", "Recalc",
+}
+
+
+def _v89_normalize_record_id(value) -> int | None:
+    try:
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    try:
+        rid = int(float(str(value).strip()))
+        return rid if rid > 0 else None
+    except Exception:
+        return None
+
+
+def _v89_id_list(values) -> list[int]:
+    out: list[int] = []
+    for v in values or []:
+        rid = _v89_normalize_record_id(v)
+        if rid is not None and rid not in out:
+            out.append(rid)
+    return out
+
+
+def _v89_authority_df(module_key: str = "02_history") -> pd.DataFrame:
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df_from_table
+        df = _pa_df_from_table(module_key, "time_records")
+        if isinstance(df, pd.DataFrame):
+            return df.copy()
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v89_table_rows_from_df(df: pd.DataFrame) -> list[dict]:
+    if df is None:
+        return []
+    try:
+        from services.permanent_authority_service import table_from_df as _pa_table_from_df
+        return _pa_table_from_df(df)
+    except Exception:
+        rows: list[dict] = []
+        try:
+            clean = df.copy()
+            clean = clean.where(pd.notna(clean), None)
+            for _, r in clean.iterrows():
+                rows.append(dict(r))
+        except Exception:
+            pass
+        return rows
+
+
+def _v89_sort_records(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    if "id" in out.columns:
+        try:
+            out["_v89_id_sort"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values("_v89_id_sort", ascending=False, kind="stable").drop(columns=["_v89_id_sort"], errors="ignore")
+            return out.reset_index(drop=True)
+        except Exception:
+            pass
+    return out.reset_index(drop=True)
+
+
+def _v89_save_time_authority_df(df: pd.DataFrame, reason: str = "v89_save_time_authority", *, github: bool = True) -> int:
+    """Save one canonical time_records DataFrame to both 01 and 02 authority files."""
+    rows = _v89_table_rows_from_df(_v89_sort_records(df))
+    try:
+        from services.permanent_authority_service import save_authority as _pa_save_authority
+        _pa_save_authority("01_time_records", records={"time_records": rows}, reason=f"{reason}_01", github=bool(github))
+        _pa_save_authority("02_history", records={"time_records": rows}, reason=f"{reason}_02", github=bool(github))
+    except Exception as exc:
+        try:
+            write_log("V89_TIME_AUTHORITY_SAVE_ERROR", f"01/02 權威檔寫入失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        clear_today_records_fast_cache()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            clear_query_cache()
+        except Exception:
+            pass
+    return int(len(rows))
+
+
+def _v89_existing_time_columns() -> list[str]:
+    try:
+        rows = query_df("PRAGMA table_info(time_records)")
+        if isinstance(rows, pd.DataFrame) and not rows.empty and "name" in rows.columns:
+            return [str(x) for x in rows["name"].tolist() if str(x)]
+    except Exception:
+        pass
+    return []
+
+
+def _v89_sync_sqlite_cache_from_authority(df: pd.DataFrame) -> int:
+    """Rewrite SQLite cache from canonical authority.
+
+    SQLite 在此架構下只是快取。02 刪除或編輯後，必須用 canonical 覆蓋快取，
+    不能再用 SQLite 反向覆蓋 canonical，否則刪除資料會復活。
+    """
+    try:
+        cols = _v89_existing_time_columns()
+        if not cols:
+            return 0
+        clean = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+        if clean.empty:
+            rows: list[dict] = []
+        else:
+            # 補齊 DB 欄位，只寫入 DB 既有欄位，避免新增 UI 欄位造成 SQL 失敗。
+            for c in cols:
+                if c not in clean.columns:
+                    clean[c] = None
+            clean = clean[cols].where(pd.notna(clean[cols]), None)
+            rows = clean.to_dict(orient="records")
+        import sqlite3 as _sqlite3
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        conn = _sqlite3.connect(DB_PATH, timeout=15)
+        try:
+            conn.execute("PRAGMA busy_timeout=8000")
+            conn.execute("BEGIN")
+            conn.execute("DELETE FROM time_records")
+            if rows:
+                placeholders = ",".join(["?"] * len(cols))
+                quoted_cols = ",".join([f'"{c}"' for c in cols])
+                sql = f'INSERT INTO time_records ({quoted_cols}) VALUES ({placeholders})'
+                vals = [tuple(r.get(c) for c in cols) for r in rows]
+                conn.executemany(sql, vals)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+        try:
+            clear_query_cache()
+        except Exception:
+            pass
+        return len(rows)
+    except Exception as exc:
+        try:
+            write_log("V89_SQLITE_CACHE_SYNC_ERROR", f"SQLite 快取由權威檔覆蓋失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        return 0
+
+
+def _v89_next_id(df: pd.DataFrame) -> int:
+    try:
+        if df is not None and not df.empty and "id" in df.columns:
+            max_id = pd.to_numeric(df["id"], errors="coerce").dropna().max()
+            if pd.notna(max_id):
+                return int(max_id) + 1
+    except Exception:
+        pass
+    return 1
+
+
+def _v89_clean_editor_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None:
+        return pd.DataFrame()
+    out = df.copy()
+    drop_cols = [c for c in out.columns if str(c).strip() in _V89_CHECKBOX_COLS]
+    if drop_cols:
+        out = out.drop(columns=drop_cols, errors="ignore")
+    # 移除完全空白新增列。
+    if not out.empty:
+        try:
+            non_id_cols = [c for c in out.columns if str(c) not in {"id", "ID", "ID / ID"}]
+            if non_id_cols:
+                mask_any = out[non_id_cols].apply(lambda r: any(not _is_blank_value(v) for v in r), axis=1)
+                out = out.loc[mask_any].copy()
+        except Exception:
+            pass
+    return out.reset_index(drop=True)
+
+
+def _v89_normalize_row_for_save(row: dict, *, recalc_work_hours: bool = False) -> dict:
+    out = dict(row)
+    try:
+        normalized_dt = normalize_record_datetime_fields(out, recalc_work_hours=recalc_work_hours)
+        out.update(normalized_dt)
+    except Exception:
+        pass
+    # 工時欄可能是 HH:MM:SS 顯示格式，存回 decimal hours。
+    if "work_hours" in out and not _is_blank_value(out.get("work_hours")):
+        try:
+            v = out.get("work_hours")
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                out["work_hours"] = float(v)
+            else:
+                out["work_hours"] = hms_to_hours(v)
+        except Exception:
+            pass
+    if "is_group_work" in out and not _is_blank_value(out.get("is_group_work")):
+        try:
+            out["is_group_work"] = int(bool(out.get("is_group_work")))
+        except Exception:
+            pass
+    out["updated_at"] = _now()
+    if not out.get("created_at"):
+        out["created_at"] = _now()
+    if not out.get("record_key"):
+        try:
+            out["record_key"] = make_record_key(
+                str(out.get("employee_id") or ""),
+                str(out.get("work_order") or ""),
+                str(out.get("process_name") or ""),
+                str(out.get("start_timestamp") or ""),
+            )
+        except Exception:
+            out["record_key"] = uuid.uuid4().hex
+    return out
+
+
+def _v89_filter_records_df(df: pd.DataFrame, start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:
+    if df is None:
+        return pd.DataFrame()
+    out = df.copy()
+    if start_date:
+        col = "work_date" if "work_date" in out.columns else "start_date"
+        if col in out.columns:
+            out = out[out[col].fillna("").astype(str) >= str(start_date)]
+    if end_date:
+        col = "work_date" if "work_date" in out.columns else "start_date"
+        if col in out.columns:
+            out = out[out[col].fillna("").astype(str) <= str(end_date)]
+    if employee_id and "employee_id" in out.columns:
+        out = out[out["employee_id"].fillna("").astype(str) == str(employee_id)]
+    if work_order and "work_order" in out.columns:
+        out = out[out["work_order"].fillna("").astype(str) == str(work_order)]
+    return _v89_sort_records(out)
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    # V89：02 歷史紀錄只讀 02_history canonical。SQLite 永遠只是快取，不作為 02 來源。
+    df = _v89_authority_df("02_history")
+    return _v89_filter_records_df(df, start_date, end_date, employee_id, work_order)
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    """V89 authority-first save.
+
+    編輯表格只更新/新增畫面中的列，不會用 SQLite 舊資料覆蓋 canonical。
+    """
+    edit_df = _v89_clean_editor_df(df)
+    if edit_df.empty:
+        return 0
+    auth_df = _v89_authority_df("02_history")
+    if auth_df is None:
+        auth_df = pd.DataFrame()
+
+    # 用 canonical 欄位 + 編輯欄位聯集，避免欄位遺失。
+    cols: list[str] = []
+    for c in list(auth_df.columns if isinstance(auth_df, pd.DataFrame) else []) + list(edit_df.columns):
+        if str(c) not in cols:
+            cols.append(str(c))
+    if "id" not in cols:
+        cols.insert(0, "id")
+    if auth_df.empty:
+        auth_df = pd.DataFrame(columns=cols)
+    else:
+        for c in cols:
+            if c not in auth_df.columns:
+                auth_df[c] = None
+        auth_df = auth_df[cols].copy()
+
+    next_id = _v89_next_id(auth_df)
+    updated = 0
+    by_id: dict[int, int] = {}
+    if not auth_df.empty and "id" in auth_df.columns:
+        for idx, val in auth_df["id"].items():
+            rid = _v89_normalize_record_id(val)
+            if rid is not None:
+                by_id[rid] = idx
+
+    for _, r in edit_df.iterrows():
+        row = dict(r)
+        rid = _v89_normalize_record_id(row.get("id")) or _v89_normalize_record_id(row.get("ID")) or _v89_normalize_record_id(row.get("ID / ID"))
+        if rid is None:
+            rid = next_id
+            next_id += 1
+        row["id"] = rid
+        row = _v89_normalize_row_for_save(row, recalc_work_hours=bool(recalc_edited_timestamps))
+        for c in row.keys():
+            if c not in auth_df.columns:
+                auth_df[c] = None
+        if rid in by_id:
+            idx = by_id[rid]
+            for c, v in row.items():
+                auth_df.at[idx, c] = v
+        else:
+            new_row = {c: None for c in auth_df.columns}
+            for c, v in row.items():
+                if c not in new_row:
+                    auth_df[c] = None
+                    new_row[c] = v
+                else:
+                    new_row[c] = v
+            auth_df = pd.concat([auth_df, pd.DataFrame([new_row])], ignore_index=True)
+            by_id[rid] = int(auth_df.index[-1])
+        updated += 1
+
+    _v89_save_time_authority_df(auth_df, "save_time_records_v89_authority_first", github=True)
+    _v89_sync_sqlite_cache_from_authority(auth_df)
+    try:
+        write_log("SAVE_TIME_RECORDS", f"V89 權威檔優先：已儲存/更新歷史紀錄 {updated} 筆，並同步 01/02 canonical。", "time_records")
+    except Exception:
+        pass
+    return int(updated)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = set(_v89_id_list(record_ids))
+    if not ids:
+        return 0
+    auth_df = _v89_authority_df("02_history")
+    if auth_df is None or auth_df.empty or "id" not in auth_df.columns:
+        return 0
+    id_series = auth_df["id"].map(_v89_normalize_record_id)
+    before = len(auth_df)
+    remaining = auth_df.loc[~id_series.isin(ids)].copy()
+    deleted = before - len(remaining)
+    if deleted:
+        _v89_save_time_authority_df(remaining, "delete_time_records_v89_authority_first", github=True)
+        _v89_sync_sqlite_cache_from_authority(remaining)
+        try:
+            write_log("DELETE_TIME_RECORDS", f"{reason}：V89 權威檔優先已刪除 {deleted} 筆，SQLite 快取已由 canonical 覆蓋，不會復活。", "time_records", level="WARN")
+        except Exception:
+            pass
+    return int(deleted)
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    auth_df = _v89_authority_df("02_history")
+    if auth_df is None or auth_df.empty:
+        return 0
+    ids = set(_v89_id_list(record_ids)) if record_ids else set()
+    if "id" not in auth_df.columns:
+        return 0
+    target_mask = auth_df["id"].map(_v89_normalize_record_id).map(lambda x: bool(x in ids) if ids else True)
+    count = 0
+    for idx in auth_df.loc[target_mask].index:
+        row = dict(auth_df.loc[idx])
+        start_ts = row.get("start_timestamp")
+        end_ts = row.get("end_timestamp")
+        if _is_blank_value(start_ts) or _is_blank_value(end_ts):
+            continue
+        normalized = normalize_record_datetime_fields(row, recalc_work_hours=True)
+        if not normalized.get("start_timestamp") or not normalized.get("end_timestamp"):
+            continue
+        for c, v in normalized.items():
+            if c not in auth_df.columns:
+                auth_df[c] = None
+            auth_df.at[idx, c] = v
+        status = str(auth_df.at[idx, "status"] if "status" in auth_df.columns else "").strip()
+        if not status or status == "作業中":
+            if "status" not in auth_df.columns:
+                auth_df["status"] = None
+            auth_df.at[idx, "status"] = row.get("end_action") or "已結束"
+        if "updated_at" not in auth_df.columns:
+            auth_df["updated_at"] = None
+        auth_df.at[idx, "updated_at"] = _now()
+        count += 1
+    if count:
+        _v89_save_time_authority_df(auth_df, "recalculate_time_records_v89_authority_first", github=True)
+        _v89_sync_sqlite_cache_from_authority(auth_df)
+        try:
+            write_log("RECALC_TIME_RECORDS", f"V89 權威檔優先：已重新計算 {count} 筆工時，並同步 01/02 canonical。", "time_records")
+        except Exception:
+            pass
+    return int(count)
+
+
+def sync_time_records_01_02_now(reason: str = "v89_manual_sync", *, github: bool = True) -> int:  # type: ignore[override]
+    """V89：手動同步時，以 02_history canonical 為準同步 01 與 SQLite 快取。"""
+    auth_df = _v89_authority_df("02_history")
+    _v89_save_time_authority_df(auth_df, reason, github=bool(github))
+    _v89_sync_sqlite_cache_from_authority(auth_df)
+    return int(len(auth_df) if isinstance(auth_df, pd.DataFrame) else 0)
+# ===================== END V89 02 HISTORY STRICT AUTHORITY-FIRST =====================
+
+# ===================== V89B 01 ACTION BASELINE FROM AUTHORITY =====================
+# 防止 01 開始/完工使用舊 SQLite 快取後，又把已刪除的 02 紀錄同步回 canonical。
+
+def _v89_baseline_sqlite_from_canonical(reason: str = "v89_baseline") -> int:
+    df = _v89_authority_df("02_history")
+    return _v89_sync_sqlite_cache_from_authority(df)
+
+
+def _v89_sync_canonical_from_sqlite_after_live_action(reason: str, *, github: bool = False) -> int:
+    try:
+        if "_v84_sync_time_records_canonical_from_sqlite" in globals():
+            return int(_v84_sync_time_records_canonical_from_sqlite(reason, github=bool(github)))
+    except Exception as exc:
+        try:
+            write_log("V89_LIVE_SYNC_ERROR", f"01 live action 後由 SQLite 同步 canonical 失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    return 0
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    _v89_baseline_sqlite_from_canonical("start_work_v89_baseline")
+    rid = _v89_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) if callable(_v89_prev_start_work) else 0
+    try:
+        clear_today_records_fast_cache()  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if rid:
+        _v89_sync_canonical_from_sqlite_after_live_action("start_work_v89", github=False)
+    return int(rid or 0)
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    _v89_baseline_sqlite_from_canonical("finish_work_v89_baseline")
+    count = _v89_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) if callable(_v89_prev_finish_work) else 0
+    try:
+        clear_today_records_fast_cache()  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if count:
+        _v89_sync_canonical_from_sqlite_after_live_action("finish_work_v89", github=False)
+    return int(count or 0)
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    # 匯入前先讓 SQLite 快取等於 canonical，避免舊 SQLite 殘留列被匯入同步流程帶回。
+    _v89_baseline_sqlite_from_canonical("import_time_records_v89_baseline")
+    result = _v89_prev_import_time_records(df, recalc=recalc, source=source) if callable(_v89_prev_import_time_records) else {"inserted": 0, "updated": 0}
+    try:
+        changed = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
+    except Exception:
+        changed = 0
+    if changed:
+        _v89_sync_canonical_from_sqlite_after_live_action("import_time_records_v89", github=True)
+        try:
+            clear_today_records_fast_cache()  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return result
+# =================== END V89B 01 ACTION BASELINE FROM AUTHORITY ===================
