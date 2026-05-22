@@ -763,42 +763,65 @@ with tab_accounts:
                 _v56_touch_account_editor()
                 st.rerun()
 
-        st.warning("V56：帳號總表已移除 st.form 包覆，批次按鈕會直接修改同一份草稿表格並換新 editor key，避免 checkbox 被舊畫面狀態蓋回。既有帳號顯示 ******** 代表維持原密碼；新增帳號請輸入密碼後再按下方『套用並儲存』。")
+        st.warning("V102：帳號總表改為穩定送出模式。點選表格與勾選刪除時不再即時 rerun，避免畫面跳掉、勾選掉回去或需要點兩下。修改完成後請按表格下方『套用並儲存』才會正式寫入權威檔。")
 
-        account_editor_key = f"v56_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
+        account_editor_key = f"v102_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
         draft_df = _v56_prepare_account_draft()
 
-        edited_users = _v95_raw_data_editor(
-            draft_df,
-            key=account_editor_key,
-            use_container_width=True,
-            num_rows="fixed",
-            hide_index=True,
-            disabled=not account_edit_enabled,
-            height=360,
-            # V97C：欄位順序保留「刪除」在第一欄，但不可重複加入同名欄位。
-            column_order=list(dict.fromkeys(["刪除 / Delete"] + [c for c in draft_df.columns if c != "刪除 / Delete"])),
-            column_config={
-                "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
-                "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
-                "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
-                "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
-                "工號 / Employee ID": st.column_config.TextColumn("工號 / Employee ID"),
-                "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
-                "Email": st.column_config.TextColumn("Email"),
-                "角色 / Role": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
-                "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active"),
-                "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
-                "備註 / Note": st.column_config.TextColumn("備註 / Note"),
-                "最後登入 / Last Login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
-                "更新時間 / Updated At": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
-            },
-        )
+        # V102：data_editor 放入 form，讓 checkbox / cell edits 留在前端草稿，
+        # 不因每次點擊觸發整頁 rerun；送出時再一次讀回並寫權威檔。
+        with st.form("v102_account_editor_commit_form", clear_on_submit=False):
+            edited_users = _v95_raw_data_editor(
+                draft_df,
+                key=account_editor_key,
+                use_container_width=True,
+                num_rows="fixed",
+                hide_index=True,
+                disabled=not account_edit_enabled,
+                height=360,
+                # V97C：欄位順序保留「刪除」在第一欄，但不可重複加入同名欄位。
+                column_order=list(dict.fromkeys(["刪除 / Delete"] + [c for c in draft_df.columns if c != "刪除 / Delete"])),
+                column_config={
+                    "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
+                    "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
+                    "密碼狀態 / Password Status": st.column_config.TextColumn("密碼 / Password（輸入修改）", help="可直接輸入新密碼；******** 或提示文字代表維持原密碼"),
+                    "新密碼 / New Password": st.column_config.TextColumn("新密碼 / New Password", help="要改密碼才填寫；新增帳號必填"),
+                    "工號 / Employee ID": st.column_config.TextColumn("工號 / Employee ID"),
+                    "姓名 / Display Name": st.column_config.TextColumn("姓名 / Display Name", required=True),
+                    "Email": st.column_config.TextColumn("Email"),
+                    "角色 / Role": st.column_config.SelectboxColumn("角色 / Role", options=ROLE_OPTIONS, required=True),
+                    "啟用 / Active": st.column_config.CheckboxColumn("啟用 / Active"),
+                    "強制改密碼 / Force Change": st.column_config.CheckboxColumn("強制改密碼 / Force Change"),
+                    "備註 / Note": st.column_config.TextColumn("備註 / Note"),
+                    "最後登入 / Last Login": st.column_config.TextColumn("最後登入 / Last Login", disabled=True),
+                    "更新時間 / Updated At": st.column_config.TextColumn("更新時間 / Updated At", disabled=True),
+                },
+            )
 
-        if account_edit_enabled and isinstance(edited_users, pd.DataFrame):
-            edited_users = edited_users.copy()
+            submitted_accounts = st.form_submit_button(
+                "▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master",
+                type="primary",
+                use_container_width=True,
+                disabled=not account_edit_enabled,
+            )
+
+        # 未送出時不把 data_editor 回傳值寫回 session_state，避免 widget 前端草稿
+        # 在 rerun 時被舊資料蓋掉。統計顯示 session 草稿值，正式送出才更新。
+        metric_df = st.session_state.get("v133_users_df", draft_df)
+        if not isinstance(metric_df, pd.DataFrame):
+            metric_df = draft_df
+        active_count = int(_to_bool_series(metric_df, "啟用 / Active").sum())
+        delete_count = int(_to_bool_series(metric_df, "刪除 / Delete").sum())
+        new_password_count = int(sum(1 for _, _row in metric_df.iterrows() if _password_from_editor_row(_row)))
+        m1, m2, m3 = st.columns(3)
+        m1.metric("啟用帳號 / Active", active_count)
+        m2.metric("待刪除 / Pending Delete", delete_count)
+        m3.metric("密碼異動 / Password Changes", new_password_count)
+
+        if submitted_accounts:
+            df = edited_users.copy() if isinstance(edited_users, pd.DataFrame) else draft_df.copy()
             try:
-                edited_users = edited_users.loc[:, ~pd.Index(edited_users.columns).duplicated()].copy()
+                df = df.loc[:, ~pd.Index(df.columns).duplicated()].copy()
             except Exception:
                 pass
             for _col, _default in [
@@ -806,35 +829,11 @@ with tab_accounts:
                 ("啟用 / Active", True),
                 ("強制改密碼 / Force Change", False),
             ]:
-                if _col in edited_users.columns:
-                    edited_users[_col] = _to_bool_series(edited_users, _col).fillna(bool(_default)).astype(bool)
-            st.session_state["v133_users_df"] = edited_users.copy()
-
-        active_count = int(_to_bool_series(st.session_state.get("v133_users_df", edited_users), "啟用 / Active").sum())
-        delete_count = int(_to_bool_series(st.session_state.get("v133_users_df", edited_users), "刪除 / Delete").sum())
-        new_password_count = int(sum(1 for _, _row in st.session_state.get("v133_users_df", edited_users).iterrows() if _password_from_editor_row(_row)))
-        m1, m2, m3 = st.columns(3)
-        m1.metric("啟用帳號 / Active", active_count)
-        m2.metric("待刪除 / Pending Delete", delete_count)
-        m3.metric("密碼異動 / Password Changes", new_password_count)
-
-        submitted_accounts = st.button(
-            "▣ 套用並儲存帳號密碼總表 / Apply and Save Account Master",
-            type="primary",
-            use_container_width=True,
-            disabled=not account_edit_enabled,
-            key="v56_apply_save_account_master",
-        )
-
-        if submitted_accounts:
-            df = st.session_state.get("v133_users_df", edited_users).copy()
-            for _col, _default in [
-                ("刪除 / Delete", False),
-                ("啟用 / Active", True),
-                ("強制改密碼 / Force Change", False),
-            ]:
-                if _col in df.columns:
-                    df[_col] = _to_bool_series(df, _col).fillna(bool(_default)).astype(bool)
+                if _col not in df.columns:
+                    df[_col] = _default
+                df[_col] = _to_bool_series(df, _col).fillna(bool(_default)).astype(bool)
+            # 送出瞬間同步 session 草稿，避免 checkbox delta 尚未併入 dataframe 時漏判。
+            st.session_state["v133_users_df"] = df.copy()
             to_delete = _selected_delete_usernames(df, account_editor_key)
             if to_delete:
                 save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy()
