@@ -2992,3 +2992,686 @@ def delete_process_options(ids: Iterable[int]) -> int:  # type: ignore[override]
     tables["process_category_options"] = opts; tables["process_options"] = list(opts)
     if _v28_update_tables is not None: _v28_update_tables("13_system_settings", tables, reason="delete_process_options_v28")
     return max(0, before - len(opts))
+
+# ========================= V85 SYSTEM SETTINGS SINGLE AUTHORITY FIX =========================
+# 目的：13. 系統設定改成與 01 / V28 權威檔相同做法。
+# 規則：所有類別、工段、休息時間、app_settings 只以
+# data/permanent_store/modules/13_system_settings/records.json 為 records 權威檔。
+# SQLite 只做相容快取；讀取與 Reboot 不再以 SQLite / history / 舊 persistent 檔覆蓋權威檔。
+
+try:
+    from services.permanent_authority_service import (
+        load_tables as _v85_pa_load_tables,
+        save_authority as _v85_pa_save_authority,
+        canonical_path as _v85_pa_canonical_path,
+        authority_file_exists as _v85_pa_authority_file_exists,
+    )
+except Exception:
+    _v85_pa_load_tables = None  # type: ignore
+    _v85_pa_save_authority = None  # type: ignore
+    _v85_pa_canonical_path = None  # type: ignore
+    _v85_pa_authority_file_exists = None  # type: ignore
+
+_V85_MODULE_KEY = "13_system_settings"
+_V85_AUTH_READY = False
+
+
+def _v85_auth_file_exists() -> bool:
+    try:
+        if _v85_pa_authority_file_exists is not None:
+            return bool(_v85_pa_authority_file_exists(_V85_MODULE_KEY, "records"))
+    except Exception:
+        pass
+    try:
+        if _v85_pa_canonical_path is not None:
+            return bool(_v85_pa_canonical_path(_V85_MODULE_KEY, "records").exists())
+    except Exception:
+        pass
+    return False
+
+
+def _v85_now() -> str:
+    try:
+        return _now()
+    except Exception:
+        try:
+            return now_text()
+        except Exception:
+            return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v85_blank(v: Any) -> bool:
+    if v is None:
+        return True
+    try:
+        if pd.isna(v):
+            return True
+    except Exception:
+        pass
+    return str(v).strip().lower() in {"", "nan", "none", "null", "<na>"}
+
+
+def _v85_text(v: Any, default: str = "") -> str:
+    return default if _v85_blank(v) else str(v).strip()
+
+
+def _v85_get(row: Any, *names: str, default: Any = "") -> Any:
+    try:
+        keys = list(row.keys()) if hasattr(row, "keys") else []
+        lower = {str(k).strip().lower(): k for k in keys}
+        for n in names:
+            if n in row and not _v85_blank(row.get(n)):
+                return row.get(n)
+            real = lower.get(str(n).strip().lower())
+            if real is not None and not _v85_blank(row.get(real)):
+                return row.get(real)
+    except Exception:
+        pass
+    return default
+
+
+def _v85_bool(v: Any, default: bool = True) -> int:
+    if _v85_blank(v):
+        return 1 if default else 0
+    if isinstance(v, bool):
+        return 1 if v else 0
+    text = str(v).strip().lower()
+    if text in {"1", "true", "yes", "y", "on", "是", "啟用", "在廠", "出勤"}:
+        return 1
+    if text in {"0", "false", "no", "n", "off", "否", "停用", "未啟用"}:
+        return 0
+    return 1 if default else 0
+
+
+def _v85_int(v: Any, default: int | None = None) -> int | None:
+    if _v85_blank(v):
+        return default
+    try:
+        return int(float(str(v).strip()))
+    except Exception:
+        return default
+
+
+def _v85_next_id(rows: list[dict[str, Any]]) -> int:
+    mx = 0
+    for r in rows or []:
+        x = _v85_int(r.get("id"), None)
+        if x is not None and x > mx:
+            mx = x
+    return mx + 1
+
+
+def _v85_records_df(rows: list[dict[str, Any]], cols: list[str]) -> pd.DataFrame:
+    df = pd.DataFrame(rows or [])
+    for c in cols:
+        if c not in df.columns:
+            df[c] = ""
+    if not df.empty:
+        return df[cols].copy()
+    return pd.DataFrame(columns=cols)
+
+
+def _v85_raw_tables() -> dict[str, list[dict[str, Any]]]:
+    if _v85_pa_load_tables is None:
+        return {}
+    try:
+        tables = _v85_pa_load_tables(_V85_MODULE_KEY, "records") or {}
+        return {str(k): [dict(r) for r in (v or []) if isinstance(r, dict)] for k, v in tables.items() if isinstance(v, list)}
+    except Exception:
+        return {}
+
+
+def _v85_normalize_tables(tables: dict[str, list[dict[str, Any]]] | None) -> dict[str, list[dict[str, Any]]]:
+    out = {str(k): [dict(r) for r in (v or []) if isinstance(r, dict)] for k, v in (tables or {}).items() if isinstance(v, list)}
+    out.setdefault("process_categories", [])
+    # 權威檔內正式使用 process_category_options；process_options 僅做舊版相容鏡像。
+    if not out.get("process_category_options") and out.get("process_options"):
+        fixed = []
+        for idx, r in enumerate(out.get("process_options") or [], start=1):
+            x = dict(r)
+            x.setdefault("id", idx)
+            x.setdefault("category_name", PROCESS_CATEGORY_ALL)
+            fixed.append(x)
+        out["process_category_options"] = fixed
+    out.setdefault("process_category_options", [])
+    out["process_options"] = list(out.get("process_category_options", []))
+    out.setdefault("rest_periods", [])
+    out.setdefault("app_settings", [])
+    return out
+
+
+def _v85_tables() -> dict[str, list[dict[str, Any]]]:
+    return _v85_normalize_tables(_v85_raw_tables())
+
+
+def _v85_save_tables(tables: dict[str, list[dict[str, Any]]], reason: str) -> dict[str, Any]:
+    tables = _v85_normalize_tables(tables)
+    if _v85_pa_save_authority is None:
+        return {"ok": False, "reason": "permanent_authority_service_not_available"}
+    res = _v85_pa_save_authority(_V85_MODULE_KEY, records=tables, reason=reason, github=True)
+    _v85_sync_to_sqlite(tables)
+    _clear_settings_cache()
+    return res
+
+
+def _v85_seed_tables() -> dict[str, list[dict[str, Any]]]:
+    now = _v85_now()
+    cats = [{"id": 1, "category_name": PROCESS_CATEGORY_ALL, "is_active": 1, "sort_order": 1, "note": "系統預設類別", "created_at": now, "updated_at": now}]
+    opts = []
+    for idx, name in enumerate(DEFAULT_PROCESS_OPTIONS, start=1):
+        opts.append({"id": idx, "category_name": PROCESS_CATEGORY_ALL, "process_name": name, "is_active": 1, "sort_order": idx, "note": "系統預設工段，可於 13 系統設定修改", "created_at": now, "updated_at": now})
+    rests = []
+    for idx, r in enumerate(DEFAULT_REST_PERIODS, start=1):
+        x = dict(r); x.setdefault("id", idx); rests.append(x)
+    apps = [
+        {"setting_key": "live_page_reset_time", "setting_value": DEFAULT_LIVE_PAGE_RESET_TIME, "note": "01 工時紀錄每日重新整理時間；只影響 01 顯示，不刪除 02 歷史紀錄", "updated_at": now},
+        {"setting_key": DEFAULT_PROCESS_CATEGORY_KEY, "setting_value": PROCESS_CATEGORY_ALL, "note": "01 工時紀錄預設類別", "updated_at": now},
+    ]
+    return _v85_normalize_tables({"process_categories": cats, "process_category_options": opts, "rest_periods": rests, "app_settings": apps})
+
+
+def _v85_create_sqlite_schema() -> None:
+    try:
+        if "_v366_create_category_tables_no_seed" in globals():
+            _v366_create_category_tables_no_seed()  # type: ignore[name-defined]
+            return
+    except Exception:
+        pass
+    try:
+        _basic_create_tables()
+        execute("""
+            CREATE TABLE IF NOT EXISTS process_categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_name TEXT UNIQUE NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                sort_order INTEGER DEFAULT 0,
+                note TEXT,
+                created_at TEXT,
+                updated_at TEXT
+            )
+        """)
+        execute("""
+            CREATE TABLE IF NOT EXISTS process_category_options (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_name TEXT DEFAULT '',
+                process_name TEXT NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                sort_order INTEGER DEFAULT 0,
+                note TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                UNIQUE(category_name, process_name)
+            )
+        """)
+    except Exception:
+        pass
+
+
+def _v85_sync_to_sqlite(tables: dict[str, list[dict[str, Any]]]) -> None:
+    """SQLite 只作相容快取。權威仍是 records.json。"""
+    try:
+        _v85_create_sqlite_schema()
+        execute("DELETE FROM process_categories")
+        execute("DELETE FROM process_category_options")
+        execute("DELETE FROM process_options")
+        execute("DELETE FROM rest_periods")
+        execute("DELETE FROM app_settings")
+        for idx, r in enumerate(tables.get("process_categories", []) or [], start=1):
+            name = _v85_text(r.get("category_name"))
+            if not name:
+                continue
+            execute(
+                """
+                INSERT INTO process_categories(id, category_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(category_name) DO UPDATE SET
+                    is_active=excluded.is_active,
+                    sort_order=excluded.sort_order,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+                """,
+                (_v85_int(r.get("id"), idx), name, _v85_bool(r.get("is_active"), True), _v85_int(r.get("sort_order"), idx), _v85_text(r.get("note")), _v85_text(r.get("created_at"), _v85_now()), _v85_text(r.get("updated_at"), _v85_now())),
+            )
+        for idx, r in enumerate(tables.get("process_category_options", []) or tables.get("process_options", []) or [], start=1):
+            proc = _v85_text(r.get("process_name"))
+            if not proc:
+                continue
+            category = _norm_category_name(r.get("category_name") or PROCESS_CATEGORY_ALL)
+            rid = _v85_int(r.get("id"), idx)
+            active = _v85_bool(r.get("is_active"), True)
+            sort_order = _v85_int(r.get("sort_order"), idx)
+            note = _v85_text(r.get("note"))
+            created = _v85_text(r.get("created_at"), _v85_now())
+            updated = _v85_text(r.get("updated_at"), _v85_now())
+            execute(
+                """
+                INSERT INTO process_category_options(id, category_name, process_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(category_name, process_name) DO UPDATE SET
+                    is_active=excluded.is_active,
+                    sort_order=excluded.sort_order,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+                """,
+                (rid, category, proc, active, sort_order, note, created, updated),
+            )
+            execute(
+                """
+                INSERT INTO process_options(process_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(process_name) DO UPDATE SET
+                    is_active=excluded.is_active,
+                    sort_order=excluded.sort_order,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+                """,
+                (proc, active, sort_order, note, created, updated),
+            )
+        for idx, r in enumerate(tables.get("rest_periods", []) or [], start=1):
+            name = _v85_text(r.get("name")) or f"休息時間{idx}"
+            start = _v85_text(r.get("start_time"))
+            end = _v85_text(r.get("end_time"))
+            if not start or not end:
+                continue
+            execute(
+                "INSERT INTO rest_periods(id, name, start_time, end_time, is_active, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
+                (_v85_int(r.get("id"), idx), name, start, end, _v85_bool(r.get("is_active"), True), _v85_int(r.get("sort_order"), idx)),
+            )
+        for r in tables.get("app_settings", []) or []:
+            key = _v85_text(r.get("setting_key"))
+            if not key:
+                continue
+            execute(
+                "INSERT OR REPLACE INTO app_settings(setting_key, setting_value, note, updated_at) VALUES (?, ?, ?, ?)",
+                (key, _v85_text(r.get("setting_value")), _v85_text(r.get("note")), _v85_text(r.get("updated_at"), _v85_now())),
+            )
+    except Exception:
+        pass
+
+
+def ensure_system_settings_schema() -> None:  # type: ignore[override]
+    global _V85_AUTH_READY, _SYSTEM_SETTINGS_SCHEMA_READY
+    _v85_create_sqlite_schema()
+    existed = _v85_auth_file_exists()
+    tables = _v85_tables()
+    # 權威檔不存在且完全沒有資料時，才建立初始預設。權威檔一旦存在，即使空表也視為正式設定。
+    has_any = any(len(v) > 0 for k, v in tables.items() if k in {"process_categories", "process_category_options", "rest_periods", "app_settings"})
+    if not existed and not has_any:
+        tables = _v85_seed_tables()
+        _v85_save_tables(tables, "seed_default_13_system_settings_v85")
+    else:
+        _v85_sync_to_sqlite(tables)
+    _V85_AUTH_READY = True
+    _SYSTEM_SETTINGS_SCHEMA_READY = True
+
+
+def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    ensure_system_settings_schema()
+    tables = _v85_tables()
+    res = _v85_save_tables(tables, f"export_{reason}_v85")
+    return {"ok": True, "mode": "v85_single_authority", "files": res.get("files", []), "table_counts": {k: len(v) for k, v in tables.items() if isinstance(v, list)}}
+
+
+def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    ensure_system_settings_schema()
+    tables = _v85_tables()
+    _v85_sync_to_sqlite(tables)
+    return {"ok": True, "mode": "v85_single_authority", "source": "data/permanent_store/modules/13_system_settings/records.json", "restored": {k: len(v) for k, v in tables.items() if isinstance(v, list)}}
+
+
+def load_process_categories_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    ensure_system_settings_schema()
+    cols = ["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"]
+    df = _v85_records_df(_v85_tables().get("process_categories", []), cols)
+    if active_only and not df.empty:
+        m = df["is_active"].map(lambda x: _v85_bool(x, True) == 1)
+        df = df[m]
+    if not df.empty:
+        df["sort_order"] = pd.to_numeric(df["sort_order"], errors="coerce").fillna(999999)
+        df["id"] = pd.to_numeric(df["id"], errors="coerce").fillna(999999)
+        df = df.sort_values(["sort_order", "id"], kind="stable")
+    return df.reset_index(drop=True)
+
+
+def load_process_options_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    ensure_system_settings_schema()
+    cols = ["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"]
+    df = _v85_records_df(_v85_tables().get("process_category_options", []), cols)
+    if active_only and not df.empty:
+        m = df["is_active"].map(lambda x: _v85_bool(x, True) == 1)
+        df = df[m]
+    if not df.empty:
+        df["sort_order"] = pd.to_numeric(df["sort_order"], errors="coerce").fillna(999999)
+        df["id"] = pd.to_numeric(df["id"], errors="coerce").fillna(999999)
+        df = df.sort_values(["category_name", "sort_order", "id"], kind="stable")
+    return df.reset_index(drop=True)
+
+
+def load_process_category_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    cats = load_process_categories_df(active_only=True)
+    names: list[str] = []
+    for x in cats.get("category_name", []).tolist() if cats is not None and not cats.empty else []:
+        n = _norm_category_name(x)
+        if n and n not in names:
+            names.append(n)
+    # 防止有工段但類別表漏資料時下拉看不到。
+    opts = load_process_options_df(active_only=True)
+    for x in opts.get("category_name", []).tolist() if opts is not None and not opts.empty else []:
+        n = _norm_category_name(x)
+        if n and n not in names:
+            names.append(n)
+    if include_common and PROCESS_CATEGORY_ALL not in names:
+        names.insert(0, PROCESS_CATEGORY_ALL)
+    return names
+
+
+def get_default_process_category() -> str:  # type: ignore[override]
+    tables = _v85_tables()
+    for r in tables.get("app_settings", []) or []:
+        if _v85_text(r.get("setting_key")) == DEFAULT_PROCESS_CATEGORY_KEY:
+            val = _norm_category_name(r.get("setting_value"))
+            return val or PROCESS_CATEGORY_ALL
+    return PROCESS_CATEGORY_ALL
+
+
+def save_default_process_category(category_name: str) -> str:  # type: ignore[override]
+    category = _norm_category_name(category_name)
+    tables = _v85_tables()
+    _v85_upsert_app_setting(tables, DEFAULT_PROCESS_CATEGORY_KEY, category, "01 工時紀錄：類別空白或找不到對應工段時使用的預設類別")
+    _v85_save_tables(tables, "save_default_process_category_v85")
+    try:
+        write_log("SAVE_DEFAULT_PROCESS_CATEGORY", f"儲存預設類別：{category}", "13_system_settings")
+    except Exception:
+        pass
+    return category
+
+
+def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
+    category = _norm_category_name(category_name)
+    df = load_process_options_df(active_only=True)
+    if df.empty or "category_name" not in df.columns:
+        return []
+    if include_common and category != PROCESS_CATEGORY_ALL:
+        mask = df["category_name"].astype(str).str.strip().isin([PROCESS_CATEGORY_ALL, category])
+    else:
+        mask = df["category_name"].astype(str).str.strip().eq(category)
+    out: list[str] = []
+    for x in df.loc[mask, "process_name"].tolist():
+        s = _v85_text(x)
+        if s and s not in out:
+            out.append(s)
+    return out
+
+
+def get_process_options() -> list[str]:  # type: ignore[override]
+    return get_process_options_by_category(get_default_process_category(), include_common=False)
+
+
+def _v85_normalize_category_rows(df: pd.DataFrame, existing: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    rows: list[dict[str, Any]] = []
+    id_to_old = {str(_v85_int(r.get("id"), -1)): _v85_text(r.get("category_name")) for r in existing if _v85_int(r.get("id"), None) is not None}
+    rename_map: dict[str, str] = {}
+    next_id = _v85_next_id(existing)
+    seen: set[str] = set()
+    now = _v85_now()
+    for idx, (_, r) in enumerate((df.copy() if df is not None else pd.DataFrame()).fillna("").iterrows(), start=1):
+        name = _norm_category_name(_v85_get(r, "category_name", "category", "類別", "類別 / Category", default=""))
+        if not name or name in seen:
+            continue
+        rid = _v85_int(_v85_get(r, "id", "ID", "ID / ID", default=""), None)
+        if rid is None:
+            rid = next_id; next_id += 1
+        old_name = id_to_old.get(str(rid), "")
+        if old_name and old_name != name:
+            rename_map[old_name] = name
+        rows.append({
+            "id": rid,
+            "category_name": name,
+            "is_active": _v85_bool(_v85_get(r, "is_active", "啟用", "啟用 / Active", default=True), True),
+            "sort_order": _v85_int(_v85_get(r, "sort_order", "排序", "排序 / Sort", default=idx), idx),
+            "note": _v85_text(_v85_get(r, "note", "備註", "備註 / Note", default="")),
+            "created_at": _v85_text(_v85_get(r, "created_at", "建立時間", default=""), now),
+            "updated_at": now,
+        })
+        seen.add(name)
+    return rows, rename_map
+
+
+def save_process_categories_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    if df is None:
+        return 0
+    tables = _v85_tables()
+    existing = tables.get("process_categories", [])
+    rows, rename_map = _v85_normalize_category_rows(df.drop(columns=["刪除", "delete", "selected", "刪除 / Delete"], errors="ignore"), existing)
+    for r in tables.get("process_category_options", []) or []:
+        cat = _v85_text(r.get("category_name"))
+        if cat in rename_map:
+            r["category_name"] = rename_map[cat]
+            r["updated_at"] = _v85_now()
+    tables["process_categories"] = rows
+    _v85_save_tables(tables, "save_process_categories_v85")
+    try:
+        write_log("SAVE_PROCESS_CATEGORIES", f"儲存類別設定 {len(rows)} 筆，已寫入 13 權威檔", "13_system_settings")
+    except Exception:
+        pass
+    return len(rows)
+
+
+def delete_process_categories(ids: Iterable[int]) -> int:  # type: ignore[override]
+    tables = _v85_tables()
+    ids_set = {str(_v85_int(x, -999999)) for x in (ids or [])}
+    before = len(tables.get("process_categories", []) or [])
+    removed = []
+    kept = []
+    for r in tables.get("process_categories", []) or []:
+        rid = str(_v85_int(r.get("id"), -1))
+        cat = _v85_text(r.get("category_name"))
+        if rid in ids_set and cat != PROCESS_CATEGORY_ALL:
+            removed.append(cat)
+        else:
+            kept.append(r)
+    if removed:
+        tables["process_categories"] = kept
+        tables["process_category_options"] = [r for r in tables.get("process_category_options", []) or [] if _v85_text(r.get("category_name")) not in set(removed)]
+        _v85_save_tables(tables, "delete_process_categories_v85")
+    return max(0, before - len(kept))
+
+
+def _v85_normalize_process_rows(df: pd.DataFrame, existing: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], set[str]]:
+    raw = df.copy() if df is not None else pd.DataFrame()
+    raw = raw.drop(columns=["刪除", "delete", "selected", "刪除 / Delete"], errors="ignore").fillna("")
+    existing_by_id = {str(_v85_int(r.get("id"), -1)): dict(r) for r in existing if _v85_int(r.get("id"), None) is not None}
+    next_id = _v85_next_id(existing)
+    rows: list[dict[str, Any]] = []
+    affected_categories: set[str] = set()
+    seen_key: set[tuple[str, str]] = set()
+    now = _v85_now()
+    for idx, (_, r) in enumerate(raw.iterrows(), start=1):
+        category = _norm_category_name(_v85_get(r, "category_name", "category", "類別", "類別 / Category", "type_name", default=PROCESS_CATEGORY_ALL))
+        if category:
+            affected_categories.add(category)
+        name = _v85_text(_v85_get(r, "process_name", "工段名稱", "工段名稱 / Process", "process", "工段", default=""))
+        if not name:
+            continue
+        key = (category, name)
+        if key in seen_key:
+            continue
+        seen_key.add(key)
+        rid = _v85_int(_v85_get(r, "id", "ID", "ID / ID", default=""), None)
+        old = existing_by_id.get(str(rid), {}) if rid is not None else {}
+        if rid is None:
+            rid = next_id; next_id += 1
+        rows.append({
+            "id": rid,
+            "category_name": category,
+            "process_name": name,
+            "is_active": _v85_bool(_v85_get(r, "is_active", "啟用", "啟用 / Active", default=True), True),
+            "sort_order": _v85_int(_v85_get(r, "sort_order", "排序", "排序 / Sort", default=idx), idx),
+            "note": _v85_text(_v85_get(r, "note", "備註", "備註 / Note", default="")),
+            "created_at": _v85_text(_v85_get(r, "created_at", "建立時間", default=old.get("created_at", "")), now),
+            "updated_at": now,
+        })
+    return rows, affected_categories
+
+
+def save_process_options_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    if df is None:
+        return 0
+    tables = _v85_tables()
+    existing = tables.get("process_category_options", []) or []
+    incoming, affected = _v85_normalize_process_rows(df, existing)
+    # 13 頁一次只編輯目前篩選類別；所以只替換受影響類別，其他類別保留。
+    if affected:
+        kept = [r for r in existing if _v85_text(r.get("category_name")) not in affected]
+        tables["process_category_options"] = kept + incoming
+    else:
+        # 無法判斷類別時，不覆蓋舊資料，避免空白表格誤清空。
+        tables["process_category_options"] = existing
+    # 若新增工段類別不存在，補到類別主表。
+    cat_names = {_v85_text(r.get("category_name")) for r in tables.get("process_categories", []) or []}
+    next_cat_id = _v85_next_id(tables.get("process_categories", []) or [])
+    for cat in sorted(affected):
+        if cat and cat not in cat_names:
+            tables.setdefault("process_categories", []).append({"id": next_cat_id, "category_name": cat, "is_active": 1, "sort_order": next_cat_id, "note": "由工段設定自動補入", "created_at": _v85_now(), "updated_at": _v85_now()})
+            next_cat_id += 1
+            cat_names.add(cat)
+    _v85_save_tables(tables, "save_process_options_v85")
+    try:
+        write_log("SAVE_PROCESS_OPTIONS", f"儲存工段設定 {len(incoming)} 筆，影響類別：{', '.join(sorted(affected))}", "13_system_settings")
+    except Exception:
+        pass
+    return len(incoming)
+
+
+def delete_process_options(ids: Iterable[int]) -> int:  # type: ignore[override]
+    tables = _v85_tables()
+    ids_set = {str(_v85_int(x, -999999)) for x in (ids or [])}
+    before = len(tables.get("process_category_options", []) or [])
+    tables["process_category_options"] = [r for r in tables.get("process_category_options", []) or [] if str(_v85_int(r.get("id"), -1)) not in ids_set]
+    if before != len(tables["process_category_options"]):
+        _v85_save_tables(tables, "delete_process_options_v85")
+    return max(0, before - len(tables["process_category_options"]))
+
+
+def load_rest_periods_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    ensure_system_settings_schema()
+    cols = ["id", "name", "start_time", "end_time", "is_active", "sort_order"]
+    df = _v85_records_df(_v85_tables().get("rest_periods", []), cols)
+    if active_only and not df.empty:
+        df = df[df["is_active"].map(lambda x: _v85_bool(x, True) == 1)]
+    if not df.empty:
+        df["sort_order"] = pd.to_numeric(df["sort_order"], errors="coerce").fillna(999999)
+        df["id"] = pd.to_numeric(df["id"], errors="coerce").fillna(999999)
+        df = df.sort_values(["sort_order", "id"], kind="stable")
+    return df.reset_index(drop=True)
+
+
+def _v85_normalize_rest_rows(df: pd.DataFrame, existing: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    work = df.copy().drop(columns=["刪除", "delete", "selected", "刪除 / Delete"], errors="ignore").fillna("") if df is not None else pd.DataFrame()
+    next_id = _v85_next_id(existing)
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for idx, (_, r) in enumerate(work.iterrows(), start=1):
+        name = _v85_text(_v85_get(r, "name", "名稱", "休息名稱", "休息名稱 / Name", default=""))
+        start = _v85_text(_v85_get(r, "start_time", "開始時間", "開始時間 / Start", default=""))
+        end = _v85_text(_v85_get(r, "end_time", "結束時間", "結束時間 / End", default=""))
+        if not start or not end:
+            continue
+        if not name:
+            name = f"休息時間{idx}"
+        key = (name, start, end)
+        if key in seen:
+            continue
+        seen.add(key)
+        rid = _v85_int(_v85_get(r, "id", "ID", "ID / ID", default=""), None)
+        if rid is None:
+            rid = next_id; next_id += 1
+        out.append({"id": rid, "name": name, "start_time": start, "end_time": end, "is_active": _v85_bool(_v85_get(r, "is_active", "啟用", "啟用 / Active", default=True), True), "sort_order": _v85_int(_v85_get(r, "sort_order", "排序", "排序 / Sort", default=idx), idx)})
+    return out
+
+
+def save_rest_periods_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    if df is None:
+        return 0
+    tables = _v85_tables()
+    rows = _v85_normalize_rest_rows(df, tables.get("rest_periods", []) or [])
+    tables["rest_periods"] = rows
+    _v85_save_tables(tables, "save_rest_periods_v85")
+    try:
+        write_log("SAVE_REST_PERIODS", f"儲存休息時間設定 {len(rows)} 筆，已寫入 13 權威檔", "13_system_settings")
+    except Exception:
+        pass
+    return len(rows)
+
+
+def delete_rest_periods(ids: Iterable[int]) -> int:  # type: ignore[override]
+    tables = _v85_tables()
+    ids_set = {str(_v85_int(x, -999999)) for x in (ids or [])}
+    before = len(tables.get("rest_periods", []) or [])
+    tables["rest_periods"] = [r for r in tables.get("rest_periods", []) or [] if str(_v85_int(r.get("id"), -1)) not in ids_set]
+    if before != len(tables["rest_periods"]):
+        _v85_save_tables(tables, "delete_rest_periods_v85")
+    return max(0, before - len(tables["rest_periods"]))
+
+
+def _v85_upsert_app_setting(tables: dict[str, list[dict[str, Any]]], key: str, value: str, note: str = "") -> None:
+    rows = tables.setdefault("app_settings", [])
+    now = _v85_now()
+    for r in rows:
+        if _v85_text(r.get("setting_key")) == key:
+            r["setting_value"] = value
+            r["note"] = note or _v85_text(r.get("note"))
+            r["updated_at"] = now
+            return
+    rows.append({"setting_key": key, "setting_value": value, "note": note, "updated_at": now})
+
+
+def get_live_page_reset_time() -> str:  # type: ignore[override]
+    tables = _v85_tables()
+    for r in tables.get("app_settings", []) or []:
+        if _v85_text(r.get("setting_key")) == "live_page_reset_time":
+            val = _v85_text(r.get("setting_value"), DEFAULT_LIVE_PAGE_RESET_TIME)
+            return _normalize_hhmm(val) if _valid_hhmm(val) else DEFAULT_LIVE_PAGE_RESET_TIME
+    return DEFAULT_LIVE_PAGE_RESET_TIME
+
+
+def save_live_page_reset_time(value: str) -> str:  # type: ignore[override]
+    if not _valid_hhmm(value):
+        raise ValueError("01 工時紀錄每日清理時間格式錯誤，請使用 HH:MM，例如 02:00。")
+    value = _normalize_hhmm(value)
+    tables = _v85_tables()
+    _v85_upsert_app_setting(tables, "live_page_reset_time", value, "01 工時紀錄每日重新整理時間；只影響 01 顯示，不刪除 02 歷史紀錄")
+    _v85_save_tables(tables, "save_live_page_reset_time_v85")
+    try:
+        write_log("SAVE_LIVE_PAGE_RESET_TIME", f"儲存 01 工時紀錄每日重新整理時間：{value}", "13_system_settings")
+    except Exception:
+        pass
+    return value
+
+
+def dedupe_rest_periods() -> int:  # type: ignore[override]
+    df = load_rest_periods_df(active_only=False)
+    before = len(df)
+    rows = _v85_normalize_rest_rows(df, _v85_tables().get("rest_periods", []) or [])
+    tables = _v85_tables(); tables["rest_periods"] = rows
+    _v85_save_tables(tables, "dedupe_rest_periods_v85")
+    return max(0, before - len(rows))
+
+# Compatibility aliases
+
+def load_process_model_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    return load_process_category_choices(include_common=include_common)
+
+
+def get_default_process_model() -> str:  # type: ignore[override]
+    return get_default_process_category()
+
+
+def save_default_process_model(type_name: str) -> str:  # type: ignore[override]
+    return save_default_process_category(type_name)
+
+
+def get_process_options_by_model(type_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
+    return get_process_options_by_category(type_name, include_common=include_common)
+
+# ======================= END V85 SYSTEM SETTINGS SINGLE AUTHORITY FIX =======================
