@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "13_system_settings",
   "kind": "records",
-  "updated_at": "2026-05-22 08:56:21",
-  "exported_at": "2026-05-22 08:56:21",
-  "reason": "save_process_categories_v28",
+  "updated_at": "2026-05-22 08:58:53",
+  "exported_at": "2026-05-22 08:58:53",
+  "reason": "save_process_options_v28",
   "empty_authoritative": false,
   "tables": {
     "process_categories": [
@@ -66,7 +66,7 @@
     "process_category_options": [
       {
         "id": "",
-        "category_name": "全部 / 通用",
+        "category_name": "Sorter/EFEM",
         "process_name": "",
         "is_active": true,
         "sort_order": 1,
@@ -76,17 +76,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
-        "process_name": "",
-        "is_active": "",
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "前置鈑金",
         "is_active": true,
         "sort_order": "",
@@ -96,8 +86,8 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
-        "process_name": "模組",
+        "category_name": "Sorter/EFEM",
+        "process_name": "LP改造",
         "is_active": true,
         "sort_order": "",
         "note": "",
@@ -106,7 +96,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "骨架組立",
         "is_active": true,
         "sort_order": "",
@@ -116,7 +106,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "配電",
         "is_active": true,
         "sort_order": "",
@@ -126,7 +116,17 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
+        "process_name": "模組",
+        "is_active": true,
+        "sort_order": "",
+        "note": "",
+        "created_at": "",
+        "updated_at": ""
+      },
+      {
+        "id": "",
+        "category_name": "Sorter/EFEM",
         "process_name": "水平",
         "is_active": true,
         "sort_order": "",
@@ -136,7 +136,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "S.T.",
         "is_active": true,
         "sort_order": "",
@@ -146,17 +146,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
-        "process_name": "Packing",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "清潔",
         "is_active": true,
         "sort_order": "",
@@ -166,7 +156,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "收機",
         "is_active": true,
         "sort_order": "",
@@ -176,7 +166,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "包機",
         "is_active": true,
         "sort_order": "",
@@ -186,7 +176,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "Packing",
         "is_active": true,
         "sort_order": "",
@@ -196,7 +186,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "異常",
         "is_active": true,
         "sort_order": "",
@@ -206,7 +196,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "設變",
         "is_active": true,
         "sort_order": "",
@@ -216,7 +206,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "重工",
         "is_active": true,
         "sort_order": "",
@@ -226,7 +216,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "教育訓練",
         "is_active": true,
         "sort_order": "",
@@ -236,7 +226,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "IPQC",
         "is_active": true,
         "sort_order": "",
@@ -246,7 +236,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "其他",
         "is_active": true,
         "sort_order": "",
@@ -258,7 +248,7 @@
     "process_options": [
       {
         "id": "",
-        "category_name": "全部 / 通用",
+        "category_name": "Sorter/EFEM",
         "process_name": "",
         "is_active": true,
         "sort_order": 1,
@@ -268,17 +258,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
-        "process_name": "",
-        "is_active": "",
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "前置鈑金",
         "is_active": true,
         "sort_order": "",
@@ -288,8 +268,8 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
-        "process_name": "模組",
+        "category_name": "Sorter/EFEM",
+        "process_name": "LP改造",
         "is_active": true,
         "sort_order": "",
         "note": "",
@@ -298,7 +278,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "骨架組立",
         "is_active": true,
         "sort_order": "",
@@ -308,7 +288,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "配電",
         "is_active": true,
         "sort_order": "",
@@ -318,7 +298,17 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
+        "process_name": "模組",
+        "is_active": true,
+        "sort_order": "",
+        "note": "",
+        "created_at": "",
+        "updated_at": ""
+      },
+      {
+        "id": "",
+        "category_name": "Sorter/EFEM",
         "process_name": "水平",
         "is_active": true,
         "sort_order": "",
@@ -328,7 +318,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "S.T.",
         "is_active": true,
         "sort_order": "",
@@ -338,17 +328,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
-        "process_name": "Packing",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "清潔",
         "is_active": true,
         "sort_order": "",
@@ -358,7 +338,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "收機",
         "is_active": true,
         "sort_order": "",
@@ -368,7 +348,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "包機",
         "is_active": true,
         "sort_order": "",
@@ -378,7 +358,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "Packing",
         "is_active": true,
         "sort_order": "",
@@ -388,7 +368,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "異常",
         "is_active": true,
         "sort_order": "",
@@ -398,7 +378,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "設變",
         "is_active": true,
         "sort_order": "",
@@ -408,7 +388,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "重工",
         "is_active": true,
         "sort_order": "",
@@ -418,7 +398,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "教育訓練",
         "is_active": true,
         "sort_order": "",
@@ -428,7 +408,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "IPQC",
         "is_active": true,
         "sort_order": "",
@@ -438,7 +418,7 @@
       },
       {
         "id": "",
-        "category_name": "FCLP",
+        "category_name": "Sorter/EFEM",
         "process_name": "其他",
         "is_active": true,
         "sort_order": "",
@@ -501,8 +481,8 @@
   "settings": {},
   "table_counts": {
     "process_categories": 6,
-    "process_category_options": 19,
-    "process_options": 19,
+    "process_category_options": 18,
+    "process_options": 18,
     "rest_periods": 5,
     "app_settings": 1
   }
