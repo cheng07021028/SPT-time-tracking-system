@@ -1,29 +1,30 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-22 23:46:06",
+  "exported_at": "2026-05-23 00:47:50",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 6,
+  "business_row_count": 5,
   "table_counts": {
     "auth_account_permissions": 117,
     "auth_login_logs": 0,
     "auth_security_settings": 2,
-    "auth_users": 9,
+    "auth_users": 10,
     "employees": 0,
     "login_logs": 42,
     "process_options": 17,
     "rest_periods": 5,
-    "security_login_logs": 1,
+    "security_login_logs": 2,
     "security_module_permissions": 78,
     "security_roles": 6,
     "security_settings": 2,
     "security_user_roles": 9,
     "security_users": 9,
-    "system_logs": 94,
+    "system_logs": 126,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "time_records": 6,
+    "table_ui_settings": 0,
+    "time_records": 5,
     "work_orders": 0
   },
   "tables": {
@@ -456,227 +457,6 @@
       {
         "id": 26,
         "username": "Ethan",
-        "module_code": "13",
-        "module_name_zh": "系統設定",
-        "module_name_en": "System Settings",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-18 15:25:08"
-      },
-      {
-        "id": 27,
-        "username": "admin",
-        "module_code": "01",
-        "module_name_zh": "工時紀錄",
-        "module_name_en": "Time Recording",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-15 03:46:59"
-      },
-      {
-        "id": 28,
-        "username": "admin",
-        "module_code": "02",
-        "module_name_zh": "歷史紀錄",
-        "module_name_en": "History Records",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-15 03:46:59"
-      },
-      {
-        "id": 29,
-        "username": "admin",
-        "module_code": "03",
-        "module_name_zh": "製令管理",
-        "module_name_en": "Work Order Management",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-15 03:46:59"
-      },
-      {
-        "id": 30,
-        "username": "admin",
-        "module_code": "04",
-        "module_name_zh": "人員名單",
-        "module_name_en": "Employee Master",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-15 03:46:59"
-      },
-      {
-        "id": 31,
-        "username": "admin",
-        "module_code": "05",
-        "module_name_zh": "製令工時分析",
-        "module_name_en": "Work Order Time Analysis",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-15 03:46:59"
-      },
-      {
-        "id": 32,
-        "username": "admin",
-        "module_code": "06",
-        "module_name_zh": "LOG查詢",
-        "module_name_en": "Log Inquiry",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-15 03:46:59"
-      },
-      {
-        "id": 33,
-        "username": "admin",
-        "module_code": "07",
-        "module_name_zh": "今日未紀錄名單",
-        "module_name_en": "Missing Records Today",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-15 03:46:59"
-      },
-      {
-        "id": 34,
-        "username": "admin",
-        "module_code": "08",
-        "module_name_zh": "人員每日工時",
-        "module_name_en": "Daily Employee Hours",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-15 03:46:59"
-      },
-      {
-        "id": 35,
-        "username": "admin",
-        "module_code": "09",
-        "module_name_zh": "資料永久保存與備份",
-        "module_name_en": "Permanent Backup",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-15 03:46:59"
-      },
-      {
-        "id": 36,
-        "username": "admin",
-        "module_code": "10",
-        "module_name_zh": "權限管理",
-        "module_name_en": "Permission Management",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-15 03:46:59"
-      },
-      {
-        "id": 37,
-        "username": "admin",
-        "module_code": "11",
-        "module_name_zh": "登入紀錄",
-        "module_name_en": "Login Logs",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-15 03:46:59"
-      },
-      {
-        "id": 38,
-        "username": "admin",
-        "module_code": "12",
-        "module_name_zh": "模組永久紀錄中心",
-        "module_name_en": "Module Permanent Records",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 1,
-        "can_import": 1,
-        "can_export": 1,
-        "can_backup": 1,
-        "can_restore": 1,
-        "can_manage": 1,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 39,
-        "username": "admin",
         "module_code": "13",
         "module_name_zh": "系統設定",
         "module_name_en": "System Settings",
@@ -1576,227 +1356,6 @@
         "updated_at": "2026-05-18 15:25:08"
       },
       {
-        "id": 92,
-        "username": "spt142",
-        "module_code": "01",
-        "module_name_zh": "工時紀錄",
-        "module_name_en": "Time Recording",
-        "can_view": 1,
-        "can_create": 1,
-        "can_edit": 1,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 93,
-        "username": "spt142",
-        "module_code": "02",
-        "module_name_zh": "歷史紀錄",
-        "module_name_en": "History Records",
-        "can_view": 1,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 94,
-        "username": "spt142",
-        "module_code": "03",
-        "module_name_zh": "製令管理",
-        "module_name_en": "Work Order Management",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 95,
-        "username": "spt142",
-        "module_code": "04",
-        "module_name_zh": "人員名單",
-        "module_name_en": "Employee Master",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 96,
-        "username": "spt142",
-        "module_code": "05",
-        "module_name_zh": "製令工時分析",
-        "module_name_en": "Work Order Time Analysis",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 97,
-        "username": "spt142",
-        "module_code": "06",
-        "module_name_zh": "LOG查詢",
-        "module_name_en": "Log Inquiry",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 98,
-        "username": "spt142",
-        "module_code": "07",
-        "module_name_zh": "今日未紀錄名單",
-        "module_name_en": "Missing Records Today",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 99,
-        "username": "spt142",
-        "module_code": "08",
-        "module_name_zh": "人員每日工時",
-        "module_name_en": "Daily Employee Hours",
-        "can_view": 1,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 100,
-        "username": "spt142",
-        "module_code": "09",
-        "module_name_zh": "資料永久保存與備份",
-        "module_name_en": "Permanent Backup",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 101,
-        "username": "spt142",
-        "module_code": "10",
-        "module_name_zh": "權限管理",
-        "module_name_en": "Permission Management",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 102,
-        "username": "spt142",
-        "module_code": "11",
-        "module_name_zh": "登入紀錄",
-        "module_name_en": "Login Logs",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 103,
-        "username": "spt142",
-        "module_code": "12",
-        "module_name_zh": "模組永久紀錄中心",
-        "module_name_en": "Module Permanent Records",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-15 10:48:48"
-      },
-      {
-        "id": 104,
-        "username": "spt142",
-        "module_code": "13",
-        "module_name_zh": "系統設定",
-        "module_name_en": "System Settings",
-        "can_view": 0,
-        "can_create": 0,
-        "can_edit": 0,
-        "can_delete": 0,
-        "can_import": 0,
-        "can_export": 0,
-        "can_backup": 0,
-        "can_restore": 0,
-        "can_manage": 0,
-        "updated_at": "2026-05-19 00:16:24"
-      },
-      {
         "id": 105,
         "username": "viewer",
         "module_code": "01",
@@ -2016,6 +1575,448 @@
         "can_restore": 0,
         "can_manage": 0,
         "updated_at": "2026-05-18 15:25:08"
+      },
+      {
+        "id": 235,
+        "username": "SPT142",
+        "module_code": "01",
+        "module_name_zh": "工時紀錄",
+        "module_name_en": "Time Recording",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 236,
+        "username": "SPT142",
+        "module_code": "02",
+        "module_name_zh": "歷史紀錄",
+        "module_name_en": "History Records",
+        "can_view": 1,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 237,
+        "username": "SPT142",
+        "module_code": "03",
+        "module_name_zh": "製令管理",
+        "module_name_en": "Work Order Management",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 238,
+        "username": "SPT142",
+        "module_code": "04",
+        "module_name_zh": "人員名單",
+        "module_name_en": "Employee Master",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 239,
+        "username": "SPT142",
+        "module_code": "05",
+        "module_name_zh": "製令工時分析",
+        "module_name_en": "Work Order Time Analysis",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 240,
+        "username": "SPT142",
+        "module_code": "06",
+        "module_name_zh": "LOG查詢",
+        "module_name_en": "Log Inquiry",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 241,
+        "username": "SPT142",
+        "module_code": "07",
+        "module_name_zh": "今日未紀錄名單",
+        "module_name_en": "Missing Records Today",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 242,
+        "username": "SPT142",
+        "module_code": "08",
+        "module_name_zh": "人員每日工時",
+        "module_name_en": "Daily Employee Hours",
+        "can_view": 1,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 243,
+        "username": "SPT142",
+        "module_code": "09",
+        "module_name_zh": "資料永久保存與備份",
+        "module_name_en": "Permanent Backup",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 244,
+        "username": "SPT142",
+        "module_code": "10",
+        "module_name_zh": "權限管理",
+        "module_name_en": "Permission Management",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 245,
+        "username": "SPT142",
+        "module_code": "11",
+        "module_name_zh": "登入紀錄",
+        "module_name_en": "Login Logs",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 246,
+        "username": "SPT142",
+        "module_code": "12",
+        "module_name_zh": "模組永久紀錄中心",
+        "module_name_en": "Module Permanent Records",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 247,
+        "username": "SPT142",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 248,
+        "username": "admin",
+        "module_code": "01",
+        "module_name_zh": "工時紀錄",
+        "module_name_en": "Time Recording",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
+      },
+      {
+        "id": 249,
+        "username": "admin",
+        "module_code": "02",
+        "module_name_zh": "歷史紀錄",
+        "module_name_en": "History Records",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
+      },
+      {
+        "id": 250,
+        "username": "admin",
+        "module_code": "03",
+        "module_name_zh": "製令管理",
+        "module_name_en": "Work Order Management",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
+      },
+      {
+        "id": 251,
+        "username": "admin",
+        "module_code": "04",
+        "module_name_zh": "人員名單",
+        "module_name_en": "Employee Master",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
+      },
+      {
+        "id": 252,
+        "username": "admin",
+        "module_code": "05",
+        "module_name_zh": "製令工時分析",
+        "module_name_en": "Work Order Time Analysis",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
+      },
+      {
+        "id": 253,
+        "username": "admin",
+        "module_code": "06",
+        "module_name_zh": "LOG查詢",
+        "module_name_en": "Log Inquiry",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
+      },
+      {
+        "id": 254,
+        "username": "admin",
+        "module_code": "07",
+        "module_name_zh": "今日未紀錄名單",
+        "module_name_en": "Missing Records Today",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
+      },
+      {
+        "id": 255,
+        "username": "admin",
+        "module_code": "08",
+        "module_name_zh": "人員每日工時",
+        "module_name_en": "Daily Employee Hours",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
+      },
+      {
+        "id": 256,
+        "username": "admin",
+        "module_code": "09",
+        "module_name_zh": "資料永久保存與備份",
+        "module_name_en": "Permanent Backup",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
+      },
+      {
+        "id": 257,
+        "username": "admin",
+        "module_code": "10",
+        "module_name_zh": "權限管理",
+        "module_name_en": "Permission Management",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
+      },
+      {
+        "id": 258,
+        "username": "admin",
+        "module_code": "11",
+        "module_name_zh": "登入紀錄",
+        "module_name_en": "Login Logs",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
+      },
+      {
+        "id": 259,
+        "username": "admin",
+        "module_code": "12",
+        "module_name_zh": "模組永久紀錄中心",
+        "module_name_en": "Module Permanent Records",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
+      },
+      {
+        "id": 260,
+        "username": "admin",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1,
+        "updated_at": "2026-05-23 00:47:32"
       }
     ],
     "auth_login_logs": [],
@@ -2037,18 +2038,18 @@
       {
         "id": 1,
         "username": "admin",
-        "password_hash": "pbkdf2_sha256$3a6f3a7befa0885e8c08cc2eb15a9859$4c37ee557e8e94cd84ddf1e2c31156cdb5fed35b9880b147e7e72302444f72ee",
+        "password_hash": "pbkdf2_sha256$3e3ea79eeda46c4497564337aba9adc6$fe2bf3efc524f48b26b2f0e8793ba7d61677605d7dac0d3a4c1bef41cd5747b1",
         "password_hint": "預設密碼，正式使用請修改",
         "employee_id": "nan",
         "display_name": "系統管理員",
-        "email": "Admin",
+        "email": "admin",
         "role_code": "admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-22 23:46:02",
+        "last_login_at": "2026-05-23 00:47:32",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-22 23:46:02"
+        "updated_at": "2026-05-23 00:47:32"
       },
       {
         "id": 2,
@@ -2141,10 +2142,10 @@
         "role_code": "operator",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-15 11:18:26",
+        "last_login_at": "2026-05-23 00:46:46",
         "note": "",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-15 11:18:26"
+        "updated_at": "2026-05-23 00:46:46"
       },
       {
         "id": 14,
@@ -2177,6 +2178,22 @@
         "note": "",
         "created_at": "2026-05-16 14:29:55",
         "updated_at": "2026-05-19 00:16:23"
+      },
+      {
+        "id": 16,
+        "username": "SPT142",
+        "password_hash": "pbkdf2_sha256$2e9d05d3b13d5a6da61bb0207ce4569e$5c1063f1e94046ef875540fc169b0ebe0793cee61d461b963327fce6837352a4",
+        "password_hint": "V105 canonical authority login cache",
+        "employee_id": "SPT142",
+        "display_name": "黃沂澂",
+        "email": "manager",
+        "role_code": "manager",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-23 00:46:46",
+        "note": "",
+        "created_at": "2026-05-15 10:48:48",
+        "updated_at": "2026-05-23 00:46:46"
       }
     ],
     "employees": [],
@@ -2819,8 +2836,8 @@
         "is_active": 1,
         "sort_order": 1,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 2,
@@ -2828,8 +2845,8 @@
         "is_active": 1,
         "sort_order": 2,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 3,
@@ -2837,8 +2854,8 @@
         "is_active": 1,
         "sort_order": 3,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 4,
@@ -2846,8 +2863,8 @@
         "is_active": 1,
         "sort_order": 4,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 5,
@@ -2855,8 +2872,8 @@
         "is_active": 1,
         "sort_order": 5,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 6,
@@ -2864,8 +2881,8 @@
         "is_active": 1,
         "sort_order": 6,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 7,
@@ -2873,8 +2890,8 @@
         "is_active": 1,
         "sort_order": 7,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 8,
@@ -2882,8 +2899,8 @@
         "is_active": 1,
         "sort_order": 8,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 9,
@@ -2891,8 +2908,8 @@
         "is_active": 1,
         "sort_order": 9,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 10,
@@ -2900,8 +2917,8 @@
         "is_active": 1,
         "sort_order": 10,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 11,
@@ -2909,8 +2926,8 @@
         "is_active": 1,
         "sort_order": 11,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 12,
@@ -2918,8 +2935,8 @@
         "is_active": 1,
         "sort_order": 12,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 13,
@@ -2927,8 +2944,8 @@
         "is_active": 1,
         "sort_order": 13,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 14,
@@ -2936,8 +2953,8 @@
         "is_active": 1,
         "sort_order": 14,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 15,
@@ -2945,8 +2962,8 @@
         "is_active": 1,
         "sort_order": 15,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 16,
@@ -2954,8 +2971,8 @@
         "is_active": 1,
         "sort_order": 16,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 17,
@@ -2963,8 +2980,8 @@
         "is_active": 1,
         "sort_order": 17,
         "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       }
     ],
     "rest_periods": [
@@ -3012,17 +3029,31 @@
     "security_login_logs": [
       {
         "id": 1,
+        "username": "SPT142",
+        "display_name": "黃沂澂",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=manager;source=authority",
+        "module_code": "",
+        "login_time": "2026-05-23 00:46:46",
+        "logout_time": null,
+        "idle_seconds": null,
+        "user_agent": "streamlit",
+        "created_at": "2026-05-23 00:46:46"
+      },
+      {
+        "id": 2,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGIN",
         "result": "SUCCESS",
-        "message": "role=admin",
+        "message": "role=admin;source=authority",
         "module_code": "",
-        "login_time": "2026-05-22 23:46:02",
+        "login_time": "2026-05-23 00:47:32",
         "logout_time": null,
         "idle_seconds": null,
         "user_agent": "streamlit",
-        "created_at": "2026-05-22 23:46:02"
+        "created_at": "2026-05-23 00:47:32"
       }
     ],
     "security_module_permissions": [
@@ -3042,7 +3073,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 2,
@@ -3060,7 +3091,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 3,
@@ -3078,7 +3109,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 4,
@@ -3096,7 +3127,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 5,
@@ -3114,7 +3145,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 6,
@@ -3132,7 +3163,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 7,
@@ -3150,7 +3181,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 8,
@@ -3168,7 +3199,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 9,
@@ -3186,7 +3217,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 10,
@@ -3204,7 +3235,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 11,
@@ -3222,7 +3253,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 12,
@@ -3240,7 +3271,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 13,
@@ -3258,7 +3289,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 14,
@@ -3276,7 +3307,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 15,
@@ -3294,7 +3325,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 16,
@@ -3312,7 +3343,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 17,
@@ -3330,7 +3361,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 18,
@@ -3348,7 +3379,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 19,
@@ -3366,7 +3397,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 20,
@@ -3384,7 +3415,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 21,
@@ -3402,7 +3433,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 22,
@@ -3420,7 +3451,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 23,
@@ -3438,7 +3469,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 24,
@@ -3456,7 +3487,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 25,
@@ -3474,7 +3505,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 26,
@@ -3492,7 +3523,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 27,
@@ -3510,7 +3541,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 28,
@@ -3528,7 +3559,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 29,
@@ -3546,7 +3577,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 30,
@@ -3564,7 +3595,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 31,
@@ -3582,7 +3613,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 32,
@@ -3600,7 +3631,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 33,
@@ -3618,7 +3649,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 34,
@@ -3636,7 +3667,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 35,
@@ -3654,7 +3685,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 36,
@@ -3672,7 +3703,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 37,
@@ -3690,7 +3721,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 38,
@@ -3708,7 +3739,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 39,
@@ -3726,7 +3757,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 40,
@@ -3744,7 +3775,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 41,
@@ -3762,7 +3793,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 42,
@@ -3780,7 +3811,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 43,
@@ -3798,7 +3829,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 44,
@@ -3816,7 +3847,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 45,
@@ -3834,7 +3865,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 46,
@@ -3852,7 +3883,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 47,
@@ -3870,7 +3901,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 48,
@@ -3888,7 +3919,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 49,
@@ -3906,7 +3937,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 50,
@@ -3924,7 +3955,7 @@
         "can_backup": 1,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 51,
@@ -3942,7 +3973,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 52,
@@ -3960,7 +3991,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 53,
@@ -3978,7 +4009,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 54,
@@ -3996,7 +4027,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 55,
@@ -4014,7 +4045,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 56,
@@ -4032,7 +4063,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 57,
@@ -4050,7 +4081,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 58,
@@ -4068,7 +4099,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 59,
@@ -4086,7 +4117,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 60,
@@ -4104,7 +4135,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 61,
@@ -4122,7 +4153,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 62,
@@ -4140,7 +4171,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 63,
@@ -4158,7 +4189,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 64,
@@ -4176,7 +4207,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 65,
@@ -4194,7 +4225,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 66,
@@ -4212,7 +4243,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 67,
@@ -4230,7 +4261,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 68,
@@ -4248,7 +4279,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 69,
@@ -4266,7 +4297,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 70,
@@ -4284,7 +4315,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 71,
@@ -4302,7 +4333,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 72,
@@ -4320,7 +4351,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 73,
@@ -4338,7 +4369,7 @@
         "can_backup": 1,
         "can_restore": 1,
         "can_manage": 1,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 74,
@@ -4356,7 +4387,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 75,
@@ -4374,7 +4405,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 76,
@@ -4392,7 +4423,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 77,
@@ -4410,7 +4441,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 78,
@@ -4428,7 +4459,7 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0,
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       }
     ],
     "security_roles": [
@@ -4439,8 +4470,8 @@
         "role_name_en": "System Admin",
         "description": "System Admin",
         "is_system_role": 1,
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 2,
@@ -4449,8 +4480,8 @@
         "role_name_en": "Manufacturing Manager",
         "description": "Manufacturing Manager",
         "is_system_role": 1,
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 3,
@@ -4459,8 +4490,8 @@
         "role_name_en": "Line Leader",
         "description": "Line Leader",
         "is_system_role": 1,
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 4,
@@ -4469,8 +4500,8 @@
         "role_name_en": "Operator",
         "description": "Operator",
         "is_system_role": 1,
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 5,
@@ -4479,8 +4510,8 @@
         "role_name_en": "Viewer",
         "description": "Viewer",
         "is_system_role": 1,
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "id": 6,
@@ -4489,8 +4520,8 @@
         "role_name_en": "Auditor",
         "description": "Auditor",
         "is_system_role": 1,
-        "created_at": "2026-05-22 23:45:57",
-        "updated_at": "2026-05-22 23:45:57"
+        "created_at": "2026-05-23 00:46:00",
+        "updated_at": "2026-05-23 00:46:00"
       }
     ],
     "security_settings": [
@@ -4573,9 +4604,9 @@
         "email": "Admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-22 23:46:02",
+        "last_login_at": "2026-05-23 00:47:32",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-22 23:46:02"
+        "updated_at": "2026-05-23 00:47:32"
       },
       {
         "id": 2,
@@ -4651,9 +4682,9 @@
         "email": "",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-15 11:18:26",
+        "last_login_at": "2026-05-23 00:46:46",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-19 17:35:07"
+        "updated_at": "2026-05-23 00:46:46"
       },
       {
         "id": 8,
@@ -4685,7 +4716,7 @@
     "system_logs": [
       {
         "id": 1,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "SYSTEM",
         "action_type": "AUTO_INIT_DATABASE",
         "target_table": "ALL",
@@ -4696,7 +4727,7 @@
       },
       {
         "id": 2,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_roles",
@@ -4707,7 +4738,7 @@
       },
       {
         "id": 3,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_roles",
@@ -4718,7 +4749,7 @@
       },
       {
         "id": 4,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_roles",
@@ -4729,7 +4760,7 @@
       },
       {
         "id": 5,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_roles",
@@ -4740,7 +4771,7 @@
       },
       {
         "id": 6,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_roles",
@@ -4751,7 +4782,7 @@
       },
       {
         "id": 7,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_roles",
@@ -4762,7 +4793,7 @@
       },
       {
         "id": 8,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4773,7 +4804,7 @@
       },
       {
         "id": 9,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4784,7 +4815,7 @@
       },
       {
         "id": 10,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4795,7 +4826,7 @@
       },
       {
         "id": 11,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4806,7 +4837,7 @@
       },
       {
         "id": 12,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4817,7 +4848,7 @@
       },
       {
         "id": 13,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4828,7 +4859,7 @@
       },
       {
         "id": 14,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4839,7 +4870,7 @@
       },
       {
         "id": 15,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:00",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4850,7 +4881,7 @@
       },
       {
         "id": 16,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4861,7 +4892,7 @@
       },
       {
         "id": 17,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4872,7 +4903,7 @@
       },
       {
         "id": 18,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4883,7 +4914,7 @@
       },
       {
         "id": 19,
-        "log_time": "2026-05-22 23:45:57",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4894,7 +4925,7 @@
       },
       {
         "id": 20,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4905,7 +4936,7 @@
       },
       {
         "id": 21,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4916,7 +4947,7 @@
       },
       {
         "id": 22,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4927,7 +4958,7 @@
       },
       {
         "id": 23,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4938,7 +4969,7 @@
       },
       {
         "id": 24,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4949,7 +4980,7 @@
       },
       {
         "id": 25,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4960,7 +4991,7 @@
       },
       {
         "id": 26,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4971,7 +5002,7 @@
       },
       {
         "id": 27,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4982,7 +5013,7 @@
       },
       {
         "id": 28,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -4993,7 +5024,7 @@
       },
       {
         "id": 29,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5004,7 +5035,7 @@
       },
       {
         "id": 30,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5015,7 +5046,7 @@
       },
       {
         "id": 31,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5026,7 +5057,7 @@
       },
       {
         "id": 32,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5037,7 +5068,7 @@
       },
       {
         "id": 33,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5048,7 +5079,7 @@
       },
       {
         "id": 34,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5059,7 +5090,7 @@
       },
       {
         "id": 35,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5070,7 +5101,7 @@
       },
       {
         "id": 36,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5081,7 +5112,7 @@
       },
       {
         "id": 37,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5092,7 +5123,7 @@
       },
       {
         "id": 38,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5103,7 +5134,7 @@
       },
       {
         "id": 39,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5114,7 +5145,7 @@
       },
       {
         "id": 40,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5125,7 +5156,7 @@
       },
       {
         "id": 41,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5136,7 +5167,7 @@
       },
       {
         "id": 42,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5147,7 +5178,7 @@
       },
       {
         "id": 43,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5158,7 +5189,7 @@
       },
       {
         "id": 44,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5169,7 +5200,7 @@
       },
       {
         "id": 45,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5180,7 +5211,7 @@
       },
       {
         "id": 46,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5191,7 +5222,7 @@
       },
       {
         "id": 47,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5202,7 +5233,7 @@
       },
       {
         "id": 48,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5213,7 +5244,7 @@
       },
       {
         "id": 49,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5224,7 +5255,7 @@
       },
       {
         "id": 50,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5235,7 +5266,7 @@
       },
       {
         "id": 51,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5246,7 +5277,7 @@
       },
       {
         "id": 52,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5257,7 +5288,7 @@
       },
       {
         "id": 53,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5268,7 +5299,7 @@
       },
       {
         "id": 54,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5279,7 +5310,7 @@
       },
       {
         "id": 55,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5290,7 +5321,7 @@
       },
       {
         "id": 56,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5301,7 +5332,7 @@
       },
       {
         "id": 57,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5312,7 +5343,7 @@
       },
       {
         "id": 58,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5323,7 +5354,7 @@
       },
       {
         "id": 59,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5334,7 +5365,7 @@
       },
       {
         "id": 60,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5345,7 +5376,7 @@
       },
       {
         "id": 61,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5356,7 +5387,7 @@
       },
       {
         "id": 62,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5367,7 +5398,7 @@
       },
       {
         "id": 63,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5378,7 +5409,7 @@
       },
       {
         "id": 64,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5389,7 +5420,7 @@
       },
       {
         "id": 65,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5400,7 +5431,7 @@
       },
       {
         "id": 66,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5411,7 +5442,7 @@
       },
       {
         "id": 67,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5422,7 +5453,7 @@
       },
       {
         "id": 68,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5433,7 +5464,7 @@
       },
       {
         "id": 69,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5444,7 +5475,7 @@
       },
       {
         "id": 70,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5455,7 +5486,7 @@
       },
       {
         "id": 71,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5466,7 +5497,7 @@
       },
       {
         "id": 72,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5477,7 +5508,7 @@
       },
       {
         "id": 73,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5488,7 +5519,7 @@
       },
       {
         "id": 74,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5499,7 +5530,7 @@
       },
       {
         "id": 75,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5510,7 +5541,7 @@
       },
       {
         "id": 76,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5521,7 +5552,7 @@
       },
       {
         "id": 77,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5532,7 +5563,7 @@
       },
       {
         "id": 78,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5543,7 +5574,7 @@
       },
       {
         "id": 79,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5554,7 +5585,7 @@
       },
       {
         "id": 80,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5565,7 +5596,7 @@
       },
       {
         "id": 81,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5576,7 +5607,7 @@
       },
       {
         "id": 82,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5587,7 +5618,7 @@
       },
       {
         "id": 83,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5598,7 +5629,7 @@
       },
       {
         "id": 84,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5609,7 +5640,7 @@
       },
       {
         "id": 85,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_module_permissions",
@@ -5620,7 +5651,7 @@
       },
       {
         "id": 86,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_user_roles",
@@ -5631,7 +5662,7 @@
       },
       {
         "id": 87,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_user_roles",
@@ -5642,7 +5673,7 @@
       },
       {
         "id": 88,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_user_roles",
@@ -5653,7 +5684,7 @@
       },
       {
         "id": 89,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_user_roles",
@@ -5664,7 +5695,7 @@
       },
       {
         "id": 90,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_user_roles",
@@ -5675,7 +5706,7 @@
       },
       {
         "id": 91,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_user_roles",
@@ -5686,7 +5717,7 @@
       },
       {
         "id": 92,
-        "log_time": "2026-05-22 23:45:58",
+        "log_time": "2026-05-23 00:46:01",
         "user_name": "appuser",
         "action_type": "INSERT",
         "target_table": "security_settings",
@@ -5697,24 +5728,376 @@
       },
       {
         "id": 93,
-        "log_time": "2026-05-22 23:46:02",
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 94,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO"
+      },
+      {
+        "id": 95,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 96,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 97,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 98,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 99,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 100,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 101,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 102,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 103,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 104,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 105,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 106,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 107,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 108,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "SPT142",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO"
+      },
+      {
+        "id": 109,
+        "log_time": "2026-05-23 00:46:46",
+        "user_name": "SPT142",
+        "action_type": "UPDATE",
+        "target_table": "security_users",
+        "target_id": "",
+        "message": "UPDATE security_users",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO"
+      },
+      {
+        "id": 110,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 111,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO"
+      },
+      {
+        "id": 112,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 113,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 114,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 115,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 116,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 117,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 118,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 119,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 120,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 121,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 122,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 123,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 124,
+        "log_time": "2026-05-23 00:47:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 125,
+        "log_time": "2026-05-23 00:47:32",
         "user_name": "admin",
         "action_type": "UPDATE",
         "target_table": "auth_users",
         "target_id": "",
         "message": "UPDATE auth_users",
-        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE username=?",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
         "level": "INFO"
       },
       {
-        "id": 94,
-        "log_time": "2026-05-22 23:46:02",
+        "id": 126,
+        "log_time": "2026-05-23 00:47:32",
         "user_name": "admin",
         "action_type": "UPDATE",
         "target_table": "security_users",
         "target_id": "",
         "message": "UPDATE security_users",
-        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE username=?",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
         "level": "INFO"
       }
     ],
@@ -5723,41 +6106,42 @@
         "setting_key": "company_name",
         "setting_value": "超慧科技",
         "note": "公司名稱",
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "setting_key": "system_name",
         "setting_value": "製造部智慧工時紀錄系統",
         "note": "系統名稱",
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "setting_key": "standard_work_start",
         "setting_value": "09:00",
         "note": "標準上班時間",
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "setting_key": "standard_work_end",
         "setting_value": "18:00",
         "note": "標準下班時間",
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "setting_key": "daily_expected_hours_min",
         "setting_value": "7.0",
         "note": "每日最低合理工時",
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       },
       {
         "setting_key": "daily_expected_hours_max",
         "setting_value": "7.5",
         "note": "每日最高合理工時",
-        "updated_at": "2026-05-22 23:45:57"
+        "updated_at": "2026-05-23 00:46:00"
       }
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
+    "table_ui_settings": [],
     "time_records": [
       {
         "id": 12,
@@ -5893,33 +6277,6 @@
         "source": "streamlit",
         "created_at": "2026-05-22 09:18:47",
         "updated_at": "2026-05-22 13:36:28"
-      },
-      {
-        "id": 17,
-        "record_key": "B002|21M0241-01|水平|2026-05-22 23:22:59|b6af629c",
-        "status": "作業中",
-        "work_order": "21M0241-01",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "水平",
-        "employee_id": "B002",
-        "employee_name": "張文品",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-22 23:22:59",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": null,
-        "start_date": "2026-05-22",
-        "start_time": "23:22:59",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "B002|水平|2026-05-22",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-22 23:22:59",
-        "updated_at": "2026-05-22 23:22:59"
       }
     ],
     "work_orders": []
