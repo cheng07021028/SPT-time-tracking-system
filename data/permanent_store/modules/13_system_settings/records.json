@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "13_system_settings",
   "kind": "records",
-  "updated_at": "2026-05-22 12:03:30",
-  "exported_at": "2026-05-22 12:03:30",
-  "reason": "export_13_system_settings_page_apply_v85",
+  "updated_at": "2026-05-22 13:05:41",
+  "exported_at": "2026-05-22 13:05:41",
+  "reason": "save_process_options_v85",
   "empty_authoritative": false,
   "tables": {
     "process_categories": [
@@ -65,186 +65,6 @@
     ],
     "process_category_options": [
       {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "",
-        "is_active": true,
-        "sort_order": 1,
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "前置鈑金",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "LP改造",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "骨架組立",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "配電",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "模組",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "水平",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "S.T.",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "清潔",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "收機",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "包機",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "Packing",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "異常",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "設變",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "重工",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "教育訓練",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "IPQC",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "其他",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
         "id": 1,
         "category_name": "全部 / 通用",
         "process_name": "前置鈑金",
@@ -1063,190 +883,180 @@
         "note": "",
         "created_at": "2026-05-22 12:03:29",
         "updated_at": "2026-05-22 12:03:29"
+      },
+      {
+        "id": 84,
+        "category_name": "Sorter/EFEM",
+        "process_name": "前置鈑金",
+        "is_active": 1,
+        "sort_order": 2,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 85,
+        "category_name": "Sorter/EFEM",
+        "process_name": "LP改造",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 86,
+        "category_name": "Sorter/EFEM",
+        "process_name": "骨架組立",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 87,
+        "category_name": "Sorter/EFEM",
+        "process_name": "配電",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 88,
+        "category_name": "Sorter/EFEM",
+        "process_name": "模組",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 89,
+        "category_name": "Sorter/EFEM",
+        "process_name": "水平",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 90,
+        "category_name": "Sorter/EFEM",
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 91,
+        "category_name": "Sorter/EFEM",
+        "process_name": "清潔",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 92,
+        "category_name": "Sorter/EFEM",
+        "process_name": "收機",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 93,
+        "category_name": "Sorter/EFEM",
+        "process_name": "包機",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 94,
+        "category_name": "Sorter/EFEM",
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 95,
+        "category_name": "Sorter/EFEM",
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 13,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 96,
+        "category_name": "Sorter/EFEM",
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 97,
+        "category_name": "Sorter/EFEM",
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 98,
+        "category_name": "Sorter/EFEM",
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 99,
+        "category_name": "Sorter/EFEM",
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 100,
+        "category_name": "Sorter/EFEM",
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
       }
     ],
     "process_options": [
       {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "",
-        "is_active": true,
-        "sort_order": 1,
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "前置鈑金",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "LP改造",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "骨架組立",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "配電",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "模組",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "水平",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "S.T.",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "清潔",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "收機",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "包機",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "Packing",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "異常",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "設變",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "重工",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "教育訓練",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "IPQC",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": "",
-        "category_name": "Sorter/EFEM",
-        "process_name": "其他",
-        "is_active": true,
-        "sort_order": "",
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
         "id": 1,
         "category_name": "全部 / 通用",
         "process_name": "前置鈑金",
@@ -2065,6 +1875,176 @@
         "note": "",
         "created_at": "2026-05-22 12:03:29",
         "updated_at": "2026-05-22 12:03:29"
+      },
+      {
+        "id": 84,
+        "category_name": "Sorter/EFEM",
+        "process_name": "前置鈑金",
+        "is_active": 1,
+        "sort_order": 2,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 85,
+        "category_name": "Sorter/EFEM",
+        "process_name": "LP改造",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 86,
+        "category_name": "Sorter/EFEM",
+        "process_name": "骨架組立",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 87,
+        "category_name": "Sorter/EFEM",
+        "process_name": "配電",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 88,
+        "category_name": "Sorter/EFEM",
+        "process_name": "模組",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 89,
+        "category_name": "Sorter/EFEM",
+        "process_name": "水平",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 90,
+        "category_name": "Sorter/EFEM",
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 91,
+        "category_name": "Sorter/EFEM",
+        "process_name": "清潔",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 92,
+        "category_name": "Sorter/EFEM",
+        "process_name": "收機",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 93,
+        "category_name": "Sorter/EFEM",
+        "process_name": "包機",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 94,
+        "category_name": "Sorter/EFEM",
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 95,
+        "category_name": "Sorter/EFEM",
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 13,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 96,
+        "category_name": "Sorter/EFEM",
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 97,
+        "category_name": "Sorter/EFEM",
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 98,
+        "category_name": "Sorter/EFEM",
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 99,
+        "category_name": "Sorter/EFEM",
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
+      },
+      {
+        "id": 100,
+        "category_name": "Sorter/EFEM",
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-22 13:05:41",
+        "updated_at": "2026-05-22 13:05:41"
       }
     ],
     "rest_periods": [
@@ -2121,8 +2101,8 @@
   "settings": {},
   "table_counts": {
     "process_categories": 6,
-    "process_category_options": 100,
-    "process_options": 100,
+    "process_category_options": 99,
+    "process_options": 99,
     "rest_periods": 5,
     "app_settings": 1
   }
