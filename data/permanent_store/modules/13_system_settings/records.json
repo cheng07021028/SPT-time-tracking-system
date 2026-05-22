@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "13_system_settings",
   "kind": "records",
-  "updated_at": "2026-05-22 09:11:41",
-  "exported_at": "2026-05-22 09:11:41",
-  "reason": "save_process_options_v28",
+  "updated_at": "2026-05-22 09:49:56",
+  "exported_at": "2026-05-22 09:49:56",
+  "reason": "save_default_process_category_v85",
   "empty_authoritative": false,
   "tables": {
     "process_categories": [
@@ -472,9 +472,9 @@
     "app_settings": [
       {
         "setting_key": "default_process_category",
-        "setting_value": "SSS",
+        "setting_value": "全部 / 通用",
         "note": "01 工時紀錄：類別空白或找不到對應工段時使用的預設類別",
-        "updated_at": "2026-05-20 15:49:24"
+        "updated_at": "2026-05-22 09:49:56"
       }
     ]
   },
