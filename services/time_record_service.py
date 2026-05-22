@@ -3478,3 +3478,193 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
         pass
     return int(len(updated_ids))
 # =================== END V90 01 FINISH-WORK AUTHORITY MERGE FIX ===================
+
+
+# ===================== V94 02 HISTORY DELETE TOMBSTONE + 01 EDITOR SAFETY =====================
+# 目的：02 歷史紀錄刪除後，任何後續編輯/01同步/SQLite舊快取都不得把已刪紀錄救回。
+# 作法：在 02_history/settings.json 記錄 deleted_record_ids / deleted_record_keys，所有 save/upsert 都會過濾 tombstone。
+
+try:
+    _v94_prev_save_time_records = save_time_records
+except Exception:
+    _v94_prev_save_time_records = None
+try:
+    _v94_prev_delete_time_records = delete_time_records
+except Exception:
+    _v94_prev_delete_time_records = None
+try:
+    _v94_prev_v90_upsert_rows_to_0102_authority = _v90_upsert_rows_to_0102_authority
+except Exception:
+    _v94_prev_v90_upsert_rows_to_0102_authority = None
+
+
+def _v94_history_settings() -> dict:
+    try:
+        from services.permanent_authority_service import load_settings as _pa_load_settings
+        data = _pa_load_settings("02_history")
+        return dict(data) if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _v94_save_history_settings(settings: dict, reason: str = "history_settings_v94") -> None:
+    try:
+        from services.permanent_authority_service import save_settings as _pa_save_settings
+        _pa_save_settings("02_history", settings or {}, reason=reason, github=True)
+    except Exception:
+        pass
+
+
+def _v94_deleted_ids_keys() -> tuple[set[int], set[str]]:
+    stg = _v94_history_settings()
+    ids = set()
+    keys = set()
+    for x in stg.get("deleted_record_ids", []) if isinstance(stg.get("deleted_record_ids", []), list) else []:
+        rid = _v89_normalize_record_id(x) if "_v89_normalize_record_id" in globals() else None
+        if rid is not None:
+            ids.add(int(rid))
+    for x in stg.get("deleted_record_keys", []) if isinstance(stg.get("deleted_record_keys", []), list) else []:
+        sx = str(x or "").strip()
+        if sx:
+            keys.add(sx)
+    return ids, keys
+
+
+def _v94_record_key_from_row(row) -> str:
+    try:
+        if isinstance(row, dict):
+            v = row.get("record_key") or row.get("紀錄鍵 / Record Key")
+        else:
+            v = row.get("record_key") if "record_key" in row.index else (row.get("紀錄鍵 / Record Key") if "紀錄鍵 / Record Key" in row.index else "")
+        return str(v or "").strip()
+    except Exception:
+        return ""
+
+
+def _v94_filter_deleted_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame() if df is None else df
+    ids, keys = _v94_deleted_ids_keys()
+    if not ids and not keys:
+        return df
+    out = df.copy()
+    mask = pd.Series([True] * len(out), index=out.index)
+    id_col = None
+    for c in ["id", "ID", "ID / ID", "ID / ID / ID"]:
+        if c in out.columns:
+            id_col = c; break
+    if id_col and ids:
+        mask &= ~out[id_col].map(lambda x: (_v89_normalize_record_id(x) if "_v89_normalize_record_id" in globals() else None) in ids)
+    key_col = None
+    for c in ["record_key", "紀錄鍵 / Record Key"]:
+        if c in out.columns:
+            key_col = c; break
+    if key_col and keys:
+        mask &= ~out[key_col].fillna("").astype(str).str.strip().isin(keys)
+    return out.loc[mask].copy().reset_index(drop=True)
+
+
+def _v94_add_history_tombstones(df_or_rows) -> None:
+    stg = _v94_history_settings()
+    ids = set(stg.get("deleted_record_ids", []) if isinstance(stg.get("deleted_record_ids", []), list) else [])
+    keys = set(stg.get("deleted_record_keys", []) if isinstance(stg.get("deleted_record_keys", []), list) else [])
+    try:
+        if isinstance(df_or_rows, pd.DataFrame):
+            rows = [r for _, r in df_or_rows.iterrows()]
+        else:
+            rows = list(df_or_rows or [])
+    except Exception:
+        rows = []
+    for r in rows:
+        try:
+            rid = None
+            if isinstance(r, dict):
+                for c in ["id", "ID", "ID / ID", "ID / ID / ID"]:
+                    rid = _v89_normalize_record_id(r.get(c)) if "_v89_normalize_record_id" in globals() else None
+                    if rid is not None:
+                        break
+            else:
+                for c in ["id", "ID", "ID / ID", "ID / ID / ID"]:
+                    if c in r.index:
+                        rid = _v89_normalize_record_id(r.get(c)) if "_v89_normalize_record_id" in globals() else None
+                        if rid is not None:
+                            break
+            if rid is not None:
+                ids.add(int(rid))
+            k = _v94_record_key_from_row(r)
+            if k:
+                keys.add(k)
+        except Exception:
+            continue
+    stg["deleted_record_ids"] = sorted({int(x) for x in ids if _v89_normalize_record_id(x) is not None})
+    stg["deleted_record_keys"] = sorted({str(x) for x in keys if str(x).strip()})
+    stg["delete_tombstone_updated_at"] = _now() if "_now" in globals() else now_text()
+    _v94_save_history_settings(stg, "v94_history_delete_tombstone")
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = _v89_authority_df("02_history") if "_v89_authority_df" in globals() else pd.DataFrame()
+    df = _v94_filter_deleted_df(df)
+    return _v89_filter_records_df(df, start_date, end_date, employee_id, work_order) if "_v89_filter_records_df" in globals() else df
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    safe_df = _v94_filter_deleted_df(_v89_clean_editor_df(df) if "_v89_clean_editor_df" in globals() else df)
+    if safe_df is None or safe_df.empty:
+        return 0
+    n = _v94_prev_save_time_records(safe_df, recalc_edited_timestamps=recalc_edited_timestamps) if callable(_v94_prev_save_time_records) else 0
+    # 儲存後再次清洗 canonical，防止舊 wrapper 或 SQLite 快取帶回已刪列。
+    try:
+        auth_df = _v94_filter_deleted_df(_v89_authority_df("02_history"))
+        if "_v89_save_time_authority_df" in globals():
+            _v89_save_time_authority_df(auth_df, "save_time_records_v94_tombstone_filter", github=True)
+        if "_v89_sync_sqlite_cache_from_authority" in globals():
+            _v89_sync_sqlite_cache_from_authority(auth_df)
+    except Exception:
+        pass
+    return int(n or 0)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = set(_v89_id_list(record_ids) if "_v89_id_list" in globals() else [int(x) for x in record_ids or []])
+    if not ids:
+        return 0
+    auth_df = _v89_authority_df("02_history") if "_v89_authority_df" in globals() else pd.DataFrame()
+    if auth_df is None or auth_df.empty:
+        _v94_add_history_tombstones([{"id": x} for x in ids])
+        return 0
+    id_col = "id" if "id" in auth_df.columns else ("ID" if "ID" in auth_df.columns else None)
+    if not id_col:
+        _v94_add_history_tombstones([{"id": x} for x in ids])
+        return 0
+    match_mask = auth_df[id_col].map(lambda x: (_v89_normalize_record_id(x) if "_v89_normalize_record_id" in globals() else None) in ids)
+    deleted_rows = auth_df.loc[match_mask].copy()
+    _v94_add_history_tombstones(deleted_rows if not deleted_rows.empty else [{"id": x} for x in ids])
+    remaining = _v94_filter_deleted_df(auth_df.loc[~match_mask].copy())
+    deleted = int(len(auth_df) - len(remaining))
+    if "_v89_save_time_authority_df" in globals():
+        _v89_save_time_authority_df(remaining, "delete_time_records_v94_tombstone", github=True)
+    if "_v89_sync_sqlite_cache_from_authority" in globals():
+        _v89_sync_sqlite_cache_from_authority(remaining)
+    try:
+        write_log("DELETE_TIME_RECORDS", f"{reason}：V94 已刪除 {deleted} 筆並建立 tombstone，後續編輯/SQLite 不會復活。", "time_records", level="WARN")
+    except Exception:
+        pass
+    return deleted
+
+
+def _v90_upsert_rows_to_0102_authority(rows_df: pd.DataFrame, reason: str = "finish_work_v94", *, github: bool = False) -> int:  # type: ignore[override]
+    rows_df = _v94_filter_deleted_df(rows_df)
+    if rows_df is None or rows_df.empty:
+        return 0
+    n = _v94_prev_v90_upsert_rows_to_0102_authority(rows_df, reason=reason, github=github) if callable(_v94_prev_v90_upsert_rows_to_0102_authority) else 0
+    try:
+        auth_df = _v94_filter_deleted_df(_v89_authority_df("02_history"))
+        if "_v89_save_time_authority_df" in globals():
+            _v89_save_time_authority_df(auth_df, f"{reason}_v94_final_filter", github=bool(github))
+        if "_v89_sync_sqlite_cache_from_authority" in globals():
+            _v89_sync_sqlite_cache_from_authority(auth_df)
+    except Exception:
+        pass
+    return int(n or 0)
+# =================== END V94 02 HISTORY DELETE TOMBSTONE + 01 EDITOR SAFETY ===================

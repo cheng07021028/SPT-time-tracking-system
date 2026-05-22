@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from io import StringIO
+from io import StringIO, BytesIO
+from datetime import datetime
 import pandas as pd
 import streamlit as st
 
@@ -21,6 +22,10 @@ from services.permission_service import (
     save_users,
     restore_default_accounts_once_v57,
 )
+try:
+    from services.permission_service import save_account_master as _v94_save_account_master
+except Exception:
+    _v94_save_account_master = None
 
 apply_theme()
 require_module_access("10_permissions", "can_manage")
@@ -383,6 +388,167 @@ def _permission_summary(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def _v93_safe_text(value) -> str:
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    return str(value)
+
+
+def _v93_bool_text(value) -> str:
+    return "是 / Yes" if _as_bool_value(value, default=False) else "否 / No"
+
+
+def _v93_account_export_df() -> pd.DataFrame:
+    raw = pd.DataFrame(get_users())
+    if raw.empty:
+        return pd.DataFrame(columns=[
+            "帳號 / Username", "密碼狀態 / Password Status", "新密碼 / New Password",
+            "工號 / Employee ID", "姓名 / Display Name", "Email", "角色 / Role",
+            "啟用 / Active", "強制改密碼 / Force Change", "備註 / Note",
+            "最後登入 / Last Login", "更新時間 / Updated At",
+        ])
+    out = pd.DataFrame()
+    out["帳號 / Username"] = raw.get("username", "").map(_v93_safe_text)
+    # 系統不輸出既有密碼明碼，也不輸出 password_hash；只輸出畫面使用的遮罩狀態。
+    out["密碼狀態 / Password Status"] = raw.get("password_display", "********").map(_v93_safe_text) if "password_display" in raw else "********"
+    out["新密碼 / New Password"] = ""
+    out["工號 / Employee ID"] = raw.get("employee_id", "").map(_v93_safe_text) if "employee_id" in raw else ""
+    out["姓名 / Display Name"] = raw.get("display_name", "").map(_v93_safe_text) if "display_name" in raw else ""
+    out["Email"] = raw.get("email", "").map(_v93_safe_text) if "email" in raw else ""
+    out["角色 / Role"] = raw.get("role_code", "").map(_v93_safe_text) if "role_code" in raw else ""
+    out["啟用 / Active"] = raw.get("is_active", 1).map(_v93_bool_text) if "is_active" in raw else "是 / Yes"
+    out["強制改密碼 / Force Change"] = raw.get("force_password_change", 0).map(_v93_bool_text) if "force_password_change" in raw else "否 / No"
+    out["備註 / Note"] = raw.get("note", "").map(_v93_safe_text) if "note" in raw else ""
+    out["最後登入 / Last Login"] = raw.get("last_login_at", "").map(_v93_safe_text) if "last_login_at" in raw else ""
+    out["更新時間 / Updated At"] = raw.get("updated_at", "").map(_v93_safe_text) if "updated_at" in raw else ""
+    return out
+
+
+def _v93_permission_export_df() -> pd.DataFrame:
+    raw = pd.DataFrame(get_account_permissions())
+    base_cols = ["username", "display_name", "role_code", "module_code", "module_name_zh", "module_name_en"]
+    if raw.empty:
+        raw = pd.DataFrame(columns=base_cols + ACTION_COLS)
+    out = pd.DataFrame()
+    col_map = {
+        "username": "帳號 / Username",
+        "display_name": "姓名 / Name",
+        "role_code": "角色 / Role",
+        "module_code": "模組代碼 / Module Code",
+        "module_name_zh": "模組中文 / Module Chinese",
+        "module_name_en": "模組英文 / Module English",
+    }
+    for src, dst in col_map.items():
+        out[dst] = raw[src].map(_v93_safe_text) if src in raw.columns else ""
+    action_map = {key: f"{zh} / {en}" for key, zh, en in ACTIONS}
+    for key in ACTION_COLS:
+        dst = action_map.get(key, key)
+        out[dst] = raw[key].map(_v93_bool_text) if key in raw.columns else "否 / No"
+    return out
+
+
+def _v93_security_export_df() -> pd.DataFrame:
+    settings = get_security_settings() or {}
+    labels = {
+        "idle_timeout_minutes": "閒置自動登出分鐘數 / Idle Auto Logout Minutes",
+        "ask_continue_after_record": "工時完成後詢問是否繼續記錄 / Ask Continue After Time Record",
+    }
+    rows = []
+    for key in sorted(settings.keys()):
+        value = settings.get(key, "")
+        display_value = _v93_safe_text(value)
+        if key == "ask_continue_after_record":
+            display_value = "啟用 / Enabled" if str(value) != "0" else "停用 / Disabled"
+        rows.append({
+            "設定鍵 / Setting Key": key,
+            "設定名稱 / Setting Name": labels.get(key, key),
+            "設定值 / Setting Value": display_value,
+        })
+    if not rows:
+        rows.append({"設定鍵 / Setting Key": "", "設定名稱 / Setting Name": "", "設定值 / Setting Value": ""})
+    return pd.DataFrame(rows)
+
+
+def _v93_write_dataframe_sheet(wb, sheet_name: str, df: pd.DataFrame, title: str):
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    ws = wb.create_sheet(sheet_name)
+    ws.cell(row=1, column=1, value=title)
+    ws.cell(row=2, column=1, value=f"匯出時間 / Export Time：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    ws.cell(row=3, column=1, value="說明 / Note：既有密碼不輸出明碼；密碼欄僅提供狀態或匯入更新用空欄。")
+    header_row = 5
+    header_fill = PatternFill("solid", fgColor="D9EAF7")
+    title_fill = PatternFill("solid", fgColor="17365D")
+    ws.cell(row=1, column=1).fill = title_fill
+    ws.cell(row=1, column=1).font = Font(color="FFFFFF", bold=True, size=14)
+    for col_idx, col_name in enumerate(df.columns.tolist(), start=1):
+        cell = ws.cell(row=header_row, column=col_idx, value=col_name)
+        cell.fill = header_fill
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    for row_idx, row in enumerate(df.itertuples(index=False), start=header_row + 1):
+        for col_idx, value in enumerate(row, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+    ws.freeze_panes = ws.cell(row=header_row + 1, column=1)
+    ws.auto_filter.ref = ws.dimensions
+    for col_idx, col_name in enumerate(df.columns.tolist(), start=1):
+        values = [str(col_name)] + [str(v) for v in df.iloc[:, col_idx - 1].head(200).tolist()] if not df.empty else [str(col_name)]
+        width = min(max(max(len(v) for v in values) + 2, 12), 42)
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+    return ws
+
+
+def _build_permission_excel_export_v93() -> bytes:
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    default_ws = wb.active
+    wb.remove(default_ws)
+    _v93_write_dataframe_sheet(
+        wb,
+        "帳號密碼總表",
+        _v93_account_export_df(),
+        "帳號密碼總表 / Account Password Master",
+    )
+    _v93_write_dataframe_sheet(
+        wb,
+        "帳號模組權限",
+        _v93_permission_export_df(),
+        "帳號模組權限 / Account Module Permissions",
+    )
+    _v93_write_dataframe_sheet(
+        wb,
+        "安全設定",
+        _v93_security_export_df(),
+        "安全設定 / Security",
+    )
+    bio = BytesIO()
+    wb.save(bio)
+    return bio.getvalue()
+
+
+with st.expander("⟰ 權限管理 Excel 下載 / Permission Management Excel Export", expanded=False):
+    st.caption("只新增下載功能，不會修改帳號、權限或安全設定。既有密碼不輸出明碼，只輸出密碼狀態。")
+    try:
+        st.download_button(
+            "▣ 下載權限管理 Excel / Download Permission Workbook",
+            data=_build_permission_excel_export_v93(),
+            file_name=f"SPT_permission_management_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="v93_permission_management_excel_download",
+        )
+    except Exception as ex:
+        st.warning(f"Excel 下載檔建立失敗 / Export failed：{ex}")
+
+
 tab_accounts, tab_perm, tab_sec = st.tabs([
     "帳號密碼總表 / Account Password Master",
     "帳號模組權限 / Account Module Permissions",
@@ -627,8 +793,14 @@ with tab_accounts:
                 save_df = df.loc[~df["帳號 / Username"].astype(str).str.strip().isin(to_delete)].copy()
             else:
                 save_df = df.copy()
-            result = save_users(_users_to_service_rows(save_df))
-            deleted = delete_users(to_delete)
+            service_rows = _users_to_service_rows(save_df)
+            if callable(_v94_save_account_master):
+                master_result = _v94_save_account_master(service_rows, delete_usernames=to_delete)
+                result = {"saved": int(master_result.get("saved", 0)), "skipped": master_result.get("skipped", [])}
+                deleted = int(master_result.get("deleted", 0))
+            else:
+                result = save_users(service_rows)
+                deleted = delete_users(to_delete)
             if to_delete and deleted == 0:
                 st.warning("已偵測到刪除勾選，但未刪除任何帳號；admin 系統帳號不可刪除，其他帳號請確認帳號欄位是否有效。")
             st.success(f"帳號已儲存：{result['saved']} 筆；刪除：{deleted} 筆 / Accounts saved and deleted")

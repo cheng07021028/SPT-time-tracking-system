@@ -377,18 +377,41 @@ if is_admin:
                 except Exception:
                     display_admin = admin_df.copy()
                     column_cfg = {}
+                # V94：避免共用 column_config 將文字欄誤設成 Checkbox/Number 造成 StreamlitAPIException。
+                #      先確保刪除欄為純 bool，再只保留目前表格實際存在的 column_config；若仍失敗，改用最小設定 fallback。
+                if delete_col in display_admin.columns:
+                    display_admin[delete_col] = display_admin[delete_col].map(lambda v: _v92_to_int_id(v) is not None if str(v).strip().isdigit() else bool(v)).astype(bool)
+                try:
+                    column_cfg = {k: v for k, v in dict(column_cfg).items() if k in display_admin.columns}
+                except Exception:
+                    column_cfg = {}
                 column_cfg[delete_col] = st.column_config.CheckboxColumn("刪除 / Delete", width=120)
                 disabled_cols = [c for c in ["id", "ID", "ID / ID", "ID / ID / ID", "record_key", "紀錄鍵 / Record Key", "created_at", "建立時間 / Created At", "updated_at", "更新時間 / Updated At"] if c in display_admin.columns]
-                edited_admin_return = st.data_editor(
-                    display_admin,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config=column_cfg,
-                    disabled=disabled_cols,
-                    num_rows="fixed",
-                    key=editor_key,
-                    height=460,
-                )
+                try:
+                    edited_admin_return = st.data_editor(
+                        display_admin,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config=column_cfg,
+                        disabled=disabled_cols,
+                        num_rows="fixed",
+                        key=editor_key,
+                        height=460,
+                    )
+                except Exception as _v94_editor_error:
+                    st.warning(f"維護表格欄位型態設定已自動降級，避免畫面中斷：{_v94_editor_error}")
+                    safe_column_cfg = {delete_col: st.column_config.CheckboxColumn("刪除 / Delete", width=120)}
+                    edited_admin_return = st.data_editor(
+                        display_admin,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config=safe_column_cfg,
+                        disabled=disabled_cols,
+                        num_rows="fixed",
+                        key=f"{editor_key}_safe",
+                        height=460,
+                    )
+                    editor_key = f"{editor_key}_safe"
                 edited_admin = _v92_editor_state_to_df(display_admin, edited_admin_return, editor_key)
 
                 manual_ids = _v92_checked_ids(edited_admin, delete_col, _id_col)
