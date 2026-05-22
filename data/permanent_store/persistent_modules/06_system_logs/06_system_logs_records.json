@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-23 01:12:27",
+  "exported_at": "2026-05-23 01:15:44",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -1393,10 +1393,87 @@
         "message": "UPDATE security_users",
         "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
         "level": "INFO"
+      },
+      {
+        "id": 127,
+        "log_time": "2026-05-23 01:13:00",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 128,
+        "log_time": "2026-05-23 01:13:00",
+        "user_name": "admin",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "18",
+        "message": "張文品 開始 21M0241-04 / 前置鈑金",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 129,
+        "log_time": "2026-05-23 01:13:06",
+        "user_name": "admin",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
+        "level": "INFO"
+      },
+      {
+        "id": 130,
+        "log_time": "2026-05-23 01:13:06",
+        "user_name": "admin",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "18",
+        "message": "V96 結束工時紀錄 #18，同步結束=1筆，狀態=完工",
+        "detail": "18",
+        "level": "INFO"
+      },
+      {
+        "id": 131,
+        "log_time": "2026-05-23 01:14:55",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V89 權威檔優先：已儲存/更新歷史紀錄 1 筆，並同步 01/02 canonical。",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 132,
+        "log_time": "2026-05-23 01:15:07",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V89 權威檔優先：已儲存/更新歷史紀錄 1 筆，並同步 01/02 canonical。",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 133,
+        "log_time": "2026-05-23 01:15:13",
+        "user_name": "admin",
+        "action_type": "RECALC_TIME_RECORDS_0102_SYNC",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V109：已重算 1 筆，並將同一批權威資料同步寫入 01 工時紀錄與 02 歷史紀錄。",
+        "detail": "",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 126
+    "system_logs": 133
   }
 }
