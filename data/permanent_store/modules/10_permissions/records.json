@@ -2,9 +2,9 @@
   "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-22 17:13:13",
+  "updated_at": "2026-05-22 17:38:34",
   "exported_at": "2026-05-22 13:04:29",
-  "reason": "save_account_master_v96",
+  "reason": "save_security_settings_v97",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -1792,13 +1792,13 @@
         "setting_key": "idle_timeout_minutes",
         "setting_value": "3",
         "note": "V97 direct-authority security setting",
-        "updated_at": "2026-05-22 17:05:49"
+        "updated_at": "2026-05-22 17:38:34"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
         "note": "V97 direct-authority security setting",
-        "updated_at": "2026-05-22 17:05:49"
+        "updated_at": "2026-05-22 17:38:34"
       }
     ],
     "security_settings": [
@@ -1806,13 +1806,13 @@
         "setting_key": "idle_timeout_minutes",
         "setting_value": "3",
         "note": "V97 direct-authority security setting",
-        "updated_at": "2026-05-22 17:05:49"
+        "updated_at": "2026-05-22 17:38:34"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
         "note": "V97 direct-authority security setting",
-        "updated_at": "2026-05-22 17:05:49"
+        "updated_at": "2026-05-22 17:38:34"
       }
     ],
     "security_users": [
