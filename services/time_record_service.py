@@ -3224,3 +3224,257 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
             pass
     return result
 # =================== END V89B 01 ACTION BASELINE FROM AUTHORITY ===================
+
+# ===================== V90 01 FINISH-WORK AUTHORITY MERGE FIX =====================
+# 修正 V89：finish_work 前先用 02_history canonical 覆蓋 SQLite，會把 01 頁面剛查到的作業中 id 洗掉，
+# 導致「找不到工時紀錄」。V90 結束作業不再先 baseline；改成直接更新目前 SQLite 中的作業中列，
+# 再只把本次受影響的列 upsert 到 01/02 canonical 權威檔，最後以 canonical 回寫 SQLite 快取。
+
+
+def _v90_id_list(ids) -> list[int]:
+    out: list[int] = []
+    for x in ids or []:
+        try:
+            if pd.isna(x):
+                continue
+        except Exception:
+            pass
+        try:
+            out.append(int(float(str(x).strip())))
+        except Exception:
+            continue
+    seen: set[int] = set()
+    deduped: list[int] = []
+    for x in out:
+        if x not in seen:
+            seen.add(x)
+            deduped.append(x)
+    return deduped
+
+
+def _v90_query_records_by_ids(ids: list[int]) -> pd.DataFrame:
+    clean_ids = _v90_id_list(ids)
+    if not clean_ids:
+        return pd.DataFrame()
+    placeholders = ",".join(["?"] * len(clean_ids))
+    try:
+        return query_df(f"SELECT * FROM time_records WHERE id IN ({placeholders}) ORDER BY id", clean_ids)
+    except Exception:
+        rows = []
+        for rid in clean_ids:
+            r = query_one("SELECT * FROM time_records WHERE id=?", (rid,)) or {}
+            if r:
+                rows.append(r)
+        return pd.DataFrame(rows)
+
+
+def _v90_upsert_rows_to_0102_authority(rows_df: pd.DataFrame, reason: str = "finish_work_v90", *, github: bool = False) -> int:
+    if rows_df is None or not isinstance(rows_df, pd.DataFrame) or rows_df.empty:
+        return 0
+    if "id" not in rows_df.columns:
+        return 0
+    try:
+        auth_df = _v89_authority_df("02_history") if "_v89_authority_df" in globals() else pd.DataFrame()
+    except Exception:
+        auth_df = pd.DataFrame()
+    if auth_df is None or not isinstance(auth_df, pd.DataFrame):
+        auth_df = pd.DataFrame()
+
+    rows = rows_df.copy()
+    rows = rows.loc[:, ~pd.Index(rows.columns).duplicated()].copy()
+    auth_df = auth_df.loc[:, ~pd.Index(auth_df.columns).duplicated()].copy() if not auth_df.empty else pd.DataFrame()
+
+    # 欄位聯集，避免 01/02 顯示欄位或後續重算欄位被洗掉。
+    all_cols: list[str] = []
+    for c in list(auth_df.columns) + list(rows.columns):
+        sc = str(c)
+        if sc not in all_cols:
+            all_cols.append(sc)
+    if "id" not in all_cols:
+        all_cols.insert(0, "id")
+    if auth_df.empty:
+        auth_df = pd.DataFrame(columns=all_cols)
+    else:
+        for c in all_cols:
+            if c not in auth_df.columns:
+                auth_df[c] = None
+        auth_df = auth_df[all_cols].copy()
+    for c in all_cols:
+        if c not in rows.columns:
+            rows[c] = None
+    rows = rows[all_cols].copy()
+
+    by_id: dict[int, int] = {}
+    if "id" in auth_df.columns:
+        for idx, val in auth_df["id"].items():
+            rid = _v89_normalize_record_id(val) if "_v89_normalize_record_id" in globals() else None
+            if rid is None:
+                try:
+                    rid = int(float(str(val).strip()))
+                except Exception:
+                    rid = None
+            if rid is not None:
+                by_id[int(rid)] = idx
+
+    changed = 0
+    for _, row in rows.iterrows():
+        rid = _v89_normalize_record_id(row.get("id")) if "_v89_normalize_record_id" in globals() else None
+        if rid is None:
+            try:
+                rid = int(float(str(row.get("id")).strip()))
+            except Exception:
+                continue
+        row_dict = row.to_dict()
+        if "_v89_normalize_row_for_save" in globals():
+            try:
+                row_dict = _v89_normalize_row_for_save(row_dict, recalc_work_hours=False)
+            except Exception:
+                pass
+        for c in row_dict.keys():
+            if c not in auth_df.columns:
+                auth_df[c] = None
+        if int(rid) in by_id:
+            idx = by_id[int(rid)]
+            for c, v in row_dict.items():
+                auth_df.at[idx, c] = v
+        else:
+            new_row = {c: None for c in auth_df.columns}
+            for c, v in row_dict.items():
+                if c not in auth_df.columns:
+                    auth_df[c] = None
+                    new_row[c] = v
+                else:
+                    new_row[c] = v
+            auth_df = pd.concat([auth_df, pd.DataFrame([new_row])], ignore_index=True)
+            by_id[int(rid)] = int(auth_df.index[-1])
+        changed += 1
+
+    if changed:
+        if "_v89_save_time_authority_df" in globals():
+            _v89_save_time_authority_df(auth_df, reason, github=bool(github))
+        elif "_v84_sync_time_records_canonical_from_sqlite" in globals():
+            _v84_sync_time_records_canonical_from_sqlite(reason, github=bool(github))
+        # 以 canonical 覆蓋 SQLite 快取，可清掉 02 已刪除但 SQLite 仍殘留的紀錄。
+        try:
+            if "_v89_sync_sqlite_cache_from_authority" in globals():
+                _v89_sync_sqlite_cache_from_authority(auth_df)
+        except Exception as exc:
+            try:
+                write_log("V90_SQLITE_CACHE_SYNC_WARN", f"V90 結束作業後同步 SQLite 快取失敗：{exc}", "time_records", level="WARN")
+            except Exception:
+                pass
+    return int(changed)
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V90：01 結束/暫停/完工不再先用 02 權威檔覆蓋 SQLite。
+
+    直接對目前作業中的 SQLite 紀錄完成結束動作，然後只把本次受影響列合併回 01/02 權威檔。
+    這可避免 V89 的「先 baseline」把畫面剛取得的 record_id 洗掉，造成找不到工時紀錄。
+    """
+    try:
+        if "_v86_ensure_time_record_indexes_once" in globals():
+            _v86_ensure_time_record_indexes_once()
+    except Exception:
+        pass
+
+    try:
+        rid0 = int(float(str(record_id).strip()))
+    except Exception:
+        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (rid0,))
+    if not rec:
+        # 只有找不到時才嘗試由 canonical 補回 SQLite；避免一開始就覆蓋掉現場作業中的列。
+        try:
+            if "_v89_baseline_sqlite_from_canonical" in globals():
+                _v89_baseline_sqlite_from_canonical("finish_work_v90_missing_record_retry")
+        except Exception:
+            pass
+        rec = query_one("SELECT * FROM time_records WHERE id=?", (rid0,))
+        if not rec:
+            raise ValueError("找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。請重新整理 01. 工時紀錄後再操作。")
+    if rec.get("end_timestamp"):
+        return 0
+
+    now = _now()
+    end_date, end_time = split_timestamp(now)
+    status = end_action if end_action in ("下班", "暫停", "完工") else "已結束"
+
+    if finish_parallel_group:
+        try:
+            group = get_active_group(rid0)
+        except Exception:
+            group = pd.DataFrame([rec])
+    else:
+        group = pd.DataFrame([rec])
+    if group is None or not isinstance(group, pd.DataFrame) or group.empty:
+        group = pd.DataFrame([rec])
+
+    group_ids = _v90_id_list(group.get("id", pd.Series([rid0])).tolist())
+    if not group_ids:
+        group_ids = [rid0]
+    try:
+        starts = [str(x) for x in group.get("start_timestamp", pd.Series(dtype=object)).dropna().tolist() if str(x).strip()]
+        earliest_start = min(starts) if starts else str(rec.get("start_timestamp") or now)
+    except Exception:
+        earliest_start = str(rec.get("start_timestamp") or now)
+    total_hours = calculate_work_hours(earliest_start, now)
+    avg_hours = round(total_hours / max(len(group_ids), 1), 2)
+    try:
+        is_group = 1 if len(group_ids) > 1 else int(rec.get("is_group_work") or 0)
+    except Exception:
+        is_group = 1 if len(group_ids) > 1 else 0
+    group_key = rec.get("group_key") or f"{rec.get('employee_id')}|{rec.get('process_name')}|{rec.get('start_date')}"
+
+    updated_ids: list[int] = []
+    for rid in group_ids:
+        old = query_one("SELECT remark FROM time_records WHERE id=?", (rid,)) or {}
+        new_remark = old.get("remark") or ""
+        append = remark or ""
+        if len(group_ids) > 1:
+            append = (append + "；" if append else "") + f"同步作業平均分配：{len(group_ids)}筆，群組總工時={total_hours:.2f}，平均={avg_hours:.2f}"
+        if append:
+            new_remark = (new_remark + "；" if new_remark else "") + append
+        try:
+            execute(
+                """
+                UPDATE time_records
+                SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                    work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
+                WHERE id=? AND end_timestamp IS NULL
+                """,
+                (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, is_group, now, int(rid)),
+            )
+            updated_ids.append(int(rid))
+        except Exception as exc:
+            try:
+                write_log("V90_FINISH_UPDATE_ERROR", f"更新工時紀錄 #{rid} 失敗：{exc}", "time_records", rid, level="ERROR")
+            except Exception:
+                pass
+
+    updated_ids = _v90_id_list(updated_ids)
+    if not updated_ids:
+        return 0
+
+    try:
+        rows_df = _v90_query_records_by_ids(updated_ids)
+        _v90_upsert_rows_to_0102_authority(rows_df, "finish_work_v90_authority_merge", github=False)
+    finally:
+        try:
+            clear_today_records_fast_cache()  # type: ignore[name-defined]
+        except Exception:
+            pass
+
+    try:
+        write_log(
+            "END_WORK_GROUP" if len(updated_ids) > 1 else "END_WORK",
+            f"V90 結束工時紀錄 #{rid0}，同步結束={len(updated_ids)}筆，狀態={status}，群組總工時={total_hours:.2f}，平均工時={avg_hours:.2f}",
+            "time_records",
+            rid0,
+            detail=",".join(str(x) for x in updated_ids),
+        )
+    except Exception:
+        pass
+    return int(len(updated_ids))
+# =================== END V90 01 FINISH-WORK AUTHORITY MERGE FIX ===================
