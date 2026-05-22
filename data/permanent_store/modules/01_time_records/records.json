@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-23 01:20:38",
-  "exported_at": "2026-05-23 01:20:38",
-  "reason": "finish_work_v108_fast_local_sync_01",
+  "updated_at": "2026-05-23 01:21:09",
+  "exported_at": "2026-05-23 01:21:09",
+  "reason": "save_time_records_v89_authority_first_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -19,11 +19,11 @@
         "employee_id": "B002",
         "employee_name": "張文品",
         "start_action": "開始",
-        "start_timestamp": "2026-05-23 01:19:59",
+        "start_timestamp": "2026-05-22 01:19:59",
         "end_action": "完工",
         "end_timestamp": "2026-05-23 01:20:38",
         "remark": "",
-        "start_date": "2026-05-23",
+        "start_date": "2026-05-22",
         "start_time": "01:19:59",
         "end_date": "2026-05-23",
         "end_time": "01:20:38",
@@ -33,7 +33,9 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-23 01:19:59",
-        "updated_at": "2026-05-23 01:20:38"
+        "updated_at": "2026-05-23 01:21:09",
+        "department": "製造二課",
+        "title": "派遣部 _德興"
       }
     ]
   },
