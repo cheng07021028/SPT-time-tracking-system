@@ -2,43 +2,61 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "13_system_settings",
   "kind": "records",
-  "updated_at": "2026-05-21 18:20:45",
-  "exported_at": "2026-05-21 18:20:45",
+  "updated_at": "2026-05-22 08:47:37",
+  "exported_at": "2026-05-22 08:47:37",
   "reason": "save_process_categories_v28",
   "empty_authoritative": false,
   "tables": {
     "process_categories": [
       {
-        "id": 1,
+        "id": 1.0,
         "category_name": "全部 / 通用",
         "is_active": true,
-        "sort_order": 1,
+        "sort_order": 1.0,
         "note": "所有類別共用工段",
         "created_at": "2026-05-20 14:24:53",
         "updated_at": "2026-05-20 14:43:35"
       },
       {
-        "id": 2,
-        "category_name": "SSS",
+        "id": 2.0,
+        "category_name": "Sorter/EFEM",
         "is_active": true,
-        "sort_order": 2,
+        "sort_order": 2.0,
         "note": "",
         "created_at": "2026-05-20 14:25:52",
         "updated_at": "2026-05-20 14:43:35"
       },
       {
-        "id": 3,
-        "category_name": "CCC",
+        "id": 3.0,
+        "category_name": "NTB",
         "is_active": true,
-        "sort_order": 3,
+        "sort_order": 3.0,
         "note": "",
         "created_at": "2026-05-20 14:43:35",
         "updated_at": "2026-05-20 14:43:35"
       },
       {
         "id": "",
-        "category_name": "DDD",
+        "category_name": "FCLP",
         "is_active": true,
+        "sort_order": "",
+        "note": "",
+        "created_at": "",
+        "updated_at": ""
+      },
+      {
+        "id": "",
+        "category_name": "GPTC",
+        "is_active": "",
+        "sort_order": "",
+        "note": "",
+        "created_at": "",
+        "updated_at": ""
+      },
+      {
+        "id": "",
+        "category_name": "BWBS",
+        "is_active": "",
         "sort_order": "",
         "note": "",
         "created_at": "",
@@ -522,7 +540,7 @@
   },
   "settings": {},
   "table_counts": {
-    "process_categories": 4,
+    "process_categories": 6,
     "process_category_options": 21,
     "process_options": 21,
     "rest_periods": 5,
