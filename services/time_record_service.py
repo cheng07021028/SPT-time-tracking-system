@@ -4354,3 +4354,344 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
 def sync_time_records_01_02_now(reason: str = "v98_manual_sync", *, github: bool = True) -> int:  # type: ignore[override]
     return _v98_sync_0102_from_sqlite(reason, github=github)
 # ======================= END V98 01/02 TRUE WRITE-THROUGH + DISPLAY SELF-REPAIR =======================
+
+
+# ======================= V104 01 ACTIVE WORK AUTHORITY/SQLITE ALIGNMENT FIX =======================
+# 修正重點：
+# 1) 今日工時紀錄 / Today Records 讀 01_time_records 權威檔，但結束目前作業 / Finish Work 舊版只讀 SQLite。
+#    Streamlit Cloud Reboot 或 SQLite cache 尚未回填時，會出現「今日有紀錄，但 Finish Work 說沒有未結束作業」。
+# 2) V104 將 get_active_record / get_active_records / get_active_group 先讀 SQLite；若沒有，再用 01/02 權威檔自動回填 SQLite cache。
+# 3) finish_work 前若 SQLite 找不到該筆 id，會先以權威檔完整回填 cache，再執行原 finish_work 流程，避免 01/02 狀態不同步。
+# 4) 不改 01 頁 UI、不改 10/11 權限與登入紀錄，避免覆蓋 V101~V103 修正。
+
+_v104_prev_get_active_records = get_active_records
+_v104_prev_get_active_record = get_active_record
+_v104_prev_get_active_group = get_active_group
+_v104_prev_get_active_same_work = get_active_same_work
+_v104_prev_get_conflicting_active_records = get_conflicting_active_records
+_v104_prev_finish_work = finish_work
+
+
+def _v104_blank(value) -> bool:
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    if value is None:
+        return True
+    s = str(value).strip()
+    return s == "" or s.lower() in {"none", "nan", "nat", "null", "<na>"}
+
+
+def _v104_clean_sql_value(value):
+    if _v104_blank(value):
+        return None
+    if isinstance(value, (datetime, date)):
+        if isinstance(value, datetime):
+            return value.strftime("%Y-%m-%d %H:%M:%S")
+        return value.strftime("%Y-%m-%d")
+    try:
+        if hasattr(value, "item"):
+            value = value.item()
+    except Exception:
+        pass
+    return value
+
+
+def _v104_time_record_columns() -> list[str]:
+    return [
+        "id", "record_key", "status", "work_order", "part_no", "type_name", "process_name",
+        "employee_id", "employee_name", "start_action", "start_timestamp", "end_action", "end_timestamp",
+        "remark", "start_date", "start_time", "end_date", "end_time", "work_hours", "assembly_location",
+        "group_key", "is_group_work", "source", "created_at", "updated_at",
+    ]
+
+
+def _v104_to_int(value):
+    if _v104_blank(value):
+        return None
+    try:
+        return int(float(str(value).strip()))
+    except Exception:
+        return None
+
+
+def _v104_authority_df_for_active() -> pd.DataFrame:
+    # 先讀正式 01_time_records；若舊資料只在 02_history，才讀 02_history。
+    frames = []
+    try:
+        if "_v98_authority_df" in globals():
+            df1 = _v98_authority_df("01_time_records")
+            if isinstance(df1, pd.DataFrame) and not df1.empty:
+                frames.append(df1)
+            df2 = _v98_authority_df("02_history")
+            if isinstance(df2, pd.DataFrame) and not df2.empty:
+                frames.append(df2)
+    except Exception:
+        pass
+    if not frames:
+        try:
+            from services.permanent_authority_service import df_from_table as _pa_df
+            for module_key in ("01_time_records", "02_history"):
+                df = _pa_df(module_key, "time_records")
+                if isinstance(df, pd.DataFrame) and not df.empty:
+                    frames.append(df)
+        except Exception:
+            pass
+    if not frames:
+        return pd.DataFrame()
+    try:
+        out = pd.concat(frames, ignore_index=True)
+        out = out.loc[:, ~pd.Index(out.columns).duplicated()].copy()
+        # 以 record_key 優先去重，沒有 record_key 才以 id 去重。
+        if "record_key" in out.columns:
+            rk = out["record_key"].astype(str).str.strip()
+            has_rk = rk.ne("") & rk.str.lower().ne("nan")
+            a = out.loc[has_rk].drop_duplicates(subset=["record_key"], keep="last")
+            b = out.loc[~has_rk]
+            if "id" in b.columns:
+                b = b.drop_duplicates(subset=["id"], keep="last")
+            out = pd.concat([a, b], ignore_index=True)
+        elif "id" in out.columns:
+            out = out.drop_duplicates(subset=["id"], keep="last")
+        return _v98_sort_records(_v98_filter_deleted(out), descending=False) if "_v98_sort_records" in globals() else out.reset_index(drop=True)
+    except Exception:
+        return frames[0]
+
+
+def _v104_unfinished_mask(df: pd.DataFrame) -> pd.Series:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.Series([], dtype=bool)
+    if "end_timestamp" in df.columns:
+        mask = df["end_timestamp"].map(_v104_blank)
+    else:
+        mask = pd.Series([True] * len(df), index=df.index)
+    # 狀態若明確是結束類，視為非作業中；避免舊髒資料 end_timestamp 空但 status 已結束。
+    if "status" in df.columns:
+        ended = df["status"].astype(str).str.strip().isin(["下班", "暫停", "完工", "已結束", "結束"])
+        mask = mask & (~ended)
+    return mask
+
+
+def _v104_filter_active_authority(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:
+    df = _v104_authority_df_for_active()
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.loc[_v104_unfinished_mask(df)].copy()
+    if out.empty:
+        return out
+    if employee_id and "employee_id" in out.columns:
+        out = out[out["employee_id"].astype(str).str.strip() == str(employee_id).strip()]
+    if employee_name and "employee_name" in out.columns:
+        out = out[out["employee_name"].astype(str).str.strip() == str(employee_name).strip()]
+    if process_name and "process_name" in out.columns:
+        out = out[out["process_name"].astype(str).str.strip() == str(process_name).strip()]
+    if start_date and "start_date" in out.columns:
+        out = out[out["start_date"].astype(str).str.strip() == str(start_date).strip()]
+    return _v98_sort_records(out, descending=False) if "_v98_sort_records" in globals() else out.reset_index(drop=True)
+
+
+def _v104_sqlite_row_count() -> int:
+    try:
+        r = query_one("SELECT COUNT(*) AS n FROM time_records") or {}
+        return int(r.get("n") or 0)
+    except Exception:
+        return 0
+
+
+def _v104_upsert_rows_to_sqlite(df: pd.DataFrame, *, replace_all_if_empty: bool = False) -> int:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return 0
+    cols = _v104_time_record_columns()
+    try:
+        if replace_all_if_empty and _v104_sqlite_row_count() == 0:
+            execute("DELETE FROM time_records")
+    except Exception:
+        pass
+    changed = 0
+    for _, row in df.iterrows():
+        rid = _v104_to_int(row.get("id")) if hasattr(row, "get") else None
+        record_key = "" if _v104_blank(row.get("record_key")) else str(row.get("record_key")).strip()
+        values = []
+        insert_cols = []
+        for c in cols:
+            v = row.get(c, None) if hasattr(row, "get") else None
+            if c == "id":
+                if rid is None:
+                    continue
+                v = rid
+            if c == "work_hours":
+                try:
+                    v = float(v) if not _v104_blank(v) else 0.0
+                except Exception:
+                    v = 0.0
+            if c == "is_group_work":
+                try:
+                    v = int(float(v)) if not _v104_blank(v) else 0
+                except Exception:
+                    v = 0
+            insert_cols.append(c)
+            values.append(_v104_clean_sql_value(v))
+        if not insert_cols:
+            continue
+        try:
+            qcols = ", ".join(insert_cols)
+            ph = ", ".join(["?"] * len(insert_cols))
+            # SQLite 是快取；authority 為準。使用 OR REPLACE 可修復 Reboot 後空 cache 或 id cache 錯位。
+            execute(f"INSERT OR REPLACE INTO time_records ({qcols}) VALUES ({ph})", tuple(values))
+            changed += 1
+        except Exception as exc:
+            try:
+                write_log("V104_SQLITE_HYDRATE_ROW_ERROR", f"回填工時 SQLite cache 失敗 id={rid} record_key={record_key}: {exc}", "time_records", rid or "", level="ERROR")
+            except Exception:
+                pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return changed
+
+
+def _v104_hydrate_sqlite_from_authority(*, active_only: bool = False, employee_id: str | None = None, record_id: int | None = None, reason: str = "v104_hydrate") -> int:
+    df = _v104_authority_df_for_active()
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return 0
+    if active_only:
+        df = df.loc[_v104_unfinished_mask(df)].copy()
+    if employee_id and "employee_id" in df.columns:
+        df = df[df["employee_id"].astype(str).str.strip() == str(employee_id).strip()]
+    if record_id is not None and "id" in df.columns:
+        df = df[df["id"].map(_v104_to_int) == int(record_id)]
+    if df.empty:
+        return 0
+    n = _v104_upsert_rows_to_sqlite(df, replace_all_if_empty=True)
+    try:
+        write_log("V104_TIME_AUTHORITY_TO_SQLITE", f"{reason}: 已由 01/02 權威檔回填 SQLite cache {n} 筆", "time_records", record_id or "", level="INFO")
+    except Exception:
+        pass
+    return int(n)
+
+
+def _v104_authority_active_to_display(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    return _v98_sort_records(df, descending=False) if "_v98_sort_records" in globals() else df.reset_index(drop=True)
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = _v104_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
+    # SQLite 沒有，但 Today Records/authority 有未結束資料時，立即回填 cache。
+    auth_active = _v104_filter_active_authority(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    if auth_active is None or auth_active.empty:
+        return pd.DataFrame()
+    _v104_hydrate_sqlite_from_authority(active_only=False, reason="get_active_records_v104_cache_repair")
+    df2 = _v104_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    if isinstance(df2, pd.DataFrame) and not df2.empty:
+        return df2
+    return _v104_authority_active_to_display(auth_active)
+
+
+def get_active_record(employee_id: str) -> dict | None:  # type: ignore[override]
+    rec = _v104_prev_get_active_record(employee_id)
+    if rec:
+        return rec
+    auth_active = _v104_filter_active_authority(employee_id=employee_id)
+    if auth_active is None or auth_active.empty:
+        return None
+    _v104_hydrate_sqlite_from_authority(active_only=False, reason="get_active_record_v104_cache_repair")
+    rec2 = _v104_prev_get_active_record(employee_id)
+    if rec2:
+        return rec2
+    try:
+        row = auth_active.sort_values("id", ascending=False, kind="stable").iloc[0].where(pd.notna(auth_active.iloc[0]), None).to_dict() if "id" in auth_active.columns else auth_active.iloc[-1].where(pd.notna(auth_active.iloc[-1]), None).to_dict()
+        return row
+    except Exception:
+        return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        rid = int(float(str(record_id).strip()))
+    except Exception:
+        return pd.DataFrame()
+    df = _v104_prev_get_active_group(rid)
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
+    _v104_hydrate_sqlite_from_authority(active_only=False, record_id=rid, reason="get_active_group_v104_cache_repair")
+    df2 = _v104_prev_get_active_group(rid)
+    if isinstance(df2, pd.DataFrame) and not df2.empty:
+        return df2
+    auth_all = _v104_authority_df_for_active()
+    if auth_all is None or auth_all.empty or "id" not in auth_all.columns:
+        return pd.DataFrame()
+    recs = auth_all[auth_all["id"].map(_v104_to_int) == rid]
+    if recs.empty:
+        return pd.DataFrame()
+    rec = recs.iloc[0]
+    return _v104_filter_active_authority(
+        employee_id=str(rec.get("employee_id") or "").strip(),
+        employee_name=str(rec.get("employee_name") or "").strip(),
+        process_name=str(rec.get("process_name") or "").strip(),
+        start_date=str(rec.get("start_date") or "").strip(),
+    )
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    rec = _v104_prev_get_active_same_work(employee_id, work_order, process_name, start_date=start_date, employee_name=employee_name)
+    if rec:
+        return rec
+    auth = _v104_filter_active_authority(employee_id=employee_id, process_name=process_name, start_date=start_date or today_text(), employee_name=employee_name)
+    if auth is None or auth.empty or "work_order" not in auth.columns:
+        return None
+    auth = auth[auth["work_order"].astype(str).str.strip() == str(work_order).strip()]
+    if auth.empty:
+        return None
+    _v104_hydrate_sqlite_from_authority(active_only=False, reason="get_active_same_work_v104_cache_repair")
+    return auth.iloc[-1].where(pd.notna(auth.iloc[-1]), None).to_dict()
+
+
+def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = _v104_prev_get_conflicting_active_records(employee_id, process_name, start_date=start_date, employee_name=employee_name)
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
+    start_date = start_date or today_text()
+    active = _v104_filter_active_authority(employee_id=employee_id, employee_name=employee_name)
+    if active is None or active.empty:
+        return pd.DataFrame()
+    out = active[(active["process_name"].astype(str) != str(process_name)) | (active["start_date"].astype(str) != str(start_date))].copy()
+    if not out.empty:
+        _v104_hydrate_sqlite_from_authority(active_only=False, reason="get_conflicting_active_records_v104_cache_repair")
+    return out
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    try:
+        rid = int(float(str(record_id).strip()))
+    except Exception:
+        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (rid,))
+    if not rec:
+        # 若 Finish Work 由 authority 顯示出的 active record 觸發，但 SQLite cache 空，先完整回填。
+        _v104_hydrate_sqlite_from_authority(active_only=False, reason="finish_work_v104_pre_hydrate")
+    n = int(_v104_prev_finish_work(rid, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n:
+        try:
+            # 補做一次 01/02 權威檔一致化，確保結束後 Today Records 與 02 History 同步。
+            if "_v98_sync_0102_from_sqlite" in globals():
+                _v98_sync_0102_from_sqlite("finish_work_v104_authority_alignment", github=True)
+        except Exception as exc:
+            try:
+                write_log("V104_FINISH_AUTHORITY_SYNC_ERROR", f"Finish Work 後 01/02 權威檔同步失敗：{exc}", "time_records", rid, level="ERROR")
+            except Exception:
+                pass
+    return n
+
+
+def repair_time_record_active_cache_now(reason: str = "manual_v104_active_cache_repair") -> int:
+    """手動/測試用：將 01/02 權威檔目前所有工時紀錄回填到 SQLite cache。"""
+    return _v104_hydrate_sqlite_from_authority(active_only=False, reason=reason)
+
+# ===================== END V104 01 ACTIVE WORK AUTHORITY/SQLITE ALIGNMENT FIX =====================

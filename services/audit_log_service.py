@@ -1465,3 +1465,129 @@ get_audit_state_status = get_audit_permanent_status
 login_log_state_status = get_audit_permanent_status
 get_login_log_permanent_status = get_audit_permanent_status
 # ===== V103 LOGIN LOG CANONICAL DELETE + DISPLAY FIX END =====
+
+
+# ===== V104 LOGIN LOG DATE CLEAR AUTHORITY HARDENING START =====
+# 修正重點：
+# 1) 11｜登入紀錄清除時，畫面查詢與刪除必須使用同一套日期解析；支援 2026/05/22、2026-05-22、含時間字串。
+# 2) 清除後 canonical records.json、legacy json、SQLite cache 三者同步成同一份剩餘資料。
+# 3) 即使刪除 0 筆也會重新寫權威檔，讓畫面可確認已執行權威檔讀寫。
+
+def _v104_parse_any_date(value: Any):
+    if value in (None, ""):
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    s = s.replace("T", " ").replace("/", "-").replace(".", "-")
+    if "+" in s:
+        s = s.split("+", 1)[0].strip()
+    if s.endswith("Z"):
+        s = s[:-1].strip()
+    candidates = []
+    try:
+        candidates.append(s[:10])
+    except Exception:
+        pass
+    try:
+        candidates.append(s.split(" ", 1)[0])
+    except Exception:
+        pass
+    candidates.append(s)
+    for c in candidates:
+        c = str(c or "").strip()
+        if not c:
+            continue
+        for fmt in ("%Y-%m-%d", "%Y%m%d", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+            try:
+                return datetime.strptime(c, fmt).date()
+            except Exception:
+                pass
+        try:
+            return datetime.fromisoformat(c).date()
+        except Exception:
+            pass
+    return None
+
+
+def _v104_row_log_date(row: Dict[str, Any]):
+    for key in ("login_time", "login_at", "created_at", "log_time", "event_time", "timestamp", "logout_time"):
+        d = _v104_parse_any_date(row.get(key))
+        if d is not None:
+            return d
+    return None
+
+
+def _filter_records(records: List[Dict[str, Any]], start_date: Optional[str], end_date: Optional[str], keyword: str,
+                    event_types: Optional[List[str]], results: Optional[List[str]]) -> List[Dict[str, Any]]:  # type: ignore[override]
+    """V104: Query display uses robust date parsing; no slash/hyphen string-compare mismatch."""
+    start_d = _v104_parse_any_date(start_date) if start_date else None
+    end_d = _v104_parse_any_date(end_date) if end_date else None
+    if start_d is not None and end_d is not None and end_d < start_d:
+        start_d, end_d = end_d, start_d
+    kw = (keyword or "").strip().lower()
+    out: List[Dict[str, Any]] = []
+    for r in records or []:
+        rd = _v104_row_log_date(r)
+        if start_d is not None and rd is not None and rd < start_d:
+            continue
+        if end_d is not None and rd is not None and rd > end_d:
+            continue
+        if event_types and r.get("event_type") not in event_types:
+            continue
+        if results and r.get("result") not in results:
+            continue
+        if kw:
+            blob = " ".join(str(v) for v in r.values()).lower()
+            if kw not in blob:
+                continue
+        out.append(r)
+    return out
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    start_d = _v104_parse_any_date(start_date)
+    end_d = _v104_parse_any_date(end_date)
+    if start_d is None or end_d is None:
+        return 0
+    if end_d < start_d:
+        start_d, end_d = end_d, start_d
+    try:
+        before = _v103_all_current_login_records(include_legacy=True) if "_v103_all_current_login_records" in globals() else _to_records(load_login_logs(limit=100000, include_legacy=True))
+    except Exception:
+        before = []
+    remaining: List[Dict[str, Any]] = []
+    deleted = 0
+    for row in before or []:
+        rd = _v104_row_log_date(row)
+        if rd is not None and start_d <= rd <= end_d:
+            deleted += 1
+        else:
+            remaining.append(row)
+    try:
+        remaining = _v103_merge_login_rows(remaining) if "_v103_merge_login_rows" in globals() else _merge_record_sets(remaining)
+    except Exception:
+        pass
+    # 全面對齊：SQLite cache、canonical 權威檔、legacy 相容檔都覆寫成 remaining。
+    try:
+        if "_v103_replace_db_with_login_records" in globals():
+            _v103_replace_db_with_login_records(remaining)
+    except Exception:
+        pass
+    try:
+        if "_v103_write_authority_login_records" in globals():
+            _v103_write_authority_login_records(remaining, reason="v104_clear_login_logs_date_range_authority_hardened")
+        elif "_v97_write_login_authority" in globals():
+            _v97_write_login_authority(remaining, "v104_clear_login_logs_date_range_authority_hardened")
+    except Exception:
+        pass
+    return int(deleted)
+
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+delete_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+clear_audit_logs_by_date = delete_login_logs_by_date_range
+# ===== V104 LOGIN LOG DATE CLEAR AUTHORITY HARDENING END =====

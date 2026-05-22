@@ -102,16 +102,12 @@ div[data-baseweb="popover"] [role="option"]:hover,
 div[data-baseweb="popover"] [aria-selected="true"] {
     background: rgba(79,229,255,0.18) !important;
 }
-/* Only Work Order keyword input + filtered Work Order selectbox get the yellow focus glow. */
-div[data-testid="stTextInput"]:has(input[aria-label*="製令"]),
-div[data-testid="stSelectbox"]:has(div[aria-label*="製令"]),
-div[data-testid="stSelectbox"]:has(input[aria-label*="製令"]) {
+/* V104: 黃色光暈只套用在「製令關鍵字」手動輸入格；下方「製令｜Work Order」下拉不加黃色光暈，避免影響其他下拉欄位。 */
+div[data-testid="stTextInput"]:has(input[aria-label*="製令關鍵字"]) {
     border-radius: 16px !important;
     filter: drop-shadow(0 0 14px rgba(255, 221, 87, 0.40));
 }
-div[data-testid="stTextInput"]:has(input[aria-label*="製令"]) div[data-baseweb="input"] > div,
-div[data-testid="stSelectbox"]:has(div[aria-label*="製令"]) div[data-baseweb="select"] > div,
-div[data-testid="stSelectbox"]:has(input[aria-label*="製令"]) div[data-baseweb="select"] > div {
+div[data-testid="stTextInput"]:has(input[aria-label*="製令關鍵字"]) div[data-baseweb="input"] > div {
     border: 1.5px solid rgba(255, 221, 87, 0.98) !important;
     box-shadow: 0 0 0 1px rgba(255,221,87,0.28), 0 0 22px rgba(255,221,87,0.42), inset 0 1px 0 rgba(255,255,255,0.10) !important;
 }
