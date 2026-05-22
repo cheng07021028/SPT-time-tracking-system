@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-21 22:47:16",
-  "exported_at": "2026-05-21 22:47:16",
-  "reason": "v369_save_column_order_v72_ui_mirror",
+  "updated_at": "2026-05-22 13:04:26",
+  "exported_at": "2026-05-22 13:04:26",
+  "reason": "v367_column_settings_saved_v72",
   "empty_authoritative": false,
   "tables": {},
   "settings": {
@@ -4094,7 +4094,7 @@
             "order": 7
           }
         },
-        "updated_at": "2026-05-21 21:47:19",
+        "updated_at": "2026-05-22 13:04:26",
         "reason": "v367_column_settings_saved"
       },
       "80435544260397582": {
@@ -4935,56 +4935,56 @@
             "label": "姓名 / Display Name / 姓名 / Display Name",
             "visible": true,
             "width": "medium",
-            "order": 4
+            "order": 10
           },
           "Email": {
             "source": "Email",
             "label": "Email / Email",
             "visible": true,
             "width": "medium",
-            "order": 5
+            "order": 11
           },
           "角色 / Role": {
             "source": "角色 / Role",
             "label": "角色 / Role / 角色 / Role",
             "visible": true,
             "width": "medium",
-            "order": 6
+            "order": 5
           },
           "啟用 / Active": {
             "source": "啟用 / Active",
             "label": "啟用 / Active / 啟用 / Active",
             "visible": true,
             "width": "medium",
-            "order": 7
+            "order": 6
           },
           "強制改密碼 / Force Change": {
             "source": "強制改密碼 / Force Change",
             "label": "強制改密碼 / Force Change / 強制改密碼 / Force Change",
             "visible": true,
             "width": "medium",
-            "order": 8
+            "order": 4
           },
           "備註 / Note": {
             "source": "備註 / Note",
             "label": "備註 / Note / 備註 / Note",
             "visible": true,
             "width": "medium",
-            "order": 9
+            "order": 7
           },
           "最後登入 / Last Login": {
             "source": "最後登入 / Last Login",
             "label": "最後登入 / Last Login / 最後登入 / Last Login",
             "visible": true,
             "width": "medium",
-            "order": 10
+            "order": 8
           },
           "更新時間 / Updated At": {
             "source": "更新時間 / Updated At",
             "label": "更新時間 / Updated At / 更新時間 / Updated At",
             "visible": true,
             "width": "medium",
-            "order": 11
+            "order": 9
           }
         },
         "updated_at": "2026-05-21 21:44:00",
