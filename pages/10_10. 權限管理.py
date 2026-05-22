@@ -763,7 +763,24 @@ with tab_accounts:
                 _v56_touch_account_editor()
                 st.rerun()
 
-        st.warning("V102：帳號總表改為穩定送出模式。點選表格與勾選刪除時不再即時 rerun，避免畫面跳掉、勾選掉回去或需要點兩下。修改完成後請按表格下方『套用並儲存』才會正式寫入權威檔。")
+        # V107：只新增「強制改密碼」批次按鈕；不調整原本六顆按鈕、不改表格欄位、不改儲存流程。
+        fc1, fc2, fc_spacer = st.columns([1, 1, 4])
+        with fc1:
+            if st.button("☑ 強制改密碼全選 / Force Change All", use_container_width=True, disabled=not account_edit_enabled, key="v107_account_force_change_all"):
+                df0 = _v56_prepare_account_draft()
+                df0["強制改密碼 / Force Change"] = True
+                st.session_state["v133_users_df"] = df0.copy()
+                _v56_touch_account_editor()
+                st.rerun()
+        with fc2:
+            if st.button("☐ 強制改密碼取消 / Clear Force Change", use_container_width=True, disabled=not account_edit_enabled, key="v107_account_force_change_clear"):
+                df0 = _v56_prepare_account_draft()
+                df0["強制改密碼 / Force Change"] = False
+                st.session_state["v133_users_df"] = df0.copy()
+                _v56_touch_account_editor()
+                st.rerun()
+
+        st.warning("V107：帳號總表為穩定送出模式。批次按鈕只更新畫面草稿；修改完成後請按表格下方『套用並儲存』才會正式寫入權威檔。")
 
         account_editor_key = f"v102_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
         draft_df = _v56_prepare_account_draft()
