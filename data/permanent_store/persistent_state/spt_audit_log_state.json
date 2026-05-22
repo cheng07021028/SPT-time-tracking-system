@@ -1,7 +1,9 @@
 {
-  "version": "V1.60-delete-aware",
-  "exported_at": "2026-05-22 23:13:33",
-  "source": "audit_log_service.delete_aware",
+  "version": "V103-canonical-login-logs",
+  "authority_schema": "SPT-PermanentAuthority-V103-CompatibilityMirror",
+  "exported_at": "2026-05-22 23:47:40",
+  "updated_at": "2026-05-22 23:47:40",
+  "source": "v104_clear_login_logs_date_range_authority_hardened",
   "module_key": "11_login_logs",
   "module_code": "11_login_logs",
   "module_name_zh": "登入紀錄",
@@ -10,9 +12,14 @@
   "count": 0,
   "records": [],
   "tables": {
-    "login_logs": []
+    "login_logs": [],
+    "auth_login_logs": [],
+    "security_login_logs": []
   },
   "table_counts": {
-    "login_logs": 0
-  }
+    "login_logs": 0,
+    "auth_login_logs": 0,
+    "security_login_logs": 0
+  },
+  "empty_authoritative": true
 }
