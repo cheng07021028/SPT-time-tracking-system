@@ -2718,3 +2718,196 @@ def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
     except Exception:
         pass
 # ======================= END V98 IDLE TIMEOUT SINGLE AUTHORITY FIX =======================
+
+# ========================= V101 IDLE TIMEOUT CANONICAL SETTINGS FIX =========================
+# 修正目的：
+# 1) 10｜權限管理設定 3 分鐘後，Reboot / 重新登入仍跳回 15 分鐘。
+# 2) 統一以 data/permanent_store/modules/10_permissions/settings.json 為最高優先權威來源，
+#    records.json 與舊 idle_timeout_settings.json 僅作相容備援。
+# 3) set_idle_timeout_minutes() 同步寫 settings.json + records.json + legacy files + SQLite cache。
+
+def _v101_pa_json(path: Path) -> dict[str, Any]:
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        pass
+    return {}
+
+
+def _v101_extract_idle(payload: Any) -> int | None:
+    try:
+        if not isinstance(payload, dict):
+            return None
+        candidates: list[Any] = []
+        candidates.append(payload.get("idle_timeout_minutes"))
+        settings = payload.get("settings")
+        if isinstance(settings, dict):
+            candidates.append(settings.get("idle_timeout_minutes"))
+            sec = settings.get("security_settings")
+            if isinstance(sec, dict):
+                candidates.append(sec.get("idle_timeout_minutes"))
+        sec = payload.get("security_settings")
+        if isinstance(sec, dict):
+            candidates.append(sec.get("idle_timeout_minutes"))
+        tables = payload.get("tables")
+        if isinstance(tables, dict):
+            for table_name in ("auth_security_settings", "security_settings"):
+                rows = tables.get(table_name)
+                if isinstance(rows, list):
+                    for row in rows:
+                        if isinstance(row, dict) and str(row.get("setting_key") or "").strip() == "idle_timeout_minutes":
+                            candidates.append(row.get("setting_value"))
+        for value in candidates:
+            if value in (None, ""):
+                continue
+            minutes = int(float(str(value).strip()))
+            if minutes >= 1:
+                return minutes
+    except Exception:
+        return None
+    return None
+
+
+def _v101_idle_authority_paths() -> list[Path]:
+    root = Path(__file__).resolve().parents[1]
+    return [
+        root / "data" / "permanent_store" / "modules" / "10_permissions" / "settings.json",
+        root / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json",
+        root / "data" / "permanent_store" / "config" / "idle_timeout_settings.json",
+        root / "data" / "permanent_store" / "persistent_state" / "spt_idle_timeout_settings.json",
+        root / "data" / "permanent_store" / "config" / "security_settings.json",
+        root / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "config" / "idle_timeout_settings.json",
+        root / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+    ]
+
+
+def _v101_read_idle_from_authority_files() -> int | None:
+    for path in _v101_idle_authority_paths():
+        minutes = _v101_extract_idle(_v101_pa_json(path))
+        if minutes is not None:
+            return minutes
+    return None
+
+
+def get_idle_timeout_minutes() -> int:  # type: ignore[override]
+    """V101 final reader: canonical settings.json first, then records/legacy/DB, then default."""
+    try:
+        cache = st.session_state.get("_spt_idle_timeout_cache")
+        if isinstance(cache, dict):
+            minutes = int(float(cache.get("minutes", 0)))
+            if minutes >= 1:
+                return minutes
+    except Exception:
+        pass
+
+    minutes = _v101_read_idle_from_authority_files()
+    if minutes is None:
+        try:
+            ensure_security_schema()
+            for table in ("auth_security_settings", "security_settings"):
+                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
+                if row and row.get("setting_value") not in (None, ""):
+                    minutes = int(float(row.get("setting_value")))
+                    break
+        except Exception:
+            minutes = None
+    if minutes is None:
+        minutes = DEFAULT_IDLE_MINUTES
+    minutes = max(1, int(minutes))
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+    except Exception:
+        pass
+    return minutes
+
+
+def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
+    """V101 final writer: settings.json + records.json + DB + legacy mirrors."""
+    minutes = max(1, int(minutes))
+    ask = "1"
+    try:
+        ss = st.session_state.get("spt_security_settings", {})
+        if isinstance(ss, dict) and ss.get("ask_continue_after_record") is not None:
+            ask = str(ss.get("ask_continue_after_record"))
+    except Exception:
+        pass
+    ask = "0" if str(ask).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    now = _now()
+
+    # SQLite cache for runtime compatibility.
+    try:
+        ensure_security_schema()
+        for table in ("auth_security_settings", "security_settings"):
+            execute(f"""
+                CREATE TABLE IF NOT EXISTS {table} (
+                    setting_key TEXT PRIMARY KEY,
+                    setting_value TEXT,
+                    note TEXT,
+                    updated_at TEXT
+                )
+            """)
+            for key, value, note in [
+                ("idle_timeout_minutes", str(minutes), "V101 canonical idle timeout minutes"),
+                ("ask_continue_after_record", ask, "V101 canonical post-record prompt"),
+            ]:
+                execute(f"""
+                    INSERT INTO {table} (setting_key, setting_value, note, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(setting_key) DO UPDATE SET
+                        setting_value=excluded.setting_value,
+                        note=excluded.note,
+                        updated_at=excluded.updated_at
+                """, (key, value, note, now))
+    except Exception:
+        pass
+
+    # Legacy mirror files for older code paths.
+    try:
+        _v98_write_idle_timeout_files(minutes, ask)  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+    # Permanent authority canonical files.
+    try:
+        from services.permanent_authority_service import load_tables as _pa_load_tables, save_authority as _pa_save_authority, save_settings as _pa_save_settings, force_upload_authority_file as _pa_force
+        settings_payload = {
+            "idle_timeout_minutes": str(minutes),
+            "ask_continue_after_record": ask,
+            "security_settings": {
+                "idle_timeout_minutes": str(minutes),
+                "ask_continue_after_record": ask,
+            },
+            "updated_at": now,
+        }
+        _pa_save_settings("10_permissions", settings_payload, reason="v101_idle_timeout_settings", github=True)
+        tables = _pa_load_tables("10_permissions", "records")
+        rows = [
+            {"setting_key": "idle_timeout_minutes", "setting_value": str(minutes), "note": "V101 canonical idle timeout", "updated_at": now},
+            {"setting_key": "ask_continue_after_record", "setting_value": ask, "note": "V101 canonical post-record prompt", "updated_at": now},
+        ]
+        tables["auth_security_settings"] = rows
+        tables["security_settings"] = list(rows)
+        _pa_save_authority("10_permissions", records=tables, reason="v101_idle_timeout_records", github=True)
+        try:
+            _pa_force("10_permissions", "settings", reason="v101_force_upload_idle_settings")
+            _pa_force("10_permissions", "records", reason="v101_force_upload_idle_records")
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+        settings = st.session_state.get("spt_security_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        settings["idle_timeout_minutes"] = str(minutes)
+        settings["ask_continue_after_record"] = ask
+        st.session_state["spt_security_settings"] = settings
+    except Exception:
+        pass
+# ======================= END V101 IDLE TIMEOUT CANONICAL SETTINGS FIX =======================

@@ -604,8 +604,11 @@ with tab_accounts:
             st.rerun()
     with c_edit2:
         if st.button("◌ 停止編輯 / Lock Edit", use_container_width=True, disabled=not _edit_on, key="v169_disable_account_edit_top"):
+            # V101：停止編輯只切換唯讀保護，不重新載入權威檔。
+            # 舊版在這裡呼叫 _users_for_editor()；若 GitHub/權威檔短暫讀到空表，
+            # 會把目前畫面草稿覆蓋成空白，造成「啟動編輯 → 停止編輯 → 全部資料消失」。
+            # 正式重新載入請使用「重新載入 / Reload」按鈕；未儲存的草稿仍留在 session_state。
             st.session_state["v166_account_edit_enabled"] = False
-            st.session_state["v133_users_df"] = _users_for_editor()
             st.rerun()
     with c_edit3:
         if _edit_on:

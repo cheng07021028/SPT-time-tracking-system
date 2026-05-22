@@ -5324,3 +5324,165 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
 
 check_permission = has_permission
 # ======================= END V98 SECURITY SETTINGS WRITE-THROUGH ALIGNMENT =======================
+
+# ========================= V101 PERMISSION SECURITY + ACCOUNT SAFETY FIX =========================
+# 修正目的：
+# 1) 10｜權限管理安全設定儲存後仍跳回 15 分鐘。
+# 2) 10｜權限管理停止編輯時若讀到空權威檔，帳號表不可被空表覆蓋。
+# 3) get_users() 以 auth_users 為主，必要時相容 security_users，但尊重 deleted_usernames。
+
+def _v101_truthy_value(v, default: bool = False) -> bool:
+    try:
+        return _truthy(v, default)  # type: ignore[name-defined]
+    except Exception:
+        if v is None:
+            return default
+        t = str(v).strip().lower()
+        if t in {"1", "true", "yes", "y", "on", "是", "啟用", "active"}:
+            return True
+        if t in {"0", "false", "no", "n", "off", "否", "停用", "inactive", ""}:
+            return False
+        return default
+
+
+def _v101_load_permission_tables() -> dict:
+    try:
+        from services.permanent_authority_service import load_tables as _pa_load_tables
+        tables = _pa_load_tables("10_permissions", "records")
+        return tables if isinstance(tables, dict) else {}
+    except Exception:
+        try:
+            payload = _v96_auth_payload() if "_v96_auth_payload" in globals() else {}
+            return payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        except Exception:
+            return {}
+
+
+def _v101_deleted_users(tables: dict | None = None) -> set[str]:
+    try:
+        payload = _v96_auth_payload() if "_v96_auth_payload" in globals() else {}
+        return {str(x).strip().lower() for x in (payload.get("deleted_usernames") or []) if str(x).strip()}
+    except Exception:
+        return set()
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    tables = _v101_load_permission_tables()
+    deleted = _v101_deleted_users(tables)
+    rows = [dict(r) for r in tables.get("auth_users", []) if isinstance(r, dict)]
+    if not rows:
+        rows = [dict(r) for r in tables.get("security_users", []) if isinstance(r, dict)]
+    out: list[dict] = []
+    for r in rows:
+        u = str(r.get("username") or r.get("user_name") or "").strip()
+        if not u or u.lower() in deleted:
+            continue
+        x = dict(r)
+        x["username"] = u
+        x.setdefault("password_display", "********" if x.get("password_hash") else "")
+        x.setdefault("new_password", "")
+        x.setdefault("role_code", x.get("role") or "operator")
+        x["is_active"] = 1 if _v101_truthy_value(x.get("is_active", True), True) else 0
+        x["force_password_change"] = 1 if _v101_truthy_value(x.get("force_password_change", False), False) else 0
+        out.append(x)
+    return sorted(out, key=lambda x: (0 if str(x.get("username", "")).lower() == "admin" else 1, str(x.get("username", "")).lower()))
+
+
+def _v101_extract_setting_from_payload(payload: dict, key: str) -> str | None:
+    try:
+        if not isinstance(payload, dict):
+            return None
+        settings = payload.get("settings")
+        if isinstance(settings, dict):
+            if settings.get(key) not in (None, ""):
+                return str(settings.get(key))
+            sec = settings.get("security_settings")
+            if isinstance(sec, dict) and sec.get(key) not in (None, ""):
+                return str(sec.get(key))
+        sec2 = payload.get("security_settings")
+        if isinstance(sec2, dict) and sec2.get(key) not in (None, ""):
+            return str(sec2.get(key))
+        tables = payload.get("tables")
+        if isinstance(tables, dict):
+            for table_name in ("auth_security_settings", "security_settings"):
+                for row in tables.get(table_name, []) if isinstance(tables.get(table_name), list) else []:
+                    if isinstance(row, dict) and str(row.get("setting_key") or "").strip() == key:
+                        if row.get("setting_value") not in (None, ""):
+                            return str(row.get("setting_value"))
+    except Exception:
+        return None
+    return None
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    out = dict(DEFAULT_SECURITY_SETTINGS)
+    try:
+        from services.permanent_authority_service import load_authority as _pa_load_authority
+        # settings.json 是最高優先來源。
+        sp = _pa_load_authority("10_permissions", "settings")
+        rp = _pa_load_authority("10_permissions", "records")
+        for key in ("idle_timeout_minutes", "ask_continue_after_record"):
+            val = _v101_extract_setting_from_payload(sp, key)
+            if val is None:
+                val = _v101_extract_setting_from_payload(rp, key)
+            if val not in (None, ""):
+                out[key] = str(val)
+    except Exception:
+        pass
+    try:
+        from services.security_service import get_idle_timeout_minutes as _get_idle
+        out["idle_timeout_minutes"] = str(int(_get_idle()))
+    except Exception:
+        pass
+    out["ask_continue_after_record"] = "0" if str(out.get("ask_continue_after_record", "1")).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    return out
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    merged = get_security_settings()
+    merged.update({str(k): str(v) for k, v in (settings or {}).items()})
+    try:
+        idle = max(1, int(float(merged.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    ask = "0" if str(merged.get("ask_continue_after_record", "1")).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    merged["idle_timeout_minutes"] = str(idle)
+    merged["ask_continue_after_record"] = ask
+    try:
+        from services.security_service import set_idle_timeout_minutes as _set_idle
+        _set_idle(idle)
+    except Exception:
+        pass
+    try:
+        from services.permanent_authority_service import load_tables as _pa_load_tables, save_authority as _pa_save_authority, save_settings as _pa_save_settings, force_upload_authority_file as _pa_force
+        now = _v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text()
+        _pa_save_settings("10_permissions", {
+            "idle_timeout_minutes": str(idle),
+            "ask_continue_after_record": ask,
+            "security_settings": dict(merged),
+            "updated_at": now,
+        }, reason="v101_save_security_settings", github=True)
+        tables = _pa_load_tables("10_permissions", "records")
+        rows = [
+            {"setting_key": "idle_timeout_minutes", "setting_value": str(idle), "note": "V101 permission page security setting", "updated_at": now},
+            {"setting_key": "ask_continue_after_record", "setting_value": ask, "note": "V101 permission page security setting", "updated_at": now},
+        ]
+        tables["auth_security_settings"] = rows
+        tables["security_settings"] = list(rows)
+        _pa_save_authority("10_permissions", records=tables, reason="v101_save_security_settings_records", github=True)
+        try:
+            _pa_force("10_permissions", "settings", reason="v101_force_upload_security_settings")
+            _pa_force("10_permissions", "records", reason="v101_force_upload_security_records")
+        except Exception:
+            pass
+    except Exception:
+        pass
+    if st is not None:
+        try:
+            st.session_state["_spt_idle_timeout_cache"] = {"minutes": idle, "ts": 0}
+            st.session_state["spt_security_settings"] = dict(merged)
+        except Exception:
+            pass
+
+check_permission = has_permission
+# ======================= END V101 PERMISSION SECURITY + ACCOUNT SAFETY FIX =======================

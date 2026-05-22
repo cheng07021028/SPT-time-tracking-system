@@ -71,7 +71,7 @@ def _v100_inject_work_order_input_css() -> None:
     st.markdown(
         """
 <style>
-/* V100｜01 工時紀錄：製令下拉、模糊搜尋、手動輸入文字改淺色，不改資料流程 */
+/* V101｜01 工時紀錄：製令手動輸入、即時模糊篩選、下拉文字改淺色，不改開始作業資料流程 */
 .stSelectbox div[data-baseweb="select"] > div,
 .stTextInput div[data-baseweb="input"] > div,
 .stTextInput input {
@@ -216,42 +216,52 @@ with left:
     emp_match = employees[employees["employee_id"].fillna("").astype(str).str.strip() == emp_id]
     employee = emp_match.iloc[0].fillna("").to_dict() if not emp_match.empty else (query_one("SELECT * FROM employees WHERE employee_id=?", (emp_id,)) or {})
 
-    # V100：製令可保留原下拉，也可手動輸入/模糊搜尋。
-    # - 未輸入關鍵字：維持原本下拉選單流程。
-    # - 有輸入關鍵字：先清空下拉預設值，避免沿用上一筆選到的製令；可直接使用手動輸入，或從模糊搜尋結果選擇。
-    wo_manual_query = st.text_input(
-        "製令手動輸入 / 模糊搜尋｜Manual Work Order Search",
-        value="",
-        key="start_work_order_manual_query_v100",
-        placeholder="可輸入製令、P/N、機型關鍵字；輸入後下方製令下拉會先清空",
-    )
+    # V101：製令欄改為「手動輸入 + 即時模糊篩選」的操作邏輯。
+    # 使用者輸入 25M 時，下方只列出 25M 相關製令；不是用一層浮動遮罩蓋住原下拉。
     _wo_all_labels = [_v100_work_order_label(r) for _, r in work_orders.iterrows()]
     _wo_all_labels = [x for x in _wo_all_labels if x]
+    wo_manual_query = st.text_input(
+        "製令｜Work Order（可手動輸入；輸入 25M 會篩選相關製令）",
+        value="",
+        key="start_work_order_manual_query_v101",
+        placeholder="例如輸入：25M、21M0241、P/N、機型關鍵字",
+    )
     _wo_query = str(wo_manual_query or "").strip()
     if _wo_query:
-        _wo_fuzzy_labels = _v100_fuzzy_work_order_options(work_orders, _wo_query)
-        _manual_direct_label = f"直接使用手動輸入｜{_wo_query}"
-        _wo_options = [""] + [_manual_direct_label] + [x for x in _wo_fuzzy_labels if x]
+        _wo_fuzzy_labels = _v100_fuzzy_work_order_options(work_orders, _wo_query, limit=120)
+        if _wo_fuzzy_labels:
+            wo_label = st.selectbox(
+                "符合製令 / Matched Work Orders",
+                _wo_fuzzy_labels,
+                index=0,
+                key="start_work_order_matched_select_v101",
+                help="依輸入關鍵字即時篩選製令、P/N、機型、組立地點、客戶與備註。",
+            )
+            use_manual_wo = st.checkbox(
+                "使用手動輸入製令，不使用上方搜尋結果 / Use typed work order instead",
+                value=False,
+                key="start_work_order_use_manual_v101",
+            )
+            if use_manual_wo:
+                wo_no = _wo_query
+                work_order = _v100_find_work_order_dict(work_orders, wo_no)
+                st.caption(f"將使用手動輸入製令：{wo_no}")
+            else:
+                wo_no = str(wo_label or "").split("｜")[0].strip()
+                work_order = _v100_find_work_order_dict(work_orders, wo_no)
+                st.caption(f"已依關鍵字找到 {len(_wo_fuzzy_labels)} 筆相關製令，目前選擇：{wo_no}")
+        else:
+            wo_no = _wo_query
+            work_order = _v100_find_work_order_dict(work_orders, wo_no)
+            st.info(f"主檔沒有找到相符製令，將直接使用手動輸入：{wo_no}")
+    else:
         wo_label = st.selectbox(
             "製令｜Work Order",
-            _wo_options,
-            index=0,
-            key="start_work_order_select_v100_manual",
-            format_func=lambda x: "請選擇模糊搜尋結果，或選『直接使用手動輸入』" if x == "" else x,
+            _wo_all_labels,
+            key="start_work_order_select_v101_normal",
+            help="也可以直接在此下拉內輸入關鍵字搜尋。",
         )
-        if wo_label == "":
-            wo_no = _wo_query
-            work_order = _v100_find_work_order_dict(work_orders, wo_no)
-            st.caption("已清空原下拉選取；若直接按開始，會使用上方手動輸入的製令。")
-        elif wo_label.startswith("直接使用手動輸入｜"):
-            wo_no = _wo_query
-            work_order = _v100_find_work_order_dict(work_orders, wo_no)
-        else:
-            wo_no = wo_label.split("｜")[0]
-            work_order = _v100_find_work_order_dict(work_orders, wo_no)
-    else:
-        wo_label = st.selectbox("製令｜Work Order", _wo_all_labels, key="start_work_order_select_v100_normal")
-        wo_no = wo_label.split("｜")[0]
+        wo_no = str(wo_label or "").split("｜")[0].strip()
         work_order = _v100_find_work_order_dict(work_orders, wo_no)
 
     category_choices = load_process_category_choices(include_common=True)
