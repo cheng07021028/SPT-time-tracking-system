@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "13_system_settings",
   "kind": "records",
-  "updated_at": "2026-05-22 13:12:07",
-  "exported_at": "2026-05-22 13:12:07",
-  "reason": "export_13_system_settings_page_apply_v85",
+  "updated_at": "2026-05-22 17:14:19",
+  "exported_at": "2026-05-22 17:14:19",
+  "reason": "save_process_categories_v85",
   "empty_authoritative": false,
   "tables": {
     "process_categories": [
@@ -15,7 +15,7 @@
         "sort_order": 1,
         "note": "所有類別共用工段",
         "created_at": "2026-05-20 14:24:53",
-        "updated_at": "2026-05-22 09:54:34"
+        "updated_at": "2026-05-22 17:14:19"
       },
       {
         "id": 2,
@@ -24,7 +24,7 @@
         "sort_order": 2,
         "note": "",
         "created_at": "2026-05-20 14:25:52",
-        "updated_at": "2026-05-22 09:54:34"
+        "updated_at": "2026-05-22 17:14:19"
       },
       {
         "id": 3,
@@ -33,34 +33,43 @@
         "sort_order": 3,
         "note": "",
         "created_at": "2026-05-20 14:43:35",
-        "updated_at": "2026-05-22 09:54:34"
+        "updated_at": "2026-05-22 17:14:19"
       },
       {
-        "id": 999999,
+        "id": 4,
         "category_name": "FCLP",
         "is_active": 1,
-        "sort_order": 999999,
+        "sort_order": 4,
         "note": "",
         "created_at": "2026-05-22 09:54:34",
-        "updated_at": "2026-05-22 09:54:34"
+        "updated_at": "2026-05-22 17:14:19"
       },
       {
-        "id": 999999,
+        "id": 5,
         "category_name": "GPTC",
         "is_active": 1,
-        "sort_order": 999999,
+        "sort_order": 5,
         "note": "",
         "created_at": "2026-05-22 09:54:34",
-        "updated_at": "2026-05-22 09:54:34"
+        "updated_at": "2026-05-22 17:14:19"
       },
       {
-        "id": 999999,
+        "id": 6,
         "category_name": "BWBS",
         "is_active": 1,
-        "sort_order": 999999,
+        "sort_order": 6,
         "note": "",
         "created_at": "2026-05-22 09:54:34",
-        "updated_at": "2026-05-22 09:54:34"
+        "updated_at": "2026-05-22 17:14:19"
+      },
+      {
+        "id": 1000000,
+        "category_name": "SSS",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 17:14:19",
+        "updated_at": "2026-05-22 17:14:19"
       }
     ],
     "process_category_options": [
@@ -2100,7 +2109,7 @@
   },
   "settings": {},
   "table_counts": {
-    "process_categories": 6,
+    "process_categories": 7,
     "process_category_options": 99,
     "process_options": 99,
     "rest_periods": 5,
