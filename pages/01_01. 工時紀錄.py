@@ -67,11 +67,11 @@ render_post_record_continue_prompt()
 
 # ===== V100 WORK ORDER MANUAL INPUT + FUZZY SEARCH FIX =====
 def _v100_inject_work_order_input_css() -> None:
-    """Page-level override: keep 01 work-order dropdown/search text readable on dark HUD theme."""
+    """Page-level override: readable dark inputs and yellow glow only on Work Order controls."""
     st.markdown(
         """
 <style>
-/* V101｜01 工時紀錄：製令手動輸入、即時模糊篩選、下拉文字改淺色，不改開始作業資料流程 */
+/* V103｜01 工時紀錄：維持深色可讀性；黃色光暈只套用在製令輸入/下拉，不影響其他按鈕與表格 */
 .stSelectbox div[data-baseweb="select"] > div,
 .stTextInput div[data-baseweb="input"] > div,
 .stTextInput input {
@@ -102,11 +102,23 @@ div[data-baseweb="popover"] [role="option"]:hover,
 div[data-baseweb="popover"] [aria-selected="true"] {
     background: rgba(79,229,255,0.18) !important;
 }
+/* Only Work Order keyword input + filtered Work Order selectbox get the yellow focus glow. */
+div[data-testid="stTextInput"]:has(input[aria-label*="製令"]),
+div[data-testid="stSelectbox"]:has(div[aria-label*="製令"]),
+div[data-testid="stSelectbox"]:has(input[aria-label*="製令"]) {
+    border-radius: 16px !important;
+    filter: drop-shadow(0 0 14px rgba(255, 221, 87, 0.40));
+}
+div[data-testid="stTextInput"]:has(input[aria-label*="製令"]) div[data-baseweb="input"] > div,
+div[data-testid="stSelectbox"]:has(div[aria-label*="製令"]) div[data-baseweb="select"] > div,
+div[data-testid="stSelectbox"]:has(input[aria-label*="製令"]) div[data-baseweb="select"] > div {
+    border: 1.5px solid rgba(255, 221, 87, 0.98) !important;
+    box-shadow: 0 0 0 1px rgba(255,221,87,0.28), 0 0 22px rgba(255,221,87,0.42), inset 0 1px 0 rgba(255,255,255,0.10) !important;
+}
 </style>
 """,
         unsafe_allow_html=True,
     )
-
 
 def _v100_norm(value) -> str:
     text = str(value or "").strip().upper()
@@ -170,6 +182,34 @@ def _v100_fuzzy_work_order_options(work_orders_df: pd.DataFrame, keyword: str, l
     return out
 
 
+
+def _v103_work_order_option_to_no(option: str, query: str = "") -> str:
+    s = str(option or "").strip()
+    manual_prefix = "＋ 使用手動輸入："
+    if s.startswith(manual_prefix):
+        return str(query or "").strip()
+    if "｜" in s:
+        return s.split("｜", 1)[0].strip()
+    return s.strip()
+
+
+def _v103_work_order_filtered_options(work_orders_df: pd.DataFrame, query: str, limit: int = 120) -> list[str]:
+    q = str(query or "").strip()
+    labels = _v100_fuzzy_work_order_options(work_orders_df, q, limit=limit) if q else [
+        _v100_work_order_label(r) for _, r in work_orders_df.head(limit).iterrows()
+    ]
+    labels = [x for x in labels if str(x or "").strip()]
+    if q:
+        q_norm = _v100_norm(q)
+        exact = False
+        for label in labels:
+            if _v100_norm(str(label).split("｜", 1)[0]) == q_norm:
+                exact = True
+                break
+        if not exact:
+            labels.append(f"＋ 使用手動輸入：{q}")
+    return labels or ([f"＋ 使用手動輸入：{q}"] if q else [])
+
 def _v100_find_work_order_dict(work_orders_df: pd.DataFrame, work_order_no: str) -> dict:
     wo_no = str(work_order_no or "").strip()
     if not wo_no:
@@ -216,53 +256,30 @@ with left:
     emp_match = employees[employees["employee_id"].fillna("").astype(str).str.strip() == emp_id]
     employee = emp_match.iloc[0].fillna("").to_dict() if not emp_match.empty else (query_one("SELECT * FROM employees WHERE employee_id=?", (emp_id,)) or {})
 
-    # V101：製令欄改為「手動輸入 + 即時模糊篩選」的操作邏輯。
-    # 使用者輸入 25M 時，下方只列出 25M 相關製令；不是用一層浮動遮罩蓋住原下拉。
-    _wo_all_labels = [_v100_work_order_label(r) for _, r in work_orders.iterrows()]
-    _wo_all_labels = [x for x in _wo_all_labels if x]
+    # V103：製令欄改為「輸入關鍵字 → 下方製令下拉立即縮小範圍」。
+    # 例如輸入 2，製令下拉只列出 25... / 24... / 26... 等相關製令；不再使用額外遮罩式搜尋結果。
     wo_manual_query = st.text_input(
-        "製令｜Work Order（可手動輸入；輸入 25M 會篩選相關製令）",
+        "製令關鍵字｜Work Order Keyword（可手動輸入；輸入 25M 會篩選下方製令）",
         value="",
-        key="start_work_order_manual_query_v101",
-        placeholder="例如輸入：25M、21M0241、P/N、機型關鍵字",
+        key="start_work_order_manual_query_v103",
+        placeholder="輸入 2、25M、21M0241、P/N、機型關鍵字，下方製令會即時篩選",
     )
     _wo_query = str(wo_manual_query or "").strip()
+    _wo_options = _v103_work_order_filtered_options(work_orders, _wo_query, limit=120)
+    if not _wo_options:
+        _wo_options = ["＋ 使用手動輸入：" + _wo_query] if _wo_query else []
+    wo_label = st.selectbox(
+        "製令｜Work Order",
+        _wo_options,
+        index=0,
+        key=f"start_work_order_select_v103_{_v100_norm(_wo_query)[:40] or 'all'}",
+        help="會依上方輸入即時篩選；若主檔沒有資料，可選擇『使用手動輸入』直接記錄。",
+    )
+    wo_no = _v103_work_order_option_to_no(wo_label, _wo_query)
+    work_order = _v100_find_work_order_dict(work_orders, wo_no)
     if _wo_query:
-        _wo_fuzzy_labels = _v100_fuzzy_work_order_options(work_orders, _wo_query, limit=120)
-        if _wo_fuzzy_labels:
-            wo_label = st.selectbox(
-                "符合製令 / Matched Work Orders",
-                _wo_fuzzy_labels,
-                index=0,
-                key="start_work_order_matched_select_v101",
-                help="依輸入關鍵字即時篩選製令、P/N、機型、組立地點、客戶與備註。",
-            )
-            use_manual_wo = st.checkbox(
-                "使用手動輸入製令，不使用上方搜尋結果 / Use typed work order instead",
-                value=False,
-                key="start_work_order_use_manual_v101",
-            )
-            if use_manual_wo:
-                wo_no = _wo_query
-                work_order = _v100_find_work_order_dict(work_orders, wo_no)
-                st.caption(f"將使用手動輸入製令：{wo_no}")
-            else:
-                wo_no = str(wo_label or "").split("｜")[0].strip()
-                work_order = _v100_find_work_order_dict(work_orders, wo_no)
-                st.caption(f"已依關鍵字找到 {len(_wo_fuzzy_labels)} 筆相關製令，目前選擇：{wo_no}")
-        else:
-            wo_no = _wo_query
-            work_order = _v100_find_work_order_dict(work_orders, wo_no)
-            st.info(f"主檔沒有找到相符製令，將直接使用手動輸入：{wo_no}")
-    else:
-        wo_label = st.selectbox(
-            "製令｜Work Order",
-            _wo_all_labels,
-            key="start_work_order_select_v101_normal",
-            help="也可以直接在此下拉內輸入關鍵字搜尋。",
-        )
-        wo_no = str(wo_label or "").split("｜")[0].strip()
-        work_order = _v100_find_work_order_dict(work_orders, wo_no)
+        matched_count = len([x for x in _wo_options if not str(x).startswith("＋ 使用手動輸入：")])
+        st.caption(f"已依『{_wo_query}』篩選出 {matched_count} 筆相關製令，目前使用：{wo_no}")
 
     category_choices = load_process_category_choices(include_common=True)
     default_category = get_default_process_category()

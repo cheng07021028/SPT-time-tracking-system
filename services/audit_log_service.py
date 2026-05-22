@@ -1170,3 +1170,298 @@ clear_audit_logs_by_date = delete_login_logs_by_date_range
 restore_login_logs_from_permanent_file = restore_audit_logs_from_permanent_file
 restore_audit_logs_from_state = restore_audit_logs_from_permanent_file
 # ===== V97 LOGIN LOG SINGLE-AUTHORITY DELETE-PERSIST FIX END =====
+
+
+# ===== V103 LOGIN LOG CANONICAL DELETE + DISPLAY FIX START =====
+# 目的：11｜登入紀錄的「清除」必須直接修改正式權威檔，不能只刪 SQLite / 舊 persistent 檔。
+# 修正重點：
+# 1. load_login_logs 會合併 canonical authority + SQLite current rows，避免頁面看起來沒讀權威檔。
+# 2. delete_login_logs_by_date_range 會先從所有來源彙整，再依日期範圍過濾，最後用剩餘資料覆寫 canonical。
+# 3. 刪到 0 筆時也會寫入空權威檔，避免 Reboot App 從舊 history / persistent_modules 復活。
+# 4. 仍保留舊 AUDIT_STATE_PATH / MODULE_RECORDS_PATH 相容寫入，但 canonical records.json 是唯一判準。
+
+_V103_LOGIN_AUTHORITY_PATH = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_logs" / "records.json"
+_v103_prev_load_login_logs = load_login_logs
+_v103_prev_get_login_log_stats = get_login_log_stats
+_v103_prev_get_audit_permanent_status = get_audit_permanent_status
+
+
+def _v103_parse_row_date(row: Dict[str, Any]):
+    try:
+        return _v16_row_log_date(row) if "_v16_row_log_date" in globals() else None
+    except Exception:
+        return None
+
+
+def _v103_record_key(row: Dict[str, Any]) -> str:
+    return "|".join([
+        _txt(row.get("username")),
+        _normalise_event_type(row.get("event_type")),
+        _normalise_result(row.get("result")),
+        _txt(row.get("login_time") or row.get("created_at") or row.get("logout_time")),
+        _txt(row.get("module_code")),
+        _txt(row.get("message")),
+    ])
+
+
+def _v103_merge_login_rows(*sets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for rows in sets:
+        for row in _valid_login_rows("v103_merge", rows or []):
+            key = _v103_record_key(row)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(row)
+    return out
+
+
+def _v103_read_authority_login_records() -> List[Dict[str, Any]]:
+    """Read canonical records.json first; fall back to V97 helper if present."""
+    rows: List[Dict[str, Any]] = []
+    try:
+        from services.permanent_authority_service import load_authority
+        payload = load_authority("11_login_logs", "records")
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        for table in ("login_logs", "auth_login_logs", "security_login_logs"):
+            vals = tables.get(table, [])
+            if isinstance(vals, list):
+                rows.extend([dict(x) for x in vals if isinstance(x, dict)])
+    except Exception:
+        pass
+    try:
+        if not rows and "_v97_read_login_authority_records" in globals():
+            rows.extend(_v97_read_login_authority_records())  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if not rows and _V103_LOGIN_AUTHORITY_PATH.exists():
+            payload = _read_json_file(_V103_LOGIN_AUTHORITY_PATH)
+            rows.extend(_extract_login_records_from_payload(payload))
+    except Exception:
+        pass
+    return _v103_merge_login_rows(rows)
+
+
+def _v103_db_login_records(include_legacy: bool = True) -> List[Dict[str, Any]]:
+    ensure_login_logs_table()
+    try:
+        _prune_invalid_primary_login_rows()
+    except Exception:
+        pass
+    conn = get_connection()
+    try:
+        records = _primary_login_rows(conn)
+        if include_legacy:
+            records.extend(_security_login_rows(conn))
+            records.extend(_auth_login_rows(conn))
+        return _v103_merge_login_rows(records)
+    finally:
+        conn.close()
+
+
+def _v103_all_current_login_records(include_legacy: bool = True) -> List[Dict[str, Any]]:
+    authority_rows = _v103_read_authority_login_records()
+    db_rows = _v103_db_login_records(include_legacy=include_legacy)
+    return _v103_merge_login_rows(authority_rows, db_rows)
+
+
+def _v103_write_legacy_login_files(records: List[Dict[str, Any]], reason: str) -> None:
+    """Write old permanent files too, only for compatibility. Canonical remains source of truth."""
+    _ensure_dirs()
+    clean = _v103_merge_login_rows(records or [])
+    payload = {
+        "version": "V103-canonical-login-logs",
+        "authority_schema": "SPT-PermanentAuthority-V103-CompatibilityMirror",
+        "exported_at": _now(),
+        "updated_at": _now(),
+        "source": reason,
+        "module_key": "11_login_logs",
+        "module_code": "11_login_logs",
+        "module_name_zh": "登入紀錄",
+        "module_name_en": "Login Logs",
+        "table": "login_logs",
+        "count": len(clean),
+        "records": clean,
+        "tables": {"login_logs": clean, "auth_login_logs": [], "security_login_logs": []},
+        "table_counts": {"login_logs": len(clean), "auth_login_logs": 0, "security_login_logs": 0},
+        "empty_authoritative": len(clean) == 0,
+    }
+    for path in (AUDIT_STATE_PATH, MODULE_RECORDS_PATH):
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            tmp.replace(path)
+        except Exception:
+            pass
+    try:
+        MODULE_SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        MODULE_SETTINGS_PATH.write_text(json.dumps({
+            "version": "V103-canonical-login-logs",
+            "exported_at": _now(),
+            "module": "11_login_logs",
+            "settings": {"source_tables": ["login_logs"], "canonical_authority": str(_V103_LOGIN_AUTHORITY_PATH)},
+        }, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _v103_write_authority_login_records(records: List[Dict[str, Any]], reason: str = "v103_login_logs") -> Dict[str, Any]:
+    clean = _v103_merge_login_rows(records or [])
+    result: Dict[str, Any] = {"ok": True, "count": len(clean), "files": [], "github": []}
+    try:
+        from services.permanent_authority_service import save_authority, canonical_path
+        result = save_authority(
+            "11_login_logs",
+            records={"login_logs": clean, "auth_login_logs": [], "security_login_logs": []},
+            reason=reason,
+            github=True,
+        )
+        result["count"] = len(clean)
+        result["canonical_path"] = str(canonical_path("11_login_logs", "records"))
+    except Exception as exc:
+        result = {"ok": False, "count": len(clean), "error": str(exc)[:300], "files": [str(_V103_LOGIN_AUTHORITY_PATH)]}
+        try:
+            payload = {
+                "authority_schema": "SPT-PermanentAuthority-V103",
+                "module_key": "11_login_logs",
+                "kind": "records",
+                "updated_at": _now(),
+                "exported_at": _now(),
+                "reason": reason,
+                "empty_authoritative": len(clean) == 0,
+                "tables": {"login_logs": clean, "auth_login_logs": [], "security_login_logs": []},
+                "table_counts": {"login_logs": len(clean), "auth_login_logs": 0, "security_login_logs": 0},
+            }
+            _V103_LOGIN_AUTHORITY_PATH.parent.mkdir(parents=True, exist_ok=True)
+            tmp = _V103_LOGIN_AUTHORITY_PATH.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            tmp.replace(_V103_LOGIN_AUTHORITY_PATH)
+            result["ok"] = True
+        except Exception as exc2:
+            result["fallback_error"] = str(exc2)[:300]
+    _v103_write_legacy_login_files(clean, reason)
+    try:
+        from services.permanent_write_through_service import github_write_through_files
+        github_write_through_files([_V103_LOGIN_AUTHORITY_PATH, AUDIT_STATE_PATH, MODULE_RECORDS_PATH, MODULE_SETTINGS_PATH], source=reason, force=True)
+    except Exception:
+        pass
+    return result
+
+
+def _v103_replace_db_with_login_records(records: List[Dict[str, Any]]) -> None:
+    """Make SQLite cache match canonical state; legacy login tables are cleared to stop resurrection."""
+    ensure_login_logs_table()
+    clean = _v103_merge_login_rows(records or [])
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        for table in ("login_logs", "security_login_logs", "auth_login_logs"):
+            try:
+                if table == "login_logs" or _table_exists(conn, table):
+                    cur.execute(f"DELETE FROM {table}")
+            except Exception:
+                pass
+        for r in clean:
+            cur.execute("""
+            INSERT INTO login_logs (
+                username, display_name, event_type, result, message, module_code,
+                login_time, logout_time, idle_minutes, ip_address, user_agent, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                r.get("username"), r.get("display_name"), r.get("event_type"), r.get("result"),
+                r.get("message"), r.get("module_code"), r.get("login_time"), r.get("logout_time"),
+                r.get("idle_minutes"), r.get("ip_address"), r.get("user_agent"), r.get("created_at"),
+            ))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def load_login_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "",
+                    limit: int = 1000, event_types: Optional[List[str]] = None,
+                    results: Optional[List[str]] = None, include_legacy: bool = True, **kwargs: Any):  # type: ignore[override]
+    # V103: page 11 must visibly read canonical authority, then merge same-session SQLite rows.
+    records = _v103_all_current_login_records(include_legacy=include_legacy)
+    records = _filter_records(records, start_date, end_date, keyword, event_types, results)
+    records.sort(key=lambda r: str(r.get("login_time") or r.get("created_at") or ""), reverse=True)
+    if limit:
+        records = records[:int(limit)]
+    if pd is not None:
+        return pd.DataFrame(records)
+    return records
+
+
+def get_login_log_stats(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "") -> Dict[str, int]:  # type: ignore[override]
+    logs = load_login_logs(start_date=start_date, end_date=end_date, keyword=keyword, limit=100000)
+    if pd is not None and hasattr(logs, "empty"):
+        total = int(len(logs))
+        if total:
+            result_s = logs.get("result", "").astype(str).str.upper()
+            success = int(result_s.isin(["SUCCESS", "OK", "INFO"]).sum())
+        else:
+            success = 0
+        return {"records": total, "success": success, "failed": total - success}
+    total = len(logs)
+    success = sum(1 for r in logs if _normalise_result(r.get("result")) in {"SUCCESS", "OK", "INFO"})
+    return {"records": total, "success": success, "failed": total - success}
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    start_d = _v16_parse_date(start_date) if "_v16_parse_date" in globals() else None
+    end_d = _v16_parse_date(end_date) if "_v16_parse_date" in globals() else None
+    if start_d is None or end_d is None:
+        return 0
+    if end_d < start_d:
+        start_d, end_d = end_d, start_d
+
+    before = _v103_all_current_login_records(include_legacy=True)
+    remaining: List[Dict[str, Any]] = []
+    deleted = 0
+    for row in before:
+        rd = _v103_parse_row_date(row)
+        if rd is not None and start_d <= rd <= end_d:
+            deleted += 1
+        else:
+            remaining.append(row)
+    remaining = _v103_merge_login_rows(remaining)
+
+    # The selected range is authoritative even when deleted == 0; this still rewrites
+    # canonical from the current non-deleted set and clears legacy tables.
+    _v103_replace_db_with_login_records(remaining)
+    _v103_write_authority_login_records(remaining, reason="v103_clear_login_logs_date_range")
+    return int(deleted)
+
+
+def get_audit_permanent_status() -> Dict[str, Any]:  # type: ignore[override]
+    records = _v103_read_authority_login_records()
+    path = _V103_LOGIN_AUTHORITY_PATH
+    payload = _read_json_file(path) if path.exists() else {}
+    return {
+        "exists": path.exists(),
+        "path": str(path),
+        "size": path.stat().st_size if path.exists() else 0,
+        "count": len(records),
+        "exported_at": str(payload.get("exported_at") or payload.get("updated_at") or "") if isinstance(payload, dict) else "",
+        "db_count": len(_v103_db_login_records(include_legacy=True)),
+        "authority_schema": str(payload.get("authority_schema", "")) if isinstance(payload, dict) else "",
+    }
+
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+delete_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+clear_audit_logs_by_date = delete_login_logs_by_date_range
+get_login_logs = load_login_logs
+query_login_logs = load_login_logs
+load_audit_logs = load_login_logs
+login_log_stats = get_login_log_stats
+audit_permanent_status = get_audit_permanent_status
+get_audit_state_status = get_audit_permanent_status
+login_log_state_status = get_audit_permanent_status
+get_login_log_permanent_status = get_audit_permanent_status
+# ===== V103 LOGIN LOG CANONICAL DELETE + DISPLAY FIX END =====

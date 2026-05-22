@@ -56,9 +56,10 @@ with st.expander("⧠ 使用說明 / User Guide", expanded=False):
 st.markdown("### 登入紀錄永久保存狀態 / Audit Log Permanent Status")
 status = get_audit_permanent_status()
 c1, c2, c3 = st.columns(3)
-c1.metric("永久檔 / Permanent File", "Exists" if status.get("exists") else "Not Found")
-c2.metric("匯出時間 / Exported At", status.get("exported_at") or "-")
-c3.metric("永久檔筆數 / Saved Logs", status.get("count", 0))
+c1.metric("權威檔 / Authority File", "Exists" if status.get("exists") else "Not Found")
+c2.metric("權威檔筆數 / Authority Rows", status.get("count", 0))
+c3.metric("SQLite快取筆數 / Cache Rows", status.get("db_count", 0))
+st.caption(f"權威檔路徑：{status.get('path', '-')}｜Schema：{status.get('authority_schema', '-') or '-'}")
 
 b1, b2, b3, b4 = st.columns(4)
 with b1:
@@ -154,7 +155,7 @@ else:
 
 st.divider()
 st.markdown("### 清除登入紀錄 / Clear Login Logs")
-st.warning("刪除前建議先建立登入紀錄永久檔或上傳 GitHub，避免稽核紀錄遺失。")
+st.warning("V103：清除會直接覆寫 data/permanent_store/modules/11_login_logs/records.json 權威檔；刪到 0 筆也會寫入空權威檔，避免 Reboot App 復活舊資料。")
 
 # V1.99：改成點選確認，不再要求輸入 DELETE。
 # 深色主題下文字輸入框容易看不清楚，也不符合使用者要求的「點選確認」。
@@ -173,6 +174,8 @@ if st.button("⊖ 確認清除日期區間內登入紀錄 / Delete Logs in Date 
         st.error("請先勾選確認刪除，系統不會使用文字輸入 DELETE。")
     else:
         count = delete_login_logs_by_date_range(str(start), str(end))
-        st.success(f"已清除 {count} 筆登入紀錄 / Deleted {count} logs")
+        status_after = get_audit_permanent_status()
+        st.success(f"已清除 {count} 筆登入紀錄，權威檔目前 {status_after.get('count', 0)} 筆 / Deleted {count} logs; authority now has {status_after.get('count', 0)} rows")
+        st.caption(f"權威檔已更新：{status_after.get('path', '-')}")
         st.session_state["v11_reset_confirm_delete_login_logs"] = True
         st.rerun()
