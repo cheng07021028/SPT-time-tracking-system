@@ -1,25 +1,59 @@
 {
   "version": "V103-canonical-login-logs",
   "authority_schema": "SPT-PermanentAuthority-V103-CompatibilityMirror",
-  "exported_at": "2026-05-23 00:52:04",
-  "updated_at": "2026-05-23 00:52:04",
-  "source": "v106_clear_login_logs_tombstone_authority",
+  "exported_at": "2026-05-23 01:25:06",
+  "updated_at": "2026-05-23 01:25:06",
+  "source": "v106_export_login_logs_tombstone_filtered",
   "module_key": "11_login_logs",
   "module_code": "11_login_logs",
   "module_name_zh": "登入紀錄",
   "module_name_en": "Login Logs",
   "table": "login_logs",
-  "count": 0,
-  "records": [],
+  "count": 1,
+  "records": [
+    {
+      "id": 1,
+      "source": "v103_merge",
+      "username": "admin",
+      "display_name": "系統管理員",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "message": "roles=admin",
+      "module_code": "11_login_logs",
+      "login_time": "2026-05-23 01:25:05",
+      "logout_time": "",
+      "idle_minutes": null,
+      "ip_address": "",
+      "user_agent": "",
+      "created_at": "2026-05-23 01:25:05"
+    }
+  ],
   "tables": {
-    "login_logs": [],
+    "login_logs": [
+      {
+        "id": 1,
+        "source": "v103_merge",
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "11_login_logs",
+        "login_time": "2026-05-23 01:25:05",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "",
+        "created_at": "2026-05-23 01:25:05"
+      }
+    ],
     "auth_login_logs": [],
     "security_login_logs": []
   },
   "table_counts": {
-    "login_logs": 0,
+    "login_logs": 1,
     "auth_login_logs": 0,
     "security_login_logs": 0
   },
-  "empty_authoritative": true
+  "empty_authoritative": false
 }
