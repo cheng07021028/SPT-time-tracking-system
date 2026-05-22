@@ -1048,3 +1048,44 @@ def _v72_github_timeout_put() -> float:  # type: ignore[override]
     except Exception:
         return 4.0
 # ===================== END V86 FAST GITHUB TIMEOUT DEFAULTS =====================
+
+# ========================= V98 AUTHORITY DB PATH + FORCE UPLOAD HELPERS =========================
+# 修正目的：
+# 1) permanent_authority_service 舊版 DB_PATH 指到 data/database，與目前正式 SQLite
+#    data/permanent_store/database/spt_time_tracking.db 不一致，會造成 Reboot/遷移時讀不到正式快取。
+# 2) 01 開始作業為了速度先本機寫 authority，後續若再次 save_authority 因本機內容 unchanged
+#    會跳過 GitHub，導致 Streamlit Cloud Reboot 後資料消失。提供 force_upload_authority_file()
+#    給關鍵路徑明確上傳 canonical 權威檔。
+DB_PATH = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"  # type: ignore[assignment]
+
+
+def force_upload_authority_file(module_key: str, kind: str = "records", reason: str = "force_authority_upload_v98") -> dict[str, Any]:
+    """Upload the existing canonical authority file even when local content did not change.
+
+    save_authority() correctly skips GitHub when the local file is unchanged, but the
+    operator start-work flow writes local first for speed and then must still publish
+    the same canonical file to GitHub so Streamlit Cloud Reboot can restore it.
+    """
+    try:
+        p = canonical_path(str(module_key), "settings" if str(kind).lower().startswith("set") else "records")
+        if not p.exists():
+            return {"ok": False, "skipped": True, "reason": "canonical_file_missing", "path": str(p)}
+        return github_put_file(p, p.read_text(encoding="utf-8"), f"SPT authority {module_key} {kind}: {reason}")
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300], "module_key": str(module_key), "kind": str(kind)}
+
+
+# Keep GitHub calls bounded; explicit environment values still win.
+def _v72_github_timeout_get() -> float:  # type: ignore[override]
+    try:
+        return float(os.environ.get("SPT_GITHUB_GET_TIMEOUT", "2.5") or 2.5)
+    except Exception:
+        return 2.5
+
+
+def _v72_github_timeout_put() -> float:  # type: ignore[override]
+    try:
+        return float(os.environ.get("SPT_GITHUB_PUT_TIMEOUT", "5") or 5)
+    except Exception:
+        return 5.0
+# ======================= END V98 AUTHORITY DB PATH + FORCE UPLOAD HELPERS =======================

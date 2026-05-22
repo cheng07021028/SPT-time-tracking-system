@@ -2520,3 +2520,201 @@ def render_post_record_continue_prompt() -> None:  # type: ignore[override]
     # 關鍵：對話框顯示後停止本次頁面渲染，不再往下跑 01 表格與管理員維護區。
     st.stop()
 # ===================== END V86 01 FAST PROMPT STOP =====================
+
+# ========================= V98 IDLE TIMEOUT SINGLE AUTHORITY FIX =========================
+# 修正目的：
+# - 10｜權限管理安全設定已寫入 data/permanent_store/modules/10_permissions/records.json，
+#   但登入列仍可能優先讀舊 data/persistent_state / data/config，導致畫面顯示 15 分鐘。
+# - 本段將登入列、閒置監控、10 權限管理安全設定統一到 permanent_store 優先。
+
+def _v98_idle_timeout_paths() -> list[Path]:
+    root = Path(__file__).resolve().parents[1]
+    return [
+        root / "data" / "permanent_store" / "config" / "idle_timeout_settings.json",
+        root / "data" / "permanent_store" / "persistent_state" / "spt_idle_timeout_settings.json",
+        root / "data" / "permanent_store" / "config" / "security_settings.json",
+        root / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "permanent_store" / "modules" / "10_permissions" / "settings.json",
+        root / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json",
+        # Legacy read compatibility only; these are lower priority and should not override permanent_store.
+        root / "data" / "config" / "idle_timeout_settings.json",
+        root / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+        root / "data" / "config" / "security_settings.json",
+        root / "data" / "persistent_state" / "spt_security_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        root / "data" / "persistent_modules" / "10_permissions" / "security_settings.json",
+    ]
+
+
+def _v98_extract_idle_timeout(payload: Any) -> int | None:
+    try:
+        if not isinstance(payload, dict):
+            return None
+        candidates: list[Any] = [payload.get("idle_timeout_minutes")]
+        for key in ("security_settings", "settings"):
+            obj = payload.get(key)
+            if isinstance(obj, dict):
+                candidates.append(obj.get("idle_timeout_minutes"))
+                nested = obj.get("security_settings")
+                if isinstance(nested, dict):
+                    candidates.append(nested.get("idle_timeout_minutes"))
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        for table_name in ("auth_security_settings", "security_settings"):
+            rows = tables.get(table_name) if isinstance(tables, dict) else []
+            if isinstance(rows, list):
+                for row in rows:
+                    if isinstance(row, dict) and str(row.get("setting_key") or "").strip() == "idle_timeout_minutes":
+                        candidates.append(row.get("setting_value"))
+        for v in candidates:
+            if v in (None, ""):
+                continue
+            minutes = int(float(v))
+            if minutes >= 1:
+                return minutes
+    except Exception:
+        return None
+    return None
+
+
+def _v98_read_idle_timeout_from_files() -> int | None:
+    for path in _v98_idle_timeout_paths():
+        try:
+            if not path.exists() or path.stat().st_size <= 0:
+                continue
+            minutes = _v98_extract_idle_timeout(json.loads(path.read_text(encoding="utf-8")))
+            if minutes is not None:
+                return minutes
+        except Exception:
+            continue
+    return None
+
+
+def _v98_write_idle_timeout_files(minutes: int, ask_continue_after_record: str = "1") -> None:
+    minutes = max(1, int(minutes))
+    ask = "0" if str(ask_continue_after_record).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    idle_payload = {
+        "version": "V98",
+        "idle_timeout_minutes": minutes,
+        "updated_at": _now(),
+        "note": "閒置自動登出分鐘數永久設定。10 權限管理、登入列、閒置監控皆以 permanent_store 為優先權威來源。",
+    }
+    security_payload = {
+        "version": "V98",
+        "updated_at": _now(),
+        "security_settings": {
+            "idle_timeout_minutes": str(minutes),
+            "ask_continue_after_record": ask,
+        },
+    }
+    for path in _v98_idle_timeout_paths():
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.name in {"idle_timeout_settings.json", "spt_idle_timeout_settings.json"}:
+                payload = idle_payload
+            else:
+                payload = security_payload
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+
+def get_idle_timeout_minutes() -> int:  # type: ignore[override]
+    """V98 final reader: permanent_store first, then DB, then safe default."""
+    try:
+        cache = st.session_state.get("_spt_idle_timeout_cache")
+        if cache:
+            minutes = int(float(cache.get("minutes", 0)))
+            if minutes >= 1:
+                return minutes
+    except Exception:
+        pass
+
+    minutes = _v98_read_idle_timeout_from_files()
+    if minutes is None:
+        try:
+            from services.permission_service import get_security_settings as _perm_security_settings
+            sec = _perm_security_settings()
+            if sec.get("idle_timeout_minutes") not in (None, ""):
+                minutes = int(float(sec.get("idle_timeout_minutes")))
+        except Exception:
+            minutes = None
+    if minutes is None:
+        try:
+            ensure_security_schema()
+            for table in ("auth_security_settings", "security_settings"):
+                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
+                if row and row.get("setting_value") not in (None, ""):
+                    minutes = int(float(row.get("setting_value")))
+                    break
+        except Exception:
+            minutes = None
+    if minutes is None:
+        minutes = DEFAULT_IDLE_MINUTES
+    minutes = max(1, int(minutes))
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+    except Exception:
+        pass
+    return minutes
+
+
+def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
+    """V98 final writer: DB + permanent_store files + 10_permissions authority + session cache."""
+    minutes = max(1, int(minutes))
+    ask = "1"
+    try:
+        ss = st.session_state.get("spt_security_settings", {})
+        if isinstance(ss, dict) and ss.get("ask_continue_after_record") is not None:
+            ask = str(ss.get("ask_continue_after_record"))
+    except Exception:
+        pass
+    try:
+        ensure_security_schema()
+        for table in ("auth_security_settings", "security_settings"):
+            execute(f"""
+                CREATE TABLE IF NOT EXISTS {table} (
+                    setting_key TEXT PRIMARY KEY,
+                    setting_value TEXT,
+                    note TEXT,
+                    updated_at TEXT
+                )
+            """)
+            execute(f"""
+                INSERT INTO {table} (setting_key, setting_value, note, updated_at)
+                VALUES ('idle_timeout_minutes', ?, '閒置多久自動登出，單位分鐘', ?)
+                ON CONFLICT(setting_key) DO UPDATE SET
+                    setting_value=excluded.setting_value,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (str(minutes), _now()))
+    except Exception:
+        pass
+
+    _v98_write_idle_timeout_files(minutes, ask)
+
+    # 同步 10_permissions 權威檔，避免 Reboot 後 10 頁與登入列讀不同來源。
+    try:
+        from services.permanent_authority_service import load_tables as _pa_load_tables, save_authority as _pa_save_authority
+        tables = _pa_load_tables("10_permissions", "records")
+        rows = [
+            {"setting_key": "idle_timeout_minutes", "setting_value": str(minutes), "note": "V98 single authority idle timeout", "updated_at": _now()},
+            {"setting_key": "ask_continue_after_record", "setting_value": "0" if str(ask).strip().lower() in {"0", "false", "no", "n", "否"} else "1", "note": "V98 single authority post-record prompt", "updated_at": _now()},
+        ]
+        tables["auth_security_settings"] = rows
+        tables["security_settings"] = list(rows)
+        _pa_save_authority("10_permissions", records=tables, reason="set_idle_timeout_minutes_v98", github=True)
+    except Exception:
+        pass
+
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+        settings = st.session_state.get("spt_security_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        settings["idle_timeout_minutes"] = str(minutes)
+        settings["ask_continue_after_record"] = "0" if str(ask).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+        st.session_state["spt_security_settings"] = settings
+    except Exception:
+        pass
+# ======================= END V98 IDLE TIMEOUT SINGLE AUTHORITY FIX =======================

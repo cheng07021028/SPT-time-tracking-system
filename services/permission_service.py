@@ -5273,3 +5273,54 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
 check_permission = has_permission
 # ===== V97 PERMISSION SECURITY SETTINGS NAMEERROR GUARD END =====
 
+
+# ========================= V98 SECURITY SETTINGS WRITE-THROUGH ALIGNMENT =========================
+# 10｜權限管理安全設定的畫面值、登入列顯示值、權威檔值必須一致。
+_v98_prev_get_security_settings = get_security_settings
+_v98_prev_save_security_settings = save_security_settings
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    out = dict(DEFAULT_SECURITY_SETTINGS)
+    try:
+        out.update(_v98_prev_get_security_settings())
+    except Exception:
+        pass
+    # 讓 10 頁也吃 security_service 的 permanent_store 優先讀法，避免畫面與上方登入列不同。
+    try:
+        from services.security_service import get_idle_timeout_minutes as _get_idle
+        out["idle_timeout_minutes"] = str(int(_get_idle()))
+    except Exception:
+        pass
+    return out
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    merged = get_security_settings()
+    merged.update({str(k): str(v) for k, v in (settings or {}).items()})
+    try:
+        idle = max(1, int(float(merged.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    ask = "0" if str(merged.get("ask_continue_after_record", "1")).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    merged["idle_timeout_minutes"] = str(idle)
+    merged["ask_continue_after_record"] = ask
+    try:
+        _v98_prev_save_security_settings(merged)
+    except Exception:
+        # 不讓舊函式失敗阻斷新的權威寫入。
+        pass
+    try:
+        from services.security_service import set_idle_timeout_minutes as _set_idle
+        _set_idle(idle)
+    except Exception:
+        pass
+    if st is not None:
+        try:
+            st.session_state["_spt_idle_timeout_cache"] = {"minutes": idle, "ts": 0}
+            st.session_state["spt_security_settings"] = dict(merged)
+        except Exception:
+            pass
+
+check_permission = has_permission
+# ======================= END V98 SECURITY SETTINGS WRITE-THROUGH ALIGNMENT =======================

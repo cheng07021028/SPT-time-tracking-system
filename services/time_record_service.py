@@ -4092,3 +4092,265 @@ def start_work(employee: dict, work_order: dict, process_name: str, remark: str 
             pass
     return rid
 # ================= END V97 01/02 SYNC TOMBSTONE-ID REUSE HARD FIX =================
+
+# ========================= V98 01/02 TRUE WRITE-THROUGH + DISPLAY SELF-REPAIR =========================
+# 修正目的：
+# 1) 01 開始作業先前為了速度 github=False，只寫本機 authority；Streamlit Cloud Reboot 後會消失。
+# 2) 今日工時紀錄 / 02 歷史紀錄若遇到空 authority，但 SQLite 已有作業中資料，畫面會顯示 No data。
+# 3) 01/02 必須共用同一批 time_records，任何開始、結束、刪除、重算、匯入後都同步 canonical 權威檔。
+
+_v98_prev_today_records = today_records
+_v98_prev_load_records = load_records
+_v98_prev_start_work = start_work
+_v98_prev_finish_work = finish_work
+_v98_prev_save_time_records = save_time_records
+_v98_prev_recalculate_time_records = recalculate_time_records
+_v98_prev_delete_time_records = delete_time_records
+_v98_prev_import_time_records = globals().get("import_time_records")
+
+
+def _v98_is_nonempty_df(df: pd.DataFrame) -> bool:
+    return isinstance(df, pd.DataFrame) and not df.empty
+
+
+def _v98_sqlite_time_records_df() -> pd.DataFrame:
+    try:
+        df = query_df("SELECT * FROM time_records ORDER BY id")
+        return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v98_sort_records(df: pd.DataFrame, descending: bool = False) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.loc[:, ~pd.Index(df.columns).duplicated()].copy()
+    if "id" in out.columns:
+        try:
+            out["_v98_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values("_v98_sort_id", ascending=not descending, kind="stable").drop(columns=["_v98_sort_id"], errors="ignore")
+        except Exception:
+            pass
+    return out.reset_index(drop=True)
+
+
+def _v98_filter_deleted(df: pd.DataFrame) -> pd.DataFrame:
+    try:
+        if "_v97_filter_deleted_df" in globals():
+            return _v97_filter_deleted_df(df)
+        if "_v96_filter_tombstone" in globals():
+            return _v96_filter_tombstone(df)
+    except Exception:
+        pass
+    return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+
+
+def _v98_table_rows(df: pd.DataFrame) -> list[dict]:
+    try:
+        from services.permanent_authority_service import table_from_df as _pa_table
+        return _pa_table(df)
+    except Exception:
+        try:
+            clean = df.copy().where(pd.notna(df), "")
+            return [dict(r) for _, r in clean.iterrows()]
+        except Exception:
+            return []
+
+
+def _v98_force_upload_time_authority(reason: str = "v98_force_upload") -> None:
+    try:
+        from services.permanent_authority_service import force_upload_authority_file as _pa_force_upload
+        _pa_force_upload("01_time_records", "records", reason=reason)
+        _pa_force_upload("02_history", "records", reason=reason)
+    except Exception:
+        pass
+
+
+def _v98_save_0102_authority_df(df: pd.DataFrame, reason: str = "v98_save_0102", *, github: bool = True) -> int:
+    out = _v98_sort_records(_v98_filter_deleted(df), descending=False)
+    rows = _v98_table_rows(out)
+    try:
+        from services.permanent_authority_service import save_authority as _pa_save
+        # 先寫本機 canonical，再強制上傳。即使本機內容 unchanged，也要確保 GitHub 有最新檔。
+        _pa_save("01_time_records", records={"time_records": rows}, reason=f"{reason}_01", github=False)
+        _pa_save("02_history", records={"time_records": rows}, reason=f"{reason}_02", github=False)
+        if github:
+            _v98_force_upload_time_authority(reason)
+    except Exception as exc:
+        try:
+            write_log("V98_TIME_AUTHORITY_SAVE_ERROR", f"V98 01/02 權威檔寫入失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(len(rows))
+
+
+def _v98_sync_0102_from_sqlite(reason: str = "v98_sync_from_sqlite", *, github: bool = True) -> int:
+    return _v98_save_0102_authority_df(_v98_sqlite_time_records_df(), reason=reason, github=github)
+
+
+def _v98_authority_df(module_key: str) -> pd.DataFrame:
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df
+        df = _pa_df(module_key, "time_records")
+        if isinstance(df, pd.DataFrame):
+            return _v98_filter_deleted(df.copy())
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v98_authority_or_sqlite_df(module_key: str, reason: str = "v98_display_repair") -> pd.DataFrame:
+    auth_df = _v98_authority_df(module_key)
+    if _v98_is_nonempty_df(auth_df):
+        return _v98_sort_records(auth_df, descending=True)
+    # 畫面自我修復：authority 空但 SQLite 有資料時，不能讓使用者看到 No data。
+    sqlite_df = _v98_filter_deleted(_v98_sqlite_time_records_df())
+    if _v98_is_nonempty_df(sqlite_df):
+        # V98B：這是異常自我修復路徑。若 SQLite 有資料但 authority 空，
+        # 代表前一版曾經沒有寫入 GitHub 權威檔；此時必須立即寫回並上傳，
+        # 否則 Streamlit Cloud 下一次 Reboot 還是會再次消失。
+        _v98_save_0102_authority_df(sqlite_df, reason=reason, github=True)
+        return _v98_sort_records(sqlite_df, descending=True)
+    return pd.DataFrame()
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    df = _v98_authority_or_sqlite_df("01_time_records", reason="today_records_v98_sqlite_fallback")
+    if not _v98_is_nonempty_df(df):
+        return pd.DataFrame()
+    out = df.copy()
+    unfinished = _v84_is_unfinished_df(out) if "_v84_is_unfinished_df" in globals() else pd.Series([True] * len(out), index=out.index)
+    if unfinished_only:
+        out = out.loc[unfinished].copy()
+    else:
+        try:
+            cycle_start = _business_cycle_start_date()
+        except Exception:
+            cycle_start = today_text()
+        if "start_date" in out.columns:
+            current_cycle = out["start_date"].astype(str) >= str(cycle_start)
+            out = out.loc[current_cycle | unfinished].copy()
+    return _v98_sort_records(out, descending=True)
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = _v98_authority_or_sqlite_df("02_history", reason="load_records_v98_sqlite_fallback")
+    if not _v98_is_nonempty_df(df):
+        return pd.DataFrame()
+    out = df.copy()
+    if start_date and "start_date" in out.columns:
+        out = out[out["start_date"].astype(str) >= str(start_date)]
+    if end_date and "start_date" in out.columns:
+        out = out[out["start_date"].astype(str) <= str(end_date)]
+    if employee_id and "employee_id" in out.columns:
+        out = out[out["employee_id"].astype(str) == str(employee_id)]
+    if work_order and "work_order" in out.columns:
+        out = out[out["work_order"].astype(str) == str(work_order)]
+    return _v98_sort_records(out, descending=True)
+
+
+def _v98_rows_by_ids(ids) -> pd.DataFrame:
+    try:
+        if "_v96_query_rows_by_ids" in globals():
+            return _v96_query_rows_by_ids(ids)
+    except Exception:
+        pass
+    clean = []
+    for x in ids or []:
+        try:
+            i = int(float(str(x).strip()))
+            if i > 0 and i not in clean:
+                clean.append(i)
+        except Exception:
+            continue
+    if not clean:
+        return pd.DataFrame()
+    try:
+        ph = ",".join(["?"] * len(clean))
+        return query_df(f"SELECT * FROM time_records WHERE id IN ({ph}) ORDER BY id", clean)
+    except Exception:
+        return pd.DataFrame()
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    rid = int(_v98_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        try:
+            row = _v98_rows_by_ids([rid])
+            if _v98_is_nonempty_df(row):
+                if "record_key" in row.columns:
+                    _v97_clear_reused_id_tombstone(rid, str(row.iloc[0].get("record_key") or "")) if "_v97_clear_reused_id_tombstone" in globals() else None
+                # V98：先本機 upsert，再強制上傳 GitHub，避免 Reboot App 後 01/02 空白。
+                try:
+                    if "_v96_upsert_rows_to_authority" in globals():
+                        _v96_upsert_rows_to_authority(row, "start_work_v98_write_through_upsert", github=False)
+                except Exception:
+                    pass
+                _v98_force_upload_time_authority("start_work_v98_write_through")
+            else:
+                _v98_sync_0102_from_sqlite("start_work_v98_full_repair", github=True)
+        except Exception as exc:
+            try:
+                write_log("V98_START_WRITE_THROUGH_ERROR", f"01 開始作業後權威檔/GitHub 同步失敗：{exc}", "time_records", rid, level="ERROR")
+            except Exception:
+                pass
+        try:
+            clear_today_records_fast_cache()
+        except Exception:
+            pass
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    n = int(_v98_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n:
+        _v98_sync_0102_from_sqlite("finish_work_v98_write_through", github=True)
+    return n
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    n = int(_v98_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    if n:
+        _v98_sync_0102_from_sqlite("save_time_records_v98_write_through", github=True)
+    return n
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    n = int(_v98_prev_recalculate_time_records(record_ids) or 0)
+    if n:
+        _v98_sync_0102_from_sqlite("recalculate_time_records_v98_write_through", github=True)
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    n = int(_v98_prev_delete_time_records(record_ids, reason=reason) or 0)
+    # 刪除後即使 DB/authority 變空，也要把空權威檔上傳，避免 Reboot 復活。
+    _v98_sync_0102_from_sqlite("delete_time_records_v98_write_through", github=True)
+    return n
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    if callable(_v98_prev_import_time_records):
+        result = _v98_prev_import_time_records(df, recalc=recalc, source=source)
+    else:
+        result = {"inserted": 0, "updated": 0}
+    try:
+        changed = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
+    except Exception:
+        changed = 0
+    if changed:
+        _v98_sync_0102_from_sqlite("import_time_records_v98_write_through", github=True)
+    return result
+
+
+def sync_time_records_01_02_now(reason: str = "v98_manual_sync", *, github: bool = True) -> int:  # type: ignore[override]
+    return _v98_sync_0102_from_sqlite(reason, github=github)
+# ======================= END V98 01/02 TRUE WRITE-THROUGH + DISPLAY SELF-REPAIR =======================
