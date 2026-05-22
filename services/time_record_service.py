@@ -3988,3 +3988,107 @@ def load_records(start_date: str | None = None, end_date: str | None = None, emp
     return _v89_filter_records_df(df, start_date, end_date, employee_id, work_order) if "_v89_filter_records_df" in globals() else df
 
 # =================== END V96 01 FAST START + 01/2 DELETE AUTHORITY HARD FIX ===================
+
+# =================== V97 01/02 SYNC TOMBSTONE-ID REUSE HARD FIX ===================
+# 修正重點：
+# - 舊版 02 tombstone 同時記錄 id 與 record_key。SQLite 重建後 id 可能被重用，
+#   造成 01 新增成功但同步 02 時被舊 id tombstone 誤殺。
+# - V97 改為 record_key 優先；只有 row 沒有 record_key 時，才允許 id-only tombstone 生效。
+# - 新開始作業完成後若新 record_key 不在刪除清單，會移除同 id 的舊 tombstone，避免後續再被誤過濾。
+
+_v97_prev_start_work = start_work
+
+
+def _v97_filter_deleted_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame() if df is None else df
+    try:
+        ids, keys = _v94_deleted_ids_keys() if "_v94_deleted_ids_keys" in globals() else (set(), set())
+    except Exception:
+        ids, keys = set(), set()
+    if not ids and not keys:
+        return df
+    out = df.copy()
+    id_col = next((c for c in ["id", "ID", "ID / ID", "ID / ID / ID"] if c in out.columns), "")
+    key_col = next((c for c in ["record_key", "紀錄鍵 / Record Key"] if c in out.columns), "")
+    mask = pd.Series([True] * len(out), index=out.index)
+
+    if key_col and keys:
+        key_s = out[key_col].fillna("").astype(str).str.strip()
+        mask &= ~key_s.isin(keys)
+
+    # ID tombstone 僅處理沒有 record_key 的舊資料；避免 SQLite id 重用造成新資料無法同步 02。
+    if id_col and ids:
+        if key_col:
+            key_s = out[key_col].fillna("").astype(str).str.strip()
+            no_key = key_s.eq("")
+        else:
+            no_key = pd.Series([True] * len(out), index=out.index)
+        id_deleted = out[id_col].map(lambda x: (_v89_normalize_record_id(x) if "_v89_normalize_record_id" in globals() else None) in ids)
+        mask &= ~(no_key & id_deleted)
+    return out.loc[mask].copy().reset_index(drop=True)
+
+
+def _v97_clear_reused_id_tombstone(record_id: int, record_key: str) -> None:
+    try:
+        stg = _v94_history_settings() if "_v94_history_settings" in globals() else {}
+        keys = {str(x).strip() for x in stg.get("deleted_record_keys", []) if str(x).strip()}
+        if str(record_key or "").strip() in keys:
+            return
+        rid = _v89_normalize_record_id(record_id) if "_v89_normalize_record_id" in globals() else None
+        if rid is None:
+            return
+        old_ids = stg.get("deleted_record_ids", []) if isinstance(stg.get("deleted_record_ids", []), list) else []
+        new_ids = []
+        changed = False
+        for x in old_ids:
+            xid = _v89_normalize_record_id(x) if "_v89_normalize_record_id" in globals() else None
+            if xid == rid:
+                changed = True
+                continue
+            if xid is not None:
+                new_ids.append(int(xid))
+        if changed:
+            stg["deleted_record_ids"] = sorted(set(new_ids))
+            stg["delete_tombstone_updated_at"] = _now() if "_now" in globals() else now_text()
+            # 開始作業路徑必須維持秒級；清除 SQLite id 重用 tombstone 只寫本地權威檔，避免同步 GitHub 阻塞人員操作。
+            try:
+                from services.permanent_authority_service import save_settings as _pa_save_settings
+                _pa_save_settings("02_history", stg, reason="v97_clear_reused_sqlite_id_tombstone", github=False)
+            except Exception:
+                _v94_save_history_settings(stg, "v97_clear_reused_sqlite_id_tombstone")
+    except Exception:
+        pass
+
+
+def _v96_filter_tombstone(df: pd.DataFrame) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        return _v97_filter_deleted_df(df)
+    except Exception:
+        return df
+
+
+def _v94_filter_deleted_df(df: pd.DataFrame) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        return _v97_filter_deleted_df(df)
+    except Exception:
+        return df
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    rid = int(_v97_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    try:
+        row = _v96_query_rows_by_ids([rid]) if "_v96_query_rows_by_ids" in globals() else pd.DataFrame()
+        record_key = ""
+        if isinstance(row, pd.DataFrame) and not row.empty and "record_key" in row.columns:
+            record_key = str(row.iloc[0].get("record_key") or "").strip()
+        _v97_clear_reused_id_tombstone(rid, record_key)
+        if isinstance(row, pd.DataFrame) and not row.empty and "_v96_upsert_rows_to_authority" in globals():
+            _v96_upsert_rows_to_authority(row, "start_work_v97_reused_id_safe_upsert", github=False)
+    except Exception as exc:
+        try:
+            write_log("V97_START_SYNC_ERROR", f"01 開始作業後同步 02 權威檔失敗：{exc}", "time_records", rid, level="ERROR")
+        except Exception:
+            pass
+    return rid
+# ================= END V97 01/02 SYNC TOMBSTONE-ID REUSE HARD FIX =================

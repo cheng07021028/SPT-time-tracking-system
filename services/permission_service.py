@@ -25,6 +25,13 @@ DB_PATH = PROJECT_ROOT / "data" / "database" / "spt_time_tracking.db"
 _PERMISSION_SCHEMA_READY = False
 _PERMISSION_CACHE_TTL_SECONDS = 300
 
+# V97 guard: V96 direct-authority get_security_settings() uses this constant.
+# It must always exist so 10｜權限管理 can open even if earlier patches are reordered.
+DEFAULT_SECURITY_SETTINGS: Dict[str, str] = {
+    "idle_timeout_minutes": "15",
+    "ask_continue_after_record": "1",
+}
+
 MODULES: List[Dict[str, str]] = [
     {"module_code": "01", "module_name_zh": "工時紀錄", "module_name_en": "Time Recording"},
     {"module_code": "02", "module_name_zh": "歷史紀錄", "module_name_en": "History Records"},
@@ -5212,3 +5219,57 @@ def _v96_best_effort_restore_cache(payload: dict | None = None) -> None:
 # 重要：維持 check_permission 對 has_permission 的指向，登入與模組管制不改。
 check_permission = has_permission
 # ===== V96 PERMISSION TRUE SINGLE-AUTHORITY DIRECT READ/WRITE + SPEED PATCH END =====
+
+# ===== V97 PERMISSION SECURITY SETTINGS NAMEERROR GUARD START =====
+# Fix: 10｜權限管理曾因 DEFAULT_SECURITY_SETTINGS 遺失而整頁 NameError。
+# This final wrapper keeps security settings local-first and direct-authority based.
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    payload = _v96_auth_payload() if "_v96_auth_payload" in globals() else {}
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    out = dict(DEFAULT_SECURITY_SETTINGS)
+    for t in ["auth_security_settings", "security_settings"]:
+        for r in tables.get(t, []) if isinstance(tables.get(t, []), list) else []:
+            if not isinstance(r, dict):
+                continue
+            k = str(r.get("setting_key") or "").strip()
+            if k:
+                out[k] = str(r.get("setting_value") if r.get("setting_value") is not None else out.get(k, ""))
+    return out
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    payload = _v96_auth_payload() if "_v96_auth_payload" in globals() else {}
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {k: [] for k in _V96_AUTH_TABLES}
+    merged = get_security_settings()
+    merged.update({str(k): str(v) for k, v in (settings or {}).items()})
+    try:
+        idle = max(1, int(float(merged.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    merged["idle_timeout_minutes"] = str(idle)
+    merged["ask_continue_after_record"] = "0" if str(merged.get("ask_continue_after_record", "1")).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    rows = [{
+        "setting_key": k,
+        "setting_value": v,
+        "note": "V97 direct-authority security setting",
+        "updated_at": _v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text(),
+    } for k, v in merged.items()]
+    tables["auth_security_settings"] = rows
+    tables["security_settings"] = list(rows)
+    payload["tables"] = tables
+    if "_v96_write_payload" in globals():
+        _v96_write_payload(payload, "save_security_settings_v97", github=True)
+        try:
+            _v96_best_effort_restore_cache(payload)
+        except Exception:
+            pass
+    if st is not None:
+        try:
+            st.session_state["_spt_idle_timeout_cache"] = {"minutes": idle, "ts": 0}
+            st.session_state["spt_security_settings"] = dict(merged)
+        except Exception:
+            pass
+
+check_permission = has_permission
+# ===== V97 PERMISSION SECURITY SETTINGS NAMEERROR GUARD END =====
+

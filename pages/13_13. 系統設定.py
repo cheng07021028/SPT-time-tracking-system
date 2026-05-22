@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from datetime import datetime
 import json
 from pathlib import Path
 import pandas as pd
@@ -300,9 +301,35 @@ def _render_external_auto_backup_center() -> None:
         "系統會依目前執行環境自動停用不適用的模式。"
     )
 
+    # V97：13 系統設定開頁必須秒級。自動備份排程/狀態檢查改為使用者展開後再載入，
+    # 避免每次進入 13 頁面都觸發檔案掃描、排程檢查或雲端同步。
+    try:
+        cfg = load_backup_schedule()
+    except Exception as exc:
+        st.error(f"自動備份設定讀取失敗：{exc}")
+        st.divider()
+        return
+
+    if not st.session_state.get("spt_v97_backup_center_loaded", False):
+        env_info = get_runtime_environment()
+        current_mode = normalize_backup_mode(cfg.get("backup_mode"))
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("排程狀態", "啟用" if cfg.get("enabled") else "停用")
+        s2.metric("每日時間", str(cfg.get("daily_time") or "未設定"))
+        s3.metric("備份模式", {"local_windows": "本機 Windows", "cloud_project": "雲端專案內", "github_cloud": "GitHub 雲端"}.get(current_mode, current_mode))
+        s4.metric("執行環境", "Windows 本機" if env_info.get("is_windows") else ("Streamlit Cloud / Linux 雲端" if env_info.get("is_streamlit_cloud_like") else str(env_info.get("system") or "Unknown")))
+        st.caption("V97 快速載入模式：自動備份詳細狀態、目的地檢查與補跑備份不會在開頁時自動執行。")
+        if st.button("載入自動備份詳細設定 / Load Backup Settings", key="spt_v97_load_backup_center", use_container_width=True):
+            st.session_state["spt_v97_backup_center_loaded"] = True
+            try:
+                st.rerun()
+            except Exception:
+                st.experimental_rerun()
+        st.divider()
+        return
+
     try:
         start_auto_backup_scheduler_once()
-        cfg = load_backup_schedule()
         status = get_schedule_status()
     except Exception as exc:
         st.error(f"自動備份服務載入失敗：{exc}")

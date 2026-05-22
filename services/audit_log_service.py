@@ -1043,3 +1043,130 @@ clear_login_logs_by_date = delete_login_logs_by_date_range
 clear_login_logs = delete_login_logs_by_date_range
 clear_audit_logs_by_date = delete_login_logs_by_date_range
 # ===== V16 ROBUST LOGIN LOG DELETE END =====
+
+# ===== V97 LOGIN LOG SINGLE-AUTHORITY DELETE-PERSIST FIX START =====
+# 目的：11｜登入紀錄刪除後不可再從舊 persistent_state / history 復活。
+# 新增同專案權威檔：data/permanent_store/modules/11_login_logs/records.json。
+# 讀取順序固定：canonical latest -> legacy latest；history 只在 latest 全部不存在時才 fallback。
+
+_V97_LOGIN_AUTHORITY_PATH = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_logs" / "records.json"
+_v97_prev_export_audit_logs_to_permanent_file = export_audit_logs_to_permanent_file
+_v97_prev_delete_login_logs_by_date_range = delete_login_logs_by_date_range
+
+
+def _v97_write_login_authority(records: List[Dict[str, Any]], reason: str = "login_logs_v97") -> None:
+    try:
+        from services.permanent_authority_service import save_authority
+        clean = _merge_record_sets(_valid_login_rows("v97_authority", records or []))
+        save_authority("11_login_logs", records={"login_logs": clean}, reason=reason, github=False)
+    except Exception:
+        try:
+            payload = {
+                "authority_schema": "SPT-PermanentAuthority-V97",
+                "module_key": "11_login_logs",
+                "kind": "records",
+                "reason": reason,
+                "updated_at": _now(),
+                "tables": {"login_logs": records or []},
+                "table_counts": {"login_logs": len(records or [])},
+            }
+            _V97_LOGIN_AUTHORITY_PATH.parent.mkdir(parents=True, exist_ok=True)
+            tmp = _V97_LOGIN_AUTHORITY_PATH.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            tmp.replace(_V97_LOGIN_AUTHORITY_PATH)
+        except Exception:
+            pass
+
+
+def _v97_read_login_authority_records() -> List[Dict[str, Any]]:
+    try:
+        if not _V97_LOGIN_AUTHORITY_PATH.exists() or _V97_LOGIN_AUTHORITY_PATH.stat().st_size <= 2:
+            return []
+        payload = _read_json_file(_V97_LOGIN_AUTHORITY_PATH)
+        rows: List[Dict[str, Any]] = []
+        if isinstance(payload, dict):
+            tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+            for t in ("login_logs", "security_login_logs", "auth_login_logs"):
+                rows.extend([dict(r) for r in tables.get(t, []) if isinstance(r, dict)])
+            if not rows:
+                rows.extend(_extract_login_records_from_payload(payload))
+        return _merge_record_sets(_valid_login_rows("v97_canonical", rows))
+    except Exception:
+        return []
+
+
+def _permanent_candidate_paths() -> List[Path]:  # type: ignore[override]
+    latest: List[Path] = [_V97_LOGIN_AUTHORITY_PATH, AUDIT_STATE_PATH, MODULE_RECORDS_PATH]
+    existing_latest = [p for p in latest if p.exists() and p.stat().st_size > 2]
+    paths: List[Path] = list(existing_latest)
+    if not existing_latest:
+        paths.extend(sorted(AUDIT_HISTORY_DIR.glob("spt_audit_log_state_*.json"), reverse=True)[:3])
+        paths.extend(sorted((MODULE_DIR / "history").glob("11_login_logs_records_*.json"), reverse=True)[:3])
+    seen: set[str] = set(); unique: List[Path] = []
+    for p in paths:
+        sp = str(p)
+        if sp not in seen:
+            seen.add(sp); unique.append(p)
+    return unique
+
+
+def _best_permanent_records() -> tuple[List[Dict[str, Any]], str]:  # type: ignore[override]
+    canonical = _v97_read_login_authority_records()
+    if _V97_LOGIN_AUTHORITY_PATH.exists():
+        return canonical, str(_V97_LOGIN_AUTHORITY_PATH)
+    best: List[Dict[str, Any]] = []
+    best_path = ""; best_ts = ""
+    for path in _permanent_candidate_paths():
+        payload = _read_json_file(path)
+        records = _extract_login_records_from_payload(payload)
+        ts = _payload_timestamp(payload, path)
+        if records or path.exists():
+            if not best_path or ts >= best_ts:
+                best = records; best_path = str(path); best_ts = ts
+    return best, best_path
+
+
+def export_audit_logs_to_permanent_file(create_history: bool = True, merge_existing: bool = True) -> Dict[str, Any]:  # type: ignore[override]
+    # 先沿用原本匯出邏輯，確保 legacy latest 檔仍保持相容；再額外寫 canonical 權威檔。
+    res = _v97_prev_export_audit_logs_to_permanent_file(create_history=create_history, merge_existing=merge_existing)
+    try:
+        records = _to_records(load_login_logs(limit=100000, include_legacy=True))
+        if merge_existing:
+            old_records, _ = _best_permanent_records()
+            records = _merge_record_sets(old_records, records)
+        _v97_write_login_authority(records, "export_login_logs_v97_merge" if merge_existing else "export_login_logs_v97_db_only")
+        res["v97_authority_file"] = str(_V97_LOGIN_AUTHORITY_PATH)
+        res["v97_authority_count"] = len(records)
+    except Exception as exc:
+        res["v97_authority_error"] = str(exc)[:300]
+    return res
+
+
+def _v97_export_login_logs_from_db_only(create_history: bool = True) -> Dict[str, Any]:
+    # 刪除後必須只以目前 DB 狀態覆寫，不得 merge 舊永久檔。
+    res = _v16_export_audit_logs_from_db_only(create_history=create_history) if "_v16_export_audit_logs_from_db_only" in globals() else {"ok": True}
+    records = _to_records(load_login_logs(limit=100000, include_legacy=True))
+    _v97_write_login_authority(records, "delete_login_logs_v97_db_only_authority")
+    res["v97_authority_file"] = str(_V97_LOGIN_AUTHORITY_PATH)
+    res["v97_authority_count"] = len(records)
+    return res
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    deleted = int(_v97_prev_delete_login_logs_by_date_range(start_date, end_date) or 0)
+    try:
+        _v97_export_login_logs_from_db_only(create_history=True)
+    except Exception:
+        pass
+    return deleted
+
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+delete_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+clear_audit_logs_by_date = delete_login_logs_by_date_range
+restore_login_logs_from_permanent_file = restore_audit_logs_from_permanent_file
+restore_audit_logs_from_state = restore_audit_logs_from_permanent_file
+# ===== V97 LOGIN LOG SINGLE-AUTHORITY DELETE-PERSIST FIX END =====
