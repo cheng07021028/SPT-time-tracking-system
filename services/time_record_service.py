@@ -2571,3 +2571,176 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
 def sync_time_records_01_02_now(reason: str = "v84_manual_sync", *, github: bool = True) -> int:  # type: ignore[override]
     return _v84_sync_time_records_canonical_from_sqlite(reason, github=github)
 # ======================= END V84 01/02 SINGLE AUTHORITY SYNC =====================
+
+
+# ======================= V86 01 FAST LOAD / SYNC OVERRIDE =======================
+# 目標：01 工時紀錄為作業人員主要頁面，開始/結束作業後不得因 GitHub/重型查詢卡住。
+# 原則：
+# 1. 業務規則不改：仍走原 start_work / finish_work / save / recalc / delete。
+# 2. 01/02 權威檔仍同步，但一般作業先做本機 canonical；管理員操作可依設定做 GitHub。
+# 3. today_records 加短暫快取，資料異動後立即清除。
+# 4. 建立 SQLite 索引，加速目前作業與今日紀錄查詢。
+
+_V86_TODAY_CACHE: dict[tuple[bool, bool], tuple[float, pd.DataFrame]] = {}
+_V86_INDEX_READY = False
+_V86_TODAY_CACHE_SECONDS = 5.0
+
+try:
+    _v86_prev_today_records = today_records
+except Exception:
+    _v86_prev_today_records = None
+try:
+    _v86_prev_start_work = start_work
+except Exception:
+    _v86_prev_start_work = None
+try:
+    _v86_prev_finish_work = finish_work
+except Exception:
+    _v86_prev_finish_work = None
+try:
+    _v86_prev_save_time_records = save_time_records
+except Exception:
+    _v86_prev_save_time_records = None
+try:
+    _v86_prev_recalculate_time_records = recalculate_time_records
+except Exception:
+    _v86_prev_recalculate_time_records = None
+try:
+    _v86_prev_delete_time_records = delete_time_records
+except Exception:
+    _v86_prev_delete_time_records = None
+try:
+    _v86_prev_import_time_records = import_time_records
+except Exception:
+    _v86_prev_import_time_records = None
+
+
+def _v86_time_now_seconds() -> float:
+    try:
+        import time as _time
+        return float(_time.time())
+    except Exception:
+        return 0.0
+
+
+def clear_today_records_fast_cache() -> None:
+    """Public cache clear hook for 01 page / other services."""
+    try:
+        _V86_TODAY_CACHE.clear()
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+
+
+def _v86_ensure_time_record_indexes_once() -> None:
+    global _V86_INDEX_READY
+    if _V86_INDEX_READY:
+        return
+    _V86_INDEX_READY = True
+    stmts = [
+        "CREATE INDEX IF NOT EXISTS idx_time_records_start_date ON time_records(start_date)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_employee_active ON time_records(employee_id, end_timestamp, status)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_group_active ON time_records(employee_id, employee_name, process_name, start_date, end_timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_updated_at ON time_records(updated_at)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_work_order ON time_records(work_order)",
+    ]
+    for sql in stmts:
+        try:
+            execute(sql)
+        except Exception:
+            pass
+
+
+def _v86_fast_sync_time_authority(reason: str, *, github: bool = False) -> int:
+    """Sync 01/02 canonical files without forcing slow GitHub during operator clicks."""
+    try:
+        if "_v84_sync_time_records_canonical_from_sqlite" in globals():
+            return int(_v84_sync_time_records_canonical_from_sqlite(reason, github=github))
+    except Exception as exc:
+        try:
+            write_log("V86_FAST_SYNC_ERROR", f"01/02 權威檔快速同步失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    return 0
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    _v86_ensure_time_record_indexes_once()
+    key = (bool(include_finished), bool(unfinished_only))
+    now_s = _v86_time_now_seconds()
+    cached = _V86_TODAY_CACHE.get(key)
+    if cached and (now_s - cached[0] <= _V86_TODAY_CACHE_SECONDS):
+        return cached[1].copy()
+    if callable(_v86_prev_today_records):
+        df = _v86_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+    else:
+        df = pd.DataFrame()
+    if df is None:
+        df = pd.DataFrame()
+    _V86_TODAY_CACHE[key] = (now_s, df.copy())
+    return df.copy()
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    _v86_ensure_time_record_indexes_once()
+    rid = _v86_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) if callable(_v86_prev_start_work) else 0
+    clear_today_records_fast_cache()
+    # 作業員點選開始時不做重型 GitHub；本機 canonical 立即同步，02 歷史可即時讀到。
+    if rid:
+        _v86_fast_sync_time_authority("start_work_v86_fast", github=False)
+    return int(rid or 0)
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    _v86_ensure_time_record_indexes_once()
+    count = _v86_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) if callable(_v86_prev_finish_work) else 0
+    clear_today_records_fast_cache()
+    if count:
+        _v86_fast_sync_time_authority("finish_work_v86_fast", github=False)
+    return int(count or 0)
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    n = _v86_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) if callable(_v86_prev_save_time_records) else 0
+    clear_today_records_fast_cache()
+    if n:
+        # 管理員明確存檔才允許 GitHub，但底層有 unchanged skip 與短逾時。
+        _v86_fast_sync_time_authority("save_time_records_v86", github=True)
+    return int(n or 0)
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    count = _v86_prev_recalculate_time_records(record_ids) if callable(_v86_prev_recalculate_time_records) else 0
+    clear_today_records_fast_cache()
+    if count:
+        _v86_fast_sync_time_authority("recalculate_time_records_v86", github=True)
+    return int(count or 0)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    deleted = _v86_prev_delete_time_records(record_ids, reason=reason) if callable(_v86_prev_delete_time_records) else 0
+    clear_today_records_fast_cache()
+    if deleted:
+        _v86_fast_sync_time_authority("delete_time_records_v86", github=True)
+    return int(deleted or 0)
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    result = _v86_prev_import_time_records(df, recalc=recalc, source=source) if callable(_v86_prev_import_time_records) else {"inserted": 0, "updated": 0}
+    clear_today_records_fast_cache()
+    try:
+        changed = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
+    except Exception:
+        changed = 0
+    if changed:
+        _v86_fast_sync_time_authority("import_time_records_v86", github=True)
+    return result
+
+
+def sync_time_records_01_02_now(reason: str = "v86_manual_sync", *, github: bool = True) -> int:  # type: ignore[override]
+    clear_today_records_fast_cache()
+    return _v86_fast_sync_time_authority(reason, github=github)
+# ===================== END V86 01 FAST LOAD / SYNC OVERRIDE =====================

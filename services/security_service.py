@@ -2491,3 +2491,32 @@ def _restore_auth_users_lightweight_if_needed(username: str = "") -> None:  # ty
             ))
     except Exception:
         pass
+
+
+# ======================= V86 01 FAST PROMPT STOP =======================
+# 目的：01 工時紀錄完成後顯示「是否繼續」對話框時，立即停止背景頁面繼續渲染。
+# 避免使用者點「繼續」時，背景還在重建今日紀錄/管理員表格造成卡住。
+try:
+    _v86_prev_render_post_record_continue_prompt = render_post_record_continue_prompt
+except Exception:
+    _v86_prev_render_post_record_continue_prompt = None
+
+
+def render_post_record_continue_prompt() -> None:  # type: ignore[override]
+    if not st.session_state.get("post_record_prompt"):
+        return
+    if callable(_v86_prev_render_post_record_continue_prompt):
+        _v86_prev_render_post_record_continue_prompt()
+    else:
+        st.success(st.session_state.get("post_record_message", "工時紀錄已完成"))
+        c1, c2 = st.columns(2)
+        if c1.button("是，繼續記錄 / Continue", use_container_width=True, key="post_continue_yes_v86"):
+            st.session_state["post_record_prompt"] = False
+            mark_activity()
+            st.rerun()
+        if c2.button("否，登出帳號 / Logout", use_container_width=True, key="post_continue_no_v86"):
+            logout("完成工時後選擇不繼續記錄，自動登出")
+            st.rerun()
+    # 關鍵：對話框顯示後停止本次頁面渲染，不再往下跑 01 表格與管理員維護區。
+    st.stop()
+# ===================== END V86 01 FAST PROMPT STOP =====================

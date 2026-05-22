@@ -586,3 +586,77 @@ def save_employees_df(df: pd.DataFrame) -> int:  # type: ignore[override]
     write_log("SAVE_EMPLOYEES", f"V84 canonical 權威檔儲存人員 {len(rows)} 筆", "employees")
     return len(rows)
 # ======================= END V84 03/04 SINGLE AUTHORITY LOAD/SAVE =====================
+
+
+# ======================= V86 01 MASTER DATA FAST CACHE =======================
+# 01 工時紀錄每次 widget 互動都會 rerun；此處只快取作業員頁必需下拉資料。
+# 資料新增/修改/刪除仍走原本 03/04 權威檔，短暫快取只減少同一使用者連續點選的讀檔成本。
+_V86_MD_FAST_CACHE: dict[tuple[str, bool, bool], tuple[float, pd.DataFrame]] = {}
+_V86_MD_CACHE_SECONDS = 15.0
+
+try:
+    _v86_prev_load_employees_for_time_record_fast = load_employees_for_time_record_fast
+except Exception:
+    _v86_prev_load_employees_for_time_record_fast = None
+try:
+    _v86_prev_load_work_orders_for_time_record_fast = load_work_orders_for_time_record_fast
+except Exception:
+    _v86_prev_load_work_orders_for_time_record_fast = None
+try:
+    _v86_prev_has_master_data_for_time_record_fast = has_master_data_for_time_record_fast
+except Exception:
+    _v86_prev_has_master_data_for_time_record_fast = None
+
+
+def _v86_md_now() -> float:
+    try:
+        import time as _time
+        return float(_time.time())
+    except Exception:
+        return 0.0
+
+
+def clear_time_record_master_fast_cache() -> None:
+    try:
+        _V86_MD_FAST_CACHE.clear()
+    except Exception:
+        pass
+
+
+def _v86_md_cached(key: tuple[str, bool, bool], loader):
+    now_s = _v86_md_now()
+    got = _V86_MD_FAST_CACHE.get(key)
+    if got and (now_s - got[0] <= _V86_MD_CACHE_SECONDS):
+        return got[1].copy()
+    df = loader()
+    if df is None:
+        df = pd.DataFrame()
+    _V86_MD_FAST_CACHE[key] = (now_s, df.copy())
+    return df.copy()
+
+
+def load_employees_for_time_record_fast(active_only: bool = True, in_factory_only: bool = False):  # type: ignore[override]
+    return _v86_md_cached(
+        ("employees", bool(active_only), bool(in_factory_only)),
+        lambda: _v86_prev_load_employees_for_time_record_fast(active_only=active_only, in_factory_only=in_factory_only) if callable(_v86_prev_load_employees_for_time_record_fast) else load_employees(active_only=active_only, in_factory_only=in_factory_only),
+    )
+
+
+def load_work_orders_for_time_record_fast(active_only: bool = True):  # type: ignore[override]
+    return _v86_md_cached(
+        ("work_orders", bool(active_only), False),
+        lambda: _v86_prev_load_work_orders_for_time_record_fast(active_only=active_only) if callable(_v86_prev_load_work_orders_for_time_record_fast) else load_work_orders(active_only=active_only),
+    )
+
+
+def has_master_data_for_time_record_fast(employees=None, work_orders=None):  # type: ignore[override]
+    if callable(_v86_prev_has_master_data_for_time_record_fast):
+        return _v86_prev_has_master_data_for_time_record_fast(employees, work_orders)
+    emp_df = employees if employees is not None else load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
+    wo_df = work_orders if work_orders is not None else load_work_orders_for_time_record_fast(active_only=True)
+    has_emp = bool(emp_df is not None and hasattr(emp_df, "empty") and not emp_df.empty)
+    has_wo = bool(wo_df is not None and hasattr(wo_df, "empty") and not wo_df.empty)
+    if employees is None and work_orders is None:
+        return {"has_employees_master": has_emp, "has_work_orders_master": has_wo, "employees_count": len(emp_df) if emp_df is not None else 0, "work_orders_count": len(wo_df) if wo_df is not None else 0}
+    return has_emp, has_wo
+# ===================== END V86 01 MASTER DATA FAST CACHE =====================

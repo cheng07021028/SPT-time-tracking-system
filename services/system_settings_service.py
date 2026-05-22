@@ -3675,3 +3675,88 @@ def get_process_options_by_model(type_name: str | None = None, include_common: b
     return get_process_options_by_category(type_name, include_common=include_common)
 
 # ======================= END V85 SYSTEM SETTINGS SINGLE AUTHORITY FIX =======================
+
+
+# ======================= V86 01 SYSTEM SETTINGS FAST CACHE =======================
+# 只針對 01 工時紀錄下拉必需設定做短暫快取；13 系統設定儲存後仍會清除原本設定快取。
+_V86_SYS_FAST_CACHE: dict[tuple[str, str, bool], tuple[float, object]] = {}
+_V86_SYS_CACHE_SECONDS = 15.0
+
+try:
+    _v86_prev_load_process_category_choices = load_process_category_choices
+except Exception:
+    _v86_prev_load_process_category_choices = None
+try:
+    _v86_prev_get_default_process_category = get_default_process_category
+except Exception:
+    _v86_prev_get_default_process_category = None
+try:
+    _v86_prev_get_process_options_by_category_exact = get_process_options_by_category_exact
+except Exception:
+    _v86_prev_get_process_options_by_category_exact = None
+try:
+    _v86_prev_get_live_page_reset_time = get_live_page_reset_time
+except Exception:
+    _v86_prev_get_live_page_reset_time = None
+
+
+def _v86_sys_now() -> float:
+    try:
+        import time as _time
+        return float(_time.time())
+    except Exception:
+        return 0.0
+
+
+def clear_time_record_system_fast_cache() -> None:
+    try:
+        _V86_SYS_FAST_CACHE.clear()
+    except Exception:
+        pass
+
+
+def _v86_sys_cached(key: tuple[str, str, bool], loader, copy_list: bool = True):
+    now_s = _v86_sys_now()
+    got = _V86_SYS_FAST_CACHE.get(key)
+    if got and (now_s - got[0] <= _V86_SYS_CACHE_SECONDS):
+        val = got[1]
+        return list(val) if copy_list and isinstance(val, list) else val
+    val = loader()
+    if isinstance(val, list):
+        store_val = list(val)
+    else:
+        store_val = val
+    _V86_SYS_FAST_CACHE[key] = (now_s, store_val)
+    return list(store_val) if copy_list and isinstance(store_val, list) else store_val
+
+
+def load_process_category_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    return _v86_sys_cached(
+        ("category_choices", "", bool(include_common)),
+        lambda: _v86_prev_load_process_category_choices(include_common=include_common) if callable(_v86_prev_load_process_category_choices) else [PROCESS_CATEGORY_ALL],
+    )
+
+
+def get_default_process_category() -> str:  # type: ignore[override]
+    return str(_v86_sys_cached(
+        ("default_category", "", False),
+        lambda: _v86_prev_get_default_process_category() if callable(_v86_prev_get_default_process_category) else PROCESS_CATEGORY_ALL,
+        copy_list=False,
+    ) or PROCESS_CATEGORY_ALL)
+
+
+def get_process_options_by_category_exact(category_name: str | None = None) -> list[str]:  # type: ignore[override]
+    category = _norm_category_name(category_name)
+    return _v86_sys_cached(
+        ("process_options_exact", category, False),
+        lambda: _v86_prev_get_process_options_by_category_exact(category) if callable(_v86_prev_get_process_options_by_category_exact) else [],
+    )
+
+
+def get_live_page_reset_time() -> str:  # type: ignore[override]
+    return str(_v86_sys_cached(
+        ("live_page_reset_time", "", False),
+        lambda: _v86_prev_get_live_page_reset_time() if callable(_v86_prev_get_live_page_reset_time) else DEFAULT_LIVE_PAGE_RESET_TIME,
+        copy_list=False,
+    ) or DEFAULT_LIVE_PAGE_RESET_TIME)
+# ===================== END V86 01 SYSTEM SETTINGS FAST CACHE =====================

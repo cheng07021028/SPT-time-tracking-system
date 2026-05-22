@@ -19,6 +19,7 @@ from services.master_data_service import (
     has_master_data_for_time_record_fast,
 )
 from services.time_record_service import (
+    clear_today_records_fast_cache,
     clear_today_finished_from_work_page,
     delete_time_records,
     recalculate_time_records,
@@ -188,6 +189,10 @@ if is_admin:
     with c_filter2:
         if st.button("⚡ 立即重新整理 01 顯示（隱藏舊週期已完工，不影響 02 歷史紀錄）", use_container_width=True, key="clear_today_finished_view"):
             n = clear_today_finished_from_work_page()
+            try:
+                clear_today_records_fast_cache()
+            except Exception:
+                pass
             st.success(f"已重新整理 01 頁顯示；02 歷史紀錄不受影響。已隱藏目前已結束筆數：{n}")
             st.rerun()
 df = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
@@ -197,274 +202,146 @@ if is_admin and not df.empty:
         render_width_settings("01.time_records.main", df, title="01 工時紀錄欄位順序與欄寬設定 / Column Order and Width")
 render_table(df, "01.time_records.main", editable=False, height=420)
 
-# V1.81：修改、刪除、存檔功能只允許管理員看見與操作。
-# 一般作業人員只能開始/暫停/下班/完工，不顯示人工維護工具，避免冒用或誤刪資料。
+# V1.81 + V86：修改、刪除、存檔功能只允許管理員看見與操作。
+# V86：管理員維護表格改成需要時才載入，避免作業員或管理員一般點選時都重建大型 data_editor。
 if is_admin:
     st.divider()
     with st.expander("▤ 管理員工時紀錄維護｜修改、刪除、存檔", expanded=False):
-        st.warning("此區僅管理員可見。修改或刪除會直接影響正式工時紀錄，請確認後再存檔。")
-        if df.empty:
-            st.info("今日目前沒有可維護的工時紀錄。")
-        else:
-            # V79：管理員維護區改為按需載入，避免 01 頁每次點選都先建立大型可編輯表格。
-            load_admin_maintenance = st.checkbox(
-                "載入管理員維護表格 / Load Admin Maintenance Table",
-                value=bool(st.session_state.get("_v79_load_01_admin_maintenance", False)),
-                key="_v79_load_01_admin_maintenance",
-                help="平常不載入可編輯維護表格，可大幅降低 01 頁每次點選後的等待時間；需要修改、重算或刪除時再勾選。",
-            )
-            if not load_admin_maintenance:
-                st.info("為加速 01 工時紀錄頁面，管理員維護表格目前未載入。需修改、重算或刪除時，請勾選上方『載入管理員維護表格』。")
-                st.stop()
-
-            # V79：維護表格一定重新讀取 01 顯示同一份即時資料，不沿用舊 data_editor 草稿。
-            admin_df = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
-            admin_select_key = "_spt_select_today_records_admin_delete_ids"
-            editor_version_key = "today_records_admin_editor_version"
-            if editor_version_key not in st.session_state:
-                st.session_state[editor_version_key] = 0
-
-            # V79：如果 SQLite 正式資料已變更（例如上方 Today Records 已完工），
-            # 必須清掉管理員維護表格舊草稿，否則同一 id 的 end_action/end_timestamp 會被舊 draft 顯示成 None。
+        st.warning("此區僅管理員可見。V86 起預設不載入大型編輯表格；需要修改/刪除/重算時再按下方按鈕載入。")
+        load_admin_table = st.session_state.get("today_records_admin_load_v86", False)
+        ca, cb, cc = st.columns([1.2, 1.2, 2.2])
+        if ca.button("▤ 載入維護表格 / Load", use_container_width=True, key="today_records_admin_load_btn_v86"):
+            st.session_state["today_records_admin_load_v86"] = True
             try:
-                _sig_cols = [c for c in ["id", "updated_at", "status", "end_action", "end_timestamp", "work_hours", "remark"] if c in admin_df.columns]
-                _admin_source_sig = "|".join(admin_df[_sig_cols].astype(str).fillna("").agg("¦".join, axis=1).tolist()) if _sig_cols else str(len(admin_df))
-                if st.session_state.get("_v79_today_admin_source_sig") != _admin_source_sig:
-                    try:
-                        from services.column_settings_service import clear_editor_draft
-                        clear_editor_draft("01.time_records.admin_maintenance")
-                        clear_editor_draft("today_records_admin_maintenance")
-                    except Exception:
-                        pass
-                    st.session_state["_v79_today_admin_source_sig"] = _admin_source_sig
-                    st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                clear_today_records_fast_cache()
             except Exception:
                 pass
+            st.rerun()
+        if cb.button("⟳ 卸載維護表格 / Unload", use_container_width=True, key="today_records_admin_unload_btn_v86"):
+            st.session_state["today_records_admin_load_v86"] = False
+            st.rerun()
+        cc.caption("一般開始/暫停/完工/下班不會再重建此表格；正式修改時再載入，可大幅縮短 01 頁面每次點選時間。")
 
-            def _safe_int_id(v):
-                try:
-                    if pd.isna(v):
-                        return None
-                except Exception:
-                    pass
-                try:
-                    return int(float(str(v).strip()))
-                except Exception:
-                    return None
+        if not st.session_state.get("today_records_admin_load_v86", False):
+            st.info("管理員維護表格尚未載入。平常作業記錄不需要載入此區，避免拖慢 01 工時紀錄。")
+        else:
+            try:
+                clear_today_records_fast_cache()
+            except Exception:
+                pass
+            admin_source_df = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
+            if admin_source_df.empty:
+                st.info("今日目前沒有可維護的工時紀錄。")
+            else:
+                admin_df = admin_source_df.copy()
+                admin_select_key = "_spt_select_today_records_admin_delete_ids"
+                editor_version_key = "today_records_admin_editor_version"
+                if editor_version_key not in st.session_state:
+                    st.session_state[editor_version_key] = 0
 
-            def _safe_bool_cell(v):
-                if isinstance(v, bool):
-                    return v
-                try:
-                    if pd.isna(v):
-                        return False
-                except Exception:
-                    pass
-                s = str(v).strip().lower()
-                if s in {"1", "true", "yes", "y", "on", "是", "勾選", "checked"}:
-                    return True
-                if s in {"0", "false", "no", "n", "off", "否", "", "none", "nan"}:
-                    return False
-                return bool(v)
-
-            def _find_first_col(frame, candidates):
-                """Find a backend/display column safely. V77 fixes Select All when ID is displayed as ID / ID."""
-                try:
-                    cols = list(frame.columns)
-                except Exception:
-                    return None
-                exact = {str(c): c for c in cols}
-                for c in candidates:
-                    if c in exact:
-                        return exact[c]
-                lowered = {str(c).strip().lower(): c for c in cols}
-                for c in candidates:
-                    key = str(c).strip().lower()
-                    if key in lowered:
-                        return lowered[key]
-                return None
-
-            def _normalize_today_admin_edit_df(frame):
-                """Convert display labels returned by data_editor back to backend column names."""
-                if frame is None or not isinstance(frame, pd.DataFrame):
-                    return pd.DataFrame()
-                out = frame.copy()
-                rename_map = {
-                    "ID / ID": "id",
-                    "紀錄鍵 / Record Key": "record_key",
-                    "狀態 / Status": "status",
-                    "製令 / Work Order": "work_order",
-                    "P/N / Part No.": "part_no",
-                    "機型 / Type": "type_name",
-                    "工段名稱 / Process": "process_name",
-                    "工號 / Employee ID": "employee_id",
-                    "姓名 / Name": "employee_name",
-                    "開始時間戳 / Start Timestamp": "start_timestamp",
-                    "結束時間戳 / End Timestamp": "end_timestamp",
-                    "開始日期 / Start Date": "start_date",
-                    "開始時間 / Start Time": "start_time",
-                    "結束日期 / End Date": "end_date",
-                    "結束時間 / End Time": "end_time",
-                    "工時小計 / Work Time": "work_hours",
-                    "備註 / Remark": "remark",
-                    "建立時間 / Created At": "created_at",
-                    "更新時間 / Updated At": "updated_at",
-                }
-                out = out.rename(columns={k: v for k, v in rename_map.items() if k in out.columns and v not in out.columns})
-                return out
-
-            def _clear_today_admin_editor_state():
-                # V75：只清本維護表格的 data_editor 草稿，不清其他模組狀態。
-                # 原本全選/取消已改 session_state，但全域 data_editor draft 仍保留舊 checkbox，
-                # 所以畫面看起來像兩個按鈕沒有作用。
-                tokens = (
-                    "today_records_admin_editor_",
-                    "today_records_admin_maintenance",
-                    "today_records_admin_maintenance_editor_",
-                    "01.time_records.admin_maintenance",
-                    "01.time_records.main",
-                )
-                for k in list(st.session_state.keys()):
-                    sk = str(k)
-                    if sk in {admin_select_key, editor_version_key}:
-                        continue
-                    if sk.startswith("today_records_admin_editor_") or any(t in sk for t in tokens):
+                _id_col = "id" if "id" in admin_df.columns else ("ID" if "ID" in admin_df.columns else ("ID / ID" if "ID / ID" in admin_df.columns else ""))
+                _all_admin_ids = []
+                if _id_col:
+                    for _x in admin_df[_id_col].dropna().tolist():
                         try:
-                            st.session_state.pop(k, None)
+                            _all_admin_ids.append(int(float(str(_x))))
                         except Exception:
                             pass
-                try:
-                    from services.column_settings_service import clear_editor_draft
-                    clear_editor_draft("today_records_admin_editor")
-                    clear_editor_draft("today_records_admin_maintenance")
-                    clear_editor_draft("today_records_admin_maintenance_editor")
-                    clear_editor_draft("01.time_records.admin_maintenance")
-                    clear_editor_draft("01.time_records.main")
-                except Exception:
-                    pass
+                _all_admin_id_set = set(_all_admin_ids)
+                _selected_admin_ids = set()
+                for _x in st.session_state.get(admin_select_key, []):
+                    try:
+                        _ix = int(float(str(_x)))
+                        if _ix in _all_admin_id_set:
+                            _selected_admin_ids.add(_ix)
+                    except Exception:
+                        pass
 
-            def _set_today_admin_selected(ids):
-                clean_ids = []
-                for x in ids or []:
-                    ix = _safe_int_id(x)
-                    if ix is not None:
-                        clean_ids.append(ix)
-                st.session_state[admin_select_key] = clean_ids
-                st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                _clear_today_admin_editor_state()
-                return set(clean_ids)
+                sc1, sc2, sc3 = st.columns([1, 1, 3])
+                if sc1.button("◈ 勾選全部紀錄 / Select All", use_container_width=True, key="today_admin_select_all_rows_v86"):
+                    st.session_state[admin_select_key] = _all_admin_ids
+                    st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                    st.rerun()
+                if sc2.button("◌ 取消全部勾選 / Clear All", use_container_width=True, key="today_admin_clear_all_rows_v86"):
+                    st.session_state[admin_select_key] = []
+                    st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                    st.rerun()
+                sc3.caption("勾選會保留到你手動取消、刪除成功或卸載本表格；不會因重算或重新整理自動消失。")
 
-            _admin_id_col = _find_first_col(admin_df, ["id", "ID", "ID / ID", "Id / Id"])
-            _all_admin_ids = []
-            if _admin_id_col is not None:
-                _all_admin_ids = [x for x in [_safe_int_id(v) for v in admin_df[_admin_id_col].tolist()] if x is not None]
-            _all_admin_id_set = set(_all_admin_ids)
-            _selected_admin_ids = set()
-            for x in st.session_state.get(admin_select_key, []) or []:
-                ix = _safe_int_id(x)
-                if ix is not None and ix in _all_admin_id_set:
-                    _selected_admin_ids.add(ix)
+                _selected_admin_ids = set()
+                for _x in st.session_state.get(admin_select_key, []):
+                    try:
+                        _ix = int(float(str(_x)))
+                        if _ix in _all_admin_id_set:
+                            _selected_admin_ids.add(_ix)
+                    except Exception:
+                        pass
+                if _id_col:
+                    admin_df.insert(0, "刪除 / Delete", admin_df[_id_col].map(lambda x: int(float(str(x))) in _selected_admin_ids if str(x).strip().lower() not in {"", "nan", "none", "nat"} else False))
+                else:
+                    admin_df.insert(0, "刪除 / Delete", False)
 
-            sc1, sc2, sc3 = st.columns([1, 1, 3])
-            if sc1.button("◈ 勾選全部紀錄 / Select All", use_container_width=True, key="today_admin_select_all_rows"):
-                _selected_admin_ids = _set_today_admin_selected(_all_admin_ids)
-            if sc2.button("◌ 取消全部勾選 / Clear All", use_container_width=True, key="today_admin_clear_all_rows"):
-                _selected_admin_ids = _set_today_admin_selected([])
-            sc3.caption("勾選會保留到你手動取消、刪除成功或離開本頁；不會因重新計算後自動清空。")
-
-            # V77：刪除欄值直接由後端選取清單重建；支援 id / ID / ID / ID 顯示欄位。
-            # 先移除舊刪除欄，避免重複欄位讓 data_editor 只顯示其中一個。
-            for _del_col in ["刪除", "刪除 / Delete"]:
-                if _del_col in admin_df.columns:
-                    admin_df = admin_df.drop(columns=[_del_col])
-            if _admin_id_col is not None:
-                admin_df.insert(0, "刪除", [_safe_int_id(x) in _selected_admin_ids for x in admin_df[_admin_id_col].tolist()])
-            else:
-                admin_df.insert(0, "刪除", False)
-            selection_sig = f"{len(_selected_admin_ids)}_{sum(_selected_admin_ids) if _selected_admin_ids else 0}"
-            editor_key = f"today_records_admin_maintenance_editor_{st.session_state[editor_version_key]}_{selection_sig}"
-            st.info("V2.28：確認執行後會重新載入表格，畫面會同步顯示最新日期、時間與工時小計。")
-            with st.form("today_records_admin_commit_form", clear_on_submit=False):
+                editor_key = f"today_records_admin_editor_v86_{st.session_state[editor_version_key]}"
+                st.info("V86：此表格僅在需要維護時載入；儲存、重算、刪除後會同步 01/02 權威檔並清除今日快取。")
                 edited_admin = render_table(
                     admin_df,
                     "today_records_admin_maintenance",
                     editable=True,
-                    disabled=["id", "ID / ID", "record_key", "紀錄鍵 / Record Key", "created_at", "建立時間 / Created At", "updated_at", "更新時間 / Updated At"],
+                    disabled=["id", "ID", "ID / ID", "record_key", "created_at", "updated_at"],
                     key=editor_key,
                     height=460,
                 )
-                st.markdown("**確認後執行動作 / Confirm Action**")
-                act_save_col, act_recalc_col, act_delete_col = st.columns([1.1, 1.8, 1.2])
-                save_admin_clicked = act_save_col.form_submit_button(
-                    "◈ 僅儲存修改 / Save",
-                    type="primary",
-                    use_container_width=True,
-                )
-                recalc_admin_clicked = act_recalc_col.form_submit_button(
-                    "◇ 重算勾選工時並同步 02 / Recalc Selected",
-                    type="primary",
-                    use_container_width=True,
-                )
-                delete_admin_clicked = act_delete_col.form_submit_button(
-                    "◉ 刪除勾選整列 / Delete Selected",
-                    type="primary",
-                    use_container_width=True,
-                )
-                submitted_admin = bool(save_admin_clicked or recalc_admin_clicked or delete_admin_clicked)
-                if save_admin_clicked:
-                    admin_action = "僅儲存修改"
-                elif recalc_admin_clicked:
-                    admin_action = "重新計算勾選紀錄工時並同步 02 歷史紀錄"
-                elif delete_admin_clicked:
-                    admin_action = "刪除勾選整列紀錄"
-                else:
-                    admin_action = ""
 
-            if submitted_admin and edited_admin is not None:
-                edited_admin_backend = _normalize_today_admin_edit_df(edited_admin)
-                ui_delete_ids = []
-                try:
-                    delete_col = _find_first_col(edited_admin_backend, ["刪除", "刪除 / Delete"])
-                    id_col = _find_first_col(edited_admin_backend, ["id", "ID", "ID / ID", "Id / Id"])
-                    delete_mask = edited_admin_backend[delete_col].map(_safe_bool_cell) if delete_col is not None else pd.Series(False, index=edited_admin_backend.index)
-                    delete_rows = edited_admin_backend[delete_mask]
-                    if id_col is not None:
-                        ui_delete_ids = [int(x) for x in [_safe_int_id(v) for v in delete_rows[id_col].tolist()] if x is not None]
-                except Exception:
-                    ui_delete_ids = []
-                session_delete_ids = [x for x in st.session_state.get(admin_select_key, []) if _safe_int_id(x) in _all_admin_id_set]
-                # V75：批次全選/取消以 session 選取清單為準；手動勾選則以表格回傳為準。
-                # 這可避免 data_editor 舊草稿尚未刷新時，按鈕已執行但確認動作取不到勾選列。
-                delete_ids = ui_delete_ids or session_delete_ids
-                st.session_state[admin_select_key] = delete_ids
+                b1, b2, b3 = st.columns(3)
+                do_save = b1.button("💾 僅儲存修改 / Save", type="primary", use_container_width=True, key="today_admin_save_v86")
+                do_recalc = b2.button("🧮 重算勾選工時並同步 02 / Recalc", use_container_width=True, key="today_admin_recalc_v86")
+                do_delete = b3.button("🗑 刪除勾選整列 / Delete", use_container_width=True, key="today_admin_delete_v86")
 
-                if admin_action == "僅儲存修改":
-                    save_df = edited_admin_backend.drop(columns=["刪除", "刪除 / Delete"], errors="ignore")
-                    count = save_time_records(save_df)
-                    st.success(f"已由管理員存檔修改 {count} 筆今日工時紀錄。")
-                    _clear_today_admin_editor_state()
-                    st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                    st.rerun()
-                elif admin_action == "重新計算勾選紀錄工時並同步 02 歷史紀錄":
-                    if not delete_ids:
-                        st.warning("請先在『刪除』勾選欄勾選要重新計算的紀錄，再按確認執行。")
-                    else:
-                        # V2.26：若管理員剛修改開始/結束時間戳，先儲存並同步日期/時間欄位，再重新計算。
-                        save_df = edited_admin_backend.drop(columns=["刪除", "刪除 / Delete"], errors="ignore")
-                        save_time_records(save_df, recalc_edited_timestamps=True)
-                        count = recalculate_time_records(delete_ids)
-                        st.success(f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時，同步更新到 02 歷史紀錄。")
-                        _clear_today_admin_editor_state()
+                if (do_save or do_recalc or do_delete) and edited_admin is not None:
+                    delete_col = "刪除 / Delete" if "刪除 / Delete" in edited_admin.columns else ("刪除" if "刪除" in edited_admin.columns else "")
+                    delete_ids = []
+                    try:
+                        if delete_col and _id_col and _id_col in edited_admin.columns:
+                            delete_rows = edited_admin[edited_admin[delete_col].astype(bool)]
+                            delete_ids = [int(float(str(x))) for x in delete_rows[_id_col].dropna().tolist()]
+                    except Exception:
+                        delete_ids = []
+                    st.session_state[admin_select_key] = delete_ids
+
+                    if do_save:
+                        save_df = edited_admin.drop(columns=[delete_col], errors="ignore")
+                        count = save_time_records(save_df)
+                        try:
+                            clear_today_records_fast_cache()
+                        except Exception:
+                            pass
+                        st.success(f"已由管理員存檔修改 {count} 筆今日工時紀錄。")
                         st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                         st.rerun()
-                else:
-                    if not delete_ids:
-                        st.warning("請先在『刪除』勾選欄勾選要刪除的紀錄，再按確認執行。")
-                    else:
-                        count = delete_time_records(delete_ids, reason="01 工時紀錄管理員維護區刪除")
-                        remaining = [x for x in st.session_state.get(admin_select_key, []) if int(x) not in set(delete_ids)]
-                        st.session_state[admin_select_key] = remaining
-                        st.success(f"已由管理員刪除 {count} 筆今日工時紀錄。")
-                        _clear_today_admin_editor_state()
-                        st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
-                        st.rerun()
+                    elif do_recalc:
+                        if not delete_ids:
+                            st.warning("請先在『刪除 / Delete』勾選欄勾選要重新計算的紀錄，再按重算。")
+                        else:
+                            save_df = edited_admin.drop(columns=[delete_col], errors="ignore")
+                            save_time_records(save_df, recalc_edited_timestamps=True)
+                            count = recalculate_time_records(delete_ids)
+                            try:
+                                clear_today_records_fast_cache()
+                            except Exception:
+                                pass
+                            st.success(f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時，同步更新到 02 歷史紀錄。")
+                            st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                            st.rerun()
+                    elif do_delete:
+                        if not delete_ids:
+                            st.warning("請先在『刪除 / Delete』勾選欄勾選要刪除的紀錄，再按刪除。")
+                        else:
+                            count = delete_time_records(delete_ids, reason="01 工時紀錄管理員維護區刪除")
+                            st.session_state[admin_select_key] = []
+                            try:
+                                clear_today_records_fast_cache()
+                            except Exception:
+                                pass
+                            st.success(f"已由管理員刪除 {count} 筆今日工時紀錄。")
+                            st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
+                            st.rerun()

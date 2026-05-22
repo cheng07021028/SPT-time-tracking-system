@@ -1029,3 +1029,22 @@ def load_authority(module_key: str, kind: str = "records") -> dict[str, Any]:  #
     atomic_write_json(p, payload)
     return payload
 # ======================= END V84.4 PROMOTE LEGACY ONLY FOR PRE-V84 BROKEN EMPTY PRIMARY =====================
+
+
+# ======================= V86 FAST GITHUB TIMEOUT DEFAULTS =======================
+# 01 工時紀錄是高頻作業頁；GitHub 網路異常時不得讓頁面卡住很久。
+# 若公司環境需要較長逾時，可用 Streamlit secrets / 環境變數覆蓋：
+# SPT_GITHUB_GET_TIMEOUT、SPT_GITHUB_PUT_TIMEOUT。
+def _v72_github_timeout_get() -> float:  # type: ignore[override]
+    try:
+        return float(os.environ.get("SPT_GITHUB_GET_TIMEOUT", "2.0") or 2.0)
+    except Exception:
+        return 2.0
+
+
+def _v72_github_timeout_put() -> float:  # type: ignore[override]
+    try:
+        return float(os.environ.get("SPT_GITHUB_PUT_TIMEOUT", "4.0") or 4.0)
+    except Exception:
+        return 4.0
+# ===================== END V86 FAST GITHUB TIMEOUT DEFAULTS =====================
