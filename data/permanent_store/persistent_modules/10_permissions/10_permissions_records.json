@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-22 13:45:43",
+  "exported_at": "2026-05-22 17:13:21",
   "source": "db_service_write",
   "module_key": "10_permissions",
   "module_code": "10",
@@ -2148,14 +2148,20 @@
       {
         "setting_key": "idle_timeout_minutes",
         "setting_value": "15",
-        "note": "閒置自動登出分鐘數 / Idle logout minutes",
-        "updated_at": "2026-05-22 13:42:33"
+        "note": "V1.69 synchronized security setting",
+        "updated_at": "2026-05-15 11:23:50"
+      },
+      {
+        "setting_key": "ask_continue_after_record",
+        "setting_value": "1",
+        "note": "V1.69 synchronized security setting",
+        "updated_at": "2026-05-15 11:23:50"
       }
     ]
   },
   "table_counts": {
     "auth_users": 9,
     "auth_account_permissions": 117,
-    "auth_security_settings": 1
+    "auth_security_settings": 2
   }
 }
