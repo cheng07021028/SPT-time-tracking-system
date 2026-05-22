@@ -1,12 +1,14 @@
 {
-  "authority_schema": "SPT-PermanentAuthority-V29",
+  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-22 17:38:36",
+  "updated_at": "2026-05-22 17:43:56",
   "exported_at": "2026-05-22 17:38:36",
-  "reason": "set_idle_timeout_minutes_v98",
+  "reason": "save_account_master_pre_delete_v96",
   "empty_authoritative": false,
   "tables": {
+    "auth_users": [],
+    "auth_account_permissions": [],
     "auth_security_settings": [
       {
         "setting_key": "idle_timeout_minutes",
@@ -34,11 +36,22 @@
         "note": "V98 single authority post-record prompt",
         "updated_at": "2026-05-22 17:38:36"
       }
-    ]
+    ],
+    "security_users": [],
+    "security_user_roles": []
   },
   "settings": {},
   "table_counts": {
+    "auth_users": 0,
+    "auth_account_permissions": 0,
     "auth_security_settings": 2,
-    "security_settings": 2
-  }
+    "security_settings": 2,
+    "security_users": 0,
+    "security_user_roles": 0
+  },
+  "deleted_usernames": [
+    "sss"
+  ],
+  "version": "V96-direct-authority",
+  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
 }
