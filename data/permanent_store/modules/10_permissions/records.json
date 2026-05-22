@@ -2,9 +2,9 @@
   "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-22 23:12:59",
+  "updated_at": "2026-05-22 23:13:00",
   "exported_at": "2026-05-22 17:13:21",
-  "reason": "save_account_master_pre_delete_v96",
+  "reason": "save_users_v96",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -18,10 +18,9 @@
         "role_code": "admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": "2026-05-15 11:23:39",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-15 11:23:39"
+        "updated_at": "2026-05-22 23:13:00"
       },
       {
         "username": "manager",
@@ -33,10 +32,9 @@
         "role_code": "manager",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-15 10:58:34"
+        "updated_at": "2026-05-22 23:13:00"
       },
       {
         "username": "leader",
@@ -48,10 +46,9 @@
         "role_code": "leader",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-15 10:58:34"
+        "updated_at": "2026-05-22 23:13:00"
       },
       {
         "username": "operator",
@@ -63,10 +60,9 @@
         "role_code": "operator",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-15 10:58:34"
+        "updated_at": "2026-05-22 23:13:00"
       },
       {
         "username": "viewer",
@@ -78,10 +74,9 @@
         "role_code": "viewer",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-15 10:58:34"
+        "updated_at": "2026-05-22 23:13:00"
       },
       {
         "username": "auditor",
@@ -93,10 +88,9 @@
         "role_code": "auditor",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-15 10:58:34"
+        "updated_at": "2026-05-22 23:13:00"
       },
       {
         "username": "Ethan",
@@ -108,10 +102,9 @@
         "role_code": "admin",
         "is_active": 1,
         "force_password_change": 0,
-        "last_login_at": null,
         "note": "",
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-19 00:16:23"
+        "updated_at": "2026-05-22 23:13:00"
       }
     ],
     "auth_account_permissions": [
