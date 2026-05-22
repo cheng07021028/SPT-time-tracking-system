@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import re
+
 import streamlit as st
 import pandas as pd
 
@@ -63,6 +65,131 @@ render_header("01｜工時紀錄", "快速開始、同步作業、暫停、下�
 render_post_record_continue_prompt()
 
 
+# ===== V100 WORK ORDER MANUAL INPUT + FUZZY SEARCH FIX =====
+def _v100_inject_work_order_input_css() -> None:
+    """Page-level override: keep 01 work-order dropdown/search text readable on dark HUD theme."""
+    st.markdown(
+        """
+<style>
+/* V100｜01 工時紀錄：製令下拉、模糊搜尋、手動輸入文字改淺色，不改資料流程 */
+.stSelectbox div[data-baseweb="select"] > div,
+.stTextInput div[data-baseweb="input"] > div,
+.stTextInput input {
+    background: linear-gradient(135deg, rgba(18, 28, 68, 0.98), rgba(28, 41, 91, 0.94)) !important;
+    border: 1px solid rgba(103, 239, 255, 0.92) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 16px rgba(79,229,255,0.22) !important;
+}
+.stSelectbox div[data-baseweb="select"] span,
+.stSelectbox div[data-baseweb="select"] p,
+.stSelectbox div[data-baseweb="select"] div,
+.stSelectbox div[data-baseweb="select"] input,
+.stSelectbox div[data-baseweb="select"] div[role="combobox"],
+.stTextInput input,
+.stTextInput input::placeholder,
+div[data-baseweb="popover"] [role="option"],
+div[data-baseweb="popover"] [role="option"] * {
+    color: #eaffff !important;
+    -webkit-text-fill-color: #eaffff !important;
+    font-weight: 850 !important;
+    text-shadow: 0 0 10px rgba(121,237,255,0.26) !important;
+}
+div[data-baseweb="popover"] > div {
+    background: #07162b !important;
+    border: 1px solid rgba(103,239,255,0.55) !important;
+    box-shadow: 0 18px 46px rgba(0,0,0,0.58), 0 0 28px rgba(79,229,255,0.18) !important;
+}
+div[data-baseweb="popover"] [role="option"]:hover,
+div[data-baseweb="popover"] [aria-selected="true"] {
+    background: rgba(79,229,255,0.18) !important;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def _v100_norm(value) -> str:
+    text = str(value or "").strip().upper()
+    return re.sub(r"[^0-9A-Z\u4e00-\u9fff]+", "", text)
+
+
+def _v100_work_order_label(row) -> str:
+    parts = [
+        str(row.get("work_order") or "").strip(),
+        str(row.get("part_no") or "").strip(),
+        str(row.get("type_name") or "").strip(),
+    ]
+    return "｜".join([x for x in parts if x])
+
+
+def _v100_fuzzy_work_order_options(work_orders_df: pd.DataFrame, keyword: str, limit: int = 80) -> list[str]:
+    """Return scored fuzzy-search labels without touching the original work-order table."""
+    if work_orders_df is None or work_orders_df.empty:
+        return []
+    keyword_raw = str(keyword or "").strip()
+    keyword_norm = _v100_norm(keyword_raw)
+    if not keyword_norm:
+        return [_v100_work_order_label(r) for _, r in work_orders_df.head(limit).iterrows()]
+
+    tokens = [_v100_norm(x) for x in re.split(r"[\s,，/|｜]+", keyword_raw) if _v100_norm(x)]
+    scored: list[tuple[int, str]] = []
+    for _, row in work_orders_df.iterrows():
+        label = _v100_work_order_label(row)
+        searchable = " ".join(
+            str(row.get(c) or "")
+            for c in ["work_order", "part_no", "type_name", "assembly_location", "customer", "note"]
+            if c in work_orders_df.columns
+        )
+        n_label = _v100_norm(label)
+        n_search = _v100_norm(searchable)
+        score = 0
+        wo_norm = _v100_norm(row.get("work_order"))
+        if wo_norm == keyword_norm:
+            score += 1000
+        if wo_norm.startswith(keyword_norm):
+            score += 720
+        if keyword_norm in wo_norm:
+            score += 620
+        if keyword_norm in n_label:
+            score += 520
+        if keyword_norm in n_search:
+            score += 420
+        if tokens and all(t in n_search for t in tokens):
+            score += 260 + len(tokens)
+        if score:
+            scored.append((score, label))
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    out: list[str] = []
+    seen: set[str] = set()
+    for _, label in scored:
+        if label and label not in seen:
+            seen.add(label)
+            out.append(label)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _v100_find_work_order_dict(work_orders_df: pd.DataFrame, work_order_no: str) -> dict:
+    wo_no = str(work_order_no or "").strip()
+    if not wo_no:
+        return {}
+    if work_orders_df is not None and not work_orders_df.empty and "work_order" in work_orders_df.columns:
+        mask = work_orders_df["work_order"].fillna("").astype(str).str.strip().str.upper() == wo_no.upper()
+        match = work_orders_df[mask]
+        if not match.empty:
+            return match.iloc[0].fillna("").to_dict()
+    row = query_one("SELECT * FROM work_orders WHERE UPPER(TRIM(work_order))=UPPER(TRIM(?))", (wo_no,))
+    if row:
+        return row
+    # 手動輸入但主檔沒有時，仍允許建立工時紀錄；P/N、機型保留空白，不影響既有 start_work 邏輯。
+    return {"work_order": wo_no, "part_no": "", "type_name": "", "assembly_location": ""}
+
+
+_v100_inject_work_order_input_css()
+# ===== V100 WORK ORDER MANUAL INPUT + FUZZY SEARCH FIX END =====
+
+
 # V13: 01 opens from latest memory files/SQLite without doing heavy master restore inline.
 employees = load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
 work_orders = load_work_orders_for_time_record_fast(active_only=True)
@@ -89,10 +216,43 @@ with left:
     emp_match = employees[employees["employee_id"].fillna("").astype(str).str.strip() == emp_id]
     employee = emp_match.iloc[0].fillna("").to_dict() if not emp_match.empty else (query_one("SELECT * FROM employees WHERE employee_id=?", (emp_id,)) or {})
 
-    wo_label = st.selectbox("製令｜Work Order", work_orders.apply(lambda r: f"{r['work_order']}｜{r.get('part_no','')}｜{r.get('type_name','')}", axis=1).tolist())
-    wo_no = wo_label.split("｜")[0]
-    wo_match = work_orders[work_orders["work_order"].fillna("").astype(str).str.strip() == wo_no]
-    work_order = wo_match.iloc[0].fillna("").to_dict() if not wo_match.empty else (query_one("SELECT * FROM work_orders WHERE work_order=?", (wo_no,)) or {})
+    # V100：製令可保留原下拉，也可手動輸入/模糊搜尋。
+    # - 未輸入關鍵字：維持原本下拉選單流程。
+    # - 有輸入關鍵字：先清空下拉預設值，避免沿用上一筆選到的製令；可直接使用手動輸入，或從模糊搜尋結果選擇。
+    wo_manual_query = st.text_input(
+        "製令手動輸入 / 模糊搜尋｜Manual Work Order Search",
+        value="",
+        key="start_work_order_manual_query_v100",
+        placeholder="可輸入製令、P/N、機型關鍵字；輸入後下方製令下拉會先清空",
+    )
+    _wo_all_labels = [_v100_work_order_label(r) for _, r in work_orders.iterrows()]
+    _wo_all_labels = [x for x in _wo_all_labels if x]
+    _wo_query = str(wo_manual_query or "").strip()
+    if _wo_query:
+        _wo_fuzzy_labels = _v100_fuzzy_work_order_options(work_orders, _wo_query)
+        _manual_direct_label = f"直接使用手動輸入｜{_wo_query}"
+        _wo_options = [""] + [_manual_direct_label] + [x for x in _wo_fuzzy_labels if x]
+        wo_label = st.selectbox(
+            "製令｜Work Order",
+            _wo_options,
+            index=0,
+            key="start_work_order_select_v100_manual",
+            format_func=lambda x: "請選擇模糊搜尋結果，或選『直接使用手動輸入』" if x == "" else x,
+        )
+        if wo_label == "":
+            wo_no = _wo_query
+            work_order = _v100_find_work_order_dict(work_orders, wo_no)
+            st.caption("已清空原下拉選取；若直接按開始，會使用上方手動輸入的製令。")
+        elif wo_label.startswith("直接使用手動輸入｜"):
+            wo_no = _wo_query
+            work_order = _v100_find_work_order_dict(work_orders, wo_no)
+        else:
+            wo_no = wo_label.split("｜")[0]
+            work_order = _v100_find_work_order_dict(work_orders, wo_no)
+    else:
+        wo_label = st.selectbox("製令｜Work Order", _wo_all_labels, key="start_work_order_select_v100_normal")
+        wo_no = wo_label.split("｜")[0]
+        work_order = _v100_find_work_order_dict(work_orders, wo_no)
 
     category_choices = load_process_category_choices(include_common=True)
     default_category = get_default_process_category()
