@@ -1,0 +1,270 @@
+{
+  "authority_schema": "SPT-LoginLogsDeleteState-V106",
+  "module_key": "11_login_logs",
+  "updated_at": "2026-05-23 00:51:52",
+  "delete_ranges": [
+    {
+      "start_date": "2026-04-23",
+      "end_date": "2026-05-23",
+      "deleted_at": "2026-05-23 00:51:52",
+      "deleted_count": 42
+    }
+  ],
+  "deleted_keys": [
+    "Admin|LOGIN|FAIL|2026-05-15 11:23:34||帳號不存在",
+    "B211|AUTO_LOGOUT|SUCCESS|2026-05-15 11:15:13||閒置超過 1 分鐘，自動登出",
+    "B211|LOGIN|SUCCESS|2026-05-15 10:59:01||roles=operator",
+    "B211|LOGIN|SUCCESS|2026-05-15 11:13:59||roles=operator",
+    "B211|LOGIN|SUCCESS|2026-05-15 11:21:46||roles=operator",
+    "admin|LOGIN|FAIL|2026-05-15 10:47:49||密碼錯誤",
+    "admin|LOGIN|SUCCESS|2026-05-15 03:46:55||roles=admin",
+    "admin|LOGIN|SUCCESS|2026-05-15 03:51:27||roles=admin",
+    "admin|LOGIN|SUCCESS|2026-05-15 03:52:41||roles=admin",
+    "admin|LOGIN|SUCCESS|2026-05-15 05:26:06||roles=admin",
+    "admin|LOGIN|SUCCESS|2026-05-15 07:34:12||roles=admin",
+    "admin|LOGIN|SUCCESS|2026-05-15 10:47:55||roles=admin",
+    "admin|LOGIN|SUCCESS|2026-05-15 10:49:34||roles=admin",
+    "admin|LOGIN|SUCCESS|2026-05-15 10:57:27||roles=admin",
+    "admin|LOGIN|SUCCESS|2026-05-15 11:08:18|11_login_logs|roles=admin",
+    "admin|LOGIN|SUCCESS|2026-05-15 11:23:39||roles=admin",
+    "admin|LOGIN|SUCCESS|2026-05-23 00:51:24|11_login_logs|roles=admin",
+    "admin|LOGOUT|SUCCESS|2026-05-15 07:33:36||使用者手動登出",
+    "admin|LOGOUT|SUCCESS|2026-05-15 10:48:59||使用者手動登出",
+    "admin|LOGOUT|SUCCESS|2026-05-15 10:50:29||使用者手動登出",
+    "admin|LOGOUT|SUCCESS|2026-05-15 10:58:43||使用者手動登出",
+    "b211|LOGIN|FAIL|2026-05-15 10:58:51||帳號不存在",
+    "spt142|LOGIN|FAIL|2026-05-15 10:46:52||帳號不存在",
+    "spt142|LOGIN|SUCCESS|2026-05-15 10:49:08||roles=operator",
+    "spt142|LOGIN|SUCCESS|2026-05-15 10:50:40||roles=operator",
+    "spt142|LOGIN|SUCCESS|2026-05-15 11:18:26||roles=operator",
+    "spt142|LOGOUT|SUCCESS|2026-05-15 10:49:21||使用者手動登出",
+    "spt142|LOGOUT|SUCCESS|2026-05-15 11:18:36||使用者手動登出",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:36:52|03_work_orders|03_work_orders:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:36:53|04_employees|04_employees:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:36:54|03_work_orders|03_work_orders:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:36:56|05_analysis|05_analysis:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:36:57|06_logs|06_logs:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:00|07_missing|07_missing:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:03|09_persistence|09_persistence:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:05|11_login_logs|11_login_logs:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:06|11_login_logs|11_login_logs:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:06|12_module_persistence|12_module_persistence:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:07|12_module_persistence|12_module_persistence:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:08|11_login_logs|11_login_logs:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:49:18|03_work_orders|03_work_orders:can_view",
+    "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:49:19|04_employees|04_employees:can_view"
+  ],
+  "last_deleted_count": 42,
+  "last_deleted_rows_preview": [
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-23 00:51:24",
+      "key": "admin|LOGIN|SUCCESS|2026-05-23 00:51:24|11_login_logs|roles=admin"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 11:23:39",
+      "key": "admin|LOGIN|SUCCESS|2026-05-15 11:23:39||roles=admin"
+    },
+    {
+      "username": "Admin",
+      "event_type": "LOGIN",
+      "result": "FAIL",
+      "login_time": "2026-05-15 11:23:34",
+      "key": "Admin|LOGIN|FAIL|2026-05-15 11:23:34||帳號不存在"
+    },
+    {
+      "username": "B211",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 11:21:46",
+      "key": "B211|LOGIN|SUCCESS|2026-05-15 11:21:46||roles=operator"
+    },
+    {
+      "username": "spt142",
+      "event_type": "LOGOUT",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 11:18:36",
+      "key": "spt142|LOGOUT|SUCCESS|2026-05-15 11:18:36||使用者手動登出"
+    },
+    {
+      "username": "spt142",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 11:18:26",
+      "key": "spt142|LOGIN|SUCCESS|2026-05-15 11:18:26||roles=operator"
+    },
+    {
+      "username": "B211",
+      "event_type": "AUTO_LOGOUT",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 11:15:13",
+      "key": "B211|AUTO_LOGOUT|SUCCESS|2026-05-15 11:15:13||閒置超過 1 分鐘，自動登出"
+    },
+    {
+      "username": "B211",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 11:13:59",
+      "key": "B211|LOGIN|SUCCESS|2026-05-15 11:13:59||roles=operator"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 11:08:18",
+      "key": "admin|LOGIN|SUCCESS|2026-05-15 11:08:18|11_login_logs|roles=admin"
+    },
+    {
+      "username": "B211",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 10:59:01",
+      "key": "B211|LOGIN|SUCCESS|2026-05-15 10:59:01||roles=operator"
+    },
+    {
+      "username": "b211",
+      "event_type": "LOGIN",
+      "result": "FAIL",
+      "login_time": "2026-05-15 10:58:51",
+      "key": "b211|LOGIN|FAIL|2026-05-15 10:58:51||帳號不存在"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGOUT",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 10:58:43",
+      "key": "admin|LOGOUT|SUCCESS|2026-05-15 10:58:43||使用者手動登出"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 10:57:27",
+      "key": "admin|LOGIN|SUCCESS|2026-05-15 10:57:27||roles=admin"
+    },
+    {
+      "username": "spt142",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 10:50:40",
+      "key": "spt142|LOGIN|SUCCESS|2026-05-15 10:50:40||roles=operator"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGOUT",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 10:50:29",
+      "key": "admin|LOGOUT|SUCCESS|2026-05-15 10:50:29||使用者手動登出"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 10:49:34",
+      "key": "admin|LOGIN|SUCCESS|2026-05-15 10:49:34||roles=admin"
+    },
+    {
+      "username": "spt142",
+      "event_type": "LOGOUT",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 10:49:21",
+      "key": "spt142|LOGOUT|SUCCESS|2026-05-15 10:49:21||使用者手動登出"
+    },
+    {
+      "username": "spt142",
+      "event_type": "PERMISSION_DENIED",
+      "result": "FAIL",
+      "login_time": "2026-05-15 10:49:19",
+      "key": "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:49:19|04_employees|04_employees:can_view"
+    },
+    {
+      "username": "spt142",
+      "event_type": "PERMISSION_DENIED",
+      "result": "FAIL",
+      "login_time": "2026-05-15 10:49:18",
+      "key": "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:49:18|03_work_orders|03_work_orders:can_view"
+    },
+    {
+      "username": "spt142",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 10:49:08",
+      "key": "spt142|LOGIN|SUCCESS|2026-05-15 10:49:08||roles=operator"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGOUT",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 10:48:59",
+      "key": "admin|LOGOUT|SUCCESS|2026-05-15 10:48:59||使用者手動登出"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-15 10:47:55",
+      "key": "admin|LOGIN|SUCCESS|2026-05-15 10:47:55||roles=admin"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "FAIL",
+      "login_time": "2026-05-15 10:47:49",
+      "key": "admin|LOGIN|FAIL|2026-05-15 10:47:49||密碼錯誤"
+    },
+    {
+      "username": "spt142",
+      "event_type": "LOGIN",
+      "result": "FAIL",
+      "login_time": "2026-05-15 10:46:52",
+      "key": "spt142|LOGIN|FAIL|2026-05-15 10:46:52||帳號不存在"
+    },
+    {
+      "username": "spt142",
+      "event_type": "PERMISSION_DENIED",
+      "result": "FAIL",
+      "login_time": "2026-05-15 10:37:08",
+      "key": "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:08|11_login_logs|11_login_logs:can_view"
+    },
+    {
+      "username": "spt142",
+      "event_type": "PERMISSION_DENIED",
+      "result": "FAIL",
+      "login_time": "2026-05-15 10:37:07",
+      "key": "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:07|12_module_persistence|12_module_persistence:can_view"
+    },
+    {
+      "username": "spt142",
+      "event_type": "PERMISSION_DENIED",
+      "result": "FAIL",
+      "login_time": "2026-05-15 10:37:06",
+      "key": "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:06|11_login_logs|11_login_logs:can_view"
+    },
+    {
+      "username": "spt142",
+      "event_type": "PERMISSION_DENIED",
+      "result": "FAIL",
+      "login_time": "2026-05-15 10:37:06",
+      "key": "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:06|12_module_persistence|12_module_persistence:can_view"
+    },
+    {
+      "username": "spt142",
+      "event_type": "PERMISSION_DENIED",
+      "result": "FAIL",
+      "login_time": "2026-05-15 10:37:05",
+      "key": "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:05|11_login_logs|11_login_logs:can_view"
+    },
+    {
+      "username": "spt142",
+      "event_type": "PERMISSION_DENIED",
+      "result": "FAIL",
+      "login_time": "2026-05-15 10:37:03",
+      "key": "spt142|PERMISSION_DENIED|FAIL|2026-05-15 10:37:03|09_persistence|09_persistence:can_view"
+    }
+  ]
+}
