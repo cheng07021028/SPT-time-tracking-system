@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-22 23:13:23",
-  "exported_at": "2026-05-22 23:13:23",
-  "reason": "export_login_logs_v97_merge",
+  "updated_at": "2026-05-22 23:13:32",
+  "exported_at": "2026-05-22 23:13:32",
+  "reason": "export_login_logs_v97_db_only",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
@@ -25,7 +25,7 @@
         "created_at": "2026-05-22 23:13:23"
       },
       {
-        "id": 43,
+        "id": 44,
         "source": "v97_authority",
         "username": "admin",
         "display_name": "系統管理員",
@@ -41,7 +41,7 @@
         "created_at": "2026-05-22 22:03:54"
       },
       {
-        "id": 43,
+        "id": 45,
         "source": "v97_authority",
         "username": "admin",
         "display_name": "系統管理員",
@@ -57,7 +57,7 @@
         "created_at": "2026-05-22 18:25:02"
       },
       {
-        "id": 1,
+        "id": 46,
         "source": "v97_authority",
         "username": "admin",
         "display_name": "系統管理員",
@@ -473,22 +473,6 @@
         "created_at": "2026-05-15 10:37:07"
       },
       {
-        "id": 17,
-        "source": "v97_authority",
-        "username": "spt142",
-        "display_name": "spt142",
-        "event_type": "PERMISSION_DENIED",
-        "result": "FAIL",
-        "message": "12_module_persistence:can_view",
-        "module_code": "12_module_persistence",
-        "login_time": "2026-05-15 10:37:06",
-        "logout_time": "",
-        "idle_minutes": null,
-        "ip_address": "",
-        "user_agent": "streamlit",
-        "created_at": "2026-05-15 10:37:06"
-      },
-      {
         "id": 16,
         "source": "v97_authority",
         "username": "spt142",
@@ -497,6 +481,22 @@
         "result": "FAIL",
         "message": "11_login_logs:can_view",
         "module_code": "11_login_logs",
+        "login_time": "2026-05-15 10:37:06",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-15 10:37:06"
+      },
+      {
+        "id": 17,
+        "source": "v97_authority",
+        "username": "spt142",
+        "display_name": "spt142",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "12_module_persistence:can_view",
+        "module_code": "12_module_persistence",
         "login_time": "2026-05-15 10:37:06",
         "logout_time": "",
         "idle_minutes": null,
