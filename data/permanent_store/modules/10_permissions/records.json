@@ -2,9 +2,9 @@
   "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-23 00:49:43",
+  "updated_at": "2026-05-23 00:49:46",
   "exported_at": "0000-DB-CACHE",
-  "reason": "save_users_v96",
+  "reason": "save_account_master_v96",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -20,7 +20,7 @@
         "force_password_change": 0,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "manager",
@@ -34,7 +34,7 @@
         "force_password_change": 0,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "leader",
@@ -48,7 +48,7 @@
         "force_password_change": 0,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "operator",
@@ -62,7 +62,7 @@
         "force_password_change": 0,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "viewer",
@@ -72,11 +72,11 @@
         "display_name": "查詢者",
         "email": "viewer",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:24"
       },
       {
         "username": "auditor",
@@ -90,7 +90,7 @@
         "force_password_change": 0,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "SPT142",
@@ -104,7 +104,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "B211",
@@ -116,9 +116,10 @@
         "role_code": "operator",
         "is_active": 1,
         "force_password_change": 0,
+        "last_login_at": "2026-05-15 11:21:46",
         "note": "",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-15 11:21:46"
       },
       {
         "username": "Ethan",
@@ -132,7 +133,7 @@
         "force_password_change": 0,
         "note": "V1.29 default account",
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "SPT003",
@@ -146,7 +147,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "SPT005",
@@ -160,7 +161,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "SPT236",
@@ -174,7 +175,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "SPT015",
@@ -188,7 +189,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "SPT024",
@@ -202,7 +203,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "SPT031",
@@ -216,7 +217,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "SPT034",
@@ -230,7 +231,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "SPT048",
@@ -244,7 +245,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "SPT059",
@@ -258,7 +259,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:21"
       },
       {
         "username": "SPT063",
@@ -272,7 +273,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT077",
@@ -286,7 +287,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT084",
@@ -300,7 +301,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT087",
@@ -314,7 +315,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT088",
@@ -328,7 +329,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT089",
@@ -342,7 +343,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT091",
@@ -356,7 +357,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT092",
@@ -370,7 +371,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT121",
@@ -384,7 +385,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT118",
@@ -398,7 +399,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT138",
@@ -412,7 +413,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT105",
@@ -426,7 +427,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT120",
@@ -440,7 +441,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT145",
@@ -454,7 +455,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT148",
@@ -468,7 +469,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT149",
@@ -482,7 +483,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT150",
@@ -496,7 +497,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT151",
@@ -510,7 +511,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT158",
@@ -524,7 +525,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT160",
@@ -538,7 +539,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT172",
@@ -552,7 +553,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT173",
@@ -566,7 +567,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT174",
@@ -580,7 +581,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT183",
@@ -594,7 +595,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT189",
@@ -608,7 +609,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT193",
@@ -622,7 +623,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT195",
@@ -636,7 +637,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT196",
@@ -650,7 +651,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT199",
@@ -664,7 +665,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT201",
@@ -678,7 +679,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT208",
@@ -692,7 +693,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT220",
@@ -706,7 +707,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT227",
@@ -720,7 +721,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT228",
@@ -734,7 +735,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT229",
@@ -748,7 +749,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT230",
@@ -762,7 +763,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT231",
@@ -776,7 +777,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT235",
@@ -790,7 +791,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT239",
@@ -804,7 +805,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:22"
       },
       {
         "username": "SPT240",
@@ -818,7 +819,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "SPT241",
@@ -832,7 +833,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "SPT242",
@@ -846,7 +847,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "SPT243",
@@ -860,7 +861,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "SPT244",
@@ -874,7 +875,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "SPT245",
@@ -888,7 +889,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "SPT250",
@@ -902,7 +903,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "SPT252",
@@ -916,7 +917,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B002",
@@ -930,7 +931,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B126",
@@ -944,7 +945,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B135",
@@ -958,7 +959,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B177",
@@ -972,7 +973,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B189",
@@ -986,7 +987,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B190",
@@ -1000,7 +1001,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B203",
@@ -1014,7 +1015,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B204",
@@ -1028,7 +1029,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B227",
@@ -1042,7 +1043,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B210",
@@ -1056,7 +1057,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B226",
@@ -1070,7 +1071,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B228",
@@ -1084,7 +1085,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B235",
@@ -1098,7 +1099,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B155",
@@ -1112,7 +1113,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B168",
@@ -1126,7 +1127,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B229",
@@ -1140,7 +1141,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B230",
@@ -1154,7 +1155,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B243",
@@ -1168,7 +1169,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B244",
@@ -1182,7 +1183,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B245",
@@ -1196,7 +1197,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B246",
@@ -1210,7 +1211,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B247",
@@ -1224,7 +1225,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B248",
@@ -1238,7 +1239,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B250",
@@ -1252,7 +1253,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B251",
@@ -1266,7 +1267,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B252",
@@ -1280,7 +1281,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B253",
@@ -1294,7 +1295,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B254",
@@ -1308,7 +1309,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:15",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B255",
@@ -1322,7 +1323,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:15",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B256",
@@ -1336,7 +1337,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:15",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B249",
@@ -1350,7 +1351,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:15",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:23"
       },
       {
         "username": "B258",
@@ -1364,7 +1365,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:15",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:24"
       },
       {
         "username": "B259",
@@ -1378,7 +1379,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-23 00:17:15",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:24"
       },
       {
         "username": "B257",
@@ -1392,7 +1393,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:15",
-        "updated_at": "2026-05-23 00:49:43"
+        "updated_at": "2026-05-23 00:25:24"
       }
     ],
     "auth_account_permissions": [
