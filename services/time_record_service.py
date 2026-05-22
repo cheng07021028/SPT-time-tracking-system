@@ -4898,3 +4898,295 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
 
 # =================== END V108 01 START/FINISH FAST ASYNC AUTHORITY UPLOAD =====================
 
+# ===================== V109 01/02 RECALC BIDIRECTIONAL AUTHORITY SYNC =====================
+# 修正目的：
+# 1) 01「重算勾選工時並同步」完成後，01_time_records 與 02_history 必須同一批資料、同一個工時計算結果。
+# 2) 02「重算勾選工時」完成後，也必須同步回 01_time_records，不可只更新 02 畫面或 SQLite cache。
+# 3) 重算後的最終來源改為 canonical 權威檔合併結果，不再由 SQLite 舊快取反向覆蓋剛算好的資料。
+# 4) 不改 01/02 頁面 UI、不改 10 權限、不改 11 登入紀錄、不改開始作業 V108 秒級化。
+
+_v109_prev_recalculate_time_records = recalculate_time_records
+
+
+def _v109_to_int(value):
+    try:
+        if value is None:
+            return None
+        try:
+            if pd.isna(value):
+                return None
+        except Exception:
+            pass
+        s = str(value).strip()
+        if not s or s.lower() in {"nan", "none", "null", "<na>"}:
+            return None
+        return int(float(s))
+    except Exception:
+        return None
+
+
+def _v109_blank(value) -> bool:
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    if value is None:
+        return True
+    return str(value).strip().lower() in {"", "nan", "none", "null", "nat", "<na>"}
+
+
+def _v109_row_key(row: dict) -> str:
+    rk = str(row.get("record_key") or "").strip()
+    if rk and rk.lower() not in {"nan", "none", "null"}:
+        return "rk:" + rk
+    rid = _v109_to_int(row.get("id") if "id" in row else row.get("ID"))
+    if rid is not None:
+        return "id:" + str(rid)
+    try:
+        # 最後防線：用業務主鍵避免無 id 的列被全部丟掉。
+        return "biz:" + make_record_key(
+            str(row.get("employee_id") or ""),
+            str(row.get("work_order") or ""),
+            str(row.get("process_name") or ""),
+            str(row.get("start_timestamp") or ""),
+        )
+    except Exception:
+        return "tmp:" + str(len(str(row))) + ":" + str(row)[:80]
+
+
+def _v109_updated_score(row: dict) -> str:
+    # ISO-like 字串可直接排序；缺值放前面，避免覆蓋較新的 authority。
+    for c in ("updated_at", "Update Time", "最後更新", "created_at", "start_timestamp"):
+        v = row.get(c)
+        if not _v109_blank(v):
+            return str(v)
+    return ""
+
+
+def _v109_df_rows(df: pd.DataFrame | None) -> list[dict]:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return []
+    try:
+        clean = df.copy().where(pd.notna(df), "")
+        return [dict(r) for _, r in clean.iterrows()]
+    except Exception:
+        return []
+
+
+def _v109_authority_df(module_key: str) -> pd.DataFrame:
+    try:
+        if "_v98_authority_df" in globals():
+            df = _v98_authority_df(module_key)
+            if isinstance(df, pd.DataFrame):
+                return df.copy()
+    except Exception:
+        pass
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df
+        df = _pa_df(module_key, "time_records")
+        if isinstance(df, pd.DataFrame):
+            return df.copy()
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v109_sqlite_df() -> pd.DataFrame:
+    try:
+        if "_v98_sqlite_time_records_df" in globals():
+            df = _v98_sqlite_time_records_df()
+            if isinstance(df, pd.DataFrame):
+                return df.copy()
+    except Exception:
+        pass
+    try:
+        return query_df("SELECT * FROM time_records ORDER BY id")
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v109_filter_deleted(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    for fn_name in ("_v98_filter_deleted", "_v94_filter_deleted_df"):
+        try:
+            fn = globals().get(fn_name)
+            if callable(fn):
+                out = fn(out)
+        except Exception:
+            pass
+    return out
+
+
+def _v109_merged_authority_df(record_ids: list[int] | set[int] | None = None, *, sqlite_fallback: bool = True) -> pd.DataFrame:
+    """Merge 01/02 authority safely.
+
+    Important: SQLite is cache only.  To avoid bringing back rows that were already
+    deleted from authority, SQLite rows are included only when authority is empty,
+    or when a selected id exists only in SQLite.
+    """
+    ids = {_v109_to_int(x) for x in (record_ids or [])}
+    ids = {x for x in ids if x is not None}
+
+    authority_sources: list[tuple[int, pd.DataFrame]] = [
+        (10, _v109_authority_df("02_history")),
+        (20, _v109_authority_df("01_time_records")),
+    ]
+    chosen: dict[str, tuple[str, int, dict]] = {}
+    all_cols: list[str] = []
+
+    def _add_rows(source_rank: int, df: pd.DataFrame, *, only_selected_missing: bool = False) -> None:
+        existing_ids = {
+            _v109_to_int(v[2].get("id"))
+            for v in chosen.values()
+            if _v109_to_int(v[2].get("id")) is not None
+        }
+        for r in _v109_df_rows(df):
+            rid = _v109_to_int(r.get("id"))
+            if only_selected_missing:
+                if not ids or rid not in ids or rid in existing_ids:
+                    continue
+            for c in r.keys():
+                if c not in all_cols:
+                    all_cols.append(c)
+            k = _v109_row_key(r)
+            score = _v109_updated_score(r)
+            old = chosen.get(k)
+            if old is None or (score, source_rank) >= (old[0], old[1]):
+                chosen[k] = (score, source_rank, r)
+
+    for source_rank, df in authority_sources:
+        _add_rows(source_rank, df)
+
+    if sqlite_fallback:
+        sqlite_df = _v109_sqlite_df()
+        if not chosen:
+            # First-run/authority-missing repair only.
+            _add_rows(30, sqlite_df)
+        elif ids:
+            # For selected recalculation, use SQLite only to rescue selected rows missing from authority.
+            _add_rows(30, sqlite_df, only_selected_missing=True)
+
+    rows = []
+    for _, _, r in chosen.values():
+        rows.append({c: r.get(c, "") for c in all_cols})
+    out = pd.DataFrame(rows, columns=all_cols) if rows else pd.DataFrame(columns=all_cols)
+    out = _v109_filter_deleted(out)
+    try:
+        if "_v98_sort_records" in globals():
+            out = _v98_sort_records(out, descending=True)
+        elif "_v89_sort_records" in globals():
+            out = _v89_sort_records(out)
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v109_save_0102_and_cache(df: pd.DataFrame, reason: str, *, github: bool = True) -> int:
+    safe = _v109_filter_deleted(df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame())
+    try:
+        if "_v89_save_time_authority_df" in globals():
+            n = int(_v89_save_time_authority_df(safe, reason, github=bool(github)) or 0)
+        elif "_v98_save_0102_authority_df" in globals():
+            n = int(_v98_save_0102_authority_df(safe, reason=reason, github=bool(github)) or 0)
+        else:
+            from services.permanent_authority_service import save_authority as _pa_save, table_from_df as _pa_table
+            rows = _pa_table(safe)
+            _pa_save("01_time_records", records={"time_records": rows}, reason=f"{reason}_01", github=bool(github))
+            _pa_save("02_history", records={"time_records": rows}, reason=f"{reason}_02", github=bool(github))
+            n = len(rows)
+    except Exception as exc:
+        try:
+            write_log("V109_RECALC_AUTHORITY_SAVE_ERROR", f"V109 01/02 權威檔同步失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        n = 0
+    try:
+        if "_v89_sync_sqlite_cache_from_authority" in globals():
+            _v89_sync_sqlite_cache_from_authority(safe)
+    except Exception as exc:
+        try:
+            write_log("V109_RECALC_SQLITE_SYNC_ERROR", f"V109 SQLite cache 回寫失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(n)
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    """V109 authority-first bidirectional recalculation.
+
+    Called by both 01 and 02 pages.  The result is saved to both:
+      - data/permanent_store/modules/01_time_records/records.json
+      - data/permanent_store/modules/02_history/records.json
+    and then SQLite is refreshed from that same authority data.
+    """
+    ids = {_v109_to_int(x) for x in (record_ids or [])}
+    ids = {x for x in ids if x is not None}
+
+    auth_df = _v109_merged_authority_df(list(ids), sqlite_fallback=True)
+    if auth_df is None or auth_df.empty:
+        return 0
+    if "id" not in auth_df.columns:
+        return 0
+
+    id_series = auth_df["id"].map(_v109_to_int)
+    target_mask = id_series.isin(ids) if ids else pd.Series([True] * len(auth_df), index=auth_df.index)
+    count = 0
+    for idx in auth_df.loc[target_mask].index:
+        row = dict(auth_df.loc[idx])
+        start_ts = row.get("start_timestamp") or row.get("Start Timestamp") or row.get("開始時間")
+        end_ts = row.get("end_timestamp") or row.get("End Timestamp") or row.get("結束時間")
+        if _v109_blank(start_ts) or _v109_blank(end_ts):
+            continue
+        try:
+            normalized = normalize_record_datetime_fields(row, recalc_work_hours=True)
+        except Exception:
+            normalized = {}
+        if not normalized:
+            continue
+        for c, v in normalized.items():
+            if c not in auth_df.columns:
+                auth_df[c] = ""
+            auth_df.at[idx, c] = v
+        if "status" not in auth_df.columns:
+            auth_df["status"] = ""
+        status_now = str(auth_df.at[idx, "status"] or "").strip()
+        if not status_now or status_now == "作業中":
+            auth_df.at[idx, "status"] = row.get("end_action") or "已結束"
+        if "updated_at" not in auth_df.columns:
+            auth_df["updated_at"] = ""
+        try:
+            auth_df.at[idx, "updated_at"] = _now()
+        except Exception:
+            auth_df.at[idx, "updated_at"] = now_text() if "now_text" in globals() else ""
+        count += 1
+
+    if count:
+        _v109_save_0102_and_cache(auth_df, "recalculate_time_records_v109_bidirectional_authority", github=True)
+        try:
+            write_log(
+                "RECALC_TIME_RECORDS_0102_SYNC",
+                f"V109：已重算 {count} 筆，並將同一批權威資料同步寫入 01 工時紀錄與 02 歷史紀錄。",
+                "time_records",
+            )
+        except Exception:
+            pass
+    return int(count)
+
+
+def sync_time_records_01_02_now(reason: str = "v109_manual_0102_authority_sync", *, github: bool = True) -> int:  # type: ignore[override]
+    """Manual helper: merge 01/02/SQLite, then save the same authority set to both modules."""
+    df = _v109_merged_authority_df(None, sqlite_fallback=True)
+    if df is None:
+        df = pd.DataFrame()
+    return _v109_save_0102_and_cache(df, reason, github=bool(github))
+
+# =================== END V109 01/02 RECALC BIDIRECTIONAL AUTHORITY SYNC =====================
