@@ -3822,3 +3822,356 @@ def get_live_page_reset_time() -> str:  # type: ignore[override]
         copy_list=False,
     ) or DEFAULT_LIVE_PAGE_RESET_TIME)
 # ===================== END V86 01 SYSTEM SETTINGS FAST CACHE =====================
+
+# ======================= V88 13 SYSTEM SETTINGS SPEED + DELETE COMMON CATEGORY FIX =======================
+# 目的：
+# 1) 13｜系統設定套用/存檔不再因每次 rerun 都把整份設定逐筆寫回 SQLite 而卡很久。
+# 2) SQLite 僅為相容快取，改用單一 transaction 且不觸發 after-write/GitHub/export/log storm。
+# 3) 類別清單管理允許刪除「全部 / 通用」，刪除後不再由下拉清單函式自動補回。
+# 4) 不改 13 權威檔架構：仍只以 data/permanent_store/modules/13_system_settings/records.json 為資料權威。
+
+import hashlib as _v88_hashlib
+import json as _v88_json
+
+_V88_SQLITE_SYNC_HASH: str = ""
+_V88_CATEGORY_CACHE_HASH: str = ""
+_V88_CATEGORY_CACHE: list[str] = []
+
+
+def _v88_json_fingerprint(obj: Any) -> str:
+    try:
+        text = _v88_json.dumps(obj, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
+    except Exception:
+        text = str(obj)
+    return _v88_hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()
+
+
+def _v88_clear_all_system_caches() -> None:
+    global _V88_CATEGORY_CACHE_HASH, _V88_CATEGORY_CACHE
+    _V88_CATEGORY_CACHE_HASH = ""
+    _V88_CATEGORY_CACHE = []
+    try:
+        _clear_settings_cache()
+    except Exception:
+        pass
+    try:
+        clear_time_record_system_fast_cache()  # V86 cache
+    except Exception:
+        pass
+
+
+try:
+    _v88_prev_v85_sync_to_sqlite = _v85_sync_to_sqlite
+except Exception:  # pragma: no cover
+    _v88_prev_v85_sync_to_sqlite = None
+
+
+def _v85_sync_to_sqlite(tables: dict[str, list[dict[str, Any]]]) -> None:  # type: ignore[override]
+    """V88：用 hash + transaction 加速 13 設定相容 SQLite 快取同步。
+
+    舊版每次載入 13 頁、每次 data_editor rerun 都會：
+    DELETE 多張表 → 逐筆 execute INSERT → 每筆 execute 觸發 system_logs / after_write 檢查。
+    這會讓「編輯、套用、存檔」跑很久。
+
+    新版規則：
+    - 權威檔未變，不重寫 SQLite。
+    - 權威檔有變，只用一次 execute_transaction 寫入 SQLite 快取。
+    - mark_changed=False，因為這只是從權威檔同步到 SQLite 快取，不是新的使用者資料異動。
+    """
+    global _V88_SQLITE_SYNC_HASH
+    try:
+        norm = _v85_normalize_tables(tables)
+    except Exception:
+        norm = tables or {}
+    fp = _v88_json_fingerprint(norm)
+    if _V88_SQLITE_SYNC_HASH == fp:
+        return
+
+    try:
+        _v85_create_sqlite_schema()
+        from .db_service import execute_transaction
+        ops: list[tuple[str, tuple[Any, ...]]] = [
+            ("DELETE FROM process_categories", ()),
+            ("DELETE FROM process_category_options", ()),
+            ("DELETE FROM process_options", ()),
+            ("DELETE FROM rest_periods", ()),
+            ("DELETE FROM app_settings", ()),
+        ]
+        now = _v85_now()
+        for idx, r in enumerate(norm.get("process_categories", []) or [], start=1):
+            name = _v85_text(r.get("category_name"))
+            if not name:
+                continue
+            ops.append((
+                """
+                INSERT INTO process_categories(id, category_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(category_name) DO UPDATE SET
+                    is_active=excluded.is_active,
+                    sort_order=excluded.sort_order,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    _v85_int(r.get("id"), idx),
+                    name,
+                    _v85_bool(r.get("is_active"), True),
+                    _v87_sort_or_default(r.get("sort_order"), idx) if "_v87_sort_or_default" in globals() else (_v85_int(r.get("sort_order"), idx) or idx),
+                    _v85_text(r.get("note")),
+                    _v85_text(r.get("created_at"), now),
+                    _v85_text(r.get("updated_at"), now),
+                ),
+            ))
+        for idx, r in enumerate(norm.get("process_category_options", []) or norm.get("process_options", []) or [], start=1):
+            proc = _v85_text(r.get("process_name"))
+            if not proc:
+                continue
+            category = _norm_category_name(r.get("category_name") or PROCESS_CATEGORY_ALL)
+            rid = _v85_int(r.get("id"), idx) or idx
+            active = _v85_bool(r.get("is_active"), True)
+            sort_order = _v87_sort_or_default(r.get("sort_order"), idx) if "_v87_sort_or_default" in globals() else (_v85_int(r.get("sort_order"), idx) or idx)
+            note = _v85_text(r.get("note"))
+            created = _v85_text(r.get("created_at"), now)
+            updated = _v85_text(r.get("updated_at"), now)
+            ops.append((
+                """
+                INSERT INTO process_category_options(id, category_name, process_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(category_name, process_name) DO UPDATE SET
+                    is_active=excluded.is_active,
+                    sort_order=excluded.sort_order,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+                """,
+                (rid, category, proc, active, sort_order, note, created, updated),
+            ))
+            # 舊相容表 process_options 沒有 category 欄，若不同類別有相同工段，保留最後一次更新即可。
+            ops.append((
+                """
+                INSERT INTO process_options(process_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(process_name) DO UPDATE SET
+                    is_active=excluded.is_active,
+                    sort_order=excluded.sort_order,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+                """,
+                (proc, active, sort_order, note, created, updated),
+            ))
+        for idx, r in enumerate(norm.get("rest_periods", []) or [], start=1):
+            name = _v85_text(r.get("name")) or f"休息時間{idx}"
+            start = _v85_text(r.get("start_time"))
+            end = _v85_text(r.get("end_time"))
+            if not start or not end:
+                continue
+            ops.append((
+                "INSERT INTO rest_periods(id, name, start_time, end_time, is_active, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    _v85_int(r.get("id"), idx) or idx,
+                    name,
+                    start,
+                    end,
+                    _v85_bool(r.get("is_active"), True),
+                    _v87_sort_or_default(r.get("sort_order"), idx) if "_v87_sort_or_default" in globals() else (_v85_int(r.get("sort_order"), idx) or idx),
+                ),
+            ))
+        for r in norm.get("app_settings", []) or []:
+            key = _v85_text(r.get("setting_key"))
+            if not key:
+                continue
+            ops.append((
+                "INSERT OR REPLACE INTO app_settings(setting_key, setting_value, note, updated_at) VALUES (?, ?, ?, ?)",
+                (key, _v85_text(r.get("setting_value")), _v85_text(r.get("note")), _v85_text(r.get("updated_at"), now)),
+            ))
+        execute_transaction(ops, mark_changed=False, reason="13_system_settings_sqlite_cache_sync_v88", source_sql="V88_SYNC_13_SYSTEM_SETTINGS_CACHE")
+        _V88_SQLITE_SYNC_HASH = fp
+    except Exception:
+        # 保底：若 transaction 版本在舊環境失敗，回到上一版同步方式，但仍不要中斷頁面。
+        try:
+            if callable(_v88_prev_v85_sync_to_sqlite):
+                _v88_prev_v85_sync_to_sqlite(norm)
+                _V88_SQLITE_SYNC_HASH = fp
+        except Exception:
+            pass
+
+
+try:
+    _v88_prev_v85_save_tables = _v85_save_tables
+except Exception:  # pragma: no cover
+    _v88_prev_v85_save_tables = None
+
+
+def _v85_save_tables(tables: dict[str, list[dict[str, Any]]], reason: str) -> dict[str, Any]:  # type: ignore[override]
+    """V88：保留權威檔寫入，但減少重複 cache/sync 負擔。"""
+    tables = _v85_normalize_tables(tables)
+    if _v85_pa_save_authority is None:
+        return {"ok": False, "reason": "permanent_authority_service_not_available"}
+    # 保留 GitHub write-through，避免 Reboot App 後資料消失；save_authority 本身已做 hash，沒變更不會上傳。
+    res = _v85_pa_save_authority(_V85_MODULE_KEY, records=tables, reason=reason, github=True)
+    _v85_sync_to_sqlite(tables)
+    _v88_clear_all_system_caches()
+    return res
+
+
+def _v88_category_rows(active_only: bool = True) -> list[dict[str, Any]]:
+    rows = [dict(r) for r in (_v85_tables().get("process_categories", []) or []) if isinstance(r, dict)]
+    if active_only:
+        rows = [r for r in rows if _v85_bool(r.get("is_active"), True) == 1]
+    def _key(r: dict[str, Any]) -> tuple[int, int, str]:
+        return (
+            _v87_sort_or_default(r.get("sort_order"), 999999) if "_v87_sort_or_default" in globals() else (_v85_int(r.get("sort_order"), 999999) or 999999),
+            _v85_int(r.get("id"), 999999) or 999999,
+            _v85_text(r.get("category_name")),
+        )
+    return sorted(rows, key=_key)
+
+
+def _v88_active_category_names() -> list[str]:
+    tables = _v85_tables()
+    fp = _v88_json_fingerprint(tables.get("process_categories", []))
+    global _V88_CATEGORY_CACHE_HASH, _V88_CATEGORY_CACHE
+    if _V88_CATEGORY_CACHE_HASH == fp:
+        return list(_V88_CATEGORY_CACHE)
+    out: list[str] = []
+    seen: set[str] = set()
+    for r in _v88_category_rows(active_only=True):
+        name = _norm_category_name(r.get("category_name"))
+        if name and name not in seen:
+            seen.add(name)
+            out.append(name)
+    _V88_CATEGORY_CACHE_HASH = fp
+    _V88_CATEGORY_CACHE = list(out)
+    return out
+
+
+def load_process_category_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    """V88：只回傳權威檔內存在的類別，不再自動補回「全部 / 通用」。"""
+    return _v88_active_category_names()
+
+
+def get_default_process_category() -> str:  # type: ignore[override]
+    """V88：預設類別若已被刪除，改用第一個現存類別；沒有類別則回傳空字串。"""
+    names = _v88_active_category_names()
+    tables = _v85_tables()
+    val = ""
+    for r in tables.get("app_settings", []) or []:
+        if _v85_text(r.get("setting_key")) == DEFAULT_PROCESS_CATEGORY_KEY:
+            val = _norm_category_name(r.get("setting_value"))
+            break
+    if val and val in names:
+        return val
+    return names[0] if names else ""
+
+
+def save_default_process_category(category_name: str) -> str:  # type: ignore[override]
+    category = _norm_category_name(category_name)
+    names = _v88_active_category_names()
+    if category and category not in names:
+        raise ValueError(f"類別不存在或已停用：{category}")
+    tables = _v85_tables()
+    _v85_upsert_app_setting(tables, DEFAULT_PROCESS_CATEGORY_KEY, category, "01 工時紀錄預設類別")
+    _v85_save_tables(tables, "save_default_process_category_v88")
+    try:
+        write_log("SAVE_DEFAULT_PROCESS_CATEGORY", f"儲存預設類別：{category}", "13_system_settings")
+    except Exception:
+        pass
+    return category
+
+
+def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
+    """V88：類別不存在就不回傳工段；只有「全部 / 通用」仍存在時才可作共用補充。"""
+    category = _norm_category_name(category_name)
+    tables = _v85_tables()
+    cat_names = {_norm_category_name(r.get("category_name")) for r in tables.get("process_categories", []) or [] if _v85_bool(r.get("is_active"), True) == 1}
+    if not category:
+        category = get_default_process_category()
+    if category and category not in cat_names:
+        return []
+    rows = [dict(r) for r in (tables.get("process_category_options", []) or []) if isinstance(r, dict) and _v85_bool(r.get("is_active"), True) == 1]
+    def _row_key(r: dict[str, Any]) -> tuple[int, int, str]:
+        return (
+            _v87_sort_or_default(r.get("sort_order"), 999999) if "_v87_sort_or_default" in globals() else (_v85_int(r.get("sort_order"), 999999) or 999999),
+            _v85_int(r.get("id"), 999999) or 999999,
+            _v85_text(r.get("process_name")),
+        )
+    selected: list[str] = []
+    seen: set[str] = set()
+    allowed_categories: list[str] = []
+    if include_common and PROCESS_CATEGORY_ALL in cat_names and category != PROCESS_CATEGORY_ALL:
+        allowed_categories.append(PROCESS_CATEGORY_ALL)
+    if category:
+        allowed_categories.append(category)
+    for r in sorted(rows, key=_row_key):
+        cat = _norm_category_name(r.get("category_name") or PROCESS_CATEGORY_ALL)
+        if cat not in allowed_categories:
+            continue
+        name = _v85_text(r.get("process_name"))
+        if name and name not in seen:
+            seen.add(name)
+            selected.append(name)
+    return selected
+
+
+def get_process_options_by_category_exact(category_name: str | None = None) -> list[str]:  # type: ignore[override]
+    return get_process_options_by_category(category_name, include_common=False)
+
+
+def get_process_options() -> list[str]:  # type: ignore[override]
+    return get_process_options_by_category(get_default_process_category(), include_common=True)
+
+
+def delete_process_categories(ids: Iterable[int]) -> int:  # type: ignore[override]
+    """V88：允許刪除「全部 / 通用」，並同步刪除該類別底下工段。"""
+    tables = _v85_tables()
+    ids_set: set[str] = set()
+    for x in ids or []:
+        n = _v87_clean_input_id(x) if "_v87_clean_input_id" in globals() else _v85_int(x, None)
+        if n is not None:
+            ids_set.add(str(n))
+    if not ids_set:
+        return 0
+
+    old_cats = [dict(r) for r in tables.get("process_categories", []) or [] if isinstance(r, dict)]
+    removed_names: set[str] = set()
+    kept_cats: list[dict[str, Any]] = []
+    for r in old_cats:
+        rid = _v87_clean_input_id(r.get("id")) if "_v87_clean_input_id" in globals() else _v85_int(r.get("id"), None)
+        if rid is not None and str(rid) in ids_set:
+            name = _norm_category_name(r.get("category_name"))
+            if name:
+                removed_names.add(name)
+        else:
+            kept_cats.append(r)
+    if not removed_names:
+        return 0
+
+    tables["process_categories"] = kept_cats
+    tables["process_category_options"] = [
+        dict(r) for r in tables.get("process_category_options", []) or []
+        if _norm_category_name(r.get("category_name") or PROCESS_CATEGORY_ALL) not in removed_names
+    ]
+    tables["process_options"] = list(tables.get("process_category_options", []) or [])
+
+    # 若預設類別被刪除，改成第一個剩餘啟用類別；沒有剩餘就存空字串，不再補回「全部 / 通用」。
+    active_after: list[str] = []
+    for r in sorted(tables.get("process_categories", []) or [], key=lambda x: (_v85_int(x.get("sort_order"), 999999) or 999999, _v85_int(x.get("id"), 999999) or 999999)):
+        if _v85_bool(r.get("is_active"), True) == 1:
+            name = _norm_category_name(r.get("category_name"))
+            if name:
+                active_after.append(name)
+    current_default = ""
+    for r in tables.get("app_settings", []) or []:
+        if _v85_text(r.get("setting_key")) == DEFAULT_PROCESS_CATEGORY_KEY:
+            current_default = _norm_category_name(r.get("setting_value"))
+            break
+    if current_default in removed_names or (current_default and current_default not in active_after):
+        _v85_upsert_app_setting(tables, DEFAULT_PROCESS_CATEGORY_KEY, active_after[0] if active_after else "", "01 工時紀錄預設類別")
+
+    _v85_save_tables(tables, "delete_process_categories_v88")
+    try:
+        write_log("DELETE_PROCESS_CATEGORIES", f"刪除類別 {len(removed_names)} 筆：{', '.join(sorted(removed_names))}", "13_system_settings", level="WARN")
+    except Exception:
+        pass
+    return len(removed_names)
+
+# ===================== END V88 13 SYSTEM SETTINGS SPEED + DELETE COMMON CATEGORY FIX =====================
