@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 
 
@@ -226,6 +227,77 @@ _v100_inject_work_order_input_css()
 # ===== V100 WORK ORDER MANUAL INPUT + FUZZY SEARCH FIX END =====
 
 
+# ===== V105 WORK ORDER KEYWORD LIVE URL SYNC =====
+def _v105_qp_get(name: str) -> str:
+    try:
+        raw = st.query_params.get(name, "")
+        if isinstance(raw, list):
+            raw = raw[0] if raw else ""
+        return str(raw or "")
+    except Exception:
+        try:
+            raw = st.experimental_get_query_params().get(name, [""])
+            return str(raw[0] if isinstance(raw, list) and raw else raw or "")
+        except Exception:
+            return ""
+
+
+def _v105_prepare_live_work_order_keyword_state(key: str = "start_work_order_manual_query_v103") -> None:
+    url_kw = _v105_qp_get("spt_wo_kw").strip()
+    last = st.session_state.get("_spt_wo_kw_url_applied", None)
+    if url_kw:
+        if st.session_state.get(key, "") != url_kw or last != url_kw:
+            st.session_state[key] = url_kw
+            st.session_state["_spt_wo_kw_url_applied"] = url_kw
+    elif last not in (None, ""):
+        st.session_state[key] = ""
+        st.session_state["_spt_wo_kw_url_applied"] = ""
+
+
+def _v105_inject_live_work_order_keyword_sync() -> None:
+    """讓製令關鍵字輸入後自動刷新下方製令下拉，不需 Enter。"""
+    components.html(
+        """
+<script>
+(function(){
+  const PARAM = 'spt_wo_kw';
+  const LABEL = '製令關鍵字';
+  const DEBOUNCE_MS = 420;
+  function bind(){
+    const doc = window.parent && window.parent.document ? window.parent.document : document;
+    const inputs = Array.from(doc.querySelectorAll('input')).filter(function(inp){
+      const aria = inp.getAttribute('aria-label') || '';
+      return aria.indexOf(LABEL) >= 0;
+    });
+    if(!inputs.length){ setTimeout(bind, 300); return; }
+    const input = inputs[0];
+    if(input.dataset.sptWoLiveBound === '1') return;
+    input.dataset.sptWoLiveBound = '1';
+    let timer = null;
+    function sync(){
+      const val = (input.value || '').trim();
+      const url = new URL(window.parent.location.href);
+      const cur = (url.searchParams.get(PARAM) || '').trim();
+      if(cur === val) return;
+      if(val){ url.searchParams.set(PARAM, val); }
+      else { url.searchParams.delete(PARAM); }
+      window.parent.location.replace(url.toString());
+    }
+    input.addEventListener('input', function(){
+      if(timer) clearTimeout(timer);
+      timer = setTimeout(sync, DEBOUNCE_MS);
+    }, true);
+  }
+  bind();
+})();
+</script>
+""",
+        height=0,
+        width=0,
+    )
+# ===== END V105 WORK ORDER KEYWORD LIVE URL SYNC =====
+
+
 # V13: 01 opens from latest memory files/SQLite without doing heavy master restore inline.
 employees = load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
 work_orders = load_work_orders_for_time_record_fast(active_only=True)
@@ -252,14 +324,16 @@ with left:
     emp_match = employees[employees["employee_id"].fillna("").astype(str).str.strip() == emp_id]
     employee = emp_match.iloc[0].fillna("").to_dict() if not emp_match.empty else (query_one("SELECT * FROM employees WHERE employee_id=?", (emp_id,)) or {})
 
-    # V103：製令欄改為「輸入關鍵字 → 下方製令下拉立即縮小範圍」。
-    # 例如輸入 2，製令下拉只列出 25... / 24... / 26... 等相關製令；不再使用額外遮罩式搜尋結果。
+    # V105：製令欄改為「輸入關鍵字 → 自動刷新 → 下方製令下拉跟著縮小範圍」。
+    # 不需要按 Enter；輸入停頓後會以 URL query 觸發一次 rerun，避免另外做遮罩搜尋層。
+    _v105_prepare_live_work_order_keyword_state("start_work_order_manual_query_v103")
     wo_manual_query = st.text_input(
         "製令關鍵字｜Work Order Keyword（可手動輸入；輸入 25M 會篩選下方製令）",
         value="",
         key="start_work_order_manual_query_v103",
-        placeholder="輸入 2、25M、21M0241、P/N、機型關鍵字，下方製令會即時篩選",
+        placeholder="輸入 2、25M、21M0241、P/N、機型關鍵字；不需按 Enter，下方製令會自動篩選",
     )
+    _v105_inject_live_work_order_keyword_sync()
     _wo_query = str(wo_manual_query or "").strip()
     _wo_options = _v103_work_order_filtered_options(work_orders, _wo_query, limit=120)
     if not _wo_options:

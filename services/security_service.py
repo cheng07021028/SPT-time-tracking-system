@@ -2911,3 +2911,244 @@ def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
     except Exception:
         pass
 # ======================= END V101 IDLE TIMEOUT CANONICAL SETTINGS FIX =======================
+
+# ========================= V105 CANONICAL LOGIN AUTHORITY FIX =========================
+# 修正目的：
+# 1) 使用者帳號/密碼已在 10｜權限管理權威檔內，但登入仍顯示「帳號或密碼錯誤」。
+# 2) 登入不可只看 SQLite 快取；必須優先讀 data/permanent_store/modules/10_permissions/records.json。
+# 3) 相容 10 匯入表格的明碼欄位（密碼 / Password、密碼、password），成功後同步到 SQLite 快取供權限判斷。
+
+_V105_PERMISSION_RECORD_CANDIDATES = [
+    PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+]
+
+
+def _v105_truthy(v: Any, default: bool = True) -> bool:
+    if v is None:
+        return default
+    t = str(v).strip().lower()
+    if t in {"1", "true", "yes", "y", "on", "是", "啟用", "active", "啟用 / active"}:
+        return True
+    if t in {"0", "false", "no", "n", "off", "否", "停用", "inactive", ""}:
+        return False
+    return default
+
+
+def _v105_extract_tables_from_payload(payload: dict) -> dict[str, list[dict]]:
+    if not isinstance(payload, dict):
+        return {}
+    tables = payload.get("tables")
+    if isinstance(tables, dict):
+        return {str(k): [dict(r) for r in v if isinstance(r, dict)] for k, v in tables.items() if isinstance(v, list)}
+    for key in ("records", "data", "rows"):
+        rows = payload.get(key)
+        if isinstance(rows, list):
+            return {"auth_users": [dict(r) for r in rows if isinstance(r, dict)]}
+    return {}
+
+
+def _v105_load_permission_authority_tables() -> dict[str, list[dict]]:
+    try:
+        from services.permanent_authority_service import load_tables as _pa_load_tables
+        tables = _pa_load_tables("10_permissions", "records")
+        if isinstance(tables, dict) and (tables.get("auth_users") or tables.get("security_users")):
+            return {str(k): [dict(r) for r in v if isinstance(r, dict)] for k, v in tables.items() if isinstance(v, list)}
+    except Exception:
+        pass
+    for p in _V105_PERMISSION_RECORD_CANDIDATES:
+        try:
+            if p.exists():
+                payload = json.loads(p.read_text(encoding="utf-8"))
+                tables = _v105_extract_tables_from_payload(payload)
+                if tables.get("auth_users") or tables.get("security_users"):
+                    return tables
+        except Exception:
+            continue
+    return {}
+
+
+def _v105_find_authority_user(username: str) -> tuple[dict | None, dict[str, list[dict]]]:
+    uname = str(username or "").strip().lower()
+    if not uname:
+        return None, {}
+    tables = _v105_load_permission_authority_tables()
+    for table_name in ("auth_users", "security_users"):
+        for row in tables.get(table_name, []) or []:
+            if str(row.get("username") or row.get("帳號") or row.get("帳號 / Username") or "").strip().lower() == uname:
+                r = dict(row)
+                r["username"] = str(row.get("username") or row.get("帳號") or row.get("帳號 / Username") or username).strip()
+                return r, tables
+    return None, tables
+
+
+def _v105_plain_password_candidates(row: dict) -> list[str]:
+    keys = [
+        "password", "Password", "密碼", "密碼 / Password", "密碼 / password",
+        "new_password", "New Password", "新密碼", "新密碼 / New Password",
+        "password_plain", "plain_password",
+    ]
+    out: list[str] = []
+    for k in keys:
+        v = row.get(k)
+        if v is None:
+            continue
+        s = str(v).strip()
+        if not s or s == "********" or s.startswith("pbkdf2_sha256$"):
+            continue
+        out.append(s)
+    return out
+
+
+def _v105_verify_password_against_authority_row(password: str, row: dict) -> bool:
+    pwd = str(password or "")
+    for k in ("password_hash", "hash", "passwordHash", "密碼雜湊"):
+        h = str(row.get(k) or "").strip()
+        if h and verify_password(pwd, h):
+            return True
+    for plain in _v105_plain_password_candidates(row):
+        try:
+            if hmac.compare_digest(plain, pwd):
+                return True
+        except Exception:
+            if plain == pwd:
+                return True
+    return False
+
+
+def _v105_role_from_user(row: dict) -> str:
+    role = str(row.get("role_code") or row.get("role") or row.get("角色") or row.get("角色 / Role") or "").strip().lower()
+    return role or ("admin" if str(row.get("username") or "").strip().lower() == "admin" else "operator")
+
+
+def _v105_build_hash_if_needed(password: str, row: dict) -> str:
+    current = str(row.get("password_hash") or "").strip()
+    if current:
+        return current
+    for plain in _v105_plain_password_candidates(row):
+        if plain == str(password or ""):
+            return hash_password(plain)
+    return current
+
+
+def _v105_sync_authority_login_cache(user_row: dict, tables: dict[str, list[dict]], password: str = "") -> None:
+    """Keep SQLite cache aligned after successful canonical login; best effort only."""
+    try:
+        ensure_security_schema()
+        uname = str(user_row.get("username") or "").strip()
+        if not uname:
+            return
+        now = _now()
+        pwd_hash = _v105_build_hash_if_needed(password, user_row)
+        role = _v105_role_from_user(user_row)
+        employee_id = str(user_row.get("employee_id") or user_row.get("工號") or user_row.get("工號 / Employee ID") or "").strip()
+        display_name = str(user_row.get("display_name") or user_row.get("姓名") or user_row.get("姓名 / Display Name") or uname).strip()
+        email = str(user_row.get("email") or user_row.get("Email") or "").strip()
+        is_active = 1 if _v105_truthy(user_row.get("is_active", user_row.get("啟用", user_row.get("啟用 / Active", True))), True) else 0
+        force_change = 1 if _v105_truthy(user_row.get("force_password_change", user_row.get("強制改密碼", user_row.get("強制改密碼 / Force Change", False))), False) else 0
+        note = str(user_row.get("note") or user_row.get("備註") or user_row.get("備註 / Note") or "").strip()
+        execute("""
+            INSERT INTO auth_users
+            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(username) DO UPDATE SET
+                password_hash=excluded.password_hash,
+                employee_id=excluded.employee_id,
+                display_name=excluded.display_name,
+                email=excluded.email,
+                role_code=excluded.role_code,
+                is_active=excluded.is_active,
+                force_password_change=excluded.force_password_change,
+                last_login_at=excluded.last_login_at,
+                note=excluded.note,
+                updated_at=excluded.updated_at
+        """, (uname, pwd_hash, "V105 canonical authority login cache", employee_id, display_name, email, role, is_active, force_change, now, note, user_row.get("created_at") or now, now))
+        try:
+            execute("DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)", (uname,))
+        except Exception:
+            pass
+        for p in tables.get("auth_account_permissions", []) or []:
+            if str(p.get("username") or "").strip().lower() != uname.lower():
+                continue
+            module_code = str(p.get("module_code") or "").strip().zfill(2)
+            if not module_code:
+                continue
+            execute("""
+                INSERT OR REPLACE INTO auth_account_permissions
+                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (
+                uname, module_code,
+                str(p.get("module_name_zh") or ""), str(p.get("module_name_en") or ""),
+                1 if _v105_truthy(p.get("can_view", False), False) else 0,
+                1 if _v105_truthy(p.get("can_create", False), False) else 0,
+                1 if _v105_truthy(p.get("can_edit", False), False) else 0,
+                1 if _v105_truthy(p.get("can_delete", False), False) else 0,
+                1 if _v105_truthy(p.get("can_import", False), False) else 0,
+                1 if _v105_truthy(p.get("can_export", False), False) else 0,
+                1 if _v105_truthy(p.get("can_backup", False), False) else 0,
+                1 if _v105_truthy(p.get("can_restore", False), False) else 0,
+                1 if _v105_truthy(p.get("can_manage", False), False) else 0,
+                now,
+            ))
+    except Exception:
+        pass
+
+
+def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
+    """V105: login reads 10_permissions canonical authority before SQLite cache."""
+    ensure_security_schema()
+    username = (username or "").strip()
+    if not username:
+        return False, "帳號或密碼錯誤。"
+    auth_user, auth_tables = _v105_find_authority_user(username)
+    row = auth_user
+    source = "authority"
+    if row is None:
+        row = query_one("SELECT * FROM auth_users WHERE lower(username)=lower(?)", (username.lower(),)) or query_one("SELECT * FROM security_users WHERE lower(username)=lower(?)", (username.lower(),))
+        source = "sqlite"
+    if not row:
+        log_security_event(username, "LOGIN", "FAIL", "帳號不存在")
+        return False, "帳號或密碼錯誤。"
+    if not _v105_truthy(row.get("is_active", row.get("啟用", row.get("啟用 / Active", True))), True):
+        log_security_event(username, "LOGIN", "FAIL", "帳號停用")
+        return False, "帳號已停用。"
+    ok = _v105_verify_password_against_authority_row(password, row) if source == "authority" else verify_password(password, row.get("password_hash"))
+    if not ok:
+        if source != "authority":
+            auth_user, auth_tables = _v105_find_authority_user(username)
+            if auth_user and _v105_truthy(auth_user.get("is_active", True), True) and _v105_verify_password_against_authority_row(password, auth_user):
+                row = auth_user
+                source = "authority"
+                ok = True
+        if not ok:
+            log_security_event(username, "LOGIN", "FAIL", "密碼錯誤")
+            return False, "帳號或密碼錯誤。"
+    uname = str(row.get("username") or username).strip()
+    role = _v105_role_from_user(row)
+    if source == "authority":
+        _v105_sync_authority_login_cache(row, auth_tables, password)
+    st.session_state["auth_logged_in"] = True
+    st.session_state["auth_username"] = uname
+    st.session_state["auth_display_name"] = str(row.get("display_name") or row.get("姓名") or row.get("姓名 / Display Name") or uname)
+    st.session_state["auth_employee_id"] = str(row.get("employee_id") or row.get("工號") or row.get("工號 / Employee ID") or "")
+    st.session_state["auth_roles"] = [role]
+    st.session_state["auth_login_ts"] = time.time()
+    st.session_state["auth_last_activity_ts"] = time.time()
+    try:
+        clear_permission_cache(uname)
+    except Exception:
+        pass
+    try:
+        execute("UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)", (_now(), _now(), uname.lower()))
+    except Exception:
+        pass
+    try:
+        execute("UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)", (_now(), _now(), uname.lower()))
+    except Exception:
+        pass
+    log_security_event(uname, "LOGIN", "SUCCESS", f"role={role};source={source}")
+    return True, "登入成功。"
+
+# ======================= END V105 CANONICAL LOGIN AUTHORITY FIX =======================
