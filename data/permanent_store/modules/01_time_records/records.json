@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-23 01:15:09",
-  "exported_at": "2026-05-23 01:15:09",
-  "reason": "save_time_records_v98_write_through_01",
+  "updated_at": "2026-05-23 01:15:11",
+  "exported_at": "2026-05-23 01:15:11",
+  "reason": "recalculate_time_records_v109_bidirectional_authority_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -33,7 +33,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-23 01:13:00",
-        "updated_at": "2026-05-23 01:15:04"
+        "updated_at": "2026-05-23 01:15:11"
       }
     ]
   },
