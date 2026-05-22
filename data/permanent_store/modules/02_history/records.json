@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-22 23:46:50",
-  "exported_at": "2026-05-22 23:46:50",
-  "reason": "finish_work_v104_authority_alignment_02",
+  "updated_at": "2026-05-22 23:47:06",
+  "exported_at": "2026-05-22 23:47:06",
+  "reason": "start_work_v98_write_through_upsert_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -34,11 +34,38 @@
         "source": "streamlit",
         "created_at": "2026-05-22 23:22:59",
         "updated_at": "2026-05-22 23:46:48"
+      },
+      {
+        "id": 18,
+        "record_key": "B002|25A0724-43|前置鈑金|2026-05-22 23:47:05|aa7472f9",
+        "status": "作業中",
+        "work_order": "25A0724-43",
+        "part_no": "MZ8-25A0652",
+        "type_name": "規格：EPC-IPC-6608BP-K30 \n停產換料EPC-IPC-6608BP-S2",
+        "process_name": "前置鈑金",
+        "employee_id": "B002",
+        "employee_name": "張文品",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-22 23:47:05",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-22",
+        "start_time": "23:47:05",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B002|前置鈑金|2026-05-22",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-22 23:47:05",
+        "updated_at": "2026-05-22 23:47:05"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 1
+    "time_records": 2
   }
 }
