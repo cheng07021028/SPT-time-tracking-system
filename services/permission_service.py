@@ -4158,3 +4158,587 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
 
 check_permission = has_permission
 # ===== V94 STRICT PERMISSION SINGLE-AUTHORITY PATCH END =====
+
+
+# ===== V95 PERMISSION SINGLE-AUTHORITY SPEED + DELETE-PERSIST HARD FIX START =====
+# 目的：
+# 1) 10. 權限管理只讀寫 data/permanent_store/modules/10_permissions/records.json。
+# 2) Reboot App 後已刪帳號不得復活。
+# 3) 進入 10 頁、勾選 checkbox、切換欄位，不再每次強制還原/重寫 SQLite，避免 2~3 分鐘卡頓。
+# 4) 權限矩陣與安全設定也納入同一份權威檔。
+import time as _v95_time
+
+_V95_PERMISSION_AUTHORITY_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json"
+_V95_AUTH_TABLES = list(dict.fromkeys([
+    "auth_users",
+    "auth_account_permissions",
+    "auth_security_settings",
+    "security_settings",
+    "security_users",
+    "security_user_roles",
+]))
+_V95_LAST_RESTORE_SIG = None
+_V95_LAST_RESTORE_TS = 0.0
+_V95_RESTORE_MIN_INTERVAL = 1.5
+
+
+def _v95_now_text_safe() -> str:
+    try:
+        return now_text()
+    except Exception:
+        from datetime import datetime as _dt
+        return _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v95_authority_signature() -> tuple:
+    try:
+        stt = _V95_PERMISSION_AUTHORITY_FILE.stat()
+        return (int(stt.st_mtime_ns), int(stt.st_size))
+    except Exception:
+        return (0, 0)
+
+
+def _v95_json_read(path: _V94Path) -> dict:
+    try:
+        if path.exists() and path.stat().st_size > 2:
+            data = _v94_json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _v95_json_write(path: _V94Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    text = _v94_json.dumps(payload, ensure_ascii=False, indent=2, default=str)
+    # 沒變就不寫，避免每次操作都觸發檔案 mtime 更新與 Streamlit 重新部署/同步。
+    try:
+        if path.exists() and path.read_text(encoding="utf-8") == text:
+            return
+    except Exception:
+        pass
+    tmp.write_text(text, encoding="utf-8")
+    _v94_json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v95_deleted_usernames(payload: dict | None = None) -> set[str]:
+    payload = payload if isinstance(payload, dict) else _v95_json_read(_V95_PERMISSION_AUTHORITY_FILE)
+    raw = payload.get("deleted_usernames", []) if isinstance(payload, dict) else []
+    if not isinstance(raw, list):
+        raw = []
+    return {str(x).strip().lower() for x in raw if str(x).strip() and str(x).strip().lower() != "admin"}
+
+
+def _v95_schema_only() -> None:
+    try:
+        _v91_schema_only()  # type: ignore[name-defined]
+        return
+    except Exception:
+        pass
+    try:
+        _v83_prev_init_permission_tables(False)  # type: ignore[name-defined]
+    except Exception:
+        try:
+            _v79_prev_init_permission_tables(False)  # type: ignore[name-defined]
+        except Exception:
+            pass
+
+
+def _v95_filter_deleted_tables(tables: dict, deleted: set[str]) -> dict:
+    if not isinstance(tables, dict):
+        return {}
+    deleted = {str(x).strip().lower() for x in deleted if str(x).strip().lower() != "admin"}
+    out = {}
+    for table, rows in tables.items():
+        clean_rows = []
+        for row in rows if isinstance(rows, list) else []:
+            if not isinstance(row, dict):
+                continue
+            u = str(row.get("username") or row.get("帳號") or row.get("user") or "").strip().lower()
+            if u and u in deleted:
+                continue
+            clean_rows.append(dict(row))
+        out[str(table)] = clean_rows
+    return out
+
+
+def _v95_fetch_all_permission_tables() -> dict:
+    _v95_schema_only()
+    conn = connect_db()
+    try:
+        out = {}
+        for table in _V95_AUTH_TABLES:
+            try:
+                rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
+                got = []
+                for r in rows:
+                    d = dict(r)
+                    d.pop("id", None)
+                    got.append(d)
+                out[table] = got
+            except Exception:
+                out[table] = []
+        return out
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _v95_read_permission_payload() -> dict:
+    payload = _v95_json_read(_V95_PERMISSION_AUTHORITY_FILE)
+    # 相容 V94 舊檔：若缺 tables，回傳空；不讀其它舊路徑。
+    if not isinstance(payload, dict):
+        payload = {}
+    return payload
+
+
+def _v95_write_permission_payload(payload: dict) -> None:
+    if not isinstance(payload, dict):
+        payload = {}
+    payload.setdefault("authority_schema", "SPT-10-Permissions-SingleAuthority-V95")
+    payload.setdefault("module_key", "10_permissions")
+    payload.setdefault("kind", "records")
+    payload["authority_file"] = "data/permanent_store/modules/10_permissions/records.json"
+    payload["updated_at"] = _v95_now_text_safe()
+    deleted = _v95_deleted_usernames(payload)
+    tables = payload.get("tables", {}) if isinstance(payload.get("tables"), dict) else {}
+    payload["tables"] = _v95_filter_deleted_tables(tables, deleted)
+    payload["deleted_usernames"] = sorted(deleted)
+    payload["table_counts"] = {k: len(v) for k, v in payload.get("tables", {}).items() if isinstance(v, list)}
+    _v95_json_write(_V95_PERMISSION_AUTHORITY_FILE, payload)
+
+
+def _v95_export_permission_authority(reason: str = "permission_saved_v95") -> dict:
+    old = _v95_read_permission_payload()
+    deleted = _v95_deleted_usernames(old)
+    tables = _v95_filter_deleted_tables(_v95_fetch_all_permission_tables(), deleted)
+    auth_users = tables.get("auth_users", [])
+    # 防呆：DB 暫時異常時，不用空表覆蓋權威檔。
+    if not isinstance(auth_users, list) or not auth_users:
+        return {"ok": False, "blocked": True, "reason": "empty_auth_users", "file": str(_V95_PERMISSION_AUTHORITY_FILE)}
+    payload = {
+        "authority_schema": "SPT-10-Permissions-SingleAuthority-V95",
+        "version": "V95-single-authority-fast-delete-tombstone",
+        "module_key": "10_permissions",
+        "kind": "records",
+        "authority_file": "data/permanent_store/modules/10_permissions/records.json",
+        "reason": reason,
+        "updated_at": _v95_now_text_safe(),
+        "deleted_usernames": sorted(deleted),
+        "tables": tables,
+        "table_counts": {k: len(v) for k, v in tables.items() if isinstance(v, list)},
+    }
+    _v95_write_permission_payload(payload)
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    global _V95_LAST_RESTORE_SIG
+    _V95_LAST_RESTORE_SIG = _v95_authority_signature()
+    return {"ok": True, "file": str(_V95_PERMISSION_AUTHORITY_FILE), "table_counts": payload["table_counts"], "deleted_usernames": sorted(deleted)}
+
+
+def _v95_restore_permission_from_authority(force: bool = False) -> dict:
+    global _V95_LAST_RESTORE_SIG, _V95_LAST_RESTORE_TS
+    _v95_schema_only()
+    sig = _v95_authority_signature()
+    now_ts = _v95_time.time()
+    if not force and _V95_LAST_RESTORE_SIG == sig and (now_ts - float(_V95_LAST_RESTORE_TS or 0)) < _V95_RESTORE_MIN_INTERVAL:
+        return {"ok": True, "skipped": True, "reason": "authority_already_restored", "sig": sig}
+    payload = _v95_read_permission_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    if not isinstance(tables, dict) or not isinstance(tables.get("auth_users"), list):
+        _V95_LAST_RESTORE_SIG = sig
+        _V95_LAST_RESTORE_TS = now_ts
+        return {"ok": False, "message": "authority_file_missing_or_invalid", "file": str(_V95_PERMISSION_AUTHORITY_FILE)}
+    deleted = _v95_deleted_usernames(payload)
+    tables = _v95_filter_deleted_tables(tables, deleted)
+    conn = connect_db(); cur = conn.cursor(); restored = {}
+    try:
+        try:
+            _ensure_legacy_security_tables(cur)  # type: ignore[name-defined]
+            _ensure_security_setting_tables(cur)  # type: ignore[name-defined]
+            _migrate_permission_schema_columns(cur)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        cur.execute("BEGIN")
+        for table in _V95_AUTH_TABLES:
+            rows = tables.get(table, []) if isinstance(tables.get(table, []), list) else []
+            try:
+                cur.execute(f'DELETE FROM "{table}"')
+            except Exception:
+                restored[table] = 0
+                continue
+            try:
+                cols = {str(r[1]) for r in cur.execute(f'PRAGMA table_info("{table}")').fetchall()}
+            except Exception:
+                cols = set()
+            inserted = 0
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                clean = {str(k): v for k, v in row.items() if str(k) in cols and str(k) != "id"}
+                if not clean:
+                    continue
+                sql_cols = ",".join([f'"{c}"' for c in clean.keys()])
+                placeholders = ",".join(["?"] * len(clean))
+                try:
+                    cur.execute(f'INSERT INTO "{table}" ({sql_cols}) VALUES ({placeholders})', list(clean.values()))
+                    inserted += 1
+                except Exception:
+                    continue
+            restored[table] = inserted
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    try:
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    _V95_LAST_RESTORE_SIG = sig
+    _V95_LAST_RESTORE_TS = _v95_time.time()
+    return {"ok": True, "mode": "v95_single_authority_cached_restore", "restored": restored, "deleted_usernames": sorted(deleted)}
+
+
+def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
+    _v95_restore_permission_from_authority(force=bool(force))
+
+init_auth_tables = init_permission_tables
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    return _v95_restore_permission_from_authority(force=bool(force))
+
+
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
+    return _v95_export_permission_authority(reason)
+
+
+def restore_default_accounts_once_v57() -> dict:  # type: ignore[override]
+    return {"restored": 0, "usernames": [], "mode": "v95_disabled_default_restore"}
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    init_permission_tables(force=False)
+    deleted = _v95_deleted_usernames()
+    conn = connect_db()
+    try:
+        rows = conn.execute("""
+            SELECT id, username,
+                   '********' AS password_display,
+                   '' AS new_password,
+                   employee_id, display_name, email, role_code,
+                   is_active, force_password_change, last_login_at, note, created_at, updated_at
+            FROM auth_users
+            ORDER BY username
+        """).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            if str(d.get("username", "")).strip().lower() in deleted:
+                continue
+            out.append(d)
+        return out
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def get_account_permissions() -> List[dict]:  # type: ignore[override]
+    init_permission_tables(force=False)
+    deleted = _v95_deleted_usernames()
+    conn = connect_db()
+    try:
+        rows = conn.execute("""
+            SELECT p.username, u.display_name, u.role_code, p.module_code, p.module_name_zh, p.module_name_en,
+                   p.can_view, p.can_create, p.can_edit, p.can_delete, p.can_import, p.can_export,
+                   p.can_backup, p.can_restore, p.can_manage, p.updated_at
+            FROM auth_account_permissions p
+            LEFT JOIN auth_users u ON u.username = p.username
+            ORDER BY p.username, CAST(p.module_code AS INTEGER)
+        """).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            if str(d.get("username", "")).strip().lower() in deleted:
+                continue
+            out.append(d)
+        return out
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    init_permission_tables(force=False)
+    result: Dict[str, str] = {
+        "idle_timeout_minutes": "15",
+        "ask_continue_after_record": "1",
+        "post_record_action": "ask_continue",
+    }
+    conn = connect_db(); cur = conn.cursor()
+    try:
+        try:
+            _ensure_security_setting_tables(cur)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        for table in ["auth_security_settings", "security_settings"]:
+            try:
+                for r in cur.execute(f"SELECT setting_key, setting_value FROM {table}").fetchall():
+                    result[str(r["setting_key"])] = str(r["setting_value"])
+            except Exception:
+                pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    return result
+
+
+def save_users(rows: _V94Iterable[dict]) -> dict:  # type: ignore[override]
+    init_permission_tables(force=False)
+    input_rows = [dict(r) for r in (rows or []) if isinstance(r, dict)]
+    payload = _v95_read_permission_payload()
+    deleted = _v95_deleted_usernames(payload)
+    explicit = {str(r.get("username") or r.get("帳號 / Username") or "").strip().lower() for r in input_rows if str(r.get("username") or r.get("帳號 / Username") or "").strip()}
+    # 明確匯入/新增代表重新建立該帳號，移除 tombstone；admin 不進 tombstone。
+    deleted -= {u for u in explicit if u and u != "admin"}
+    payload["deleted_usernames"] = sorted(deleted)
+    if isinstance(payload.get("tables"), dict):
+        payload["tables"] = _v95_filter_deleted_tables(payload.get("tables", {}), deleted)
+        _v95_write_permission_payload(payload)
+    saved = 0; skipped = []
+    conn = connect_db(); cur = conn.cursor()
+    try:
+        for r in input_rows:
+            username = str(r.get("username") or r.get("帳號 / Username") or "").strip()
+            if not username:
+                continue
+            display_name = str(r.get("display_name") or r.get("姓名 / Display Name") or username).strip()
+            role_code = str(r.get("role_code") or r.get("角色 / Role") or "operator").strip() or "operator"
+            new_password = str(r.get("new_password") or r.get("密碼 / Password") or "").strip()
+            employee_id = str(r.get("employee_id") or r.get("工號 / Employee ID") or "").strip()
+            email = str(r.get("email") or r.get("Email") or "").strip()
+            note = str(r.get("note") or r.get("備註 / Note") or "").strip()
+            is_active = int(_v91_bool(r.get("is_active", r.get("啟用 / Active", True)), True)) if "_v91_bool" in globals() else int(bool(r.get("is_active", True)))
+            force_change = int(_v91_bool(r.get("force_password_change", r.get("強制改密碼 / Force Change", False)), False)) if "_v91_bool" in globals() else int(bool(r.get("force_password_change", False)))
+            exists = cur.execute("SELECT username FROM auth_users WHERE username=?", (username,)).fetchone()
+            if exists:
+                if new_password and new_password != "********":
+                    cur.execute("UPDATE auth_users SET password_hash=?, password_hint=?, employee_id=?, display_name=?, email=?, role_code=?, is_active=?, force_password_change=?, note=?, updated_at=? WHERE username=?", (hash_password(new_password), "由權限管理頁更新", employee_id, display_name, email, role_code, is_active, force_change, note, _v95_now_text_safe(), username))
+                else:
+                    cur.execute("UPDATE auth_users SET employee_id=?, display_name=?, email=?, role_code=?, is_active=?, force_password_change=?, note=?, updated_at=? WHERE username=?", (employee_id, display_name, email, role_code, is_active, force_change, note, _v95_now_text_safe(), username))
+            else:
+                if not new_password or new_password == "********":
+                    skipped.append(f"{username} 未設定新密碼 / new password required")
+                    continue
+                cur.execute("INSERT INTO auth_users(username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,note,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (username, hash_password(new_password), "由權限管理頁建立", employee_id, display_name, email, role_code, is_active, force_change, note, _v95_now_text_safe(), _v95_now_text_safe()))
+            saved += 1
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    try:
+        ensure_permissions_for_all_users(force=True)
+        sync_auth_users_to_runtime_security()
+    except Exception:
+        pass
+    return {"saved": saved, "skipped": skipped, "permanent_save": _v95_export_permission_authority("save_users_v95")}
+
+
+def save_account_master(rows: _V94Iterable[dict], delete_usernames: _V94Iterable[str] | None = None) -> dict:  # type: ignore[override]
+    init_permission_tables(force=False)
+    delete_set = {str(u).strip().lower() for u in (delete_usernames or []) if str(u).strip() and str(u).strip().lower() != "admin"}
+    input_rows = [dict(r) for r in (rows or []) if isinstance(r, dict)]
+    payload = _v95_read_permission_payload()
+    deleted = _v95_deleted_usernames(payload) | delete_set
+    payload["deleted_usernames"] = sorted(deleted)
+    if isinstance(payload.get("tables"), dict):
+        payload["tables"] = _v95_filter_deleted_tables(payload.get("tables", {}), deleted)
+        _v95_write_permission_payload(payload)
+    # 先刪除，再儲存保留列。
+    conn = connect_db(); cur = conn.cursor(); deleted_count = 0
+    try:
+        for u in sorted(delete_set):
+            try:
+                existed = cur.execute("SELECT COUNT(*) AS c FROM auth_users WHERE lower(username)=?", (u,)).fetchone()
+                deleted_count += int(existed["c"] if existed else 0)
+            except Exception:
+                pass
+            for sql in [
+                "DELETE FROM auth_account_permissions WHERE lower(username)=?",
+                "DELETE FROM security_user_roles WHERE lower(username)=?",
+                "DELETE FROM security_users WHERE lower(username)=?",
+                "DELETE FROM auth_users WHERE lower(username)=?",
+            ]:
+                try:
+                    cur.execute(sql, (u,))
+                except Exception:
+                    pass
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    filtered_rows = []
+    for r in input_rows:
+        u = str(r.get("username") or r.get("帳號 / Username") or "").strip().lower()
+        if u and u not in deleted:
+            filtered_rows.append(r)
+    result = save_users(filtered_rows)
+    # save_users 可能因明確列出帳號移除 tombstone；帳號總表刪除要保留 tombstone。
+    payload = _v95_read_permission_payload()
+    payload["deleted_usernames"] = sorted(_v95_deleted_usernames(payload) | deleted)
+    if isinstance(payload.get("tables"), dict):
+        payload["tables"] = _v95_filter_deleted_tables(payload.get("tables", {}), set(payload["deleted_usernames"]))
+    _v95_write_permission_payload(payload)
+    result["deleted"] = deleted_count
+    result["deleted_usernames"] = sorted(set(payload.get("deleted_usernames", [])))
+    result["permanent_save"] = _v95_export_permission_authority("save_account_master_v95")
+    return result
+
+
+def delete_users(usernames: _V94Iterable[str]) -> int:  # type: ignore[override]
+    targets = {str(u).strip().lower() for u in (usernames or []) if str(u).strip() and str(u).strip().lower() != "admin"}
+    if not targets:
+        return 0
+    payload = _v95_read_permission_payload()
+    deleted = _v95_deleted_usernames(payload) | targets
+    payload["deleted_usernames"] = sorted(deleted)
+    if isinstance(payload.get("tables"), dict):
+        payload["tables"] = _v95_filter_deleted_tables(payload.get("tables", {}), deleted)
+        _v95_write_permission_payload(payload)
+    conn = connect_db(); cur = conn.cursor(); count = 0
+    try:
+        for u in sorted(targets):
+            try:
+                existed = cur.execute("SELECT COUNT(*) AS c FROM auth_users WHERE lower(username)=?", (u,)).fetchone()
+                count += int(existed["c"] if existed else 0)
+            except Exception:
+                pass
+            for sql in [
+                "DELETE FROM auth_account_permissions WHERE lower(username)=?",
+                "DELETE FROM security_user_roles WHERE lower(username)=?",
+                "DELETE FROM security_users WHERE lower(username)=?",
+                "DELETE FROM auth_users WHERE lower(username)=?",
+            ]:
+                try:
+                    cur.execute(sql, (u,))
+                except Exception:
+                    pass
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    _v95_export_permission_authority("delete_users_v95")
+    return int(count)
+
+
+def save_account_permissions(rows: _V94Iterable[dict]) -> int:  # type: ignore[override]
+    init_permission_tables(force=False)
+    deleted = _v95_deleted_usernames()
+    safe_rows = [dict(r) for r in (rows or []) if isinstance(r, dict) and str(r.get("username", "")).strip().lower() not in deleted]
+    conn = connect_db(); cur = conn.cursor(); count = 0
+    try:
+        for r in safe_rows:
+            username = str(r.get("username", "")).strip()
+            module_code = str(r.get("module_code", "")).strip().zfill(2)
+            if not username or not module_code:
+                continue
+            module_info = next((m for m in MODULES if m["module_code"] == module_code), None)
+            module_name_zh = str(r.get("module_name_zh") or (module_info or {}).get("module_name_zh") or "").strip()
+            module_name_en = str(r.get("module_name_en") or (module_info or {}).get("module_name_en") or "").strip()
+            vals = {k: (_v91_bool(r.get(k, False), False) if "_v91_bool" in globals() else int(bool(r.get(k, False)))) for k, _, _ in ACTIONS}
+            cur.execute("""
+                INSERT INTO auth_account_permissions
+                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(username,module_code) DO UPDATE SET
+                    module_name_zh=excluded.module_name_zh, module_name_en=excluded.module_name_en,
+                    can_view=excluded.can_view, can_create=excluded.can_create, can_edit=excluded.can_edit,
+                    can_delete=excluded.can_delete, can_import=excluded.can_import, can_export=excluded.can_export,
+                    can_backup=excluded.can_backup, can_restore=excluded.can_restore, can_manage=excluded.can_manage,
+                    updated_at=excluded.updated_at
+            """, (username, module_code, module_name_zh, module_name_en,
+                  vals["can_view"], vals["can_create"], vals["can_edit"], vals["can_delete"], vals["can_import"], vals["can_export"], vals["can_backup"], vals["can_restore"], vals["can_manage"], _v95_now_text_safe()))
+            count += 1
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    _v95_export_permission_authority("save_account_permissions_v95")
+    return count
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    init_permission_tables(force=False)
+    merged = get_security_settings()
+    merged.update({str(k): str(v) for k, v in (settings or {}).items()})
+    conn = connect_db(); cur = conn.cursor()
+    try:
+        try:
+            _ensure_security_setting_tables(cur)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        for k, v in merged.items():
+            cur.execute("""
+                INSERT INTO auth_security_settings(setting_key, setting_value, note, updated_at)
+                VALUES (?,?,?,?)
+                ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value, updated_at=excluded.updated_at
+            """, (str(k), str(v), "V95 single authority security setting", _v95_now_text_safe()))
+            try:
+                cur.execute("""
+                    INSERT INTO security_settings(setting_key, setting_value, note, updated_at)
+                    VALUES (?,?,?,?)
+                    ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value, updated_at=excluded.updated_at
+                """, (str(k), str(v), "V95 single authority security setting", _v95_now_text_safe()))
+            except Exception:
+                pass
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    _v95_export_permission_authority("save_security_settings_v95")
+
+# 重要：維持 check_permission 對 has_permission 的指向，登入與模組管制不改。
+check_permission = has_permission
+# ===== V95 PERMISSION SINGLE-AUTHORITY SPEED + DELETE-PERSIST HARD FIX END =====

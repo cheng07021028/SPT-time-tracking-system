@@ -66,6 +66,25 @@ ACCOUNT_DISPLAY_COLUMNS = {
     "note": "備註 / Note",
 }
 
+
+# ===== V95 FAST RAW EDITOR HELPER =====
+def _v95_raw_data_editor(data=None, *args, **kwargs):
+    """Use Streamlit native data_editor for 10. 權限管理 heavy editors.
+
+    The global column-settings wrapper renders an extra settings data_editor for every
+    table. In this module it caused 2~3 minute reruns and duplicate-key failures.
+    This helper bypasses that wrapper only for the two permission-management editors.
+    """
+    try:
+        import services.column_settings_service as _css
+        _orig = getattr(_css, "_ORIGINAL_DATA_EDITOR", None)
+        if callable(_orig):
+            return _orig(data, *args, **kwargs)
+    except Exception:
+        pass
+    return st.data_editor(data, *args, **kwargs)
+# ===== V95 FAST RAW EDITOR HELPER END =====
+
 with st.expander("⧠ 權限設定使用說明 / User Guide", expanded=False):
     st.markdown("""
 ### 密碼欄位說明 / Password Field Design
@@ -535,18 +554,30 @@ def _build_permission_excel_export_v93() -> bytes:
 
 
 with st.expander("⟰ 權限管理 Excel 下載 / Permission Management Excel Export", expanded=False):
-    st.caption("只新增下載功能，不會修改帳號、權限或安全設定。既有密碼不輸出明碼，只輸出密碼狀態。")
-    try:
-        st.download_button(
-            "▣ 下載權限管理 Excel / Download Permission Workbook",
-            data=_build_permission_excel_export_v93(),
-            file_name=f"SPT_permission_management_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-            key="v93_permission_management_excel_download",
-        )
-    except Exception as ex:
-        st.warning(f"Excel 下載檔建立失敗 / Export failed：{ex}")
+    st.caption("V95：Excel 檔改成按下產生後才建立，不再每次進入 10 頁或勾選 checkbox 都重新產生，避免拖慢頁面。")
+    cex1, cex2 = st.columns([1, 1])
+    with cex1:
+        if st.button("▣ 產生權限管理 Excel / Build Permission Workbook", use_container_width=True, key="v95_build_permission_management_excel"):
+            try:
+                st.session_state["v95_permission_management_excel_bytes"] = _build_permission_excel_export_v93()
+                st.session_state["v95_permission_management_excel_ts"] = datetime.now().strftime('%Y%m%d_%H%M%S')
+                st.success("Excel 下載檔已產生 / Workbook generated")
+            except Exception as ex:
+                st.session_state.pop("v95_permission_management_excel_bytes", None)
+                st.warning(f"Excel 下載檔建立失敗 / Export failed：{ex}")
+    with cex2:
+        excel_bytes = st.session_state.get("v95_permission_management_excel_bytes")
+        if excel_bytes:
+            st.download_button(
+                "⬇ 下載權限管理 Excel / Download Permission Workbook",
+                data=excel_bytes,
+                file_name=f"SPT_permission_management_{st.session_state.get('v95_permission_management_excel_ts', datetime.now().strftime('%Y%m%d_%H%M%S'))}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="v95_permission_management_excel_download",
+            )
+        else:
+            st.info("請先按左側產生 Excel。")
 
 
 tab_accounts, tab_perm, tab_sec = st.tabs([
@@ -726,7 +757,7 @@ with tab_accounts:
         account_editor_key = f"v56_account_password_editor_{st.session_state.get('v235_account_editor_rev', 0)}"
         draft_df = _v56_prepare_account_draft()
 
-        edited_users = st.data_editor(
+        edited_users = _v95_raw_data_editor(
             draft_df,
             key=account_editor_key,
             use_container_width=True,
@@ -932,7 +963,7 @@ with tab_perm:
         col_cfg[key] = st.column_config.CheckboxColumn(f"{zh} / {en}")
     st.info("V1.89：權限表已改成確認後才套用。勾選權限時不會每一下都觸發整頁運算。")
     with st.form("permission_editor_commit_form", clear_on_submit=False):
-        edited_perm = st.data_editor(view_df[base_cols + ACTION_COLS], key=f"v189_permission_editor_{st.session_state.get('v235_permission_editor_rev', 0)}", use_container_width=True, hide_index=True, column_config=col_cfg)
+        edited_perm = _v95_raw_data_editor(view_df[base_cols + ACTION_COLS], key=f"v189_permission_editor_{st.session_state.get('v235_permission_editor_rev', 0)}", use_container_width=True, hide_index=True, column_config=col_cfg)
         submitted_perm = st.form_submit_button("▣ 確認套用並儲存權限 / Apply and Save Permissions", type="primary", use_container_width=True)
     st.markdown("#### 權限摘要預覽 / Permission Summary Preview")
     st.dataframe(_permission_summary(edited_perm), use_container_width=True, hide_index=True)

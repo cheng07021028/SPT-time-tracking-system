@@ -4,6 +4,25 @@ from __future__ import annotations
 import streamlit as st
 import pandas as pd
 
+
+# ===== V95 RAW DATA EDITOR HELPER =====
+def _v95_raw_data_editor(data=None, *args, **kwargs):
+    """Bypass global column-settings wrapper for the 01 admin maintenance editor.
+
+    The wrapper can render another settings editor with the same generated key and
+    trigger StreamlitDuplicateElementKey. 01 admin table already manages its own
+    column order/config, so bypassing the wrapper here does not remove features.
+    """
+    try:
+        import services.column_settings_service as _css
+        _orig = getattr(_css, "_ORIGINAL_DATA_EDITOR", None)
+        if callable(_orig):
+            return _orig(data, *args, **kwargs)
+    except Exception:
+        pass
+    return st.data_editor(data, *args, **kwargs)
+# ===== V95 RAW DATA EDITOR HELPER END =====
+
 from services.theme_service import apply_theme, render_header
 from services.ui_size_service import apply_dropdown_menu_size_only
 from services.security_service import (
@@ -388,7 +407,7 @@ if is_admin:
                 column_cfg[delete_col] = st.column_config.CheckboxColumn("刪除 / Delete", width=120)
                 disabled_cols = [c for c in ["id", "ID", "ID / ID", "ID / ID / ID", "record_key", "紀錄鍵 / Record Key", "created_at", "建立時間 / Created At", "updated_at", "更新時間 / Updated At"] if c in display_admin.columns]
                 try:
-                    edited_admin_return = st.data_editor(
+                    edited_admin_return = _v95_raw_data_editor(
                         display_admin,
                         use_container_width=True,
                         hide_index=True,
@@ -401,7 +420,7 @@ if is_admin:
                 except Exception as _v94_editor_error:
                     st.warning(f"維護表格欄位型態設定已自動降級，避免畫面中斷：{_v94_editor_error}")
                     safe_column_cfg = {delete_col: st.column_config.CheckboxColumn("刪除 / Delete", width=120)}
-                    edited_admin_return = st.data_editor(
+                    edited_admin_return = _v95_raw_data_editor(
                         display_admin,
                         use_container_width=True,
                         hide_index=True,
