@@ -4742,3 +4742,473 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
 # 重要：維持 check_permission 對 has_permission 的指向，登入與模組管制不改。
 check_permission = has_permission
 # ===== V95 PERMISSION SINGLE-AUTHORITY SPEED + DELETE-PERSIST HARD FIX END =====
+
+# ===== V96 PERMISSION TRUE SINGLE-AUTHORITY DIRECT READ/WRITE + SPEED PATCH START =====
+# 目的：10. 權限管理不再依賴 SQLite 還原流程作為畫面來源；讀、寫、刪除、權限矩陣、安全設定
+# 都直接以 data/permanent_store/modules/10_permissions/records.json 為唯一權威檔。
+# SQLite 僅作登入/相容快取，且只在存檔後 best-effort 同步，不再於進頁面或勾選時重建造成卡頓。
+import os as _v96_os
+import base64 as _v96_base64
+import urllib.request as _v96_urllib_request
+import urllib.parse as _v96_urllib_parse
+
+_V96_PERMISSION_AUTHORITY_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json"
+_V96_PERMISSION_REL_PATH = "data/permanent_store/modules/10_permissions/records.json"
+_V96_AUTH_TABLES = ["auth_users", "auth_account_permissions", "auth_security_settings", "security_settings", "security_users", "security_user_roles"]
+
+
+def _v96_st_secret(name: str, default: str = "") -> str:
+    try:
+        if st is not None:
+            val = st.secrets.get(name, "")  # type: ignore[attr-defined]
+            if val:
+                return str(val).strip()
+    except Exception:
+        pass
+    return _v96_os.environ.get(name, default).strip()
+
+
+def _v96_github_cfg() -> dict:
+    repo = _v96_st_secret("GITHUB_REPOSITORY", "")
+    if not repo:
+        owner = _v96_st_secret("GITHUB_REPO_OWNER", "")
+        name = _v96_st_secret("GITHUB_REPO_NAME", "")
+        if owner and name:
+            repo = f"{owner}/{name}"
+    if not repo:
+        repo = "cheng07021028/SPT-time-tracking-system"
+    return {
+        "token": _v96_st_secret("GITHUB_TOKEN", ""),
+        "repo": repo,
+        "branch": _v96_st_secret("GITHUB_BRANCH", _v96_st_secret("GITHUB_REPO_BRANCH", "main")) or "main",
+    }
+
+
+def _v96_fast_github_put(rel_path: str, text: str, message: str) -> dict:
+    cfg = _v96_github_cfg()
+    if not cfg.get("token") or not cfg.get("repo"):
+        return {"ok": False, "skipped": True, "reason": "missing_github_config"}
+    api = f"https://api.github.com/repos/{cfg['repo']}/contents/{_v96_urllib_parse.quote(rel_path)}"
+    headers = {
+        "Authorization": f"Bearer {cfg['token']}",
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "User-Agent": "SPT-TimeTracking-V96",
+    }
+    sha = ""
+    try:
+        req = _v96_urllib_request.Request(api + f"?ref={_v96_urllib_parse.quote(cfg['branch'])}", headers=headers, method="GET")
+        with _v96_urllib_request.urlopen(req, timeout=5) as resp:
+            data = _v94_json.loads(resp.read().decode("utf-8"))
+            sha = str(data.get("sha") or "")
+            try:
+                old_text = _v96_base64.b64decode(str(data.get("content", "")).encode("ascii")).decode("utf-8")
+                if old_text == text:
+                    return {"ok": True, "skipped": True, "reason": "unchanged", "path": rel_path}
+            except Exception:
+                pass
+    except Exception:
+        sha = ""
+    body = {"message": message, "content": _v96_base64.b64encode(text.encode("utf-8")).decode("ascii"), "branch": cfg["branch"]}
+    if sha:
+        body["sha"] = sha
+    try:
+        req = _v96_urllib_request.Request(api, data=_v94_json.dumps(body).encode("utf-8"), headers=headers, method="PUT")
+        with _v96_urllib_request.urlopen(req, timeout=8) as resp:
+            got = _v94_json.loads(resp.read().decode("utf-8"))
+        return {"ok": True, "path": rel_path, "commit": (got.get("commit") or {}).get("sha", "")}
+    except Exception as exc:
+        return {"ok": False, "path": rel_path, "error": str(exc)[:300]}
+
+
+def _v96_auth_payload() -> dict:
+    try:
+        if _V96_PERMISSION_AUTHORITY_FILE.exists() and _V96_PERMISSION_AUTHORITY_FILE.stat().st_size > 2:
+            data = _v94_json.loads(_V96_PERMISSION_AUTHORITY_FILE.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        pass
+    return {
+        "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+        "version": "V96-direct-authority",
+        "module_key": "10_permissions",
+        "kind": "records",
+        "authority_file": _V96_PERMISSION_REL_PATH,
+        "updated_at": _v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text(),
+        "deleted_usernames": [],
+        "tables": {k: [] for k in _V96_AUTH_TABLES},
+        "table_counts": {k: 0 for k in _V96_AUTH_TABLES},
+    }
+
+
+def _v96_deleted(payload: dict | None = None) -> set[str]:
+    payload = payload if isinstance(payload, dict) else _v96_auth_payload()
+    raw = payload.get("deleted_usernames", []) if isinstance(payload, dict) else []
+    return {str(x).strip().lower() for x in raw if str(x).strip() and str(x).strip().lower() != "admin"}
+
+
+def _v96_filter_deleted_tables(tables: dict, deleted: set[str]) -> dict:
+    deleted = {str(x).strip().lower() for x in (deleted or set()) if str(x).strip().lower() != "admin"}
+    out = {}
+    for t in _V96_AUTH_TABLES:
+        rows = tables.get(t, []) if isinstance(tables, dict) else []
+        clean = []
+        for r in rows if isinstance(rows, list) else []:
+            if not isinstance(r, dict):
+                continue
+            u = str(r.get("username") or r.get("帳號") or r.get("帳號 / Username") or "").strip().lower()
+            if u and u in deleted:
+                continue
+            x = dict(r)
+            x.pop("id", None)
+            clean.append(x)
+        out[t] = clean
+    return out
+
+
+def _v96_write_payload(payload: dict, reason: str = "permission_v96_save", *, github: bool = True) -> dict:
+    if not isinstance(payload, dict):
+        payload = {}
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    deleted = _v96_deleted(payload)
+    tables = _v96_filter_deleted_tables(tables, deleted)
+    payload.update({
+        "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+        "version": "V96-direct-authority",
+        "module_key": "10_permissions",
+        "kind": "records",
+        "authority_file": _V96_PERMISSION_REL_PATH,
+        "reason": reason,
+        "updated_at": _v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text(),
+        "deleted_usernames": sorted(deleted),
+        "tables": tables,
+        "table_counts": {k: len(v) for k, v in tables.items() if isinstance(v, list)},
+    })
+    _V96_PERMISSION_AUTHORITY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    text = _v94_json.dumps(payload, ensure_ascii=False, indent=2, default=str)
+    tmp = _V96_PERMISSION_AUTHORITY_FILE.with_suffix(".json.tmp")
+    changed = True
+    try:
+        changed = (not _V96_PERMISSION_AUTHORITY_FILE.exists()) or (_V96_PERMISSION_AUTHORITY_FILE.read_text(encoding="utf-8") != text)
+    except Exception:
+        changed = True
+    if changed:
+        tmp.write_text(text, encoding="utf-8")
+        _v94_json.loads(tmp.read_text(encoding="utf-8"))
+        tmp.replace(_V96_PERMISSION_AUTHORITY_FILE)
+    gh = {"ok": True, "skipped": True, "reason": "unchanged_or_disabled"}
+    if github and changed:
+        gh = _v96_fast_github_put(_V96_PERMISSION_REL_PATH, text, f"SPT 10 permissions authority: {reason}")
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    return {"ok": True, "changed": changed, "github": gh, "file": str(_V96_PERMISSION_AUTHORITY_FILE)}
+
+
+def _v96_table(name: str) -> list[dict]:
+    payload = _v96_auth_payload()
+    deleted = _v96_deleted(payload)
+    tables = _v96_filter_deleted_tables(payload.get("tables", {}), deleted)
+    return [dict(r) for r in tables.get(name, [])]
+
+
+def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
+    # V96：進入 10 頁或勾選 checkbox 不再把權威檔整批灌回 SQLite，避免 1~3 分鐘卡頓。
+    try:
+        _v95_schema_only() if "_v95_schema_only" in globals() else None
+    except Exception:
+        pass
+
+init_auth_tables = init_permission_tables
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    return {"ok": True, "mode": "v96_direct_authority_no_page_restore", "file": str(_V96_PERMISSION_AUTHORITY_FILE)}
+
+
+def restore_default_accounts_once_v57() -> dict:  # type: ignore[override]
+    return {"restored": 0, "usernames": [], "mode": "v96_disabled_default_restore"}
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    rows = _v96_table("auth_users")
+    out = []
+    for r in rows:
+        u = str(r.get("username") or "").strip()
+        if not u:
+            continue
+        x = dict(r)
+        x["username"] = u
+        x.setdefault("password_display", "********" if x.get("password_hash") else "")
+        x.setdefault("new_password", "")
+        x.setdefault("role_code", "operator")
+        x["is_active"] = 1 if _truthy(x.get("is_active", True), True) else 0
+        x["force_password_change"] = 1 if _truthy(x.get("force_password_change", False), False) else 0
+        out.append(x)
+    return sorted(out, key=lambda x: (0 if x.get("username") == "admin" else 1, str(x.get("username", ""))))
+
+
+def _v96_role_preset(role: str, module_code: str) -> dict:
+    role = str(role or "operator").strip().lower() or "operator"
+    preset = dict(ROLE_PRESET.get(role, ROLE_PRESET.get("operator", {})))
+    if role == "operator" and module_code in ("01", "02", "08"):
+        preset["can_view"] = 1
+        if module_code == "01":
+            preset["can_create"] = 1; preset["can_edit"] = 1
+    if role == "leader" and module_code in ("01", "02", "04", "07", "08"):
+        preset["can_view"] = 1
+    if role == "auditor" and module_code in ("02", "06", "11"):
+        preset["can_view"] = 1
+    return {k: int(_truthy(v, False)) for k, v in preset.items()}
+
+
+def _v96_default_permission_rows_for_user(username: str, role: str) -> list[dict]:
+    rows = []
+    for m in MODULES:
+        vals = _v96_role_preset(role, str(m.get("module_code", "")).zfill(2))
+        row = {
+            "username": username,
+            "module_code": str(m.get("module_code", "")).zfill(2),
+            "module_name_zh": str(m.get("module_name_zh", "")),
+            "module_name_en": str(m.get("module_name_en", "")),
+            "updated_at": _v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text(),
+        }
+        for k, _, _ in ACTIONS:
+            row[k] = int(vals.get(k, 0))
+        rows.append(row)
+    return rows
+
+
+def get_account_permissions() -> List[dict]:  # type: ignore[override]
+    payload = _v96_auth_payload()
+    deleted = _v96_deleted(payload)
+    tables = _v96_filter_deleted_tables(payload.get("tables", {}), deleted)
+    users = {str(u.get("username") or "").strip(): dict(u) for u in tables.get("auth_users", []) if str(u.get("username") or "").strip()}
+    rows = [dict(r) for r in tables.get("auth_account_permissions", [])]
+    existing = {(str(r.get("username") or ""), str(r.get("module_code") or "").zfill(2)) for r in rows}
+    for u, info in users.items():
+        role = str(info.get("role_code") or "operator")
+        for r in _v96_default_permission_rows_for_user(u, role):
+            key = (r["username"], r["module_code"])
+            if key not in existing:
+                rows.append(r); existing.add(key)
+    out = []
+    for r in rows:
+        u = str(r.get("username") or "").strip()
+        if not u or u.lower() in deleted:
+            continue
+        user = users.get(u, {})
+        x = dict(r)
+        x["username"] = u
+        x["display_name"] = user.get("display_name", x.get("display_name", ""))
+        x["role_code"] = user.get("role_code", x.get("role_code", "operator"))
+        x["module_code"] = str(x.get("module_code") or "").zfill(2)
+        for m in MODULES:
+            if str(m.get("module_code", "")).zfill(2) == x["module_code"]:
+                x.setdefault("module_name_zh", m.get("module_name_zh", ""))
+                x.setdefault("module_name_en", m.get("module_name_en", ""))
+        for k, _, _ in ACTIONS:
+            x[k] = int(_truthy(x.get(k, False), False))
+        out.append(x)
+    return sorted(out, key=lambda x: (str(x.get("username", "")), int(str(x.get("module_code") or "0") or 0)))
+
+
+def _v96_normalize_user_row(r: dict, existing: dict | None = None) -> tuple[dict | None, str]:
+    existing = existing or {}
+    username = str(r.get("username") or r.get("帳號 / Username") or r.get("帳號") or "").strip()
+    if not username:
+        return None, "空白帳號略過"
+    role = str(r.get("role_code") or r.get("角色 / Role") or existing.get("role_code") or "operator").strip() or "operator"
+    new_password = str(r.get("new_password") or r.get("密碼 / Password") or r.get("新密碼 / New Password") or r.get("password") or "").strip()
+    password_hash = str(existing.get("password_hash") or "")
+    password_hint = str(existing.get("password_hint") or "")
+    if new_password and new_password != "********":
+        password_hash = hash_password(new_password)
+        password_hint = "由權限管理頁更新"
+    elif not password_hash:
+        return None, f"{username} 未設定新密碼 / new password required"
+    row = {
+        "username": username,
+        "password_hash": password_hash,
+        "password_hint": password_hint,
+        "employee_id": str(r.get("employee_id") or r.get("工號 / Employee ID") or existing.get("employee_id") or "").strip(),
+        "display_name": str(r.get("display_name") or r.get("姓名 / Display Name") or existing.get("display_name") or username).strip(),
+        "email": str(r.get("email") or r.get("Email") or existing.get("email") or "").strip(),
+        "role_code": role,
+        "is_active": 1 if _truthy(r.get("is_active", r.get("啟用 / Active", existing.get("is_active", True))), True) else 0,
+        "force_password_change": 1 if _truthy(r.get("force_password_change", r.get("強制改密碼 / Force Change", existing.get("force_password_change", False))), False) else 0,
+        "note": str(r.get("note") or r.get("備註 / Note") or existing.get("note") or "").strip(),
+        "created_at": existing.get("created_at") or (_v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text()),
+        "updated_at": _v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text(),
+    }
+    return row, ""
+
+
+def save_users(rows: _V94Iterable[dict]) -> dict:  # type: ignore[override]
+    payload = _v96_auth_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {k: [] for k in _V96_AUTH_TABLES}
+    deleted = _v96_deleted(payload)
+    existing_users = {str(u.get("username") or "").strip().lower(): dict(u) for u in tables.get("auth_users", []) if str(u.get("username") or "").strip()}
+    saved = 0; skipped = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        username_key = str(r.get("username") or r.get("帳號 / Username") or "").strip().lower()
+        row, msg = _v96_normalize_user_row(r, existing_users.get(username_key))
+        if not row:
+            if msg:
+                skipped.append(msg)
+            continue
+        uk = row["username"].lower()
+        existing_users[uk] = row
+        deleted.discard(uk)
+        saved += 1
+    tables["auth_users"] = list(existing_users.values())
+    # 補足新帳號預設權限，但不覆蓋既有權限矩陣。
+    perms = [dict(x) for x in tables.get("auth_account_permissions", []) if isinstance(x, dict)]
+    perm_keys = {(str(p.get("username") or "").strip().lower(), str(p.get("module_code") or "").zfill(2)) for p in perms}
+    for u in tables["auth_users"]:
+        uk = str(u.get("username") or "").strip().lower()
+        if not uk or uk in deleted:
+            continue
+        for p in _v96_default_permission_rows_for_user(str(u.get("username")), str(u.get("role_code") or "operator")):
+            key = (str(p.get("username") or "").strip().lower(), str(p.get("module_code") or "").zfill(2))
+            if key not in perm_keys:
+                perms.append(p); perm_keys.add(key)
+    tables["auth_account_permissions"] = perms
+    payload["tables"] = tables
+    payload["deleted_usernames"] = sorted(deleted)
+    result = _v96_write_payload(payload, "save_users_v96", github=True)
+    _v96_best_effort_restore_cache(payload)
+    return {"saved": saved, "skipped": skipped, "permanent_save": result}
+
+
+def save_account_master(rows: _V94Iterable[dict], delete_usernames: _V94Iterable[str] | None = None) -> dict:  # type: ignore[override]
+    delete_set = {str(u).strip().lower() for u in (delete_usernames or []) if str(u).strip() and str(u).strip().lower() != "admin"}
+    payload = _v96_auth_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {k: [] for k in _V96_AUTH_TABLES}
+    old_deleted = _v96_deleted(payload) | delete_set
+    tables = _v96_filter_deleted_tables(tables, old_deleted)
+    payload["tables"] = tables; payload["deleted_usernames"] = sorted(old_deleted)
+    _v96_write_payload(payload, "save_account_master_pre_delete_v96", github=True)
+    result = save_users([dict(r) for r in (rows or []) if isinstance(r, dict)])
+    payload = _v96_auth_payload()
+    deleted = _v96_deleted(payload) | delete_set
+    payload["deleted_usernames"] = sorted(deleted)
+    payload["tables"] = _v96_filter_deleted_tables(payload.get("tables", {}), deleted)
+    final = _v96_write_payload(payload, "save_account_master_v96", github=True)
+    _v96_best_effort_restore_cache(payload)
+    result["deleted"] = len(delete_set)
+    result["deleted_usernames"] = sorted(deleted)
+    result["permanent_save"] = final
+    return result
+
+
+def delete_users(usernames: _V94Iterable[str]) -> int:  # type: ignore[override]
+    targets = {str(u).strip().lower() for u in (usernames or []) if str(u).strip() and str(u).strip().lower() != "admin"}
+    if not targets:
+        return 0
+    payload = _v96_auth_payload()
+    deleted = _v96_deleted(payload) | targets
+    payload["deleted_usernames"] = sorted(deleted)
+    payload["tables"] = _v96_filter_deleted_tables(payload.get("tables", {}), deleted)
+    result = _v96_write_payload(payload, "delete_users_v96", github=True)
+    _v96_best_effort_restore_cache(payload)
+    return len(targets)
+
+
+def save_account_permissions(rows: _V94Iterable[dict]) -> int:  # type: ignore[override]
+    payload = _v96_auth_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {k: [] for k in _V96_AUTH_TABLES}
+    deleted = _v96_deleted(payload)
+    clean = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        username = str(r.get("username") or "").strip()
+        if not username or username.lower() in deleted:
+            continue
+        module_code = str(r.get("module_code") or "").strip().zfill(2)
+        if not module_code:
+            continue
+        mod = next((m for m in MODULES if str(m.get("module_code", "")).zfill(2) == module_code), {})
+        x = {
+            "username": username,
+            "module_code": module_code,
+            "module_name_zh": str(r.get("module_name_zh") or mod.get("module_name_zh") or ""),
+            "module_name_en": str(r.get("module_name_en") or mod.get("module_name_en") or ""),
+            "updated_at": _v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text(),
+        }
+        for k, _, _ in ACTIONS:
+            x[k] = 1 if _truthy(r.get(k, False), False) else 0
+        clean.append(x)
+    tables["auth_account_permissions"] = clean
+    payload["tables"] = tables
+    _v96_write_payload(payload, "save_account_permissions_v96", github=True)
+    _v96_best_effort_restore_cache(payload)
+    return len(clean)
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    payload = _v96_auth_payload()
+    rows = []
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    for t in ["auth_security_settings", "security_settings"]:
+        rows.extend([dict(r) for r in tables.get(t, []) if isinstance(r, dict)])
+    out = dict(DEFAULT_SECURITY_SETTINGS)
+    for r in rows:
+        k = str(r.get("setting_key") or "").strip()
+        if k:
+            out[k] = str(r.get("setting_value") or "")
+    return out
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    payload = _v96_auth_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {k: [] for k in _V96_AUTH_TABLES}
+    merged = get_security_settings(); merged.update({str(k): str(v) for k, v in (settings or {}).items()})
+    rows = [{"setting_key": k, "setting_value": v, "note": "V96 single authority security setting", "updated_at": _v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text()} for k, v in merged.items()]
+    tables["auth_security_settings"] = rows
+    tables["security_settings"] = list(rows)
+    payload["tables"] = tables
+    _v96_write_payload(payload, "save_security_settings_v96", github=True)
+    _v96_best_effort_restore_cache(payload)
+
+
+def _v96_best_effort_restore_cache(payload: dict | None = None) -> None:
+    # Best-effort 同步 SQLite 快取；失敗不影響權威檔，不在進頁面時執行。
+    payload = payload if isinstance(payload, dict) else _v96_auth_payload()
+    tables = _v96_filter_deleted_tables(payload.get("tables", {}), _v96_deleted(payload))
+    try:
+        _v95_schema_only() if "_v95_schema_only" in globals() else None
+        conn = connect_db(); cur = conn.cursor()
+        for table in _V96_AUTH_TABLES:
+            try:
+                cur.execute(f'DELETE FROM "{table}"')
+            except Exception:
+                continue
+            try:
+                cols = {str(r[1]) for r in cur.execute(f'PRAGMA table_info("{table}")').fetchall()}
+            except Exception:
+                cols = set()
+            for row in tables.get(table, []):
+                clean = {str(k): v for k, v in dict(row).items() if str(k) in cols and str(k) != "id"}
+                if not clean:
+                    continue
+                sql_cols = ",".join([f'"{c}"' for c in clean.keys()])
+                ph = ",".join(["?"] * len(clean))
+                try:
+                    cur.execute(f'INSERT INTO "{table}" ({sql_cols}) VALUES ({ph})', list(clean.values()))
+                except Exception:
+                    pass
+        conn.commit(); conn.close()
+    except Exception:
+        try:
+            conn.close()  # type: ignore[name-defined]
+        except Exception:
+            pass
+
+# 重要：維持 check_permission 對 has_permission 的指向，登入與模組管制不改。
+check_permission = has_permission
+# ===== V96 PERMISSION TRUE SINGLE-AUTHORITY DIRECT READ/WRITE + SPEED PATCH END =====

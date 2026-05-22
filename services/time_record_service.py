@@ -3668,3 +3668,323 @@ def _v90_upsert_rows_to_0102_authority(rows_df: pd.DataFrame, reason: str = "fin
         pass
     return int(n or 0)
 # =================== END V94 02 HISTORY DELETE TOMBSTONE + 01 EDITOR SAFETY ===================
+
+# ===================== V96 01 FAST START + 01/02 DELETE AUTHORITY HARD FIX =====================
+# 目的：
+# 1) 01 開始作業不再 baseline / 全量同步 / GitHub，改為核心插入 + 單筆 upsert 到 01/02 權威檔。
+# 2) 01 管理員刪除必須同時刪 SQLite、01_time_records、02_history，並建立 02 tombstone，避免 02 復活。
+# 3) 不改扣休、群組平均、工時規則；只改同步與刪除寫入路徑。
+
+
+def _v96_id_set(ids) -> set[int]:
+    out: set[int] = set()
+    for x in ids or []:
+        try:
+            if pd.isna(x):
+                continue
+        except Exception:
+            pass
+        try:
+            out.add(int(float(str(x).strip())))
+        except Exception:
+            continue
+    return out
+
+
+def _v96_fast_authority_df(module_key: str) -> pd.DataFrame:
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df
+        df = _pa_df(module_key, "time_records")
+        return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v96_table_rows(df: pd.DataFrame) -> list[dict]:
+    try:
+        from services.permanent_authority_service import table_from_df as _pa_table
+        return _pa_table(df)
+    except Exception:
+        try:
+            return [dict(r) for _, r in df.fillna("").iterrows()]
+        except Exception:
+            return []
+
+
+def _v96_save_0102_df(df: pd.DataFrame, reason: str = "v96_time_authority", *, github: bool = False) -> int:
+    if df is None or not isinstance(df, pd.DataFrame):
+        df = pd.DataFrame()
+    try:
+        df = df.loc[:, ~pd.Index(df.columns).duplicated()].copy()
+    except Exception:
+        pass
+    try:
+        if "id" in df.columns:
+            df["_sort_id"] = pd.to_numeric(df["id"], errors="coerce")
+            df = df.sort_values("_sort_id").drop(columns=["_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    rows = _v96_table_rows(df)
+    try:
+        from services.permanent_authority_service import save_authority as _pa_save
+        _pa_save("01_time_records", records={"time_records": rows}, reason=f"{reason}_01", github=bool(github))
+        _pa_save("02_history", records={"time_records": rows}, reason=f"{reason}_02", github=bool(github))
+    except Exception as exc:
+        try:
+            write_log("V96_TIME_AUTH_SAVE_ERROR", f"V96 01/02 權威檔寫入失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    return int(len(rows))
+
+
+def _v96_filter_tombstone(df: pd.DataFrame) -> pd.DataFrame:
+    try:
+        return _v94_filter_deleted_df(df) if "_v94_filter_deleted_df" in globals() else df
+    except Exception:
+        return df
+
+
+def _v96_upsert_rows_to_authority(rows_df: pd.DataFrame, reason: str = "v96_upsert", *, github: bool = False) -> int:
+    if rows_df is None or not isinstance(rows_df, pd.DataFrame) or rows_df.empty or "id" not in rows_df.columns:
+        return 0
+    rows_df = rows_df.loc[:, ~pd.Index(rows_df.columns).duplicated()].copy()
+    auth_df = _v96_fast_authority_df("02_history")
+    auth_df = _v96_filter_tombstone(auth_df)
+    if auth_df is None or not isinstance(auth_df, pd.DataFrame) or auth_df.empty:
+        auth_df = pd.DataFrame(columns=list(rows_df.columns))
+    auth_df = auth_df.loc[:, ~pd.Index(auth_df.columns).duplicated()].copy()
+    all_cols = []
+    for c in list(auth_df.columns) + list(rows_df.columns):
+        if c not in all_cols:
+            all_cols.append(c)
+    if "id" not in all_cols:
+        all_cols.insert(0, "id")
+    for c in all_cols:
+        if c not in auth_df.columns:
+            auth_df[c] = None
+        if c not in rows_df.columns:
+            rows_df[c] = None
+    auth_df = auth_df[all_cols].copy(); rows_df = rows_df[all_cols].copy()
+    id_to_idx = {}
+    for idx, val in auth_df["id"].items():
+        try:
+            id_to_idx[int(float(str(val).strip()))] = idx
+        except Exception:
+            pass
+    changed = 0
+    for _, r in rows_df.iterrows():
+        try:
+            rid = int(float(str(r.get("id")).strip()))
+        except Exception:
+            continue
+        if rid in id_to_idx:
+            idx = id_to_idx[rid]
+            for c, v in r.to_dict().items():
+                auth_df.at[idx, c] = v
+        else:
+            auth_df = pd.concat([auth_df, pd.DataFrame([r.to_dict()])], ignore_index=True)
+            id_to_idx[rid] = int(auth_df.index[-1])
+        changed += 1
+    auth_df = _v96_filter_tombstone(auth_df)
+    if changed:
+        _v96_save_0102_df(auth_df, reason, github=github)
+    return int(changed)
+
+
+def _v96_query_rows_by_ids(ids) -> pd.DataFrame:
+    clean = sorted(_v96_id_set(ids))
+    if not clean:
+        return pd.DataFrame()
+    try:
+        ph = ",".join(["?"] * len(clean))
+        return query_df(f"SELECT * FROM time_records WHERE id IN ({ph}) ORDER BY id", list(clean))
+    except Exception:
+        rows = []
+        for rid in clean:
+            r = query_one("SELECT * FROM time_records WHERE id=?", (rid,)) or {}
+            if r:
+                rows.append(r)
+        return pd.DataFrame(rows)
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V96：核心快速開始作業。避免 V89 baseline + 全量同步造成 1 分鐘以上等待。"""
+    try:
+        if "_v86_ensure_time_record_indexes_once" in globals():
+            _v86_ensure_time_record_indexes_once()
+    except Exception:
+        pass
+    now = _now()
+    start_date, start_time = split_timestamp(now)
+    employee_id = str(employee.get("employee_id") or "").strip()
+    employee_name = str(employee.get("employee_name") or "").strip()
+    wo_no = str(work_order.get("work_order") or "").strip()
+    process_name = str(process_name or "").strip()
+    if not employee_id or not wo_no or not process_name:
+        raise ValueError("工號、製令、工段名稱不可空白。")
+    duplicate = get_active_same_work(employee_id, wo_no, process_name, start_date, employee_name=employee_name)
+    if duplicate:
+        raise ValueError(f"此人員已有相同製令與工段正在計時，禁止重複紀錄：{wo_no} / {process_name}")
+    conflicts = get_conflicting_active_records(employee_id, process_name, start_date, employee_name=employee_name)
+    if not conflicts.empty:
+        if not auto_pause_old:
+            raise ValueError("此人員已有不同工段正在計時，請先確認暫停前一筆作業後再開始新紀錄。")
+        _pause_conflicting_active_records(employee_id, employee_name, process_name, start_date)
+    record_key = make_record_key(employee_id, wo_no, process_name, now)
+    group_key = f"{employee_id}|{process_name}|{start_date}"
+    rid = execute(
+        """
+        INSERT INTO time_records(
+            record_key, status, work_order, part_no, type_name, process_name,
+            employee_id, employee_name, start_action, start_timestamp,
+            remark, start_date, start_time, assembly_location,
+            group_key, is_group_work, source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            record_key, "作業中", wo_no, work_order.get("part_no", ""), work_order.get("type_name", ""),
+            process_name, employee_id, employee_name, "開始", now, remark, start_date, start_time,
+            work_order.get("assembly_location", ""), group_key, 0, "streamlit", now, now,
+        ),
+    )
+    parallel = get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date)
+    affected = [rid]
+    if len(parallel) > 1:
+        execute(
+            "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL",
+            (group_key, now, employee_id, employee_name, process_name, start_date),
+        )
+        try:
+            affected = [int(x) for x in parallel.get("id", pd.Series([rid])).tolist()] + [int(rid)]
+        except Exception:
+            affected = [rid]
+    rows_df = _v96_query_rows_by_ids(affected)
+    _v96_upsert_rows_to_authority(rows_df, "start_work_v96_fast_upsert", github=False)
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+    try:
+        write_log("START_WORK", f"{employee_name} 開始 {wo_no} / {process_name}", "time_records", rid)
+    except Exception:
+        pass
+    return int(rid or 0)
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V96：快速結束/暫停，不做全量 SQLite<->authority 洗資料。"""
+    try:
+        rid0 = int(float(str(record_id).strip()))
+    except Exception:
+        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (rid0,))
+    if not rec:
+        raise ValueError("找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。")
+    if rec.get("end_timestamp"):
+        return 0
+    now = _now()
+    end_date, end_time = split_timestamp(now)
+    status = end_action if end_action in ("下班", "暫停", "完工") else "已結束"
+    group = get_active_group(rid0) if finish_parallel_group else pd.DataFrame([rec])
+    if group is None or group.empty:
+        group = pd.DataFrame([rec])
+    group_ids = [int(x) for x in group["id"].tolist()]
+    earliest_start = min(str(x) for x in group["start_timestamp"].dropna().tolist()) if "start_timestamp" in group.columns else str(rec.get("start_timestamp") or now)
+    total_hours = calculate_work_hours(earliest_start, now)
+    avg_hours = round(total_hours / max(len(group_ids), 1), 2)
+    is_group = 1 if len(group_ids) > 1 else int(rec.get("is_group_work") or 0)
+    group_key = rec.get("group_key") or f"{rec.get('employee_id')}|{rec.get('process_name')}|{rec.get('start_date')}"
+    updated = []
+    for rid in group_ids:
+        old = query_one("SELECT remark FROM time_records WHERE id=?", (rid,)) or {}
+        new_remark = old.get("remark") or ""
+        append = remark or ""
+        if len(group_ids) > 1:
+            append = (append + "；" if append else "") + f"同步作業平均分配：{len(group_ids)}筆，群組總工時={total_hours:.2f}，平均={avg_hours:.2f}"
+        if append:
+            new_remark = (new_remark + "；" if new_remark else "") + append
+        execute(
+            """
+            UPDATE time_records
+            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
+            WHERE id=? AND end_timestamp IS NULL
+            """,
+            (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, is_group, now, int(rid)),
+        )
+        updated.append(int(rid))
+    rows_df = _v96_query_rows_by_ids(updated)
+    _v96_upsert_rows_to_authority(rows_df, "finish_work_v96_fast_upsert", github=False)
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+    try:
+        write_log("END_WORK_GROUP" if len(updated) > 1 else "END_WORK", f"V96 結束工時紀錄 #{rid0}，同步結束={len(updated)}筆，狀態={status}", "time_records", rid0, detail=",".join(str(x) for x in updated))
+    except Exception:
+        pass
+    return int(len(updated))
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = _v96_id_set(record_ids)
+    if not ids:
+        return 0
+    # 建立 tombstone：即使 02 / SQLite 舊快取殘留，也不得復活。
+    try:
+        rows_for_tombstone = _v96_query_rows_by_ids(sorted(ids))
+        if rows_for_tombstone is None or rows_for_tombstone.empty:
+            rows_for_tombstone = pd.DataFrame([{"id": x} for x in sorted(ids)])
+        if "_v94_add_history_tombstones" in globals():
+            _v94_add_history_tombstones(rows_for_tombstone)
+    except Exception:
+        pass
+    # 刪 SQLite 快取。
+    deleted_sqlite = 0
+    try:
+        ph = ",".join(["?"] * len(ids))
+        before = query_one(f"SELECT COUNT(*) AS n FROM time_records WHERE id IN ({ph})", list(ids)) or {}
+        deleted_sqlite = int(before.get("n") or 0)
+        execute(f"DELETE FROM time_records WHERE id IN ({ph})", tuple(sorted(ids)))
+    except Exception as exc:
+        try:
+            write_log("V96_DELETE_SQLITE_ERROR", f"SQLite 刪除失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    # 權威檔以 02_history 為主；同步移除 01/02。
+    auth_df = _v96_fast_authority_df("02_history")
+    if auth_df is None or auth_df.empty:
+        auth_df = _v96_fast_authority_df("01_time_records")
+    if auth_df is None or not isinstance(auth_df, pd.DataFrame):
+        auth_df = pd.DataFrame()
+    if not auth_df.empty:
+        auth_df = auth_df.loc[:, ~pd.Index(auth_df.columns).duplicated()].copy()
+        id_col = "id" if "id" in auth_df.columns else ("ID" if "ID" in auth_df.columns else "")
+        if id_col:
+            before_n = len(auth_df)
+            auth_df = auth_df[~auth_df[id_col].map(lambda x: (_v96_id_set([x]).pop() if _v96_id_set([x]) else None) in ids)].copy()
+            auth_df = _v96_filter_tombstone(auth_df)
+            deleted_auth = before_n - len(auth_df)
+        else:
+            deleted_auth = 0
+    else:
+        deleted_auth = 0
+    _v96_save_0102_df(auth_df, "delete_time_records_v96_0102_sync", github=True)
+    try:
+        clear_today_records_fast_cache()
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        write_log("DELETE_TIME_RECORDS", f"{reason}：V96 已刪除 SQLite {deleted_sqlite} 筆、01/02 權威檔 {deleted_auth} 筆，並建立 tombstone。", "time_records", level="WARN")
+    except Exception:
+        pass
+    return int(max(deleted_sqlite, deleted_auth, len(ids)))
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = _v96_fast_authority_df("02_history")
+    df = _v96_filter_tombstone(df)
+    return _v89_filter_records_df(df, start_date, end_date, employee_id, work_order) if "_v89_filter_records_df" in globals() else df
+
+# =================== END V96 01 FAST START + 01/2 DELETE AUTHORITY HARD FIX ===================
