@@ -1058,7 +1058,7 @@ def _v97_write_login_authority(records: List[Dict[str, Any]], reason: str = "log
     try:
         from services.permanent_authority_service import save_authority
         clean = _merge_record_sets(_valid_login_rows("v97_authority", records or []))
-        save_authority("11_login_logs", records={"login_logs": clean}, reason=reason, github=False)
+        save_authority("11_login_logs", records={"login_logs": clean}, reason=reason, github=True)
     except Exception:
         try:
             payload = {

@@ -695,11 +695,19 @@ with tab_accounts:
             st.session_state["v235_account_editor_rev"] = int(st.session_state.get("v235_account_editor_rev", 0)) + 1
 
         def _v56_prepare_account_draft() -> pd.DataFrame:
-            """V56：統一 checkbox 欄位型別，確保 data_editor 以 bool checkbox 顯示。"""
+            """V56：統一 checkbox 欄位型別，確保 data_editor 以 bool checkbox 顯示。
+
+            V97C：移除 session_state 內可能殘留的重複欄位，避免 data_editor
+            顯示兩個「刪除 / Delete」欄，造成使用者誤判與勾選狀態錯亂。
+            """
             df0 = st.session_state.get("v133_users_df")
             if not isinstance(df0, pd.DataFrame):
                 df0 = _users_for_editor()
             df0 = df0.copy()
+            try:
+                df0 = df0.loc[:, ~pd.Index(df0.columns).duplicated()].copy()
+            except Exception:
+                pass
             for _col, _default in [
                 ("刪除 / Delete", False),
                 ("啟用 / Active", True),
@@ -765,7 +773,8 @@ with tab_accounts:
             hide_index=True,
             disabled=not account_edit_enabled,
             height=360,
-            column_order=[c for c in ["刪除 / Delete"] + list(draft_df.columns) if c in list(draft_df.columns)],
+            # V97C：欄位順序保留「刪除」在第一欄，但不可重複加入同名欄位。
+            column_order=list(dict.fromkeys(["刪除 / Delete"] + [c for c in draft_df.columns if c != "刪除 / Delete"])),
             column_config={
                 "刪除 / Delete": st.column_config.CheckboxColumn("刪除 / Delete"),
                 "帳號 / Username": st.column_config.TextColumn("帳號 / Username", required=True),
@@ -785,6 +794,10 @@ with tab_accounts:
 
         if account_edit_enabled and isinstance(edited_users, pd.DataFrame):
             edited_users = edited_users.copy()
+            try:
+                edited_users = edited_users.loc[:, ~pd.Index(edited_users.columns).duplicated()].copy()
+            except Exception:
+                pass
             for _col, _default in [
                 ("刪除 / Delete", False),
                 ("啟用 / Active", True),
