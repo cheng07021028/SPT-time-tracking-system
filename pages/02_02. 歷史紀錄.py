@@ -806,6 +806,70 @@ def _add_cross_day_end_marker(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+# V110：歷史明細編輯也要能明顯看出「開始時間戳 / 結束時間戳不同日期」。
+# Streamlit data_editor 不支援像 st.dataframe Styler 那樣逐列上色，
+# 因此在可編輯表格內增加唯讀提醒欄，並在表格上方顯示淺黃色框選預覽。
+# 儲存、重算、刪除前會把這些顯示欄位移除，不會寫回權威檔。
+HISTORY_CROSS_DAY_ALERT_COL = "跨日提醒 / Cross Day Alert"
+HISTORY_CROSS_DAY_RANGE_COL = "跨日日期 / Cross Day Date"
+HISTORY_CROSS_DAY_DISPLAY_COLS = [HISTORY_CROSS_DAY_ALERT_COL, HISTORY_CROSS_DAY_RANGE_COL, "跨日結束"]
+
+
+def _with_history_cross_day_edit_marker(df: pd.DataFrame) -> pd.DataFrame:
+    """Add read-only cross-day alert columns for Editable History."""
+    out = df.copy()
+    if out.empty:
+        return out
+    for col in HISTORY_CROSS_DAY_DISPLAY_COLS:
+        out = out.drop(columns=[col], errors="ignore")
+    marker = _is_cross_day_end_df(out)
+    start_date, end_date = _history_start_end_dates(out)
+    alert_text = marker.map(lambda x: "⚠ 跨日結束｜請確認是否昨天忘記按結束" if bool(x) else "")
+    range_text = [f"{s} → {e}" if bool(m) else "" for s, e, m in zip(start_date, end_date, marker)]
+    out.insert(0, HISTORY_CROSS_DAY_ALERT_COL, alert_text)
+    out.insert(1, HISTORY_CROSS_DAY_RANGE_COL, range_text)
+    return out
+
+
+def _strip_history_cross_day_display_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """Remove display-only cross-day columns before saving/recalculating/deleting."""
+    if df is None:
+        return df
+    return df.drop(columns=HISTORY_CROSS_DAY_DISPLAY_COLS, errors="ignore")
+
+
+def _render_cross_day_edit_notice(edit_df: pd.DataFrame) -> None:
+    """Show a light framed preview for cross-day-ended rows in edit mode."""
+    if edit_df is None or edit_df.empty:
+        return
+    mask = _is_cross_day_end_df(edit_df)
+    count = int(mask.sum()) if mask is not None else 0
+    if count <= 0:
+        return
+    st.warning(f"偵測到 {count} 筆『開始時間戳與結束時間戳不同日期』紀錄，可能是昨天忘記按結束。下方表格已用『⚠ 跨日提醒』欄標示。")
+    preview_cols = [c for c in ["id", "employee_id", "employee_name", "work_order", "process_name", "start_timestamp", "end_timestamp", "work_hours"] if c in edit_df.columns]
+    if not preview_cols:
+        return
+    preview = edit_df.loc[mask, preview_cols].copy()
+    if "work_hours" in preview.columns:
+        preview["work_hours"] = preview["work_hours"].map(hours_to_hms)
+
+    def _highlight_cross_day_rows(row):
+        return [
+            "background-color: #fff7d6; color: #1f2937; font-weight: 700; border: 1px solid #f6c85f;"
+            for _ in row
+        ]
+
+    st.caption("淺黃色框選預覽：開始日期與結束日期不同，且已有結束資訊。")
+    st.dataframe(
+        preview.rename(columns={c: label_for(str(c)) for c in preview.columns}).style.apply(_highlight_cross_day_rows, axis=1),
+        use_container_width=True,
+        hide_index=True,
+        height=min(260, 72 + max(count, 1) * 34),
+        key="frame_history_cross_day_edit_preview_v110",
+    )
+
+
 def _render_history_view_table(view_df: pd.DataFrame, table_key: str = "history_records_view", height: int = 520) -> None:
     """Read-only history table with light cross-day-end highlighting.
 
@@ -1163,6 +1227,7 @@ with tab1:
             delete_col_label = "刪除 / Delete"
             recalc_col_label = "重算 / Recalc"
             edit_df = df.copy()
+            _render_cross_day_edit_notice(edit_df)
             all_ids = _history_all_ids()
             all_id_set = set(all_ids)
             delete_ids_state = set(int(x) for x in st.session_state.get(delete_select_key, []) if int(x) in all_id_set)
@@ -1181,6 +1246,7 @@ with tab1:
                     return False
 
             edit_df = edit_df.drop(columns=["刪除", "重算", delete_col_label, recalc_col_label], errors="ignore")
+            edit_df = _with_history_cross_day_edit_marker(edit_df)
             edit_df.insert(0, delete_col_label, edit_df["id"].map(lambda x: _id_in_state(x, delete_ids_state)) if "id" in edit_df.columns else False)
             edit_df.insert(1, recalc_col_label, edit_df["id"].map(lambda x: _id_in_state(x, recalc_ids_state)) if "id" in edit_df.columns else False)
 
@@ -1191,7 +1257,7 @@ with tab1:
                 edit_df,
                 "history_records",
                 editable=True,
-                disabled=["id", "record_key", "created_at", "updated_at"],
+                disabled=["id", "record_key", "created_at", "updated_at", HISTORY_CROSS_DAY_ALERT_COL, HISTORY_CROSS_DAY_RANGE_COL],
                 key=editor_key,
                 height=560,
             )
@@ -1247,7 +1313,7 @@ with tab1:
                 st.session_state[recalc_select_key] = recalc_ids
 
                 if history_action == "儲存編輯":
-                    save_df = edited.drop(columns=[delete_col_label, recalc_col_label, "刪除", "重算"], errors="ignore")
+                    save_df = _strip_history_cross_day_display_cols(edited).drop(columns=[delete_col_label, recalc_col_label, "刪除", "重算"], errors="ignore")
                     count = save_time_records(save_df)
                     _add_history_result("success", f"已儲存 {count} 筆歷史紀錄。", append=False)
                     _history_refresh_editor()
@@ -1257,7 +1323,7 @@ with tab1:
                         _add_history_result("warning", "請先在『重算』欄勾選要重新計算的紀錄，再按確認執行。", append=False)
                         rerun()
                     else:
-                        save_df = edited.drop(columns=[delete_col_label, recalc_col_label, "刪除", "重算"], errors="ignore")
+                        save_df = _strip_history_cross_day_display_cols(edited).drop(columns=[delete_col_label, recalc_col_label, "刪除", "重算"], errors="ignore")
                         save_time_records(save_df, recalc_edited_timestamps=True)
                         count = recalculate_time_records(recalc_ids)
                         _add_history_result("success", f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時。", append=False)
