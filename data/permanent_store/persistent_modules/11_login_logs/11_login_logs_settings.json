@@ -1,13 +1,11 @@
 {
-  "version": "V1.60-delete-aware",
-  "exported_at": "2026-05-22 17:02:18",
-  "module": "11_login_logs",
-  "settings": {
-    "source_tables": [
-      "login_logs",
-      "security_login_logs",
-      "auth_login_logs"
-    ],
-    "delete_aware": true
-  }
+  "version": "V1.48",
+  "exported_at": "2026-05-22 17:13:21",
+  "source": "db_service_write",
+  "module_key": "11_login_logs",
+  "module_code": "11",
+  "module_name_zh": "登入紀錄",
+  "module_name_en": "Login Logs",
+  "tables": {},
+  "table_counts": {}
 }
