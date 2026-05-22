@@ -3319,6 +3319,74 @@ def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any
     return {"ok": True, "mode": "v85_single_authority", "source": "data/permanent_store/modules/13_system_settings/records.json", "restored": {k: len(v) for k, v in tables.items() if isinstance(v, list)}}
 
 
+
+# >>> V87_SYSTEM_SETTINGS_DISPLAY_SENTINEL_FIX
+# V87：修正 13. 系統設定表格把內部排序 sentinel 999999 顯示到畫面。
+# 重點：999999 只能做排序 fallback，不可寫回或顯示在 ID / sort_order 欄位。
+_V87_FAKE_NUMERIC_SENTINELS = {999999, -999999, 9999990, 99999999}
+
+
+def _v87_int_or_none(v: Any) -> int | None:
+    try:
+        if v is None or pd.isna(v):
+            return None
+    except Exception:
+        pass
+    try:
+        s = str(v).strip()
+        if s == "" or s.lower() in {"none", "nan", "null", "<na>"}:
+            return None
+        n = int(float(s))
+        if n in _V87_FAKE_NUMERIC_SENTINELS or n <= 0:
+            return None
+        return n
+    except Exception:
+        return None
+
+
+def _v87_sort_or_default(v: Any, default: int) -> int:
+    n = _v87_int_or_none(v)
+    return int(default) if n is None else int(n)
+
+
+def _v87_display_repair_df(df: pd.DataFrame, id_col: str = "id", sort_col: str = "sort_order", group_col: str | None = None) -> pd.DataFrame:
+    """修復 13 表格顯示：ID / 排序若是 None、999999 或重複，改成穩定序號。"""
+    if df is None or df.empty:
+        return df
+    out = df.copy()
+    if id_col in out.columns:
+        raw_ids = [_v87_int_or_none(v) for v in out[id_col].tolist()]
+        used: set[int] = set()
+        valid_ids = [n for n in raw_ids if n is not None]
+        next_id = max(valid_ids + [0]) + 1
+        fixed_ids: list[int] = []
+        for n in raw_ids:
+            if n is None or n in used:
+                while next_id in used:
+                    next_id += 1
+                n = next_id
+                next_id += 1
+            used.add(int(n))
+            fixed_ids.append(int(n))
+        out[id_col] = fixed_ids
+    if sort_col in out.columns:
+        out[sort_col] = [_v87_sort_or_default(v, i) for i, v in enumerate(out[sort_col].tolist(), start=1)]
+    sort_cols = []
+    if group_col and group_col in out.columns:
+        sort_cols.append(group_col)
+    if sort_col in out.columns:
+        sort_cols.append(sort_col)
+    if id_col in out.columns:
+        sort_cols.append(id_col)
+    if sort_cols:
+        out = out.sort_values(sort_cols, kind="stable", na_position="last")
+    return out.reset_index(drop=True)
+
+
+def _v87_clean_input_id(v: Any) -> int | None:
+    return _v87_int_or_none(v)
+# <<< V87_SYSTEM_SETTINGS_DISPLAY_SENTINEL_FIX
+
 def load_process_categories_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
     ensure_system_settings_schema()
     cols = ["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"]
@@ -3327,9 +3395,7 @@ def load_process_categories_df(active_only: bool = False) -> pd.DataFrame:  # ty
         m = df["is_active"].map(lambda x: _v85_bool(x, True) == 1)
         df = df[m]
     if not df.empty:
-        df["sort_order"] = pd.to_numeric(df["sort_order"], errors="coerce").fillna(999999)
-        df["id"] = pd.to_numeric(df["id"], errors="coerce").fillna(999999)
-        df = df.sort_values(["sort_order", "id"], kind="stable")
+        df = _v87_display_repair_df(df, id_col="id", sort_col="sort_order")
     return df.reset_index(drop=True)
 
 
@@ -3341,9 +3407,7 @@ def load_process_options_df(active_only: bool = False) -> pd.DataFrame:  # type:
         m = df["is_active"].map(lambda x: _v85_bool(x, True) == 1)
         df = df[m]
     if not df.empty:
-        df["sort_order"] = pd.to_numeric(df["sort_order"], errors="coerce").fillna(999999)
-        df["id"] = pd.to_numeric(df["id"], errors="coerce").fillna(999999)
-        df = df.sort_values(["category_name", "sort_order", "id"], kind="stable")
+        df = _v87_display_repair_df(df, id_col="id", sort_col="sort_order", group_col="category_name")
     return df.reset_index(drop=True)
 
 
@@ -3418,7 +3482,7 @@ def _v85_normalize_category_rows(df: pd.DataFrame, existing: list[dict[str, Any]
         name = _norm_category_name(_v85_get(r, "category_name", "category", "類別", "類別 / Category", default=""))
         if not name or name in seen:
             continue
-        rid = _v85_int(_v85_get(r, "id", "ID", "ID / ID", default=""), None)
+        rid = _v87_clean_input_id(_v85_get(r, "id", "ID", "ID / ID", default=""))
         if rid is None:
             rid = next_id; next_id += 1
         old_name = id_to_old.get(str(rid), "")
@@ -3428,7 +3492,7 @@ def _v85_normalize_category_rows(df: pd.DataFrame, existing: list[dict[str, Any]
             "id": rid,
             "category_name": name,
             "is_active": _v85_bool(_v85_get(r, "is_active", "啟用", "啟用 / Active", default=True), True),
-            "sort_order": _v85_int(_v85_get(r, "sort_order", "排序", "排序 / Sort", default=idx), idx),
+            "sort_order": _v87_sort_or_default(_v85_get(r, "sort_order", "排序", "排序 / Sort", default=idx), idx),
             "note": _v85_text(_v85_get(r, "note", "備註", "備註 / Note", default="")),
             "created_at": _v85_text(_v85_get(r, "created_at", "建立時間", default=""), now),
             "updated_at": now,
@@ -3497,7 +3561,7 @@ def _v85_normalize_process_rows(df: pd.DataFrame, existing: list[dict[str, Any]]
         if key in seen_key:
             continue
         seen_key.add(key)
-        rid = _v85_int(_v85_get(r, "id", "ID", "ID / ID", default=""), None)
+        rid = _v87_clean_input_id(_v85_get(r, "id", "ID", "ID / ID", default=""))
         old = existing_by_id.get(str(rid), {}) if rid is not None else {}
         if rid is None:
             rid = next_id; next_id += 1
@@ -3506,7 +3570,7 @@ def _v85_normalize_process_rows(df: pd.DataFrame, existing: list[dict[str, Any]]
             "category_name": category,
             "process_name": name,
             "is_active": _v85_bool(_v85_get(r, "is_active", "啟用", "啟用 / Active", default=True), True),
-            "sort_order": _v85_int(_v85_get(r, "sort_order", "排序", "排序 / Sort", default=idx), idx),
+            "sort_order": _v87_sort_or_default(_v85_get(r, "sort_order", "排序", "排序 / Sort", default=idx), idx),
             "note": _v85_text(_v85_get(r, "note", "備註", "備註 / Note", default="")),
             "created_at": _v85_text(_v85_get(r, "created_at", "建立時間", default=old.get("created_at", "")), now),
             "updated_at": now,
@@ -3560,9 +3624,7 @@ def load_rest_periods_df(active_only: bool = False) -> pd.DataFrame:  # type: ig
     if active_only and not df.empty:
         df = df[df["is_active"].map(lambda x: _v85_bool(x, True) == 1)]
     if not df.empty:
-        df["sort_order"] = pd.to_numeric(df["sort_order"], errors="coerce").fillna(999999)
-        df["id"] = pd.to_numeric(df["id"], errors="coerce").fillna(999999)
-        df = df.sort_values(["sort_order", "id"], kind="stable")
+        df = _v87_display_repair_df(df, id_col="id", sort_col="sort_order")
     return df.reset_index(drop=True)
 
 
@@ -3583,10 +3645,10 @@ def _v85_normalize_rest_rows(df: pd.DataFrame, existing: list[dict[str, Any]]) -
         if key in seen:
             continue
         seen.add(key)
-        rid = _v85_int(_v85_get(r, "id", "ID", "ID / ID", default=""), None)
+        rid = _v87_clean_input_id(_v85_get(r, "id", "ID", "ID / ID", default=""))
         if rid is None:
             rid = next_id; next_id += 1
-        out.append({"id": rid, "name": name, "start_time": start, "end_time": end, "is_active": _v85_bool(_v85_get(r, "is_active", "啟用", "啟用 / Active", default=True), True), "sort_order": _v85_int(_v85_get(r, "sort_order", "排序", "排序 / Sort", default=idx), idx)})
+        out.append({"id": rid, "name": name, "start_time": start, "end_time": end, "is_active": _v85_bool(_v85_get(r, "is_active", "啟用", "啟用 / Active", default=True), True), "sort_order": _v87_sort_or_default(_v85_get(r, "sort_order", "排序", "排序 / Sort", default=idx), idx)})
     return out
 
 
