@@ -2,25 +2,12 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "04_employees",
   "kind": "records",
-  "updated_at": "2026-05-22 17:12:26",
-  "exported_at": "2026-05-22 17:12:26",
+  "updated_at": "2026-05-22 17:24:06",
+  "exported_at": "2026-05-22 17:24:06",
   "reason": "crud_save_employees_v84",
   "empty_authoritative": false,
   "tables": {
     "employees": [
-      {
-        "id": "",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "department": "",
-        "title": "",
-        "is_active": true,
-        "is_in_factory": true,
-        "is_today_attendance": true,
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
       {
         "id": "",
         "employee_id": "SPT142",
@@ -1117,6 +1104,6 @@
   },
   "settings": {},
   "table_counts": {
-    "employees": 85
+    "employees": 84
   }
 }
