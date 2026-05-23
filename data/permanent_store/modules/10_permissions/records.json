@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+  "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-23 01:04:35",
-  "exported_at": "2026-05-23 01:04:06",
-  "reason": "save_account_master_v96",
+  "updated_at": "2026-05-23 08:10:49",
+  "exported_at": "2026-05-23 08:10:49",
+  "reason": "v106_force_password_change",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -892,17 +892,26 @@
       },
       {
         "username": "SPT250",
-        "password_hash": "pbkdf2_sha256$166b54451f5bf7a63388352d09b5e4a5$d4bbe83379c9f7260726d075c57be1b52803bf0370c574fa05f4a6a1beaf9a19",
+        "password_hash": "pbkdf2_sha256$180000$PlrRXRp3JCcLGeZRSKNVrw==$y/vy1xe+IEalnwB9jZrtoEJGuISFEJkdQUvE5WOM+K8=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT250",
         "display_name": "鄭至賢",
         "email": "operator",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-23 00:17:13",
-        "updated_at": "2026-05-23 01:04:32"
+        "updated_at": "2026-05-23 08:10:49",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT252",
@@ -22192,8 +22201,5 @@
     "security_settings": 2,
     "security_users": 9,
     "security_user_roles": 9
-  },
-  "deleted_usernames": [],
-  "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
+  }
 }
