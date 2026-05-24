@@ -1,16 +1,32 @@
 {
   "version": "V103-canonical-login-logs",
   "authority_schema": "SPT-PermanentAuthority-V103-CompatibilityMirror",
-  "exported_at": "2026-05-23 01:25:06",
-  "updated_at": "2026-05-23 01:25:06",
+  "exported_at": "2026-05-24 21:48:50",
+  "updated_at": "2026-05-24 21:48:50",
   "source": "v106_export_login_logs_tombstone_filtered",
   "module_key": "11_login_logs",
   "module_code": "11_login_logs",
   "module_name_zh": "登入紀錄",
   "module_name_en": "Login Logs",
   "table": "login_logs",
-  "count": 1,
+  "count": 2,
   "records": [
+    {
+      "id": 43,
+      "source": "v103_merge",
+      "username": "SPT236",
+      "display_name": "賴智文",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "message": "roles=admin",
+      "module_code": "11_login_logs",
+      "login_time": "2026-05-24 21:48:49",
+      "logout_time": "",
+      "idle_minutes": null,
+      "ip_address": "",
+      "user_agent": "",
+      "created_at": "2026-05-24 21:48:49"
+    },
     {
       "id": 1,
       "source": "v103_merge",
@@ -30,6 +46,22 @@
   ],
   "tables": {
     "login_logs": [
+      {
+        "id": 43,
+        "source": "v103_merge",
+        "username": "SPT236",
+        "display_name": "賴智文",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "roles=admin",
+        "module_code": "11_login_logs",
+        "login_time": "2026-05-24 21:48:49",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "",
+        "created_at": "2026-05-24 21:48:49"
+      },
       {
         "id": 1,
         "source": "v103_merge",
@@ -51,7 +83,7 @@
     "security_login_logs": []
   },
   "table_counts": {
-    "login_logs": 1,
+    "login_logs": 2,
     "auth_login_logs": 0,
     "security_login_logs": 0
   },
