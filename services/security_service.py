@@ -3600,3 +3600,130 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 
 require_permission = require_module_access
 # =================== END V111 CANONICAL MODULE PERMISSION EXECUTION FIX ===================
+
+
+# ===================== V112 LOGIN RECOVERY FOR PROTECTED DEFAULT ACCOUNTS =====================
+# If admin / default role accounts are accidentally disabled in 10_permissions authority,
+# login must repair them before authentication, otherwise the whole system becomes locked.
+_V112_PROTECTED_DEFAULT_USERS = {"admin", "manager", "leader", "operator", "viewer", "auditor"}
+
+
+def _v112_is_protected_user(username) -> bool:
+    return str(username or "").strip().lower() in _V112_PROTECTED_DEFAULT_USERS
+
+
+def _v112_reactivate_protected_account(username: str) -> None:
+    uname = str(username or "").strip()
+    if not _v112_is_protected_user(uname):
+        return
+    low = uname.lower()
+    now = _now() if "_now" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    changed = False
+    try:
+        from services.permanent_authority_service import load_authority, save_authority
+        payload = load_authority("10_permissions", "records")
+        if not isinstance(payload, dict):
+            payload = {}
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        deleted = {str(x).strip().lower() for x in (payload.get("deleted_usernames") or []) if str(x).strip()}
+        if low in deleted:
+            payload["deleted_usernames"] = sorted(x for x in deleted if x != low)
+            changed = True
+        for table_name in ("auth_users", "security_users"):
+            rows = tables.get(table_name, []) if isinstance(tables.get(table_name), list) else []
+            found = False
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                row_name = str(row.get("username") or row.get("帳號") or row.get("帳號 / Username") or "").strip().lower()
+                if row_name == low:
+                    found = True
+                    if row.get("is_active") not in (1, True, "1", "true", "True", "是", "啟用"):
+                        changed = True
+                    row["username"] = str(row.get("username") or uname).strip()
+                    row["is_active"] = 1
+                    row["啟用"] = True
+                    row["啟用 / Active"] = True
+                    row.setdefault("role_code", low)
+                    row["updated_at"] = now
+            if table_name == "auth_users" and not found:
+                default_pwd = {
+                    "admin": "Admin@1234",
+                    "manager": "Manager@1234",
+                    "leader": "Leader@1234",
+                    "operator": "Operator@1234",
+                    "viewer": "Viewer@1234",
+                    "auditor": "Auditor@1234",
+                }.get(low, "Admin@1234")
+                rows.append({
+                    "username": low,
+                    "password_hash": hash_password(default_pwd),
+                    "password_hint": "V112 protected login recovery",
+                    "password_display": "********",
+                    "employee_id": "",
+                    "display_name": low,
+                    "email": "",
+                    "role_code": low,
+                    "is_active": 1,
+                    "force_password_change": 0,
+                    "note": "V112 protected default account recovery",
+                    "created_at": now,
+                    "updated_at": now,
+                })
+                changed = True
+            tables[table_name] = rows
+        payload["tables"] = tables
+        if changed:
+            save_authority("10_permissions", records=tables, reason="v112_reactivate_protected_login", github=True)
+    except Exception:
+        pass
+    # Also repair SQLite cache so fallback login cannot reject the account as inactive.
+    try:
+        ensure_security_schema()
+        execute("UPDATE auth_users SET is_active=1, updated_at=? WHERE lower(username)=lower(?)", (now, low))
+    except Exception:
+        pass
+    try:
+        execute("UPDATE security_users SET is_active=1, updated_at=? WHERE lower(username)=lower(?)", (now, low))
+    except Exception:
+        pass
+    try:
+        clear_permission_cache(uname)
+    except Exception:
+        pass
+
+
+try:
+    _v112_prev_authenticate = authenticate
+except Exception:
+    _v112_prev_authenticate = None
+
+
+def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
+    if _v112_is_protected_user(username):
+        _v112_reactivate_protected_account(str(username or ""))
+    return _v112_prev_authenticate(username, password) if callable(_v112_prev_authenticate) else (False, "帳號或密碼錯誤。")
+
+
+try:
+    _v112_prev_check_permission = check_permission
+except Exception:
+    _v112_prev_check_permission = None
+
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    # Admin must remain emergency-access capable across all modules.
+    try:
+        uname = str(st.session_state.get("auth_username") or "").strip().lower()
+        roles = st.session_state.get("auth_roles", []) or []
+        if isinstance(roles, str):
+            roles = [roles]
+        if uname == "admin" or "admin" in [str(r).strip().lower() for r in roles]:
+            return True
+    except Exception:
+        pass
+    return bool(_v112_prev_check_permission(module_code, action) if callable(_v112_prev_check_permission) else False)
+
+# Keep aliases used by older pages.
+has_permission = check_permission
+# =================== END V112 LOGIN RECOVERY FOR PROTECTED DEFAULT ACCOUNTS ===================

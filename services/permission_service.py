@@ -5612,3 +5612,224 @@ def save_account_permissions(rows: _V94Iterable[dict]) -> int:  # type: ignore[o
 
 check_permission = has_permission
 # =================== END V111 PERMISSION MATRIX SAVE-MERGE FIX ===================
+
+
+# ===================== V112 PROTECTED DEFAULT ACCOUNTS SAFETY GUARD =====================
+# Fix: default role/account rows (admin / manager / leader / operator / viewer / auditor)
+# must never be disabled or deleted by accident.  This guard is intentionally placed at
+# the end of the service so it wraps all earlier V96-V111 functions without removing them.
+_V112_PROTECTED_DEFAULT_USERS = {"admin", "manager", "leader", "operator", "viewer", "auditor"}
+
+
+def _v112_is_protected_user(username) -> bool:
+    return str(username or "").strip().lower() in _V112_PROTECTED_DEFAULT_USERS
+
+
+def _v112_now_text() -> str:
+    try:
+        return _v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text()
+    except Exception:
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v112_default_user_row(username: str) -> dict | None:
+    uname = str(username or "").strip().lower()
+    for u, pwd, zh, en, role, active in DEFAULT_USERS:
+        if str(u).strip().lower() == uname:
+            now = _v112_now_text()
+            return {
+                "username": u,
+                "password_hash": hash_password(pwd),
+                "password_hint": "V112 protected default account repair",
+                "password_display": "********",
+                "new_password": "",
+                "employee_id": "",
+                "display_name": zh or en or u,
+                "email": "",
+                "role_code": role or uname,
+                "is_active": 1,
+                "force_password_change": 0,
+                "note": "系統預設帳號，不可停用 / protected default account",
+                "created_at": now,
+                "updated_at": now,
+            }
+    return None
+
+
+def _v112_sanitize_auth_tables(payload: dict | None) -> tuple[dict, bool]:
+    payload = payload if isinstance(payload, dict) else {}
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {k: [] for k in _V96_AUTH_TABLES}
+    changed = False
+    # Protected accounts must not remain in deletion tombstone.
+    deleted = {str(x).strip().lower() for x in (payload.get("deleted_usernames") or []) if str(x).strip()}
+    new_deleted = {x for x in deleted if x not in _V112_PROTECTED_DEFAULT_USERS}
+    if new_deleted != deleted:
+        payload["deleted_usernames"] = sorted(new_deleted)
+        changed = True
+    for table_name in ("auth_users", "security_users"):
+        rows = tables.get(table_name, []) if isinstance(tables.get(table_name), list) else []
+        seen = set()
+        clean_rows = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            x = dict(row)
+            uname = str(x.get("username") or x.get("帳號") or x.get("帳號 / Username") or "").strip()
+            if not uname:
+                continue
+            low = uname.lower()
+            if low in seen:
+                changed = True
+                continue
+            seen.add(low)
+            if low in _V112_PROTECTED_DEFAULT_USERS:
+                before_active = x.get("is_active")
+                x["username"] = uname
+                x["is_active"] = 1
+                x["啟用"] = True
+                x["啟用 / Active"] = True
+                x.setdefault("role_code", low)
+                x.setdefault("display_name", uname)
+                x["updated_at"] = _v112_now_text()
+                if before_active not in (1, True, "1", "true", "True", "是", "啟用"):
+                    changed = True
+            clean_rows.append(x)
+        # If a protected default account was accidentally deleted from authority,
+        # restore a safe default row so at least the system can be recovered.
+        if table_name == "auth_users":
+            existing = {str(r.get("username") or "").strip().lower() for r in clean_rows if isinstance(r, dict)}
+            for uname in sorted(_V112_PROTECTED_DEFAULT_USERS):
+                if uname not in existing:
+                    row = _v112_default_user_row(uname)
+                    if row:
+                        clean_rows.append(row)
+                        changed = True
+        tables[table_name] = clean_rows
+    payload["tables"] = tables
+    return payload, changed
+
+
+def _v112_repair_protected_accounts(reason: str = "v112_repair") -> dict:
+    try:
+        payload = _v96_auth_payload() if "_v96_auth_payload" in globals() else {}
+        payload, changed = _v112_sanitize_auth_tables(payload)
+        if changed and "_v96_write_payload" in globals():
+            res = _v96_write_payload(payload, reason, github=True)
+            try:
+                _v96_best_effort_restore_cache(payload)
+            except Exception:
+                pass
+            return {"ok": True, "changed": True, "write": res}
+        return {"ok": True, "changed": False}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300]}
+
+
+def _v112_sanitize_user_input_row(row: dict) -> dict:
+    x = dict(row or {})
+    username = str(x.get("username") or x.get("帳號 / Username") or x.get("帳號") or "").strip()
+    if _v112_is_protected_user(username):
+        x["username"] = username
+        x["is_active"] = 1
+        x["啟用"] = True
+        x["啟用 / Active"] = True
+        x["刪除 / Delete"] = False
+        # Keep each default account in its canonical role unless the admin explicitly changes
+        # non-protected custom accounts. This avoids disabling admin by role confusion.
+        if not str(x.get("role_code") or x.get("角色 / Role") or "").strip():
+            x["role_code"] = username.lower()
+    return x
+
+
+try:
+    _v112_prev_get_users = get_users
+except Exception:
+    _v112_prev_get_users = None
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    try:
+        _v112_repair_protected_accounts("v112_get_users_protected_repair")
+    except Exception:
+        pass
+    rows = _v112_prev_get_users() if callable(_v112_prev_get_users) else []
+    out = []
+    seen = set()
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        x = dict(r)
+        uname = str(x.get("username") or "").strip()
+        if not uname:
+            continue
+        if _v112_is_protected_user(uname):
+            x["is_active"] = 1
+            x["啟用"] = True
+            x["啟用 / Active"] = True
+        seen.add(uname.lower())
+        out.append(x)
+    for uname in sorted(_V112_PROTECTED_DEFAULT_USERS):
+        if uname not in seen:
+            row = _v112_default_user_row(uname)
+            if row:
+                out.append(row)
+    return sorted(out, key=lambda x: (0 if str(x.get("username", "")).lower() == "admin" else 1, str(x.get("username", "")).lower()))
+
+
+try:
+    _v112_prev_save_users = save_users
+except Exception:
+    _v112_prev_save_users = None
+
+
+def save_users(rows: _V94Iterable[dict]) -> dict:  # type: ignore[override]
+    clean = [_v112_sanitize_user_input_row(r) for r in (rows or []) if isinstance(r, dict)]
+    result = _v112_prev_save_users(clean) if callable(_v112_prev_save_users) else {"saved": len(clean), "skipped": []}
+    repair = _v112_repair_protected_accounts("v112_save_users_protected_repair")
+    try:
+        result["protected_repair"] = repair
+    except Exception:
+        pass
+    return result
+
+
+try:
+    _v112_prev_save_account_master = save_account_master
+except Exception:
+    _v112_prev_save_account_master = None
+
+
+def save_account_master(rows: _V94Iterable[dict], delete_usernames: _V94Iterable[str] | None = None) -> dict:  # type: ignore[override]
+    clean_delete = [u for u in (delete_usernames or []) if not _v112_is_protected_user(u)]
+    clean_rows = [_v112_sanitize_user_input_row(r) for r in (rows or []) if isinstance(r, dict)]
+    if callable(_v112_prev_save_account_master):
+        result = _v112_prev_save_account_master(clean_rows, delete_usernames=clean_delete)
+    else:
+        result = save_users(clean_rows)
+    repair = _v112_repair_protected_accounts("v112_save_account_master_protected_repair")
+    try:
+        result["protected_delete_blocked"] = len([u for u in (delete_usernames or []) if _v112_is_protected_user(u)])
+        result["protected_repair"] = repair
+    except Exception:
+        pass
+    return result
+
+
+try:
+    _v112_prev_delete_users = delete_users
+except Exception:
+    _v112_prev_delete_users = None
+
+
+def delete_users(usernames: _V94Iterable[str]) -> int:  # type: ignore[override]
+    targets = [u for u in (usernames or []) if not _v112_is_protected_user(u)]
+    deleted = _v112_prev_delete_users(targets) if callable(_v112_prev_delete_users) else 0
+    _v112_repair_protected_accounts("v112_delete_users_protected_repair")
+    return int(deleted or 0)
+
+# Keep alias stable for modules importing check_permission from permission_service.
+try:
+    check_permission = has_permission
+except Exception:
+    pass
+# =================== END V112 PROTECTED DEFAULT ACCOUNTS SAFETY GUARD ===================
