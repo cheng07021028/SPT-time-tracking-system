@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-PermanentAuthority-V29",
+  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-25 11:57:52",
+  "updated_at": "2026-05-25 11:57:58",
   "exported_at": "2026-05-25 11:57:52",
-  "reason": "v112_reactivate_protected_login",
+  "reason": "v112_get_users_protected_repair",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -20,7 +20,7 @@
         "force_password_change": 0,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 11:57:51",
+        "updated_at": "2026-05-25 11:57:58",
         "啟用": true,
         "啟用 / Active": true
       },
@@ -32,11 +32,13 @@
         "display_name": "製造主管",
         "email": "manager",
         "role_code": "manager",
-        "is_active": 0,
+        "is_active": 1,
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 11:25:50"
+        "updated_at": "2026-05-25 11:57:58",
+        "啟用": true,
+        "啟用 / Active": true
       },
       {
         "username": "leader",
@@ -46,11 +48,13 @@
         "display_name": "現場幹部",
         "email": "leader",
         "role_code": "leader",
-        "is_active": 0,
+        "is_active": 1,
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 11:25:50"
+        "updated_at": "2026-05-25 11:57:58",
+        "啟用": true,
+        "啟用 / Active": true
       },
       {
         "username": "operator",
@@ -60,11 +64,13 @@
         "display_name": "作業人員",
         "email": "operator",
         "role_code": "operator",
-        "is_active": 0,
+        "is_active": 1,
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 11:25:50"
+        "updated_at": "2026-05-25 11:57:58",
+        "啟用": true,
+        "啟用 / Active": true
       },
       {
         "username": "viewer",
@@ -74,11 +80,13 @@
         "display_name": "查詢者",
         "email": "viewer",
         "role_code": "operator",
-        "is_active": 0,
+        "is_active": 1,
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 11:25:50"
+        "updated_at": "2026-05-25 11:57:58",
+        "啟用": true,
+        "啟用 / Active": true
       },
       {
         "username": "auditor",
@@ -88,11 +96,13 @@
         "display_name": "稽核",
         "email": "auditor",
         "role_code": "auditor",
-        "is_active": 0,
+        "is_active": 1,
         "force_password_change": 0,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 11:25:50"
+        "updated_at": "2026-05-25 11:57:58",
+        "啟用": true,
+        "啟用 / Active": true
       },
       {
         "username": "SPT142",
@@ -22490,7 +22500,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:23:39",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 11:57:51",
+        "updated_at": "2026-05-25 11:57:58",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -22514,7 +22524,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 17:35:07"
+        "updated_at": "2026-05-25 11:57:58",
+        "啟用": true,
+        "啟用 / Active": true,
+        "role_code": "manager"
       },
       {
         "username": "leader",
@@ -22526,7 +22539,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 17:35:07"
+        "updated_at": "2026-05-25 11:57:58",
+        "啟用": true,
+        "啟用 / Active": true,
+        "role_code": "leader"
       },
       {
         "username": "operator",
@@ -22538,7 +22554,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 17:35:07"
+        "updated_at": "2026-05-25 11:57:58",
+        "啟用": true,
+        "啟用 / Active": true,
+        "role_code": "operator"
       },
       {
         "username": "viewer",
@@ -22550,7 +22569,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 17:35:07"
+        "updated_at": "2026-05-25 11:57:58",
+        "啟用": true,
+        "啟用 / Active": true,
+        "role_code": "viewer"
       },
       {
         "username": "auditor",
@@ -22562,7 +22584,10 @@
         "force_password_change": 0,
         "last_login_at": null,
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 17:35:07"
+        "updated_at": "2026-05-25 11:57:58",
+        "啟用": true,
+        "啟用 / Active": true,
+        "role_code": "auditor"
       },
       {
         "username": "spt142",
@@ -22666,5 +22691,8 @@
     "security_settings": 2,
     "security_users": 9,
     "security_user_roles": 9
-  }
+  },
+  "version": "V96-direct-authority",
+  "authority_file": "data/permanent_store/modules/10_permissions/records.json",
+  "deleted_usernames": []
 }
