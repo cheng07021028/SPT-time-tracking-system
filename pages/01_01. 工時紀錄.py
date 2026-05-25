@@ -663,41 +663,44 @@ if is_admin:
                     column_cfg = {}
                 column_cfg[delete_col] = st.column_config.CheckboxColumn("刪除 / Delete", width=120)
                 disabled_cols = [c for c in ["id", "ID", "ID / ID", "ID / ID / ID", "record_key", "紀錄鍵 / Record Key", "created_at", "建立時間 / Created At", "updated_at", "更新時間 / Updated At"] if c in display_admin.columns]
-                try:
-                    edited_admin_return = _v95_raw_data_editor(
-                        display_admin,
-                        use_container_width=True,
-                        hide_index=True,
-                        column_config=column_cfg,
-                        disabled=disabled_cols,
-                        num_rows="fixed",
-                        key=editor_key,
-                        height=460,
-                    )
-                except Exception as _v94_editor_error:
-                    st.warning(f"維護表格欄位型態設定已自動降級，避免畫面中斷：{_v94_editor_error}")
-                    safe_column_cfg = {delete_col: st.column_config.CheckboxColumn("刪除 / Delete", width=120)}
-                    edited_admin_return = _v95_raw_data_editor(
-                        display_admin,
-                        use_container_width=True,
-                        hide_index=True,
-                        column_config=safe_column_cfg,
-                        disabled=disabled_cols,
-                        num_rows="fixed",
-                        key=f"{editor_key}_safe",
-                        height=460,
-                    )
-                    editor_key = f"{editor_key}_safe"
+                # V120：管理員維護表改成穩定送出模式。
+                # data_editor 與儲存 / 重算 / 刪除放在同一個 form，避免修改一格就 rerun 跳頁。
+                with st.form("v120_today_admin_maintenance_stable_editor_form", clear_on_submit=False):
+                    try:
+                        edited_admin_return = _v95_raw_data_editor(
+                            display_admin,
+                            use_container_width=True,
+                            hide_index=True,
+                            column_config=column_cfg,
+                            disabled=disabled_cols,
+                            num_rows="fixed",
+                            key=editor_key,
+                            height=460,
+                        )
+                    except Exception as _v94_editor_error:
+                        st.warning(f"維護表格欄位型態設定已自動降級，避免畫面中斷：{_v94_editor_error}")
+                        safe_column_cfg = {delete_col: st.column_config.CheckboxColumn("刪除 / Delete", width=120)}
+                        edited_admin_return = _v95_raw_data_editor(
+                            display_admin,
+                            use_container_width=True,
+                            hide_index=True,
+                            column_config=safe_column_cfg,
+                            disabled=disabled_cols,
+                            num_rows="fixed",
+                            key=f"{editor_key}_safe",
+                            height=460,
+                        )
+                        editor_key = f"{editor_key}_safe"
+                    b1, b2, b3 = st.columns(3)
+                    do_save = b1.form_submit_button("💾 僅儲存修改 / Save", type="primary", use_container_width=True)
+                    do_recalc = b2.form_submit_button("🧮 重算勾選工時並同步 02 / Recalc", use_container_width=True)
+                    do_delete = b3.form_submit_button("🗑 刪除勾選整列 / Delete", use_container_width=True)
+
                 edited_admin = _v92_editor_state_to_df(display_admin, edited_admin_return, editor_key)
 
                 manual_ids = _v92_checked_ids(edited_admin, delete_col, _id_col)
                 if manual_ids or clear_clicked:
                     st.session_state[admin_select_key] = manual_ids
-
-                b1, b2, b3 = st.columns(3)
-                do_save = b1.button("💾 僅儲存修改 / Save", type="primary", use_container_width=True, key="today_admin_save_v92")
-                do_recalc = b2.button("🧮 重算勾選工時並同步 02 / Recalc", use_container_width=True, key="today_admin_recalc_v92")
-                do_delete = b3.button("🗑 刪除勾選整列 / Delete", use_container_width=True, key="today_admin_delete_v92")
 
                 if do_save or do_recalc or do_delete:
                     edited_admin = _v92_editor_state_to_df(display_admin, edited_admin_return, editor_key)

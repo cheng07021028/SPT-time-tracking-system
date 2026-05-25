@@ -110,7 +110,6 @@ def ensure_cols(df: pd.DataFrame) -> pd.DataFrame:
             df[c] = False if c in ["_delete", "is_active", "is_in_factory", "is_today_attendance"] else ""
     for c in BOOL_INTERNAL_COLS:
         df[c] = df[c].map(_to_bool_value).fillna(False).astype(bool) if c in df.columns else False
-    df = _normalize_employee_display_ids(df)
     return df[COLS]
 
 
@@ -131,60 +130,6 @@ def _to_bool_value(v) -> bool:
         return False
     return bool(v)
 
-
-
-
-def _blankish_id_value(v) -> bool:
-    try:
-        if pd.isna(v):
-            return True
-    except Exception:
-        pass
-    return str(v).strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
-
-
-def _positive_int_id(v):
-    if _blankish_id_value(v):
-        return None
-    try:
-        n = int(float(str(v).strip()))
-        return n if n > 0 else None
-    except Exception:
-        return None
-
-
-def _normalize_employee_display_ids(df: pd.DataFrame) -> pd.DataFrame:
-    """V113: avoid showing None/nan in ID column; assign stable display IDs for real employee rows."""
-    work = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
-    if "id" not in work.columns:
-        work["id"] = ""
-    used = set()
-    new_ids = []
-    need_new = []
-    for _, row in work.iterrows():
-        has_data = (not _blankish_id_value(row.get("employee_id", ""))) or (not _blankish_id_value(row.get("employee_name", "")))
-        cur = _positive_int_id(row.get("id", ""))
-        if not has_data:
-            new_ids.append("")
-            need_new.append(False)
-        elif cur is not None and cur not in used:
-            used.add(cur)
-            new_ids.append(cur)
-            need_new.append(False)
-        else:
-            new_ids.append("")
-            need_new.append(True)
-    nxt = 1
-    for i, need in enumerate(need_new):
-        if not need:
-            continue
-        while nxt in used:
-            nxt += 1
-        new_ids[i] = nxt
-        used.add(nxt)
-        nxt += 1
-    work["id"] = new_ids
-    return work
 
 def _to_editor_df(df: pd.DataFrame) -> pd.DataFrame:
     work = ensure_cols(df)
@@ -470,38 +415,41 @@ with tab1:
     tpl = pd.DataFrame(columns=["工號", "姓名", "單位", "職稱", "啟用", "在廠", "今日出勤", "備註"])
     e2.download_button("⟰ 下載人員匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_人員匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-    st.info("V113：人員 ID 會自動正規化，None / 空白 / 重複 ID 會補成穩定序號；儲存後會寫回權威檔。批次 checkbox 仍維持原功能。")
+    st.info("V64：批次按鈕已改為重新指定整份暫存表；刪除 / 啟用 / 在廠 / 今日出勤全選與取消會立即刷新 checkbox，不再被舊 data_editor 草稿蓋回。")
     _commit_current_editor_widget_state()
     st.session_state[STATE_KEY] = _current_internal_df()
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
-    edited = st.data_editor(
-        editor_df,
-        hide_index=True,
-        use_container_width=True,
-        num_rows="dynamic",
-        height=560,
-        column_order=EDITOR_COLS,
-        column_config={
-            DISPLAY_COLUMNS["_delete"]: st.column_config.CheckboxColumn("刪除 / Delete", width="medium"),
-            DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
-            DISPLAY_COLUMNS["employee_id"]: st.column_config.TextColumn("工號 / Employee ID", required=True, width="medium"),
-            DISPLAY_COLUMNS["employee_name"]: st.column_config.TextColumn("姓名 / Name", required=True, width="medium"),
-            DISPLAY_COLUMNS["department"]: st.column_config.TextColumn("單位 / Department", width="medium"),
-            DISPLAY_COLUMNS["title"]: st.column_config.TextColumn("職稱 / Title", width="medium"),
-            DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
-            DISPLAY_COLUMNS["is_in_factory"]: st.column_config.CheckboxColumn("在廠 / In Factory", width="medium"),
-            DISPLAY_COLUMNS["is_today_attendance"]: st.column_config.CheckboxColumn("今日出勤 / Today Attendance", width="medium"),
-            DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
-            DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
-            DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
-        },
-        key=_editor_key(),
-        disabled=not employee_edit_enabled,
-    )
+    # V120：穩定編輯模式。把 data_editor 與儲存按鈕放在同一個 form，
+    # 避免每修改一格就 rerun 跳回頁面上方；批次按鈕與原儲存邏輯不變。
+    with st.form("v120_employee_stable_editor_form", clear_on_submit=False):
+        edited = st.data_editor(
+            editor_df,
+            hide_index=True,
+            use_container_width=True,
+            num_rows="dynamic",
+            height=560,
+            column_order=EDITOR_COLS,
+            column_config={
+                DISPLAY_COLUMNS["_delete"]: st.column_config.CheckboxColumn("刪除 / Delete", width="medium"),
+                DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
+                DISPLAY_COLUMNS["employee_id"]: st.column_config.TextColumn("工號 / Employee ID", required=True, width="medium"),
+                DISPLAY_COLUMNS["employee_name"]: st.column_config.TextColumn("姓名 / Name", required=True, width="medium"),
+                DISPLAY_COLUMNS["department"]: st.column_config.TextColumn("單位 / Department", width="medium"),
+                DISPLAY_COLUMNS["title"]: st.column_config.TextColumn("職稱 / Title", width="medium"),
+                DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
+                DISPLAY_COLUMNS["is_in_factory"]: st.column_config.CheckboxColumn("在廠 / In Factory", width="medium"),
+                DISPLAY_COLUMNS["is_today_attendance"]: st.column_config.CheckboxColumn("今日出勤 / Today Attendance", width="medium"),
+                DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
+                DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
+                DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
+            },
+            key=_editor_key(),
+            disabled=not employee_edit_enabled,
+        )
+        submitted_employees = st.form_submit_button("▣ 確認儲存人員清單 / Save Employees", type="primary", use_container_width=True, disabled=not employee_edit_enabled)
     ignore_editor_return = bool(st.session_state.pop(EDITOR_IGNORE_RETURN_KEY, False))
     if employee_edit_enabled and isinstance(edited, pd.DataFrame) and not ignore_editor_return:
         st.session_state[STATE_KEY] = _from_editor_df(edited.copy())
-    submitted_employees = st.button("▣ 確認儲存人員清單 / Save Employees", type="primary", use_container_width=True, disabled=not employee_edit_enabled, key="v61_save_employees")
 
     if submitted_employees:
         current_df = _current_internal_df()

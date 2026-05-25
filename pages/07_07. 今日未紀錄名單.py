@@ -267,33 +267,37 @@ else:
     _commit_current_editor_widget_state()
     st.session_state[STATE_KEY] = ensure_cols(st.session_state[STATE_KEY])
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
-    edited = st.data_editor(
-        editor_df,
-        hide_index=True,
-        use_container_width=True,
-        height=460,
-        disabled=[DISPLAY_ROW_NO] + [DISPLAY_COLUMNS[c] for c in ["employee_id", "employee_name", "department", "title", "note", "created_at", "updated_at"]],
-        column_order=EDITOR_COLS,
-        column_config={
-            DISPLAY_ROW_NO: st.column_config.NumberColumn("序號 / No.", width="small"),
-            DISPLAY_COLUMNS["employee_id"]: st.column_config.TextColumn("工號 / Employee ID", width="medium"),
-            DISPLAY_COLUMNS["employee_name"]: st.column_config.TextColumn("姓名 / Name", width="medium"),
-            DISPLAY_COLUMNS["department"]: st.column_config.TextColumn("單位 / Department", width="medium"),
-            DISPLAY_COLUMNS["title"]: st.column_config.TextColumn("職稱 / Title", width="medium"),
-            DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
-            DISPLAY_COLUMNS["is_in_factory"]: st.column_config.CheckboxColumn("在廠 / In Factory", width="medium"),
-            DISPLAY_COLUMNS["is_today_attendance"]: st.column_config.CheckboxColumn("今日出勤 / Today Attendance", width="medium"),
-            DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
-            DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", width="medium"),
-            DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", width="medium"),
-        },
-        key=editor_key,
-    )
+    # V120：穩定編輯模式。把 data_editor 與儲存按鈕放在同一個 form，
+    # 避免 checkbox / cell edit 每一下都 rerun 跳頁；批次按鈕與原儲存邏輯不變。
+    with st.form("v120_today_attendance_stable_editor_form", clear_on_submit=False):
+        edited = st.data_editor(
+            editor_df,
+            hide_index=True,
+            use_container_width=True,
+            height=460,
+            disabled=[DISPLAY_ROW_NO] + [DISPLAY_COLUMNS[c] for c in ["employee_id", "employee_name", "department", "title", "note", "created_at", "updated_at"]],
+            column_order=EDITOR_COLS,
+            column_config={
+                DISPLAY_ROW_NO: st.column_config.NumberColumn("序號 / No.", width="small"),
+                DISPLAY_COLUMNS["employee_id"]: st.column_config.TextColumn("工號 / Employee ID", width="medium"),
+                DISPLAY_COLUMNS["employee_name"]: st.column_config.TextColumn("姓名 / Name", width="medium"),
+                DISPLAY_COLUMNS["department"]: st.column_config.TextColumn("單位 / Department", width="medium"),
+                DISPLAY_COLUMNS["title"]: st.column_config.TextColumn("職稱 / Title", width="medium"),
+                DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
+                DISPLAY_COLUMNS["is_in_factory"]: st.column_config.CheckboxColumn("在廠 / In Factory", width="medium"),
+                DISPLAY_COLUMNS["is_today_attendance"]: st.column_config.CheckboxColumn("今日出勤 / Today Attendance", width="medium"),
+                DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
+                DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", width="medium"),
+                DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", width="medium"),
+            },
+            key=editor_key,
+        )
+        submitted_today_attendance = st.form_submit_button("▣ 確認儲存今日出勤設定 / Save Today Attendance", type="primary", use_container_width=True)
 
     ignore_editor_return = bool(st.session_state.pop(EDITOR_IGNORE_RETURN_KEY, False))
     if isinstance(edited, pd.DataFrame) and not ignore_editor_return:
         st.session_state[STATE_KEY] = _from_editor_df(edited)
-    if st.button("▣ 確認儲存今日出勤設定 / Save Today Attendance", type="primary", use_container_width=True, key="save_today_attendance_v61"):
+    if submitted_today_attendance:
         save_df = st.session_state[STATE_KEY].copy()
         save_df.insert(0, "_delete", False)
         result = save_employees(save_df)

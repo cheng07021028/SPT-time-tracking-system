@@ -743,33 +743,36 @@ with tab1:
     _commit_current_editor_widget_state()
     st.session_state[STATE_KEY] = _current_internal_df()
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
-    edited = st.data_editor(
-        editor_df,
-        hide_index=True,
-        use_container_width=True,
-        num_rows="dynamic",
-        height=560,
-        column_order=EDITOR_COLS,
-        column_config={
-            DISPLAY_COLUMNS["_delete"]: st.column_config.CheckboxColumn("刪除 / Delete", width="medium"),
-            DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
-            DISPLAY_COLUMNS["work_order"]: st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
-            DISPLAY_COLUMNS["part_no"]: st.column_config.TextColumn("P/N / Part No.", width="medium"),
-            DISPLAY_COLUMNS["type_name"]: st.column_config.TextColumn("機型 / Type", width="large"),
-            DISPLAY_COLUMNS["assembly_location"]: st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
-            DISPLAY_COLUMNS["customer"]: st.column_config.TextColumn("客戶 / Customer", width="medium"),
-            DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
-            DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
-            DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
-            DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
-        },
-        key=_editor_key(),
-        disabled=not work_order_edit_enabled,
-    )
+    # V120：穩定編輯模式。把 data_editor 與儲存按鈕放在同一個 form，
+    # 避免每修改一格就 rerun 跳回頁面上方；批次按鈕與原儲存邏輯不變。
+    with st.form("v120_work_order_stable_editor_form", clear_on_submit=False):
+        edited = st.data_editor(
+            editor_df,
+            hide_index=True,
+            use_container_width=True,
+            num_rows="dynamic",
+            height=560,
+            column_order=EDITOR_COLS,
+            column_config={
+                DISPLAY_COLUMNS["_delete"]: st.column_config.CheckboxColumn("刪除 / Delete", width="medium"),
+                DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
+                DISPLAY_COLUMNS["work_order"]: st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
+                DISPLAY_COLUMNS["part_no"]: st.column_config.TextColumn("P/N / Part No.", width="medium"),
+                DISPLAY_COLUMNS["type_name"]: st.column_config.TextColumn("機型 / Type", width="large"),
+                DISPLAY_COLUMNS["assembly_location"]: st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
+                DISPLAY_COLUMNS["customer"]: st.column_config.TextColumn("客戶 / Customer", width="medium"),
+                DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
+                DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
+                DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
+                DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
+            },
+            key=_editor_key(),
+            disabled=not work_order_edit_enabled,
+        )
+        submitted_work_orders = st.form_submit_button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True, disabled=not work_order_edit_enabled)
     ignore_editor_return = bool(st.session_state.pop(EDITOR_IGNORE_RETURN_KEY, False))
     if work_order_edit_enabled and isinstance(edited, pd.DataFrame) and not ignore_editor_return:
         st.session_state[STATE_KEY] = _from_editor_df(edited.copy())
-    submitted_work_orders = st.button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True, disabled=not work_order_edit_enabled, key="v61_save_work_orders")
 
     if submitted_work_orders:
         current_df = _current_internal_df()
