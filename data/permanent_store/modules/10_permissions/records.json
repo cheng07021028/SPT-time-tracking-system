@@ -2,9 +2,9 @@
   "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-25 13:04:31",
+  "updated_at": "2026-05-25 13:08:06",
   "exported_at": "2026-05-25 11:57:52",
-  "reason": "save_account_master_v96",
+  "reason": "save_users_v96",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -1396,7 +1396,7 @@
       },
       {
         "username": "SPT203",
-        "password_hash": "pbkdf2_sha256$180000$wQLeNWxNjitVTBK0EX4zPw==$SXjiSKDP26sVIcP4DAwqwhsloGrj+t8u9RCbqdBKbek=",
+        "password_hash": "pbkdf2_sha256$5248af1b8c4c63bffda5701d08e5f5f3$8821c19c711bb0ae8138116c879e7df51fc26ef12f66c23bc17a68bb28085736",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT203",
         "display_name": "徐梓翔",
@@ -1406,7 +1406,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 10:08:17",
-        "updated_at": "2026-05-25 13:04:29"
+        "updated_at": "2026-05-25 13:08:06"
       }
     ],
     "auth_account_permissions": [
