@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-25 14:16:36",
-  "exported_at": "2026-05-25 14:16:36",
-  "reason": "v369_save_widths_v72_ui_mirror",
+  "updated_at": "2026-05-25 14:16:38",
+  "exported_at": "2026-05-25 14:16:38",
+  "reason": "v369_save_column_order_v72_ui_mirror",
   "empty_authoritative": false,
   "tables": {},
   "settings": {
@@ -5253,11 +5253,10 @@
           "department": 140,
           "title": 140
         },
-        "updated_at": "2026-05-25 14:16:36",
-        "reason": "v369_save_widths",
+        "updated_at": "2026-05-25 14:16:38",
+        "reason": "v369_save_column_order",
         "order": [
           "id",
-          "record_key",
           "employee_id",
           "status",
           "employee_name",
@@ -5282,6 +5281,7 @@
           "created_at",
           "updated_at",
           "department",
+          "record_key",
           "title"
         ]
       }
