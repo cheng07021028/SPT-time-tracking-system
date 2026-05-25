@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+  "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-25 11:25:50",
-  "exported_at": "2026-05-25 11:24:22",
-  "reason": "save_users_v96",
+  "updated_at": "2026-05-25 11:57:52",
+  "exported_at": "2026-05-25 11:57:52",
+  "reason": "v112_reactivate_protected_login",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -16,11 +16,13 @@
         "display_name": "系統管理員",
         "email": "admin",
         "role_code": "admin",
-        "is_active": 0,
+        "is_active": 1,
         "force_password_change": 0,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 11:25:50"
+        "updated_at": "2026-05-25 11:57:51",
+        "啟用": true,
+        "啟用 / Active": true
       },
       {
         "username": "manager",
@@ -22488,7 +22490,7 @@
         "force_password_change": 0,
         "last_login_at": "2026-05-15 11:23:39",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-23 01:04:06",
+        "updated_at": "2026-05-25 11:57:51",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -22497,7 +22499,10 @@
         "新密碼": "",
         "新密碼 / New Password": "",
         "強制改密碼": false,
-        "強制改密碼 / Force Change": false
+        "強制改密碼 / Force Change": false,
+        "啟用": true,
+        "啟用 / Active": true,
+        "role_code": "admin"
       },
       {
         "username": "manager",
@@ -22661,8 +22666,5 @@
     "security_settings": 2,
     "security_users": 9,
     "security_user_roles": 9
-  },
-  "deleted_usernames": [],
-  "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
+  }
 }
