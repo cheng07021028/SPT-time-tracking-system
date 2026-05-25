@@ -1836,3 +1836,190 @@ get_audit_state_status = get_audit_permanent_status
 login_log_state_status = get_audit_permanent_status
 get_login_log_permanent_status = get_audit_permanent_status
 # =================== END V106 LOGIN LOG DELETE TOMBSTONE AUTHORITY FIX ===================
+
+
+# ===================== V115 LOGIN LOG EVENT WRITE-THROUGH FIX =====================
+# 目的：11｜登入紀錄必須在登入 / 登出 / 權限不足 / 強制改密碼等事件發生當下
+#       立即寫入正式 canonical 權威檔，不可只停留在 SQLite 或舊 legacy 表。
+# 重點：
+# 1) security_service.log_security_event 會呼叫本 record_login_log。
+# 2) 本函式先寫 login_logs SQLite cache，再以目前 Page 11 可見資料覆寫
+#    data/permanent_store/modules/11_login_logs/records.json。
+# 3) 刪除 tombstone 仍保留；已刪除舊列不會因 legacy cache 回來而復活。
+# 4) aliases 全部重新指向 V115，避免舊版函式被呼叫。
+
+try:
+    _v115_prev_record_login_log = record_login_log
+except Exception:  # pragma: no cover
+    _v115_prev_record_login_log = None
+
+
+def _v115_float_idle_minutes(idle_minutes: Any = None, idle_seconds: Any = None):
+    if idle_minutes not in (None, ""):
+        try:
+            return round(float(idle_minutes), 4)
+        except Exception:
+            return None
+    if idle_seconds not in (None, ""):
+        try:
+            return round(float(idle_seconds) / 60.0, 4)
+        except Exception:
+            return None
+    return None
+
+
+def _v115_insert_login_log_sqlite(row: Dict[str, Any]) -> int:
+    ensure_login_logs_table()
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO login_logs (
+        username, display_name, event_type, result, message, module_code,
+        login_time, logout_time, idle_minutes, ip_address, user_agent, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        row.get("username") or "",
+        row.get("display_name") or "",
+        _normalise_event_type(row.get("event_type") or "LOGIN"),
+        _normalise_result(row.get("result") or "SUCCESS"),
+        row.get("message") or "",
+        row.get("module_code") or "",
+        row.get("login_time") or row.get("created_at") or _now(),
+        row.get("logout_time") or "",
+        _v115_float_idle_minutes(row.get("idle_minutes"), row.get("idle_seconds")),
+        row.get("ip_address") or "",
+        row.get("user_agent") or "streamlit",
+        row.get("created_at") or row.get("login_time") or _now(),
+    ))
+    new_id = int(cur.lastrowid or 0)
+    conn.commit()
+    conn.close()
+    return new_id
+
+
+def _v115_current_visible_records_with_extra(extra: Dict[str, Any] | None = None) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    try:
+        # V106 load_login_logs already applies tombstone and merges canonical + SQLite.
+        rows.extend(_to_records(load_login_logs(limit=100000, include_legacy=True)))
+    except Exception:
+        try:
+            if "_v106_all_raw_current_login_records" in globals():
+                rows.extend(_v106_all_raw_current_login_records(include_legacy=True))  # type: ignore[name-defined]
+        except Exception:
+            pass
+    if extra:
+        rows.append(dict(extra))
+    try:
+        rows = _v106_apply_delete_tombstone(rows) if "_v106_apply_delete_tombstone" in globals() else rows  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        rows = _v103_merge_login_rows(rows) if "_v103_merge_login_rows" in globals() else _merge_record_sets(rows)  # type: ignore[name-defined]
+    except Exception:
+        rows = _merge_record_sets(rows)
+    return rows
+
+
+def _v115_write_login_authority_from_rows(rows: List[Dict[str, Any]], reason: str) -> Dict[str, Any]:
+    clean = _valid_login_rows("v115_authority", rows or [])
+    try:
+        clean = _v103_merge_login_rows(clean) if "_v103_merge_login_rows" in globals() else _merge_record_sets(clean)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    # Keep SQLite cache aligned with canonical, but never let legacy tables be the final authority.
+    try:
+        if "_v103_replace_db_with_login_records" in globals():
+            _v103_replace_db_with_login_records(clean)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    # Write the single canonical authority file. This is the file Streamlit Cloud must keep after Reboot.
+    try:
+        from services.permanent_authority_service import save_authority, canonical_path
+        res = save_authority(
+            "11_login_logs",
+            records={"login_logs": clean, "auth_login_logs": [], "security_login_logs": []},
+            reason=reason,
+            github=True,
+        )
+        res["count"] = len(clean)
+        res["canonical_path"] = str(canonical_path("11_login_logs", "records"))
+        return res
+    except Exception as exc:
+        # Local fallback so Page 11 still displays the authoritative file path and count.
+        try:
+            path = _V103_LOGIN_AUTHORITY_PATH if "_V103_LOGIN_AUTHORITY_PATH" in globals() else _V97_LOGIN_AUTHORITY_PATH
+        except Exception:
+            path = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_logs" / "records.json"
+        payload = {
+            "authority_schema": "SPT-PermanentAuthority-V115-LoginWriteThrough",
+            "module_key": "11_login_logs",
+            "kind": "records",
+            "updated_at": _now(),
+            "exported_at": _now(),
+            "reason": reason,
+            "empty_authoritative": len(clean) == 0,
+            "tables": {"login_logs": clean, "auth_login_logs": [], "security_login_logs": []},
+            "table_counts": {"login_logs": len(clean), "auth_login_logs": 0, "security_login_logs": 0},
+        }
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            tmp.replace(path)
+            return {"ok": True, "count": len(clean), "canonical_path": str(path), "fallback": True, "error": str(exc)[:300]}
+        except Exception as exc2:
+            return {"ok": False, "count": len(clean), "error": str(exc)[:300], "fallback_error": str(exc2)[:300]}
+
+
+def record_login_log(
+    username: str = "",
+    display_name: str = "",
+    event_type: str = "LOGIN",
+    result: str = "SUCCESS",
+    message: str = "",
+    module_code: str = "",
+    login_time: Optional[str] = None,
+    logout_time: Optional[str] = None,
+    idle_minutes: Optional[float] = None,
+    ip_address: str = "",
+    user_agent: str = "streamlit",
+    **kwargs: Any,
+) -> int:  # type: ignore[override]
+    event_time = login_time or kwargs.get("event_time") or kwargs.get("created_at") or _now()
+    norm_event = _normalise_event_type(event_type or "LOGIN")
+    row = {
+        "username": username or "",
+        "display_name": display_name or "",
+        "event_type": norm_event,
+        "result": _normalise_result(result or "SUCCESS"),
+        "message": message or "",
+        "module_code": module_code or "",
+        # Page 11 uses login_time as the main event time column; keep it populated for all event types.
+        "login_time": event_time,
+        "logout_time": logout_time or (event_time if norm_event in {"LOGOUT", "AUTO_LOGOUT", "POST_RECORD_LOGOUT", "SESSION_TIMEOUT"} else ""),
+        "idle_minutes": _v115_float_idle_minutes(idle_minutes, kwargs.get("idle_seconds")),
+        "ip_address": ip_address or "",
+        "user_agent": user_agent or "streamlit",
+        "created_at": kwargs.get("created_at") or event_time,
+        "source": "login_logs",
+    }
+    clean = _canonical_login_row("login_logs", row)
+    if clean is None:
+        return 0
+    new_id = _v115_insert_login_log_sqlite(clean)
+    clean["id"] = new_id
+    rows = _v115_current_visible_records_with_extra(clean)
+    _v115_write_login_authority_from_rows(rows, reason="v115_login_event_write_through")
+    return int(new_id)
+
+
+# Keep all historical aliases pointing to the final write-through implementation.
+write_login_log = record_login_log
+add_login_log = record_login_log
+append_login_log = record_login_log
+write_audit_log = record_login_log
+record_audit_log = record_login_log
+log_login_event = record_login_log
+save_login_log = record_login_log
+# =================== END V115 LOGIN LOG EVENT WRITE-THROUGH FIX ===================
