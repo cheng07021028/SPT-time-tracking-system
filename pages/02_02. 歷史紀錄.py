@@ -17,7 +17,7 @@ from services.time_record_service import (
     import_time_records,
 )
 from services.master_data_service import load_employees, load_work_orders
-from services.table_ui_service import render_table, render_width_settings, label_for
+from services.table_ui_service import render_table, label_for
 from services.duration_service import hours_to_hms
 from services.history_filter_service import load_history_filters, save_history_filters, reset_history_filters
 
@@ -870,38 +870,48 @@ def _render_cross_day_edit_notice(edit_df: pd.DataFrame) -> None:
     )
 
 
-def _render_history_view_table(view_df: pd.DataFrame, table_key: str = "history_records", height: int = 520) -> None:
-    """Read-only history table using the same column/order pipeline as Editable History.
+def _render_history_view_table(view_df: pd.DataFrame, table_key: str = "history_records_view", height: int = 520) -> None:
+    """Read-only history table with light cross-day-end highlighting.
 
-    V117 修正：啟動編輯前後顯示不一致的根因，是未啟用編輯時走
-    `st.dataframe + Styler` 的獨立顯示流程；啟動編輯後則走 `render_table`
-    與 `table_ui_settings` 權威欄位順序。因此同一批資料在兩種狀態下會
-    出現欄位順序、欄寬、標題顯示不一致。
-
-    這裡改成：未啟用編輯時也使用 `render_table(table_key="history_records")`。
-    如此欄寬與欄位順序都會讀同一份權威檔，且不影響儲存、刪除、重算、匯入。
-    跨日提醒仍保留為顯示用欄位，僅畫面提示，不會寫回權威檔。
+    編輯模式仍使用共用 render_table，避免把『跨日結束』標示欄寫回資料庫。
     """
     if view_df is None or view_df.empty:
         st.info("目前沒有資料 / No data")
         return
+    display_df = _add_cross_day_end_marker(view_df)
 
-    display_df = _with_history_cross_day_edit_marker(view_df)
-    try:
-        count = int(_is_cross_day_end_df(view_df).sum())
-    except Exception:
-        count = 0
-    if count > 0:
-        st.caption(f"偵測到 {count} 筆跨日結束紀錄；未啟用編輯與啟動編輯使用相同欄位順序，跨日提醒只作畫面提示。")
-    else:
-        st.caption("未啟用編輯與啟動編輯使用同一套欄位順序與欄寬設定。")
+    # V2.30：跨日結束需要用 Styler 上色；Styler 不支援共用 column_config，
+    # 所以這裡手動套用雙語欄名與工時格式，避免標題只剩 raw 欄位名稱，
+    # 也避免 work_hours 顯示為 0.030000 這類小數時數。
+    if "work_hours" in display_df.columns:
+        display_df["work_hours"] = display_df["work_hours"].map(hours_to_hms)
+    if "total_hours" in display_df.columns:
+        display_df["total_hours"] = display_df["total_hours"].map(hours_to_hms)
+    if "avg_hours" in display_df.columns:
+        display_df["avg_hours"] = display_df["avg_hours"].map(hours_to_hms)
 
-    render_table(
-        display_df,
-        table_key,
-        editable=False,
+    cross_mask = display_df["跨日結束"].astype(str).eq("跨日結束") if "跨日結束" in display_df.columns else pd.Series(False, index=display_df.index)
+
+    def highlight_rows(row):
+        if bool(cross_mask.loc[row.name]):
+            return [
+                "background-color: #fff7d6; color: #1f2937; font-weight: 700; border-top: 1px solid #f6c85f; border-bottom: 1px solid #f6c85f;"
+                for _ in row
+            ]
+        return ["" for _ in row]
+
+    label_map = {col: ("跨日結束 / Cross Day End" if str(col) == "跨日結束" else label_for(str(col))) for col in display_df.columns}
+    display_df = display_df.rename(columns=label_map)
+
+    st.caption("淺黃色列代表『跨日結束』：開始日期與結束日期不同，且已完成結束。")
+    st.dataframe(
+        display_df.style.apply(highlight_rows, axis=1),
+        use_container_width=True,
+        hide_index=True,
         height=height,
+        key=f"frame_{table_key}",
     )
+
 
 def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     if df is None or df.empty:
@@ -1240,48 +1250,38 @@ with tab1:
             edit_df.insert(0, delete_col_label, edit_df["id"].map(lambda x: _id_in_state(x, delete_ids_state)) if "id" in edit_df.columns else False)
             edit_df.insert(1, recalc_col_label, edit_df["id"].map(lambda x: _id_in_state(x, recalc_ids_state)) if "id" in edit_df.columns else False)
 
-            # V116：02 歷史明細編輯也要使用正式欄寬/欄位順序設定。
-            # 注意：只顯示設定工具，不改儲存、重算、刪除與資料同步流程。
-            # table_key 必須與下方 render_table 相同，確保 Reboot 後由同一權威檔讀回。
-            render_width_settings(
-                "history_records",
-                edit_df,
-                title="02 歷史明細編輯欄寬設定 / Column Width Settings",
-            )
-
             editor_key = f"history_editor_v27_{st.session_state[editor_version_key]}"
             history_draft_key = "history_records_edited_draft_v58"
-            st.info("V63：歷史紀錄表格與 10｜權限管理同模式；批次按鈕會清除全域 data_editor 草稿，避免 KPI 與 checkbox 畫面不同步。")
-            edited = render_table(
-                edit_df,
-                "history_records",
-                editable=True,
-                disabled=["id", "record_key", "created_at", "updated_at", HISTORY_CROSS_DAY_ALERT_COL, HISTORY_CROSS_DAY_RANGE_COL],
-                key=editor_key,
-                height=560,
-            )
-            if isinstance(edited, pd.DataFrame):
-                st.session_state[history_draft_key] = edited.copy()
-            st.markdown("**確認後執行動作 / Confirm Action**")
-            hist_save_col, hist_recalc_col, hist_delete_col = st.columns([1.1, 1.7, 1.2])
-            history_save_clicked = hist_save_col.button(
-                "◈ 儲存編輯 / Save",
-                type="primary",
-                use_container_width=True,
-                key="history_records_save_button_v73",
-            )
-            history_recalc_clicked = hist_recalc_col.button(
-                "◇ 重算勾選工時 / Recalc Selected",
-                type="primary",
-                use_container_width=True,
-                key="history_records_recalc_button_v73",
-            )
-            history_delete_clicked = hist_delete_col.button(
-                "◉ 刪除勾選整列 / Delete Selected",
-                type="primary",
-                use_container_width=True,
-                key="history_records_delete_button_v73",
-            )
+            form_key = f"history_records_stable_edit_form_v119_{st.session_state[editor_version_key]}"
+            st.info("V119：歷史明細編輯改為穩定送出模式；在表格內修改時間或其他欄位時，不會每改一格就整頁 rerun 跳回上方。修改完成後再按下方儲存、重算或刪除。")
+            with st.form(key=form_key, clear_on_submit=False):
+                edited = render_table(
+                    edit_df,
+                    "history_records",
+                    editable=True,
+                    disabled=["id", "record_key", "created_at", "updated_at", HISTORY_CROSS_DAY_ALERT_COL, HISTORY_CROSS_DAY_RANGE_COL],
+                    key=editor_key,
+                    height=560,
+                )
+                if isinstance(edited, pd.DataFrame):
+                    st.session_state[history_draft_key] = edited.copy()
+                st.markdown("**確認後執行動作 / Confirm Action**")
+                hist_save_col, hist_recalc_col, hist_delete_col = st.columns([1.1, 1.7, 1.2])
+                history_save_clicked = hist_save_col.form_submit_button(
+                    "◈ 儲存編輯 / Save",
+                    type="primary",
+                    use_container_width=True,
+                )
+                history_recalc_clicked = hist_recalc_col.form_submit_button(
+                    "◇ 重算勾選工時 / Recalc Selected",
+                    type="primary",
+                    use_container_width=True,
+                )
+                history_delete_clicked = hist_delete_col.form_submit_button(
+                    "◉ 刪除勾選整列 / Delete Selected",
+                    type="primary",
+                    use_container_width=True,
+                )
             submitted_history = bool(history_save_clicked or history_recalc_clicked or history_delete_clicked)
             if history_save_clicked:
                 history_action = "儲存編輯"
