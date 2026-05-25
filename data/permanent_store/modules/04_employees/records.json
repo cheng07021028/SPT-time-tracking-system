@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "04_employees",
   "kind": "records",
-  "updated_at": "2026-05-25 22:26:21",
-  "exported_at": "2026-05-25 22:26:21",
+  "updated_at": "2026-05-25 22:26:27",
+  "exported_at": "2026-05-25 22:26:27",
   "reason": "crud_save_employees_v113_normalize_id",
   "empty_authoritative": false,
   "tables": {
@@ -28,8 +28,8 @@
         "department": "製造部",
         "title": "經理",
         "is_active": true,
-        "is_in_factory": true,
-        "is_today_attendance": true,
+        "is_in_factory": false,
+        "is_today_attendance": false,
         "note": "",
         "created_at": "",
         "updated_at": ""
