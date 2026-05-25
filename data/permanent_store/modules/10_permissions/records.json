@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+  "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-25 13:09:38",
-  "exported_at": "2026-05-25 11:57:52",
-  "reason": "save_account_master_v96",
+  "updated_at": "2026-05-25 13:34:20",
+  "exported_at": "2026-05-25 13:34:20",
+  "reason": "v106_force_password_change",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -948,17 +948,26 @@
       },
       {
         "username": "B189",
-        "password_hash": "pbkdf2_sha256$6466cf0a41398e70ef069f7704cb19e8$76915c560dd9cf5bf5b21adf4a0e565753da7f9237017e748dc32c0c3ae42623",
+        "password_hash": "pbkdf2_sha256$180000$x7qzyv4U8gB4bCkVNo4kUQ==$I4S0vOnc2Xx1PzUF5N8Z28J7/C9PoJI0s0DVixYNOGs=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B189",
         "display_name": "羅文發",
         "email": "operator",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-23 00:17:14",
-        "updated_at": "2026-05-25 13:09:36"
+        "updated_at": "2026-05-25 13:34:20",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "B190",
@@ -22662,10 +22671,5 @@
     "security_settings": 2,
     "security_users": 8,
     "security_user_roles": 8
-  },
-  "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json",
-  "deleted_usernames": [
-    "b211"
-  ]
+  }
 }
