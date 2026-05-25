@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-25 15:53:08",
-  "exported_at": "2026-05-25 15:53:08",
+  "updated_at": "2026-05-25 15:53:12",
+  "exported_at": "2026-05-25 15:53:12",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 3125,
+        "source": "v103_merge",
+        "username": "B155",
+        "display_name": "趙健浩",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "04_employees:can_view",
+        "module_code": "04_employees",
+        "login_time": "2026-05-25 15:53:11",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-25 15:53:11"
+      },
+      {
+        "id": 3047,
+        "source": "v103_merge",
+        "username": "B155",
+        "display_name": "趙健浩",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "03_work_orders:can_view",
+        "module_code": "03_work_orders",
+        "login_time": "2026-05-25 15:53:08",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-25 15:53:08"
+      },
       {
         "id": 2970,
         "source": "v103_merge",
@@ -1230,7 +1262,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 76,
+    "login_logs": 78,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
