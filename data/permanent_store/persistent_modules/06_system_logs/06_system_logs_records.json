@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-25 18:46:22",
+  "exported_at": "2026-05-25 18:52:16",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -1921,10 +1921,164 @@
         "message": "INSERT table_ui_settings",
         "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
         "level": "INFO"
+      },
+      {
+        "id": 458,
+        "log_time": "2026-05-25 18:46:52",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 459,
+        "log_time": "2026-05-25 18:46:52",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 460,
+        "log_time": "2026-05-25 18:46:55",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 461,
+        "log_time": "2026-05-25 18:46:55",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 462,
+        "log_time": "2026-05-25 18:47:37",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 463,
+        "log_time": "2026-05-25 18:47:37",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 464,
+        "log_time": "2026-05-25 18:47:40",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 465,
+        "log_time": "2026-05-25 18:47:40",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 466,
+        "log_time": "2026-05-25 18:48:51",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 467,
+        "log_time": "2026-05-25 18:48:51",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 468,
+        "log_time": "2026-05-25 18:48:54",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 469,
+        "log_time": "2026-05-25 18:48:54",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 470,
+        "log_time": "2026-05-25 18:49:06",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V89 權威檔優先：已儲存/更新歷史紀錄 13 筆，並同步 01/02 canonical。",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 471,
+        "log_time": "2026-05-25 18:49:30",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V89 權威檔優先：已儲存/更新歷史紀錄 13 筆，並同步 01/02 canonical。",
+        "detail": "",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 174
+    "system_logs": 188
   }
 }
