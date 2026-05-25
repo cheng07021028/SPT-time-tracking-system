@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-25 18:53:33",
-  "exported_at": "2026-05-25 18:53:33",
-  "reason": "v116_v369_save_column_order_02.history.records",
+  "updated_at": "2026-05-25 18:55:30",
+  "exported_at": "2026-05-25 18:55:30",
+  "reason": "v369_save_widths_v72_ui_mirror",
   "empty_authoritative": false,
   "tables": {},
   "settings": {
@@ -71,9 +71,9 @@
       },
       "02.history.records": {
         "widths": {
-          "刪除 / Delete": 120,
-          "重算 / Recalc": 120,
-          "跨日提醒 / Cross Day Alert": 120,
+          "刪除 / Delete": 100,
+          "重算 / Recalc": 100,
+          "跨日提醒 / Cross Day Alert": 100,
           "跨日日期 / Cross Day Date": 140,
           "id": 70,
           "record_key": 280,
@@ -103,8 +103,8 @@
           "department": 140,
           "title": 140
         },
-        "updated_at": "2026-05-25 18:53:31",
-        "reason": "v369_save_column_order",
+        "updated_at": "2026-05-25 18:55:29",
+        "reason": "v369_save_widths",
         "order": [
           "id",
           "跨日提醒 / Cross Day Alert",
