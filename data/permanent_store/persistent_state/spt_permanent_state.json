@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-25 14:11:19",
+  "exported_at": "2026-05-25 14:15:01",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 16,
+  "business_row_count": 17,
   "table_counts": {
     "auth_account_permissions": 117,
     "auth_login_logs": 0,
@@ -16,12 +16,12 @@
     "security_settings": 2,
     "security_user_roles": 9,
     "security_users": 9,
-    "system_logs": 154,
+    "system_logs": 162,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "table_ui_settings": 0,
-    "time_records": 16,
+    "table_ui_settings": 1,
+    "time_records": 17,
     "work_orders": 0
   },
   "tables": {
@@ -4906,6 +4906,94 @@
         "message": "get_active_record_v104_cache_repair: 已由 01/02 權威檔回填 SQLite cache 6 筆",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 320,
+        "log_time": "2026-05-25 14:14:19",
+        "user_name": "SPT150",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 321,
+        "log_time": "2026-05-25 14:14:19",
+        "user_name": "SPT150",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 322,
+        "log_time": "2026-05-25 14:14:19",
+        "user_name": "SPT150",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 323,
+        "log_time": "2026-05-25 14:14:19",
+        "user_name": "SPT150",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 324,
+        "log_time": "2026-05-25 14:14:19",
+        "user_name": "SPT150",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 325,
+        "log_time": "2026-05-25 14:14:19",
+        "user_name": "SPT150",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 326,
+        "log_time": "2026-05-25 14:14:19",
+        "user_name": "SPT150",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 327,
+        "log_time": "2026-05-25 14:14:19",
+        "user_name": "SPT150",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "get_active_record_v104_cache_repair: 已由 01/02 權威檔回填 SQLite cache 7 筆",
+        "detail": "",
+        "level": "INFO"
       }
     ],
     "system_settings": [
@@ -4948,7 +5036,14 @@
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
-    "table_ui_settings": [],
+    "table_ui_settings": [
+      {
+        "table_key": "history_records",
+        "widths_json": "{\"id\": 70, \"record_key\": 280, \"status\": 140, \"work_order\": 150, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 190, \"remark\": 260, \"start_date\": 140, \"start_time\": 140, \"end_date\": 140, \"end_time\": 140, \"work_hours\": 140, \"assembly_location\": 140, \"group_key\": 140, \"is_group_work\": 140, \"source\": 140, \"created_at\": 180, \"updated_at\": 180, \"department\": 140, \"title\": 140}",
+        "order_json": "[]",
+        "updated_at": "2026-05-25 06:15:01"
+      }
+    ],
     "time_records": [
       {
         "id": 12,
@@ -5381,6 +5476,33 @@
         "source": "streamlit",
         "created_at": "2026-05-25 14:11:19",
         "updated_at": "2026-05-25 14:11:19"
+      },
+      {
+        "id": 29,
+        "record_key": "SPT150|26N4001-05|模組|2026-05-25 14:13:59|f06f65c7",
+        "status": "作業中",
+        "work_order": "26N4001-05",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "模組",
+        "employee_id": "SPT150",
+        "employee_name": "李守益",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-25 14:13:59",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
+        "start_date": "2026-05-25",
+        "start_time": "14:13:59",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT150|模組|2026-05-25",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-25 14:13:59",
+        "updated_at": "2026-05-25 14:13:59"
       }
     ],
     "work_orders": []
