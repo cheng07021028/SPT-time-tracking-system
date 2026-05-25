@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+  "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-25 20:04:24",
-  "exported_at": "2026-05-25 19:59:37",
-  "reason": "save_account_master_v96",
+  "updated_at": "2026-05-25 22:14:14",
+  "exported_at": "2026-05-25 22:14:14",
+  "reason": "v106_force_password_change",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -892,17 +892,26 @@
       },
       {
         "username": "SPT142",
-        "password_hash": "pbkdf2_sha256$180000$1qRgks6N4TiLTpReRmJXyQ==$qKJR2YO5rhVGWsfw4DKTJYWWHjLybQfLkZSQ/MNc4MA=",
+        "password_hash": "pbkdf2_sha256$180000$bUGA8dQ+HO0NlfTtLfGxvg==$RKO0dNiXcBPFmAwEkNx2sm3gx40leDesywomQiDzMC0=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT142",
         "display_name": "黃沂澂",
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 20:04:22"
+        "updated_at": "2026-05-25 22:14:14",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT145",
@@ -22381,8 +22390,5 @@
     "security_settings": 2,
     "security_users": 6,
     "security_user_roles": 6
-  },
-  "deleted_usernames": [],
-  "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
+  }
 }
