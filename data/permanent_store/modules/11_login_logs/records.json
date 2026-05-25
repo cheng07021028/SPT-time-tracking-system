@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-25 17:44:49",
-  "exported_at": "2026-05-25 17:44:49",
+  "updated_at": "2026-05-25 17:44:59",
+  "exported_at": "2026-05-25 17:44:59",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 23973,
+        "source": "v103_merge",
+        "username": "SPT193",
+        "display_name": "呂昰儒",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出",
+        "module_code": "",
+        "login_time": "2026-05-25 17:44:58",
+        "logout_time": "2026-05-25 17:44:58",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-25 17:44:58"
+      },
       {
         "id": 23520,
         "source": "v103_merge",
@@ -19,6 +35,22 @@
         "module_code": "",
         "login_time": "2026-05-25 17:44:48",
         "logout_time": "2026-05-25 17:44:48",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-25 17:44:48"
+      },
+      {
+        "id": 23746,
+        "source": "v103_merge",
+        "username": "SPT193",
+        "display_name": "呂昰儒",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "01_time_record:can_view",
+        "module_code": "01_time_record",
+        "login_time": "2026-05-25 17:44:48",
+        "logout_time": "",
         "idle_minutes": null,
         "ip_address": "",
         "user_agent": "streamlit",
@@ -3614,7 +3646,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 225,
+    "login_logs": 227,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
