@@ -2,9 +2,9 @@
   "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-25 09:54:41",
-  "exported_at": "2026-05-25 09:54:31",
-  "reason": "save_users_v96",
+  "updated_at": "2026-05-25 09:56:22",
+  "exported_at": "2026-05-25 09:55:26",
+  "reason": "save_account_master_pre_delete_v96",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -1405,17 +1405,26 @@
       },
       {
         "username": "SPT173",
-        "password_hash": "pbkdf2_sha256$8198f1209ab71e3f76ab2c11e718c162$195a1b9c29c4ff4fed4645290ad0c4dca37827d7d6bb37f64e16d1e5a1b56dc8",
+        "password_hash": "pbkdf2_sha256$180000$o0ps8cpsN/oAvbhLkDbe7w==$SZKvi50F+ioYqPpu822J77DKJ3J0EJTv4sh/NEVav38=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT173",
         "display_name": "吳芷熙",
         "email": "leader",
         "role_code": "leader",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 09:54:40",
-        "updated_at": "2026-05-25 09:54:40"
+        "updated_at": "2026-05-25 09:55:26",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       }
     ],
     "auth_account_permissions": [
