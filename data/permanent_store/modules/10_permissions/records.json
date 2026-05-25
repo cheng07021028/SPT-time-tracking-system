@@ -2,9 +2,9 @@
   "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-25 18:12:08",
+  "updated_at": "2026-05-25 18:12:10",
   "exported_at": "2026-05-25 18:07:34",
-  "reason": "save_account_master_pre_delete_v96",
+  "reason": "save_users_v96",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -20,7 +20,7 @@
         "force_password_change": 0,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 18:09:00"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "manager",
@@ -34,7 +34,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 18:09:00"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "leader",
@@ -48,7 +48,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 18:09:00"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "operator",
@@ -62,7 +62,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 18:09:00"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "viewer",
@@ -76,7 +76,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 18:09:00"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "auditor",
@@ -90,7 +90,7 @@
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-25 18:09:00"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B002",
@@ -101,10 +101,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B126",
@@ -115,10 +115,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B135",
@@ -129,10 +129,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B155",
@@ -143,10 +143,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B168",
@@ -157,10 +157,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B177",
@@ -171,10 +171,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B189",
@@ -185,10 +185,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B190",
@@ -199,10 +199,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B203",
@@ -213,10 +213,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B204",
@@ -227,10 +227,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B210",
@@ -241,10 +241,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B226",
@@ -255,10 +255,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B227",
@@ -269,10 +269,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B228",
@@ -283,10 +283,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B229",
@@ -297,10 +297,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B230",
@@ -311,10 +311,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B235",
@@ -325,10 +325,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B243",
@@ -339,10 +339,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B244",
@@ -353,10 +353,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B245",
@@ -367,10 +367,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B246",
@@ -381,10 +381,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B247",
@@ -395,10 +395,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B248",
@@ -409,10 +409,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B249",
@@ -423,10 +423,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B250",
@@ -437,10 +437,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B251",
@@ -451,10 +451,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B252",
@@ -465,10 +465,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B253",
@@ -479,10 +479,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 18:11:33"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B254",
@@ -493,10 +493,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B255",
@@ -507,10 +507,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B256",
@@ -521,10 +521,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B257",
@@ -535,10 +535,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B258",
@@ -549,10 +549,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B259",
@@ -563,10 +563,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "B260",
@@ -577,10 +577,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "Ethan",
@@ -591,10 +591,10 @@
         "email": "",
         "role_code": "admin",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT003",
@@ -605,10 +605,10 @@
         "email": "",
         "role_code": "manager",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT005",
@@ -619,10 +619,10 @@
         "email": "",
         "role_code": "manager",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT015",
@@ -633,10 +633,10 @@
         "email": "",
         "role_code": "leader",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT024",
@@ -647,10 +647,10 @@
         "email": "",
         "role_code": "leader",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT031",
@@ -661,10 +661,10 @@
         "email": "",
         "role_code": "leader",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT034",
@@ -675,10 +675,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT048",
@@ -689,10 +689,10 @@
         "email": "",
         "role_code": "leader",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT059",
@@ -703,10 +703,10 @@
         "email": "",
         "role_code": "leader",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT063",
@@ -717,10 +717,10 @@
         "email": "",
         "role_code": "leader",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT077",
@@ -731,10 +731,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT084",
@@ -745,10 +745,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT087",
@@ -759,10 +759,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT088",
@@ -773,10 +773,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT089",
@@ -787,10 +787,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT091",
@@ -801,10 +801,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT092",
@@ -815,10 +815,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT105",
@@ -829,10 +829,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT118",
@@ -843,10 +843,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT120",
@@ -857,10 +857,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT121",
@@ -871,10 +871,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT138",
@@ -885,10 +885,10 @@
         "email": "",
         "role_code": "leader",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT142",
@@ -899,10 +899,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT145",
@@ -913,10 +913,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT148",
@@ -927,10 +927,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT149",
@@ -941,10 +941,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT150",
@@ -955,10 +955,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT151",
@@ -969,10 +969,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT158",
@@ -983,10 +983,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT160",
@@ -997,10 +997,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT172",
@@ -1011,10 +1011,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT173",
@@ -1025,10 +1025,10 @@
         "email": "",
         "role_code": "leader",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:11:34"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT174",
@@ -1039,10 +1039,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT183",
@@ -1053,10 +1053,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT189",
@@ -1067,10 +1067,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT193",
@@ -1081,10 +1081,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT195",
@@ -1095,10 +1095,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT196",
@@ -1109,10 +1109,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT199",
@@ -1123,10 +1123,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT201",
@@ -1137,10 +1137,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT203",
@@ -1151,10 +1151,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT208",
@@ -1165,10 +1165,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT220",
@@ -1179,10 +1179,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT227",
@@ -1193,10 +1193,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT228",
@@ -1207,10 +1207,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT229",
@@ -1221,10 +1221,10 @@
         "email": "",
         "role_code": "manager",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT230",
@@ -1235,10 +1235,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT231",
@@ -1249,10 +1249,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT235",
@@ -1263,10 +1263,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT236",
@@ -1277,10 +1277,10 @@
         "email": "",
         "role_code": "admin",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT239",
@@ -1291,10 +1291,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT240",
@@ -1305,10 +1305,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT241",
@@ -1319,10 +1319,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT242",
@@ -1333,10 +1333,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT243",
@@ -1347,10 +1347,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT244",
@@ -1361,10 +1361,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT245",
@@ -1375,10 +1375,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT250",
@@ -1389,10 +1389,10 @@
         "email": "",
         "role_code": "leader",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT252",
@@ -1403,10 +1403,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       },
       {
         "username": "SPT777",
@@ -1417,10 +1417,10 @@
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 0,
+        "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:11:35"
+        "updated_at": "2026-05-25 18:12:10"
       }
     ],
     "auth_account_permissions": [
