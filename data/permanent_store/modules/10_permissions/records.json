@@ -2,9 +2,9 @@
   "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-25 18:39:29",
-  "exported_at": "2026-05-25 18:34:24",
-  "reason": "save_account_master_v96",
+  "updated_at": "2026-05-25 20:04:20",
+  "exported_at": "2026-05-25 19:59:37",
+  "reason": "save_account_master_pre_delete_v96",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -892,17 +892,26 @@
       },
       {
         "username": "SPT142",
-        "password_hash": "pbkdf2_sha256$aca600add4794ef26856fddd090d72d5$b50a1582aabea3308928012bfa5a2a273afbe86d11072c339158b54c8b5ec506",
+        "password_hash": "pbkdf2_sha256$180000$1qRgks6N4TiLTpReRmJXyQ==$qKJR2YO5rhVGWsfw4DKTJYWWHjLybQfLkZSQ/MNc4MA=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT142",
         "display_name": "黃沂澂",
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-25 18:39:27"
+        "updated_at": "2026-05-25 19:12:30",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT145",
@@ -1144,17 +1153,26 @@
       },
       {
         "username": "SPT203",
-        "password_hash": "pbkdf2_sha256$75f0fbd43fbd09dc6801f3a156137a95$147cfbe30d9e0677c1ea48b31150d4ab7fb1f6299e61c83b055e50f2e95ff4a1",
+        "password_hash": "pbkdf2_sha256$180000$BLgWgBNAeK+FEwQCs6U97Q==$94cZAR+Q71YGm69blE+cweAaiJcCuDxEQElnc5EIwKU=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT203",
         "display_name": "徐梓翔",
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-25 18:39:27"
+        "updated_at": "2026-05-25 19:59:37",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT208",
@@ -22382,9 +22400,7 @@
     "security_users": 6,
     "security_user_roles": 6
   },
-  "deleted_usernames": [
-    "spt777"
-  ],
+  "deleted_usernames": [],
   "version": "V96-direct-authority",
   "authority_file": "data/permanent_store/modules/10_permissions/records.json"
 }
