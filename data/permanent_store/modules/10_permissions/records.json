@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+  "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-25 16:33:20",
-  "exported_at": "2026-05-25 15:48:41",
-  "reason": "save_account_master_v96",
+  "updated_at": "2026-05-25 16:33:56",
+  "exported_at": "2026-05-25 16:33:56",
+  "reason": "v106_force_password_change",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -318,17 +318,26 @@
       },
       {
         "username": "SPT089",
-        "password_hash": "pbkdf2_sha256$9566425a01e0f322110225ca26f9f098$9e0352c0a392c211efc79097bf584cbf06a88fb239554baae4424cd0b077ec3c",
+        "password_hash": "pbkdf2_sha256$180000$/ombTpY37mTbxcD4r0IEqA==$cd+3hnOaJESlLaaIlwXS8qqPan5CadoRUbL8D/iTr/A=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT089",
         "display_name": "陳凱彥",
         "email": "operator",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-23 00:17:12",
-        "updated_at": "2026-05-25 16:33:18"
+        "updated_at": "2026-05-25 16:33:56",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT091",
@@ -22662,8 +22671,5 @@
     "security_settings": 2,
     "security_users": 8,
     "security_user_roles": 8
-  },
-  "deleted_usernames": [],
-  "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
+  }
 }
