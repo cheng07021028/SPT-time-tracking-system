@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-25 16:34:24",
-  "exported_at": "2026-05-25 16:34:24",
+  "updated_at": "2026-05-25 16:46:20",
+  "exported_at": "2026-05-25 16:46:20",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 7271,
+        "source": "v103_merge",
+        "username": "spt243",
+        "display_name": "",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤",
+        "module_code": "",
+        "login_time": "2026-05-25 16:46:19",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-25 16:46:19"
+      },
       {
         "id": 7135,
         "source": "v103_merge",
@@ -2174,7 +2190,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 135,
+    "login_logs": 136,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
