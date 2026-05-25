@@ -870,48 +870,38 @@ def _render_cross_day_edit_notice(edit_df: pd.DataFrame) -> None:
     )
 
 
-def _render_history_view_table(view_df: pd.DataFrame, table_key: str = "history_records_view", height: int = 520) -> None:
-    """Read-only history table with light cross-day-end highlighting.
+def _render_history_view_table(view_df: pd.DataFrame, table_key: str = "history_records", height: int = 520) -> None:
+    """Read-only history table using the same column/order pipeline as Editable History.
 
-    編輯模式仍使用共用 render_table，避免把『跨日結束』標示欄寫回資料庫。
+    V117 修正：啟動編輯前後顯示不一致的根因，是未啟用編輯時走
+    `st.dataframe + Styler` 的獨立顯示流程；啟動編輯後則走 `render_table`
+    與 `table_ui_settings` 權威欄位順序。因此同一批資料在兩種狀態下會
+    出現欄位順序、欄寬、標題顯示不一致。
+
+    這裡改成：未啟用編輯時也使用 `render_table(table_key="history_records")`。
+    如此欄寬與欄位順序都會讀同一份權威檔，且不影響儲存、刪除、重算、匯入。
+    跨日提醒仍保留為顯示用欄位，僅畫面提示，不會寫回權威檔。
     """
     if view_df is None or view_df.empty:
         st.info("目前沒有資料 / No data")
         return
-    display_df = _add_cross_day_end_marker(view_df)
 
-    # V2.30：跨日結束需要用 Styler 上色；Styler 不支援共用 column_config，
-    # 所以這裡手動套用雙語欄名與工時格式，避免標題只剩 raw 欄位名稱，
-    # 也避免 work_hours 顯示為 0.030000 這類小數時數。
-    if "work_hours" in display_df.columns:
-        display_df["work_hours"] = display_df["work_hours"].map(hours_to_hms)
-    if "total_hours" in display_df.columns:
-        display_df["total_hours"] = display_df["total_hours"].map(hours_to_hms)
-    if "avg_hours" in display_df.columns:
-        display_df["avg_hours"] = display_df["avg_hours"].map(hours_to_hms)
+    display_df = _with_history_cross_day_edit_marker(view_df)
+    try:
+        count = int(_is_cross_day_end_df(view_df).sum())
+    except Exception:
+        count = 0
+    if count > 0:
+        st.caption(f"偵測到 {count} 筆跨日結束紀錄；未啟用編輯與啟動編輯使用相同欄位順序，跨日提醒只作畫面提示。")
+    else:
+        st.caption("未啟用編輯與啟動編輯使用同一套欄位順序與欄寬設定。")
 
-    cross_mask = display_df["跨日結束"].astype(str).eq("跨日結束") if "跨日結束" in display_df.columns else pd.Series(False, index=display_df.index)
-
-    def highlight_rows(row):
-        if bool(cross_mask.loc[row.name]):
-            return [
-                "background-color: #fff7d6; color: #1f2937; font-weight: 700; border-top: 1px solid #f6c85f; border-bottom: 1px solid #f6c85f;"
-                for _ in row
-            ]
-        return ["" for _ in row]
-
-    label_map = {col: ("跨日結束 / Cross Day End" if str(col) == "跨日結束" else label_for(str(col))) for col in display_df.columns}
-    display_df = display_df.rename(columns=label_map)
-
-    st.caption("淺黃色列代表『跨日結束』：開始日期與結束日期不同，且已完成結束。")
-    st.dataframe(
-        display_df.style.apply(highlight_rows, axis=1),
-        use_container_width=True,
-        hide_index=True,
+    render_table(
+        display_df,
+        table_key,
+        editable=False,
         height=height,
-        key=f"frame_{table_key}",
     )
-
 
 def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     if df is None or df.empty:
