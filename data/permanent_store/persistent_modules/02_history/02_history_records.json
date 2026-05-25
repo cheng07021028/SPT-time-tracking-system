@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-25 14:36:04",
+  "exported_at": "2026-05-25 16:04:23",
   "source": "db_service_write",
   "module_key": "02_history",
   "module_code": "02",
@@ -195,7 +195,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-25 13:35:54",
-        "updated_at": "2026-05-25 14:15:05"
+        "updated_at": "2026-05-25 14:59:41"
       },
       {
         "id": 19,
@@ -362,7 +362,7 @@
       {
         "id": 26,
         "record_key": "B203|25M0021-02|模組|2026-05-25 14:04:07|59c16abd",
-        "status": "作業中",
+        "status": "下班",
         "work_order": "25M0021-02",
         "part_no": "",
         "type_name": "",
@@ -371,20 +371,20 @@
         "employee_name": "蕭桓惟",
         "start_action": "開始",
         "start_timestamp": "2026-05-25 14:04:07",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": "",
+        "end_action": "下班",
+        "end_timestamp": "2026-05-25 16:04:23",
+        "remark": "同步作業平均分配：2筆，群組總工時=1.75，平均=0.88",
         "start_date": "2026-05-25",
         "start_time": "14:04:07",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
+        "end_date": "2026-05-25",
+        "end_time": "16:04:23",
+        "work_hours": 0.88,
         "assembly_location": "",
         "group_key": "B203|模組|2026-05-25",
-        "is_group_work": 0,
+        "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-25 14:04:07",
-        "updated_at": "2026-05-25 14:04:07"
+        "updated_at": "2026-05-25 16:04:23"
       },
       {
         "id": 27,
