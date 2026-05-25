@@ -2,18 +2,18 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "04_employees",
   "kind": "records",
-  "updated_at": "2026-05-25 13:15:08",
-  "exported_at": "2026-05-25 13:15:08",
+  "updated_at": "2026-05-25 13:16:35",
+  "exported_at": "2026-05-25 13:16:35",
   "reason": "crud_save_employees_v84",
   "empty_authoritative": false,
   "tables": {
     "employees": [
       {
         "id": "",
-        "employee_id": "SPT203",
-        "employee_name": "徐梓翔",
-        "department": "製造一課",
-        "title": "工程師",
+        "employee_id": "",
+        "employee_name": "",
+        "department": "",
+        "title": "",
         "is_active": true,
         "is_in_factory": true,
         "is_today_attendance": true,
@@ -1125,11 +1125,24 @@
         "note": "",
         "created_at": "",
         "updated_at": ""
+      },
+      {
+        "id": "",
+        "employee_id": "SPT203",
+        "employee_name": "徐梓翔",
+        "department": "製造一課",
+        "title": "工程師",
+        "is_active": true,
+        "is_in_factory": true,
+        "is_today_attendance": false,
+        "note": "",
+        "created_at": "",
+        "updated_at": ""
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "employees": 86
+    "employees": 87
   }
 }
