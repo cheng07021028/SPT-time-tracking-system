@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-25 16:50:10",
-  "exported_at": "2026-05-25 16:50:10",
+  "updated_at": "2026-05-25 16:50:12",
+  "exported_at": "2026-05-25 16:50:12",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 13320,
+        "source": "v103_merge",
+        "username": "B210",
+        "display_name": "黃承淮",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "11_login_logs:can_view",
+        "module_code": "11_login_logs",
+        "login_time": "2026-05-25 16:50:11",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-25 16:50:11"
+      },
+      {
+        "id": 13146,
+        "source": "v103_merge",
+        "username": "B210",
+        "display_name": "黃承淮",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "11_login_logs:can_view",
+        "module_code": "11_login_logs",
+        "login_time": "2026-05-25 16:50:10",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-25 16:50:10"
+      },
       {
         "id": 12801,
         "source": "v103_merge",
@@ -2766,7 +2798,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 172,
+    "login_logs": 174,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
