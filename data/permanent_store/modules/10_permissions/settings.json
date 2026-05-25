@@ -2,19 +2,19 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "settings",
-  "updated_at": "2026-05-23 00:16:03",
-  "exported_at": "2026-05-23 00:16:03",
+  "updated_at": "2026-05-25 08:46:08",
+  "exported_at": "2026-05-25 08:46:08",
   "reason": "v101_idle_timeout_settings",
   "empty_authoritative": false,
   "tables": {},
   "settings": {
-    "idle_timeout_minutes": "3",
+    "idle_timeout_minutes": "1",
     "ask_continue_after_record": "1",
     "security_settings": {
-      "idle_timeout_minutes": "3",
+      "idle_timeout_minutes": "1",
       "ask_continue_after_record": "1"
     },
-    "updated_at": "2026-05-23 00:16:02"
+    "updated_at": "2026-05-25 08:46:08"
   },
   "table_counts": {}
 }
