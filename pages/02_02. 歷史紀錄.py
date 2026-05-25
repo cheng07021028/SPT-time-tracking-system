@@ -17,7 +17,7 @@ from services.time_record_service import (
     import_time_records,
 )
 from services.master_data_service import load_employees, load_work_orders
-from services.table_ui_service import render_table, label_for, render_width_settings
+from services.table_ui_service import render_table, render_width_settings, label_for
 from services.duration_service import hours_to_hms
 from services.history_filter_service import load_history_filters, save_history_filters, reset_history_filters
 
@@ -1162,15 +1162,6 @@ tab1, tab2, tab3 = st.tabs(["歷史明細編輯", "Excel 匯入", "貼上資料"
 
 with tab1:
     st.subheader("歷史明細編輯 / Editable History")
-    # V114：02 歷史明細編輯新增欄寬設定 / Column Width Settings。
-    # 僅呼叫既有共用 table_ui_service 欄寬工具，設定以 table_key=history_records
-    # 寫入既有永久欄位設定權威檔，不改 02 儲存、重算、刪除、匯入與貼上流程。
-    if isinstance(df, pd.DataFrame) and not df.empty:
-        render_width_settings(
-            "history_records",
-            df,
-            title="02 歷史明細編輯欄寬設定 / Column Width Settings",
-        )
     if not can_edit:
         st.info("目前帳號只有查詢權限；若需修改或刪除歷史紀錄，請由管理員在權限管理開放 02 歷史紀錄的編輯/刪除權限。")
         _render_history_view_table(df, "history_records", height=520)
@@ -1258,6 +1249,15 @@ with tab1:
             edit_df = _with_history_cross_day_edit_marker(edit_df)
             edit_df.insert(0, delete_col_label, edit_df["id"].map(lambda x: _id_in_state(x, delete_ids_state)) if "id" in edit_df.columns else False)
             edit_df.insert(1, recalc_col_label, edit_df["id"].map(lambda x: _id_in_state(x, recalc_ids_state)) if "id" in edit_df.columns else False)
+
+            # V116：02 歷史明細編輯也要使用正式欄寬/欄位順序設定。
+            # 注意：只顯示設定工具，不改儲存、重算、刪除與資料同步流程。
+            # table_key 必須與下方 render_table 相同，確保 Reboot 後由同一權威檔讀回。
+            render_width_settings(
+                "history_records",
+                edit_df,
+                title="02 歷史明細編輯欄寬設定 / Column Width Settings",
+            )
 
             editor_key = f"history_editor_v27_{st.session_state[editor_version_key]}"
             history_draft_key = "history_records_edited_draft_v58"

@@ -38,6 +38,18 @@ def canonical_table_key(table_key: Any, *, kind: str = "table") -> str:
     if "start_conflicting_active_records" in text:
         return "01.time_records.conflicts"
 
+    # 02｜歷史紀錄
+    # V116：歷史明細編輯的欄寬/欄位順序必須有固定 canonical key，
+    # 避免 history_records、02_history、不同 editor key 在 Reboot 後互相讀不到設定。
+    if (
+        "history_records" in text
+        or "editable_history" in text
+        or "02_history" in text
+        or "02.history" in text
+        or "歷史紀錄" in text
+    ):
+        return "02.history.records"
+
     # 10｜權限管理
     if "v171_account_password_editor" in text or "account_password_editor" in text or "account_master" in low:
         return "10.permissions.account_master"
@@ -342,6 +354,7 @@ import time as _v366_time
 _V366_STATE_FILE = PROJECT_ROOT / "data" / "persistent_state" / "spt_table_persistence.json"
 _V366_MODULE_FILES = {
     "01": PROJECT_ROOT / "data" / "persistent_modules" / "01_time_records" / "table_persistence.json",
+    "02": PROJECT_ROOT / "data" / "persistent_modules" / "02_history" / "table_persistence.json",
     "10": PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "table_persistence.json",
     "13": PROJECT_ROOT / "data" / "persistent_modules" / "13_system_settings" / "table_persistence.json",
     "ui": PROJECT_ROOT / "data" / "persistent_modules" / "ui_table_settings" / "table_persistence.json",
@@ -360,6 +373,8 @@ def _v366_module_code_for_key(key: str) -> str:
     k = canonical_table_key(key)
     if k.startswith("01."):
         return "01"
+    if k.startswith("02."):
+        return "02"
     if k.startswith("10."):
         return "10"
     if k.startswith("13."):
@@ -1190,3 +1205,89 @@ def migrate_legacy_table_settings_to_master(*, write: bool = False) -> dict[str,
         "write": False,
     }
 # ======================= END V72 Stable Table Persistence Fix =======================
+
+
+# ========================= V116 02 History Table Settings Authority Write-Through =========================
+# 問題：02 歷史明細編輯欄寬/欄位順序若只留在 SQLite 或舊 ui shard，
+# Reboot App 後可能讀不到，造成欄位順序恢復預設。
+# 原則：
+# 1. table_persistence 仍維持原本快速本機 JSON。
+# 2. 儲存欄寬/順序時，另同步寫入 canonical 權威檔
+#    data/permanent_store/modules/ui_table_settings/settings.json。
+# 3. 讀取時優先讀 canonical 權威檔；沒有才 fallback 原本 direct JSON / SQLite。
+# 4. 新增 02.history.records 固定 key，不影響 01/10/11/13 既有功能。
+
+_v116_prev_load_table_settings = load_table_settings
+_v116_prev_save_table_settings = save_table_settings
+
+def _v116_authority_settings_payload() -> dict[str, Any]:
+    try:
+        from services.permanent_authority_service import load_settings
+        data = load_settings("ui_table_settings")
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def _v116_authority_table_settings() -> dict[str, Any]:
+    data = _v116_authority_settings_payload()
+    table_settings = data.get("table_settings") if isinstance(data.get("table_settings"), dict) else {}
+    return {canonical_table_key(k): v for k, v in dict(table_settings or {}).items() if isinstance(v, dict)}
+
+def _v116_save_table_authority_snapshot(reason: str = "v116_table_settings_saved") -> dict[str, Any]:
+    try:
+        payload = _v366_load_all_direct()
+        table_settings = {canonical_table_key(k): v for k, v in dict(payload.get("table_settings") or {}).items() if isinstance(v, dict)}
+        column_settings = {canonical_table_key(k): v for k, v in dict(payload.get("column_settings") or {}).items() if isinstance(v, dict)}
+        from services.permanent_authority_service import save_settings
+        return save_settings(
+            "ui_table_settings",
+            {
+                "version": "V116-table-settings-authority",
+                "source": "services.table_persistence_service",
+                "table_settings": table_settings,
+                "column_settings": column_settings,
+                "updated_at": _v366_now_text(),
+            },
+            reason=reason,
+            github=True,
+        )
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300], "reason": reason}
+
+def load_table_settings(table_key: Any) -> dict[str, Any]:  # type: ignore[override]
+    key = canonical_table_key(table_key)
+    auth_tables = _v116_authority_table_settings()
+    data = auth_tables.get(key) if isinstance(auth_tables, dict) else None
+    if isinstance(data, dict) and (_normalize_widths(data.get("widths", {})) or _normalize_order(data.get("order", [])) or isinstance(data.get("sort"), dict)):
+        return {
+            "table_key": key,
+            "widths": _normalize_widths(data.get("widths", {})),
+            "order": _normalize_order(data.get("order", [])),
+            "sort": data.get("sort", {}) if isinstance(data.get("sort"), dict) else {},
+        }
+    return _v116_prev_load_table_settings(table_key)
+
+def save_table_settings(table_key: Any, *, widths: dict[str, int] | None = None, order: Iterable[str] | None = None, sort: dict[str, Any] | None = None, reason: str = "table_settings_saved") -> dict[str, Any]:  # type: ignore[override]
+    key = canonical_table_key(table_key)
+    res = _v116_prev_save_table_settings(key, widths=widths, order=order, sort=sort, reason=reason)
+    auth = _v116_save_table_authority_snapshot(reason=f"v116_{reason}_{key}")
+    if isinstance(res, dict):
+        res = dict(res)
+        res["authority"] = auth
+        res["canonical_key"] = key
+    return res
+
+def debug_table_settings_authority(table_key: Any = "history_records") -> dict[str, Any]:
+    """Small diagnostic helper used by regression tests and support reports."""
+    key = canonical_table_key(table_key)
+    direct = _v116_prev_load_table_settings(key)
+    auth = load_table_settings(key)
+    return {
+        "table_key": key,
+        "direct_widths": direct.get("widths", {}) if isinstance(direct, dict) else {},
+        "direct_order": direct.get("order", []) if isinstance(direct, dict) else [],
+        "authority_widths": auth.get("widths", {}) if isinstance(auth, dict) else {},
+        "authority_order": auth.get("order", []) if isinstance(auth, dict) else [],
+        "authority_file": "data/permanent_store/modules/ui_table_settings/settings.json",
+    }
+# ======================= END V116 02 History Table Settings Authority Write-Through =======================
