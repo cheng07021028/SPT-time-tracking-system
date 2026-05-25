@@ -3364,3 +3364,239 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 
 require_permission = require_module_access
 # =================== END V106 FORCE PASSWORD CHANGE AUTHORITY UI FIX ===================
+
+# ===================== V111 CANONICAL MODULE PERMISSION EXECUTION FIX =====================
+# 修正目的：
+# 1) 10｜權限管理「帳號模組權限 / Account Module Permissions」已寫入 canonical 權威檔，
+#    但實際進入模組仍可能讀 SQLite 舊快取，造成 operator/B002 等帳號無法進入 01。
+# 2) 模組頁使用 01_time_record 這類 runtime code，10 權限頁保存 01/02 代碼；本段統一映射。
+# 3) 不做 GitHub、不掃 history、不重建矩陣，只讀 data/permanent_store/modules/10_permissions/records.json。
+
+try:
+    _v111_prev_check_permission = check_permission  # type: ignore[name-defined]
+except Exception:
+    _v111_prev_check_permission = None
+try:
+    _v111_prev_require_module_access = require_module_access  # type: ignore[name-defined]
+except Exception:
+    _v111_prev_require_module_access = None
+
+
+def _v111_truthy(v: Any, default: bool = False) -> bool:
+    if v is None:
+        return default
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return bool(v)
+    t = str(v).strip().lower()
+    if t in {"1", "true", "yes", "y", "on", "是", "啟用", "active", "checked"}:
+        return True
+    if t in {"0", "false", "no", "n", "off", "否", "停用", "inactive", "", "nan", "none"}:
+        return False
+    return default
+
+
+def _v111_load_permission_authority_tables() -> dict[str, list[dict[str, Any]]]:
+    try:
+        from services.permanent_authority_service import load_tables as _pa_load_tables
+        tables = _pa_load_tables("10_permissions", "records")
+        if isinstance(tables, dict) and (tables.get("auth_users") or tables.get("auth_account_permissions")):
+            return {str(k): list(v) if isinstance(v, list) else [] for k, v in tables.items()}
+    except Exception:
+        pass
+    try:
+        path = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json"
+        if path.exists() and path.stat().st_size > 2:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            tables = payload.get("tables") if isinstance(payload, dict) else {}
+            if isinstance(tables, dict):
+                return {str(k): list(v) if isinstance(v, list) else [] for k, v in tables.items()}
+    except Exception:
+        pass
+    return {}
+
+
+def _v111_deleted_users() -> set[str]:
+    deleted: set[str] = set()
+    try:
+        from services.permanent_authority_service import load_authority as _pa_load_authority
+        payload = _pa_load_authority("10_permissions", "records")
+        raw = payload.get("deleted_usernames") if isinstance(payload, dict) else []
+        if isinstance(raw, list):
+            deleted |= {str(x).strip().lower() for x in raw if str(x).strip()}
+    except Exception:
+        pass
+    try:
+        path = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json"
+        if path.exists() and path.stat().st_size > 2:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            raw = payload.get("deleted_usernames") if isinstance(payload, dict) else []
+            if isinstance(raw, list):
+                deleted |= {str(x).strip().lower() for x in raw if str(x).strip()}
+    except Exception:
+        pass
+    deleted.discard("admin")
+    return deleted
+
+
+def _v111_username_from_row(row: dict[str, Any]) -> str:
+    return str(row.get("username") or row.get("帳號") or row.get("帳號 / Username") or "").strip()
+
+
+def _v111_role_from_row(row: dict[str, Any] | None, username: str = "") -> str:
+    if not row:
+        return "admin" if str(username).strip().lower() == "admin" else "operator"
+    role = str(row.get("role_code") or row.get("role") or row.get("角色") or row.get("角色 / Role") or "").strip().lower()
+    return role or ("admin" if _v111_username_from_row(row).lower() == "admin" else "operator")
+
+
+def _v111_find_authority_user(username: str, tables: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, Any] | None:
+    uname = str(username or "").strip().lower()
+    if not uname or uname in _v111_deleted_users():
+        return None
+    tables = tables if isinstance(tables, dict) else _v111_load_permission_authority_tables()
+    for table_name in ("auth_users", "security_users"):
+        for row in tables.get(table_name, []) or []:
+            if isinstance(row, dict) and _v111_username_from_row(row).lower() == uname:
+                return dict(row)
+    return None
+
+
+def _v111_module_no(module_code: str) -> str:
+    raw = str(module_code or "").strip()
+    if not raw:
+        return ""
+    if raw in MODULE_CODE_TO_NO:
+        return str(MODULE_CODE_TO_NO.get(raw) or "").zfill(2)
+    if raw in MODULE_NO_TO_CODE:
+        return raw.zfill(2)
+    # Accept labels such as "01 工時紀錄" or "01_time_record" style strings.
+    head = raw.split(" ", 1)[0].split("/", 1)[0].strip()
+    if head in MODULE_CODE_TO_NO:
+        return str(MODULE_CODE_TO_NO.get(head) or "").zfill(2)
+    digits = "".join(ch for ch in head if ch.isdigit())
+    if digits:
+        return digits.zfill(2)[-2:]
+    return raw
+
+
+def _v111_module_runtime_code(module_code: str) -> str:
+    no = _v111_module_no(module_code)
+    if no in MODULE_NO_TO_CODE:
+        return MODULE_NO_TO_CODE[no]
+    raw = str(module_code or "").strip()
+    return raw
+
+
+def _v111_permission_row(username: str, module_code: str, tables: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, Any] | None:
+    uname = str(username or "").strip().lower()
+    target_no = _v111_module_no(module_code)
+    target_runtime = _v111_module_runtime_code(module_code)
+    if not uname or not target_no:
+        return None
+    tables = tables if isinstance(tables, dict) else _v111_load_permission_authority_tables()
+    for row in tables.get("auth_account_permissions", []) or []:
+        if not isinstance(row, dict):
+            continue
+        ru = str(row.get("username") or row.get("帳號") or row.get("帳號 / Username") or "").strip().lower()
+        if ru != uname:
+            continue
+        rm_raw = str(row.get("module_code") or row.get("模組代碼") or row.get("module") or "").strip()
+        rm_no = _v111_module_no(rm_raw)
+        rm_runtime = _v111_module_runtime_code(rm_raw)
+        if rm_no == target_no or rm_runtime == target_runtime or rm_raw == module_code:
+            return dict(row)
+    return None
+
+
+def _v111_row_permissions(row: dict[str, Any] | None) -> dict[str, bool]:
+    out = {c: False for c in PERMISSION_COLUMNS}
+    if not row:
+        return out
+    for c in PERMISSION_COLUMNS:
+        out[c] = _v111_truthy(row.get(c, row.get(c.replace("can_", ""), False)), False)
+    if out.get("can_manage"):
+        return {c: True for c in PERMISSION_COLUMNS}
+    return out
+
+
+def _v111_role_default_permissions(role: str, module_code: str) -> dict[str, bool]:
+    try:
+        vals = _role_perm_template(str(role or "operator"), _v111_module_runtime_code(module_code))
+        return {c: _v111_truthy(vals.get(c, False), False) for c in PERMISSION_COLUMNS}
+    except Exception:
+        return {c: False for c in PERMISSION_COLUMNS}
+
+
+def _v111_session_user() -> tuple[str, list[str]]:
+    try:
+        username = str(st.session_state.get("auth_username") or st.session_state.get("username") or st.session_state.get("current_user") or "").strip()
+        roles = st.session_state.get("auth_roles", []) or []
+        if isinstance(roles, str):
+            roles = [roles]
+        roles = [str(x).strip().lower() for x in roles if str(x).strip()]
+        return username, roles
+    except Exception:
+        return "", []
+
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    """V111: runtime permission is executed from 10_permissions canonical authority.
+
+    10｜權限管理保存的帳號模組權限使用 01/02...；頁面使用 01_time_record...
+    本函式直接讀 canonical 權威檔並統一映射，避免 SQLite 舊快取造成 operator 無法進入 01。
+    """
+    try:
+        if not st.session_state.get("auth_logged_in"):
+            return False
+    except Exception:
+        return False
+    username, session_roles = _v111_session_user()
+    if not username:
+        return False
+    if action not in PERMISSION_COLUMNS:
+        action = "can_view"
+
+    tables = _v111_load_permission_authority_tables()
+    authority_user = _v111_find_authority_user(username, tables)
+    if authority_user is not None:
+        if not _v111_truthy(authority_user.get("is_active", authority_user.get("啟用", authority_user.get("啟用 / Active", True))), True):
+            return False
+        role = _v111_role_from_row(authority_user, username)
+    else:
+        role = session_roles[0] if session_roles else ("admin" if username.lower() == "admin" else "operator")
+
+    if _is_admin_user(username, [role] + session_roles):
+        return True
+
+    row = _v111_permission_row(username, module_code, tables)
+    if row is not None:
+        perms = _v111_row_permissions(row)
+    elif authority_user is not None:
+        # If account exists but one module row is missing, use the role preset instead of denying everything.
+        perms = _v111_role_default_permissions(role, module_code)
+    else:
+        # Last fallback for legacy deployments without canonical authority.
+        try:
+            if callable(_v111_prev_check_permission):
+                return bool(_v111_prev_check_permission(module_code, action))
+        except Exception:
+            pass
+        perms = _v111_role_default_permissions(role, module_code)
+
+    if perms.get("can_manage"):
+        return True
+    return bool(perms.get(action, False))
+
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    require_login(module_code)
+    if not check_permission(module_code, action):
+        log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
+        st.error("權限不足：你的帳號未被授權使用此模組或功能。")
+        st.stop()
+
+
+require_permission = require_module_access
+# =================== END V111 CANONICAL MODULE PERMISSION EXECUTION FIX ===================

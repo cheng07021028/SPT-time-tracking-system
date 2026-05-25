@@ -5486,3 +5486,129 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
 
 check_permission = has_permission
 # ======================= END V101 PERMISSION SECURITY + ACCOUNT SAFETY FIX =======================
+
+# ===================== V111 PERMISSION MATRIX SAVE-MERGE FIX =====================
+# 修正目的：
+# 10｜權限管理「帳號模組權限」使用篩選後儲存時，舊版 save_account_permissions 會用目前畫面 rows
+# 直接覆蓋整張 auth_account_permissions，導致其他帳號/模組權限被清空，實際執行時出現 operator
+# 無法進入 01 等問題。本段改為「依 username + module_code 合併更新」，未出現在本次畫面的權限保留。
+
+try:
+    _v111_prev_save_account_permissions = save_account_permissions  # type: ignore[name-defined]
+except Exception:
+    _v111_prev_save_account_permissions = None
+
+
+def _v111_perm_truthy(v, default: bool = False) -> bool:
+    try:
+        return _truthy(v, default)  # type: ignore[name-defined]
+    except Exception:
+        if v is None:
+            return default
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, (int, float)):
+            return bool(v)
+        t = str(v).strip().lower()
+        if t in {"1", "true", "yes", "y", "on", "是", "啟用", "active", "checked"}:
+            return True
+        if t in {"0", "false", "no", "n", "off", "否", "停用", "inactive", "", "nan", "none"}:
+            return False
+        return default
+
+
+def _v111_perm_module_no(value) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    # Permission-service MODULES are 01/02..., but accept runtime codes from security_service too.
+    runtime_to_no = {
+        "01_time_record": "01", "02_history": "02", "03_work_orders": "03", "04_employees": "04",
+        "05_analysis": "05", "06_logs": "06", "07_missing": "07", "08_daily_hours": "08",
+        "09_persistence": "09", "10_permissions": "10", "11_login_logs": "11",
+        "12_module_persistence": "12", "13_system_settings": "13",
+    }
+    if raw in runtime_to_no:
+        return runtime_to_no[raw]
+    head = raw.split(" ", 1)[0].split("/", 1)[0].strip()
+    if head in runtime_to_no:
+        return runtime_to_no[head]
+    digits = "".join(ch for ch in head if ch.isdigit())
+    if digits:
+        return digits.zfill(2)[-2:]
+    return raw.zfill(2) if raw.isdigit() else raw
+
+
+def _v111_perm_module_info(module_no: str) -> dict:
+    no = _v111_perm_module_no(module_no)
+    for m in MODULES:
+        if _v111_perm_module_no(m.get("module_code")) == no:
+            return dict(m)
+    return {"module_code": no, "module_name_zh": "", "module_name_en": ""}
+
+
+def save_account_permissions(rows: _V94Iterable[dict]) -> int:  # type: ignore[override]
+    payload = _v96_auth_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {k: [] for k in _V96_AUTH_TABLES}
+    deleted = _v96_deleted(payload)
+
+    # Existing authority rows are preserved unless the same (username,module_code) is submitted.
+    existing: dict[tuple[str, str], dict] = {}
+    for r in tables.get("auth_account_permissions", []) if isinstance(tables.get("auth_account_permissions", []), list) else []:
+        if not isinstance(r, dict):
+            continue
+        username = str(r.get("username") or "").strip()
+        module_no = _v111_perm_module_no(r.get("module_code"))
+        if not username or not module_no or username.lower() in deleted:
+            continue
+        x = dict(r)
+        x["username"] = username
+        x["module_code"] = module_no
+        existing[(username.lower(), module_no)] = x
+
+    saved = 0
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        username = str(r.get("username") or r.get("帳號 / Username") or r.get("帳號") or "").strip()
+        module_no = _v111_perm_module_no(r.get("module_code") or r.get("模組代碼 / Module Code") or r.get("模組代碼"))
+        if not username or not module_no or username.lower() in deleted:
+            continue
+        mod = _v111_perm_module_info(module_no)
+        x = dict(existing.get((username.lower(), module_no), {}))
+        x.update({
+            "username": username,
+            "module_code": module_no,
+            "module_name_zh": str(r.get("module_name_zh") or r.get("模組中文 / Module Chinese") or x.get("module_name_zh") or mod.get("module_name_zh") or ""),
+            "module_name_en": str(r.get("module_name_en") or r.get("模組英文 / Module English") or x.get("module_name_en") or mod.get("module_name_en") or ""),
+            "updated_at": _v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text(),
+        })
+        for k, _, _ in ACTIONS:
+            x[k] = 1 if _v111_perm_truthy(r.get(k, x.get(k, False)), False) else 0
+        existing[(username.lower(), module_no)] = x
+        saved += 1
+
+    # Ensure every active account keeps a full 13-module matrix, without overwriting explicit rows.
+    users = [dict(u) for u in tables.get("auth_users", []) if isinstance(u, dict)] if isinstance(tables.get("auth_users", []), list) else []
+    for u in users:
+        username = str(u.get("username") or "").strip()
+        if not username or username.lower() in deleted:
+            continue
+        role = str(u.get("role_code") or u.get("role") or "operator").strip() or "operator"
+        for p in _v96_default_permission_rows_for_user(username, role):
+            module_no = _v111_perm_module_no(p.get("module_code"))
+            existing.setdefault((username.lower(), module_no), dict(p))
+
+    final_rows = sorted(existing.values(), key=lambda x: (str(x.get("username", "")).lower(), int(_v111_perm_module_no(x.get("module_code")) or 0)))
+    tables["auth_account_permissions"] = final_rows
+    payload["tables"] = tables
+    result = _v96_write_payload(payload, "v111_save_account_permissions_merge", github=True)
+    _v96_best_effort_restore_cache(payload)
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    return saved
+
+check_permission = has_permission
+# =================== END V111 PERMISSION MATRIX SAVE-MERGE FIX ===================
