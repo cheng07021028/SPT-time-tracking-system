@@ -5487,349 +5487,242 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
 check_permission = has_permission
 # ======================= END V101 PERMISSION SECURITY + ACCOUNT SAFETY FIX =======================
 
-# ===================== V111 PERMISSION MATRIX SAVE-MERGE FIX =====================
-# 修正目的：
-# 10｜權限管理「帳號模組權限」使用篩選後儲存時，舊版 save_account_permissions 會用目前畫面 rows
-# 直接覆蓋整張 auth_account_permissions，導致其他帳號/模組權限被清空，實際執行時出現 operator
-# 無法進入 01 等問題。本段改為「依 username + module_code 合併更新」，未出現在本次畫面的權限保留。
 
-try:
-    _v111_prev_save_account_permissions = save_account_permissions  # type: ignore[name-defined]
-except Exception:
-    _v111_prev_save_account_permissions = None
+# ========================= V118 PERMISSION SERVICE CANONICAL ROLE EXECUTION FIX =========================
+# 目的：10｜權限管理的帳號模組權限必須作為唯一權威；has_permission/save/delete 需保護預設帳號並相容 01_time_record 這類模組代碼。
+
+_V118_PROTECTED_DEFAULT_ACCOUNTS = {"admin", "manager", "leader", "operator", "viewer", "auditor"}
+_V118_MODULE_ALIAS_TO_NO = {
+    "01": "01", "1": "01", "01_time_record": "01", "01_time_records": "01", "time_record": "01", "time_records": "01", "工時紀錄": "01",
+    "02": "02", "2": "02", "02_history": "02", "history": "02", "歷史紀錄": "02",
+    "03": "03", "3": "03", "03_work_orders": "03", "work_orders": "03", "製令管理": "03",
+    "04": "04", "4": "04", "04_employees": "04", "employees": "04", "人員名單": "04",
+    "05": "05", "5": "05", "05_analysis": "05", "analysis": "05", "製令工時分析": "05",
+    "06": "06", "6": "06", "06_logs": "06", "logs": "06", "log": "06", "LOG查詢": "06", "log查詢": "06",
+    "07": "07", "7": "07", "07_missing": "07", "07_missing_records": "07", "missing": "07", "今日未紀錄名單": "07",
+    "08": "08", "8": "08", "08_daily_hours": "08", "daily_hours": "08", "人員每日工時": "08",
+    "09": "09", "9": "09", "09_persistence": "09", "persistence": "09", "資料永久保存與備份": "09",
+    "10": "10", "10_permissions": "10", "permissions": "10", "權限管理": "10",
+    "11": "11", "11_login_logs": "11", "login_logs": "11", "登入紀錄": "11",
+    "12": "12", "12_module_persistence": "12", "module_persistence": "12", "模組永久紀錄中心": "12",
+    "13": "13", "13_system_settings": "13", "system_settings": "13", "系統設定": "13",
+}
 
 
-def _v111_perm_truthy(v, default: bool = False) -> bool:
+def _v118_norm_username(v: object) -> str:
+    return str(v or "").strip().lower()
+
+
+def _v118_truthy(v: object, default: bool = False) -> bool:
     try:
-        return _truthy(v, default)  # type: ignore[name-defined]
+        return bool(_v101_truthy_value(v, default))  # type: ignore[name-defined]
     except Exception:
-        if v is None:
-            return default
-        if isinstance(v, bool):
-            return v
-        if isinstance(v, (int, float)):
-            return bool(v)
-        t = str(v).strip().lower()
-        if t in {"1", "true", "yes", "y", "on", "是", "啟用", "active", "checked"}:
-            return True
-        if t in {"0", "false", "no", "n", "off", "否", "停用", "inactive", "", "nan", "none"}:
-            return False
+        pass
+    if v is None:
+        return default
+    t = str(v).strip().lower()
+    if t in {"1", "true", "yes", "y", "on", "是", "是 / yes", "啟用", "active", "啟用 / active"}:
+        return True
+    if t in {"0", "false", "no", "n", "off", "否", "否 / no", "停用", "inactive", ""}:
+        return False
+    try:
+        return bool(int(float(t)))
+    except Exception:
         return default
 
 
-def _v111_perm_module_no(value) -> str:
-    raw = str(value or "").strip()
+def _v118_module_no(module_code: object) -> str:
+    raw = str(module_code or "").strip()
     if not raw:
         return ""
-    # Permission-service MODULES are 01/02..., but accept runtime codes from security_service too.
-    runtime_to_no = {
-        "01_time_record": "01", "02_history": "02", "03_work_orders": "03", "04_employees": "04",
-        "05_analysis": "05", "06_logs": "06", "07_missing": "07", "08_daily_hours": "08",
-        "09_persistence": "09", "10_permissions": "10", "11_login_logs": "11",
-        "12_module_persistence": "12", "13_system_settings": "13",
-    }
-    if raw in runtime_to_no:
-        return runtime_to_no[raw]
-    head = raw.split(" ", 1)[0].split("/", 1)[0].strip()
-    if head in runtime_to_no:
-        return runtime_to_no[head]
-    digits = "".join(ch for ch in head if ch.isdigit())
-    if digits:
-        return digits.zfill(2)[-2:]
+    if raw in _V118_MODULE_ALIAS_TO_NO:
+        return _V118_MODULE_ALIAS_TO_NO[raw]
+    low = raw.lower()
+    if low in _V118_MODULE_ALIAS_TO_NO:
+        return _V118_MODULE_ALIAS_TO_NO[low]
+    import re as _v118_re
+    m = _v118_re.search(r"(\d{1,2})", raw)
+    if m:
+        try:
+            n = int(m.group(1))
+            if 1 <= n <= 13:
+                return f"{n:02d}"
+        except Exception:
+            pass
     return raw.zfill(2) if raw.isdigit() else raw
 
 
-def _v111_perm_module_info(module_no: str) -> dict:
-    no = _v111_perm_module_no(module_no)
-    for m in MODULES:
-        if _v111_perm_module_no(m.get("module_code")) == no:
-            return dict(m)
-    return {"module_code": no, "module_name_zh": "", "module_name_en": ""}
-
-
-def save_account_permissions(rows: _V94Iterable[dict]) -> int:  # type: ignore[override]
-    payload = _v96_auth_payload()
-    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {k: [] for k in _V96_AUTH_TABLES}
-    deleted = _v96_deleted(payload)
-
-    # Existing authority rows are preserved unless the same (username,module_code) is submitted.
-    existing: dict[tuple[str, str], dict] = {}
-    for r in tables.get("auth_account_permissions", []) if isinstance(tables.get("auth_account_permissions", []), list) else []:
-        if not isinstance(r, dict):
-            continue
-        username = str(r.get("username") or "").strip()
-        module_no = _v111_perm_module_no(r.get("module_code"))
-        if not username or not module_no or username.lower() in deleted:
-            continue
-        x = dict(r)
-        x["username"] = username
-        x["module_code"] = module_no
-        existing[(username.lower(), module_no)] = x
-
-    saved = 0
-    for r in rows or []:
-        if not isinstance(r, dict):
-            continue
-        username = str(r.get("username") or r.get("帳號 / Username") or r.get("帳號") or "").strip()
-        module_no = _v111_perm_module_no(r.get("module_code") or r.get("模組代碼 / Module Code") or r.get("模組代碼"))
-        if not username or not module_no or username.lower() in deleted:
-            continue
-        mod = _v111_perm_module_info(module_no)
-        x = dict(existing.get((username.lower(), module_no), {}))
-        x.update({
-            "username": username,
-            "module_code": module_no,
-            "module_name_zh": str(r.get("module_name_zh") or r.get("模組中文 / Module Chinese") or x.get("module_name_zh") or mod.get("module_name_zh") or ""),
-            "module_name_en": str(r.get("module_name_en") or r.get("模組英文 / Module English") or x.get("module_name_en") or mod.get("module_name_en") or ""),
-            "updated_at": _v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text(),
-        })
-        for k, _, _ in ACTIONS:
-            x[k] = 1 if _v111_perm_truthy(r.get(k, x.get(k, False)), False) else 0
-        existing[(username.lower(), module_no)] = x
-        saved += 1
-
-    # Ensure every active account keeps a full 13-module matrix, without overwriting explicit rows.
-    users = [dict(u) for u in tables.get("auth_users", []) if isinstance(u, dict)] if isinstance(tables.get("auth_users", []), list) else []
-    for u in users:
-        username = str(u.get("username") or "").strip()
-        if not username or username.lower() in deleted:
-            continue
-        role = str(u.get("role_code") or u.get("role") or "operator").strip() or "operator"
-        for p in _v96_default_permission_rows_for_user(username, role):
-            module_no = _v111_perm_module_no(p.get("module_code"))
-            existing.setdefault((username.lower(), module_no), dict(p))
-
-    final_rows = sorted(existing.values(), key=lambda x: (str(x.get("username", "")).lower(), int(_v111_perm_module_no(x.get("module_code")) or 0)))
-    tables["auth_account_permissions"] = final_rows
-    payload["tables"] = tables
-    result = _v96_write_payload(payload, "v111_save_account_permissions_merge", github=True)
-    _v96_best_effort_restore_cache(payload)
+def _v118_load_permission_tables() -> dict[str, list[dict]]:
     try:
-        clear_permission_runtime_cache()
+        from services.permanent_authority_service import load_tables as _pa_load_tables
+        tables = _pa_load_tables("10_permissions", "records")
+        if isinstance(tables, dict):
+            return {str(k): [dict(r) for r in v if isinstance(r, dict)] for k, v in tables.items() if isinstance(v, list)}
     except Exception:
         pass
-    return saved
-
-check_permission = has_permission
-# =================== END V111 PERMISSION MATRIX SAVE-MERGE FIX ===================
-
-
-# ===================== V112 PROTECTED DEFAULT ACCOUNTS SAFETY GUARD =====================
-# Fix: default role/account rows (admin / manager / leader / operator / viewer / auditor)
-# must never be disabled or deleted by accident.  This guard is intentionally placed at
-# the end of the service so it wraps all earlier V96-V111 functions without removing them.
-_V112_PROTECTED_DEFAULT_USERS = {"admin", "manager", "leader", "operator", "viewer", "auditor"}
-
-
-def _v112_is_protected_user(username) -> bool:
-    return str(username or "").strip().lower() in _V112_PROTECTED_DEFAULT_USERS
-
-
-def _v112_now_text() -> str:
+    p = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json"
     try:
-        return _v95_now_text_safe() if "_v95_now_text_safe" in globals() else now_text()
+        payload = json.loads(p.read_text(encoding="utf-8"))
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        return {str(k): [dict(r) for r in v if isinstance(r, dict)] for k, v in tables.items() if isinstance(v, list)} if isinstance(tables, dict) else {}
     except Exception:
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return {}
 
 
-def _v112_default_user_row(username: str) -> dict | None:
-    uname = str(username or "").strip().lower()
-    for u, pwd, zh, en, role, active in DEFAULT_USERS:
-        if str(u).strip().lower() == uname:
-            now = _v112_now_text()
-            return {
-                "username": u,
-                "password_hash": hash_password(pwd),
-                "password_hint": "V112 protected default account repair",
-                "password_display": "********",
-                "new_password": "",
-                "employee_id": "",
-                "display_name": zh or en or u,
-                "email": "",
-                "role_code": role or uname,
-                "is_active": 1,
-                "force_password_change": 0,
-                "note": "系統預設帳號，不可停用 / protected default account",
-                "created_at": now,
-                "updated_at": now,
-            }
+def _v118_find_user_row(username: str, tables: dict[str, list[dict]] | None = None) -> dict | None:
+    uname = _v118_norm_username(username)
+    tables = tables if isinstance(tables, dict) else _v118_load_permission_tables()
+    for table_name in ("auth_users", "security_users"):
+        for r in tables.get(table_name, []) or []:
+            if _v118_norm_username(r.get("username") or r.get("帳號") or r.get("帳號 / Username")) == uname:
+                return dict(r)
     return None
 
 
-def _v112_sanitize_auth_tables(payload: dict | None) -> tuple[dict, bool]:
-    payload = payload if isinstance(payload, dict) else {}
-    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {k: [] for k in _V96_AUTH_TABLES}
-    changed = False
-    # Protected accounts must not remain in deletion tombstone.
-    deleted = {str(x).strip().lower() for x in (payload.get("deleted_usernames") or []) if str(x).strip()}
-    new_deleted = {x for x in deleted if x not in _V112_PROTECTED_DEFAULT_USERS}
-    if new_deleted != deleted:
-        payload["deleted_usernames"] = sorted(new_deleted)
-        changed = True
-    for table_name in ("auth_users", "security_users"):
-        rows = tables.get(table_name, []) if isinstance(tables.get(table_name), list) else []
-        seen = set()
-        clean_rows = []
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            x = dict(row)
-            uname = str(x.get("username") or x.get("帳號") or x.get("帳號 / Username") or "").strip()
-            if not uname:
-                continue
-            low = uname.lower()
-            if low in seen:
-                changed = True
-                continue
-            seen.add(low)
-            if low in _V112_PROTECTED_DEFAULT_USERS:
-                before_active = x.get("is_active")
-                x["username"] = uname
-                x["is_active"] = 1
-                x["啟用"] = True
-                x["啟用 / Active"] = True
-                x.setdefault("role_code", low)
-                x.setdefault("display_name", uname)
-                x["updated_at"] = _v112_now_text()
-                if before_active not in (1, True, "1", "true", "True", "是", "啟用"):
-                    changed = True
-            clean_rows.append(x)
-        # If a protected default account was accidentally deleted from authority,
-        # restore a safe default row so at least the system can be recovered.
-        if table_name == "auth_users":
-            existing = {str(r.get("username") or "").strip().lower() for r in clean_rows if isinstance(r, dict)}
-            for uname in sorted(_V112_PROTECTED_DEFAULT_USERS):
-                if uname not in existing:
-                    row = _v112_default_user_row(uname)
-                    if row:
-                        clean_rows.append(row)
-                        changed = True
-        tables[table_name] = clean_rows
-    payload["tables"] = tables
-    return payload, changed
+def _v118_role_from_user(row: dict | None, username: str = "") -> str:
+    if row:
+        role = str(row.get("role_code") or row.get("role") or row.get("角色") or row.get("角色 / Role") or "").strip().lower()
+        if role:
+            return role
+    uname = _v118_norm_username(username)
+    return "admin" if uname == "admin" else "operator"
 
 
-def _v112_repair_protected_accounts(reason: str = "v112_repair") -> dict:
-    try:
-        payload = _v96_auth_payload() if "_v96_auth_payload" in globals() else {}
-        payload, changed = _v112_sanitize_auth_tables(payload)
-        if changed and "_v96_write_payload" in globals():
-            res = _v96_write_payload(payload, reason, github=True)
-            try:
-                _v96_best_effort_restore_cache(payload)
-            except Exception:
-                pass
-            return {"ok": True, "changed": True, "write": res}
-        return {"ok": True, "changed": False}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:300]}
+def _v118_user_active(row: dict | None, username: str = "") -> bool:
+    uname = _v118_norm_username(username or (row or {}).get("username"))
+    if uname in _V118_PROTECTED_DEFAULT_ACCOUNTS:
+        return True
+    if row is None:
+        return False
+    return _v118_truthy(row.get("is_active", row.get("啟用", row.get("啟用 / Active", True))), True)
 
 
-def _v112_sanitize_user_input_row(row: dict) -> dict:
-    x = dict(row or {})
-    username = str(x.get("username") or x.get("帳號 / Username") or x.get("帳號") or "").strip()
-    if _v112_is_protected_user(username):
-        x["username"] = username
-        x["is_active"] = 1
-        x["啟用"] = True
-        x["啟用 / Active"] = True
-        x["刪除 / Delete"] = False
-        # Keep each default account in its canonical role unless the admin explicitly changes
-        # non-protected custom accounts. This avoids disabling admin by role confusion.
-        if not str(x.get("role_code") or x.get("角色 / Role") or "").strip():
-            x["role_code"] = username.lower()
-    return x
+def _v118_permission_value(row: dict, action: str) -> bool:
+    if _v118_truthy(row.get("can_manage", row.get("管理", row.get("管理 / Manage", False))), False):
+        return True
+    keys = {
+        "can_view": ("can_view", "可進入", "可進入 / View", "view"),
+        "can_create": ("can_create", "新增", "新增 / Create", "create"),
+        "can_edit": ("can_edit", "編輯", "編輯 / Edit", "edit"),
+        "can_delete": ("can_delete", "刪除", "刪除 / Delete", "delete"),
+        "can_import": ("can_import", "匯入", "匯入 / Import", "import"),
+        "can_export": ("can_export", "匯出", "匯出 / Export", "export"),
+        "can_backup": ("can_backup", "備份", "備份 / Backup", "backup"),
+        "can_restore": ("can_restore", "還原", "還原 / Restore", "restore"),
+        "can_manage": ("can_manage", "管理", "管理 / Manage", "manage"),
+    }.get(action, (action,))
+    for k in keys:
+        if k in row:
+            return _v118_truthy(row.get(k), False)
+    return False
+
+
+def _v118_perm_row_for(rows: list[dict], username: str, module_no: str) -> dict | None:
+    uname = _v118_norm_username(username)
+    for r in rows:
+        if _v118_norm_username(r.get("username") or r.get("帳號") or r.get("帳號 / Username")) != uname:
+            continue
+        if _v118_module_no(r.get("module_code") or r.get("模組代碼 / Module Code") or r.get("模組代碼")) == module_no:
+            return dict(r)
+    return None
+
+
+def has_permission(username: str, module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    action = str(action or "can_view").strip()
+    if action not in [a[0] for a in ACTIONS]:
+        action = "can_view"
+    uname = _v118_norm_username(username)
+    if not uname:
+        return False
+    if uname == "admin":
+        return True
+    module_no = _v118_module_no(module_code)
+    tables = _v118_load_permission_tables()
+    user_row = _v118_find_user_row(uname, tables)
+    if not _v118_user_active(user_row, uname):
+        return False
+    role = _v118_role_from_user(user_row, uname)
+    if role == "admin":
+        return True
+    rows = tables.get("auth_account_permissions", []) or []
+    direct = _v118_perm_row_for(rows, uname, module_no)
+    if direct is not None:
+        return _v118_permission_value(direct, action)
+    if role:
+        role_row = _v118_perm_row_for(rows, role, module_no)
+        if role_row is not None:
+            return _v118_permission_value(role_row, action)
+    for r in rows:
+        if str(r.get("role_code") or r.get("角色 / Role") or "").strip().lower() != role:
+            continue
+        if _v118_module_no(r.get("module_code") or r.get("模組代碼 / Module Code") or r.get("模組代碼")) == module_no:
+            return _v118_permission_value(r, action)
+    return False
 
 
 try:
-    _v112_prev_get_users = get_users
+    _v118_prev_save_users = save_users
 except Exception:
-    _v112_prev_get_users = None
+    _v118_prev_save_users = None
+try:
+    _v118_prev_save_account_master = save_account_master
+except Exception:
+    _v118_prev_save_account_master = None
+try:
+    _v118_prev_delete_users = delete_users
+except Exception:
+    _v118_prev_delete_users = None
+try:
+    _v118_prev_save_account_permissions = save_account_permissions
+except Exception:
+    _v118_prev_save_account_permissions = None
 
 
-def get_users() -> List[dict]:  # type: ignore[override]
-    try:
-        _v112_repair_protected_accounts("v112_get_users_protected_repair")
-    except Exception:
-        pass
-    rows = _v112_prev_get_users() if callable(_v112_prev_get_users) else []
-    out = []
-    seen = set()
-    for r in rows or []:
+def _v118_protect_user_row(row: dict) -> dict:
+    r = dict(row)
+    uname = _v118_norm_username(r.get("username") or r.get("帳號 / Username") or r.get("帳號"))
+    if uname in _V118_PROTECTED_DEFAULT_ACCOUNTS:
+        r["is_active"] = 1
+        r["啟用"] = True
+        r["啟用 / Active"] = True
+    return r
+
+
+def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
+    safe = [_v118_protect_user_row(dict(r)) for r in (rows or []) if isinstance(r, dict)]
+    if callable(_v118_prev_save_users):
+        return _v118_prev_save_users(safe)
+    return {"saved": 0, "skipped": ["save_users unavailable"]}
+
+
+def save_account_master(rows: Iterable[dict], delete_usernames: Iterable[str] | None = None) -> dict:  # type: ignore[override]
+    safe_rows = [_v118_protect_user_row(dict(r)) for r in (rows or []) if isinstance(r, dict)]
+    safe_delete = [u for u in (delete_usernames or []) if _v118_norm_username(u) not in _V118_PROTECTED_DEFAULT_ACCOUNTS]
+    if callable(_v118_prev_save_account_master):
+        return _v118_prev_save_account_master(safe_rows, safe_delete)
+    return {"saved": 0, "deleted": 0, "skipped": ["save_account_master unavailable"]}
+
+
+def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
+    safe = [u for u in (usernames or []) if _v118_norm_username(u) not in _V118_PROTECTED_DEFAULT_ACCOUNTS]
+    if callable(_v118_prev_delete_users):
+        return int(_v118_prev_delete_users(safe))
+    return 0
+
+
+def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
+    # 正規化模組代碼，避免 01_time_record 與 01 混存造成執行端讀不到。
+    safe = []
+    for r in (rows or []):
         if not isinstance(r, dict):
             continue
         x = dict(r)
-        uname = str(x.get("username") or "").strip()
-        if not uname:
-            continue
-        if _v112_is_protected_user(uname):
-            x["is_active"] = 1
-            x["啟用"] = True
-            x["啟用 / Active"] = True
-        seen.add(uname.lower())
-        out.append(x)
-    for uname in sorted(_V112_PROTECTED_DEFAULT_USERS):
-        if uname not in seen:
-            row = _v112_default_user_row(uname)
-            if row:
-                out.append(row)
-    return sorted(out, key=lambda x: (0 if str(x.get("username", "")).lower() == "admin" else 1, str(x.get("username", "")).lower()))
+        x["module_code"] = _v118_module_no(x.get("module_code") or x.get("模組代碼 / Module Code") or x.get("模組代碼"))
+        safe.append(x)
+    if callable(_v118_prev_save_account_permissions):
+        return int(_v118_prev_save_account_permissions(safe))
+    return 0
 
 
-try:
-    _v112_prev_save_users = save_users
-except Exception:
-    _v112_prev_save_users = None
-
-
-def save_users(rows: _V94Iterable[dict]) -> dict:  # type: ignore[override]
-    clean = [_v112_sanitize_user_input_row(r) for r in (rows or []) if isinstance(r, dict)]
-    result = _v112_prev_save_users(clean) if callable(_v112_prev_save_users) else {"saved": len(clean), "skipped": []}
-    repair = _v112_repair_protected_accounts("v112_save_users_protected_repair")
-    try:
-        result["protected_repair"] = repair
-    except Exception:
-        pass
-    return result
-
-
-try:
-    _v112_prev_save_account_master = save_account_master
-except Exception:
-    _v112_prev_save_account_master = None
-
-
-def save_account_master(rows: _V94Iterable[dict], delete_usernames: _V94Iterable[str] | None = None) -> dict:  # type: ignore[override]
-    clean_delete = [u for u in (delete_usernames or []) if not _v112_is_protected_user(u)]
-    clean_rows = [_v112_sanitize_user_input_row(r) for r in (rows or []) if isinstance(r, dict)]
-    if callable(_v112_prev_save_account_master):
-        result = _v112_prev_save_account_master(clean_rows, delete_usernames=clean_delete)
-    else:
-        result = save_users(clean_rows)
-    repair = _v112_repair_protected_accounts("v112_save_account_master_protected_repair")
-    try:
-        result["protected_delete_blocked"] = len([u for u in (delete_usernames or []) if _v112_is_protected_user(u)])
-        result["protected_repair"] = repair
-    except Exception:
-        pass
-    return result
-
-
-try:
-    _v112_prev_delete_users = delete_users
-except Exception:
-    _v112_prev_delete_users = None
-
-
-def delete_users(usernames: _V94Iterable[str]) -> int:  # type: ignore[override]
-    targets = [u for u in (usernames or []) if not _v112_is_protected_user(u)]
-    deleted = _v112_prev_delete_users(targets) if callable(_v112_prev_delete_users) else 0
-    _v112_repair_protected_accounts("v112_delete_users_protected_repair")
-    return int(deleted or 0)
-
-# Keep alias stable for modules importing check_permission from permission_service.
-try:
-    check_permission = has_permission
-except Exception:
-    pass
-# =================== END V112 PROTECTED DEFAULT ACCOUNTS SAFETY GUARD ===================
+check_permission = has_permission
+# ======================= END V118 PERMISSION SERVICE CANONICAL ROLE EXECUTION FIX =======================

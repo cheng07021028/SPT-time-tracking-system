@@ -3366,79 +3366,320 @@ require_permission = require_module_access
 # =================== END V106 FORCE PASSWORD CHANGE AUTHORITY UI FIX ===================
 
 
-# ===================== V115 SECURITY EVENT CANONICAL LOGIN LOG FIX =====================
-# 目的：任何登入、登出、閒置登出、權限不足、強制改密碼事件，發生當下就要寫入
-#       11_login_logs canonical 權威檔。不能只寫 SQLite security_login_logs，否則
-#       Streamlit Cloud Reboot 後會看起來「沒有確實紀錄」。
+# ========================= V118 CANONICAL MODULE PERMISSION RUNTIME FIX =========================
+# 目的：10｜權限管理「帳號模組權限 / Account Module Permissions」必須真正控制 01～13 模組入口與按鈕。
+# 根因：舊版 check_permission 仍可能讀 SQLite / session_state 舊快取；權威檔已有 operator→01 權限時，仍被舊快取擋住。
+# 原則：登入與模組判斷一律優先讀 data/permanent_store/modules/10_permissions/records.json；SQLite 僅作相容快取。
+
+_V118_PROTECTED_DEFAULT_ACCOUNTS = {"admin", "manager", "leader", "operator", "viewer", "auditor"}
+_V118_MODULE_ALIAS_TO_NO = {
+    "01": "01", "1": "01", "01_time_record": "01", "01_time_records": "01", "time_record": "01", "time_records": "01", "工時紀錄": "01",
+    "02": "02", "2": "02", "02_history": "02", "history": "02", "歷史紀錄": "02",
+    "03": "03", "3": "03", "03_work_orders": "03", "work_orders": "03", "製令管理": "03",
+    "04": "04", "4": "04", "04_employees": "04", "employees": "04", "人員名單": "04",
+    "05": "05", "5": "05", "05_analysis": "05", "analysis": "05", "製令工時分析": "05",
+    "06": "06", "6": "06", "06_logs": "06", "logs": "06", "log": "06", "LOG查詢": "06", "log查詢": "06",
+    "07": "07", "7": "07", "07_missing": "07", "07_missing_records": "07", "missing": "07", "今日未紀錄名單": "07",
+    "08": "08", "8": "08", "08_daily_hours": "08", "daily_hours": "08", "人員每日工時": "08",
+    "09": "09", "9": "09", "09_persistence": "09", "persistence": "09", "資料永久保存與備份": "09",
+    "10": "10", "10_permissions": "10", "permissions": "10", "權限管理": "10",
+    "11": "11", "11_login_logs": "11", "login_logs": "11", "登入紀錄": "11",
+    "12": "12", "12_module_persistence": "12", "module_persistence": "12", "模組永久紀錄中心": "12",
+    "13": "13", "13_system_settings": "13", "system_settings": "13", "系統設定": "13",
+}
+_V118_MODULE_NO_TO_RUNTIME = {
+    "01": "01_time_record", "02": "02_history", "03": "03_work_orders", "04": "04_employees", "05": "05_analysis",
+    "06": "06_logs", "07": "07_missing", "08": "08_daily_hours", "09": "09_persistence", "10": "10_permissions",
+    "11": "11_login_logs", "12": "12_module_persistence", "13": "13_system_settings",
+}
+
+
+def _v118_norm_username(v: object) -> str:
+    return str(v or "").strip().lower()
+
+
+def _v118_truthy(v: object, default: bool = False) -> bool:
+    try:
+        if "_v105_truthy" in globals():
+            return bool(_v105_truthy(v, default))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if v is None:
+        return default
+    t = str(v).strip().lower()
+    if t in {"1", "true", "yes", "y", "on", "是", "是 / yes", "啟用", "active", "啟用 / active"}:
+        return True
+    if t in {"0", "false", "no", "n", "off", "否", "否 / no", "停用", "inactive", ""}:
+        return False
+    try:
+        return bool(int(float(t)))
+    except Exception:
+        return default
+
+
+def _v118_module_no(module_code: object) -> str:
+    raw = str(module_code or "").strip()
+    if not raw:
+        return ""
+    if raw in _V118_MODULE_ALIAS_TO_NO:
+        return _V118_MODULE_ALIAS_TO_NO[raw]
+    low = raw.lower()
+    if low in _V118_MODULE_ALIAS_TO_NO:
+        return _V118_MODULE_ALIAS_TO_NO[low]
+    # 例如 "01. 工時紀錄" / "01_工時紀錄" / "01 Time Recording"
+    import re as _v118_re
+    m = _v118_re.search(r"(\d{1,2})", raw)
+    if m:
+        try:
+            n = int(m.group(1))
+            if 1 <= n <= 13:
+                return f"{n:02d}"
+        except Exception:
+            pass
+    try:
+        return MODULE_CODE_TO_NO.get(raw, raw)  # type: ignore[name-defined]
+    except Exception:
+        return raw
+
+
+def _v118_runtime_code(module_code: object) -> str:
+    no = _v118_module_no(module_code)
+    return _V118_MODULE_NO_TO_RUNTIME.get(no, str(module_code or "").strip())
+
+
+def _v118_load_permission_payload() -> dict:
+    # 最高優先權威檔。不得用 SQLite 舊快取當最終來源。
+    try:
+        from services.permanent_authority_service import load_authority as _pa_load_authority
+        payload = _pa_load_authority("10_permissions", "records")
+        if isinstance(payload, dict) and isinstance(payload.get("tables"), dict):
+            return payload
+    except Exception:
+        pass
+    for p in [
+        PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+    ]:
+        try:
+            if p.exists() and p.stat().st_size > 0:
+                payload = json.loads(p.read_text(encoding="utf-8"))
+                if isinstance(payload, dict):
+                    return payload
+        except Exception:
+            continue
+    return {}
+
+
+def _v118_load_permission_tables() -> dict[str, list[dict]]:
+    payload = _v118_load_permission_payload()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    out: dict[str, list[dict]] = {}
+    if isinstance(tables, dict):
+        for k, v in tables.items():
+            if isinstance(v, list):
+                out[str(k)] = [dict(r) for r in v if isinstance(r, dict)]
+    return out
+
+
+def _v118_find_user_row(username: str, tables: dict[str, list[dict]] | None = None) -> dict | None:
+    uname = _v118_norm_username(username)
+    if not uname:
+        return None
+    tables = tables if isinstance(tables, dict) else _v118_load_permission_tables()
+    for table_name in ("auth_users", "security_users"):
+        for r in tables.get(table_name, []) or []:
+            cand = _v118_norm_username(r.get("username") or r.get("帳號") or r.get("帳號 / Username"))
+            if cand == uname:
+                return dict(r)
+    return None
+
+
+def _v118_user_active(row: dict | None, username: str = "") -> bool:
+    # 預設角色帳號不可被停用，避免 admin/operator 之類鎖死。
+    uname = _v118_norm_username(username or (row or {}).get("username"))
+    if uname in _V118_PROTECTED_DEFAULT_ACCOUNTS:
+        return True
+    if row is None:
+        return False
+    return _v118_truthy(row.get("is_active", row.get("啟用", row.get("啟用 / Active", True))), True)
+
+
+def _v118_role_from_user(row: dict | None, username: str = "", roles: list | tuple | None = None) -> str:
+    if row:
+        role = str(row.get("role_code") or row.get("role") or row.get("角色") or row.get("角色 / Role") or "").strip().lower()
+        if role:
+            return role
+    roles = list(roles or [])
+    if roles:
+        return str(roles[0] or "").strip().lower()
+    uname = _v118_norm_username(username)
+    return "admin" if uname == "admin" else "operator"
+
+
+def _v118_permission_value(row: dict, action: str) -> bool:
+    if _v118_truthy(row.get("can_manage", row.get("管理", row.get("管理 / Manage", False))), False):
+        return True
+    aliases = {
+        "can_view": ("can_view", "可進入", "可進入 / View", "view"),
+        "can_create": ("can_create", "新增", "新增 / Create", "create"),
+        "can_edit": ("can_edit", "編輯", "編輯 / Edit", "edit"),
+        "can_delete": ("can_delete", "刪除", "刪除 / Delete", "delete"),
+        "can_import": ("can_import", "匯入", "匯入 / Import", "import"),
+        "can_export": ("can_export", "匯出", "匯出 / Export", "export"),
+        "can_backup": ("can_backup", "備份", "備份 / Backup", "backup"),
+        "can_restore": ("can_restore", "還原", "還原 / Restore", "restore"),
+        "can_manage": ("can_manage", "管理", "管理 / Manage", "manage"),
+    }.get(action, (action,))
+    for k in aliases:
+        if k in row:
+            return _v118_truthy(row.get(k), False)
+    return False
+
+
+def _v118_perm_row_for(rows: list[dict], username: str, module_no: str) -> dict | None:
+    uname = _v118_norm_username(username)
+    for r in rows:
+        ru = _v118_norm_username(r.get("username") or r.get("帳號") or r.get("帳號 / Username"))
+        if ru != uname:
+            continue
+        if _v118_module_no(r.get("module_code") or r.get("模組代碼 / Module Code") or r.get("模組代碼")) == module_no:
+            return dict(r)
+    return None
+
+
+def _v118_has_authority_permission(username: str, module_code: str, action: str = "can_view", roles: list | tuple | None = None) -> bool:
+    action = str(action or "can_view").strip()
+    try:
+        if action not in PERMISSION_COLUMNS:  # type: ignore[name-defined]
+            action = "can_view"
+    except Exception:
+        if action not in {"can_view", "can_create", "can_edit", "can_delete", "can_import", "can_export", "can_backup", "can_restore", "can_manage"}:
+            action = "can_view"
+    uname = _v118_norm_username(username)
+    if not uname:
+        return False
+    role_list = [str(x or "").strip().lower() for x in (roles or []) if str(x or "").strip()]
+    if uname == "admin" or "admin" in role_list:
+        return True
+    module_no = _v118_module_no(module_code)
+    if not module_no:
+        return False
+    tables = _v118_load_permission_tables()
+    user_row = _v118_find_user_row(uname, tables)
+    if not _v118_user_active(user_row, uname):
+        return False
+    role = _v118_role_from_user(user_row, uname, role_list)
+    if role == "admin":
+        return True
+    perm_rows = tables.get("auth_account_permissions", []) or []
+    # 1) 帳號級權限最高優先。
+    direct = _v118_perm_row_for(perm_rows, uname, module_no)
+    if direct is not None:
+        return _v118_permission_value(direct, action)
+    # 2) 若帳號沒有專屬列，使用角色樣板列。例如 username=operator 的 01 權限。
+    if role:
+        role_row = _v118_perm_row_for(perm_rows, role, module_no)
+        if role_row is not None:
+            return _v118_permission_value(role_row, action)
+    # 3) 相容 role_code 欄位的權限列。
+    for r in perm_rows:
+        if str(r.get("role_code") or r.get("角色 / Role") or "").strip().lower() != role:
+            continue
+        if _v118_module_no(r.get("module_code") or r.get("模組代碼 / Module Code") or r.get("模組代碼")) == module_no:
+            return _v118_permission_value(r, action)
+    # 4) 相容舊 role table。
+    for r in tables.get("security_module_permissions", []) or []:
+        if str(r.get("role_code") or "").strip().lower() != role:
+            continue
+        if _v118_module_no(r.get("module_code") or r.get("module_no") or r.get("模組代碼")) == module_no:
+            return _v118_permission_value(r, action)
+    return False
+
+
+def clear_permission_cache(username: str | None = None) -> None:  # type: ignore[override]
+    try:
+        keys = list(st.session_state.keys())
+        u = _v118_norm_username(username) if username else ""
+        for k in keys:
+            lk = str(k).lower()
+            if lk.startswith("_spt_perm_cache_") or lk.startswith("_v118_perm_cache_"):
+                if not u or lk.endswith(u):
+                    st.session_state.pop(k, None)
+    except Exception:
+        pass
+
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    if not st.session_state.get("auth_logged_in"):
+        return False
+    username = str(st.session_state.get("auth_username") or "").strip()
+    roles = st.session_state.get("auth_roles", []) or []
+    return _v118_has_authority_permission(username, module_code, action, roles)
+
 
 try:
-    _v115_prev_log_security_event = log_security_event
-except Exception:  # pragma: no cover
-    _v115_prev_log_security_event = None
+    _v118_prev_authenticate = authenticate
+except Exception:
+    _v118_prev_authenticate = None
 
 
-def _v115_idle_minutes_from_seconds(idle_seconds: int | None):
-    if idle_seconds in (None, ""):
-        return None
+def _v118_repair_protected_accounts() -> None:
+    """預設帳號不可被停用/刪除。只在需要時修權威檔，不掃 history。"""
     try:
-        return round(float(idle_seconds) / 60.0, 4)
+        from services.permanent_authority_service import load_authority as _pa_load_authority, save_authority as _pa_save_authority
+        payload = _pa_load_authority("10_permissions", "records")
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        if not isinstance(tables, dict):
+            return
+        changed = False
+        deleted = payload.get("deleted_usernames") if isinstance(payload.get("deleted_usernames"), list) else []
+        kept_deleted = []
+        for u in deleted:
+            if _v118_norm_username(u) in _V118_PROTECTED_DEFAULT_ACCOUNTS:
+                changed = True
+                continue
+            kept_deleted.append(u)
+        payload["deleted_usernames"] = kept_deleted
+        for table_name in ("auth_users", "security_users"):
+            rows = tables.get(table_name, [])
+            if not isinstance(rows, list):
+                continue
+            for r in rows:
+                if not isinstance(r, dict):
+                    continue
+                uname = _v118_norm_username(r.get("username") or r.get("帳號") or r.get("帳號 / Username"))
+                if uname in _V118_PROTECTED_DEFAULT_ACCOUNTS:
+                    if not _v118_truthy(r.get("is_active", True), True):
+                        r["is_active"] = 1
+                        r["啟用"] = True
+                        r["啟用 / Active"] = True
+                        changed = True
+        if changed:
+            tables = {str(k): [dict(x) for x in v if isinstance(x, dict)] for k, v in tables.items() if isinstance(v, list)}
+            _pa_save_authority("10_permissions", records=tables, reason="v118_protected_accounts_runtime_repair", github=True)
     except Exception:
-        return None
-
-
-def log_security_event(username: str | None, event_type: str, result: str, message: str = "", module_code: str = "", idle_seconds: int | None = None) -> None:  # type: ignore[override]
-    ensure_security_schema()
-    event_time = _now()
-    uname = str(username or "").strip()
-    event = str(event_type or "LOGIN").strip().upper().replace("-", "_").replace(" ", "_")
-    res = str(result or "SUCCESS").strip().upper()
-    display_name = ""
-    try:
-        display_name = str(st.session_state.get("auth_display_name", "") or "")
-    except Exception:
-        display_name = ""
-    logout_time = event_time if event in {"LOGOUT", "AUTO_LOGOUT", "POST_RECORD_LOGOUT", "SESSION_TIMEOUT"} else ""
-
-    # 1) Keep legacy SQLite table for compatibility with old pages/tools.
-    try:
-        execute("""
-            INSERT INTO security_login_logs
-            (username, display_name, event_type, result, message, module_code, login_time, logout_time, idle_seconds, user_agent, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            uname,
-            display_name,
-            event,
-            res,
-            message or "",
-            module_code or "",
-            event_time,
-            logout_time,
-            idle_seconds,
-            "streamlit",
-            event_time,
-        ))
-    except Exception:
-        # Compatibility path must never stop login/logout.
         pass
 
-    # 2) Write the real Page-11 canonical authority immediately.
-    try:
-        from services.audit_log_service import record_login_log
-        record_login_log(
-            username=uname,
-            display_name=display_name,
-            event_type=event,
-            result=res,
-            message=message or "",
-            module_code=module_code or "",
-            login_time=event_time,
-            logout_time=logout_time,
-            idle_minutes=_v115_idle_minutes_from_seconds(idle_seconds),
-            user_agent="streamlit",
-            created_at=event_time,
-        )
-    except Exception:
-        # Do not block login if the audit writer has a temporary failure.
-        pass
-# =================== END V115 SECURITY EVENT CANONICAL LOGIN LOG FIX ===================
+
+def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
+    _v118_repair_protected_accounts()
+    ok, msg = _v118_prev_authenticate(username, password) if callable(_v118_prev_authenticate) else (False, "帳號或密碼錯誤。")
+    if ok:
+        try:
+            clear_permission_cache(str(username or ""))
+        except Exception:
+            pass
+    return ok, msg
+
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    require_login(module_code)
+    if not check_permission(module_code, action):
+        log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
+        st.error("權限不足：你的帳號未被授權使用此模組或功能。")
+        st.stop()
+
+
+require_permission = require_module_access
+# ======================= END V118 CANONICAL MODULE PERMISSION RUNTIME FIX =======================
