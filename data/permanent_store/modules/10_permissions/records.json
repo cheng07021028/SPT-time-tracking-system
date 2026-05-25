@@ -2,9 +2,9 @@
   "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-25 10:16:32",
-  "exported_at": "2026-05-25 10:09:07",
-  "reason": "save_account_permissions_v96",
+  "updated_at": "2026-05-25 10:36:09",
+  "exported_at": "2026-05-25 10:26:20",
+  "reason": "save_account_master_pre_delete_v96",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -1368,17 +1368,26 @@
       },
       {
         "username": "B257",
-        "password_hash": "pbkdf2_sha256$bd5cf4faf9e3acf7cc676b7060a76c5a$685b638236d2708a708e7da2cb045c55a318a5135a08b21a5d85733b57ba2f96",
+        "password_hash": "pbkdf2_sha256$180000$CLaIg2SKRSIhyzcrbFI4ow==$Q90AWk5RmjxrMr7U3olHoOxUHiuY2R0CrZjPU3jXxjY=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B257",
         "display_name": "彭紹恩",
         "email": "operator",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "V1.29 default account",
         "created_at": "2026-05-23 00:17:15",
-        "updated_at": "2026-05-25 10:08:31"
+        "updated_at": "2026-05-25 10:26:20",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "B260",
@@ -2991,7 +3000,7 @@
     "security_users": 9,
     "security_user_roles": 9
   },
+  "deleted_usernames": [],
   "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json",
-  "deleted_usernames": []
+  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
 }
