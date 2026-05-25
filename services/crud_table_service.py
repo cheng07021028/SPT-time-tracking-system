@@ -552,3 +552,101 @@ def save_employees(df: pd.DataFrame) -> dict:  # type: ignore[override]
     log_action("SAVE_EMPLOYEES", "employees", "V84 canonical 儲存人員清單", f"rows={len(rows)}")
     return {"inserted": 0, "updated": len(rows), "deleted": 0, "skipped": 0, "saved": len(rows)}
 # ======================= END V84 CRUD SINGLE AUTHORITY SAVE =====================
+
+
+# ========================= V113 EMPLOYEE ID DISPLAY NORMALIZATION =========================
+# Purpose:
+# 04｜人員名單目前以 permanent authority records.json 為主，舊匯入資料常帶入 id=None。
+# data_editor 會直接顯示 None，造成「ID 異常」。
+# 這裡只補 04 employees 的 ID 正規化：
+# - 既有正整數 ID 會保留。
+# - None / 空白 / nan / null / 重複 ID 會依目前資料順序補成 1..N。
+# - 空白新增列不強制產生 ID，避免尚未輸入資料就占用編號。
+# - save_employees() 寫回 canonical 前也會補齊，Reboot 後不再顯示 None。
+
+def _v113_blankish(v: Any) -> bool:
+    try:
+        if pd.isna(v):
+            return True
+    except Exception:
+        pass
+    return str(v).strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _v113_positive_int(v: Any) -> int | None:
+    if _v113_blankish(v):
+        return None
+    try:
+        n = int(float(str(v).strip()))
+        return n if n > 0 else None
+    except Exception:
+        return None
+
+
+def _v113_normalize_employee_ids_df(df: pd.DataFrame) -> pd.DataFrame:
+    cols = ["id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at"]
+    work = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    for c in cols:
+        if c not in work.columns:
+            work[c] = ""
+
+    used: set[int] = set()
+    normalized: list[int | str] = []
+    needs_new: list[bool] = []
+
+    for _, row in work.iterrows():
+        has_business_key = (not _v113_blankish(row.get("employee_id"))) or (not _v113_blankish(row.get("employee_name")))
+        cur = _v113_positive_int(row.get("id"))
+        if not has_business_key:
+            normalized.append("")
+            needs_new.append(False)
+        elif cur is not None and cur not in used:
+            used.add(cur)
+            normalized.append(cur)
+            needs_new.append(False)
+        else:
+            normalized.append("")
+            needs_new.append(True)
+
+    next_id = 1
+    for i, need in enumerate(needs_new):
+        if not need:
+            continue
+        while next_id in used:
+            next_id += 1
+        normalized[i] = next_id
+        used.add(next_id)
+        next_id += 1
+
+    work["id"] = normalized
+    return work[cols]
+
+
+def load_employees() -> pd.DataFrame:  # type: ignore[override]
+    cols = ["id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at"]
+    if _v28_df_from_table is not None and _v84_crud_authority_exists("04_employees"):
+        df = _v28_df_from_table("04_employees", "employees", columns=cols)
+        for c in cols:
+            if c not in df.columns:
+                df[c] = ""
+        df = _v113_normalize_employee_ids_df(df[cols])
+        for c in ["is_active", "is_in_factory", "is_today_attendance"]:
+            if c in df.columns:
+                df[c] = df[c].map(_bool).astype(bool)
+        return df[cols]
+    return pd.DataFrame(columns=cols)
+
+
+def save_employees(df: pd.DataFrame) -> dict:  # type: ignore[override]
+    cols = ["id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at"]
+    work = df.drop(columns=["刪除 / Delete", "刪除", "_delete"], errors="ignore").copy() if isinstance(df, pd.DataFrame) else pd.DataFrame(columns=cols)
+    for c in cols:
+        if c not in work.columns:
+            work[c] = ""
+    work = _v113_normalize_employee_ids_df(work[cols])
+    rows = _v28_table_from_df(work) if _v28_table_from_df is not None else []
+    if _v28_update_tables is not None:
+        _v28_update_tables("04_employees", {"employees": rows}, reason="crud_save_employees_v113_normalize_id", github=True)
+    log_action("SAVE_EMPLOYEES", "employees", "V113 儲存人員清單並正規化 ID", f"rows={len(rows)}")
+    return {"inserted": 0, "updated": len(rows), "deleted": 0, "skipped": 0, "saved": len(rows), "id_normalized": True}
+# ======================= END V113 EMPLOYEE ID DISPLAY NORMALIZATION =====================

@@ -110,6 +110,7 @@ def ensure_cols(df: pd.DataFrame) -> pd.DataFrame:
             df[c] = False if c in ["_delete", "is_active", "is_in_factory", "is_today_attendance"] else ""
     for c in BOOL_INTERNAL_COLS:
         df[c] = df[c].map(_to_bool_value).fillna(False).astype(bool) if c in df.columns else False
+    df = _normalize_employee_display_ids(df)
     return df[COLS]
 
 
@@ -130,6 +131,60 @@ def _to_bool_value(v) -> bool:
         return False
     return bool(v)
 
+
+
+
+def _blankish_id_value(v) -> bool:
+    try:
+        if pd.isna(v):
+            return True
+    except Exception:
+        pass
+    return str(v).strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _positive_int_id(v):
+    if _blankish_id_value(v):
+        return None
+    try:
+        n = int(float(str(v).strip()))
+        return n if n > 0 else None
+    except Exception:
+        return None
+
+
+def _normalize_employee_display_ids(df: pd.DataFrame) -> pd.DataFrame:
+    """V113: avoid showing None/nan in ID column; assign stable display IDs for real employee rows."""
+    work = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    if "id" not in work.columns:
+        work["id"] = ""
+    used = set()
+    new_ids = []
+    need_new = []
+    for _, row in work.iterrows():
+        has_data = (not _blankish_id_value(row.get("employee_id", ""))) or (not _blankish_id_value(row.get("employee_name", "")))
+        cur = _positive_int_id(row.get("id", ""))
+        if not has_data:
+            new_ids.append("")
+            need_new.append(False)
+        elif cur is not None and cur not in used:
+            used.add(cur)
+            new_ids.append(cur)
+            need_new.append(False)
+        else:
+            new_ids.append("")
+            need_new.append(True)
+    nxt = 1
+    for i, need in enumerate(need_new):
+        if not need:
+            continue
+        while nxt in used:
+            nxt += 1
+        new_ids[i] = nxt
+        used.add(nxt)
+        nxt += 1
+    work["id"] = new_ids
+    return work
 
 def _to_editor_df(df: pd.DataFrame) -> pd.DataFrame:
     work = ensure_cols(df)
@@ -415,7 +470,7 @@ with tab1:
     tpl = pd.DataFrame(columns=["工號", "姓名", "單位", "職稱", "啟用", "在廠", "今日出勤", "備註"])
     e2.download_button("⟰ 下載人員匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_人員匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-    st.info("V64：批次按鈕已改為重新指定整份暫存表；刪除 / 啟用 / 在廠 / 今日出勤全選與取消會立即刷新 checkbox，不再被舊 data_editor 草稿蓋回。")
+    st.info("V113：人員 ID 會自動正規化，None / 空白 / 重複 ID 會補成穩定序號；儲存後會寫回權威檔。批次 checkbox 仍維持原功能。")
     _commit_current_editor_widget_state()
     st.session_state[STATE_KEY] = _current_internal_df()
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
