@@ -2,16 +2,48 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-25 17:59:09",
-  "exported_at": "2026-05-25 17:59:09",
+  "updated_at": "2026-05-25 17:59:15",
+  "exported_at": "2026-05-25 17:59:15",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
       {
+        "id": 54083,
+        "source": "v103_merge",
+        "username": "B248",
+        "display_name": "",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "帳號不存在",
+        "module_code": "",
+        "login_time": "2026-05-25 17:59:14",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-25 17:59:14"
+      },
+      {
         "id": 53428,
         "source": "v103_merge",
         "username": "B248",
+        "display_name": "",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "帳號不存在",
+        "module_code": "",
+        "login_time": "2026-05-25 17:59:08",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-25 17:59:08"
+      },
+      {
+        "id": 53755,
+        "source": "v103_merge",
+        "username": "B177",
         "display_name": "",
         "event_type": "LOGIN",
         "result": "FAIL",
@@ -5230,7 +5262,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 326,
+    "login_logs": 328,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
