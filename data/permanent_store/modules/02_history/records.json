@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-25 14:32:40",
-  "exported_at": "2026-05-25 14:32:40",
-  "reason": "start_work_v108_fast_local_upsert_02",
+  "updated_at": "2026-05-25 14:33:17",
+  "exported_at": "2026-05-25 14:33:17",
+  "reason": "finish_work_v108_fast_local_sync_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -60,7 +60,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-25 13:39:44",
-        "updated_at": "2026-05-25 14:15:05"
+        "updated_at": "2026-05-25 13:39:44"
       },
       {
         "id": 20,
@@ -114,7 +114,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-25 13:42:32",
-        "updated_at": "2026-05-25 14:15:05"
+        "updated_at": "2026-05-25 13:42:32"
       },
       {
         "id": 22,
@@ -141,7 +141,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-25 13:43:19",
-        "updated_at": "2026-05-25 14:15:05"
+        "updated_at": "2026-05-25 13:43:19"
       },
       {
         "id": 23,
@@ -195,7 +195,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-25 14:02:26",
-        "updated_at": "2026-05-25 14:15:05"
+        "updated_at": "2026-05-25 14:02:26"
       },
       {
         "id": 26,
@@ -249,7 +249,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-25 14:09:28",
-        "updated_at": "2026-05-25 14:15:05"
+        "updated_at": "2026-05-25 14:09:28"
       },
       {
         "id": 28,
@@ -291,51 +291,24 @@
         "start_action": "開始",
         "start_timestamp": "2026-05-25 14:13:59",
         "end_action": "暫停",
-        "end_timestamp": "2026-05-25 14:32:05",
+        "end_timestamp": "2026-05-25 14:30:42",
         "remark": "",
         "start_date": "2026-05-25",
         "start_time": "14:13:59",
         "end_date": "2026-05-25",
-        "end_time": "14:32:05",
-        "work_hours": 0.3,
+        "end_time": "14:30:42",
+        "work_hours": 0.28,
         "assembly_location": "竹東",
         "group_key": "SPT150|模組|2026-05-25",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-25 14:13:59",
-        "updated_at": "2026-05-25 14:32:05"
-      },
-      {
-        "id": 30,
-        "record_key": "SPT242|22M0162-91|前置鈑金|2026-05-25 14:21:39|d64bdc00",
-        "status": "作業中",
-        "work_order": "22M0162-91",
-        "part_no": "4TRSC020-004-02->4TRSC020-004-06",
-        "type_name": "NTB 3 LP +快拆+EMO",
-        "process_name": "前置鈑金",
-        "employee_id": "SPT242",
-        "employee_name": "保羅",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-25 14:21:39",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
-        "start_date": "2026-05-25",
-        "start_time": "14:21:39",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SPT242|前置鈑金|2026-05-25",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-25 14:21:39",
-        "updated_at": "2026-05-25 14:21:39"
+        "updated_at": "2026-05-25 14:30:42"
       },
       {
         "id": 31,
         "record_key": "SPT150|21M0241-01|S.T.|2026-05-25 14:32:39|dde7b519",
-        "status": "作業中",
+        "status": "暫停",
         "work_order": "21M0241-01",
         "part_no": "4TRSC020-004-02",
         "type_name": "NTB 3 PORT",
@@ -344,25 +317,25 @@
         "employee_name": "李守益",
         "start_action": "開始",
         "start_timestamp": "2026-05-25 14:32:39",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-25 14:33:16",
         "remark": "",
         "start_date": "2026-05-25",
         "start_time": "14:32:39",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-25",
+        "end_time": "14:33:16",
+        "work_hours": 0.01,
         "assembly_location": "竹東",
         "group_key": "SPT150|S.T.|2026-05-25",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-25 14:32:39",
-        "updated_at": "2026-05-25 14:32:39"
+        "updated_at": "2026-05-25 14:33:16"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 13
+    "time_records": 12
   }
 }
