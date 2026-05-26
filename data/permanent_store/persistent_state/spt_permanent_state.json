@@ -1,19 +1,16 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 15:19:20",
+  "exported_at": "2026-05-26 15:24:10",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 33,
+  "business_row_count": 34,
   "table_counts": {
-    "app_settings": 0,
     "auth_account_permissions": 130,
     "auth_login_logs": 0,
     "auth_security_settings": 2,
     "auth_users": 10,
     "employees": 0,
     "login_logs": 42,
-    "process_categories": 0,
-    "process_category_options": 0,
     "process_options": 17,
     "rest_periods": 5,
     "security_settings": 2,
@@ -24,11 +21,10 @@
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 0,
-    "time_records": 33,
+    "time_records": 34,
     "work_orders": 0
   },
   "tables": {
-    "app_settings": [],
     "auth_account_permissions": [
       {
         "id": 1,
@@ -3051,8 +3047,6 @@
         "created_at": "2026-05-15 11:23:39"
       }
     ],
-    "process_categories": [],
-    "process_category_options": [],
     "process_options": [
       {
         "id": 1,
@@ -5759,6 +5753,33 @@
         "source": "streamlit",
         "created_at": "2026-05-26 13:34:12",
         "updated_at": "2026-05-26 13:34:12"
+      },
+      {
+        "id": 70,
+        "record_key": "SPT105|22M0162-91|Packing|2026-05-26 15:24:10|a00541b4",
+        "status": "作業中",
+        "work_order": "22M0162-91",
+        "part_no": "4TRSC020-004-02->4TRSC020-004-06",
+        "type_name": "NTB 3 LP +快拆+EMO",
+        "process_name": "Packing",
+        "employee_id": "SPT105",
+        "employee_name": "劉秀鳳",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-26 15:24:10",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-26",
+        "start_time": "15:24:10",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT105|Packing|2026-05-26",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-26 15:24:10",
+        "updated_at": "2026-05-26 15:24:10"
       }
     ],
     "work_orders": []
