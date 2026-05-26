@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-26 17:24:55",
-  "exported_at": "2026-05-26 17:24:55",
+  "updated_at": "2026-05-26 17:30:49",
+  "exported_at": "2026-05-26 17:30:49",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -739,11 +739,47 @@
         "detail": "",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 146,
+        "log_time": "2026-05-26 17:28:02",
+        "user_name": "SPT142",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "53",
+        "message": "V96 結束工時紀錄 #53，同步結束=1筆，狀態=下班",
+        "detail": "53",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 145,
+        "log_time": "2026-05-26 17:28:02",
+        "user_name": "SPT142",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 198,
+        "log_time": "2026-05-26 17:30:49",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V89 權威檔優先：已儲存/更新歷史紀錄 23 筆，並同步 01/02 canonical。",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 61
+    "system_logs": 64
   }
 }
