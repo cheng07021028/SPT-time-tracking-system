@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 18:17:46",
+  "exported_at": "2026-05-26 18:42:30",
   "source": "db_service_write",
   "module_key": "02_history",
   "module_code": "02",
@@ -9,30 +9,11 @@
   "tables": {
     "table_column_settings": [],
     "table_sort_settings": [],
-    "table_ui_settings": [
-      {
-        "table_key": "02.history.records",
-        "widths_json": "{\"刪除 / Delete\": 100, \"重算 / Recalc\": 100, \"跨日提醒 / Cross Day Alert\": 80, \"跨日日期 / Cross Day Date\": 140, \"id\": 70, \"record_key\": 280, \"status\": 140, \"work_order\": 150, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 190, \"remark\": 260, \"start_date\": 140, \"start_time\": 140, \"end_date\": 140, \"end_time\": 140, \"work_hours\": 140, \"assembly_location\": 140, \"group_key\": 140, \"is_group_work\": 140, \"source\": 140, \"created_at\": 180, \"updated_at\": 180, \"department\": 140, \"title\": 140}",
-        "order_json": "[\"id\", \"跨日提醒 / Cross Day Alert\", \"刪除 / Delete\", \"重算 / Recalc\", \"employee_id\", \"status\", \"employee_name\", \"work_order\", \"department\", \"title\", \"part_no\", \"type_name\", \"process_name\", \"start_action\", \"start_timestamp\", \"end_action\", \"end_timestamp\", \"remark\", \"start_date\", \"start_time\", \"end_date\", \"end_time\", \"work_hours\", \"assembly_location\", \"group_key\", \"跨日日期 / Cross Day Date\", \"is_group_work\", \"source\", \"created_at\", \"updated_at\", \"record_key\"]",
-        "updated_at": "2026-05-26 09:31:16"
-      },
-      {
-        "table_key": "history_records",
-        "widths_json": "{\"刪除 / Delete\": 100, \"重算 / Recalc\": 100, \"跨日提醒 / Cross Day Alert\": 80, \"跨日日期 / Cross Day Date\": 140, \"id\": 70, \"record_key\": 280, \"status\": 140, \"work_order\": 150, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 190, \"remark\": 260, \"start_date\": 140, \"start_time\": 140, \"end_date\": 140, \"end_time\": 140, \"work_hours\": 140, \"assembly_location\": 140, \"group_key\": 140, \"is_group_work\": 140, \"source\": 140, \"created_at\": 180, \"updated_at\": 180, \"department\": 140, \"title\": 140}",
-        "order_json": "[\"id\", \"跨日提醒 / Cross Day Alert\", \"刪除 / Delete\", \"重算 / Recalc\", \"employee_id\", \"status\", \"employee_name\", \"work_order\", \"department\", \"title\", \"part_no\", \"type_name\", \"process_name\", \"start_action\", \"start_timestamp\", \"end_action\", \"end_timestamp\", \"remark\", \"start_date\", \"start_time\", \"end_date\", \"end_time\", \"work_hours\", \"assembly_location\", \"group_key\", \"跨日日期 / Cross Day Date\", \"is_group_work\", \"source\", \"created_at\", \"updated_at\", \"record_key\"]",
-        "updated_at": "2026-05-26 09:24:16"
-      },
-      {
-        "table_key": "01.time_records.main",
-        "widths_json": "{\"id\": 60, \"record_key\": 100, \"status\": 80, \"work_order\": 80, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 60, \"remark\": 250, \"start_date\": 120, \"start_time\": 120, \"end_date\": 120, \"end_time\": 120, \"work_hours\": 120, \"assembly_location\": 100, \"group_key\": 60, \"is_group_work\": 60, \"source\": 60, \"created_at\": 60, \"updated_at\": 180}",
-        "order_json": "[]",
-        "updated_at": "2026-05-26 09:48:23"
-      }
-    ]
+    "table_ui_settings": []
   },
   "table_counts": {
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "table_ui_settings": 3
+    "table_ui_settings": 0
   }
 }
