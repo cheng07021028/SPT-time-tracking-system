@@ -1089,3 +1089,50 @@ def _v72_github_timeout_put() -> float:  # type: ignore[override]
     except Exception:
         return 5.0
 # ======================= END V98 AUTHORITY DB PATH + FORCE UPLOAD HELPERS =======================
+
+# ===================== V121 MULTI-USER AUTHORITY FILE LOCK =====================
+# 目的：多人同時按開始/結束/儲存時，避免兩個 session 同時寫同一個 records.json，
+# 造成後寫者以舊內容覆蓋先寫者。此鎖只保護本機 canonical JSON 寫入；不改資料格式。
+try:
+    import threading as _v121_threading
+    _V121_AUTHORITY_LOCK = _v121_threading.RLock()
+except Exception:  # pragma: no cover
+    _V121_AUTHORITY_LOCK = None
+
+try:
+    _v121_prev_save_authority = save_authority
+except Exception:
+    _v121_prev_save_authority = None
+try:
+    _v121_prev_update_tables = update_tables
+except Exception:
+    _v121_prev_update_tables = None
+try:
+    _v121_prev_save_settings = save_settings
+except Exception:
+    _v121_prev_save_settings = None
+
+
+def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    if _V121_AUTHORITY_LOCK is None or not callable(_v121_prev_save_authority):
+        return _v121_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=github) if callable(_v121_prev_save_authority) else {"ok": False, "error": "save_authority_unavailable"}
+    with _V121_AUTHORITY_LOCK:
+        return _v121_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=github)
+
+
+def update_tables(module_key: str, updates: dict[str, list[dict[str, Any]]], *, reason: str = "update_tables", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    if _V121_AUTHORITY_LOCK is None:
+        return _v121_prev_update_tables(module_key, updates, reason=reason, github=github) if callable(_v121_prev_update_tables) else {"ok": False, "error": "update_tables_unavailable"}
+    with _V121_AUTHORITY_LOCK:
+        cur = load_tables(module_key, "records")
+        cur.update({str(k): _clean_rows(v) for k, v in (updates or {}).items()})
+        return save_authority(module_key, records=cur, reason=reason, github=github)
+
+
+def save_settings(module_key: str, settings: dict[str, Any], *, reason: str = "save_settings", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    if _V121_AUTHORITY_LOCK is None or not callable(_v121_prev_save_settings):
+        return _v121_prev_save_settings(module_key, settings, reason=reason, github=github) if callable(_v121_prev_save_settings) else {"ok": False, "error": "save_settings_unavailable"}
+    with _V121_AUTHORITY_LOCK:
+        return _v121_prev_save_settings(module_key, settings, reason=reason, github=github)
+
+# =================== END V121 MULTI-USER AUTHORITY FILE LOCK =====================

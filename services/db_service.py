@@ -109,11 +109,12 @@ def _now() -> str:
 
 def _open_connection() -> sqlite3.Connection:
     DB_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=15)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
     # Connection-level pragmas: reduce locking and speed up read-heavy Streamlit reruns.
     try:
-        conn.execute("PRAGMA busy_timeout=8000")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=30000")
         conn.execute("PRAGMA temp_store=MEMORY")
         conn.execute("PRAGMA cache_size=-20000")
         conn.execute("PRAGMA synchronous=NORMAL")

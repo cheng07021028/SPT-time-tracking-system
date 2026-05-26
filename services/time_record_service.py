@@ -5190,3 +5190,113 @@ def sync_time_records_01_02_now(reason: str = "v109_manual_0102_authority_sync",
     return _v109_save_0102_and_cache(df, reason, github=bool(github))
 
 # =================== END V109 01/02 RECALC BIDIRECTIONAL AUTHORITY SYNC =====================
+
+# ===================== V121 MULTI-USER SAFE FINISH GROUP GUARD =====================
+# 目的：多人同時記錄時，任何人按「結束目前作業」只能結束同一人員的同步作業群組；
+# 若舊資料 employee_id / employee_name 空白或異常，為避免誤停其他人，只結束被點選的那一筆。
+
+try:
+    _v121_prev_get_active_group = get_active_group
+except Exception:
+    _v121_prev_get_active_group = None
+try:
+    _v121_prev_finish_work = finish_work
+except Exception:
+    _v121_prev_finish_work = None
+
+
+def _v121_clean_text(v) -> str:
+    s = str(v if v is not None else "").strip()
+    return "" if s.lower() in {"", "none", "nan", "nat", "<na>", "null"} else s
+
+
+def _v121_active_status_sql() -> str:
+    return "(end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='') AND COALESCE(status,'') NOT IN ('下班','暫停','完工','已結束','結束')"
+
+
+def _v121_strict_active_group(record_id: int) -> pd.DataFrame:
+    try:
+        rid = int(float(str(record_id).strip()))
+    except Exception:
+        return pd.DataFrame()
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (rid,))
+    if not rec:
+        return pd.DataFrame()
+    if _v121_clean_text(rec.get("end_timestamp")):
+        return pd.DataFrame([rec])
+    emp_id = _v121_clean_text(rec.get("employee_id"))
+    emp_name = _v121_clean_text(rec.get("employee_name"))
+    process = _v121_clean_text(rec.get("process_name"))
+    start_date = _v121_clean_text(rec.get("start_date"))
+    # Any missing key can turn the WHERE into a broad group. Refuse grouping and end only selected record.
+    if not emp_id or not emp_name or not process or not start_date:
+        return pd.DataFrame([rec])
+    try:
+        return query_df(
+            f"""
+            SELECT * FROM time_records
+            WHERE employee_id=?
+              AND COALESCE(employee_name,'')=?
+              AND process_name=?
+              AND start_date=?
+              AND {_v121_active_status_sql()}
+            ORDER BY id
+            """,
+            (emp_id, emp_name, process, start_date),
+        )
+    except Exception:
+        return pd.DataFrame([rec])
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    group = _v121_strict_active_group(record_id)
+    if isinstance(group, pd.DataFrame) and not group.empty:
+        return group
+    if callable(_v121_prev_get_active_group):
+        return _v121_prev_get_active_group(record_id)
+    return pd.DataFrame()
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V121 strict finish guard.
+
+    The old chain is kept for normal records, but we disable parallel-group ending when the selected
+    record has incomplete identity keys. This prevents one worker with blank/dirty identity data from
+    closing every active record in the same process/date.
+    """
+    try:
+        rid = int(float(str(record_id).strip()))
+    except Exception:
+        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (rid,))
+    if not rec and "_v104_hydrate_sqlite_from_authority" in globals():
+        try:
+            _v104_hydrate_sqlite_from_authority(active_only=False, record_id=rid, reason="finish_work_v121_pre_hydrate")
+            rec = query_one("SELECT * FROM time_records WHERE id=?", (rid,))
+        except Exception:
+            rec = None
+    if not rec:
+        raise ValueError("找不到工時紀錄")
+
+    emp_id = _v121_clean_text(rec.get("employee_id"))
+    emp_name = _v121_clean_text(rec.get("employee_name"))
+    process = _v121_clean_text(rec.get("process_name"))
+    start_date = _v121_clean_text(rec.get("start_date"))
+    safe_group = bool(finish_parallel_group and emp_id and emp_name and process and start_date)
+
+    # If the record is dirty/incomplete, never allow the previous finish implementation to build a broad group.
+    n = int(_v121_prev_finish_work(rid, end_action, remark, finish_parallel_group=safe_group) if callable(_v121_prev_finish_work) else 0)
+    if n:
+        try:
+            write_log(
+                "V121_SAFE_FINISH_GROUP",
+                f"結束工時紀錄 #{rid}；strict_group={safe_group}；employee_id={emp_id or 'EMPTY'}；employee_name={emp_name or 'EMPTY'}；affected={n}",
+                "time_records",
+                rid,
+                level="INFO",
+            )
+        except Exception:
+            pass
+    return n
+
+# =================== END V121 MULTI-USER SAFE FINISH GROUP GUARD =====================

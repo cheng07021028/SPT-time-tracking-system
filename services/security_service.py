@@ -3683,3 +3683,158 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 
 require_permission = require_module_access
 # ======================= END V118 CANONICAL MODULE PERMISSION RUNTIME FIX =======================
+
+# ===================== V121 MULTI-USER SESSION ISOLATION GUARD =====================
+# 目的：
+# 1) 50 人同時使用時，每一個瀏覽器 session 只能顯示自己的登入帳號/角色，
+#    不可被 legacy auth_user/current_user/username 舊鍵干擾。
+# 2) 登入成功後同步寫入舊版相容鍵，但每次 require_login 都會以 auth_username 為準重新校正。
+# 3) 不改權限權威檔、不改 10 權限頁 UI，只處理 session 顯示與舊 helper 相容。
+try:
+    _v121_prev_authenticate = authenticate
+except Exception:  # pragma: no cover
+    _v121_prev_authenticate = None
+
+
+def _v121_new_session_id() -> str:
+    try:
+        import uuid as _uuid
+        return _uuid.uuid4().hex
+    except Exception:
+        return str(time.time())
+
+
+def _v121_sync_legacy_auth_keys() -> None:
+    """Keep old helpers in the same Streamlit session aligned with the canonical auth_* keys."""
+    try:
+        if not st.session_state.get("auth_logged_in"):
+            return
+        username = str(st.session_state.get("auth_username") or "").strip()
+        display_name = str(st.session_state.get("auth_display_name") or username).strip()
+        roles = st.session_state.get("auth_roles", []) or []
+        if isinstance(roles, str):
+            roles = [roles]
+        role = str(roles[0] if roles else "").strip()
+        employee_id = str(st.session_state.get("auth_employee_id") or "").strip()
+        if not username:
+            return
+        # Legacy compatibility keys used by older services/ui.py, log helpers and historical modules.
+        st.session_state["auth_user"] = username
+        st.session_state["auth_role"] = role
+        st.session_state["auth_name"] = display_name
+        st.session_state["username"] = username
+        st.session_state["current_username"] = username
+        st.session_state["login_username"] = username
+        st.session_state["current_user"] = {
+            "username": username,
+            "display_name": display_name,
+            "employee_id": employee_id,
+            "roles": list(roles),
+        }
+        st.session_state["auth_user_info"] = dict(st.session_state["current_user"])
+    except Exception:
+        pass
+
+
+def _v121_clear_foreign_auth_cache_on_login() -> None:
+    """Before a new login in the same browser session, clear only authentication-specific state.
+
+    This prevents one workstation/browser from keeping the previous worker's account banner while
+    another worker logs in on the same screen. It does not touch table/UI settings.
+    """
+    try:
+        for k in list(st.session_state.keys()):
+            lk = str(k).lower()
+            if (
+                lk.startswith("auth_")
+                or lk.startswith("_spt_perm_cache_")
+                or lk.startswith("_v118_perm_cache_")
+                or lk in {"username", "current_username", "login_username", "current_user", "user"}
+            ):
+                st.session_state.pop(k, None)
+    except Exception:
+        pass
+
+
+def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
+    # Clear stale identity keys before logging in a different user in the same session.
+    old_user = str(st.session_state.get("auth_username") or st.session_state.get("auth_user") or "").strip().lower()
+    new_user = str(username or "").strip().lower()
+    if old_user and new_user and old_user != new_user:
+        _v121_clear_foreign_auth_cache_on_login()
+    ok, msg = _v121_prev_authenticate(username, password) if callable(_v121_prev_authenticate) else (False, "帳號或密碼錯誤。")
+    if ok:
+        try:
+            st.session_state["auth_session_id"] = _v121_new_session_id()
+            st.session_state["auth_session_started_at"] = time.time()
+            _v121_sync_legacy_auth_keys()
+            clear_permission_cache(str(st.session_state.get("auth_username") or username or ""))
+        except Exception:
+            pass
+    return ok, msg
+
+
+def get_current_user() -> dict[str, Any] | None:  # type: ignore[override]
+    if not st.session_state.get("auth_logged_in"):
+        return None
+    username = str(st.session_state.get("auth_username") or "").strip()
+    if not username:
+        return None
+    roles = st.session_state.get("auth_roles", []) or []
+    if isinstance(roles, str):
+        roles = [roles]
+    roles = [str(r).strip() for r in roles if str(r).strip()]
+    if not roles:
+        try:
+            roles = _repair_session_role_from_account_master()
+        except Exception:
+            roles = []
+    # Correct any old compatibility keys that may have been left by previous modules.
+    _v121_sync_legacy_auth_keys()
+    return {
+        "username": username,
+        "display_name": st.session_state.get("auth_display_name", username),
+        "employee_id": st.session_state.get("auth_employee_id", ""),
+        "roles": roles,
+        "session_id": st.session_state.get("auth_session_id", ""),
+    }
+
+
+try:
+    _v121_prev_logout = logout
+except Exception:
+    _v121_prev_logout = None
+
+
+def logout(reason: str = "使用者登出") -> None:  # type: ignore[override]
+    if callable(_v121_prev_logout):
+        _v121_prev_logout(reason)
+    try:
+        # Also remove legacy keys that older services.auth_service may have set.
+        for k in ["auth_user", "auth_role", "auth_name", "username", "current_username", "login_username", "current_user", "user", "auth_user_info"]:
+            st.session_state.pop(k, None)
+    except Exception:
+        pass
+
+
+try:
+    _v121_prev_require_login = require_login
+except Exception:
+    _v121_prev_require_login = None
+
+
+def require_login(module_code: str = "") -> None:  # type: ignore[override]
+    if callable(_v121_prev_require_login):
+        _v121_prev_require_login(module_code)
+        # After user bar renders, align legacy keys again for the current session.
+        _v121_sync_legacy_auth_keys()
+        return
+    ensure_security_schema()
+    if not st.session_state.get("auth_logged_in"):
+        render_login_form()
+        st.stop()
+    _check_idle_timeout()
+    _v121_sync_legacy_auth_keys()
+    render_user_bar(module_code)
+
+# =================== END V121 MULTI-USER SESSION ISOLATION GUARD =====================
