@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+  "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-26 17:56:27",
-  "exported_at": "2026-05-26 17:54:16",
-  "reason": "v125_get_permissions_repair",
+  "updated_at": "2026-05-26 20:19:55",
+  "exported_at": "2026-05-26 20:19:55",
+  "reason": "v106_force_password_change",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -108,17 +108,26 @@
       },
       {
         "username": "B126",
-        "password_hash": "pbkdf2_sha256$dd1d7a4f0ae67a0fb38c9591ad56c2f8$9f450a5c19beddf5cdaf84b4ce9a7dbb454451e49b46a88d217b58067d0595a4",
+        "password_hash": "pbkdf2_sha256$180000$vMwu2dcj6ZIfuzzM9M/3Qw==$4UmFQ6PgoLnMDWI+xZz6Jt+2Le66Ug4tDYYn4vw4M4c=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B126",
         "display_name": "戴鎰祥",
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-26 13:01:10"
+        "updated_at": "2026-05-26 20:19:55",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "B135",
@@ -22552,8 +22561,5 @@
     "security_settings": 2,
     "security_users": 6,
     "security_user_roles": 6
-  },
-  "deleted_usernames": [],
-  "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
+  }
 }
