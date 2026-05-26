@@ -298,6 +298,38 @@ def _v105_inject_live_work_order_keyword_sync() -> None:
 # ===== END V105 WORK ORDER KEYWORD LIVE URL SYNC =====
 
 
+
+
+# ===== V126 LOGIN EMPLOYEE DEFAULT FIX =====
+def _v126_employee_options_and_login_index(employees_df: pd.DataFrame) -> tuple[list[str], int]:
+    """Default Employee selectors to the logged-in account's employee.
+
+    50 人同時使用時，畫面上方登入者與 01 開始/結束人員下拉若不同，
+    現場會誤以為系統把別人的帳號帶入。這裡只調整預設 index，
+    不移除其他選項、不鎖定管理員選擇，不影響既有按鈕與權限。
+    """
+    if employees_df is None or employees_df.empty:
+        return [], 0
+    labels = employees_df.apply(lambda r: f"{str(r.get('employee_id','')).strip()}｜{str(r.get('employee_name','')).strip()}", axis=1).tolist()
+    try:
+        auth_emp = str(st.session_state.get('auth_employee_id') or '').strip().lower()
+        auth_user = str(st.session_state.get('auth_username') or '').strip().lower()
+        auth_name = str(st.session_state.get('auth_display_name') or '').strip().lower()
+        for i, (_, r) in enumerate(employees_df.iterrows()):
+            emp_id = str(r.get('employee_id') or '').strip().lower()
+            emp_name = str(r.get('employee_name') or '').strip().lower()
+            if auth_emp and emp_id == auth_emp:
+                return labels, i
+            if auth_user and emp_id == auth_user:
+                return labels, i
+            if auth_name and emp_name == auth_name:
+                return labels, i
+    except Exception:
+        pass
+    return labels, 0
+
+# ===== END V126 LOGIN EMPLOYEE DEFAULT FIX =====
+
 # V13: 01 opens from latest memory files/SQLite without doing heavy master restore inline.
 employees = load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
 work_orders = load_work_orders_for_time_record_fast(active_only=True)
@@ -317,9 +349,11 @@ if employees.empty or work_orders.empty:
     st.stop()
 
 left, right = st.columns([1.1, 1])
+_employee_options_v126, _login_employee_index_v126 = _v126_employee_options_and_login_index(employees)
+
 with left:
     st.subheader("開始作業 / Start Work")
-    emp_label = st.selectbox("工號 / 姓名｜Employee", employees.apply(lambda r: f"{r['employee_id']}｜{r['employee_name']}", axis=1).tolist())
+    emp_label = st.selectbox("工號 / 姓名｜Employee", _employee_options_v126, index=_login_employee_index_v126, key="start_emp_v126")
     emp_id = emp_label.split("｜")[0]
     emp_match = employees[employees["employee_id"].fillna("").astype(str).str.strip() == emp_id]
     employee = emp_match.iloc[0].fillna("").to_dict() if not emp_match.empty else (query_one("SELECT * FROM employees WHERE employee_id=?", (emp_id,)) or {})
@@ -405,7 +439,7 @@ with left:
 
 with right:
     st.subheader("結束目前作業 / Finish Work")
-    emp_label2 = st.selectbox("選擇人員｜Employee", employees.apply(lambda r: f"{r['employee_id']}｜{r['employee_name']}", axis=1).tolist(), key="end_emp")
+    emp_label2 = st.selectbox("選擇人員｜Employee", _employee_options_v126, index=_login_employee_index_v126, key="end_emp_v126")
     emp_id2 = emp_label2.split("｜")[0]
     active2 = get_active_record(emp_id2)
     if not active2:

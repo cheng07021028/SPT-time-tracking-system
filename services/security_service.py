@@ -3540,3 +3540,244 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 require_permission = require_module_access
 # ======================= END V125 RUNTIME PERMISSION AUTHORITY CHECK =======================
 
+
+# ===================== V126 ONLINE USERS RESTORE + SESSION DISPLAY ALIGNMENT =====================
+# 修正：V123/V125 若覆蓋 security_service，會把 V122 的 get_online_users 移除，造成
+# pages/11_11. 登入紀錄.py 匯入失敗。此段補回在線人員 API，並每次 render_user_bar
+# 校正舊版 username/current_user 鍵，避免多人同時使用時顯示到別人的帳號。
+import uuid as _v126_uuid
+import threading as _v126_threading
+
+_V126_ONLINE_LOCK = _v126_threading.RLock()
+_V126_ONLINE_PATH = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_logs" / "online_users.json"
+_V126_HEARTBEAT_MIN_SECONDS = 15
+
+
+def _v126_now_ts() -> float:
+    try:
+        return time.time()
+    except Exception:
+        return 0.0
+
+
+def _v126_session_id() -> str:
+    sid = str(st.session_state.get("auth_session_id") or "").strip()
+    if not sid:
+        sid = _v126_uuid.uuid4().hex
+        st.session_state["auth_session_id"] = sid
+    return sid
+
+
+def _v126_read_online_payload() -> dict[str, Any]:
+    try:
+        if _V126_ONLINE_PATH.exists() and _V126_ONLINE_PATH.stat().st_size > 0:
+            data = json.loads(_V126_ONLINE_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                data.setdefault("sessions", {})
+                return data
+    except Exception:
+        pass
+    return {"version": "V126", "updated_at": _now(), "sessions": {}}
+
+
+def _v126_write_online_payload(payload: dict[str, Any]) -> None:
+    try:
+        payload = dict(payload or {})
+        payload["version"] = "V126"
+        payload["updated_at"] = _now()
+        _V126_ONLINE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _V126_ONLINE_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        tmp.replace(_V126_ONLINE_PATH)
+    except Exception:
+        pass
+
+
+def _v126_normalize_identity_session_keys() -> None:
+    if not st.session_state.get("auth_logged_in"):
+        return
+    username = str(st.session_state.get("auth_username") or "").strip()
+    display_name = str(st.session_state.get("auth_display_name") or username).strip()
+    employee_id = str(st.session_state.get("auth_employee_id") or "").strip()
+    roles = st.session_state.get("auth_roles", []) or []
+    if not isinstance(roles, list):
+        roles = [str(roles)]
+    if username:
+        st.session_state["username"] = username
+        st.session_state["current_username"] = username
+        st.session_state["login_username"] = username
+        st.session_state["auth_user"] = username
+        st.session_state["display_name"] = display_name
+        st.session_state["current_user"] = {
+            "username": username,
+            "display_name": display_name,
+            "employee_id": employee_id,
+            "roles": list(roles),
+        }
+
+
+def update_online_user(module_code: str = "", event: str = "heartbeat") -> None:
+    if not st.session_state.get("auth_logged_in"):
+        return
+    username = str(st.session_state.get("auth_username") or "").strip()
+    if not username:
+        return
+    sid = _v126_session_id()
+    now_ts = _v126_now_ts()
+    # Heartbeat 降頻；切換模組、登入、登出仍會立即寫入。
+    last_hb = float(st.session_state.get("_v126_online_last_write_ts", 0) or 0)
+    last_mod = str(st.session_state.get("_v126_online_last_module", "") or "")
+    if event == "heartbeat" and last_hb and now_ts - last_hb < _V126_HEARTBEAT_MIN_SECONDS and last_mod == str(module_code or ""):
+        return
+    roles = st.session_state.get("auth_roles", []) or []
+    role_text = ",".join(roles) if isinstance(roles, list) else str(roles)
+    with _V126_ONLINE_LOCK:
+        payload = _v126_read_online_payload()
+        sessions = payload.get("sessions") if isinstance(payload.get("sessions"), dict) else {}
+        # 清除 24 小時以上的離線/stale session，避免在線清單膨脹。
+        for old_sid, old_row in list(sessions.items()):
+            try:
+                if str(old_row.get("status") or "") != "online" and now_ts - float(old_row.get("last_seen_ts", 0) or 0) > 86400:
+                    sessions.pop(old_sid, None)
+            except Exception:
+                pass
+        old = sessions.get(sid, {}) if isinstance(sessions.get(sid), dict) else {}
+        login_time = old.get("login_time") or st.session_state.get("auth_login_time_text") or _now()
+        sessions[sid] = {
+            "session_id": sid,
+            "username": username,
+            "display_name": str(st.session_state.get("auth_display_name") or username),
+            "employee_id": str(st.session_state.get("auth_employee_id") or ""),
+            "roles": role_text,
+            "module_code": module_code or old.get("module_code", ""),
+            "login_time": login_time,
+            "last_seen": _now(),
+            "last_seen_ts": now_ts,
+            "idle_seconds": int(now_ts - float(st.session_state.get("auth_last_activity_ts", now_ts) or now_ts)),
+            "status": "online",
+            "event": event,
+        }
+        payload["sessions"] = sessions
+        _v126_write_online_payload(payload)
+        st.session_state["_v126_online_last_write_ts"] = now_ts
+        st.session_state["_v126_online_last_module"] = str(module_code or "")
+
+
+def mark_online_user_offline(reason: str = "logout") -> None:
+    sid = str(st.session_state.get("auth_session_id") or "").strip()
+    if not sid:
+        return
+    with _V126_ONLINE_LOCK:
+        payload = _v126_read_online_payload()
+        sessions = payload.get("sessions") if isinstance(payload.get("sessions"), dict) else {}
+        row = sessions.get(sid)
+        if isinstance(row, dict):
+            row["status"] = "offline"
+            row["logout_time"] = _now()
+            row["last_seen"] = _now()
+            row["last_seen_ts"] = _v126_now_ts()
+            row["event"] = reason
+            sessions[sid] = row
+            payload["sessions"] = sessions
+            _v126_write_online_payload(payload)
+
+
+def get_online_users(stale_minutes: int | None = None) -> pd.DataFrame:
+    try:
+        stale = int(stale_minutes) if stale_minutes else max(int(get_idle_timeout_minutes()) * 2, 30)
+    except Exception:
+        stale = 30
+    now_ts = _v126_now_ts()
+    payload = _v126_read_online_payload()
+    sessions = payload.get("sessions") if isinstance(payload.get("sessions"), dict) else {}
+    rows: list[dict[str, Any]] = []
+    changed = False
+    for sid, row in list(sessions.items()):
+        if not isinstance(row, dict):
+            continue
+        last_ts = float(row.get("last_seen_ts", 0) or 0)
+        age_min = (now_ts - last_ts) / 60 if last_ts else 999999
+        status = str(row.get("status") or "online")
+        if status == "online" and age_min <= stale:
+            rows.append({
+                "帳號 / Username": row.get("username", ""),
+                "姓名 / Name": row.get("display_name", ""),
+                "工號 / Employee ID": row.get("employee_id", ""),
+                "角色 / Roles": row.get("roles", ""),
+                "目前模組 / Current Module": row.get("module_code", ""),
+                "登入時間 / Login Time": row.get("login_time", ""),
+                "最後活動 / Last Seen": row.get("last_seen", ""),
+                "閒置秒數 / Idle Seconds": int(row.get("idle_seconds", 0) or 0),
+                "Session ID": str(row.get("session_id", sid))[:12],
+            })
+        elif status == "online" and age_min > stale:
+            row["status"] = "stale"
+            row["event"] = "stale_timeout"
+            sessions[sid] = row
+            changed = True
+    if changed:
+        payload["sessions"] = sessions
+        _v126_write_online_payload(payload)
+    return pd.DataFrame(rows)
+
+
+try:
+    _v126_prev_authenticate = authenticate
+except Exception:
+    _v126_prev_authenticate = None
+
+
+def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
+    # 同一瀏覽器切換帳號時，清掉上一個人的舊身份鍵，避免顯示到前一位登入者。
+    if st.session_state.get("auth_username") and str(st.session_state.get("auth_username")) != str(username or "").strip():
+        try:
+            mark_online_user_offline("switch_account")
+        except Exception:
+            pass
+        for k in list(st.session_state.keys()):
+            if k.startswith("auth_") or k.startswith("_spt_perm_cache_") or k in {"username", "current_username", "login_username", "auth_user", "current_user", "display_name"}:
+                st.session_state.pop(k, None)
+    ok, msg = _v126_prev_authenticate(username, password) if callable(_v126_prev_authenticate) else (False, "帳號或密碼錯誤。")
+    if ok:
+        st.session_state["auth_session_id"] = _v126_uuid.uuid4().hex
+        st.session_state["auth_login_time_text"] = _now()
+        _v126_normalize_identity_session_keys()
+        update_online_user("login", "login")
+    return ok, msg
+
+
+try:
+    _v126_prev_logout = logout
+except Exception:
+    _v126_prev_logout = None
+
+
+def logout(reason: str = "使用者登出") -> None:  # type: ignore[override]
+    try:
+        mark_online_user_offline(reason)
+    except Exception:
+        pass
+    if callable(_v126_prev_logout):
+        _v126_prev_logout(reason)
+    else:
+        for k in list(st.session_state.keys()):
+            if k.startswith("auth_"):
+                del st.session_state[k]
+
+
+try:
+    _v126_prev_render_user_bar = render_user_bar
+except Exception:
+    _v126_prev_render_user_bar = None
+
+
+def render_user_bar(module_code: str = "") -> None:  # type: ignore[override]
+    _v126_normalize_identity_session_keys()
+    try:
+        update_online_user(module_code or "", "heartbeat")
+    except Exception:
+        pass
+    if callable(_v126_prev_render_user_bar):
+        return _v126_prev_render_user_bar(module_code)
+
+# =================== END V126 ONLINE USERS RESTORE + SESSION DISPLAY ALIGNMENT ===================
