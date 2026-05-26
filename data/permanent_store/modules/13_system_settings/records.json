@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "13_system_settings",
   "kind": "records",
-  "updated_at": "2026-05-26 15:04:40",
-  "exported_at": "2026-05-26 15:04:40",
-  "reason": "export_13_system_settings_page_apply_v85",
+  "updated_at": "2026-05-26 15:05:37",
+  "exported_at": "2026-05-26 15:05:37",
+  "reason": "save_process_options_v85",
   "empty_authoritative": false,
   "tables": {
     "process_categories": [
@@ -872,7 +872,7 @@
         "sort_order": 3,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 51,
@@ -882,7 +882,7 @@
         "sort_order": 4,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 52,
@@ -892,7 +892,7 @@
         "sort_order": 5,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 53,
@@ -902,7 +902,7 @@
         "sort_order": 6,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 54,
@@ -912,7 +912,7 @@
         "sort_order": 7,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 55,
@@ -922,7 +922,7 @@
         "sort_order": 8,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 56,
@@ -932,7 +932,7 @@
         "sort_order": 9,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 57,
@@ -942,7 +942,7 @@
         "sort_order": 10,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 58,
@@ -952,7 +952,7 @@
         "sort_order": 11,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 59,
@@ -962,7 +962,7 @@
         "sort_order": 12,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 60,
@@ -972,7 +972,7 @@
         "sort_order": 13,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 61,
@@ -982,77 +982,77 @@
         "sort_order": 14,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 62,
         "category_name": "GPTC",
         "process_name": "主機 / 次系統管路製作",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 15,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 63,
         "category_name": "GPTC",
         "process_name": "管路檢測",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 16,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 64,
         "category_name": "GPTC",
         "process_name": "管路流量調整",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 17,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 65,
         "category_name": "GPTC",
         "process_name": "上盤日",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 18,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 66,
         "category_name": "GPTC",
         "process_name": "主機 /次系統管路製作",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 19,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 67,
         "category_name": "GPTC",
         "process_name": "POWER ON",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 20,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 68,
         "category_name": "GPTC",
         "process_name": "IO Test",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 21,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       }
     ],
     "process_options": [
@@ -1864,7 +1864,7 @@
         "sort_order": 3,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 51,
@@ -1874,7 +1874,7 @@
         "sort_order": 4,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 52,
@@ -1884,7 +1884,7 @@
         "sort_order": 5,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 53,
@@ -1894,7 +1894,7 @@
         "sort_order": 6,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 54,
@@ -1904,7 +1904,7 @@
         "sort_order": 7,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 55,
@@ -1914,7 +1914,7 @@
         "sort_order": 8,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 56,
@@ -1924,7 +1924,7 @@
         "sort_order": 9,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 57,
@@ -1934,7 +1934,7 @@
         "sort_order": 10,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 58,
@@ -1944,7 +1944,7 @@
         "sort_order": 11,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 59,
@@ -1954,7 +1954,7 @@
         "sort_order": 12,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 60,
@@ -1964,7 +1964,7 @@
         "sort_order": 13,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 61,
@@ -1974,77 +1974,77 @@
         "sort_order": 14,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 62,
         "category_name": "GPTC",
         "process_name": "主機 / 次系統管路製作",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 15,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 63,
         "category_name": "GPTC",
         "process_name": "管路檢測",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 16,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 64,
         "category_name": "GPTC",
         "process_name": "管路流量調整",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 17,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 65,
         "category_name": "GPTC",
         "process_name": "上盤日",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 18,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 66,
         "category_name": "GPTC",
         "process_name": "主機 /次系統管路製作",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 19,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 67,
         "category_name": "GPTC",
         "process_name": "POWER ON",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 20,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       },
       {
         "id": 68,
         "category_name": "GPTC",
         "process_name": "IO Test",
-        "is_active": 1,
+        "is_active": 0,
         "sort_order": 21,
         "note": "",
         "created_at": "2026-05-22 12:02:45",
-        "updated_at": "2026-05-26 15:04:39"
+        "updated_at": "2026-05-26 15:05:37"
       }
     ],
     "rest_periods": [
