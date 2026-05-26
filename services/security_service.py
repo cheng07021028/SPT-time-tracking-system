@@ -3365,307 +3365,178 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 require_permission = require_module_access
 # =================== END V106 FORCE PASSWORD CHANGE AUTHORITY UI FIX ===================
 
-# ===================== V122 MULTI-USER SESSION ISOLATION + ONLINE USERS =====================
-# 目的：50 人同時使用時，每個瀏覽器連線必須維持自己的登入身分；
-# 11｜登入紀錄新增「目前在線人員名單」，並讓登入/登出/每頁活動刷新在線狀態。
-import uuid as _v122_uuid
-import threading as _v122_threading
-from pathlib import Path as _V122Path
-
-_V122_ONLINE_LOCK = _v122_threading.RLock()
-_V122_ONLINE_PATH = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_logs" / "online_users.json"
-
-
-def _v122_now_ts() -> float:
-    try:
-        return time.time()
-    except Exception:
-        return 0.0
-
-
-def _v122_session_id() -> str:
-    sid = str(st.session_state.get("auth_session_id") or "").strip()
-    if not sid:
-        sid = _v122_uuid.uuid4().hex
-        st.session_state["auth_session_id"] = sid
-    return sid
-
-
-def _v122_read_online_payload() -> dict[str, Any]:
-    try:
-        if _V122_ONLINE_PATH.exists() and _V122_ONLINE_PATH.stat().st_size > 0:
-            data = json.loads(_V122_ONLINE_PATH.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                data.setdefault("sessions", {})
-                return data
-    except Exception:
-        pass
-    return {"version": "V122", "updated_at": _now(), "sessions": {}}
+# ========================= V125 RUNTIME PERMISSION AUTHORITY CHECK =========================
+# 目的：實際進入 01~13 模組時，直接讀 10_permissions/records.json 權威檔。
+# 避免 SQLite / session_state 舊快取造成「10 權限頁設定正確，但實際模組權限不足」。
+_V125_PERMISSION_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json"
+_V125_PERMISSION_CACHE: dict[str, Any] = {"mtime": 0.0, "tables": {}}
+_V125_MODULE_ALIASES = {
+    "01": "01", "01_time_record": "01", "01_time_records": "01",
+    "02": "02", "02_history": "02",
+    "03": "03", "03_work_orders": "03",
+    "04": "04", "04_employees": "04",
+    "05": "05", "05_analysis": "05",
+    "06": "06", "06_logs": "06", "06_system_logs": "06",
+    "07": "07", "07_missing": "07", "07_missing_records": "07",
+    "08": "08", "08_daily_hours": "08",
+    "09": "09", "09_persistence": "09",
+    "10": "10", "10_permissions": "10",
+    "11": "11", "11_login_logs": "11",
+    "12": "12", "12_module_persistence": "12",
+    "13": "13", "13_system_settings": "13",
+}
+_V125_ACTION_ALIASES = {
+    "view": "can_view", "read": "can_view", "can_view": "can_view",
+    "create": "can_create", "add": "can_create", "new": "can_create", "can_create": "can_create",
+    "edit": "can_edit", "update": "can_edit", "finish": "can_edit", "can_edit": "can_edit",
+    "delete": "can_delete", "remove": "can_delete", "can_delete": "can_delete",
+    "import": "can_import", "can_import": "can_import",
+    "export": "can_export", "download": "can_export", "can_export": "can_export",
+    "backup": "can_backup", "can_backup": "can_backup",
+    "restore": "can_restore", "can_restore": "can_restore",
+    "manage": "can_manage", "admin": "can_manage", "can_manage": "can_manage",
+}
 
 
-def _v122_write_online_payload(payload: dict[str, Any]) -> None:
-    try:
-        payload = dict(payload or {})
-        payload["version"] = "V122"
-        payload["updated_at"] = _now()
-        _V122_ONLINE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        tmp = _V122_ONLINE_PATH.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-        tmp.replace(_V122_ONLINE_PATH)
-    except Exception:
-        pass
-
-
-def _v122_normalize_identity_session_keys() -> None:
-    """Keep legacy keys aligned with the authoritative auth_* keys for this Streamlit session only."""
-    if not st.session_state.get("auth_logged_in"):
-        return
-    username = str(st.session_state.get("auth_username") or "").strip()
-    display_name = str(st.session_state.get("auth_display_name") or username).strip()
-    roles = st.session_state.get("auth_roles", []) or []
-    if username:
-        st.session_state["username"] = username
-        st.session_state["current_username"] = username
-        st.session_state["login_username"] = username
-        st.session_state["auth_user"] = username
-        st.session_state["display_name"] = display_name
-        st.session_state["current_user"] = {"username": username, "display_name": display_name, "roles": list(roles) if isinstance(roles, list) else [str(roles)]}
-
-
-def update_online_user(module_code: str = "", event: str = "heartbeat") -> None:
-    if not st.session_state.get("auth_logged_in"):
-        return
-    username = str(st.session_state.get("auth_username") or "").strip()
-    if not username:
-        return
-    sid = _v122_session_id()
-    now_ts = _v122_now_ts()
-    roles = st.session_state.get("auth_roles", []) or []
-    try:
-        role_text = ",".join(roles) if isinstance(roles, list) else str(roles)
-    except Exception:
-        role_text = str(roles)
-    with _V122_ONLINE_LOCK:
-        payload = _v122_read_online_payload()
-        sessions = payload.get("sessions") if isinstance(payload.get("sessions"), dict) else {}
-        old = sessions.get(sid, {}) if isinstance(sessions.get(sid), dict) else {}
-        login_time = old.get("login_time") or st.session_state.get("auth_login_time_text") or _now()
-        sessions[sid] = {
-            "session_id": sid,
-            "username": username,
-            "display_name": str(st.session_state.get("auth_display_name") or username),
-            "employee_id": str(st.session_state.get("auth_employee_id") or ""),
-            "roles": role_text,
-            "module_code": module_code or old.get("module_code", ""),
-            "login_time": login_time,
-            "last_seen": _now(),
-            "last_seen_ts": now_ts,
-            "idle_seconds": int(now_ts - float(st.session_state.get("auth_last_activity_ts", now_ts) or now_ts)),
-            "status": "online",
-            "event": event,
-        }
-        payload["sessions"] = sessions
-        _v122_write_online_payload(payload)
-
-
-def mark_online_user_offline(reason: str = "logout") -> None:
-    sid = str(st.session_state.get("auth_session_id") or "").strip()
-    if not sid:
-        return
-    with _V122_ONLINE_LOCK:
-        payload = _v122_read_online_payload()
-        sessions = payload.get("sessions") if isinstance(payload.get("sessions"), dict) else {}
-        row = sessions.get(sid)
-        if isinstance(row, dict):
-            row["status"] = "offline"
-            row["logout_time"] = _now()
-            row["last_seen"] = _now()
-            row["event"] = reason
-            sessions[sid] = row
-            payload["sessions"] = sessions
-            _v122_write_online_payload(payload)
-
-
-def get_online_users(stale_minutes: int | None = None) -> pd.DataFrame:
-    """Return active online sessions for 11｜登入紀錄.
-
-    Online list is runtime state, not history.  A session is considered online if
-    it heartbeats within max(2 × idle timeout, 30 minutes), unless a custom
-    stale_minutes is supplied.
-    """
-    try:
-        stale = int(stale_minutes) if stale_minutes else max(int(get_idle_timeout_minutes()) * 2, 30)
-    except Exception:
-        stale = 30
-    now_ts = _v122_now_ts()
-    payload = _v122_read_online_payload()
-    sessions = payload.get("sessions") if isinstance(payload.get("sessions"), dict) else {}
-    rows: list[dict[str, Any]] = []
-    changed = False
-    for sid, row in list(sessions.items()):
-        if not isinstance(row, dict):
-            continue
-        last_ts = float(row.get("last_seen_ts", 0) or 0)
-        age_min = (now_ts - last_ts) / 60 if last_ts else 999999
-        status = str(row.get("status") or "online")
-        if status == "online" and age_min <= stale:
-            rows.append({
-                "帳號 / Username": row.get("username", ""),
-                "姓名 / Name": row.get("display_name", ""),
-                "工號 / Employee ID": row.get("employee_id", ""),
-                "角色 / Roles": row.get("roles", ""),
-                "目前模組 / Current Module": row.get("module_code", ""),
-                "登入時間 / Login Time": row.get("login_time", ""),
-                "最後活動 / Last Seen": row.get("last_seen", ""),
-                "閒置秒數 / Idle Seconds": int(row.get("idle_seconds", 0) or 0),
-                "Session ID": str(row.get("session_id", sid))[:12],
-            })
-        elif status == "online" and age_min > stale:
-            row["status"] = "stale"
-            row["event"] = "stale_timeout"
-            sessions[sid] = row
-            changed = True
-    if changed:
-        payload["sessions"] = sessions
-        _v122_write_online_payload(payload)
-    return pd.DataFrame(rows)
-
-
-try:
-    _v122_prev_authenticate = authenticate
-except Exception:
-    _v122_prev_authenticate = None
-
-
-def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
-    # When the same browser switches account, clear identity/cache keys before validating the new login.
-    if st.session_state.get("auth_username") and str(st.session_state.get("auth_username")) != str(username or "").strip():
+def _v125_truthy(v, default: bool = False) -> bool:
+    if v is None:
+        return default
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
         try:
-            mark_online_user_offline("switch_account")
+            return float(v) != 0
         except Exception:
-            pass
+            return default
+    s = str(v).strip().lower()
+    if s in {"1", "true", "yes", "y", "on", "是", "啟用", "active", "checked", "勾選"}:
+        return True
+    if s in {"0", "false", "no", "n", "off", "否", "停用", "inactive", "unchecked", ""}:
+        return False
+    return default
+
+
+def _v125_module_no(code: str) -> str:
+    s = str(code or "").strip()
+    if s in _V125_MODULE_ALIASES:
+        return _V125_MODULE_ALIASES[s]
+    if s in MODULE_CODE_TO_NO:
+        return MODULE_CODE_TO_NO[s]
+    if len(s) >= 2 and s[:2].isdigit():
+        return s[:2]
+    return s.zfill(2)
+
+
+def _v125_action(action: str) -> str:
+    s = str(action or "can_view").strip()
+    return _V125_ACTION_ALIASES.get(s, s if s in PERMISSION_COLUMNS else "can_view")
+
+
+def _v125_role_default(role: str, module_no: str) -> dict[str, bool]:
+    role = str(role or "operator").strip().lower() or "operator"
+    row = {c: False for c in PERMISSION_COLUMNS}
+    if role == "admin":
+        return {c: True for c in PERMISSION_COLUMNS}
+    if role == "manager":
+        for c in ("can_view", "can_create", "can_edit", "can_import", "can_export"):
+            row[c] = True
+    elif role == "leader":
+        if module_no in {"01", "02", "04", "07", "08"}:
+            row["can_view"] = True; row["can_create"] = True; row["can_edit"] = True; row["can_export"] = True
+    elif role == "operator":
+        if module_no in {"01", "02", "08"}:
+            row["can_view"] = True
+        if module_no == "01":
+            row["can_create"] = True; row["can_edit"] = True
+    elif role == "viewer":
+        row["can_view"] = True; row["can_export"] = True
+    elif role == "auditor":
+        if module_no in {"02", "06", "11", "12"}:
+            row["can_view"] = True; row["can_export"] = True
+    return row
+
+
+def _v125_load_permission_tables() -> dict[str, list[dict[str, Any]]]:
+    try:
+        mtime = _V125_PERMISSION_FILE.stat().st_mtime if _V125_PERMISSION_FILE.exists() else 0.0
+    except Exception:
+        mtime = 0.0
+    if _V125_PERMISSION_CACHE.get("mtime") == mtime and isinstance(_V125_PERMISSION_CACHE.get("tables"), dict):
+        return _V125_PERMISSION_CACHE.get("tables", {})  # type: ignore[return-value]
+    tables: dict[str, list[dict[str, Any]]] = {}
+    try:
+        if _V125_PERMISSION_FILE.exists() and _V125_PERMISSION_FILE.stat().st_size > 2:
+            payload = json.loads(_V125_PERMISSION_FILE.read_text(encoding="utf-8"))
+            raw = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+            tables = {str(k): [dict(x) for x in v if isinstance(x, dict)] for k, v in raw.items() if isinstance(v, list)}
+    except Exception:
+        tables = {}
+    _V125_PERMISSION_CACHE["mtime"] = mtime
+    _V125_PERMISSION_CACHE["tables"] = tables
+    return tables
+
+
+def clear_permission_cache(username: str | None = None) -> None:  # type: ignore[override]
+    _V125_PERMISSION_CACHE["mtime"] = -1.0
+    _V125_PERMISSION_CACHE["tables"] = {}
+    try:
         for k in list(st.session_state.keys()):
-            if k.startswith("auth_") or k.startswith("_spt_perm_cache_") or k in {"username", "current_username", "login_username", "auth_user", "current_user", "display_name"}:
+            if str(k).startswith(("_spt_perm_cache_", "_v132_perm_", "_v125_perm_")):
                 st.session_state.pop(k, None)
-    ok, msg = _v122_prev_authenticate(username, password) if callable(_v122_prev_authenticate) else (False, "帳號或密碼錯誤。")
-    if ok:
-        st.session_state["auth_session_id"] = _v122_uuid.uuid4().hex
-        st.session_state["auth_login_time_text"] = _now()
-        _v122_normalize_identity_session_keys()
-        update_online_user("login", "login")
-    return ok, msg
-
-
-try:
-    _v122_prev_logout = logout
-except Exception:
-    _v122_prev_logout = None
-
-
-def logout(reason: str = "使用者登出") -> None:  # type: ignore[override]
-    try:
-        mark_online_user_offline(reason)
-    except Exception:
-        pass
-    if callable(_v122_prev_logout):
-        _v122_prev_logout(reason)
-    else:
-        for k in list(st.session_state.keys()):
-            if k.startswith("auth_"):
-                del st.session_state[k]
-
-
-try:
-    _v122_prev_render_user_bar = render_user_bar
-except Exception:
-    _v122_prev_render_user_bar = None
-
-
-def render_user_bar(module_code: str = "") -> None:  # type: ignore[override]
-    _v122_normalize_identity_session_keys()
-    try:
-        update_online_user(module_code or "", "heartbeat")
-    except Exception:
-        pass
-    if callable(_v122_prev_render_user_bar):
-        return _v122_prev_render_user_bar(module_code)
-
-# =================== END V122 MULTI-USER SESSION ISOLATION + ONLINE USERS ===================
-
-# ===================== V123 ONLINE HEARTBEAT THROTTLE + STALE CLEANUP =====================
-# 目的：50 人同時在線時，避免每次頁面 rerun 都寫 online_users.json，降低 session 狀態互蓋與 JSON 寫入壓力。
-# 規則：login/logout 強制寫；heartbeat 預設 15 秒內同一 session 不重複寫，換模組則允許更新。
-_V123_ONLINE_HEARTBEAT_MIN_SEC = 15.0
-
-try:
-    _v123_prev_update_online_user = update_online_user
-except Exception:  # pragma: no cover
-    _v123_prev_update_online_user = None
-
-
-def update_online_user(module_code: str = "", event: str = "heartbeat") -> None:  # type: ignore[override]
-    try:
-        if not st.session_state.get("auth_logged_in"):
-            return
-        now_ts = time.time()
-        event_s = str(event or "heartbeat")
-        module_s = str(module_code or "")
-        force = event_s not in {"", "heartbeat"}
-        last_ts = float(st.session_state.get("auth_online_last_write_ts", 0) or 0)
-        last_module = str(st.session_state.get("auth_online_last_module", "") or "")
-        if not force and last_module == module_s and (now_ts - last_ts) < _V123_ONLINE_HEARTBEAT_MIN_SEC:
-            return
-        if callable(_v123_prev_update_online_user):
-            _v123_prev_update_online_user(module_s, event_s)
-        st.session_state["auth_online_last_write_ts"] = now_ts
-        st.session_state["auth_online_last_module"] = module_s
-    except Exception:
-        # online list is diagnostic runtime state; never block login/page access.
-        pass
-
-
-try:
-    _v123_prev_get_online_users = get_online_users
-except Exception:  # pragma: no cover
-    _v123_prev_get_online_users = None
-
-
-def _v123_cleanup_online_payload(max_keep_hours: float = 24.0) -> None:
-    try:
-        payload = _v122_read_online_payload() if "_v122_read_online_payload" in globals() else {}
-        sessions = payload.get("sessions") if isinstance(payload.get("sessions"), dict) else {}
-        if not sessions:
-            return
-        now_ts = time.time()
-        changed = False
-        keep: dict[str, Any] = {}
-        max_age = max(float(max_keep_hours or 24.0), 1.0) * 3600.0
-        for sid, row in sessions.items():
-            if not isinstance(row, dict):
-                changed = True
-                continue
-            last_ts = float(row.get("last_seen_ts", 0) or 0)
-            status = str(row.get("status") or "online")
-            # stale/offline 超過保留時間才清除；online 由 get_online_users 判定 stale。
-            if status in {"offline", "stale"} and last_ts and (now_ts - last_ts) > max_age:
-                changed = True
-                continue
-            keep[sid] = row
-        if changed:
-            payload["sessions"] = keep
-            if "_v122_write_online_payload" in globals():
-                _v122_write_online_payload(payload)
     except Exception:
         pass
 
 
-def get_online_users(stale_minutes: int | None = None) -> pd.DataFrame:  # type: ignore[override]
-    try:
-        _v123_cleanup_online_payload()
-    except Exception:
-        pass
-    if callable(_v123_prev_get_online_users):
-        return _v123_prev_get_online_users(stale_minutes=stale_minutes)
-    return pd.DataFrame()
+def _v125_current_user_role(username: str, tables: dict[str, list[dict[str, Any]]]) -> tuple[dict[str, Any] | None, str, bool]:
+    uname = str(username or "").strip().lower()
+    for table in ("auth_users", "security_users"):
+        for row in tables.get(table, []) or []:
+            u = str(row.get("username") or row.get("帳號") or row.get("帳號 / Username") or "").strip().lower()
+            if u == uname:
+                role = str(row.get("role_code") or row.get("role") or row.get("角色") or "operator").strip().lower() or "operator"
+                active = _v125_truthy(row.get("is_active", row.get("啟用", row.get("啟用 / Active", True))), True)
+                return row, role, active
+    roles = st.session_state.get("auth_roles", []) or []
+    role = str(roles[0] if roles else ("admin" if uname == "admin" else "operator")).strip().lower() or "operator"
+    return None, role, True
 
-# =================== END V123 ONLINE HEARTBEAT THROTTLE + STALE CLEANUP ===================
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    if not st.session_state.get("auth_logged_in"):
+        return False
+    username = str(st.session_state.get("auth_username", "") or "").strip()
+    if not username:
+        return False
+    tables = _v125_load_permission_tables()
+    user_row, role, active = _v125_current_user_role(username, tables)
+    if username.lower() == "admin" or role == "admin" or "admin" in [str(x).lower() for x in (st.session_state.get("auth_roles", []) or [])]:
+        return True
+    if not active:
+        return False
+    module_no = _v125_module_no(module_code)
+    act = _v125_action(action)
+    # Prefer explicit account-module permission from 10 權限管理 authority file.
+    for row in tables.get("auth_account_permissions", []) or []:
+        u = str(row.get("username") or "").strip().lower()
+        if u != username.lower():
+            continue
+        r_module = _v125_module_no(str(row.get("module_code") or ""))
+        if r_module != module_no:
+            continue
+        if _v125_truthy(row.get("can_manage", False), False):
+            return True
+        return _v125_truthy(row.get(act, False), False)
+    # Missing row fallback: role baseline, so operator can still enter 01/02 if matrix is incomplete.
+    return bool(_v125_role_default(role, module_no).get(act, False))
+
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    require_login(module_code)
+    if not check_permission(module_code, action):
+        log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
+        st.error("權限不足：你的帳號未被授權使用此模組或功能。")
+        st.stop()
+
+require_permission = require_module_access
+# ======================= END V125 RUNTIME PERMISSION AUTHORITY CHECK =======================
+

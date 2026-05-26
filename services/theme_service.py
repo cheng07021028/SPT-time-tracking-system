@@ -2307,3 +2307,105 @@ for _spt_v289_name in (
             return _spt_v289_wrapper
         globals()[_spt_v289_name] = _spt_v289_make_wrapper(_spt_v289_func)
 # ===== V2.89 PERMISSION BUTTON STANDARD GUARD END =====
+
+# ===== V3.00 GLOBAL SELECTED DROPDOWN TEXT CONTRAST FIX START =====
+def apply_v300_global_dropdown_selected_text_fix() -> None:
+    """Make selected selectbox/multiselect text readable across all modules.
+
+    This is CSS-only and intentionally does not touch data, buttons, tables,
+    permissions, callbacks, or authority-file logic. It targets BaseWeb select
+    widgets used by Streamlit for st.selectbox/st.multiselect.
+    """
+    try:
+        st.markdown(
+            """
+            <style>
+            /* V3.00: all module dropdown selected values should be light/readable. */
+            .stSelectbox div[data-baseweb="select"] div[role="combobox"],
+            .stSelectbox div[data-baseweb="select"] div[role="combobox"] *,
+            .stSelectbox div[data-baseweb="select"] span,
+            .stSelectbox div[data-baseweb="select"] p,
+            .stMultiSelect div[data-baseweb="select"] div[role="combobox"],
+            .stMultiSelect div[data-baseweb="select"] div[role="combobox"] *,
+            .stMultiSelect div[data-baseweb="select"] span,
+            .stMultiSelect div[data-baseweb="select"] p {
+                color: #f4fbff !important;
+                -webkit-text-fill-color: #f4fbff !important;
+                font-weight: 850 !important;
+                text-shadow: 0 0 7px rgba(35,230,255,.24) !important;
+            }
+
+            /* Multiselect selected chips/tags, e.g. selected work order/location/status. */
+            .stMultiSelect div[data-baseweb="tag"],
+            .stMultiSelect div[data-baseweb="tag"] *,
+            div[data-baseweb="tag"],
+            div[data-baseweb="tag"] * {
+                color: #f4fbff !important;
+                -webkit-text-fill-color: #f4fbff !important;
+                font-weight: 850 !important;
+            }
+            .stMultiSelect div[data-baseweb="tag"] {
+                background: linear-gradient(90deg, rgba(10, 60, 90, .92), rgba(54, 38, 120, .86)) !important;
+                border: 1px solid rgba(96, 246, 255, .72) !important;
+                box-shadow: 0 0 10px rgba(35,230,255,.20) !important;
+            }
+            .stMultiSelect div[data-baseweb="tag"] svg,
+            div[data-baseweb="tag"] svg,
+            .stSelectbox div[data-baseweb="select"] svg,
+            .stMultiSelect div[data-baseweb="select"] svg {
+                color: #8ffaff !important;
+                fill: #8ffaff !important;
+            }
+
+            /* Dropdown menu items on dark popup panels. */
+            div[data-baseweb="popover"] ul[role="listbox"] li,
+            div[data-baseweb="popover"] div[role="option"],
+            ul[role="listbox"] li,
+            div[role="option"] {
+                color: #f4fbff !important;
+                -webkit-text-fill-color: #f4fbff !important;
+                font-weight: 850 !important;
+            }
+            div[data-baseweb="popover"] ul[role="listbox"],
+            div[data-baseweb="popover"] div[role="listbox"] {
+                background: rgba(7, 16, 36, .98) !important;
+                border: 1px solid rgba(96, 246, 255, .45) !important;
+            }
+            div[data-baseweb="popover"] div[aria-selected="true"],
+            div[data-baseweb="popover"] li[aria-selected="true"],
+            div[role="option"][aria-selected="true"] {
+                background: linear-gradient(90deg, rgba(35,230,255,.22), rgba(112,61,255,.32)) !important;
+                color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        pass
+
+try:
+    apply_v300_global_dropdown_selected_text_fix()
+except Exception:
+    pass
+
+for _spt_v300_name in (
+    "apply_theme", "apply_global_theme", "apply_warroom_theme", "inject_theme",
+    "inject_global_css", "inject_common_css", "render_global_css", "apply_app_theme",
+):
+    _spt_v300_func = globals().get(_spt_v300_name)
+    if callable(_spt_v300_func) and not getattr(_spt_v300_func, "_spt_v300_wrapped", False):
+        def _spt_v300_make_wrapper(_original):
+            def _spt_v300_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v300_global_dropdown_selected_text_fix()
+                except Exception:
+                    pass
+                return result
+            _spt_v300_wrapper._spt_v300_wrapped = True
+            return _spt_v300_wrapper
+        globals()[_spt_v300_name] = _spt_v300_make_wrapper(_spt_v300_func)
+# ===== V3.00 GLOBAL SELECTED DROPDOWN TEXT CONTRAST FIX END =====
+
