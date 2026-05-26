@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 17:15:52",
+  "exported_at": "2026-05-26 17:27:25",
   "source": "db_service_write",
   "module_key": "07_missing_records",
   "module_code": "07",
@@ -525,7 +525,7 @@
       {
         "id": 53,
         "record_key": "SPT142|25M0014-02|重工|2026-05-26 09:04:50|18ee71e8",
-        "status": "作業中",
+        "status": "下班",
         "work_order": "25M0014-02",
         "part_no": "PSRSC150-SB4L-02",
         "type_name": "RSC150 FRAME SORTER(御弘)",
@@ -534,20 +534,20 @@
         "employee_name": "黃沂澂",
         "start_action": "開始",
         "start_timestamp": "2026-05-26 09:04:50",
-        "end_action": null,
-        "end_timestamp": null,
+        "end_action": "下班",
+        "end_timestamp": "2026-05-26 17:27:25",
         "remark": "",
         "start_date": "2026-05-26",
         "start_time": "09:04:50",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
+        "end_date": "2026-05-26",
+        "end_time": "17:27:25",
+        "work_hours": 6.88,
         "assembly_location": "御弘",
         "group_key": "SPT142|重工|2026-05-26",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-26 09:04:50",
-        "updated_at": "2026-05-26 09:04:50"
+        "updated_at": "2026-05-26 17:27:25"
       },
       {
         "id": 55,
