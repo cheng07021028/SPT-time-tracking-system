@@ -2308,104 +2308,102 @@ for _spt_v289_name in (
         globals()[_spt_v289_name] = _spt_v289_make_wrapper(_spt_v289_func)
 # ===== V2.89 PERMISSION BUTTON STANDARD GUARD END =====
 
-# ===== V3.00 GLOBAL SELECTED DROPDOWN TEXT CONTRAST FIX START =====
-def apply_v300_global_dropdown_selected_text_fix() -> None:
-    """Make selected selectbox/multiselect text readable across all modules.
+# ===== V2.90 LIGHT INPUT DARK TEXT GUARD START =====
+def apply_v290_light_input_dark_text_guard():
+    """Keep normal text/date/number/password inputs readable on light or white fields.
 
-    This is CSS-only and intentionally does not touch data, buttons, tables,
-    permissions, callbacks, or authority-file logic. It targets BaseWeb select
-    widgets used by Streamlit for st.selectbox/st.multiselect.
+    Scope is intentionally limited to native input widgets only. It does not target
+    selectbox/multiselect BaseWeb select containers, data editors, buttons, or tables.
     """
     try:
-        st.markdown(
-            """
-            <style>
-            /* V3.00: all module dropdown selected values should be light/readable. */
-            .stSelectbox div[data-baseweb="select"] div[role="combobox"],
-            .stSelectbox div[data-baseweb="select"] div[role="combobox"] *,
-            .stSelectbox div[data-baseweb="select"] span,
-            .stSelectbox div[data-baseweb="select"] p,
-            .stMultiSelect div[data-baseweb="select"] div[role="combobox"],
-            .stMultiSelect div[data-baseweb="select"] div[role="combobox"] *,
-            .stMultiSelect div[data-baseweb="select"] span,
-            .stMultiSelect div[data-baseweb="select"] p {
-                color: #f4fbff !important;
-                -webkit-text-fill-color: #f4fbff !important;
-                font-weight: 850 !important;
-                text-shadow: 0 0 7px rgba(35,230,255,.24) !important;
-            }
-
-            /* Multiselect selected chips/tags, e.g. selected work order/location/status. */
-            .stMultiSelect div[data-baseweb="tag"],
-            .stMultiSelect div[data-baseweb="tag"] *,
-            div[data-baseweb="tag"],
-            div[data-baseweb="tag"] * {
-                color: #f4fbff !important;
-                -webkit-text-fill-color: #f4fbff !important;
-                font-weight: 850 !important;
-            }
-            .stMultiSelect div[data-baseweb="tag"] {
-                background: linear-gradient(90deg, rgba(10, 60, 90, .92), rgba(54, 38, 120, .86)) !important;
-                border: 1px solid rgba(96, 246, 255, .72) !important;
-                box-shadow: 0 0 10px rgba(35,230,255,.20) !important;
-            }
-            .stMultiSelect div[data-baseweb="tag"] svg,
-            div[data-baseweb="tag"] svg,
-            .stSelectbox div[data-baseweb="select"] svg,
-            .stMultiSelect div[data-baseweb="select"] svg {
-                color: #8ffaff !important;
-                fill: #8ffaff !important;
-            }
-
-            /* Dropdown menu items on dark popup panels. */
-            div[data-baseweb="popover"] ul[role="listbox"] li,
-            div[data-baseweb="popover"] div[role="option"],
-            ul[role="listbox"] li,
-            div[role="option"] {
-                color: #f4fbff !important;
-                -webkit-text-fill-color: #f4fbff !important;
-                font-weight: 850 !important;
-            }
-            div[data-baseweb="popover"] ul[role="listbox"],
-            div[data-baseweb="popover"] div[role="listbox"] {
-                background: rgba(7, 16, 36, .98) !important;
-                border: 1px solid rgba(96, 246, 255, .45) !important;
-            }
-            div[data-baseweb="popover"] div[aria-selected="true"],
-            div[data-baseweb="popover"] li[aria-selected="true"],
-            div[role="option"][aria-selected="true"] {
-                background: linear-gradient(90deg, rgba(35,230,255,.22), rgba(112,61,255,.32)) !important;
-                color: #ffffff !important;
-                -webkit-text-fill-color: #ffffff !important;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
+        import streamlit as st
     except Exception:
-        pass
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.90｜白底/淺色底輸入框文字深色防回退
+           只處理一般輸入框：Text / Date / Number / Password / TextArea。
+           不碰 selectbox / multiselect、表格、按鈕，避免影響既有 V2.84 下拉風格。 */
+
+        :root {
+            --spt-v290-light-input-text: #061427;
+            --spt-v290-light-input-placeholder: #3c536a;
+            --spt-v290-light-input-caret: #061427;
+        }
+
+        .stTextInput input,
+        .stDateInput input,
+        .stNumberInput input,
+        .stPasswordInput input,
+        .stTextArea textarea,
+        div[data-testid="stTextInputRootElement"] input,
+        div[data-testid="stNumberInputRootElement"] input,
+        div[data-testid="stDateInputField"] input,
+        div[data-testid="stPasswordInput"] input,
+        div[data-testid="stTextArea"] textarea {
+            color: var(--spt-v290-light-input-text) !important;
+            -webkit-text-fill-color: var(--spt-v290-light-input-text) !important;
+            caret-color: var(--spt-v290-light-input-caret) !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+            mix-blend-mode: normal !important;
+        }
+
+        .stTextInput input::placeholder,
+        .stDateInput input::placeholder,
+        .stNumberInput input::placeholder,
+        .stPasswordInput input::placeholder,
+        .stTextArea textarea::placeholder,
+        div[data-testid="stTextInputRootElement"] input::placeholder,
+        div[data-testid="stNumberInputRootElement"] input::placeholder,
+        div[data-testid="stDateInputField"] input::placeholder,
+        div[data-testid="stPasswordInput"] input::placeholder,
+        div[data-testid="stTextArea"] textarea::placeholder {
+            color: var(--spt-v290-light-input-placeholder) !important;
+            -webkit-text-fill-color: var(--spt-v290-light-input-placeholder) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        /* 明確排除 selectbox / multiselect 內部搜尋 input，維持下拉選單既有淺色顯示修正。 */
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete="list"] {
+            caret-color: #8df7ff !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 try:
-    apply_v300_global_dropdown_selected_text_fix()
+    apply_v290_light_input_dark_text_guard()
 except Exception:
     pass
 
-for _spt_v300_name in (
-    "apply_theme", "apply_global_theme", "apply_warroom_theme", "inject_theme",
-    "inject_global_css", "inject_common_css", "render_global_css", "apply_app_theme",
+for _spt_v290_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
 ):
-    _spt_v300_func = globals().get(_spt_v300_name)
-    if callable(_spt_v300_func) and not getattr(_spt_v300_func, "_spt_v300_wrapped", False):
-        def _spt_v300_make_wrapper(_original):
-            def _spt_v300_wrapper(*args, **kwargs):
+    _spt_v290_func = globals().get(_spt_v290_name)
+    if callable(_spt_v290_func) and not getattr(_spt_v290_func, "_spt_v290_wrapped", False):
+        def _spt_v290_make_wrapper(_original):
+            def _spt_v290_wrapper(*args, **kwargs):
                 result = _original(*args, **kwargs)
                 try:
-                    apply_v300_global_dropdown_selected_text_fix()
+                    apply_v290_light_input_dark_text_guard()
                 except Exception:
                     pass
                 return result
-            _spt_v300_wrapper._spt_v300_wrapped = True
-            return _spt_v300_wrapper
-        globals()[_spt_v300_name] = _spt_v300_make_wrapper(_spt_v300_func)
-# ===== V3.00 GLOBAL SELECTED DROPDOWN TEXT CONTRAST FIX END =====
-
+            _spt_v290_wrapper._spt_v290_wrapped = True
+            return _spt_v290_wrapper
+        globals()[_spt_v290_name] = _spt_v290_make_wrapper(_spt_v290_func)
+# ===== V2.90 LIGHT INPUT DARK TEXT GUARD END =====
