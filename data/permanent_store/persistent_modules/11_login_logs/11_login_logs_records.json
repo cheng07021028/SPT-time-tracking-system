@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 18:53:30",
+  "exported_at": "2026-05-26 19:12:19",
   "source": "db_service_write",
   "module_key": "11_login_logs",
   "module_code": "11",
@@ -10,7 +10,22 @@
     "auth_login_logs": [],
     "login_logs": [
       {
-        "id": 124,
+        "id": 128,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=admin;source=authority",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-26 19:12:05",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-26 19:12:05"
+      },
+      {
+        "id": 129,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGIN",
@@ -25,7 +40,7 @@
         "created_at": "2026-05-26 18:49:53"
       },
       {
-        "id": 125,
+        "id": 130,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "AUTO_LOGOUT",
@@ -40,7 +55,7 @@
         "created_at": "2026-05-26 18:48:29"
       },
       {
-        "id": 126,
+        "id": 131,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "AUTO_LOGOUT",
@@ -58,6 +73,6 @@
   },
   "table_counts": {
     "auth_login_logs": 0,
-    "login_logs": 3
+    "login_logs": 4
   }
 }
