@@ -2023,3 +2023,376 @@ record_audit_log = record_login_log
 log_login_event = record_login_log
 save_login_log = record_login_log
 # =================== END V115 LOGIN LOG EVENT WRITE-THROUGH FIX ===================
+
+# ===================== V135 LOGIN LOG AUTHORITY + DELETE-RANGE HARD FIX =====================
+# 目的：
+# 1) 11. 登入紀錄清除後，不可再從 SQLite 舊表、auth_login_logs、security_login_logs、
+#    persistent_modules 舊檔或歷史備份復活。
+# 2) 刪除不只記錄 deleted_keys，也記錄日期範圍 + 刪除時間 deleted_at。
+#    舊資料只要事件日期落在已清除範圍，且事件時間早於清除時間，就會被擋掉；
+#    清除後的新登入仍可正常顯示。
+# 3) Page 11 顯示與統計都使用同一套 tombstone 過濾後的 canonical 合併資料。
+# 4) 寫入事件時先過濾舊復活資料，再寫回 11_login_logs canonical 權威檔。
+
+try:
+    _v135_prev_load_login_logs = load_login_logs
+except Exception:
+    _v135_prev_load_login_logs = None
+try:
+    _v135_prev_get_login_log_stats = get_login_log_stats
+except Exception:
+    _v135_prev_get_login_log_stats = None
+try:
+    _v135_prev_delete_login_logs_by_date_range = delete_login_logs_by_date_range
+except Exception:
+    _v135_prev_delete_login_logs_by_date_range = None
+try:
+    _v135_prev_record_login_log = record_login_log
+except Exception:
+    _v135_prev_record_login_log = None
+
+
+def _v135_parse_dt(value: Any):
+    """Parse login event datetime for delete-range tombstone comparison."""
+    if value in (None, ""):
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    s = s.replace("T", " ").replace("/", "-").replace(".", "-")
+    if "+" in s:
+        s = s.split("+", 1)[0].strip()
+    if s.endswith("Z"):
+        s = s[:-1].strip()
+    candidates = [s, s[:19], s[:16], s[:10]]
+    for c in candidates:
+        c = str(c or "").strip()
+        if not c:
+            continue
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%Y%m%d"):
+            try:
+                return datetime.strptime(c, fmt)
+            except Exception:
+                pass
+        try:
+            return datetime.fromisoformat(c)
+        except Exception:
+            pass
+    return None
+
+
+def _v135_row_event_datetime(row: Dict[str, Any]):
+    for key in ("login_time", "event_time", "created_at", "log_time", "timestamp", "logout_time", "login_at"):
+        dt = _v135_parse_dt((row or {}).get(key))
+        if dt is not None:
+            return dt
+    return None
+
+
+def _v135_record_key(row: Dict[str, Any]) -> str:
+    try:
+        if "_v103_record_key" in globals():
+            return _v103_record_key(row)
+    except Exception:
+        pass
+    try:
+        return _login_record_key(row)
+    except Exception:
+        return "|".join(str((row or {}).get(x, "")) for x in ("username", "event_type", "result", "login_time", "created_at", "module_code", "message"))
+
+
+def _v135_read_delete_state() -> Dict[str, Any]:
+    try:
+        if "_v106_read_delete_state" in globals():
+            st = _v106_read_delete_state()
+            return dict(st) if isinstance(st, dict) else {}
+    except Exception:
+        pass
+    try:
+        if _V106_LOGIN_DELETE_STATE_PATH.exists():
+            data = json.loads(_V106_LOGIN_DELETE_STATE_PATH.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        pass
+    return {}
+
+
+def _v135_write_delete_state(state: Dict[str, Any]) -> None:
+    try:
+        if "_v106_write_delete_state" in globals():
+            _v106_write_delete_state(state)
+            return
+    except Exception:
+        pass
+    try:
+        state = dict(state or {})
+        state.setdefault("authority_schema", "SPT-LoginLogsDeleteState-V135")
+        state["updated_at"] = _now()
+        _V106_LOGIN_DELETE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _V106_LOGIN_DELETE_STATE_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        tmp.replace(_V106_LOGIN_DELETE_STATE_PATH)
+    except Exception:
+        pass
+
+
+def _v135_row_is_deleted_by_state(row: Dict[str, Any], state: Dict[str, Any] | None = None) -> bool:
+    state = state if isinstance(state, dict) else _v135_read_delete_state()
+    key = _v135_record_key(row)
+    deleted_keys = state.get("deleted_keys", [])
+    if isinstance(deleted_keys, list) and key in {str(x) for x in deleted_keys}:
+        return True
+
+    event_dt = _v135_row_event_datetime(row)
+    if event_dt is None:
+        return False
+    event_date = event_dt.date()
+    ranges = state.get("delete_ranges", [])
+    if not isinstance(ranges, list):
+        return False
+    for rg in ranges:
+        if not isinstance(rg, dict):
+            continue
+        sd = _v104_parse_any_date(rg.get("start_date")) if "_v104_parse_any_date" in globals() else None
+        ed = _v104_parse_any_date(rg.get("end_date")) if "_v104_parse_any_date" in globals() else None
+        if sd is None or ed is None:
+            continue
+        if ed < sd:
+            sd, ed = ed, sd
+        if not (sd <= event_date <= ed):
+            continue
+        deleted_at = _v135_parse_dt(rg.get("deleted_at")) or _v135_parse_dt(state.get("updated_at"))
+        # 清除後新登入不要被同日期 tombstone 擋掉；舊資料才擋。
+        if deleted_at is None or event_dt <= deleted_at:
+            return True
+    return False
+
+
+def _v135_filter_deleted_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    state = _v135_read_delete_state()
+    out: List[Dict[str, Any]] = []
+    for row in records or []:
+        if not isinstance(row, dict):
+            continue
+        if _v135_row_is_deleted_by_state(row, state):
+            continue
+        out.append(row)
+    try:
+        return _v103_merge_login_rows(out) if "_v103_merge_login_rows" in globals() else _merge_record_sets(out)
+    except Exception:
+        return out
+
+
+# Override V106 tombstone function so all older helpers automatically inherit range-based blocking.
+def _v106_apply_delete_tombstone(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:  # type: ignore[override]
+    return _v135_filter_deleted_records(records or [])
+
+
+def _v135_raw_records_from_all_sources(include_legacy: bool = True) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    try:
+        if "_v103_read_authority_login_records" in globals():
+            rows.extend(_v103_read_authority_login_records())
+    except Exception:
+        pass
+    try:
+        if "_v103_db_login_records" in globals():
+            rows.extend(_v103_db_login_records(include_legacy=include_legacy))
+    except Exception:
+        pass
+    if not rows:
+        try:
+            if callable(_v135_prev_load_login_logs):
+                rows.extend(_to_records(_v135_prev_load_login_logs(limit=100000, include_legacy=include_legacy)))
+        except Exception:
+            pass
+    try:
+        return _v103_merge_login_rows(rows) if "_v103_merge_login_rows" in globals() else _merge_record_sets(rows)
+    except Exception:
+        return rows
+
+
+def _v135_write_authority_and_cache(records: List[Dict[str, Any]], reason: str = "v135_login_authority", *, github: bool = True) -> Dict[str, Any]:
+    clean = _v135_filter_deleted_records(_valid_login_rows("v135", records or []))
+    # SQLite cache 必須跟 tombstone 後的權威檔一致；legacy 表清空，避免 reboot 復活。
+    try:
+        if "_v103_replace_db_with_login_records" in globals():
+            _v103_replace_db_with_login_records(clean)
+    except Exception:
+        pass
+    res: Dict[str, Any] = {"ok": True, "count": len(clean)}
+    try:
+        from services.permanent_authority_service import save_authority, canonical_path
+        res = save_authority(
+            "11_login_logs",
+            records={"login_logs": clean, "auth_login_logs": [], "security_login_logs": []},
+            reason=reason,
+            github=bool(github),
+        )
+        res["count"] = len(clean)
+        res["canonical_path"] = str(canonical_path("11_login_logs", "records"))
+    except Exception as exc:
+        res = {"ok": False, "count": len(clean), "error": str(exc)[:300]}
+        try:
+            path = _V103_LOGIN_AUTHORITY_PATH if "_V103_LOGIN_AUTHORITY_PATH" in globals() else PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_logs" / "records.json"
+            payload = {
+                "authority_schema": "SPT-PermanentAuthority-V135-LoginLogs",
+                "module_key": "11_login_logs",
+                "kind": "records",
+                "updated_at": _now(),
+                "exported_at": _now(),
+                "reason": reason,
+                "empty_authoritative": len(clean) == 0,
+                "tables": {"login_logs": clean, "auth_login_logs": [], "security_login_logs": []},
+                "table_counts": {"login_logs": len(clean), "auth_login_logs": 0, "security_login_logs": 0},
+            }
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            tmp.replace(path)
+            res["ok"] = True
+            res["canonical_path"] = str(path)
+        except Exception as exc2:
+            res["fallback_error"] = str(exc2)[:300]
+    # 相容舊路徑，但內容只能是 tombstone 後乾淨資料。
+    try:
+        if "_v103_write_legacy_login_files" in globals():
+            _v103_write_legacy_login_files(clean, reason)
+    except Exception:
+        pass
+    return res
+
+
+def load_login_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "",
+                    limit: int = 1000, event_types: Optional[List[str]] = None,
+                    results: Optional[List[str]] = None, include_legacy: bool = True, **kwargs: Any):  # type: ignore[override]
+    records = _v135_filter_deleted_records(_v135_raw_records_from_all_sources(include_legacy=include_legacy))
+    records = _filter_records(records, start_date, end_date, keyword, event_types, results)
+    records.sort(key=lambda r: str(r.get("login_time") or r.get("created_at") or r.get("logout_time") or ""), reverse=True)
+    if limit:
+        records = records[:int(limit)]
+    if pd is not None:
+        return pd.DataFrame(records)
+    return records
+
+
+def get_login_log_stats(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "") -> Dict[str, int]:  # type: ignore[override]
+    logs = load_login_logs(start_date=start_date, end_date=end_date, keyword=keyword, limit=100000)
+    if pd is not None and hasattr(logs, "empty"):
+        total = int(len(logs))
+        success = 0
+        if total:
+            result_s = logs.get("result", "").astype(str).str.upper()
+            success = int(result_s.isin(["SUCCESS", "OK", "INFO"]).sum())
+        return {"records": total, "success": success, "failed": total - success}
+    total = len(logs)
+    success = sum(1 for r in logs if _normalise_result(r.get("result")) in {"SUCCESS", "OK", "INFO"})
+    return {"records": total, "success": success, "failed": total - success}
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    start_d = _v104_parse_any_date(start_date) if "_v104_parse_any_date" in globals() else None
+    end_d = _v104_parse_any_date(end_date) if "_v104_parse_any_date" in globals() else None
+    if start_d is None or end_d is None:
+        return 0
+    if end_d < start_d:
+        start_d, end_d = end_d, start_d
+
+    now_deleted_at = _now()
+    before = _v135_raw_records_from_all_sources(include_legacy=True)
+    remaining: List[Dict[str, Any]] = []
+    deleted = 0
+    state = _v135_read_delete_state()
+    deleted_keys = set(str(k) for k in state.get("deleted_keys", []) if str(k).strip()) if isinstance(state.get("deleted_keys", []), list) else set()
+    preview: List[Dict[str, Any]] = []
+    for row in before or []:
+        rd = _v104_row_log_date(row) if "_v104_row_log_date" in globals() else None
+        if rd is not None and start_d <= rd <= end_d:
+            deleted += 1
+            deleted_keys.add(_v135_record_key(row))
+            if len(preview) < 30:
+                preview.append({
+                    "username": row.get("username"),
+                    "event_type": row.get("event_type"),
+                    "result": row.get("result"),
+                    "login_time": row.get("login_time") or row.get("created_at"),
+                    "key": _v135_record_key(row),
+                })
+        else:
+            remaining.append(row)
+
+    ranges = state.get("delete_ranges", []) if isinstance(state.get("delete_ranges"), list) else []
+    ranges.append({
+        "start_date": str(start_d),
+        "end_date": str(end_d),
+        "deleted_at": now_deleted_at,
+        "deleted_count": deleted,
+        "mode": "date_range_before_deleted_at_v135",
+    })
+    state.update({
+        "authority_schema": "SPT-LoginLogsDeleteState-V135",
+        "module_key": "11_login_logs",
+        "updated_at": now_deleted_at,
+        "delete_ranges": ranges[-200:],
+        "deleted_keys": sorted({str(k) for k in deleted_keys if str(k).strip()})[-100000:],
+        "last_deleted_count": deleted,
+        "last_deleted_rows_preview": preview,
+    })
+    _v135_write_delete_state(state)
+    # 寫權威檔時會再次套用 range tombstone，確保同日期舊資料不會被 DB/legacy 帶回。
+    _v135_write_authority_and_cache(remaining, reason="v135_clear_login_logs_authority_range_tombstone", github=True)
+    return int(deleted)
+
+
+def export_audit_logs_to_permanent_file(create_history: bool = True, merge_existing: bool = True) -> Dict[str, Any]:  # type: ignore[override]
+    # 永久匯出只能匯出 tombstone 後目前可見資料，不得 merge 舊 history。
+    records = _to_records(load_login_logs(limit=100000, include_legacy=True))
+    return _v135_write_authority_and_cache(records, reason="v135_export_login_logs_authority", github=True)
+
+
+def restore_audit_logs_from_permanent_file(*args: Any, **kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
+    # 還原也必須尊重 delete_state，不能把已清除範圍從舊檔還原。
+    records = _v135_filter_deleted_records(_v135_raw_records_from_all_sources(include_legacy=True))
+    _v135_write_authority_and_cache(records, reason="v135_restore_login_logs_tombstone_safe", github=True)
+    return {"ok": True, "message": f"已依 V135 權威檔與刪除狀態還原登入紀錄，共 {len(records)} 筆。", "count": len(records)}
+
+
+def get_audit_permanent_status() -> Dict[str, Any]:  # type: ignore[override]
+    records = _v135_filter_deleted_records(_v103_read_authority_login_records() if "_v103_read_authority_login_records" in globals() else [])
+    path = _V103_LOGIN_AUTHORITY_PATH if "_V103_LOGIN_AUTHORITY_PATH" in globals() else PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_logs" / "records.json"
+    payload = _read_json_file(path) if path.exists() else {}
+    delete_state = _v135_read_delete_state()
+    return {
+        "exists": path.exists(),
+        "path": str(path),
+        "size": path.stat().st_size if path.exists() else 0,
+        "count": len(records),
+        "exported_at": str(payload.get("exported_at") or payload.get("updated_at") or "") if isinstance(payload, dict) else "",
+        "db_count": len(_v135_filter_deleted_records(_v103_db_login_records(include_legacy=True))) if "_v103_db_login_records" in globals() else 0,
+        "authority_schema": str(payload.get("authority_schema", "")) if isinstance(payload, dict) else "",
+        "delete_state_path": str(_V106_LOGIN_DELETE_STATE_PATH),
+        "delete_state_exists": _V106_LOGIN_DELETE_STATE_PATH.exists(),
+        "deleted_keys": len(delete_state.get("deleted_keys", []) or []),
+        "delete_ranges": len(delete_state.get("delete_ranges", []) or []),
+        "last_deleted_count": int(delete_state.get("last_deleted_count", 0) or 0),
+    }
+
+
+# Keep aliases pinned to V135 implementations.
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+delete_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+clear_audit_logs_by_date = delete_login_logs_by_date_range
+get_login_logs = load_login_logs
+query_login_logs = load_login_logs
+load_audit_logs = load_login_logs
+login_log_stats = get_login_log_stats
+audit_permanent_status = get_audit_permanent_status
+get_audit_state_status = get_audit_permanent_status
+login_log_state_status = get_audit_permanent_status
+get_login_log_permanent_status = get_audit_permanent_status
+restore_login_logs_from_permanent_file = restore_audit_logs_from_permanent_file
+restore_login_logs_from_state = restore_audit_logs_from_permanent_file
+# =================== END V135 LOGIN LOG AUTHORITY + DELETE-RANGE HARD FIX ===================
