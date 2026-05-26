@@ -20,7 +20,7 @@ from services.audit_log_service import (
     auto_record_session_login,
 )
 
-from services.security_service import require_module_access
+from services.security_service import require_module_access, get_online_users
 
 apply_theme()
 require_module_access("11_login_logs", "can_view")
@@ -60,6 +60,23 @@ c1.metric("權威檔 / Authority File", "Exists" if status.get("exists") else "N
 c2.metric("權威檔筆數 / Authority Rows", status.get("count", 0))
 c3.metric("SQLite快取筆數 / Cache Rows", status.get("db_count", 0))
 st.caption(f"權威檔路徑：{status.get('path', '-')}｜Schema：{status.get('authority_schema', '-') or '-'}｜DeleteState：{status.get('delete_state_path', '-')}｜DeletedKeys：{status.get('deleted_keys', 0)}")
+
+
+st.divider()
+st.markdown("### 目前在線人員名單 / Current Online Users")
+st.caption("V122：此區塊讀取目前 Streamlit session heartbeat，不是歷史紀錄；人員登出或超過閒置時間後會自動從在線清單排除。")
+try:
+    online_df = get_online_users()
+except Exception as exc:
+    online_df = pd.DataFrame()
+    st.warning(f"在線人員名單讀取失敗：{exc}")
+if online_df is None or online_df.empty:
+    st.info("目前沒有偵測到在線人員，或尚未產生 heartbeat。")
+else:
+    oc1, oc2 = st.columns([1, 3])
+    oc1.metric("在線人數 / Online", len(online_df))
+    oc2.caption("同一帳號開多個瀏覽器分頁會以不同 Session 顯示；這可協助判斷現場是否多人同時登入。")
+    st.dataframe(online_df, use_container_width=True, hide_index=True, height=min(360, 82 + len(online_df) * 36))
 
 b1, b2, b3, b4 = st.columns(4)
 with b1:

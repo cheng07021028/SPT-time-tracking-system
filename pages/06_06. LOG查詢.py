@@ -17,6 +17,18 @@ require_module_access("06_logs")
 render_header("06｜LOG 查詢", "記錄哪個帳號、什麼時間、在哪個模組做了什麼動作｜支援日期篩選與區間刪除")
 
 
+try:
+    _log_auth_status = log_service.get_system_log_authority_status() if hasattr(log_service, "get_system_log_authority_status") else {}
+except Exception:
+    _log_auth_status = {}
+if _log_auth_status:
+    st.caption(
+        f"LOG 權威檔：{'Exists' if _log_auth_status.get('exists') else 'Not Found'}｜"
+        f"權威筆數：{_log_auth_status.get('count', 0)}｜SQLite快取：{_log_auth_status.get('db_count', 0)}｜"
+        f"DeletedKeys：{_log_auth_status.get('deleted_keys', 0)}｜Path：{_log_auth_status.get('path', '-')}"
+    )
+
+
 def _default_filters() -> dict:
     today = today_date()
     return {
@@ -119,7 +131,7 @@ else:
 st.divider()
 st.markdown("### 刪除區間 LOG / Delete Logs by Date Range")
 if check_permission("06_logs", "can_delete") or check_permission("06_logs", "can_manage"):
-    st.warning("刪除 LOG 會永久移除指定日期區間內的系統操作紀錄。請先確認日期，再勾選確認。")
+    st.warning("V122：刪除 LOG 會同步覆寫 06_logs/records.json 權威檔，並建立 delete_state.json tombstone，避免 Reboot App 後舊 LOG 復活。請先確認日期，再勾選確認。")
     d1, d2 = st.columns(2)
     delete_start = d1.date_input("刪除開始日期 / Delete Start", value=filters.get("start_date") or today_date(), key="log_delete_start")
     delete_end = d2.date_input("刪除結束日期 / Delete End", value=filters.get("end_date") or today_date(), key="log_delete_end")

@@ -306,3 +306,374 @@ def delete_logs_by_date_range(
             user_name=user_name,
         )
     return before
+
+# ===================== V122 06 LOG AUTHORITY WRITE-THROUGH + DELETE TOMBSTONE =====================
+# 目的：06｜LOG查詢不可只依賴 SQLite 快取；新增/查詢/刪除都要對齊正式權威檔，
+# 且刪除過的舊 LOG 不可因 SQLite / legacy cache 又復活。
+from pathlib import Path as _V122Path
+import json as _v122_json
+import threading as _v122_threading
+import hashlib as _v122_hashlib
+import time as _v122_time
+
+_V122_PROJECT_ROOT = _V122Path(__file__).resolve().parents[1]
+_V122_LOG_MODULE_KEY = "06_logs"
+_V122_LOG_AUTH_DIR = _V122_PROJECT_ROOT / "data" / "permanent_store" / "modules" / _V122_LOG_MODULE_KEY
+_V122_LOG_DELETE_STATE_PATH = _V122_LOG_AUTH_DIR / "delete_state.json"
+_V122_LOG_LOCK = _v122_threading.RLock()
+_V122_LOG_UPLOAD_STATE = {"running": False, "pending": False, "last_error": "", "last_upload_ts": 0.0}
+
+try:
+    _v122_original_write_log = write_log
+except Exception:  # pragma: no cover
+    _v122_original_write_log = None
+
+
+def _v122_log_date(value: Any) -> str:
+    text = _clean_text(value)
+    if not text:
+        return ""
+    try:
+        dt = pd.to_datetime(text, errors="coerce")
+        if not pd.isna(dt):
+            return dt.strftime("%Y-%m-%d")
+    except Exception:
+        pass
+    return text.replace("/", "-")[:10]
+
+
+def _v122_log_clean_row(row: Any, source: str = "") -> dict[str, Any]:
+    r = dict(row) if isinstance(row, dict) else {}
+    out = {
+        "id": r.get("id", ""),
+        "log_time": _clean_text(r.get("log_time") or r.get("created_at") or r.get("time") or r.get("LOG時間 / Log Time")),
+        "user_name": _clean_text(r.get("user_name") or r.get("username") or r.get("帳號 / User")),
+        "action_type": _clean_text(r.get("action_type") or r.get("action") or r.get("動作 / Action")),
+        "target_table": _clean_text(r.get("target_table") or r.get("module") or r.get("模組 / Module")),
+        "target_id": _clean_text(r.get("target_id") or r.get("目標ID / Target ID")),
+        "message": _clean_text(r.get("message") or r.get("操作內容 / Message")),
+        "detail": _clean_text(r.get("detail") or r.get("明細 / Detail")),
+        "level": _clean_text(r.get("level") or r.get("result") or r.get("結果 / Level") or "INFO"),
+        "source": _clean_text(r.get("source") or source or "system_logs"),
+    }
+    if not out["log_time"]:
+        out["log_time"] = now_text()
+    return out
+
+
+def _v122_log_key(row: dict[str, Any]) -> str:
+    parts = [
+        _clean_text(row.get("log_time")), _clean_text(row.get("user_name")),
+        _clean_text(row.get("action_type")), _clean_text(row.get("target_table")),
+        _clean_text(row.get("target_id")), _clean_text(row.get("message")),
+        _clean_text(row.get("detail")), _clean_text(row.get("level")),
+    ]
+    raw = "|".join(parts)
+    return _v122_hashlib.sha1(raw.encode("utf-8", errors="ignore")).hexdigest()
+
+
+def _v122_read_log_delete_state() -> dict[str, Any]:
+    try:
+        if _V122_LOG_DELETE_STATE_PATH.exists() and _V122_LOG_DELETE_STATE_PATH.stat().st_size > 0:
+            data = _v122_json.loads(_V122_LOG_DELETE_STATE_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                data.setdefault("deleted_keys", [])
+                data.setdefault("deleted_ranges", [])
+                return data
+    except Exception:
+        pass
+    return {"version": "V122", "module_key": _V122_LOG_MODULE_KEY, "deleted_keys": [], "deleted_ranges": [], "updated_at": now_text()}
+
+
+def _v122_write_log_delete_state(state: dict[str, Any]) -> None:
+    try:
+        state = dict(state or {})
+        state["version"] = "V122"
+        state["module_key"] = _V122_LOG_MODULE_KEY
+        state["updated_at"] = now_text()
+        _V122_LOG_DELETE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _V122_LOG_DELETE_STATE_PATH.with_suffix(".json.tmp")
+        tmp.write_text(_v122_json.dumps(state, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        tmp.replace(_V122_LOG_DELETE_STATE_PATH)
+    except Exception:
+        pass
+
+
+def _v122_deleted_key_set() -> set[str]:
+    state = _v122_read_log_delete_state()
+    raw = state.get("deleted_keys") if isinstance(state.get("deleted_keys"), list) else []
+    return {str(x) for x in raw if str(x).strip()}
+
+
+def _v122_read_authority_log_rows() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    try:
+        from services.permanent_authority_service import load_tables
+        tables = load_tables(_V122_LOG_MODULE_KEY, "records")
+        for r in (tables.get("system_logs") or []):
+            if isinstance(r, dict):
+                rows.append(_v122_log_clean_row(r, "authority"))
+    except Exception:
+        try:
+            auth_path = _V122_LOG_AUTH_DIR / "records.json"
+            if auth_path.exists() and auth_path.stat().st_size > 0:
+                data = _v122_json.loads(auth_path.read_text(encoding="utf-8"))
+                tables = data.get("tables", {}) if isinstance(data, dict) else {}
+                for r in (tables.get("system_logs") or data.get("records") or []):
+                    if isinstance(r, dict):
+                        rows.append(_v122_log_clean_row(r, "authority"))
+        except Exception:
+            pass
+    return rows
+
+
+def _v122_sqlite_log_rows(limit: int = 200000) -> list[dict[str, Any]]:
+    try:
+        df = query_df("SELECT * FROM system_logs ORDER BY id DESC LIMIT ?", (max(1, int(limit)),))
+        if df is None or df.empty:
+            return []
+        return [_v122_log_clean_row(r, "sqlite") for r in df.to_dict("records")]
+    except Exception:
+        return []
+
+
+def _v122_dedupe_log_rows(rows: list[dict[str, Any]], apply_tombstone: bool = True) -> list[dict[str, Any]]:
+    deleted = _v122_deleted_key_set() if apply_tombstone else set()
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        clean = _v122_log_clean_row(r, str(r.get("source") or ""))
+        key = _v122_log_key(clean)
+        if key in deleted:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        clean["log_key"] = key
+        out.append(clean)
+    return out
+
+
+def _v122_all_log_rows(*, include_sqlite: bool = True, apply_tombstone: bool = True) -> list[dict[str, Any]]:
+    rows = _v122_read_authority_log_rows()
+    if include_sqlite:
+        rows += _v122_sqlite_log_rows()
+    rows = _v122_dedupe_log_rows(rows, apply_tombstone=apply_tombstone)
+    try:
+        rows.sort(key=lambda r: (_clean_text(r.get("log_time")), int(float(r.get("id") or 0))), reverse=True)
+    except Exception:
+        rows.sort(key=lambda r: _clean_text(r.get("log_time")), reverse=True)
+    return rows
+
+
+def _v122_save_authority_log_rows(rows: list[dict[str, Any]], reason: str = "v122_system_logs", *, github: bool = False) -> dict[str, Any]:
+    clean = _v122_dedupe_log_rows(rows, apply_tombstone=True)
+    for r in clean:
+        r.pop("log_key", None)
+    try:
+        from services.permanent_authority_service import save_authority
+        return save_authority(_V122_LOG_MODULE_KEY, records={"system_logs": clean}, reason=reason, github=github)
+    except Exception as exc:
+        # Direct local fallback.
+        try:
+            _V122_LOG_AUTH_DIR.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "authority_schema": "SPT-PermanentAuthority-V122",
+                "module_key": _V122_LOG_MODULE_KEY,
+                "kind": "records",
+                "updated_at": now_text(),
+                "reason": reason,
+                "tables": {"system_logs": clean},
+                "table_counts": {"system_logs": len(clean)},
+            }
+            (_V122_LOG_AUTH_DIR / "records.json").write_text(_v122_json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            return {"ok": True, "fallback": True, "error": str(exc)[:300]}
+        except Exception as exc2:
+            return {"ok": False, "error": f"{exc}; fallback={exc2}"[:500]}
+
+
+def _v122_schedule_log_authority_upload(reason: str = "v122_async_system_log_upload") -> None:
+    try:
+        import threading
+        import time
+    except Exception:
+        return
+    def _worker() -> None:
+        try:
+            time.sleep(0.6)
+            while True:
+                _V122_LOG_UPLOAD_STATE["pending"] = False
+                try:
+                    from services.permanent_authority_service import force_upload_authority_file
+                    force_upload_authority_file(_V122_LOG_MODULE_KEY, "records", reason=reason)
+                    _V122_LOG_UPLOAD_STATE["last_upload_ts"] = time.time()
+                    _V122_LOG_UPLOAD_STATE["last_error"] = ""
+                except Exception as exc:
+                    _V122_LOG_UPLOAD_STATE["last_error"] = str(exc)[:500]
+                if not _V122_LOG_UPLOAD_STATE.get("pending"):
+                    _V122_LOG_UPLOAD_STATE["running"] = False
+                    return
+                time.sleep(0.3)
+        except Exception as exc:
+            _V122_LOG_UPLOAD_STATE["last_error"] = str(exc)[:500]
+            _V122_LOG_UPLOAD_STATE["running"] = False
+    try:
+        _V122_LOG_UPLOAD_STATE["pending"] = True
+        if _V122_LOG_UPLOAD_STATE.get("running"):
+            return
+        _V122_LOG_UPLOAD_STATE["running"] = True
+        threading.Thread(target=_worker, name="SPT-V122-SystemLogAuthorityUpload", daemon=True).start()
+    except Exception:
+        _V122_LOG_UPLOAD_STATE["running"] = False
+
+
+def _v122_sync_latest_sqlite_log_to_authority(reason: str = "v122_write_log") -> None:
+    with _V122_LOG_LOCK:
+        rows = _v122_read_authority_log_rows()
+        rows += _v122_sqlite_log_rows(limit=30)
+        _v122_save_authority_log_rows(rows, reason=reason, github=False)
+    _v122_schedule_log_authority_upload(reason)
+
+
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    if callable(_v122_original_write_log):
+        _v122_original_write_log(action_type, message, target_table, target_id, detail, level, user_name)
+    else:
+        execute(
+            """
+            INSERT INTO system_logs
+            (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (now_text(), user_name or _current_log_user(), action_type, target_table, str(target_id or ""), message, detail, level),
+        )
+    try:
+        _v122_sync_latest_sqlite_log_to_authority("v122_write_log_authority")
+    except Exception:
+        pass
+
+
+def _v122_apply_log_filters(rows: list[dict[str, Any]], start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None) -> list[dict[str, Any]]:
+    s = _date_text(start_date)
+    e = _date_text(end_date)
+    action = _clean_text(action_type)
+    lvl = _clean_text(level).upper()
+    kw = _clean_text(keyword).lower()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        d = _v122_log_date(r.get("log_time"))
+        if s and d and d < s:
+            continue
+        if e and d and d > e:
+            continue
+        if action and _clean_text(r.get("action_type")) != action:
+            continue
+        if lvl and lvl != "ALL" and _clean_text(r.get("level")).upper() != lvl:
+            continue
+        if kw:
+            blob = " ".join(_clean_text(r.get(c)) for c in ("user_name", "action_type", "target_table", "target_id", "message", "detail", "level"))
+            if kw not in blob.lower():
+                continue
+        out.append(r)
+    return out
+
+
+def load_logs(limit: int = 500, start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None):  # type: ignore[override]
+    rows = _v122_all_log_rows(include_sqlite=True, apply_tombstone=True)
+    rows = _v122_apply_log_filters(rows, start_date, end_date, action_type, level, keyword)
+    limit = max(1, _safe_int(limit, 500))
+    df = pd.DataFrame(rows[:limit])
+    for c in ["id", "log_time", "user_name", "action_type", "target_table", "target_id", "message", "detail", "level", "source"]:
+        if c not in df.columns:
+            df[c] = ""
+    return df[["id", "log_time", "user_name", "action_type", "target_table", "target_id", "message", "detail", "level", "source"]]
+
+
+def count_logs_by_date_range(start_date: Any, end_date: Any) -> int:  # type: ignore[override]
+    rows = _v122_all_log_rows(include_sqlite=True, apply_tombstone=True)
+    return len(_v122_apply_log_filters(rows, start_date, end_date))
+
+
+def _v122_replace_sqlite_logs(rows: list[dict[str, Any]]) -> None:
+    try:
+        execute("DELETE FROM system_logs")
+        for r in rows:
+            execute(
+                """
+                INSERT INTO system_logs
+                (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    _clean_text(r.get("log_time")), _clean_text(r.get("user_name")), _clean_text(r.get("action_type")),
+                    _clean_text(r.get("target_table")), _clean_text(r.get("target_id")), _clean_text(r.get("message")),
+                    _clean_text(r.get("detail")), _clean_text(r.get("level") or "INFO"),
+                ),
+            )
+        clear_query_cache()
+    except Exception:
+        pass
+
+
+def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit: bool = True, user_name: str | None = None) -> int:  # type: ignore[override]
+    s = _date_text(start_date)
+    e = _date_text(end_date)
+    if not s or not e:
+        return 0
+    with _V122_LOG_LOCK:
+        rows = _v122_all_log_rows(include_sqlite=True, apply_tombstone=True)
+        target: list[dict[str, Any]] = []
+        remaining: list[dict[str, Any]] = []
+        for r in rows:
+            d = _v122_log_date(r.get("log_time"))
+            if d and s <= d <= e:
+                target.append(r)
+            else:
+                remaining.append(r)
+        deleted_count = len(target)
+        if deleted_count <= 0:
+            return 0
+        state = _v122_read_log_delete_state()
+        deleted_keys = set(str(x) for x in (state.get("deleted_keys") or []))
+        for r in target:
+            deleted_keys.add(_v122_log_key(r))
+        state["deleted_keys"] = sorted(deleted_keys)
+        ranges = state.get("deleted_ranges") if isinstance(state.get("deleted_ranges"), list) else []
+        ranges.append({"start_date": s, "end_date": e, "deleted_count": deleted_count, "deleted_at": now_text(), "deleted_by": user_name or _current_log_user()})
+        state["deleted_ranges"] = ranges[-200:]
+        state["last_deleted_count"] = deleted_count
+        _v122_write_log_delete_state(state)
+        _v122_save_authority_log_rows(remaining, reason="v122_delete_system_logs_tombstone", github=True)
+        _v122_replace_sqlite_logs(remaining)
+    if keep_delete_audit:
+        write_log(
+            "DELETE_LOG_RANGE",
+            f"刪除 LOG 日期區間：{s} ~ {e}，刪除筆數：{deleted_count}",
+            target_table="system_logs",
+            target_id=f"{s}~{e}",
+            detail=f"deleted_count={deleted_count};authority=06_logs.records.json;tombstone=delete_state.json",
+            level="WARN",
+            user_name=user_name,
+        )
+    return int(deleted_count)
+
+
+def get_system_log_authority_status() -> dict[str, Any]:
+    rows = _v122_read_authority_log_rows()
+    db_rows = _v122_sqlite_log_rows(limit=200000)
+    state = _v122_read_log_delete_state()
+    return {
+        "module_key": _V122_LOG_MODULE_KEY,
+        "path": str(_V122_LOG_AUTH_DIR / "records.json"),
+        "exists": (_V122_LOG_AUTH_DIR / "records.json").exists(),
+        "count": len(_v122_dedupe_log_rows(rows, apply_tombstone=True)),
+        "db_count": len(db_rows),
+        "delete_state_path": str(_V122_LOG_DELETE_STATE_PATH),
+        "delete_state_exists": _V122_LOG_DELETE_STATE_PATH.exists(),
+        "deleted_keys": len(state.get("deleted_keys") or []),
+        "deleted_ranges": len(state.get("deleted_ranges") or []),
+        "upload_running": bool(_V122_LOG_UPLOAD_STATE.get("running")),
+        "last_upload_error": _V122_LOG_UPLOAD_STATE.get("last_error", ""),
+    }
+
+# =================== END V122 06 LOG AUTHORITY WRITE-THROUGH + DELETE TOMBSTONE ===================
