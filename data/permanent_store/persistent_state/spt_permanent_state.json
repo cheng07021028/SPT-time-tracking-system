@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 16:55:57",
+  "exported_at": "2026-05-26 16:59:40",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 35,
+  "business_row_count": 36,
   "table_counts": {
     "auth_account_permissions": 130,
     "auth_login_logs": 0,
@@ -21,7 +21,7 @@
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 0,
-    "time_records": 35,
+    "time_records": 36,
     "work_orders": 0
   },
   "tables": {
@@ -5807,6 +5807,33 @@
         "source": "streamlit",
         "created_at": "2026-05-26 16:55:57",
         "updated_at": "2026-05-26 16:55:57"
+      },
+      {
+        "id": 75,
+        "record_key": "SPT199|26M0051-02|收機|2026-05-26 16:59:40|a4fa00dd",
+        "status": "作業中",
+        "work_order": "26M0051-02",
+        "part_no": "PSRSC151-SB4L-05",
+        "type_name": "RSC151-SB4L+Argus",
+        "process_name": "收機",
+        "employee_id": "SPT199",
+        "employee_name": "龍斯愷",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-26 16:59:40",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-26",
+        "start_time": "16:59:40",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT199|收機|2026-05-26",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-26 16:59:40",
+        "updated_at": "2026-05-26 16:59:40"
       }
     ],
     "work_orders": []
