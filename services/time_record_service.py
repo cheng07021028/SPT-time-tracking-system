@@ -5252,3 +5252,90 @@ def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
     return out
 
 # =================== END V122 FINISH WORK SAME-PERSON HARD GUARD ===================
+
+# ===================== V123 MULTI-USER RECORD OPERATION LOCK =====================
+# 目的：多人同時開始/結束作業時，同一人員同一時間的操作加鎖；不同人員不互相阻塞。
+# 這只包住最終 start_work / finish_work，不改原本計算、同步、權威檔與按鈕流程。
+import threading as _v123_time_threading
+
+_V123_TIME_LOCKS: dict[str, _v123_time_threading.RLock] = {}
+_V123_TIME_LOCK_GUARD = _v123_time_threading.RLock()
+
+
+def _v123_time_lock(key: str) -> _v123_time_threading.RLock:
+    key = str(key or "global")
+    with _V123_TIME_LOCK_GUARD:
+        lock = _V123_TIME_LOCKS.get(key)
+        if lock is None:
+            lock = _v123_time_threading.RLock()
+            _V123_TIME_LOCKS[key] = lock
+        return lock
+
+
+def _v123_clean_key_part(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    return str(value or "").strip()
+
+
+def _v123_start_lock_key(employee: dict, process_name: str) -> str:
+    emp_id = _v123_clean_key_part((employee or {}).get("employee_id") or (employee or {}).get("工號") or (employee or {}).get("id"))
+    emp_name = _v123_clean_key_part((employee or {}).get("employee_name") or (employee or {}).get("name") or (employee or {}).get("姓名"))
+    proc = _v123_clean_key_part(process_name)
+    if emp_id or emp_name:
+        return f"employee:{emp_id}|{emp_name}|{proc}"
+    return "employee:unknown"
+
+
+def _v123_finish_lock_key(record_id: int) -> str:
+    try:
+        rid = int(float(str(record_id).strip()))
+    except Exception:
+        return f"record:{record_id}"
+    rec = None
+    try:
+        rec = query_one("SELECT * FROM time_records WHERE id=?", (rid,))
+    except Exception:
+        rec = None
+    if not rec:
+        return f"record:{rid}"
+    emp_id = _v123_clean_key_part(rec.get("employee_id"))
+    emp_name = _v123_clean_key_part(rec.get("employee_name"))
+    proc = _v123_clean_key_part(rec.get("process_name"))
+    start_date = _v123_clean_key_part(rec.get("start_date"))
+    if emp_id or emp_name:
+        return f"finish:{emp_id}|{emp_name}|{proc}|{start_date}"
+    return f"record:{rid}"
+
+
+try:
+    _v123_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v123_prev_start_work = None
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v123_prev_start_work):
+        raise RuntimeError("start_work core implementation is unavailable")
+    key = _v123_start_lock_key(employee or {}, process_name)
+    with _v123_time_lock(key):
+        return int(_v123_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+
+
+try:
+    _v123_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v123_prev_finish_work = None
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v123_prev_finish_work):
+        raise RuntimeError("finish_work core implementation is unavailable")
+    key = _v123_finish_lock_key(record_id)
+    with _v123_time_lock(key):
+        return int(_v123_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+
+# =================== END V123 MULTI-USER RECORD OPERATION LOCK ===================

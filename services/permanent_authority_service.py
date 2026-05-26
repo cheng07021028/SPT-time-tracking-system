@@ -1090,49 +1090,111 @@ def _v72_github_timeout_put() -> float:  # type: ignore[override]
         return 5.0
 # ======================= END V98 AUTHORITY DB PATH + FORCE UPLOAD HELPERS =======================
 
-# ===================== V121 MULTI-USER AUTHORITY FILE LOCK =====================
-# 目的：多人同時按開始/結束/儲存時，避免兩個 session 同時寫同一個 records.json，
-# 造成後寫者以舊內容覆蓋先寫者。此鎖只保護本機 canonical JSON 寫入；不改資料格式。
-try:
-    import threading as _v121_threading
-    _V121_AUTHORITY_LOCK = _v121_threading.RLock()
-except Exception:  # pragma: no cover
-    _V121_AUTHORITY_LOCK = None
+# ===================== V123 CONCURRENT AUTHORITY WRITE LOCK =====================
+# 目的：50 人同時使用時，避免多個 Streamlit session 同時讀寫同一個 records/settings
+# 權威檔造成 local JSON 寫入競爭或讀到半寫入檔。此段只加鎖與狀態，不改任何模組資料格式。
+import threading as _v123_threading
+
+_V123_AUTHORITY_LOCKS: dict[str, _v123_threading.RLock] = {}
+_V123_AUTHORITY_LOCKS_GUARD = _v123_threading.RLock()
+_V123_AUTHORITY_WRITE_STATUS: dict[str, dict[str, Any]] = {}
+
+
+def _v123_lock_key(module_key: str, kind: str = "records") -> str:
+    return f"{str(module_key)}::{ 'settings' if str(kind).lower().startswith('set') else 'records' }"
+
+
+def _v123_get_lock(module_key: str, kind: str = "records") -> _v123_threading.RLock:
+    key = _v123_lock_key(module_key, kind)
+    with _V123_AUTHORITY_LOCKS_GUARD:
+        lock = _V123_AUTHORITY_LOCKS.get(key)
+        if lock is None:
+            lock = _v123_threading.RLock()
+            _V123_AUTHORITY_LOCKS[key] = lock
+        return lock
+
 
 try:
-    _v121_prev_save_authority = save_authority
-except Exception:
-    _v121_prev_save_authority = None
+    _v123_prev_atomic_write_json = atomic_write_json
+except Exception:  # pragma: no cover
+    _v123_prev_atomic_write_json = None
+
+
+def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:  # type: ignore[override]
+    # 以實際檔案路徑加鎖，避免同一時間 tmp/replace 競爭。
+    key = str(path)
+    with _V123_AUTHORITY_LOCKS_GUARD:
+        lock = _V123_AUTHORITY_LOCKS.get(key)
+        if lock is None:
+            lock = _v123_threading.RLock()
+            _V123_AUTHORITY_LOCKS[key] = lock
+    with lock:
+        if callable(_v123_prev_atomic_write_json):
+            _v123_prev_atomic_write_json(path, payload)
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default), encoding="utf-8")
+            os.replace(tmp, path)
+            try:
+                _CACHE.pop((str(path), "json"), None)
+            except Exception:
+                pass
+
+
 try:
-    _v121_prev_update_tables = update_tables
-except Exception:
-    _v121_prev_update_tables = None
-try:
-    _v121_prev_save_settings = save_settings
-except Exception:
-    _v121_prev_save_settings = None
+    _v123_prev_save_authority = save_authority
+except Exception:  # pragma: no cover
+    _v123_prev_save_authority = None
 
 
 def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
-    if _V121_AUTHORITY_LOCK is None or not callable(_v121_prev_save_authority):
-        return _v121_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=github) if callable(_v121_prev_save_authority) else {"ok": False, "error": "save_authority_unavailable"}
-    with _V121_AUTHORITY_LOCK:
-        return _v121_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=github)
+    module_key = str(module_key)
+    start_ts = time.time()
+    # records/settings 可能同時寫；統一用 module 層鎖，避免同模組資料互相覆蓋。
+    with _v123_get_lock(module_key, "module"):
+        try:
+            if callable(_v123_prev_save_authority):
+                res = _v123_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=github)
+            else:
+                res = {"ok": False, "error": "previous_save_authority_missing", "module_key": module_key}
+        except Exception as exc:
+            res = {"ok": False, "error": str(exc)[:500], "module_key": module_key, "reason": reason}
+            raise
+        finally:
+            _V123_AUTHORITY_WRITE_STATUS[module_key] = {
+                "module_key": module_key,
+                "reason": reason,
+                "last_write_at": now_text(),
+                "duration_sec": round(time.time() - start_ts, 3),
+                "records_rows": sum(len(v) for v in (records or {}).values() if isinstance(v, list)) if records is not None else None,
+                "settings_keys": len(settings or {}) if settings is not None else None,
+                "github_requested": bool(github),
+            }
+        return res
+
+
+try:
+    _v123_prev_update_tables = update_tables
+except Exception:  # pragma: no cover
+    _v123_prev_update_tables = None
 
 
 def update_tables(module_key: str, updates: dict[str, list[dict[str, Any]]], *, reason: str = "update_tables", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
-    if _V121_AUTHORITY_LOCK is None:
-        return _v121_prev_update_tables(module_key, updates, reason=reason, github=github) if callable(_v121_prev_update_tables) else {"ok": False, "error": "update_tables_unavailable"}
-    with _V121_AUTHORITY_LOCK:
+    module_key = str(module_key)
+    with _v123_get_lock(module_key, "module"):
+        if callable(_v123_prev_update_tables):
+            return _v123_prev_update_tables(module_key, updates, reason=reason, github=github)
         cur = load_tables(module_key, "records")
-        cur.update({str(k): _clean_rows(v) for k, v in (updates or {}).items()})
+        cur.update({k: _clean_rows(v) for k, v in (updates or {}).items()})
         return save_authority(module_key, records=cur, reason=reason, github=github)
 
 
-def save_settings(module_key: str, settings: dict[str, Any], *, reason: str = "save_settings", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
-    if _V121_AUTHORITY_LOCK is None or not callable(_v121_prev_save_settings):
-        return _v121_prev_save_settings(module_key, settings, reason=reason, github=github) if callable(_v121_prev_save_settings) else {"ok": False, "error": "save_settings_unavailable"}
-    with _V121_AUTHORITY_LOCK:
-        return _v121_prev_save_settings(module_key, settings, reason=reason, github=github)
+def get_authority_write_status() -> dict[str, dict[str, Any]]:
+    """診斷用：回傳最近各模組權威檔寫入狀態；不觸發 GitHub。"""
+    try:
+        return {k: dict(v) for k, v in _V123_AUTHORITY_WRITE_STATUS.items()}
+    except Exception:
+        return {}
 
-# =================== END V121 MULTI-USER AUTHORITY FILE LOCK =====================
+# =================== END V123 CONCURRENT AUTHORITY WRITE LOCK ===================

@@ -3591,3 +3591,81 @@ def render_user_bar(module_code: str = "") -> None:  # type: ignore[override]
         return _v122_prev_render_user_bar(module_code)
 
 # =================== END V122 MULTI-USER SESSION ISOLATION + ONLINE USERS ===================
+
+# ===================== V123 ONLINE HEARTBEAT THROTTLE + STALE CLEANUP =====================
+# 目的：50 人同時在線時，避免每次頁面 rerun 都寫 online_users.json，降低 session 狀態互蓋與 JSON 寫入壓力。
+# 規則：login/logout 強制寫；heartbeat 預設 15 秒內同一 session 不重複寫，換模組則允許更新。
+_V123_ONLINE_HEARTBEAT_MIN_SEC = 15.0
+
+try:
+    _v123_prev_update_online_user = update_online_user
+except Exception:  # pragma: no cover
+    _v123_prev_update_online_user = None
+
+
+def update_online_user(module_code: str = "", event: str = "heartbeat") -> None:  # type: ignore[override]
+    try:
+        if not st.session_state.get("auth_logged_in"):
+            return
+        now_ts = time.time()
+        event_s = str(event or "heartbeat")
+        module_s = str(module_code or "")
+        force = event_s not in {"", "heartbeat"}
+        last_ts = float(st.session_state.get("auth_online_last_write_ts", 0) or 0)
+        last_module = str(st.session_state.get("auth_online_last_module", "") or "")
+        if not force and last_module == module_s and (now_ts - last_ts) < _V123_ONLINE_HEARTBEAT_MIN_SEC:
+            return
+        if callable(_v123_prev_update_online_user):
+            _v123_prev_update_online_user(module_s, event_s)
+        st.session_state["auth_online_last_write_ts"] = now_ts
+        st.session_state["auth_online_last_module"] = module_s
+    except Exception:
+        # online list is diagnostic runtime state; never block login/page access.
+        pass
+
+
+try:
+    _v123_prev_get_online_users = get_online_users
+except Exception:  # pragma: no cover
+    _v123_prev_get_online_users = None
+
+
+def _v123_cleanup_online_payload(max_keep_hours: float = 24.0) -> None:
+    try:
+        payload = _v122_read_online_payload() if "_v122_read_online_payload" in globals() else {}
+        sessions = payload.get("sessions") if isinstance(payload.get("sessions"), dict) else {}
+        if not sessions:
+            return
+        now_ts = time.time()
+        changed = False
+        keep: dict[str, Any] = {}
+        max_age = max(float(max_keep_hours or 24.0), 1.0) * 3600.0
+        for sid, row in sessions.items():
+            if not isinstance(row, dict):
+                changed = True
+                continue
+            last_ts = float(row.get("last_seen_ts", 0) or 0)
+            status = str(row.get("status") or "online")
+            # stale/offline 超過保留時間才清除；online 由 get_online_users 判定 stale。
+            if status in {"offline", "stale"} and last_ts and (now_ts - last_ts) > max_age:
+                changed = True
+                continue
+            keep[sid] = row
+        if changed:
+            payload["sessions"] = keep
+            if "_v122_write_online_payload" in globals():
+                _v122_write_online_payload(payload)
+    except Exception:
+        pass
+
+
+def get_online_users(stale_minutes: int | None = None) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        _v123_cleanup_online_payload()
+    except Exception:
+        pass
+    if callable(_v123_prev_get_online_users):
+        return _v123_prev_get_online_users(stale_minutes=stale_minutes)
+    return pd.DataFrame()
+
+# =================== END V123 ONLINE HEARTBEAT THROTTLE + STALE CLEANUP ===================
