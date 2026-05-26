@@ -2,88 +2,15 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-26 23:10:03",
-  "exported_at": "2026-05-26 23:10:03",
-  "reason": "v122_write_log_authority",
-  "empty_authoritative": false,
+  "updated_at": "2026-05-26 23:25:53",
+  "exported_at": "2026-05-26 23:25:53",
+  "reason": "v122_delete_system_logs_tombstone",
+  "empty_authoritative": true,
   "tables": {
-    "system_logs": [
-      {
-        "id": 313,
-        "log_time": "2026-05-26 22:58:54",
-        "user_name": "admin",
-        "action_type": "DELETE_LOG_RANGE",
-        "target_table": "system_logs",
-        "target_id": "2026-05-19~2026-05-26",
-        "message": "刪除 LOG 日期區間：2026-05-19 ~ 2026-05-26，刪除筆數：32",
-        "detail": "deleted_count=32;authority=06_logs.records.json;tombstone=delete_state.json",
-        "level": "WARN",
-        "source": "sqlite"
-      },
-      {
-        "id": 313,
-        "log_time": "2026-05-26 22:59:08",
-        "user_name": "admin",
-        "action_type": "V134_SQLITE_REPAIR_READ_ERROR",
-        "target_table": "time_records",
-        "target_id": "",
-        "message": "V134 直接讀取 SQLite time_records 失敗：no such table: time_records",
-        "detail": "",
-        "level": "ERROR",
-        "source": "sqlite"
-      },
-      {
-        "id": 313,
-        "log_time": "2026-05-26 22:59:22",
-        "user_name": "admin",
-        "action_type": "V134_SQLITE_REPAIR_READ_ERROR",
-        "target_table": "time_records",
-        "target_id": "",
-        "message": "V134 直接讀取 SQLite time_records 失敗：no such table: time_records",
-        "detail": "",
-        "level": "ERROR",
-        "source": "sqlite"
-      },
-      {
-        "id": 314,
-        "log_time": "2026-05-26 23:00:09",
-        "user_name": "admin",
-        "action_type": "DELETE_TIME_RECORDS",
-        "target_table": "time_records",
-        "target_id": "",
-        "message": "02 歷史紀錄啟動編輯後整列刪除：V96 已刪除 SQLite 1 筆、01/02 權威檔 1 筆，並建立 tombstone。",
-        "detail": "",
-        "level": "WARN",
-        "source": "sqlite"
-      },
-      {
-        "id": 314,
-        "log_time": "2026-05-26 23:04:12",
-        "user_name": "admin",
-        "action_type": "V134_SQLITE_REPAIR_READ_ERROR",
-        "target_table": "time_records",
-        "target_id": "",
-        "message": "V134 直接讀取 SQLite time_records 失敗：no such table: time_records",
-        "detail": "",
-        "level": "ERROR",
-        "source": "sqlite"
-      },
-      {
-        "id": 314,
-        "log_time": "2026-05-26 23:10:02",
-        "user_name": "admin",
-        "action_type": "V134_SQLITE_REPAIR_READ_ERROR",
-        "target_table": "time_records",
-        "target_id": "",
-        "message": "V134 直接讀取 SQLite time_records 失敗：no such table: time_records",
-        "detail": "",
-        "level": "ERROR",
-        "source": "sqlite"
-      }
-    ]
+    "system_logs": []
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 6
+    "system_logs": 0
   }
 }
