@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-26 14:05:15",
-  "exported_at": "2026-05-26 14:05:15",
-  "reason": "start_work_v108_fast_local_upsert_01",
+  "updated_at": "2026-05-26 14:05:34",
+  "exported_at": "2026-05-26 14:05:34",
+  "reason": "finish_work_v108_fast_local_sync_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -200,7 +200,7 @@
       {
         "id": 59,
         "record_key": "SPT227|26M0051-04|S.T.|2026-05-26 09:37:44|621e8d52",
-        "status": "作業中",
+        "status": "暫停",
         "work_order": "26M0051-04",
         "part_no": "PSRSC151-SB4L-05",
         "type_name": "RSC151-SB4L+Argus",
@@ -209,20 +209,20 @@
         "employee_name": "張佳銓",
         "start_action": "開始",
         "start_timestamp": "2026-05-26 09:37:44",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-26 14:05:34",
         "remark": "Argus system update (DR_PCE_BE92BT_V1001) setting",
         "start_date": "2026-05-26",
         "start_time": "09:37:44",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-26",
+        "end_time": "14:05:34",
+        "work_hours": 3.21,
         "assembly_location": "竹東",
         "group_key": "SPT227|S.T.|2026-05-26",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-26 09:37:44",
-        "updated_at": "2026-05-26 09:37:44"
+        "updated_at": "2026-05-26 14:05:34"
       },
       {
         "id": 60,
