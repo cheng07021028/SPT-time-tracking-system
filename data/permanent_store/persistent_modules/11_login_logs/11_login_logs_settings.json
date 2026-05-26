@@ -1,11 +1,19 @@
 {
-  "version": "V103-canonical-login-logs",
-  "exported_at": "2026-05-26 18:42:00",
-  "module": "11_login_logs",
-  "settings": {
-    "source_tables": [
-      "login_logs"
-    ],
-    "canonical_authority": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/11_login_logs/records.json"
+  "version": "V1.48",
+  "exported_at": "2026-05-26 18:42:31",
+  "source": "db_service_write",
+  "module_key": "11_login_logs",
+  "module_code": "11",
+  "module_name_zh": "登入紀錄",
+  "module_name_en": "Login Logs",
+  "tables": {
+    "table_column_settings": [],
+    "table_sort_settings": [],
+    "table_ui_settings": []
+  },
+  "table_counts": {
+    "table_column_settings": 0,
+    "table_sort_settings": 0,
+    "table_ui_settings": 0
   }
 }
