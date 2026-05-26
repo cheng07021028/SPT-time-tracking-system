@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+  "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-25 22:33:50",
-  "exported_at": "2026-05-25 22:14:14",
-  "reason": "save_account_master_v96",
+  "updated_at": "2026-05-26 08:22:38",
+  "exported_at": "2026-05-26 08:22:38",
+  "reason": "v106_force_password_change",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -150,17 +150,26 @@
       },
       {
         "username": "B168",
-        "password_hash": "pbkdf2_sha256$67487dc55047a1e8e11e29d8103bb09c$e98ca1eaf815d969fa74fa51d8af86de534cc3bf1acede9ad99af206c51fed12",
+        "password_hash": "pbkdf2_sha256$180000$beRqtCjEa3cHbXEs4zwzKA==$BBBVTrMWUHq7v8YhdhmEdD7Yz9bKDFDNBb1CZCH98ZA=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B168",
         "display_name": "洪敏強",
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-25 22:33:48"
+        "updated_at": "2026-05-26 08:22:38",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "B177",
@@ -22381,8 +22390,5 @@
     "security_settings": 2,
     "security_users": 6,
     "security_user_roles": 6
-  },
-  "deleted_usernames": [],
-  "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
+  }
 }
