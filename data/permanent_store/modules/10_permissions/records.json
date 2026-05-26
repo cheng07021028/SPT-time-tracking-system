@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+  "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-26 11:28:14",
-  "exported_at": "2026-05-26 11:21:05",
-  "reason": "save_users_v96",
+  "updated_at": "2026-05-26 11:49:34",
+  "exported_at": "2026-05-26 11:49:34",
+  "reason": "v106_force_password_change",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -416,17 +416,26 @@
       },
       {
         "username": "B249",
-        "password_hash": "pbkdf2_sha256$305eeb7a83ef375a097656b5d485e4b6$95f499911934f8f05fe333305d9c5d2a30c4dc4d7d8803c88fd3fa4b70ae2997",
+        "password_hash": "pbkdf2_sha256$180000$vzkmZffTEwuxT/C1OAgBBw==$BGQ5viaE+tsqYPvjuACcs/w6XRS0GawjKBqGo1yWHBM=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B249",
         "display_name": "劉翰霖",
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-26 11:28:14"
+        "updated_at": "2026-05-26 11:49:34",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "B250",
@@ -22381,8 +22390,5 @@
     "security_settings": 2,
     "security_users": 6,
     "security_user_roles": 6
-  },
-  "deleted_usernames": [],
-  "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
+  }
 }
