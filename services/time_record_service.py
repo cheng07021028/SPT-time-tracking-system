@@ -5439,3 +5439,355 @@ def flush_time_record_authority_upload_now(reason: str = "v133_logout_flush_time
     return bool(ok)
 
 # =================== END V133 01 ACTIVE REFRESH + LOGOUT FLUSH HELPERS ===================
+
+# ===================== V134 LOG INSERT MISSING 01/02 CANONICAL REPAIR =====================
+# 修正目的：
+# 1) 已確認會出現：system_logs / SQLite 有 INSERT time_records 與 START_WORK，
+#    但 01_time_records / 02_history canonical 權威檔沒有同步新增 row，導致 01、02 畫面看不到。
+# 2) 原因是 01/02 顯示層以 canonical 權威檔為準；若 start_work 在 SQLite INSERT 後，
+#    GitHub/authority upsert 被背景上傳、tombstone、快取或例外中斷，LOG 仍會有紀錄，畫面卻讀不到。
+# 3) V134 在 start_work / finish_work / today_records / load_records 加最後保險：
+#    只把 SQLite 中「本次新增 id」或「仍在作業中的 missing row」合併回 01/02 canonical。
+# 4) 不做全量舊資料復活；仍套用 tombstone 過濾，避免 02 已刪除資料被 SQLite 舊快取救回。
+# 5) 一般開始/結束作業仍不等待 GitHub；先本機 canonical 可見，再沿用 V108 背景上傳。
+
+try:
+    _v134_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v134_prev_start_work = None
+try:
+    _v134_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v134_prev_finish_work = None
+try:
+    _v134_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v134_prev_today_records = None
+try:
+    _v134_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v134_prev_load_records = None
+
+_V134_LAST_DISPLAY_REPAIR_AT = 0.0
+_V134_DISPLAY_REPAIR_TTL_SEC = 2.0
+
+
+def _v134_now_seconds() -> float:
+    try:
+        import time as _time
+        return float(_time.time())
+    except Exception:
+        return 0.0
+
+
+def _v134_is_blank(value) -> bool:
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    if value is None:
+        return True
+    return str(value).strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _v134_to_int(value):
+    if _v134_is_blank(value):
+        return None
+    try:
+        return int(float(str(value).strip()))
+    except Exception:
+        return None
+
+
+def _v134_row_identity(row: dict) -> str:
+    rk = str(row.get("record_key") or row.get("紀錄鍵 / Record Key") or "").strip()
+    if rk and rk.lower() not in {"none", "nan", "null", "<na>"}:
+        return "rk:" + rk
+    rid = _v134_to_int(row.get("id") if "id" in row else row.get("ID"))
+    if rid is not None:
+        return "id:" + str(rid)
+    return "tmp:" + str(row)[:160]
+
+
+def _v134_read_sqlite_time_records(record_ids: list[int] | None = None) -> pd.DataFrame:
+    """Direct SQLite read, bypassing query cache/wrappers.
+
+    V134 uses this only as a repair source when canonical missed a newly inserted row.
+    """
+    try:
+        from services.db_service import ensure_database as _ensure_database  # type: ignore
+        _ensure_database()
+    except Exception:
+        pass
+    try:
+        ids: list[int] = []
+        for x in record_ids or []:
+            rid = _v134_to_int(x)
+            if rid is not None and rid not in ids:
+                ids.append(int(rid))
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(DB_PATH, timeout=8) as conn:
+            conn.row_factory = sqlite3.Row
+            try:
+                conn.execute("PRAGMA busy_timeout=5000")
+            except Exception:
+                pass
+            if ids:
+                ph = ",".join(["?"] * len(ids))
+                rows = conn.execute(f"SELECT * FROM time_records WHERE id IN ({ph}) ORDER BY id", tuple(ids)).fetchall()
+            else:
+                # Display repair only needs not-ended rows; avoids resurrecting old deleted history rows.
+                rows = conn.execute(
+                    """
+                    SELECT * FROM time_records
+                    WHERE (
+                        COALESCE(status,'')='作業中'
+                        OR end_timestamp IS NULL
+                        OR TRIM(COALESCE(end_timestamp,''))=''
+                        OR LOWER(TRIM(COALESCE(end_timestamp,''))) IN ('none','nan','nat')
+                    )
+                    ORDER BY id
+                    """
+                ).fetchall()
+            return pd.DataFrame([dict(r) for r in rows])
+    except Exception as exc:
+        try:
+            write_log("V134_SQLITE_REPAIR_READ_ERROR", f"V134 直接讀取 SQLite time_records 失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        return pd.DataFrame()
+
+
+def _v134_authority_df(module_key: str = "02_history") -> pd.DataFrame:
+    try:
+        if "_v98_authority_df" in globals():
+            df = _v98_authority_df(module_key)
+            if isinstance(df, pd.DataFrame):
+                return df.copy()
+    except Exception:
+        pass
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df_from_table
+        df = _pa_df_from_table(module_key, "time_records")
+        if isinstance(df, pd.DataFrame):
+            return df.copy()
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v134_filter_deleted(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame() if df is None else df
+    out = df.copy()
+    for fn_name in ("_v97_filter_deleted_df", "_v98_filter_deleted", "_v94_filter_deleted_df", "_v96_filter_tombstone"):
+        try:
+            fn = globals().get(fn_name)
+            if callable(fn):
+                out = fn(out)
+        except Exception:
+            pass
+    return out.reset_index(drop=True)
+
+
+def _v134_df_to_rows(df: pd.DataFrame) -> list[dict]:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return []
+    try:
+        clean = df.copy().where(pd.notna(df), "")
+        return [dict(r) for _, r in clean.iterrows()]
+    except Exception:
+        return []
+
+
+def _v134_merge_rows(base_df: pd.DataFrame, incoming_df: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    base = base_df.copy() if isinstance(base_df, pd.DataFrame) else pd.DataFrame()
+    incoming = incoming_df.copy() if isinstance(incoming_df, pd.DataFrame) else pd.DataFrame()
+    if incoming.empty:
+        return base.reset_index(drop=True), 0
+    base = base.loc[:, ~pd.Index(base.columns).duplicated()].copy() if not base.empty else pd.DataFrame()
+    incoming = incoming.loc[:, ~pd.Index(incoming.columns).duplicated()].copy()
+
+    all_cols: list[str] = []
+    for c in list(base.columns) + list(incoming.columns):
+        sc = str(c)
+        if sc not in all_cols:
+            all_cols.append(sc)
+    if "id" not in all_cols:
+        all_cols.insert(0, "id")
+
+    if base.empty:
+        base = pd.DataFrame(columns=all_cols)
+    for c in all_cols:
+        if c not in base.columns:
+            base[c] = ""
+        if c not in incoming.columns:
+            incoming[c] = ""
+    base = base[all_cols].copy()
+    incoming = incoming[all_cols].copy()
+
+    key_to_idx: dict[str, int] = {}
+    for idx, r in base.iterrows():
+        key_to_idx[_v134_row_identity(dict(r))] = idx
+
+    changed = 0
+    for _, r in incoming.iterrows():
+        row_dict = dict(r)
+        key = _v134_row_identity(row_dict)
+        if key in key_to_idx:
+            idx = key_to_idx[key]
+            row_changed = False
+            for c, v in row_dict.items():
+                old_v = base.at[idx, c] if c in base.columns else ""
+                if str(old_v) != str(v):
+                    base.at[idx, c] = v
+                    row_changed = True
+            if row_changed:
+                changed += 1
+        else:
+            base = pd.concat([base, pd.DataFrame([row_dict])], ignore_index=True)
+            key_to_idx[key] = int(base.index[-1])
+            changed += 1
+    try:
+        if "id" in base.columns:
+            base["_v134_sort_id"] = pd.to_numeric(base["id"], errors="coerce")
+            base = base.sort_values("_v134_sort_id", ascending=True, kind="stable").drop(columns=["_v134_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return base.reset_index(drop=True), int(changed)
+
+
+def _v134_save_0102_authority(df: pd.DataFrame, reason: str, *, github: bool = False) -> int:
+    safe = _v134_filter_deleted(df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame())
+    try:
+        if "_v98_save_0102_authority_df" in globals():
+            return int(_v98_save_0102_authority_df(safe, reason=reason, github=bool(github)) or 0)
+        if "_v89_save_time_authority_df" in globals():
+            return int(_v89_save_time_authority_df(safe, reason, github=bool(github)) or 0)
+        from services.permanent_authority_service import save_authority as _pa_save_authority, table_from_df as _pa_table_from_df
+        rows = _pa_table_from_df(safe)
+        _pa_save_authority("01_time_records", records={"time_records": rows}, reason=f"{reason}_01", github=bool(github))
+        _pa_save_authority("02_history", records={"time_records": rows}, reason=f"{reason}_02", github=bool(github))
+        return int(len(rows))
+    except Exception as exc:
+        try:
+            write_log("V134_AUTHORITY_SAVE_ERROR", f"V134 01/02 權威檔寫入失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        return 0
+
+
+def _v134_publish_async(reason: str) -> None:
+    # 不阻塞 01 開始作業；沿用 V108 背景上傳機制。
+    try:
+        scheduler = globals().get("_v108_schedule_time_authority_upload")
+        if callable(scheduler):
+            scheduler(reason)
+            return
+    except Exception:
+        pass
+
+
+def repair_missing_time_records_from_sqlite(record_ids: list[int] | None = None, *, reason: str = "v134_repair_missing_time_records", github: bool = False) -> int:
+    """Repair rows that exist in SQLite but are missing from 01/02 canonical authority.
+
+    This is intentionally narrow:
+    - record_ids provided: repair those exact ids after start/finish.
+    - record_ids not provided: repair only currently-unfinished rows.
+    - all candidates pass tombstone filtering so deleted 02 rows are not revived.
+    """
+    sqlite_df = _v134_filter_deleted(_v134_read_sqlite_time_records(record_ids))
+    if sqlite_df is None or sqlite_df.empty:
+        return 0
+
+    auth_02 = _v134_filter_deleted(_v134_authority_df("02_history"))
+    auth_01 = _v134_filter_deleted(_v134_authority_df("01_time_records"))
+    # Use the richer current authority as base.
+    if len(auth_02) >= len(auth_01):
+        base = auth_02
+    else:
+        base = auth_01
+
+    merged, changed = _v134_merge_rows(base, sqlite_df)
+    if changed <= 0:
+        return 0
+    saved = _v134_save_0102_authority(merged, reason, github=bool(github))
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        write_log(
+            "V134_REPAIR_TIME_RECORD_CANONICAL",
+            f"V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 {changed} 筆，同步後 {saved} 筆。",
+            "time_records",
+            ",".join(str(x) for x in (record_ids or [])),
+            level="WARN",
+        )
+    except Exception:
+        pass
+    if not github:
+        _v134_publish_async(reason + "_async_publish")
+    return int(changed)
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v134_prev_start_work):
+        raise RuntimeError("start_work core implementation is unavailable")
+    rid = int(_v134_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        # 核心修正：LOG/SQLite 已 INSERT 後，立即確認 01/02 canonical 有同一筆 id。
+        repair_missing_time_records_from_sqlite([rid], reason="start_work_v134_sqlite_to_0102_canonical", github=False)
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v134_prev_finish_work):
+        raise RuntimeError("finish_work core implementation is unavailable")
+    try:
+        group_before = get_active_group(int(float(str(record_id).strip())))
+        ids_before = [int(x) for x in group_before.get("id", pd.Series(dtype=object)).tolist()] if isinstance(group_before, pd.DataFrame) and not group_before.empty else [int(float(str(record_id).strip()))]
+    except Exception:
+        ids_before = [int(float(str(record_id).strip()))] if str(record_id).strip() else []
+    n = int(_v134_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n:
+        repair_missing_time_records_from_sqlite(ids_before, reason="finish_work_v134_sqlite_to_0102_canonical", github=False)
+    return n
+
+
+def _v134_display_repair_once(reason: str) -> int:
+    global _V134_LAST_DISPLAY_REPAIR_AT
+    now_s = _v134_now_seconds()
+    if now_s and (now_s - float(_V134_LAST_DISPLAY_REPAIR_AT or 0.0)) < _V134_DISPLAY_REPAIR_TTL_SEC:
+        return 0
+    _V134_LAST_DISPLAY_REPAIR_AT = now_s
+    return repair_missing_time_records_from_sqlite(None, reason=reason, github=False)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    # 若上一輪 start_work 只完成 SQLite/LOG，先補 canonical，再交回既有顯示規則。
+    try:
+        _v134_display_repair_once("today_records_v134_display_self_repair")
+    except Exception:
+        pass
+    if callable(_v134_prev_today_records):
+        return _v134_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+    return pd.DataFrame()
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    # 02 歷史紀錄載入前也做同樣保險，修補「LOG 有、02 看不到」情境。
+    try:
+        _v134_display_repair_once("load_records_v134_display_self_repair")
+    except Exception:
+        pass
+    if callable(_v134_prev_load_records):
+        return _v134_prev_load_records(start_date, end_date, employee_id, work_order)
+    return pd.DataFrame()
+
+# =================== END V134 LOG INSERT MISSING 01/02 CANONICAL REPAIR ===================
