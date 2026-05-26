@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 17:27:25",
+  "exported_at": "2026-05-26 17:31:16",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -1393,10 +1393,21 @@
         "message": "UPDATE security_users",
         "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
         "level": "INFO"
+      },
+      {
+        "id": 198,
+        "log_time": "2026-05-26 17:30:49",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V89 權威檔優先：已儲存/更新歷史紀錄 23 筆，並同步 01/02 canonical。",
+        "detail": "",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 126
+    "system_logs": 127
   }
 }
