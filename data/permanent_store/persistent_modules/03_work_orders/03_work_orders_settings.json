@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 09:37:44",
+  "exported_at": "2026-05-26 09:41:55",
   "source": "db_service_write",
   "module_key": "03_work_orders",
   "module_code": "03",
@@ -24,9 +24,9 @@
       },
       {
         "table_key": "01.time_records.main",
-        "widths_json": "{\"id\": 60, \"record_key\": 100, \"status\": 60, \"work_order\": 60, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 60, \"remark\": 60, \"start_date\": 60, \"start_time\": 60, \"end_date\": 60, \"end_time\": 60, \"work_hours\": 60, \"assembly_location\": 60, \"group_key\": 60, \"is_group_work\": 60, \"source\": 60, \"created_at\": 60, \"updated_at\": 180}",
+        "widths_json": "{\"id\": 60, \"record_key\": 100, \"status\": 60, \"work_order\": 60, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 60, \"remark\": 200, \"start_date\": 60, \"start_time\": 60, \"end_date\": 60, \"end_time\": 60, \"work_hours\": 60, \"assembly_location\": 60, \"group_key\": 60, \"is_group_work\": 60, \"source\": 60, \"created_at\": 60, \"updated_at\": 180}",
         "order_json": "[]",
-        "updated_at": "2026-05-26 01:28:14"
+        "updated_at": "2026-05-26 01:41:55"
       }
     ]
   },
