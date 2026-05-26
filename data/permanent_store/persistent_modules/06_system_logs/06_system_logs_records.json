@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 22:39:40",
+  "exported_at": "2026-05-26 22:59:26",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -1844,10 +1844,21 @@
         "message": "01_finish_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 1 筆",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 313,
+        "log_time": "2026-05-26 22:59:22",
+        "user_name": "admin",
+        "action_type": "V134_SQLITE_REPAIR_READ_ERROR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 直接讀取 SQLite time_records 失敗：no such table: time_records",
+        "detail": "",
+        "level": "ERROR"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 167
+    "system_logs": 168
   }
 }
