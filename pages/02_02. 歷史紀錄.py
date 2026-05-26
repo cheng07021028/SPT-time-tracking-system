@@ -71,6 +71,55 @@ def rerun():
 _show_history_results()
 
 
+
+def _inject_history_dropdown_readability_css() -> None:
+    """Keep selected text in 02 history filters readable without touching data logic."""
+    st.markdown(
+        """
+        <style>
+        /* V124：02 歷史紀錄下拉/多選已選取文字改為淺色，只作用在本頁面。 */
+        div[data-testid="stMultiSelect"] div[data-baseweb="tag"] {
+            background: rgba(20, 184, 166, 0.20) !important;
+            border: 1px solid rgba(103, 232, 249, 0.75) !important;
+            box-shadow: 0 0 10px rgba(103, 232, 249, 0.30) !important;
+        }
+        div[data-testid="stMultiSelect"] div[data-baseweb="tag"],
+        div[data-testid="stMultiSelect"] div[data-baseweb="tag"] *,
+        div[data-testid="stMultiSelect"] div[data-baseweb="tag"] span,
+        div[data-testid="stMultiSelect"] div[data-baseweb="tag"] div {
+            color: #f4ffff !important;
+            -webkit-text-fill-color: #f4ffff !important;
+            text-shadow: 0 0 7px rgba(255, 255, 255, 0.45) !important;
+            opacity: 1 !important;
+        }
+        div[data-testid="stMultiSelect"] div[data-baseweb="tag"] svg,
+        div[data-testid="stMultiSelect"] div[data-baseweb="tag"] path {
+            color: #67e8f9 !important;
+            fill: #67e8f9 !important;
+            opacity: 1 !important;
+        }
+        div[data-testid="stMultiSelect"] div[data-baseweb="select"] span,
+        div[data-testid="stMultiSelect"] div[data-baseweb="select"] input,
+        div[data-testid="stSelectbox"] div[data-baseweb="select"] span,
+        div[data-testid="stSelectbox"] div[data-baseweb="select"] input {
+            color: #f4ffff !important;
+            -webkit-text-fill-color: #f4ffff !important;
+            opacity: 1 !important;
+        }
+        div[data-baseweb="popover"] li,
+        div[data-baseweb="popover"] div[role="option"],
+        div[data-baseweb="popover"] div[role="listbox"] * {
+            color: #f4ffff !important;
+            -webkit-text-fill-color: #f4ffff !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+_inject_history_dropdown_readability_css()
+
+
 def _normalize_text(v) -> str:
     if v is None:
         return ""
@@ -1252,36 +1301,37 @@ with tab1:
 
             editor_key = f"history_editor_v27_{st.session_state[editor_version_key]}"
             history_draft_key = "history_records_edited_draft_v58"
-            form_key = f"history_records_stable_edit_form_v119_{st.session_state[editor_version_key]}"
-            st.info("V119：歷史明細編輯改為穩定送出模式；在表格內修改時間或其他欄位時，不會每改一格就整頁 rerun 跳回上方。修改完成後再按下方儲存、重算或刪除。")
-            with st.form(key=form_key, clear_on_submit=False):
-                edited = render_table(
-                    edit_df,
-                    "history_records",
-                    editable=True,
-                    disabled=["id", "record_key", "created_at", "updated_at", HISTORY_CROSS_DAY_ALERT_COL, HISTORY_CROSS_DAY_RANGE_COL],
-                    key=editor_key,
-                    height=560,
-                )
-                if isinstance(edited, pd.DataFrame):
-                    st.session_state[history_draft_key] = edited.copy()
-                st.markdown("**確認後執行動作 / Confirm Action**")
-                hist_save_col, hist_recalc_col, hist_delete_col = st.columns([1.1, 1.7, 1.2])
-                history_save_clicked = hist_save_col.form_submit_button(
-                    "◈ 儲存編輯 / Save",
-                    type="primary",
-                    use_container_width=True,
-                )
-                history_recalc_clicked = hist_recalc_col.form_submit_button(
-                    "◇ 重算勾選工時 / Recalc Selected",
-                    type="primary",
-                    use_container_width=True,
-                )
-                history_delete_clicked = hist_delete_col.form_submit_button(
-                    "◉ 刪除勾選整列 / Delete Selected",
-                    type="primary",
-                    use_container_width=True,
-                )
+            st.info("V63：歷史紀錄表格與 10｜權限管理同模式；批次按鈕會清除全域 data_editor 草稿，避免 KPI 與 checkbox 畫面不同步。")
+            edited = render_table(
+                edit_df,
+                "history_records",
+                editable=True,
+                disabled=["id", "record_key", "created_at", "updated_at", HISTORY_CROSS_DAY_ALERT_COL, HISTORY_CROSS_DAY_RANGE_COL],
+                key=editor_key,
+                height=560,
+            )
+            if isinstance(edited, pd.DataFrame):
+                st.session_state[history_draft_key] = edited.copy()
+            st.markdown("**確認後執行動作 / Confirm Action**")
+            hist_save_col, hist_recalc_col, hist_delete_col = st.columns([1.1, 1.7, 1.2])
+            history_save_clicked = hist_save_col.button(
+                "◈ 儲存編輯 / Save",
+                type="primary",
+                use_container_width=True,
+                key="history_records_save_button_v73",
+            )
+            history_recalc_clicked = hist_recalc_col.button(
+                "◇ 重算勾選工時 / Recalc Selected",
+                type="primary",
+                use_container_width=True,
+                key="history_records_recalc_button_v73",
+            )
+            history_delete_clicked = hist_delete_col.button(
+                "◉ 刪除勾選整列 / Delete Selected",
+                type="primary",
+                use_container_width=True,
+                key="history_records_delete_button_v73",
+            )
             submitted_history = bool(history_save_clicked or history_recalc_clicked or history_delete_clicked)
             if history_save_clicked:
                 history_action = "儲存編輯"
