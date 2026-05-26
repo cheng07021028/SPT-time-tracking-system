@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 09:41:55",
+  "exported_at": "2026-05-26 09:45:26",
   "source": "db_service_write",
   "module_key": "11_login_logs",
   "module_code": "11",
@@ -24,9 +24,9 @@
       },
       {
         "table_key": "01.time_records.main",
-        "widths_json": "{\"id\": 60, \"record_key\": 100, \"status\": 60, \"work_order\": 60, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 60, \"remark\": 200, \"start_date\": 60, \"start_time\": 60, \"end_date\": 60, \"end_time\": 60, \"work_hours\": 60, \"assembly_location\": 60, \"group_key\": 60, \"is_group_work\": 60, \"source\": 60, \"created_at\": 60, \"updated_at\": 180}",
-        "order_json": "[]",
-        "updated_at": "2026-05-26 01:41:55"
+        "widths_json": "{\"id\": 60, \"record_key\": 100, \"status\": 60, \"work_order\": 60, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 60, \"remark\": 250, \"start_date\": 60, \"start_time\": 60, \"end_date\": 60, \"end_time\": 60, \"work_hours\": 60, \"assembly_location\": 60, \"group_key\": 60, \"is_group_work\": 60, \"source\": 60, \"created_at\": 60, \"updated_at\": 180}",
+        "order_json": "[\"id\", \"employee_id\", \"employee_name\", \"status\", \"work_order\", \"part_no\", \"type_name\", \"process_name\", \"start_action\", \"start_timestamp\", \"end_action\", \"end_timestamp\", \"remark\", \"start_date\", \"start_time\", \"end_date\", \"end_time\", \"work_hours\", \"assembly_location\", \"group_key\", \"is_group_work\", \"source\", \"created_at\", \"record_key\", \"updated_at\"]",
+        "updated_at": "2026-05-26 01:45:26"
       }
     ]
   },
