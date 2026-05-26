@@ -2,18 +2,35 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-26 18:41:59",
-  "exported_at": "2026-05-26 18:41:59",
-  "reason": "v106_clear_login_logs_tombstone_authority",
-  "empty_authoritative": true,
+  "updated_at": "2026-05-26 18:48:27",
+  "exported_at": "2026-05-26 18:48:27",
+  "reason": "v115_login_event_write_through",
+  "empty_authoritative": false,
   "tables": {
-    "login_logs": [],
+    "login_logs": [
+      {
+        "id": 118,
+        "source": "v103_merge",
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置超過 3 分鐘，自動登出; roles=admin",
+        "module_code": "",
+        "login_time": "2026-05-26 18:48:27",
+        "logout_time": "2026-05-26 18:48:27",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-26 18:48:27"
+      }
+    ],
     "auth_login_logs": [],
     "security_login_logs": []
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 0,
+    "login_logs": 1,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
