@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-PermanentAuthority-V29",
+  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-26 09:14:45",
+  "updated_at": "2026-05-26 09:15:19",
   "exported_at": "2026-05-26 09:14:45",
-  "reason": "v106_force_password_change",
+  "reason": "save_account_master_pre_delete_v96",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -22624,5 +22624,8 @@
     "security_settings": 2,
     "security_users": 6,
     "security_user_roles": 6
-  }
+  },
+  "deleted_usernames": [],
+  "version": "V96-direct-authority",
+  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
 }
