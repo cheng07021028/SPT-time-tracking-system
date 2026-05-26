@@ -17,7 +17,7 @@ from services.time_record_service import (
     import_time_records,
 )
 from services.master_data_service import load_employees, load_work_orders
-from services.table_ui_service import render_table, label_for
+from services.table_ui_service import render_table, label_for, render_width_settings
 from services.duration_service import hours_to_hms
 from services.history_filter_service import load_history_filters, save_history_filters, reset_history_filters
 
@@ -69,55 +69,6 @@ def rerun():
 
 
 _show_history_results()
-
-
-
-def _inject_history_dropdown_readability_css() -> None:
-    """Keep selected text in 02 history filters readable without touching data logic."""
-    st.markdown(
-        """
-        <style>
-        /* V124：02 歷史紀錄下拉/多選已選取文字改為淺色，只作用在本頁面。 */
-        div[data-testid="stMultiSelect"] div[data-baseweb="tag"] {
-            background: rgba(20, 184, 166, 0.20) !important;
-            border: 1px solid rgba(103, 232, 249, 0.75) !important;
-            box-shadow: 0 0 10px rgba(103, 232, 249, 0.30) !important;
-        }
-        div[data-testid="stMultiSelect"] div[data-baseweb="tag"],
-        div[data-testid="stMultiSelect"] div[data-baseweb="tag"] *,
-        div[data-testid="stMultiSelect"] div[data-baseweb="tag"] span,
-        div[data-testid="stMultiSelect"] div[data-baseweb="tag"] div {
-            color: #f4ffff !important;
-            -webkit-text-fill-color: #f4ffff !important;
-            text-shadow: 0 0 7px rgba(255, 255, 255, 0.45) !important;
-            opacity: 1 !important;
-        }
-        div[data-testid="stMultiSelect"] div[data-baseweb="tag"] svg,
-        div[data-testid="stMultiSelect"] div[data-baseweb="tag"] path {
-            color: #67e8f9 !important;
-            fill: #67e8f9 !important;
-            opacity: 1 !important;
-        }
-        div[data-testid="stMultiSelect"] div[data-baseweb="select"] span,
-        div[data-testid="stMultiSelect"] div[data-baseweb="select"] input,
-        div[data-testid="stSelectbox"] div[data-baseweb="select"] span,
-        div[data-testid="stSelectbox"] div[data-baseweb="select"] input {
-            color: #f4ffff !important;
-            -webkit-text-fill-color: #f4ffff !important;
-            opacity: 1 !important;
-        }
-        div[data-baseweb="popover"] li,
-        div[data-baseweb="popover"] div[role="option"],
-        div[data-baseweb="popover"] div[role="listbox"] * {
-            color: #f4ffff !important;
-            -webkit-text-fill-color: #f4ffff !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-_inject_history_dropdown_readability_css()
 
 
 def _normalize_text(v) -> str:
@@ -1211,6 +1162,26 @@ tab1, tab2, tab3 = st.tabs(["歷史明細編輯", "Excel 匯入", "貼上資料"
 
 with tab1:
     st.subheader("歷史明細編輯 / Editable History")
+
+    # V131：02 歷史明細編輯欄寬設定。
+    # 只新增欄寬/欄位順序設定入口，沿用 table_ui_service 的權威檔永久讀寫；
+    # 不改 02 儲存、重算、刪除、匯入、01/02 同步等既有功能。
+    _history_width_df = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    if not _history_width_df.empty:
+        try:
+            if can_edit:
+                _history_width_df = _history_width_df.drop(columns=["刪除", "重算", "刪除 / Delete", "重算 / Recalc"], errors="ignore")
+                _history_width_df = _with_history_cross_day_edit_marker(_history_width_df)
+                _history_width_df.insert(0, "刪除 / Delete", False)
+                _history_width_df.insert(1, "重算 / Recalc", False)
+            render_width_settings(
+                "history_records",
+                _history_width_df,
+                title="02 歷史明細編輯欄寬設定 / Column Width Settings",
+            )
+        except Exception as _history_width_exc:
+            st.caption(f"欄寬設定暫時無法載入：{_history_width_exc}")
+
     if not can_edit:
         st.info("目前帳號只有查詢權限；若需修改或刪除歷史紀錄，請由管理員在權限管理開放 02 歷史紀錄的編輯/刪除權限。")
         _render_history_view_table(df, "history_records", height=520)
