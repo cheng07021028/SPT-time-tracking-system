@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 09:04:50",
+  "exported_at": "2026-05-26 09:15:33",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 20,
+  "business_row_count": 21,
   "table_counts": {
     "auth_account_permissions": 117,
     "auth_login_logs": 0,
@@ -21,7 +21,7 @@
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 2,
-    "time_records": 20,
+    "time_records": 21,
     "work_orders": 0
   },
   "tables": {
@@ -11374,6 +11374,33 @@
         "source": "streamlit",
         "created_at": "2026-05-26 09:04:50",
         "updated_at": "2026-05-26 09:04:50"
+      },
+      {
+        "id": 55,
+        "record_key": "SPT231|26M0090-16|收機|2026-05-26 09:15:33|c73fb1d1",
+        "status": "作業中",
+        "work_order": "26M0090-16",
+        "part_no": "4TRSC121-EB2-61",
+        "type_name": "RSC121 EB2 (御弘)",
+        "process_name": "收機",
+        "employee_id": "SPT231",
+        "employee_name": "陳建勳",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-26 09:15:33",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-26",
+        "start_time": "09:15:33",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "御弘",
+        "group_key": "SPT231|收機|2026-05-26",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-26 09:15:33",
+        "updated_at": "2026-05-26 09:15:33"
       }
     ],
     "work_orders": []
