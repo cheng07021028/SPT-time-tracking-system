@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "settings",
-  "updated_at": "2026-05-26 17:49:41",
-  "exported_at": "2026-05-26 17:49:41",
-  "reason": "v369_save_column_order_v72_01.time_records.main",
+  "updated_at": "2026-05-26 17:50:12",
+  "exported_at": "2026-05-26 17:50:12",
+  "reason": "v369_save_widths_v72_01.time_records.main",
   "empty_authoritative": false,
   "tables": {},
   "settings": {
@@ -13,7 +13,7 @@
         "widths": {
           "id": 60,
           "record_key": 100,
-          "status": 80,
+          "status": 100,
           "work_order": 80,
           "part_no": 170,
           "type_name": 230,
@@ -37,8 +37,8 @@
           "created_at": 60,
           "updated_at": 180
         },
-        "updated_at": "2026-05-26 17:49:41",
-        "reason": "v369_save_column_order",
+        "updated_at": "2026-05-26 17:50:11",
+        "reason": "v369_save_widths",
         "order": [
           "id",
           "employee_id",
