@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-26 14:07:12",
-  "exported_at": "2026-05-26 14:07:12",
+  "updated_at": "2026-05-26 14:09:55",
+  "exported_at": "2026-05-26 14:09:55",
   "reason": "start_work_v108_fast_local_upsert_02",
   "empty_authoritative": false,
   "tables": {
@@ -516,15 +516,42 @@
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT158|收機|2026-05-26",
-        "is_group_work": 0,
+        "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-26 14:07:11",
-        "updated_at": "2026-05-26 14:07:11"
+        "updated_at": "2026-05-26 14:09:54"
+      },
+      {
+        "id": 71,
+        "record_key": "SPT158|25M0691-01|收機|2026-05-26 14:09:54|1c4f971a",
+        "status": "作業中",
+        "work_order": "25M0691-01",
+        "part_no": "MZ1-1TRSC0000050112",
+        "type_name": "PACKING PARTS COMP.",
+        "process_name": "收機",
+        "employee_id": "SPT158",
+        "employee_name": "劉定澤",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-26 14:09:54",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-26",
+        "start_time": "14:09:54",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT158|收機|2026-05-26",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-26 14:09:54",
+        "updated_at": "2026-05-26 14:09:54"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 19
+    "time_records": 20
   }
 }
