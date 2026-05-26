@@ -5339,3 +5339,103 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
         return int(_v123_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
 
 # =================== END V123 MULTI-USER RECORD OPERATION LOCK ===================
+
+# ===================== V133 01 ACTIVE REFRESH + LOGOUT FLUSH HELPERS =====================
+# 目的：
+# 1) 進入 01 工時紀錄時，若 SQLite/query cache 尚未帶出本人未結束作業，從 01/02 本機權威檔輕量回補，避免必須切換模組才看得到。
+# 2) 登出前可由 security_service 呼叫 flush_time_record_authority_upload_now，將 V108 背景佇列盡量補送 GitHub，降低網路慢造成登出後資料未發布的風險。
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v133_01_active_refresh") -> int:
+    """Lightweight cache repair for 01 Active Work display.
+
+    This function does not change business records. It only repairs SQLite/query cache
+    from existing local 01/02 canonical files when the runtime cache is stale.
+    """
+    emp_id = str(employee_id or "").strip()
+    emp_name = str(employee_name or "").strip()
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+
+    def _sql_active_count() -> int:
+        try:
+            base_get = globals().get("_v104_prev_get_active_records")
+            if callable(base_get):
+                df = base_get(employee_id=emp_id or None, employee_name=emp_name or None)
+            else:
+                params = []
+                sql = "SELECT COUNT(*) AS c FROM time_records WHERE end_timestamp IS NULL"
+                if emp_id:
+                    sql += " AND employee_id=?"
+                    params.append(emp_id)
+                if emp_name:
+                    sql += " AND COALESCE(employee_name,'')=?"
+                    params.append(emp_name)
+                row = query_one(sql, tuple(params))
+                return int((row or {}).get("c", 0) or 0)
+            return int(len(df)) if isinstance(df, pd.DataFrame) else 0
+        except Exception:
+            return 0
+
+    before = _sql_active_count()
+    if before > 0:
+        return before
+    try:
+        hydrator = globals().get("_v104_hydrate_sqlite_from_authority")
+        if callable(hydrator):
+            hydrator(active_only=False, employee_id=emp_id or None, reason=reason)
+    except TypeError:
+        try:
+            globals().get("_v104_hydrate_sqlite_from_authority")(active_only=False, reason=reason)
+        except Exception:
+            pass
+    except Exception as exc:
+        try:
+            write_log("V133_ACTIVE_REFRESH_ERROR", f"01 Active Work 快取回補失敗：{exc}", "time_records", emp_id, level="ERROR")
+        except Exception:
+            pass
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return _sql_active_count()
+
+try:
+    _v133_prev_flush_time_record_authority_upload_now = flush_time_record_authority_upload_now  # type: ignore[name-defined]
+except Exception:
+    _v133_prev_flush_time_record_authority_upload_now = None
+
+
+def flush_time_record_authority_upload_now(reason: str = "v133_logout_flush_time_authority") -> bool:  # type: ignore[override]
+    """Best-effort synchronous publish before logout / diagnostics.
+
+    It keeps V108 fast Start/Finish unchanged. Only callers that explicitly request
+    a flush, such as logout, may wait for the GitHub write-through.
+    """
+    ok = False
+    try:
+        if callable(_v133_prev_flush_time_record_authority_upload_now):
+            ok = bool(_v133_prev_flush_time_record_authority_upload_now(reason))
+    except Exception as exc:
+        try:
+            write_log("V133_TIME_AUTH_FLUSH_ERROR", f"登出前 01/02 權威檔補送失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    if not ok:
+        try:
+            if "sync_time_records_01_02_now" in globals():
+                sync_time_records_01_02_now(reason, github=True)
+                ok = True
+        except Exception as exc:
+            try:
+                write_log("V133_TIME_AUTH_FLUSH_ERROR", f"登出前 01/02 權威檔同步失敗：{exc}", "time_records", level="ERROR")
+            except Exception:
+                pass
+    return bool(ok)
+
+# =================== END V133 01 ACTIVE REFRESH + LOGOUT FLUSH HELPERS ===================

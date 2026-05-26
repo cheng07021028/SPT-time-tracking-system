@@ -3753,6 +3753,13 @@ except Exception:
 
 
 def logout(reason: str = "使用者登出") -> None:  # type: ignore[override]
+    # V133：登出前先盡量補送 01/02 工時權威檔，降低人員按完開始/結束後
+    # 立刻登出、網路慢導致 GitHub 背景發布未完成的資料遺失風險。
+    try:
+        from services.time_record_service import flush_time_record_authority_upload_now
+        flush_time_record_authority_upload_now("logout_v133_time_authority_flush")
+    except Exception:
+        pass
     try:
         mark_online_user_offline(reason)
     except Exception:
@@ -3781,3 +3788,139 @@ def render_user_bar(module_code: str = "") -> None:  # type: ignore[override]
         return _v126_prev_render_user_bar(module_code)
 
 # =================== END V126 ONLINE USERS RESTORE + SESSION DISPLAY ALIGNMENT ===================
+
+# ===================== V132 LOGIN PERSONNEL AUTHORITY WRITE-THROUGH FIX =====================
+# 修正：登入/登出/權限不足等安全事件原本只穩定寫到 security_login_logs，
+#       11｜登入紀錄主要讀 login_logs + canonical records.json，因此會看起來
+#       「沒有確實執行登入人員紀錄」或只在進入 11 頁時才補一筆。
+# 重點：保留原 SQLite security_login_logs 相容寫入，額外立即寫入
+#       services.audit_log_service.record_login_log，該函式會同步 canonical 權威檔。
+try:
+    _v132_prev_log_security_event = log_security_event
+except Exception:  # pragma: no cover
+    _v132_prev_log_security_event = None
+
+
+def _v132_txt(v: Any) -> str:
+    if v is None:
+        return ""
+    s = str(v).strip()
+    if s.lower() in {"none", "nan", "nat"}:
+        return ""
+    return s
+
+
+def _v132_resolve_login_identity(username: str = "") -> dict[str, str]:
+    """Resolve display_name / employee_id from current session first, then 10權限權威檔, then SQLite.
+
+    This prevents 11 login log rows from showing empty or wrong display_name when the event is
+    written before/after session state changes, and keeps failure events safe.
+    """
+    uname = _v132_txt(username or st.session_state.get("auth_username") or st.session_state.get("username"))
+    display = _v132_txt(st.session_state.get("auth_display_name") or st.session_state.get("display_name"))
+    employee_id = _v132_txt(st.session_state.get("auth_employee_id"))
+    roles = st.session_state.get("auth_roles", []) if "st" in globals() else []
+    if isinstance(roles, list):
+        role_text = ",".join([_v132_txt(x) for x in roles if _v132_txt(x)])
+    else:
+        role_text = _v132_txt(roles)
+
+    if uname and (not display or not employee_id or not role_text):
+        # Prefer the 10_permissions canonical authority used by 權限管理.
+        try:
+            from services.permanent_authority_service import load_authority
+            payload = load_authority("10_permissions", "records")
+            tables = payload.get("tables") if isinstance(payload, dict) and isinstance(payload.get("tables"), dict) else {}
+            candidate_tables = [
+                tables.get("users"), tables.get("auth_users"), tables.get("account_master"),
+                tables.get("accounts"), tables.get("帳號清單"), tables.get("帳號密碼總表"),
+            ]
+            for rows in candidate_tables:
+                if not isinstance(rows, list):
+                    continue
+                for r in rows:
+                    if not isinstance(r, dict):
+                        continue
+                    ru = _v132_txt(r.get("username") or r.get("帳號") or r.get("帳號 / Username") or r.get("user"))
+                    if ru and ru.lower() == uname.lower():
+                        display = display or _v132_txt(r.get("display_name") or r.get("姓名") or r.get("姓名 / Display Name") or r.get("name"))
+                        employee_id = employee_id or _v132_txt(r.get("employee_id") or r.get("工號") or r.get("工號 / Employee ID"))
+                        role_text = role_text or _v132_txt(r.get("role_code") or r.get("角色") or r.get("角色 / Role") or r.get("role"))
+                        raise StopIteration
+        except StopIteration:
+            pass
+        except Exception:
+            pass
+
+    if uname and (not display or not employee_id or not role_text):
+        # SQLite fallback only; do not let it override current session/canonical data.
+        try:
+            row = query_one("SELECT username, display_name, employee_id, role_code FROM auth_users WHERE lower(username)=lower(?)", (uname,)) or \
+                  query_one("SELECT username, display_name, employee_id, role_code FROM security_users WHERE lower(username)=lower(?)", (uname,))
+            if row:
+                display = display or _v132_txt(row.get("display_name"))
+                employee_id = employee_id or _v132_txt(row.get("employee_id"))
+                role_text = role_text or _v132_txt(row.get("role_code"))
+        except Exception:
+            pass
+    return {
+        "username": uname,
+        "display_name": display or uname,
+        "employee_id": employee_id,
+        "roles": role_text,
+    }
+
+
+def log_security_event(username: str | None, event_type: str, result: str, message: str = "", module_code: str = "", idle_seconds: int | None = None) -> None:  # type: ignore[override]
+    """Write security event to both legacy security_login_logs and canonical 11_login_logs.
+
+    11｜登入紀錄 uses login_logs/canonical authority.  The legacy function only wrote
+    security_login_logs, which caused missing or delayed rows.  This final override keeps
+    compatibility while making the login record immediately visible and persistent.
+    """
+    identity = _v132_resolve_login_identity(username or "")
+    uname = identity.get("username") or _v132_txt(username)
+    norm_event = _v132_txt(event_type or "LOGIN").upper()
+    norm_result = _v132_txt(result or "SUCCESS").upper()
+    msg = _v132_txt(message)
+    if identity.get("employee_id") and "employee_id=" not in msg:
+        msg = (msg + "; " if msg else "") + f"employee_id={identity.get('employee_id')}"
+    if identity.get("roles") and "role=" not in msg and "roles=" not in msg:
+        msg = (msg + "; " if msg else "") + f"roles={identity.get('roles')}"
+
+    # 1) Keep existing security_login_logs behavior for compatibility.
+    try:
+        if callable(_v132_prev_log_security_event):
+            _v132_prev_log_security_event(uname, norm_event, norm_result, msg, module_code, idle_seconds)
+    except Exception:
+        pass
+
+    # 2) Write-through to Page 11 canonical authority immediately.
+    try:
+        from services.audit_log_service import record_login_log
+        event_time = _now()
+        record_login_log(
+            username=uname,
+            display_name=identity.get("display_name") or uname,
+            event_type=norm_event,
+            result=norm_result,
+            message=msg,
+            module_code=module_code or ("LOGIN" if norm_event == "LOGIN" else ""),
+            login_time=event_time,
+            logout_time=event_time if norm_event in {"LOGOUT", "AUTO_LOGOUT", "POST_RECORD_LOGOUT", "SESSION_TIMEOUT"} else "",
+            idle_seconds=idle_seconds,
+            user_agent="streamlit",
+            employee_id=identity.get("employee_id", ""),
+            roles=identity.get("roles", ""),
+        )
+        # Avoid duplicate auto_record_session_login when the user later opens page 11.
+        if norm_event == "LOGIN" and norm_result in {"SUCCESS", "OK", "INFO"} and uname:
+            try:
+                st.session_state[f"_spt_login_recorded_{uname}"] = True
+            except Exception:
+                pass
+    except Exception:
+        # Never block login because audit write failed.
+        pass
+
+# =================== END V132 LOGIN PERSONNEL AUTHORITY WRITE-THROUGH FIX ===================

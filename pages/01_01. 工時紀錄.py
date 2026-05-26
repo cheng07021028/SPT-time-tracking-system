@@ -50,6 +50,7 @@ from services.time_record_service import (
     get_active_record,
     get_conflicting_active_records,
     get_active_same_work,
+    refresh_active_records_for_employee,
     save_time_records,
     start_work,
     today_records,
@@ -437,6 +438,10 @@ with left:
     remark = st.text_area("備註｜Remark", height=90)
     auto_pause = st.checkbox("切換不同工段時，自動暫停同人員其他未結束作業｜Auto pause different process", value=True)
 
+    try:
+        refresh_active_records_for_employee(emp_id, str(employee.get("employee_name") or "").strip(), reason="01_start_active_visible_v133")
+    except Exception:
+        pass
     active = get_active_record(emp_id)
     duplicate = None if no_process_options else get_active_same_work(emp_id, wo_no, process, employee_name=str(employee.get("employee_name") or "").strip())
     conflicts = pd.DataFrame() if no_process_options else get_conflicting_active_records(emp_id, process, employee_name=str(employee.get("employee_name") or "").strip())
@@ -469,6 +474,12 @@ with right:
     st.subheader("結束目前作業 / Finish Work")
     emp_label2 = st.selectbox("選擇人員｜Employee", _employee_options_v126, index=_login_employee_index_v126, key=_v127_employee_select_key("end_emp_v127"))
     emp_id2 = emp_label2.split("｜")[0]
+    try:
+        _emp2_match = employees[employees["employee_id"].fillna("").astype(str).str.strip() == emp_id2]
+        _emp2_name = str(_emp2_match.iloc[0].get("employee_name") or "").strip() if not _emp2_match.empty else ""
+        refresh_active_records_for_employee(emp_id2, _emp2_name, reason="01_finish_active_visible_v133")
+    except Exception:
+        pass
     active2 = get_active_record(emp_id2)
     if not active2:
         st.success("此人員目前沒有未結束作業。")

@@ -126,6 +126,45 @@ def _format_module(target_table: Any) -> str:
     return _TABLE_LABELS.get(raw.lower(), raw)
 
 
+def _user_display_name_map() -> dict[str, str]:
+    """Best-effort username -> display name map for 06 LOG.
+
+    V133：06 LOG 查詢新增「姓名 / Name」欄。
+    優先讀 10 權限管理的帳號權威資料；失敗時回退 SQLite auth/security users。
+    這只影響顯示，不改 LOG 寫入、刪除、權威檔 tombstone。
+    """
+    mapping: dict[str, str] = {}
+    try:
+        from services.permission_service import get_users as _perm_get_users
+        for row in _perm_get_users() or []:
+            username = _clean_text((row or {}).get("username") or (row or {}).get("帳號 / Username"))
+            name = _clean_text((row or {}).get("display_name") or (row or {}).get("姓名 / Display Name"))
+            if username and name:
+                mapping[username.lower()] = name
+    except Exception:
+        pass
+    for table in ("auth_users", "security_users"):
+        try:
+            df = query_df(f"SELECT username, display_name FROM {table}")
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                for _, r in df.iterrows():
+                    username = _clean_text(r.get("username"))
+                    name = _clean_text(r.get("display_name"))
+                    if username and name and username.lower() not in mapping:
+                        mapping[username.lower()] = name
+        except Exception:
+            pass
+    return mapping
+
+
+def _lookup_display_name(username: Any, name_map: dict[str, str] | None = None) -> str:
+    user = _clean_text(username)
+    if not user:
+        return ""
+    mapping = name_map or _user_display_name_map()
+    return _clean_text(mapping.get(user.lower(), ""))
+
+
 def format_logs_for_display(df: Any) -> pd.DataFrame:
     """Format raw system_logs into a human-readable operation log.
 
@@ -134,7 +173,7 @@ def format_logs_for_display(df: Any) -> pd.DataFrame:
     """
     if df is None or not isinstance(df, pd.DataFrame) or df.empty:
         return pd.DataFrame(columns=[
-            "ID / ID", "LOG時間 / Log Time", "帳號 / User", "動作 / Action",
+            "ID / ID", "LOG時間 / Log Time", "帳號 / User", "姓名 / Name", "動作 / Action",
             "模組 / Module", "目標ID / Target ID", "操作內容 / Message",
             "結果 / Level", "明細 / Detail",
         ])
@@ -142,10 +181,12 @@ def format_logs_for_display(df: Any) -> pd.DataFrame:
     for col in ["id", "log_time", "user_name", "action_type", "target_table", "target_id", "message", "detail", "level"]:
         if col not in x.columns:
             x[col] = ""
+    _name_map = _user_display_name_map()
     out = pd.DataFrame({
         "ID / ID": x["id"],
         "LOG時間 / Log Time": x["log_time"].map(_clean_text),
         "帳號 / User": x["user_name"].map(_clean_text),
+        "姓名 / Name": x["user_name"].map(lambda v: _lookup_display_name(v, _name_map)),
         "動作 / Action": x["action_type"].map(_format_action),
         "模組 / Module": x["target_table"].map(_format_module),
         "目標ID / Target ID": x["target_id"].map(_clean_text),

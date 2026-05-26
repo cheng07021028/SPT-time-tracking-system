@@ -870,46 +870,49 @@ def _render_cross_day_edit_notice(edit_df: pd.DataFrame) -> None:
     )
 
 
-def _render_history_view_table(view_df: pd.DataFrame, table_key: str = "history_records_view", height: int = 520) -> None:
-    """Read-only history table with light cross-day-end highlighting.
+def _prepare_history_display_df(view_df: pd.DataFrame, *, include_action_cols: bool = False, delete_ids: set[int] | None = None, recalc_ids: set[int] | None = None) -> pd.DataFrame:
+    """Build one canonical 02 history table shape for view/edit/width settings.
 
-    編輯模式仍使用共用 render_table，避免把『跨日結束』標示欄寫回資料庫。
+    V133：修正啟動編輯前後顯示內容不同。
+    未啟用編輯、啟用編輯與欄寬設定都先套用同一份跨日提醒欄位，
+    編輯模式才額外插入「刪除 / Delete」「重算 / Recalc」兩欄。
+    """
+    out = view_df.copy() if isinstance(view_df, pd.DataFrame) else pd.DataFrame()
+    if out.empty:
+        return out
+    out = out.drop(columns=["刪除", "重算", "刪除 / Delete", "重算 / Recalc"], errors="ignore")
+    out = _with_history_cross_day_edit_marker(out)
+    if include_action_cols:
+        delete_ids = delete_ids or set()
+        recalc_ids = recalc_ids or set()
+
+        def _id_in_state(x, id_set: set[int]) -> bool:
+            try:
+                return int(float(str(x).strip())) in id_set
+            except Exception:
+                return False
+
+        out.insert(0, "刪除 / Delete", out["id"].map(lambda x: _id_in_state(x, delete_ids)) if "id" in out.columns else False)
+        out.insert(1, "重算 / Recalc", out["id"].map(lambda x: _id_in_state(x, recalc_ids)) if "id" in out.columns else False)
+    return out
+
+
+def _render_history_view_table(view_df: pd.DataFrame, table_key: str = "history_records", height: int = 520) -> None:
+    """Read-only history table using the same table engine/settings as edit mode.
+
+    V133：改用 render_table + history_records 同一個權威欄寬/欄位順序設定，
+    避免未啟用編輯與啟用編輯時欄位內容、順序、寬度看起來不同。
     """
     if view_df is None or view_df.empty:
         st.info("目前沒有資料 / No data")
         return
-    display_df = _add_cross_day_end_marker(view_df)
-
-    # V2.30：跨日結束需要用 Styler 上色；Styler 不支援共用 column_config，
-    # 所以這裡手動套用雙語欄名與工時格式，避免標題只剩 raw 欄位名稱，
-    # 也避免 work_hours 顯示為 0.030000 這類小數時數。
-    if "work_hours" in display_df.columns:
-        display_df["work_hours"] = display_df["work_hours"].map(hours_to_hms)
-    if "total_hours" in display_df.columns:
-        display_df["total_hours"] = display_df["total_hours"].map(hours_to_hms)
-    if "avg_hours" in display_df.columns:
-        display_df["avg_hours"] = display_df["avg_hours"].map(hours_to_hms)
-
-    cross_mask = display_df["跨日結束"].astype(str).eq("跨日結束") if "跨日結束" in display_df.columns else pd.Series(False, index=display_df.index)
-
-    def highlight_rows(row):
-        if bool(cross_mask.loc[row.name]):
-            return [
-                "background-color: #fff7d6; color: #1f2937; font-weight: 700; border-top: 1px solid #f6c85f; border-bottom: 1px solid #f6c85f;"
-                for _ in row
-            ]
-        return ["" for _ in row]
-
-    label_map = {col: ("跨日結束 / Cross Day End" if str(col) == "跨日結束" else label_for(str(col))) for col in display_df.columns}
-    display_df = display_df.rename(columns=label_map)
-
-    st.caption("淺黃色列代表『跨日結束』：開始日期與結束日期不同，且已完成結束。")
-    st.dataframe(
-        display_df.style.apply(highlight_rows, axis=1),
-        use_container_width=True,
-        hide_index=True,
+    display_df = _prepare_history_display_df(view_df, include_action_cols=False)
+    st.caption("跨日結束會以『⚠ 跨日提醒』與『跨日日期』欄提示；表格欄寬/欄位順序與編輯模式共用同一份權威設定。")
+    render_table(
+        display_df,
+        table_key,
+        editable=False,
         height=height,
-        key=f"frame_{table_key}",
     )
 
 
@@ -1166,14 +1169,9 @@ with tab1:
     # V131：02 歷史明細編輯欄寬設定。
     # 只新增欄寬/欄位順序設定入口，沿用 table_ui_service 的權威檔永久讀寫；
     # 不改 02 儲存、重算、刪除、匯入、01/02 同步等既有功能。
-    _history_width_df = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    _history_width_df = _prepare_history_display_df(df, include_action_cols=False) if isinstance(df, pd.DataFrame) else pd.DataFrame()
     if not _history_width_df.empty:
         try:
-            if can_edit:
-                _history_width_df = _history_width_df.drop(columns=["刪除", "重算", "刪除 / Delete", "重算 / Recalc"], errors="ignore")
-                _history_width_df = _with_history_cross_day_edit_marker(_history_width_df)
-                _history_width_df.insert(0, "刪除 / Delete", False)
-                _history_width_df.insert(1, "重算 / Recalc", False)
             render_width_settings(
                 "history_records",
                 _history_width_df,
@@ -1265,10 +1263,7 @@ with tab1:
                 except Exception:
                     return False
 
-            edit_df = edit_df.drop(columns=["刪除", "重算", delete_col_label, recalc_col_label], errors="ignore")
-            edit_df = _with_history_cross_day_edit_marker(edit_df)
-            edit_df.insert(0, delete_col_label, edit_df["id"].map(lambda x: _id_in_state(x, delete_ids_state)) if "id" in edit_df.columns else False)
-            edit_df.insert(1, recalc_col_label, edit_df["id"].map(lambda x: _id_in_state(x, recalc_ids_state)) if "id" in edit_df.columns else False)
+            edit_df = _prepare_history_display_df(edit_df, include_action_cols=True, delete_ids=delete_ids_state, recalc_ids=recalc_ids_state)
 
             editor_key = f"history_editor_v27_{st.session_state[editor_version_key]}"
             history_draft_key = "history_records_edited_draft_v58"
