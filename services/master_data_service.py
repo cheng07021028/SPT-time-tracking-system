@@ -660,3 +660,89 @@ def has_master_data_for_time_record_fast(employees=None, work_orders=None):  # t
         return {"has_employees_master": has_emp, "has_work_orders_master": has_wo, "employees_count": len(emp_df) if emp_df is not None else 0, "work_orders_count": len(wo_df) if wo_df is not None else 0}
     return has_emp, has_wo
 # ===================== END V86 01 MASTER DATA FAST CACHE =====================
+
+# ===================== V127 MULTI-USER EMPLOYEE FAST CACHE ISOLATION =====================
+# 修正：V86 fast cache 的 employees key 未包含登入者身份。Streamlit 是多 session 共用
+# Python process；如果 001 先載入 01 工時紀錄，002 後載入可能拿到 001 的 filtered
+# employee dataframe，造成「畫面上登入者正確，但 01 工號/姓名下拉帶到別人」。
+# V127 將 01 用人員 fast cache 改為「登入帳號/工號/角色」隔離，不再跨人共用。
+try:
+    _v127_prev_has_master_data_for_time_record_fast = has_master_data_for_time_record_fast
+except Exception:
+    _v127_prev_has_master_data_for_time_record_fast = None
+
+_V127_EMPLOYEE_FAST_CACHE: dict[tuple, tuple[float, pd.DataFrame]] = {}
+
+
+def _v127_identity_cache_key() -> tuple[str, str, str]:
+    try:
+        username, employee_id, roles = _current_login_context()
+    except Exception:
+        username, employee_id, roles = "", "", []
+    if isinstance(roles, str):
+        roles = [roles]
+    role_text = ",".join(sorted({str(r).strip().lower() for r in (roles or []) if str(r).strip()}))
+    return (str(username or "").strip().lower(), str(employee_id or "").strip().lower(), role_text)
+
+
+def clear_time_record_master_fast_cache() -> None:  # type: ignore[override]
+    try:
+        _V86_MD_FAST_CACHE.clear()
+    except Exception:
+        pass
+    try:
+        _V127_EMPLOYEE_FAST_CACHE.clear()
+    except Exception:
+        pass
+
+
+def load_employees_for_time_record_fast(active_only: bool = True, in_factory_only: bool = False):  # type: ignore[override]
+    """Load 01 employee options with per-login cache isolation.
+
+    Do NOT call the older V86 fast loader here, because its cache key is global and can
+    leak one operator's employee list into another operator's session.  We call
+    load_employees() directly so _filter_employees_for_time_record() runs against the
+    current session identity.
+    """
+    now_s = _v86_md_now() if "_v86_md_now" in globals() else 0.0
+    key = ("employees_v127", bool(active_only), bool(in_factory_only), *_v127_identity_cache_key())
+    got = _V127_EMPLOYEE_FAST_CACHE.get(key)
+    ttl = globals().get("_V86_MD_CACHE_SECONDS", 20)
+    try:
+        ttl = float(ttl)
+    except Exception:
+        ttl = 20.0
+    if got and now_s and (now_s - got[0] <= ttl):
+        return got[1].copy()
+    try:
+        # Prevent any legacy global employee fast-cache entry from being reused by accident.
+        if "_V86_MD_FAST_CACHE" in globals() and isinstance(_V86_MD_FAST_CACHE, dict):
+            for old_key in list(_V86_MD_FAST_CACHE.keys()):
+                if isinstance(old_key, tuple) and old_key and old_key[0] == "employees":
+                    _V86_MD_FAST_CACHE.pop(old_key, None)
+    except Exception:
+        pass
+    df = load_employees(active_only=active_only, in_factory_only=in_factory_only)
+    if df is None:
+        df = pd.DataFrame()
+    _V127_EMPLOYEE_FAST_CACHE[key] = (now_s, df.copy())
+    return df.copy()
+
+
+def has_master_data_for_time_record_fast(employees=None, work_orders=None):  # type: ignore[override]
+    # Keep original return contract, but make employee-side check use V127 isolated loader
+    # whenever caller does not pass an employee dataframe explicitly.
+    emp_df = employees if employees is not None else load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
+    if work_orders is not None:
+        wo_df = work_orders
+    else:
+        try:
+            wo_df = load_work_orders_for_time_record_fast(active_only=True)
+        except Exception:
+            wo_df = load_work_orders(active_only=True)
+    has_emp = bool(emp_df is not None and hasattr(emp_df, "empty") and not emp_df.empty)
+    has_wo = bool(wo_df is not None and hasattr(wo_df, "empty") and not wo_df.empty)
+    if employees is None and work_orders is None:
+        return {"has_employees_master": has_emp, "has_work_orders_master": has_wo, "employees_count": len(emp_df) if emp_df is not None else 0, "work_orders_count": len(wo_df) if wo_df is not None else 0}
+    return has_emp, has_wo
+# =================== END V127 MULTI-USER EMPLOYEE FAST CACHE ISOLATION ===================

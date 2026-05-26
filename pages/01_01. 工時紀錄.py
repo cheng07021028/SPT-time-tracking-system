@@ -330,6 +330,33 @@ def _v126_employee_options_and_login_index(employees_df: pd.DataFrame) -> tuple[
 
 # ===== END V126 LOGIN EMPLOYEE DEFAULT FIX =====
 
+
+# ===== V127 EMPLOYEE SELECTBOX SESSION ISOLATION =====
+def _v127_employee_select_key(base: str) -> str:
+    """Use a per-auth-session selectbox key so one browser/user cannot keep a stale employee.
+
+    Streamlit selectbox keeps its value by key.  V126 corrected the default index, but if
+    the key already existed from a previous user or a previous bad cache, Streamlit kept
+    that old value.  V127 makes the key include auth_session_id/employee_id so login user
+    changes reset the employee selector safely.
+    """
+    sid = str(st.session_state.get("auth_session_id") or "").strip()
+    emp = str(st.session_state.get("auth_employee_id") or "").strip()
+    user = str(st.session_state.get("auth_username") or "").strip()
+    raw = "_".join([base, sid[:16] or user or "anon", emp or "noemp"])
+    return "".join(ch if ch.isalnum() or ch in "_-." else "_" for ch in raw)
+
+
+def _v127_clear_legacy_employee_select_state() -> None:
+    """Remove stale V126 fixed-key employee selectors after V127 is active."""
+    for k in ("start_emp_v126", "end_emp_v126"):
+        try:
+            st.session_state.pop(k, None)
+        except Exception:
+            pass
+
+# ===== END V127 EMPLOYEE SELECTBOX SESSION ISOLATION =====
+
 # V13: 01 opens from latest memory files/SQLite without doing heavy master restore inline.
 employees = load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
 work_orders = load_work_orders_for_time_record_fast(active_only=True)
@@ -350,10 +377,11 @@ if employees.empty or work_orders.empty:
 
 left, right = st.columns([1.1, 1])
 _employee_options_v126, _login_employee_index_v126 = _v126_employee_options_and_login_index(employees)
+_v127_clear_legacy_employee_select_state()
 
 with left:
     st.subheader("開始作業 / Start Work")
-    emp_label = st.selectbox("工號 / 姓名｜Employee", _employee_options_v126, index=_login_employee_index_v126, key="start_emp_v126")
+    emp_label = st.selectbox("工號 / 姓名｜Employee", _employee_options_v126, index=_login_employee_index_v126, key=_v127_employee_select_key("start_emp_v127"))
     emp_id = emp_label.split("｜")[0]
     emp_match = employees[employees["employee_id"].fillna("").astype(str).str.strip() == emp_id]
     employee = emp_match.iloc[0].fillna("").to_dict() if not emp_match.empty else (query_one("SELECT * FROM employees WHERE employee_id=?", (emp_id,)) or {})
@@ -439,7 +467,7 @@ with left:
 
 with right:
     st.subheader("結束目前作業 / Finish Work")
-    emp_label2 = st.selectbox("選擇人員｜Employee", _employee_options_v126, index=_login_employee_index_v126, key="end_emp_v126")
+    emp_label2 = st.selectbox("選擇人員｜Employee", _employee_options_v126, index=_login_employee_index_v126, key=_v127_employee_select_key("end_emp_v127"))
     emp_id2 = emp_label2.split("｜")[0]
     active2 = get_active_record(emp_id2)
     if not active2:
