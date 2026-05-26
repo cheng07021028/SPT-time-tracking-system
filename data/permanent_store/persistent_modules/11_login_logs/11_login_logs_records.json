@@ -1,78 +1,25 @@
 {
-  "version": "V1.48",
-  "exported_at": "2026-05-26 19:12:19",
-  "source": "db_service_write",
+  "version": "V103-canonical-login-logs",
+  "authority_schema": "SPT-PermanentAuthority-V103-CompatibilityMirror",
+  "exported_at": "2026-05-26 19:13:14",
+  "updated_at": "2026-05-26 19:13:14",
+  "source": "v106_clear_login_logs_tombstone_authority",
   "module_key": "11_login_logs",
-  "module_code": "11",
+  "module_code": "11_login_logs",
   "module_name_zh": "登入紀錄",
   "module_name_en": "Login Logs",
+  "table": "login_logs",
+  "count": 0,
+  "records": [],
   "tables": {
+    "login_logs": [],
     "auth_login_logs": [],
-    "login_logs": [
-      {
-        "id": 128,
-        "username": "admin",
-        "display_name": "系統管理員",
-        "event_type": "LOGIN",
-        "result": "SUCCESS",
-        "message": "role=admin;source=authority",
-        "module_code": "LOGIN",
-        "login_time": "2026-05-26 19:12:05",
-        "logout_time": "",
-        "idle_minutes": null,
-        "ip_address": "",
-        "user_agent": "streamlit",
-        "created_at": "2026-05-26 19:12:05"
-      },
-      {
-        "id": 129,
-        "username": "admin",
-        "display_name": "系統管理員",
-        "event_type": "LOGIN",
-        "result": "SUCCESS",
-        "message": "role=admin;source=authority",
-        "module_code": "LOGIN",
-        "login_time": "2026-05-26 18:49:53",
-        "logout_time": "",
-        "idle_minutes": null,
-        "ip_address": "",
-        "user_agent": "streamlit",
-        "created_at": "2026-05-26 18:49:53"
-      },
-      {
-        "id": 130,
-        "username": "admin",
-        "display_name": "系統管理員",
-        "event_type": "AUTO_LOGOUT",
-        "result": "SUCCESS",
-        "message": "閒置自動登出; roles=admin",
-        "module_code": "",
-        "login_time": "2026-05-26 18:48:29",
-        "logout_time": "2026-05-26 18:48:29",
-        "idle_minutes": 3.25,
-        "ip_address": "",
-        "user_agent": "streamlit",
-        "created_at": "2026-05-26 18:48:29"
-      },
-      {
-        "id": 131,
-        "username": "admin",
-        "display_name": "系統管理員",
-        "event_type": "AUTO_LOGOUT",
-        "result": "SUCCESS",
-        "message": "閒置超過 3 分鐘，自動登出; roles=admin",
-        "module_code": "",
-        "login_time": "2026-05-26 18:48:27",
-        "logout_time": "2026-05-26 18:48:27",
-        "idle_minutes": null,
-        "ip_address": "",
-        "user_agent": "streamlit",
-        "created_at": "2026-05-26 18:48:27"
-      }
-    ]
+    "security_login_logs": []
   },
   "table_counts": {
+    "login_logs": 0,
     "auth_login_logs": 0,
-    "login_logs": 4
-  }
+    "security_login_logs": 0
+  },
+  "empty_authoritative": true
 }
