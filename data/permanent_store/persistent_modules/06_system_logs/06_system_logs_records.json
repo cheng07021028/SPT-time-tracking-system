@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-25 22:03:41",
+  "exported_at": "2026-05-26 08:25:39",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -2713,43 +2713,10 @@
         "message": "get_active_record_v104_cache_repair: 已由 01/02 權威檔回填 SQLite cache 13 筆",
         "detail": "",
         "level": "INFO"
-      },
-      {
-        "id": 530,
-        "log_time": "2026-05-25 22:02:54",
-        "user_name": "admin",
-        "action_type": "SAVE_TIME_RECORDS",
-        "target_table": "time_records",
-        "target_id": "",
-        "message": "V89 權威檔優先：已儲存/更新歷史紀錄 15 筆，並同步 01/02 canonical。",
-        "detail": "",
-        "level": "INFO"
-      },
-      {
-        "id": 531,
-        "log_time": "2026-05-25 22:03:13",
-        "user_name": "admin",
-        "action_type": "SAVE_TIME_RECORDS",
-        "target_table": "time_records",
-        "target_id": "",
-        "message": "V89 權威檔優先：已儲存/更新歷史紀錄 15 筆，並同步 01/02 canonical。",
-        "detail": "",
-        "level": "INFO"
-      },
-      {
-        "id": 532,
-        "log_time": "2026-05-25 22:03:19",
-        "user_name": "admin",
-        "action_type": "RECALC_TIME_RECORDS_0102_SYNC",
-        "target_table": "time_records",
-        "target_id": "",
-        "message": "V109：已重算 1 筆，並將同一批權威資料同步寫入 01 工時紀錄與 02 歷史紀錄。",
-        "detail": "",
-        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 249
+    "system_logs": 246
   }
 }
