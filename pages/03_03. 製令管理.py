@@ -569,13 +569,71 @@ def _build_work_order_sync_save_df(add_df: pd.DataFrame, upd_df: pd.DataFrame, d
 
 
 
-def _apply_work_order_sync_direct(add_df: pd.DataFrame, upd_df: pd.DataFrame, del_df: pd.DataFrame, do_delete: bool) -> dict:
-    """Apply OneDrive mapped sync directly to the work_orders table.
+WORK_ORDER_CANONICAL_COLS = ["id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
 
-    V2.49: The previous flow delegated to save_work_orders(), but in some deployed
-    projects that function returned zero writes or refreshed the editor with stale
-    state. This function performs explicit INSERT/UPDATE/DELETE operations and
-    returns concrete counts, so 「確認套用對應更新」一定真正寫入製令清單。
+
+def _v136_load_work_orders_from_sqlite_direct() -> pd.DataFrame:
+    """Read current SQLite work_orders table directly for immediate 03 display repair.
+
+    03｜製令管理的頁面讀取是 canonical-first；但 OneDrive mapped sync 舊流程
+    曾經只寫 SQLite，造成畫面顯示「實際新增 567」但製令清單編輯仍空白。
+    此函式只讀取剛寫入的 SQLite 現況，用於同步 canonical 與刷新畫面暫存。
+    """
+    ensure_tables()
+    conn = get_conn()
+    try:
+        df = pd.read_sql_query(
+            """
+            SELECT id, work_order, part_no, type_name, assembly_location, customer, note,
+                   is_active, created_at, updated_at
+            FROM work_orders
+            ORDER BY work_order
+            """,
+            conn,
+        )
+    finally:
+        conn.close()
+    for c in WORK_ORDER_CANONICAL_COLS:
+        if c not in df.columns:
+            df[c] = ""
+    if "is_active" in df.columns:
+        df["is_active"] = df["is_active"].map(_is_truthy)
+    return df[WORK_ORDER_CANONICAL_COLS].reset_index(drop=True)
+
+
+def _v136_sync_work_order_authority_from_sqlite(reason: str = "v136_work_order_sync") -> dict:
+    """Persist SQLite work_orders into the official 03 canonical authority file.
+
+    This is the missing bridge that caused OneDrive sync results to disappear from
+    「製令清單編輯」: the apply button inserted rows into SQLite, while the editor
+    reloaded from data/permanent_store/modules/03_work_orders/records.json.
+    """
+    df = _v136_load_work_orders_from_sqlite_direct()
+    rows = []
+    try:
+        from services.permanent_authority_service import save_authority, table_from_df
+        rows = table_from_df(df)
+        save_authority("03_work_orders", records={"work_orders": rows}, reason=reason, github=True)
+        return {"ok": True, "rows": len(rows), "error": ""}
+    except Exception as exc:
+        # Local SQLite has already been updated; return the error so the page can warn
+        # the user instead of silently showing an empty canonical table again.
+        try:
+            from services.log_service import write_log
+            write_log("V136_WORK_ORDER_AUTH_SYNC_ERROR", f"03 製令權威檔同步失敗：{exc}", "work_orders", level="ERROR")
+        except Exception:
+            pass
+        return {"ok": False, "rows": len(rows) if rows else len(df), "error": str(exc)[:500]}
+
+
+def _apply_work_order_sync_direct(add_df: pd.DataFrame, upd_df: pd.DataFrame, del_df: pd.DataFrame, do_delete: bool) -> dict:
+    """Apply OneDrive mapped sync and then write the official 03 authority file.
+
+    V136 fix:
+    - Keep the proven direct SQLite insert/update/delete path for concrete counts.
+    - Immediately mirror the final SQLite table into 03_work_orders canonical records.
+    - Refresh the editor from that same final table, so 「實際新增 567」 will appear
+      in 「製令清單編輯」 after rerun instead of showing an empty table.
     """
     ensure_tables()
     conn = get_conn()
@@ -642,7 +700,6 @@ def _apply_work_order_sync_direct(add_df: pd.DataFrame, upd_df: pd.DataFrame, de
                     updated += cur.rowcount
                     updated_keys.append(wo)
                 else:
-                    # If the record disappeared between preview and apply, insert it safely.
                     cur.execute(
                         """
                         INSERT INTO work_orders
@@ -668,6 +725,7 @@ def _apply_work_order_sync_direct(add_df: pd.DataFrame, upd_df: pd.DataFrame, de
     finally:
         conn.close()
 
+    authority = _v136_sync_work_order_authority_from_sqlite("onedrive_mapped_sync_v136")
     return {
         "inserted": inserted,
         "updated": updated,
@@ -676,6 +734,9 @@ def _apply_work_order_sync_direct(add_df: pd.DataFrame, upd_df: pd.DataFrame, de
         "inserted_keys": inserted_keys,
         "updated_keys": updated_keys,
         "deleted_keys": deleted_keys,
+        "authority_ok": authority.get("ok", False),
+        "authority_rows": authority.get("rows", 0),
+        "authority_error": authority.get("error", ""),
     }
 
 if STATE_KEY not in st.session_state:
@@ -1010,7 +1071,13 @@ with tab4:
                     st.info(msg)
                 else:
                     result = _apply_work_order_sync_direct(add_df, upd_df, del_df, bool(do_delete))
-                    reload_data()
+                    # V136：先用 SQLite 最終結果刷新畫面，再讓 load_work_orders 讀 canonical。
+                    # 避免「實際新增 567」但 editor 還讀到空 canonical。
+                    try:
+                        latest_df = _v136_load_work_orders_from_sqlite_direct()
+                        st.session_state[STATE_KEY] = ensure_cols(latest_df.assign(_delete=False))
+                    except Exception:
+                        reload_data()
                     msg = (
                         f"製令同步完成，且已永久記錄欄位對應與匯入模式："
                         f"應新增 {len(add_df)}、應更新 {len(upd_df)}、"
@@ -1018,16 +1085,18 @@ with tab4:
                         f"實際新增 {result.get('inserted', 0)}、"
                         f"實際更新 {result.get('updated', 0)}、"
                         f"實際刪除 {result.get('deleted', 0)}、"
-                        f"略過 {result.get('skipped', 0)}。"
+                        f"略過 {result.get('skipped', 0)}；"
+                        f"03 權威檔同步 {result.get('authority_rows', 0)} 筆。"
                         f"新增：{_safe_join(result.get('inserted_keys', []))}；"
                         f"更新：{_safe_join(result.get('updated_keys', []))}；"
                         f"刪除：{_safe_join(result.get('deleted_keys', []))}"
                     )
                     st.session_state["wo_onedrive_sync_last_message_v248"] = msg
-                    st.success(msg)
-                    # 清掉編輯頁舊暫存，回到製令清單可直接看到最新資料。
-                    try:
-                        st.session_state[STATE_KEY] = ensure_cols(load_work_orders().assign(_delete=False))
-                    except Exception:
-                        reload_data()
+                    if result.get("authority_ok", False):
+                        st.success(msg)
+                    else:
+                        st.warning(msg)
+                        st.error(f"製令已寫入 SQLite，但 03 權威檔同步失敗：{result.get('authority_error', '')}")
+                    # 清掉編輯頁舊 data_editor 草稿，回到製令清單可直接看到最新資料。
+                    _refresh_editor_widget()
                     rerun()
