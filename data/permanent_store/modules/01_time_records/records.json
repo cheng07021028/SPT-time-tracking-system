@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-26 15:24:45",
-  "exported_at": "2026-05-26 15:24:45",
-  "reason": "start_work_v108_fast_local_upsert_01",
+  "updated_at": "2026-05-26 15:25:25",
+  "exported_at": "2026-05-26 15:25:25",
+  "reason": "finish_work_v108_fast_local_sync_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -470,7 +470,7 @@
       {
         "id": 69,
         "record_key": "SPT172|25M0690-01|Packing|2026-05-26 13:34:12|de5f0887",
-        "status": "作業中",
+        "status": "暫停",
         "work_order": "25M0690-01",
         "part_no": "MZ1-1TRSC131N110205",
         "type_name": "PACKING PARTS COMP.",
@@ -479,20 +479,20 @@
         "employee_name": "胡瑄芸",
         "start_action": "開始",
         "start_timestamp": "2026-05-26 13:34:12",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-26 15:25:25",
         "remark": "",
         "start_date": "2026-05-26",
         "start_time": "13:34:12",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-26",
+        "end_time": "15:25:25",
+        "work_hours": 1.6,
         "assembly_location": "竹東",
         "group_key": "SPT172|Packing|2026-05-26",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-26 13:34:12",
-        "updated_at": "2026-05-26 13:34:12"
+        "updated_at": "2026-05-26 15:25:25"
       },
       {
         "id": 70,
