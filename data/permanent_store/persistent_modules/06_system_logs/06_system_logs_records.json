@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 09:41:55",
+  "exported_at": "2026-05-26 09:45:26",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -2779,10 +2779,65 @@
         "message": "陳凱彥 開始 25MN0014-06 / 其他",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 2088,
+        "log_time": "2026-05-26 09:43:32",
+        "user_name": "SPT089",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 2089,
+        "log_time": "2026-05-26 09:43:36",
+        "user_name": "SPT089",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 2090,
+        "log_time": "2026-05-26 09:43:39",
+        "user_name": "SPT089",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 2091,
+        "log_time": "2026-05-26 09:43:42",
+        "user_name": "SPT031",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 2092,
+        "log_time": "2026-05-26 09:43:42",
+        "user_name": "SPT031",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "61",
+        "message": "吳政昌 開始 24N4001-34 / S.T.",
+        "detail": "",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 252
+    "system_logs": 257
   }
 }
