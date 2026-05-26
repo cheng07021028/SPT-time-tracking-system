@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+  "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-26 13:06:29",
-  "exported_at": "2026-05-26 11:58:32",
-  "reason": "v125_get_permissions_repair",
+  "updated_at": "2026-05-26 13:10:09",
+  "exported_at": "2026-05-26 13:10:09",
+  "reason": "v106_force_password_change",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -864,17 +864,26 @@
       },
       {
         "username": "SPT121",
-        "password_hash": "pbkdf2_sha256$b3ab05f9172013c91c904af8d9a43ef1$f402e6c64bcfcff8b5dba01c11a4590dc8ada6db6fb875f14d05767f5958ed50",
+        "password_hash": "pbkdf2_sha256$180000$zl4VLessDb+iVyOQytyyQw==$Q3Mdh+wH/jSWSplam061PW5BckOfJrPA7a9yL5B4S24=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT121",
         "display_name": "徐兆生",
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-26 13:01:10"
+        "updated_at": "2026-05-26 13:10:09",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT138",
@@ -22381,8 +22390,5 @@
     "security_settings": 2,
     "security_users": 6,
     "security_user_roles": 6
-  },
-  "deleted_usernames": [],
-  "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
+  }
 }
