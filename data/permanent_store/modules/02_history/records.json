@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-26 09:17:58",
-  "exported_at": "2026-05-26 09:17:58",
-  "reason": "finish_work_v108_fast_local_sync_02",
+  "updated_at": "2026-05-26 09:19:09",
+  "exported_at": "2026-05-26 09:19:09",
+  "reason": "start_work_v108_fast_local_upsert_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -92,7 +92,7 @@
       {
         "id": 52,
         "record_key": "SPT084|25MN0014-07|OPEN 配線|2026-05-26 08:58:34|722b9e10",
-        "status": "暫停",
+        "status": "作業中",
         "work_order": "25MN0014-07",
         "part_no": "9MRSC2A2-BWN01-03",
         "type_name": "BWS3200\nRSC2A2-BWN01-03",
@@ -101,20 +101,20 @@
         "employee_name": "陳育信",
         "start_action": "開始",
         "start_timestamp": "2026-05-26 08:58:34",
-        "end_action": "暫停",
-        "end_timestamp": "2026-05-26 09:17:58",
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "",
         "start_date": "2026-05-26",
         "start_time": "08:58:34",
-        "end_date": "2026-05-26",
-        "end_time": "09:17:58",
-        "work_hours": 0.32,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT084|OPEN 配線|2026-05-26",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-26 08:58:34",
-        "updated_at": "2026-05-26 09:17:58"
+        "updated_at": "2026-05-26 08:58:34"
       },
       {
         "id": 53,
@@ -169,11 +169,38 @@
         "source": "streamlit",
         "created_at": "2026-05-26 09:15:33",
         "updated_at": "2026-05-26 09:15:33"
+      },
+      {
+        "id": 57,
+        "record_key": "SPT250|25MN0014-06|其他|2026-05-26 09:18:38|241c6a42",
+        "status": "作業中",
+        "work_order": "25MN0014-06",
+        "part_no": "9MRSC2A2-BWN01-03",
+        "type_name": "BWS3200\nRSC2A2-BWN01-03",
+        "process_name": "其他",
+        "employee_id": "SPT250",
+        "employee_name": "鄭至賢",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-26 09:18:38",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "S.T.",
+        "start_date": "2026-05-26",
+        "start_time": "09:18:38",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT250|其他|2026-05-26",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-26 09:18:38",
+        "updated_at": "2026-05-26 09:18:38"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 6
+    "time_records": 7
   }
 }
