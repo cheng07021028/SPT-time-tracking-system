@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-26 22:59:10",
-  "exported_at": "2026-05-26 22:59:10",
+  "updated_at": "2026-05-26 22:59:24",
+  "exported_at": "2026-05-26 22:59:24",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -31,11 +31,23 @@
         "detail": "",
         "level": "ERROR",
         "source": "sqlite"
+      },
+      {
+        "id": 313,
+        "log_time": "2026-05-26 22:59:22",
+        "user_name": "admin",
+        "action_type": "V134_SQLITE_REPAIR_READ_ERROR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 直接讀取 SQLite time_records 失敗：no such table: time_records",
+        "detail": "",
+        "level": "ERROR",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2
+    "system_logs": 3
   }
 }
