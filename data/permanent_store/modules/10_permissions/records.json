@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+  "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-26 17:39:12",
-  "exported_at": "2026-05-26 17:14:52",
-  "reason": "v125_get_permissions_repair",
+  "updated_at": "2026-05-26 17:47:16",
+  "exported_at": "2026-05-26 17:47:16",
+  "reason": "v106_force_password_change",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -1006,17 +1006,26 @@
       },
       {
         "username": "SPT149",
-        "password_hash": "pbkdf2_sha256$23b8c5309b94b28b07cb6064c3d4c851$62d2a0c9d0910c4df29027d5db751d6aa21a4b4ca8c965fd48b0be9cfcd2cd7a",
+        "password_hash": "pbkdf2_sha256$180000$nwEBBqPCcTBmtAq2ZH69GQ==$Po2SaWgbWCDiy0JLEzhn+RUYfMnbEAk2Zy2r1zv4BFA=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT149",
         "display_name": "江金福",
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-26 13:01:10"
+        "updated_at": "2026-05-26 17:47:16",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT150",
@@ -22525,8 +22534,5 @@
     "security_settings": 2,
     "security_users": 6,
     "security_user_roles": 6
-  },
-  "deleted_usernames": [],
-  "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
+  }
 }
