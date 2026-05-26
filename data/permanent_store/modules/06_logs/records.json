@@ -2,15 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-26 22:58:53",
-  "exported_at": "2026-05-26 22:58:53",
-  "reason": "v122_delete_system_logs_tombstone",
-  "empty_authoritative": true,
+  "updated_at": "2026-05-26 22:58:54",
+  "exported_at": "2026-05-26 22:58:54",
+  "reason": "v122_write_log_authority",
+  "empty_authoritative": false,
   "tables": {
-    "system_logs": []
+    "system_logs": [
+      {
+        "id": 313,
+        "log_time": "2026-05-26 22:58:54",
+        "user_name": "admin",
+        "action_type": "DELETE_LOG_RANGE",
+        "target_table": "system_logs",
+        "target_id": "2026-05-19~2026-05-26",
+        "message": "刪除 LOG 日期區間：2026-05-19 ~ 2026-05-26，刪除筆數：32",
+        "detail": "deleted_count=32;authority=06_logs.records.json;tombstone=delete_state.json",
+        "level": "WARN",
+        "source": "sqlite"
+      }
+    ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 0
+    "system_logs": 1
   }
 }
