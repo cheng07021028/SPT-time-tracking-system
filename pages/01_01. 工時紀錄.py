@@ -394,7 +394,7 @@ with left:
         "製令關鍵字｜Work Order Keyword（可手動輸入；輸入 25M 會篩選下方製令）",
         value="",
         key="start_work_order_manual_query_v103",
-        placeholder="輸入 2、25M、21M0241、P/N、機型關鍵字；不需按 Enter，下方製令會自動篩選",
+        placeholder="輸入 2、25M、21M0241、P/N、機型關鍵字；需按 Enter，下方製令會自動篩選",
     )
     _v105_inject_live_work_order_keyword_sync()
     _wo_query = str(wo_manual_query or "").strip()
