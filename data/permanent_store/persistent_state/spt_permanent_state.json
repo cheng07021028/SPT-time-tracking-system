@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 09:45:26",
+  "exported_at": "2026-05-26 10:16:18",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 25,
+  "business_row_count": 26,
   "table_counts": {
     "auth_account_permissions": 117,
     "auth_login_logs": 0,
@@ -21,7 +21,7 @@
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 3,
-    "time_records": 25,
+    "time_records": 26,
     "work_orders": 0
   },
   "tables": {
@@ -11636,6 +11636,33 @@
         "source": "streamlit",
         "created_at": "2026-05-26 09:43:42",
         "updated_at": "2026-05-26 09:43:42"
+      },
+      {
+        "id": 62,
+        "record_key": "SPT174|V3141247|Robot TeGPT Cching機構調整|2026-05-26 10:16:18|56d40f40",
+        "status": "作業中",
+        "work_order": "V3141247",
+        "part_no": "PP411390041",
+        "type_name": "BENCH 300 LPR Stripper Auto 2C 1Q 2D",
+        "process_name": "Robot TeGPT Cching機構調整",
+        "employee_id": "SPT174",
+        "employee_name": "龍才華",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-26 10:16:18",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-26",
+        "start_time": "10:16:18",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT174|Robot TeGPT Cching機構調整|2026-05-26",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-26 10:16:18",
+        "updated_at": "2026-05-26 10:16:18"
       }
     ],
     "work_orders": []
