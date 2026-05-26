@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 10:46:55",
+  "exported_at": "2026-05-26 10:54:50",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 27,
+  "business_row_count": 28,
   "table_counts": {
     "auth_account_permissions": 117,
     "auth_login_logs": 0,
@@ -21,7 +21,7 @@
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 3,
-    "time_records": 27,
+    "time_records": 28,
     "work_orders": 0
   },
   "tables": {
@@ -11690,6 +11690,33 @@
         "source": "streamlit",
         "created_at": "2026-05-26 10:46:55",
         "updated_at": "2026-05-26 10:46:55"
+      },
+      {
+        "id": 64,
+        "record_key": "SPT092|24N4001-35|S.T.|2026-05-26 10:54:50|3e7d0b12",
+        "status": "作業中",
+        "work_order": "24N4001-35",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "S.T.",
+        "employee_id": "SPT092",
+        "employee_name": "林昶志",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-26 10:54:50",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-26",
+        "start_time": "10:54:50",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT092|S.T.|2026-05-26",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-26 10:54:50",
+        "updated_at": "2026-05-26 10:54:50"
       }
     ],
     "work_orders": []
