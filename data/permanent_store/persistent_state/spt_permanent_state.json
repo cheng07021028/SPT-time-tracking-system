@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-26 09:41:55",
+  "exported_at": "2026-05-26 09:45:26",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 24,
+  "business_row_count": 25,
   "table_counts": {
     "auth_account_permissions": 117,
     "auth_login_logs": 0,
@@ -16,12 +16,12 @@
     "security_settings": 2,
     "security_user_roles": 9,
     "security_users": 9,
-    "system_logs": 252,
+    "system_logs": 257,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 3,
-    "time_records": 24,
+    "time_records": 25,
     "work_orders": 0
   },
   "tables": {
@@ -10844,6 +10844,61 @@
         "message": "陳凱彥 開始 25MN0014-06 / 其他",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 2088,
+        "log_time": "2026-05-26 09:43:32",
+        "user_name": "SPT089",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 2089,
+        "log_time": "2026-05-26 09:43:36",
+        "user_name": "SPT089",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 2090,
+        "log_time": "2026-05-26 09:43:39",
+        "user_name": "SPT089",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 2091,
+        "log_time": "2026-05-26 09:43:42",
+        "user_name": "SPT031",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 2092,
+        "log_time": "2026-05-26 09:43:42",
+        "user_name": "SPT031",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "61",
+        "message": "吳政昌 開始 24N4001-34 / S.T.",
+        "detail": "",
+        "level": "INFO"
       }
     ],
     "system_settings": [
@@ -10901,9 +10956,9 @@
       },
       {
         "table_key": "01.time_records.main",
-        "widths_json": "{\"id\": 60, \"record_key\": 100, \"status\": 60, \"work_order\": 60, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 60, \"remark\": 200, \"start_date\": 60, \"start_time\": 60, \"end_date\": 60, \"end_time\": 60, \"work_hours\": 60, \"assembly_location\": 60, \"group_key\": 60, \"is_group_work\": 60, \"source\": 60, \"created_at\": 60, \"updated_at\": 180}",
-        "order_json": "[]",
-        "updated_at": "2026-05-26 01:41:55"
+        "widths_json": "{\"id\": 60, \"record_key\": 100, \"status\": 60, \"work_order\": 60, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 60, \"remark\": 250, \"start_date\": 60, \"start_time\": 60, \"end_date\": 60, \"end_time\": 60, \"work_hours\": 60, \"assembly_location\": 60, \"group_key\": 60, \"is_group_work\": 60, \"source\": 60, \"created_at\": 60, \"updated_at\": 180}",
+        "order_json": "[\"id\", \"employee_id\", \"employee_name\", \"status\", \"work_order\", \"part_no\", \"type_name\", \"process_name\", \"start_action\", \"start_timestamp\", \"end_action\", \"end_timestamp\", \"remark\", \"start_date\", \"start_time\", \"end_date\", \"end_time\", \"work_hours\", \"assembly_location\", \"group_key\", \"is_group_work\", \"source\", \"created_at\", \"record_key\", \"updated_at\"]",
+        "updated_at": "2026-05-26 01:45:26"
       }
     ],
     "time_records": [
@@ -11554,6 +11609,33 @@
         "source": "streamlit",
         "created_at": "2026-05-26 09:40:21",
         "updated_at": "2026-05-26 09:40:21"
+      },
+      {
+        "id": 61,
+        "record_key": "SPT031|24N4001-34|S.T.|2026-05-26 09:43:42|8dda16ac",
+        "status": "作業中",
+        "work_order": "24N4001-34",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "S.T.",
+        "employee_id": "SPT031",
+        "employee_name": "吳政昌",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-26 09:43:42",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-26",
+        "start_time": "09:43:42",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT031|S.T.|2026-05-26",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-26 09:43:42",
+        "updated_at": "2026-05-26 09:43:42"
       }
     ],
     "work_orders": []
