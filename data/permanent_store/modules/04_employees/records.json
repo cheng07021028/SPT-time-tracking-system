@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "04_employees",
   "kind": "records",
-  "updated_at": "2026-05-27 11:07:14",
-  "exported_at": "2026-05-27 11:07:14",
+  "updated_at": "2026-05-27 11:08:40",
+  "exported_at": "2026-05-27 11:08:40",
   "reason": "crud_save_employees_v113_normalize_id",
   "empty_authoritative": false,
   "tables": {
@@ -1164,11 +1164,50 @@
         "note": "",
         "created_at": "",
         "updated_at": ""
+      },
+      {
+        "id": 89,
+        "employee_id": "B211",
+        "employee_name": "張瑀榛",
+        "department": "製造一課",
+        "title": "晟銘",
+        "is_active": true,
+        "is_in_factory": true,
+        "is_today_attendance": true,
+        "note": "",
+        "created_at": "",
+        "updated_at": ""
+      },
+      {
+        "id": 91,
+        "employee_id": "B211",
+        "employee_name": "張瑀榛",
+        "department": "製造一課",
+        "title": "晟銘",
+        "is_active": true,
+        "is_in_factory": true,
+        "is_today_attendance": true,
+        "note": "",
+        "created_at": "",
+        "updated_at": ""
+      },
+      {
+        "id": 92,
+        "employee_id": "B211",
+        "employee_name": "張瑀榛",
+        "department": "製造一課",
+        "title": "晟銘",
+        "is_active": true,
+        "is_in_factory": true,
+        "is_today_attendance": true,
+        "note": "",
+        "created_at": "",
+        "updated_at": ""
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "employees": 89
+    "employees": 92
   }
 }
