@@ -2,27 +2,43 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 08:37:12",
-  "exported_at": "2026-05-27 08:37:12",
+  "updated_at": "2026-05-27 08:37:17",
+  "exported_at": "2026-05-27 08:37:17",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
       {
-        "id": 447,
+        "id": 541,
         "source": "v103_merge",
-        "username": "B251",
-        "display_name": "胡昌叡",
-        "event_type": "LOGIN",
+        "username": "B189",
+        "display_name": "羅文發",
+        "event_type": "POST_RECORD_LOGOUT",
         "result": "SUCCESS",
-        "message": "role=operator;source=authority; employee_id=B251",
+        "message": "完成工時後選擇不繼續記錄，自動登出; employee_id=B189; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 08:37:17",
+        "logout_time": "2026-05-27 08:37:17",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 08:37:17"
+      },
+      {
+        "id": 494,
+        "source": "v103_merge",
+        "username": "B164",
+        "display_name": "B164",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "帳號不存在",
         "module_code": "LOGIN",
-        "login_time": "2026-05-27 08:37:12",
+        "login_time": "2026-05-27 08:37:14",
         "logout_time": "",
         "idle_minutes": null,
         "ip_address": "",
         "user_agent": "streamlit",
-        "created_at": "2026-05-27 08:37:12"
+        "created_at": "2026-05-27 08:37:14"
       },
       {
         "id": 447,
@@ -750,7 +766,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 46,
+    "login_logs": 47,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
