@@ -2,12 +2,60 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 18:01:39",
-  "exported_at": "2026-05-27 18:01:39",
+  "updated_at": "2026-05-27 18:02:44",
+  "exported_at": "2026-05-27 18:02:44",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 192804,
+        "source": "v103_merge",
+        "username": "B126",
+        "display_name": "戴鎰祥",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=B126",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 18:02:43",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 18:02:43"
+      },
+      {
+        "id": 192579,
+        "source": "v103_merge",
+        "username": "B126",
+        "display_name": "戴鎰祥",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=B126; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 18:02:34",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 18:02:34"
+      },
+      {
+        "id": 192355,
+        "source": "v103_merge",
+        "username": "SSS",
+        "display_name": "SSS",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=admin;source=authority; employee_id=SSS",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 18:01:57",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 18:01:57"
+      },
       {
         "id": 192132,
         "source": "v103_merge",
@@ -3566,7 +3614,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 222,
+    "login_logs": 225,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
