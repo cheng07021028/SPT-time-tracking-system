@@ -7244,3 +7244,297 @@ def diagnose_time_record_id_gaps(start_date: str | None = None, end_date: str | 
     }
 
 # =================== END V140 HISTORY ID INTEGRITY + NON-DESTRUCTIVE 01/02 SAVE GUARD ===================
+
+# ===================== V141 STRICT SELECTED-EMPLOYEE ACTIVE WORK FILTER =====================
+# 修正目的：
+# 1) 01「結束目前作業 / Finish Work」選擇 SSS 時，Active Work 不得顯示 SPT243 羅丹等其他人員未結束紀錄。
+# 2) 病根：前面多版為了修 01/02 權威檔與 SQLite cache 不同步，Active Work 會合併 01_time_records、02_history、SQLite；
+#    若合併後欄位是 UI 顯示欄名（例如「工號 / Employee ID」）或 selectbox label 解析出現 sss | sss，
+#    舊版只在存在 employee_id 欄時才套用篩選，欄位不一致時會跳過篩選，導致回傳第一筆作業中資料。
+# 3) V141：所有 Active Work 查詢先把欄位轉成 canonical 欄位，再用 工號 + 姓名 + 工段 + 日期 做嚴格篩選；
+#    若指定人員查不到未結束資料，必須回傳空，不可 fallback 成其他人員。
+
+_V141_FIELD_ALIASES = {
+    "id": ["id", "ID", "ID / ID", "ID/ID", "編號", "序號"],
+    "employee_id": ["employee_id", "工號", "工號 / Employee ID", "Employee ID", "員工編號"],
+    "employee_name": ["employee_name", "姓名", "姓名 / Name", "Name", "員工姓名"],
+    "status": ["status", "狀態", "狀態 / Status", "Status"],
+    "work_order": ["work_order", "製令", "製令 / Work Order", "Work Order"],
+    "process_name": ["process_name", "工段", "工段名稱", "工段名稱 / Process", "製程", "Process"],
+    "start_date": ["start_date", "開始日期", "開始日期 / Start Date", "Work Date", "work_date"],
+    "start_time": ["start_time", "開始時間", "開始時間 / Start Time"],
+    "start_timestamp": ["start_timestamp", "開始時間戳", "開始時間戳 / Start Timestamp", "Start Timestamp", "開始時間"],
+    "end_timestamp": ["end_timestamp", "結束時間戳", "結束時間戳 / End Timestamp", "End Timestamp", "結束時間"],
+    "end_action": ["end_action", "結束動作", "結束動作 / End Action", "End Action"],
+    "record_key": ["record_key", "紀錄鍵", "紀錄鍵 / Record Key", "Record Key"],
+    "group_key": ["group_key", "群組鍵", "群組鍵 / Group Key", "Group Key"],
+}
+
+
+def _v141_norm_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if text.lower() in {"none", "nan", "nat", "null", "<na>"}:
+        return ""
+    return text
+
+
+def _v141_norm_key(value) -> str:
+    return _v141_norm_text(value).casefold()
+
+
+def _v141_parse_employee_label(value) -> tuple[str, str]:
+    """Accept both 'SPT001｜王小明' and 'SPT001 | 王小明'."""
+    text = _v141_norm_text(value)
+    if not text:
+        return "", ""
+    import re as _re
+    parts = [p.strip() for p in _re.split(r"\s*[｜|]\s*", text, maxsplit=1)]
+    if len(parts) >= 2:
+        return parts[0], parts[1]
+    return text, ""
+
+
+def _v141_first_existing_col(df: pd.DataFrame, names: list[str]) -> str | None:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return None
+    existing = {str(c).strip(): c for c in df.columns}
+    existing_fold = {str(c).strip().casefold(): c for c in df.columns}
+    for n in names:
+        if n in existing:
+            return existing[n]
+        fn = str(n).strip().casefold()
+        if fn in existing_fold:
+            return existing_fold[fn]
+    return None
+
+
+def _v141_canonical_active_df(df: pd.DataFrame | None) -> pd.DataFrame:
+    """Make sure active-work filtering always has canonical columns.
+
+    It does not remove original display columns; it only adds canonical columns when
+    a display/bilingual alias exists. This keeps render_table behavior unchanged.
+    """
+    if df is None or not isinstance(df, pd.DataFrame):
+        return pd.DataFrame()
+    out = df.copy()
+    if out.empty:
+        return out
+    try:
+        out = out.loc[:, ~pd.Index(out.columns).duplicated()].copy()
+    except Exception:
+        pass
+    for canonical, aliases in _V141_FIELD_ALIASES.items():
+        if canonical not in out.columns:
+            src = _v141_first_existing_col(out, aliases)
+            if src is not None:
+                out[canonical] = out[src]
+    return out.reset_index(drop=True)
+
+
+def _v141_is_active_row(row: dict) -> bool:
+    try:
+        if "_v139_is_active_row" in globals():
+            return bool(_v139_is_active_row(row))
+    except Exception:
+        pass
+    status = _v141_norm_text(row.get("status"))
+    end_ts = _v141_norm_text(row.get("end_timestamp"))
+    if status and status != "作業中":
+        return False
+    return not bool(end_ts)
+
+
+def _v141_reconciled_active_source(reason: str = "v141_active_filter") -> pd.DataFrame:
+    try:
+        if "_v139_repair_if_needed" in globals():
+            return _v141_canonical_active_df(_v139_repair_if_needed(reason))
+    except Exception:
+        pass
+    try:
+        if "_v139_reconciled_df" in globals():
+            return _v141_canonical_active_df(_v139_reconciled_df(include_sqlite=True))
+    except Exception:
+        pass
+    try:
+        return _v141_canonical_active_df(query_df("SELECT * FROM time_records ORDER BY id"))
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v141_filter_active_df(
+    employee_id: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+    reason: str = "v141_filter_active",
+) -> pd.DataFrame:
+    emp_id, parsed_name = _v141_parse_employee_label(employee_id)
+    emp_name = _v141_norm_text(employee_name) or parsed_name
+    proc = _v141_norm_text(process_name)
+    sdate = _v141_norm_text(start_date)
+
+    df = _v141_reconciled_active_source(reason)
+    if df.empty:
+        return pd.DataFrame()
+
+    active_rows = []
+    for _, rr in df.iterrows():
+        row = dict(rr.to_dict())
+        if _v141_is_active_row(row):
+            active_rows.append(row)
+    out = pd.DataFrame(active_rows) if active_rows else pd.DataFrame(columns=df.columns)
+    out = _v141_canonical_active_df(out)
+    if out.empty:
+        return out
+
+    # 指定 employee_id 時必須嚴格篩選；欄位不存在也不可回傳其他人。
+    if emp_id:
+        if "employee_id" not in out.columns:
+            return pd.DataFrame(columns=out.columns)
+        out = out[out["employee_id"].map(_v141_norm_key) == _v141_norm_key(emp_id)].copy()
+    if emp_name:
+        if "employee_name" not in out.columns:
+            return pd.DataFrame(columns=out.columns)
+        out = out[out["employee_name"].map(_v141_norm_key) == _v141_norm_key(emp_name)].copy()
+    if proc:
+        if "process_name" not in out.columns:
+            return pd.DataFrame(columns=out.columns)
+        out = out[out["process_name"].map(_v141_norm_key) == _v141_norm_key(proc)].copy()
+    if sdate:
+        if "start_date" not in out.columns:
+            return pd.DataFrame(columns=out.columns)
+        out = out[out["start_date"].map(_v141_norm_text) == sdate].copy()
+    try:
+        if "id" in out.columns:
+            out["_v141_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values("_v141_sort_id", ascending=True, kind="stable").drop(columns=["_v141_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    return _v141_filter_active_df(
+        employee_id=employee_id,
+        employee_name=employee_name,
+        process_name=process_name,
+        start_date=start_date,
+        reason="get_active_records_v141_strict_selected_employee",
+    )
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = _v141_filter_active_df(
+        employee_id=employee_id,
+        employee_name=employee_name,
+        reason="get_active_record_v141_strict_selected_employee",
+    )
+    if df.empty:
+        return None
+    try:
+        if "id" in df.columns:
+            df["_v141_sort_id"] = pd.to_numeric(df["id"], errors="coerce")
+            df = df.sort_values("_v141_sort_id", ascending=False, kind="stable").drop(columns=["_v141_sort_id"], errors="ignore")
+        row = df.iloc[0].where(pd.notna(df.iloc[0]), None).to_dict()
+        # 最後防線：確認回傳者仍等於指定人員。
+        emp_id, parsed_name = _v141_parse_employee_label(employee_id)
+        emp_name = _v141_norm_text(employee_name) or parsed_name
+        if emp_id and _v141_norm_key(row.get("employee_id")) != _v141_norm_key(emp_id):
+            return None
+        if emp_name and _v141_norm_key(row.get("employee_name")) != _v141_norm_key(emp_name):
+            return None
+        return row
+    except Exception:
+        return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        rid = int(float(str(record_id).strip()))
+    except Exception:
+        return pd.DataFrame()
+    df = _v141_reconciled_active_source("get_active_group_v141_strict_selected_employee")
+    df = _v141_canonical_active_df(df)
+    if df.empty or "id" not in df.columns:
+        return pd.DataFrame()
+    try:
+        recs = df[df["id"].map(lambda x: int(float(str(x).strip())) if _v141_norm_text(x) else -1) == rid].copy()
+    except Exception:
+        recs = pd.DataFrame()
+    if recs.empty:
+        return pd.DataFrame()
+    row = dict(recs.iloc[0].to_dict())
+    if not _v141_is_active_row(row):
+        return pd.DataFrame()
+    emp_id = _v141_norm_text(row.get("employee_id"))
+    emp_name = _v141_norm_text(row.get("employee_name"))
+    proc = _v141_norm_text(row.get("process_name"))
+    sdate = _v141_norm_text(row.get("start_date"))
+    if not emp_id:
+        return recs.reset_index(drop=True)
+    return _v141_filter_active_df(
+        employee_id=emp_id,
+        employee_name=emp_name or None,
+        process_name=proc or None,
+        start_date=sdate or None,
+        reason="get_active_group_v141_strict_selected_employee_group",
+    )
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = _v141_filter_active_df(
+        employee_id=employee_id,
+        employee_name=employee_name,
+        process_name=process_name,
+        start_date=start_date or today_text(),
+        reason="get_active_same_work_v141_strict_selected_employee",
+    )
+    if df.empty:
+        return None
+    if "work_order" not in df.columns:
+        return None
+    df = df[df["work_order"].map(_v141_norm_key) == _v141_norm_key(work_order)].copy()
+    if df.empty:
+        return None
+    try:
+        return df.iloc[-1].where(pd.notna(df.iloc[-1]), None).to_dict()
+    except Exception:
+        return None
+
+
+def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    start_date = start_date or today_text()
+    active = _v141_filter_active_df(
+        employee_id=employee_id,
+        employee_name=employee_name,
+        reason="get_conflicting_active_records_v141_strict_selected_employee",
+    )
+    if active.empty:
+        return pd.DataFrame()
+    for c in ["process_name", "start_date"]:
+        if c not in active.columns:
+            active[c] = ""
+    out = active[(active["process_name"].map(_v141_norm_key) != _v141_norm_key(process_name)) | (active["start_date"].map(_v141_norm_text) != _v141_norm_text(start_date))].copy()
+    return out.reset_index(drop=True)
+
+
+def repair_active_work_employee_filter_now(reason: str = "manual_v141_active_employee_filter_repair") -> dict:
+    """Diagnostic helper for 01 Active Work mismatch."""
+    df = _v141_reconciled_active_source(reason)
+    out = _v141_canonical_active_df(df)
+    active = _v141_filter_active_df(reason=reason + "_active_only")
+    return {
+        "total_rows": int(len(out)) if isinstance(out, pd.DataFrame) else 0,
+        "active_rows": int(len(active)) if isinstance(active, pd.DataFrame) else 0,
+        "columns": list(out.columns) if isinstance(out, pd.DataFrame) else [],
+        "note": "V141 已強制 Active Work 依選擇人員的工號與姓名過濾；指定人員查無未結束紀錄時回傳空，不會顯示其他人員。",
+    }
+
+# =================== END V141 STRICT SELECTED-EMPLOYEE ACTIVE WORK FILTER ===================

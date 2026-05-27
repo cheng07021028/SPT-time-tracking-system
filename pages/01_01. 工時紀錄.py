@@ -358,6 +358,69 @@ def _v127_clear_legacy_employee_select_state() -> None:
 
 # ===== END V127 EMPLOYEE SELECTBOX SESSION ISOLATION =====
 
+
+# ===== V141 SELECTED EMPLOYEE / ACTIVE WORK STRICT BINDING =====
+def _v141_norm_employee_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if text.lower() in {"none", "nan", "nat", "null", "<na>"}:
+        return ""
+    return text
+
+
+def _v141_parse_employee_label(label: str) -> tuple[str, str]:
+    """Support both fullwidth and normal separators: SPT001｜王小明 / SPT001 | 王小明."""
+    text = _v141_norm_employee_text(label)
+    if not text:
+        return "", ""
+    parts = [p.strip() for p in re.split(r"\s*[｜|]\s*", text, maxsplit=1)]
+    if len(parts) >= 2:
+        return parts[0], parts[1]
+    return text, ""
+
+
+def _v141_selected_employee(label: str, employees_df: pd.DataFrame) -> tuple[str, str, dict]:
+    emp_id, emp_name = _v141_parse_employee_label(label)
+    if employees_df is None or employees_df.empty:
+        return emp_id, emp_name, {}
+    work = employees_df.copy()
+    for c in ["employee_id", "employee_name"]:
+        if c not in work.columns:
+            work[c] = ""
+    emp_id_key = emp_id.casefold()
+    emp_name_key = emp_name.casefold()
+    match = work[work["employee_id"].fillna("").astype(str).str.strip().str.casefold() == emp_id_key]
+    if emp_name_key and not match.empty:
+        named = match[match["employee_name"].fillna("").astype(str).str.strip().str.casefold() == emp_name_key]
+        if not named.empty:
+            match = named
+    if match.empty and emp_name_key:
+        match = work[work["employee_name"].fillna("").astype(str).str.strip().str.casefold() == emp_name_key]
+    if match.empty:
+        row = query_one("SELECT * FROM employees WHERE lower(trim(employee_id))=?", (emp_id_key,)) or {}
+        return emp_id, emp_name, row
+    row = match.iloc[0].fillna("").to_dict()
+    return str(row.get("employee_id") or emp_id).strip(), str(row.get("employee_name") or emp_name).strip(), row
+
+
+def _v141_active_matches_employee(active_row: dict | None, employee_id: str, employee_name: str = "") -> bool:
+    if not active_row:
+        return False
+    got_id = _v141_norm_employee_text(active_row.get("employee_id") or active_row.get("工號 / Employee ID") or active_row.get("工號"))
+    got_name = _v141_norm_employee_text(active_row.get("employee_name") or active_row.get("姓名 / Name") or active_row.get("姓名"))
+    if employee_id and got_id.casefold() != str(employee_id).strip().casefold():
+        return False
+    if employee_name and got_name and got_name.casefold() != str(employee_name).strip().casefold():
+        return False
+    return True
+# ===== END V141 SELECTED EMPLOYEE / ACTIVE WORK STRICT BINDING =====
+
 # V13: 01 opens from latest memory files/SQLite without doing heavy master restore inline.
 employees = load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
 work_orders = load_work_orders_for_time_record_fast(active_only=True)
@@ -383,9 +446,7 @@ _v127_clear_legacy_employee_select_state()
 with left:
     st.subheader("開始作業 / Start Work")
     emp_label = st.selectbox("工號 / 姓名｜Employee", _employee_options_v126, index=_login_employee_index_v126, key=_v127_employee_select_key("start_emp_v127"))
-    emp_id = emp_label.split("｜")[0]
-    emp_match = employees[employees["employee_id"].fillna("").astype(str).str.strip() == emp_id]
-    employee = emp_match.iloc[0].fillna("").to_dict() if not emp_match.empty else (query_one("SELECT * FROM employees WHERE employee_id=?", (emp_id,)) or {})
+    emp_id, emp_name, employee = _v141_selected_employee(emp_label, employees)
 
     # V105：製令欄改為「輸入關鍵字 → 自動刷新 → 下方製令下拉跟著縮小範圍」。
     # 不需要按 Enter；輸入停頓後會以 URL query 觸發一次 rerun，避免另外做遮罩搜尋層。
@@ -473,14 +534,20 @@ with left:
 with right:
     st.subheader("結束目前作業 / Finish Work")
     emp_label2 = st.selectbox("選擇人員｜Employee", _employee_options_v126, index=_login_employee_index_v126, key=_v127_employee_select_key("end_emp_v127"))
-    emp_id2 = emp_label2.split("｜")[0]
+    emp_id2, _emp2_name, _emp2_row = _v141_selected_employee(emp_label2, employees)
     try:
-        _emp2_match = employees[employees["employee_id"].fillna("").astype(str).str.strip() == emp_id2]
-        _emp2_name = str(_emp2_match.iloc[0].get("employee_name") or "").strip() if not _emp2_match.empty else ""
-        refresh_active_records_for_employee(emp_id2, _emp2_name, reason="01_finish_active_visible_v133")
+        refresh_active_records_for_employee(emp_id2, _emp2_name, reason="01_finish_active_visible_v141")
     except Exception:
         pass
-    active2 = get_active_record(emp_id2)
+    try:
+        active2 = get_active_record(emp_id2, employee_name=_emp2_name)
+    except TypeError:
+        active2 = get_active_record(emp_id2)
+    if active2 and not _v141_active_matches_employee(active2, emp_id2, _emp2_name):
+        st.error(
+            f"Active Work 人員不一致：目前選擇 {emp_id2} {_emp2_name}，但系統讀到 {active2.get('employee_id','')} {active2.get('employee_name','')}。已停止顯示，請重新整理或通知管理員。"
+        )
+        active2 = None
     if not active2:
         st.success("此人員目前沒有未結束作業。")
     else:
@@ -489,6 +556,7 @@ with right:
             f"""
 <div class="spt-card spt-glow">
 <b>目前作業中 / Active Work</b><br>
+選擇人員：{emp_id2} {_emp2_name}<br>
 工段：{active2['process_name']}<br>
 同步計時：{len(group_df)} 筆<br>
 說明：按下暫停、下班或完工時，會同步結束同一人員、同一天、同一工段的所有未結束計時，並平均分配工時。<br>
