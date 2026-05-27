@@ -106,6 +106,97 @@ def _delete_mask(df: pd.DataFrame) -> pd.Series:
 
 
 
+# ===================== V144 Category Process Editor Category-Switch Guard =====================
+# 目的：13｜系統設定「類別對應工段設定」切換顯示類別時，data_editor 不得沿用上一個類別的舊草稿。
+# 病根：Streamlit data_editor 以固定 key 保存前一次表格狀態；選擇 GPTC 後，若 key 未變，
+#      可能仍顯示/送出 BWBS 的編輯草稿，造成「上方是 GPTC，下方明細是 BWBS」。
+
+def _v144_safe_key_part(value) -> str:
+    text = str(value or "").strip()
+    out = []
+    for ch in text:
+        if ch.isalnum() or ch in {"_", "-"}:
+            out.append(ch)
+        else:
+            out.append("_")
+    return "".join(out).strip("_") or "all"
+
+
+def _v144_clear_process_option_editor_state(reason: str = "category_changed") -> None:
+    """Clear all process-option editor drafts when the selected category changes."""
+    targets = [
+        "system_process_options_editor_v192",
+        "system_process_options_editor_v144",
+        "system_process_options_draft_v58",
+        "system_process_options_draft_v144",
+        "system_process_options",
+        "_spt_v144_last_process_category",
+    ]
+    for k in list(st.session_state.keys()):
+        sk = str(k)
+        if any(t in sk for t in targets):
+            st.session_state.pop(k, None)
+    try:
+        from services.column_settings_service import clear_editor_draft
+        clear_editor_draft("system_process_options")
+        clear_editor_draft("system_process_options_editor_v192")
+        clear_editor_draft("system_process_options_editor_v144")
+    except Exception:
+        pass
+
+
+def _v144_normalize_category_text(value) -> str:
+    text = str(value or "").strip()
+    return text or "全部 / 通用"
+
+
+def _v144_process_rows_match_selected_category(df: pd.DataFrame, selected_category: str) -> tuple[bool, list[str]]:
+    """Return whether an edited process table belongs to the selected category.
+
+    Empty new rows are ignored.  Any non-empty category that differs from the
+    selected filter is treated as stale editor state and blocked from saving.
+    """
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return True, []
+    selected = _v144_normalize_category_text(selected_category)
+    mismatches: list[str] = []
+    category_cols = [c for c in ["category_name", "category", "類別", "類別 / Category", "type_name", "機型"] if c in df.columns]
+    if not category_cols:
+        return True, []
+    for _, row in df.iterrows():
+        # 完全空白新增列不檢查。
+        try:
+            has_business_value = any(
+                str(row.get(c, "")).strip()
+                for c in ["process_name", "工段名稱", "工段名稱 / Process", "note", "備註", "備註 / Note"]
+                if c in df.columns
+            )
+        except Exception:
+            has_business_value = True
+        if not has_business_value:
+            continue
+        for c in category_cols:
+            val = str(row.get(c, "") or "").strip()
+            if val and val != selected:
+                mismatches.append(val)
+    return len(mismatches) == 0, sorted(set(mismatches))
+
+
+def _v144_prepare_process_save_df_for_category(df: pd.DataFrame, selected_category: str) -> pd.DataFrame:
+    """Force all saved process rows to the selected category after validation."""
+    out = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    selected = _v144_normalize_category_text(selected_category)
+    if "category_name" not in out.columns:
+        out.insert(1 if len(out.columns) else 0, "category_name", selected)
+    out["category_name"] = selected
+    # 移除舊別名欄，避免 save_process_options_df 誤讀到其他類別別名。
+    for c in ["category", "類別", "類別 / Category", "type_name", "機型"]:
+        if c in out.columns and c != "category_name":
+            out = out.drop(columns=[c], errors="ignore")
+    return out
+# =================== END V144 Category Process Editor Category-Switch Guard ===================
+
+
 
 # -----------------------------------------------------------------------------
 # V3.23: System settings permanent-file health center
@@ -267,6 +358,9 @@ def _refresh_after_apply(message: str, *edit_mode_keys: str) -> None:
             st.session_state[k] = False
     _clear_editor_state(
         "system_process_options_editor_v192",
+        "system_process_options_editor_v144",
+        "system_process_options_draft_v58",
+        "system_process_options_draft_v144",
         "system_process_apply_action_v192",
         "system_rest_periods_editor_v192",
         "system_rest_apply_action_v192",
@@ -661,8 +755,16 @@ filter_category = st.selectbox(
     all_category_choices,
     index=all_category_choices.index(current_default_category) if current_default_category in all_category_choices else 0,
     key="system_process_category_filter_v333",
-    help="選擇類別後，下方表格只顯示該類別與通用工段，方便設定與檢查。",
+    help="選擇類別後，下方表格只顯示該類別自己的工段；切換類別會清除上一類別的編輯草稿。",
 )
+
+# V144：選擇類別改變時，必須清除 data_editor 舊草稿；否則上方 GPTC、下方仍可能顯示 BWBS。
+_v144_current_process_category = _v144_normalize_category_text(filter_category)
+_v144_last_process_category = st.session_state.get("_spt_v144_last_process_category")
+if _v144_last_process_category is not None and _v144_last_process_category != _v144_current_process_category:
+    _v144_clear_process_option_editor_state("process_category_changed")
+st.session_state["_spt_v144_last_process_category"] = _v144_current_process_category
+_v144_process_category_key = _v144_safe_key_part(_v144_current_process_category)
 
 proc_df = load_process_options_df(active_only=False)
 if proc_df.empty:
@@ -705,13 +807,15 @@ if can_manage:
 
 if can_manage and st.session_state.get(proc_edit_key, False):
     st.info("V63：工段表格與 10｜權限管理同模式；套用/刪除後會清除全域 data_editor 草稿，避免畫面殘留舊 checkbox 狀態。")
-    proc_draft_key = "system_process_options_draft_v58"
+    proc_draft_key = f"system_process_options_draft_v144_{_v144_process_category_key}"
     edited_proc = render_table(
         proc_view,
         "system_process_options",
         editable=True,
-        disabled=["id", "created_at", "updated_at"],
-        key="system_process_options_editor_v192",
+        # V144：類別由上方 Show Category 決定，表格內不允許改 category_name，避免跨類別污染。
+        disabled=["id", "category_name", "created_at", "updated_at"],
+        # V144：每個類別使用獨立 data_editor key，避免 GPTC/BWBS 切換後沿用舊草稿。
+        key=f"system_process_options_editor_v144_{_v144_process_category_key}",
         height=430,
         num_rows="dynamic",
     )
@@ -741,12 +845,19 @@ if can_manage and st.session_state.get(proc_edit_key, False):
             st.stop()
         if action == "套用並永久儲存工段名稱設定":
             save_df = edited_proc.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore")
-            if "category_name" not in save_df.columns:
-                save_df.insert(1, "category_name", filter_category or "全部 / 通用")
-            save_df["category_name"] = save_df["category_name"].fillna("").astype(str).replace({"": filter_category or "全部 / 通用"})
+            ok_category, mismatches = _v144_process_rows_match_selected_category(save_df, filter_category or "全部 / 通用")
+            if not ok_category:
+                _v144_clear_process_option_editor_state("process_category_mismatch_blocked")
+                st.error(
+                    "偵測到工段表格草稿不是目前選定類別，已阻止儲存，避免 GPTC/BWBS 互相覆蓋。"
+                    f"目前選定：{filter_category}；草稿含有：{', '.join(mismatches[:8])}。"
+                    "請重新整理或重新切換類別後再編輯。"
+                )
+                st.stop()
+            save_df = _v144_prepare_process_save_df_for_category(save_df, filter_category or "全部 / 通用")
             count = save_process_options_df(save_df)
-            _export_permanent_settings(f"已套用工段名稱設定 {count} 筆")
-            _refresh_after_apply(f"已套用工段名稱設定 {count} 筆，畫面已重新整理。", proc_edit_key)
+            _export_permanent_settings(f"已套用 {filter_category} 類別工段設定 {count} 筆")
+            _refresh_after_apply(f"已套用 {filter_category} 類別工段設定 {count} 筆，畫面已重新整理。", proc_edit_key)
         else:
             try:
                 ids = [int(float(x)) for x in edited_proc[_delete_mask(edited_proc)]["id"].dropna().tolist()]
