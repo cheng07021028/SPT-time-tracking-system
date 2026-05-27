@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 09:39:41",
-  "exported_at": "2026-05-27 09:39:41",
-  "reason": "today_records_v134_display_self_repair_01",
+  "updated_at": "2026-05-27 09:39:45",
+  "exported_at": "2026-05-27 09:39:45",
+  "reason": "start_work_v134_sqlite_to_0102_canonical_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -520,11 +520,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 09:39:18",
         "updated_at": "2026-05-27 09:39:18"
+      },
+      {
+        "id": 141,
+        "record_key": "SPT199|26M0095-09|收機|2026-05-27 09:39:45|199ae2fe",
+        "status": "作業中",
+        "work_order": "26M0095-09",
+        "part_no": "4TRSC131-005-05",
+        "type_name": "2LP Asymtek EFEM (wafer)(宏田)",
+        "process_name": "收機",
+        "employee_id": "SPT199",
+        "employee_name": "龍斯愷",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 09:39:45",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "09:39:45",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "宏田",
+        "group_key": "SPT199|收機|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 09:39:45",
+        "updated_at": "2026-05-27 09:39:45"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 19
+    "time_records": 20
   }
 }
