@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 11:05:40",
+  "exported_at": "2026-05-27 11:18:00",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -4024,13 +4024,13 @@
         "level": "WARN"
       },
       {
-        "id": 3448,
-        "log_time": "2026-05-27 11:05:29",
-        "user_name": "SPT105",
+        "id": 3553,
+        "log_time": "2026-05-27 11:17:52",
+        "user_name": "SPT121",
         "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
         "target_table": "time_records",
         "target_id": "",
-        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 18 筆，同步後 23 筆。",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 18 筆，同步後 24 筆。",
         "detail": "",
         "level": "WARN"
       }
