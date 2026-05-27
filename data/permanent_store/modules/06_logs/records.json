@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 08:59:03",
-  "exported_at": "2026-05-27 08:59:03",
+  "updated_at": "2026-05-27 08:59:44",
+  "exported_at": "2026-05-27 08:59:44",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -955,11 +955,83 @@
         "detail": "",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 544,
+        "log_time": "2026-05-27 08:59:08",
+        "user_name": "SPT250",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 6 筆，同步後 11 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 545,
+        "log_time": "2026-05-27 08:59:11",
+        "user_name": "B259",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 6 筆，同步後 11 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 563,
+        "log_time": "2026-05-27 08:59:15",
+        "user_name": "B259",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 6 筆，同步後 11 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 565,
+        "log_time": "2026-05-27 08:59:44",
+        "user_name": "SPT250",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "88",
+        "message": "鄭至賢 開始 25MN0014-06 / 其他",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 564,
+        "log_time": "2026-05-27 08:59:44",
+        "user_name": "SPT250",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 566,
+        "log_time": "2026-05-27 08:59:44",
+        "user_name": "SPT250",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "88",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 1 筆，同步後 12 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 79
+    "system_logs": 85
   }
 }
