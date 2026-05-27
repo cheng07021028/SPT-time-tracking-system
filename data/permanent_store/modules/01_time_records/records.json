@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 20:27:56",
-  "exported_at": "2026-05-27 20:27:56",
-  "reason": "start_work_v139_final_state_reconcile_01",
+  "updated_at": "2026-05-27 20:29:31",
+  "exported_at": "2026-05-27 20:29:31",
+  "reason": "start_work_v108_fast_local_upsert_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -88,11 +88,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 20:27:51",
         "updated_at": "2026-05-27 20:27:51"
+      },
+      {
+        "id": 190,
+        "record_key": "SPT241|24N4001-24|收機|2026-05-27 20:28:51|0c0ce35f",
+        "status": "作業中",
+        "work_order": "24N4001-24",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "收機",
+        "employee_id": "SPT241",
+        "employee_name": "達文",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 20:28:51",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "20:28:51",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT241|收機|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 20:28:51",
+        "updated_at": "2026-05-27 20:28:51"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 3
+    "time_records": 4
   }
 }
