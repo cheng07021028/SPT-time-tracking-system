@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 10:42:35",
-  "exported_at": "2026-05-27 10:42:35",
-  "reason": "load_records_v134_display_self_repair_02",
+  "updated_at": "2026-05-27 10:42:41",
+  "exported_at": "2026-05-27 10:42:41",
+  "reason": "delete_time_records_v96_0102_sync_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -495,33 +495,6 @@
         "updated_at": "2026-05-27 10:41:03"
       },
       {
-        "id": 154,
-        "record_key": "B002|26N4001-03|其他|2026-05-27 10:38:29|38f844a0",
-        "status": "作業中",
-        "work_order": "26N4001-03",
-        "part_no": "1SLP01S-FCA1-01",
-        "type_name": "FCLP EFEM",
-        "process_name": "其他",
-        "employee_id": "B002",
-        "employee_name": "張文品",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 10:38:29",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "前置線材組作業",
-        "start_date": "2026-05-27",
-        "start_time": "10:38:29",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "B002|其他|2026-05-27",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-27 10:38:29",
-        "updated_at": "2026-05-27 10:38:29"
-      },
-      {
         "id": 155,
         "record_key": "SPT203|25M0785-02|配電|2026-05-27 10:38:49|4dfabc6f",
         "status": "作業中",
@@ -579,6 +552,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 21
+    "time_records": 20
   }
 }
