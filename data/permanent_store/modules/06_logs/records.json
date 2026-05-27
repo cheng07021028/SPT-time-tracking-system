@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 19:55:00",
-  "exported_at": "2026-05-27 19:55:00",
+  "updated_at": "2026-05-27 20:26:59",
+  "exported_at": "2026-05-27 20:26:59",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -35119,11 +35119,83 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 7883,
+        "log_time": "2026-05-27 19:57:23",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：V96 已刪除 SQLite 2 筆、01/02 權威檔 5 筆，並建立 tombstone。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 7882,
+        "log_time": "2026-05-27 19:57:20",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "DELETE time_records",
+        "detail": "DELETE FROM time_records WHERE id IN (?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7917,
+        "log_time": "2026-05-27 20:25:53",
+        "user_name": "SPT208",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "187",
+        "message": "邱珍娜 開始 24N4001-24 / 收機",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7916,
+        "log_time": "2026-05-27 20:25:51",
+        "user_name": "SPT208",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7935,
+        "log_time": "2026-05-27 20:26:59",
+        "user_name": "SPT239",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "188",
+        "message": "麥可 開始 24N4001-24 / 收機",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7934,
+        "log_time": "2026-05-27 20:26:58",
+        "user_name": "SPT239",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2926
+    "system_logs": 2932
   }
 }
