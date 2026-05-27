@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 14:26:05",
+  "exported_at": "2026-05-27 14:30:02",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 56,
@@ -11,7 +11,7 @@
     "auth_security_settings": 2,
     "auth_users": 10,
     "employees": 0,
-    "login_logs": 487,
+    "login_logs": 489,
     "process_categories": 6,
     "process_category_options": 99,
     "process_options": 17,
@@ -19,7 +19,7 @@
     "security_settings": 2,
     "security_user_roles": 9,
     "security_users": 9,
-    "system_logs": 446,
+    "system_logs": 447,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
@@ -2428,7 +2428,37 @@
     "employees": [],
     "login_logs": [
       {
-        "id": 118455,
+        "id": 119432,
+        "username": "SPT208",
+        "display_name": "邱珍娜",
+        "event_type": "POST_RECORD_LOGOUT",
+        "result": "SUCCESS",
+        "message": "完成工時後選擇不繼續記錄，自動登出; employee_id=SPT208; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 14:29:55",
+        "logout_time": "2026-05-27 14:29:55",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 14:29:55"
+      },
+      {
+        "id": 119433,
+        "username": "SPT199",
+        "display_name": "龍斯愷",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=SPT199",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 14:27:56",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 14:27:56"
+      },
+      {
+        "id": 119434,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "LOGIN",
@@ -2443,7 +2473,7 @@
         "created_at": "2026-05-27 14:23:59"
       },
       {
-        "id": 118456,
+        "id": 119435,
         "username": "SPT244",
         "display_name": "費南",
         "event_type": "AUTO_LOGOUT",
@@ -2458,7 +2488,7 @@
         "created_at": "2026-05-27 14:23:44"
       },
       {
-        "id": 118457,
+        "id": 119436,
         "username": "SPT244",
         "display_name": "費南",
         "event_type": "AUTO_LOGOUT",
@@ -2473,7 +2503,7 @@
         "created_at": "2026-05-27 14:23:42"
       },
       {
-        "id": 118458,
+        "id": 119437,
         "username": "SPT239",
         "display_name": "麥可",
         "event_type": "LOGOUT",
@@ -2488,7 +2518,7 @@
         "created_at": "2026-05-27 14:23:16"
       },
       {
-        "id": 118459,
+        "id": 119438,
         "username": "SPT031",
         "display_name": "吳政昌",
         "event_type": "LOGIN",
@@ -2503,7 +2533,7 @@
         "created_at": "2026-05-27 14:19:26"
       },
       {
-        "id": 118460,
+        "id": 119439,
         "username": "SPT239",
         "display_name": "麥可",
         "event_type": "LOGIN",
@@ -2518,7 +2548,7 @@
         "created_at": "2026-05-27 14:17:37"
       },
       {
-        "id": 118461,
+        "id": 119440,
         "username": "SPT239",
         "display_name": "麥可",
         "event_type": "POST_RECORD_LOGOUT",
@@ -2533,7 +2563,7 @@
         "created_at": "2026-05-27 14:17:24"
       },
       {
-        "id": 118462,
+        "id": 119441,
         "username": "SPT034",
         "display_name": "陳長彥",
         "event_type": "LOGIN",
@@ -2548,7 +2578,7 @@
         "created_at": "2026-05-27 14:15:44"
       },
       {
-        "id": 118463,
+        "id": 119442,
         "username": "SPT034",
         "display_name": "陳長彥",
         "event_type": "POST_RECORD_LOGOUT",
@@ -2563,7 +2593,7 @@
         "created_at": "2026-05-27 14:15:23"
       },
       {
-        "id": 118464,
+        "id": 119443,
         "username": "SPT239",
         "display_name": "麥可",
         "event_type": "LOGIN",
@@ -2578,7 +2608,7 @@
         "created_at": "2026-05-27 14:14:31"
       },
       {
-        "id": 118465,
+        "id": 119444,
         "username": "SPT244",
         "display_name": "費南",
         "event_type": "LOGIN",
@@ -2593,7 +2623,7 @@
         "created_at": "2026-05-27 14:14:14"
       },
       {
-        "id": 118466,
+        "id": 119445,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "LOGOUT",
@@ -2608,7 +2638,7 @@
         "created_at": "2026-05-27 14:14:12"
       },
       {
-        "id": 118467,
+        "id": 119446,
         "username": "SPT244",
         "display_name": "費南",
         "event_type": "POST_RECORD_LOGOUT",
@@ -2623,7 +2653,7 @@
         "created_at": "2026-05-27 14:13:56"
       },
       {
-        "id": 118468,
+        "id": 119447,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "LOGIN",
@@ -2638,7 +2668,7 @@
         "created_at": "2026-05-27 14:13:34"
       },
       {
-        "id": 118469,
+        "id": 119448,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "POST_RECORD_LOGOUT",
@@ -2653,7 +2683,7 @@
         "created_at": "2026-05-27 14:13:22"
       },
       {
-        "id": 118470,
+        "id": 119449,
         "username": "SPT034",
         "display_name": "陳長彥",
         "event_type": "PERMISSION_DENIED",
@@ -2668,7 +2698,7 @@
         "created_at": "2026-05-27 14:10:23"
       },
       {
-        "id": 118471,
+        "id": 119450,
         "username": "SPT034",
         "display_name": "陳長彥",
         "event_type": "PERMISSION_DENIED",
@@ -2683,7 +2713,7 @@
         "created_at": "2026-05-27 14:10:19"
       },
       {
-        "id": 118472,
+        "id": 119451,
         "username": "SPT244",
         "display_name": "費南",
         "event_type": "LOGIN",
@@ -2698,7 +2728,7 @@
         "created_at": "2026-05-27 14:09:11"
       },
       {
-        "id": 118473,
+        "id": 119452,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "LOGIN",
@@ -2713,7 +2743,7 @@
         "created_at": "2026-05-27 14:08:54"
       },
       {
-        "id": 118474,
+        "id": 119453,
         "username": "SPT239",
         "display_name": "麥可",
         "event_type": "LOGIN",
@@ -2728,7 +2758,7 @@
         "created_at": "2026-05-27 14:08:18"
       },
       {
-        "id": 118475,
+        "id": 119454,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "LOGOUT",
@@ -2743,7 +2773,7 @@
         "created_at": "2026-05-27 14:08:02"
       },
       {
-        "id": 118476,
+        "id": 119455,
         "username": "SPT034",
         "display_name": "陳長彥",
         "event_type": "LOGIN",
@@ -2758,7 +2788,7 @@
         "created_at": "2026-05-27 14:07:59"
       },
       {
-        "id": 118477,
+        "id": 119456,
         "username": "SPT105",
         "display_name": "劉秀鳳",
         "event_type": "LOGOUT",
@@ -2773,7 +2803,7 @@
         "created_at": "2026-05-27 14:07:50"
       },
       {
-        "id": 118478,
+        "id": 119457,
         "username": "SPT034",
         "display_name": "陳長彥",
         "event_type": "LOGOUT",
@@ -2788,7 +2818,7 @@
         "created_at": "2026-05-27 14:07:31"
       },
       {
-        "id": 118479,
+        "id": 119458,
         "username": "SPT034",
         "display_name": "陳長彥",
         "event_type": "LOGOUT",
@@ -2803,7 +2833,7 @@
         "created_at": "2026-05-27 14:07:28"
       },
       {
-        "id": 118480,
+        "id": 119459,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "PERMISSION_DENIED",
@@ -2818,7 +2848,7 @@
         "created_at": "2026-05-27 14:07:26"
       },
       {
-        "id": 118481,
+        "id": 119460,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "PERMISSION_DENIED",
@@ -2833,7 +2863,7 @@
         "created_at": "2026-05-27 14:07:25"
       },
       {
-        "id": 118482,
+        "id": 119461,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "PERMISSION_DENIED",
@@ -2848,7 +2878,7 @@
         "created_at": "2026-05-27 14:07:24"
       },
       {
-        "id": 118483,
+        "id": 119462,
         "username": "SPT105",
         "display_name": "劉秀鳳",
         "event_type": "LOGIN",
@@ -2863,7 +2893,7 @@
         "created_at": "2026-05-27 14:07:21"
       },
       {
-        "id": 118484,
+        "id": 119463,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "PERMISSION_DENIED",
@@ -2878,7 +2908,7 @@
         "created_at": "2026-05-27 14:07:18"
       },
       {
-        "id": 118485,
+        "id": 119464,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "PERMISSION_DENIED",
@@ -2893,7 +2923,7 @@
         "created_at": "2026-05-27 14:07:15"
       },
       {
-        "id": 118486,
+        "id": 119465,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "PERMISSION_DENIED",
@@ -2908,7 +2938,7 @@
         "created_at": "2026-05-27 14:07:14"
       },
       {
-        "id": 118487,
+        "id": 119466,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "PERMISSION_DENIED",
@@ -2923,7 +2953,7 @@
         "created_at": "2026-05-27 14:07:11"
       },
       {
-        "id": 118488,
+        "id": 119467,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGOUT",
@@ -2938,7 +2968,7 @@
         "created_at": "2026-05-27 14:07:05"
       },
       {
-        "id": 118489,
+        "id": 119468,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "LOGIN",
@@ -2953,7 +2983,7 @@
         "created_at": "2026-05-27 14:06:52"
       },
       {
-        "id": 118490,
+        "id": 119469,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "LOGIN",
@@ -2968,7 +2998,7 @@
         "created_at": "2026-05-27 14:06:46"
       },
       {
-        "id": 118491,
+        "id": 119470,
         "username": "SPT034",
         "display_name": "陳長彥",
         "event_type": "LOGIN",
@@ -2983,7 +3013,7 @@
         "created_at": "2026-05-27 14:06:30"
       },
       {
-        "id": 118492,
+        "id": 119471,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGIN",
@@ -2998,7 +3028,7 @@
         "created_at": "2026-05-27 14:05:07"
       },
       {
-        "id": 118493,
+        "id": 119472,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGIN",
@@ -3013,7 +3043,7 @@
         "created_at": "2026-05-27 14:05:03"
       },
       {
-        "id": 118494,
+        "id": 119473,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "POST_RECORD_LOGOUT",
@@ -3028,7 +3058,7 @@
         "created_at": "2026-05-27 14:04:53"
       },
       {
-        "id": 118495,
+        "id": 119474,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGIN",
@@ -3043,7 +3073,7 @@
         "created_at": "2026-05-27 14:00:51"
       },
       {
-        "id": 118496,
+        "id": 119475,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGIN",
@@ -3058,7 +3088,7 @@
         "created_at": "2026-05-27 14:00:47"
       },
       {
-        "id": 118497,
+        "id": 119476,
         "username": "SPT105",
         "display_name": "劉秀鳳",
         "event_type": "LOGIN",
@@ -3073,7 +3103,7 @@
         "created_at": "2026-05-27 13:54:41"
       },
       {
-        "id": 118498,
+        "id": 119477,
         "username": "SPT105",
         "display_name": "劉秀鳳",
         "event_type": "LOGIN",
@@ -3088,7 +3118,7 @@
         "created_at": "2026-05-27 13:54:36"
       },
       {
-        "id": 118499,
+        "id": 119478,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGIN",
@@ -3103,7 +3133,7 @@
         "created_at": "2026-05-27 13:54:16"
       },
       {
-        "id": 118500,
+        "id": 119479,
         "username": "SPT142",
         "display_name": "黃沂澂",
         "event_type": "LOGOUT",
@@ -3118,7 +3148,7 @@
         "created_at": "2026-05-27 13:54:03"
       },
       {
-        "id": 118501,
+        "id": 119480,
         "username": "SPT142",
         "display_name": "黃沂澂",
         "event_type": "PERMISSION_DENIED",
@@ -3133,7 +3163,7 @@
         "created_at": "2026-05-27 13:54:01"
       },
       {
-        "id": 118502,
+        "id": 119481,
         "username": "SPT142",
         "display_name": "黃沂澂",
         "event_type": "PERMISSION_DENIED",
@@ -3148,7 +3178,7 @@
         "created_at": "2026-05-27 13:51:16"
       },
       {
-        "id": 118503,
+        "id": 119482,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGOUT",
@@ -3163,7 +3193,7 @@
         "created_at": "2026-05-27 13:49:52"
       },
       {
-        "id": 118504,
+        "id": 119483,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGIN",
@@ -3178,7 +3208,7 @@
         "created_at": "2026-05-27 13:47:57"
       },
       {
-        "id": 118505,
+        "id": 119484,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGIN",
@@ -3193,7 +3223,7 @@
         "created_at": "2026-05-27 13:47:49"
       },
       {
-        "id": 118506,
+        "id": 119485,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "POST_RECORD_LOGOUT",
@@ -3208,7 +3238,7 @@
         "created_at": "2026-05-27 13:47:36"
       },
       {
-        "id": 118507,
+        "id": 119486,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGIN",
@@ -3223,7 +3253,7 @@
         "created_at": "2026-05-27 13:46:37"
       },
       {
-        "id": 118508,
+        "id": 119487,
         "username": "SPT142",
         "display_name": "黃沂澂",
         "event_type": "LOGIN",
@@ -3238,7 +3268,7 @@
         "created_at": "2026-05-27 13:45:58"
       },
       {
-        "id": 118509,
+        "id": 119488,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGOUT",
@@ -3253,7 +3283,7 @@
         "created_at": "2026-05-27 13:45:43"
       },
       {
-        "id": 118510,
+        "id": 119489,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGIN",
@@ -3268,7 +3298,7 @@
         "created_at": "2026-05-27 13:43:26"
       },
       {
-        "id": 118511,
+        "id": 119490,
         "username": "B260",
         "display_name": "莊仕琦",
         "event_type": "POST_RECORD_LOGOUT",
@@ -3283,7 +3313,7 @@
         "created_at": "2026-05-27 13:39:56"
       },
       {
-        "id": 118512,
+        "id": 119491,
         "username": "B260",
         "display_name": "莊仕琦",
         "event_type": "LOGIN",
@@ -3298,7 +3328,7 @@
         "created_at": "2026-05-27 13:39:02"
       },
       {
-        "id": 118513,
+        "id": 119492,
         "username": "B260",
         "display_name": "趙健浩",
         "event_type": "LOGIN",
@@ -3313,7 +3343,7 @@
         "created_at": "2026-05-27 13:38:57"
       },
       {
-        "id": 118514,
+        "id": 119493,
         "username": "B155",
         "display_name": "趙健浩",
         "event_type": "LOGOUT",
@@ -3328,7 +3358,7 @@
         "created_at": "2026-05-27 13:38:47"
       },
       {
-        "id": 118515,
+        "id": 119494,
         "username": "B155",
         "display_name": "趙健浩",
         "event_type": "LOGIN",
@@ -3343,7 +3373,7 @@
         "created_at": "2026-05-27 13:36:18"
       },
       {
-        "id": 118516,
+        "id": 119495,
         "username": "B155",
         "display_name": "姚奕舟",
         "event_type": "LOGIN",
@@ -3358,7 +3388,7 @@
         "created_at": "2026-05-27 13:36:15"
       },
       {
-        "id": 118517,
+        "id": 119496,
         "username": "B155",
         "display_name": "姚奕舟",
         "event_type": "LOGIN",
@@ -3373,7 +3403,7 @@
         "created_at": "2026-05-27 13:36:12"
       },
       {
-        "id": 118518,
+        "id": 119497,
         "username": "B229",
         "display_name": "姚奕舟",
         "event_type": "LOGOUT",
@@ -3388,7 +3418,7 @@
         "created_at": "2026-05-27 13:36:04"
       },
       {
-        "id": 118519,
+        "id": 119498,
         "username": "B229",
         "display_name": "姚奕舟",
         "event_type": "LOGIN",
@@ -3403,7 +3433,7 @@
         "created_at": "2026-05-27 13:35:55"
       },
       {
-        "id": 118520,
+        "id": 119499,
         "username": "B229",
         "display_name": "莊仕琦",
         "event_type": "LOGIN",
@@ -3418,7 +3448,7 @@
         "created_at": "2026-05-27 13:35:49"
       },
       {
-        "id": 118521,
+        "id": 119500,
         "username": "B260",
         "display_name": "莊仕琦",
         "event_type": "LOGOUT",
@@ -3433,7 +3463,7 @@
         "created_at": "2026-05-27 13:35:41"
       },
       {
-        "id": 118522,
+        "id": 119501,
         "username": "B260",
         "display_name": "莊仕琦",
         "event_type": "LOGIN",
@@ -3448,7 +3478,7 @@
         "created_at": "2026-05-27 13:35:21"
       },
       {
-        "id": 118523,
+        "id": 119502,
         "username": "B260",
         "display_name": "莊仕琦",
         "event_type": "LOGIN",
@@ -3463,7 +3493,7 @@
         "created_at": "2026-05-27 13:35:15"
       },
       {
-        "id": 118524,
+        "id": 119503,
         "username": "B234",
         "display_name": "B234",
         "event_type": "LOGIN",
@@ -3478,7 +3508,7 @@
         "created_at": "2026-05-27 13:35:07"
       },
       {
-        "id": 118525,
+        "id": 119504,
         "username": "B234",
         "display_name": "B234",
         "event_type": "LOGIN",
@@ -3493,7 +3523,7 @@
         "created_at": "2026-05-27 13:34:59"
       },
       {
-        "id": 118526,
+        "id": 119505,
         "username": "B135",
         "display_name": "鍾明志",
         "event_type": "LOGIN",
@@ -3508,7 +3538,7 @@
         "created_at": "2026-05-27 13:26:43"
       },
       {
-        "id": 118527,
+        "id": 119506,
         "username": "B135",
         "display_name": "鍾明志",
         "event_type": "LOGIN",
@@ -3523,7 +3553,7 @@
         "created_at": "2026-05-27 13:25:12"
       },
       {
-        "id": 118528,
+        "id": 119507,
         "username": "SPT239",
         "display_name": "麥可",
         "event_type": "LOGIN",
@@ -3538,7 +3568,7 @@
         "created_at": "2026-05-27 13:22:07"
       },
       {
-        "id": 118529,
+        "id": 119508,
         "username": "SPT244",
         "display_name": "費南",
         "event_type": "LOGIN",
@@ -3553,7 +3583,7 @@
         "created_at": "2026-05-27 13:21:03"
       },
       {
-        "id": 118530,
+        "id": 119509,
         "username": "SPT239",
         "display_name": "麥可",
         "event_type": "LOGIN",
@@ -3568,7 +3598,7 @@
         "created_at": "2026-05-27 13:19:24"
       },
       {
-        "id": 118531,
+        "id": 119510,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "LOGIN",
@@ -3583,7 +3613,7 @@
         "created_at": "2026-05-27 13:17:30"
       },
       {
-        "id": 118532,
+        "id": 119511,
         "username": "SPT059",
         "display_name": "蘇萬紘",
         "event_type": "LOGIN",
@@ -3598,7 +3628,7 @@
         "created_at": "2026-05-27 13:17:26"
       },
       {
-        "id": 118533,
+        "id": 119512,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "LOGIN",
@@ -3613,7 +3643,7 @@
         "created_at": "2026-05-27 13:17:21"
       },
       {
-        "id": 118534,
+        "id": 119513,
         "username": "B135",
         "display_name": "鍾明志",
         "event_type": "PERMISSION_DENIED",
@@ -3628,7 +3658,7 @@
         "created_at": "2026-05-27 13:16:10"
       },
       {
-        "id": 118535,
+        "id": 119514,
         "username": "B135",
         "display_name": "鍾明志",
         "event_type": "PASSWORD_CHANGE",
@@ -3643,7 +3673,7 @@
         "created_at": "2026-05-27 13:15:09"
       },
       {
-        "id": 118536,
+        "id": 119515,
         "username": "B135",
         "display_name": "鍾明志",
         "event_type": "LOGIN",
@@ -3658,7 +3688,7 @@
         "created_at": "2026-05-27 13:14:43"
       },
       {
-        "id": 118537,
+        "id": 119516,
         "username": "SPT031",
         "display_name": "吳政昌",
         "event_type": "LOGIN",
@@ -3673,7 +3703,7 @@
         "created_at": "2026-05-27 13:06:36"
       },
       {
-        "id": 118538,
+        "id": 119517,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGIN",
@@ -3688,7 +3718,7 @@
         "created_at": "2026-05-27 13:03:56"
       },
       {
-        "id": 118539,
+        "id": 119518,
         "username": "SPT256",
         "display_name": "阿杰",
         "event_type": "LOGOUT",
@@ -3703,7 +3733,7 @@
         "created_at": "2026-05-27 12:38:15"
       },
       {
-        "id": 118540,
+        "id": 119519,
         "username": "SPT256",
         "display_name": "阿杰",
         "event_type": "LOGOUT",
@@ -3718,7 +3748,7 @@
         "created_at": "2026-05-27 12:38:13"
       },
       {
-        "id": 118541,
+        "id": 119520,
         "username": "SPT256",
         "display_name": "阿杰",
         "event_type": "LOGIN",
@@ -3733,7 +3763,7 @@
         "created_at": "2026-05-27 12:37:04"
       },
       {
-        "id": 118542,
+        "id": 119521,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "PERMISSION_DENIED",
@@ -3748,7 +3778,7 @@
         "created_at": "2026-05-27 12:02:40"
       },
       {
-        "id": 118543,
+        "id": 119522,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGIN",
@@ -3763,7 +3793,7 @@
         "created_at": "2026-05-27 11:58:04"
       },
       {
-        "id": 118544,
+        "id": 119523,
         "username": "B164",
         "display_name": "陳宛廷",
         "event_type": "PERMISSION_DENIED",
@@ -3778,7 +3808,7 @@
         "created_at": "2026-05-27 11:37:50"
       },
       {
-        "id": 118545,
+        "id": 119524,
         "username": "B164",
         "display_name": "陳宛廷",
         "event_type": "PASSWORD_CHANGE",
@@ -3793,7 +3823,7 @@
         "created_at": "2026-05-27 11:37:48"
       },
       {
-        "id": 118546,
+        "id": 119525,
         "username": "SPT151",
         "display_name": "鄭智鍵",
         "event_type": "LOGOUT",
@@ -3808,7 +3838,7 @@
         "created_at": "2026-05-27 11:37:20"
       },
       {
-        "id": 118547,
+        "id": 119526,
         "username": "B164",
         "display_name": "陳宛廷",
         "event_type": "LOGIN",
@@ -3823,7 +3853,7 @@
         "created_at": "2026-05-27 11:37:19"
       },
       {
-        "id": 118548,
+        "id": 119527,
         "username": "SPT236",
         "display_name": "賴智文",
         "event_type": "LOGOUT",
@@ -3838,7 +3868,7 @@
         "created_at": "2026-05-27 11:37:06"
       },
       {
-        "id": 118549,
+        "id": 119528,
         "username": "SPT236",
         "display_name": "賴智文",
         "event_type": "LOGOUT",
@@ -3853,7 +3883,7 @@
         "created_at": "2026-05-27 11:37:04"
       },
       {
-        "id": 118550,
+        "id": 119529,
         "username": "SPT236",
         "display_name": "賴智文",
         "event_type": "LOGOUT",
@@ -3868,7 +3898,7 @@
         "created_at": "2026-05-27 11:37:02"
       },
       {
-        "id": 118551,
+        "id": 119530,
         "username": "SPT236",
         "display_name": "賴智文",
         "event_type": "LOGIN",
@@ -3883,7 +3913,7 @@
         "created_at": "2026-05-27 11:35:36"
       },
       {
-        "id": 118552,
+        "id": 119531,
         "username": "SPT158",
         "display_name": "劉定澤",
         "event_type": "LOGIN",
@@ -3898,7 +3928,7 @@
         "created_at": "2026-05-27 11:33:14"
       },
       {
-        "id": 118553,
+        "id": 119532,
         "username": "SPT151",
         "display_name": "鄭智鍵",
         "event_type": "LOGIN",
@@ -3913,7 +3943,7 @@
         "created_at": "2026-05-27 11:33:05"
       },
       {
-        "id": 118554,
+        "id": 119533,
         "username": "SPT105",
         "display_name": "劉秀鳳",
         "event_type": "LOGOUT",
@@ -3928,7 +3958,7 @@
         "created_at": "2026-05-27 11:31:12"
       },
       {
-        "id": 118555,
+        "id": 119534,
         "username": "SPT105",
         "display_name": "劉秀鳳",
         "event_type": "LOGIN",
@@ -3943,7 +3973,7 @@
         "created_at": "2026-05-27 11:29:05"
       },
       {
-        "id": 118556,
+        "id": 119535,
         "username": "B211",
         "display_name": "張瑀榛",
         "event_type": "POST_RECORD_LOGOUT",
@@ -3958,7 +3988,7 @@
         "created_at": "2026-05-27 11:28:52"
       },
       {
-        "id": 118557,
+        "id": 119536,
         "username": "B211",
         "display_name": "張瑀榛",
         "event_type": "LOGIN",
@@ -3973,7 +4003,7 @@
         "created_at": "2026-05-27 11:26:16"
       },
       {
-        "id": 118558,
+        "id": 119537,
         "username": "B211",
         "display_name": "張瑀榛",
         "event_type": "LOGOUT",
@@ -3988,7 +4018,7 @@
         "created_at": "2026-05-27 11:25:00"
       },
       {
-        "id": 118559,
+        "id": 119538,
         "username": "B211",
         "display_name": "張瑀榛",
         "event_type": "LOGIN",
@@ -4003,7 +4033,7 @@
         "created_at": "2026-05-27 11:24:30"
       },
       {
-        "id": 118560,
+        "id": 119539,
         "username": "SPT256",
         "display_name": "阿杰",
         "event_type": "LOGOUT",
@@ -4018,7 +4048,7 @@
         "created_at": "2026-05-27 11:23:35"
       },
       {
-        "id": 118561,
+        "id": 119540,
         "username": "SPT256",
         "display_name": "阿杰",
         "event_type": "LOGIN",
@@ -4033,7 +4063,7 @@
         "created_at": "2026-05-27 11:21:39"
       },
       {
-        "id": 118562,
+        "id": 119541,
         "username": "SPT256",
         "display_name": "阿杰",
         "event_type": "LOGIN",
@@ -4048,7 +4078,7 @@
         "created_at": "2026-05-27 11:21:24"
       },
       {
-        "id": 118563,
+        "id": 119542,
         "username": "SPT256",
         "display_name": "阿杰",
         "event_type": "LOGIN",
@@ -4063,7 +4093,7 @@
         "created_at": "2026-05-27 11:21:18"
       },
       {
-        "id": 118564,
+        "id": 119543,
         "username": "SPT121",
         "display_name": "徐兆生",
         "event_type": "POST_RECORD_LOGOUT",
@@ -4078,7 +4108,7 @@
         "created_at": "2026-05-27 11:19:06"
       },
       {
-        "id": 118565,
+        "id": 119544,
         "username": "SPT121",
         "display_name": "徐兆生",
         "event_type": "LOGIN",
@@ -4093,7 +4123,7 @@
         "created_at": "2026-05-27 11:17:50"
       },
       {
-        "id": 118566,
+        "id": 119545,
         "username": "SPT236",
         "display_name": "賴智文",
         "event_type": "AUTO_LOGOUT",
@@ -4108,7 +4138,7 @@
         "created_at": "2026-05-27 11:16:48"
       },
       {
-        "id": 118567,
+        "id": 119546,
         "username": "SPT236",
         "display_name": "賴智文",
         "event_type": "AUTO_LOGOUT",
@@ -4123,7 +4153,7 @@
         "created_at": "2026-05-27 11:16:45"
       },
       {
-        "id": 118568,
+        "id": 119547,
         "username": "B164",
         "display_name": "陳宛廷",
         "event_type": "LOGOUT",
@@ -4138,7 +4168,7 @@
         "created_at": "2026-05-27 11:15:14"
       },
       {
-        "id": 118569,
+        "id": 119548,
         "username": "B164",
         "display_name": "陳宛廷",
         "event_type": "LOGIN",
@@ -4153,7 +4183,7 @@
         "created_at": "2026-05-27 11:14:37"
       },
       {
-        "id": 118570,
+        "id": 119549,
         "username": "SPT174",
         "display_name": "龍才華",
         "event_type": "LOGIN",
@@ -4168,7 +4198,7 @@
         "created_at": "2026-05-27 11:12:18"
       },
       {
-        "id": 118571,
+        "id": 119550,
         "username": "SPT174",
         "display_name": "龍才華",
         "event_type": "LOGIN",
@@ -4183,7 +4213,7 @@
         "created_at": "2026-05-27 11:09:20"
       },
       {
-        "id": 118572,
+        "id": 119551,
         "username": "SPT105",
         "display_name": "劉秀鳳",
         "event_type": "LOGOUT",
@@ -4198,7 +4228,7 @@
         "created_at": "2026-05-27 11:09:18"
       },
       {
-        "id": 118573,
+        "id": 119552,
         "username": "SPT174",
         "display_name": "龍才華",
         "event_type": "LOGIN",
@@ -4213,7 +4243,7 @@
         "created_at": "2026-05-27 11:08:35"
       },
       {
-        "id": 118574,
+        "id": 119553,
         "username": "SPT236",
         "display_name": "賴智文",
         "event_type": "LOGIN",
@@ -4228,7 +4258,7 @@
         "created_at": "2026-05-27 11:04:40"
       },
       {
-        "id": 118575,
+        "id": 119554,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "PASSWORD_CHANGE",
@@ -4243,7 +4273,7 @@
         "created_at": "2026-05-27 11:04:11"
       },
       {
-        "id": 118576,
+        "id": 119555,
         "username": "SPT105",
         "display_name": "劉秀鳳",
         "event_type": "LOGIN",
@@ -4258,7 +4288,7 @@
         "created_at": "2026-05-27 11:03:06"
       },
       {
-        "id": 118577,
+        "id": 119556,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "LOGIN",
@@ -4273,7 +4303,7 @@
         "created_at": "2026-05-27 11:03:06"
       },
       {
-        "id": 118578,
+        "id": 119557,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGOUT",
@@ -4288,7 +4318,7 @@
         "created_at": "2026-05-27 11:02:46"
       },
       {
-        "id": 118579,
+        "id": 119558,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "AUTO_LOGOUT",
@@ -4303,7 +4333,7 @@
         "created_at": "2026-05-27 11:02:37"
       },
       {
-        "id": 118580,
+        "id": 119559,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "AUTO_LOGOUT",
@@ -4318,7 +4348,7 @@
         "created_at": "2026-05-27 11:02:34"
       },
       {
-        "id": 118581,
+        "id": 119560,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "LOGIN",
@@ -4333,7 +4363,7 @@
         "created_at": "2026-05-27 10:59:46"
       },
       {
-        "id": 118582,
+        "id": 119561,
         "username": "SPT256",
         "display_name": "阿杰",
         "event_type": "LOGOUT",
@@ -4348,7 +4378,7 @@
         "created_at": "2026-05-27 10:58:42"
       },
       {
-        "id": 118583,
+        "id": 119562,
         "username": "B237",
         "display_name": "彭紹恩",
         "event_type": "LOGOUT",
@@ -4363,7 +4393,7 @@
         "created_at": "2026-05-27 10:57:02"
       },
       {
-        "id": 118584,
+        "id": 119563,
         "username": "B237",
         "display_name": "彭紹恩",
         "event_type": "LOGIN",
@@ -4378,7 +4408,7 @@
         "created_at": "2026-05-27 10:56:16"
       },
       {
-        "id": 118585,
+        "id": 119564,
         "username": "B237",
         "display_name": "彭紹恩",
         "event_type": "LOGOUT",
@@ -4393,7 +4423,7 @@
         "created_at": "2026-05-27 10:56:05"
       },
       {
-        "id": 118586,
+        "id": 119565,
         "username": "SPT256",
         "display_name": "阿杰",
         "event_type": "PASSWORD_CHANGE",
@@ -4408,7 +4438,7 @@
         "created_at": "2026-05-27 10:55:59"
       },
       {
-        "id": 118587,
+        "id": 119566,
         "username": "SPT121",
         "display_name": "徐兆生",
         "event_type": "LOGOUT",
@@ -4423,7 +4453,7 @@
         "created_at": "2026-05-27 10:55:37"
       },
       {
-        "id": 118588,
+        "id": 119567,
         "username": "SPT121",
         "display_name": "徐兆生",
         "event_type": "LOGIN",
@@ -4438,7 +4468,7 @@
         "created_at": "2026-05-27 10:55:11"
       },
       {
-        "id": 118589,
+        "id": 119568,
         "username": "SPT256",
         "display_name": "阿杰",
         "event_type": "LOGIN",
@@ -4453,7 +4483,7 @@
         "created_at": "2026-05-27 10:55:03"
       },
       {
-        "id": 118590,
+        "id": 119569,
         "username": "SPT121",
         "display_name": "徐兆生",
         "event_type": "POST_RECORD_LOGOUT",
@@ -4468,7 +4498,7 @@
         "created_at": "2026-05-27 10:54:58"
       },
       {
-        "id": 118591,
+        "id": 119570,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "LOGIN",
@@ -4483,7 +4513,7 @@
         "created_at": "2026-05-27 10:54:47"
       },
       {
-        "id": 118592,
+        "id": 119571,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "LOGIN",
@@ -4498,7 +4528,7 @@
         "created_at": "2026-05-27 10:54:19"
       },
       {
-        "id": 118593,
+        "id": 119572,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "LOGIN",
@@ -4513,7 +4543,7 @@
         "created_at": "2026-05-27 10:54:18"
       },
       {
-        "id": 118594,
+        "id": 119573,
         "username": "B164",
         "display_name": "陳宛廷",
         "event_type": "LOGIN",
@@ -4528,7 +4558,7 @@
         "created_at": "2026-05-27 10:52:17"
       },
       {
-        "id": 118595,
+        "id": 119574,
         "username": "SPT121",
         "display_name": "徐兆生",
         "event_type": "LOGIN",
@@ -4543,7 +4573,7 @@
         "created_at": "2026-05-27 10:51:17"
       },
       {
-        "id": 118596,
+        "id": 119575,
         "username": "B211",
         "display_name": "張瑀榛",
         "event_type": "PASSWORD_CHANGE",
@@ -4558,7 +4588,7 @@
         "created_at": "2026-05-27 10:51:08"
       },
       {
-        "id": 118597,
+        "id": 119576,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGIN",
@@ -4573,7 +4603,7 @@
         "created_at": "2026-05-27 10:50:56"
       },
       {
-        "id": 118598,
+        "id": 119577,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGIN",
@@ -4588,7 +4618,7 @@
         "created_at": "2026-05-27 10:50:52"
       },
       {
-        "id": 118599,
+        "id": 119578,
         "username": "B211",
         "display_name": "張瑀榛",
         "event_type": "LOGIN",
@@ -4603,7 +4633,7 @@
         "created_at": "2026-05-27 10:50:51"
       },
       {
-        "id": 118600,
+        "id": 119579,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "POST_RECORD_LOGOUT",
@@ -4618,7 +4648,7 @@
         "created_at": "2026-05-27 10:50:39"
       },
       {
-        "id": 118601,
+        "id": 119580,
         "username": "B237",
         "display_name": "彭紹恩",
         "event_type": "LOGIN",
@@ -4633,7 +4663,7 @@
         "created_at": "2026-05-27 10:50:00"
       },
       {
-        "id": 118602,
+        "id": 119581,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGIN",
@@ -4648,7 +4678,7 @@
         "created_at": "2026-05-27 10:47:32"
       },
       {
-        "id": 118603,
+        "id": 119582,
         "username": "SPT236",
         "display_name": "賴智文",
         "event_type": "LOGIN",
@@ -4663,7 +4693,7 @@
         "created_at": "2026-05-27 10:46:34"
       },
       {
-        "id": 118604,
+        "id": 119583,
         "username": "SPT203",
         "display_name": "徐梓翔",
         "event_type": "POST_RECORD_LOGOUT",
@@ -4678,7 +4708,7 @@
         "created_at": "2026-05-27 10:38:56"
       },
       {
-        "id": 118605,
+        "id": 119584,
         "username": "SPT203",
         "display_name": "徐梓翔",
         "event_type": "PASSWORD_CHANGE",
@@ -4693,7 +4723,7 @@
         "created_at": "2026-05-27 10:38:04"
       },
       {
-        "id": 118606,
+        "id": 119585,
         "username": "SPT203",
         "display_name": "徐梓翔",
         "event_type": "LOGIN",
@@ -4708,7 +4738,7 @@
         "created_at": "2026-05-27 10:37:38"
       },
       {
-        "id": 118607,
+        "id": 119586,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "POST_RECORD_LOGOUT",
@@ -4723,7 +4753,7 @@
         "created_at": "2026-05-27 10:26:14"
       },
       {
-        "id": 118608,
+        "id": 119587,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "POST_RECORD_LOGOUT",
@@ -4738,7 +4768,7 @@
         "created_at": "2026-05-27 10:26:11"
       },
       {
-        "id": 118609,
+        "id": 119588,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "LOGIN",
@@ -4753,7 +4783,7 @@
         "created_at": "2026-05-27 10:23:11"
       },
       {
-        "id": 118610,
+        "id": 119589,
         "username": "SPT236",
         "display_name": "賴智文",
         "event_type": "LOGIN",
@@ -4768,7 +4798,7 @@
         "created_at": "2026-05-27 10:21:18"
       },
       {
-        "id": 118611,
+        "id": 119590,
         "username": "B211",
         "display_name": "B211",
         "event_type": "LOGIN",
@@ -4783,7 +4813,7 @@
         "created_at": "2026-05-27 10:16:38"
       },
       {
-        "id": 118612,
+        "id": 119591,
         "username": "SPT236",
         "display_name": "賴智文",
         "event_type": "LOGIN",
@@ -4798,7 +4828,7 @@
         "created_at": "2026-05-27 10:03:34"
       },
       {
-        "id": 118613,
+        "id": 119592,
         "username": "SPT236",
         "display_name": "賴智文",
         "event_type": "LOGIN",
@@ -4813,7 +4843,7 @@
         "created_at": "2026-05-27 10:02:44"
       },
       {
-        "id": 118614,
+        "id": 119593,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGIN",
@@ -4828,7 +4858,7 @@
         "created_at": "2026-05-27 10:01:45"
       },
       {
-        "id": 118615,
+        "id": 119594,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "POST_RECORD_LOGOUT",
@@ -4843,7 +4873,7 @@
         "created_at": "2026-05-27 10:00:22"
       },
       {
-        "id": 118616,
+        "id": 119595,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "LOGIN",
@@ -4858,7 +4888,7 @@
         "created_at": "2026-05-27 09:58:35"
       },
       {
-        "id": 118617,
+        "id": 119596,
         "username": "B203",
         "display_name": "蕭桓惟",
         "event_type": "LOGIN",
@@ -4873,7 +4903,7 @@
         "created_at": "2026-05-27 09:57:57"
       },
       {
-        "id": 118618,
+        "id": 119597,
         "username": "SPT160",
         "display_name": "邱信維",
         "event_type": "LOGOUT",
@@ -4888,7 +4918,7 @@
         "created_at": "2026-05-27 09:50:56"
       },
       {
-        "id": 118619,
+        "id": 119598,
         "username": "SPT242",
         "display_name": "保羅",
         "event_type": "POST_RECORD_LOGOUT",
@@ -4903,7 +4933,7 @@
         "created_at": "2026-05-27 09:50:55"
       },
       {
-        "id": 118620,
+        "id": 119599,
         "username": "SPT149",
         "display_name": "江金福",
         "event_type": "LOGOUT",
@@ -4918,7 +4948,7 @@
         "created_at": "2026-05-27 09:50:52"
       },
       {
-        "id": 118621,
+        "id": 119600,
         "username": "SPT242",
         "display_name": "保羅",
         "event_type": "PASSWORD_CHANGE",
@@ -4933,7 +4963,7 @@
         "created_at": "2026-05-27 09:50:03"
       },
       {
-        "id": 118622,
+        "id": 119601,
         "username": "SPT242",
         "display_name": "保羅",
         "event_type": "LOGIN",
@@ -4948,7 +4978,7 @@
         "created_at": "2026-05-27 09:49:42"
       },
       {
-        "id": 118623,
+        "id": 119602,
         "username": "SPT228",
         "display_name": "王添慶",
         "event_type": "POST_RECORD_LOGOUT",
@@ -4963,7 +4993,7 @@
         "created_at": "2026-05-27 09:49:28"
       },
       {
-        "id": 118624,
+        "id": 119603,
         "username": "SPT149",
         "display_name": "江金福",
         "event_type": "LOGIN",
@@ -4978,7 +5008,7 @@
         "created_at": "2026-05-27 09:49:23"
       },
       {
-        "id": 118625,
+        "id": 119604,
         "username": "SPT160",
         "display_name": "邱信維",
         "event_type": "PASSWORD_CHANGE",
@@ -4993,7 +5023,7 @@
         "created_at": "2026-05-27 09:48:49"
       },
       {
-        "id": 118626,
+        "id": 119605,
         "username": "SPT160",
         "display_name": "邱信維",
         "event_type": "LOGIN",
@@ -5008,7 +5038,7 @@
         "created_at": "2026-05-27 09:48:33"
       },
       {
-        "id": 118627,
+        "id": 119606,
         "username": "SPT149",
         "display_name": "江金福",
         "event_type": "LOGOUT",
@@ -5023,7 +5053,7 @@
         "created_at": "2026-05-27 09:48:00"
       },
       {
-        "id": 118628,
+        "id": 119607,
         "username": "SPT228",
         "display_name": "王添慶",
         "event_type": "PASSWORD_CHANGE",
@@ -5038,7 +5068,7 @@
         "created_at": "2026-05-27 09:46:46"
       },
       {
-        "id": 118629,
+        "id": 119608,
         "username": "SPT149",
         "display_name": "江金福",
         "event_type": "LOGIN",
@@ -5053,7 +5083,7 @@
         "created_at": "2026-05-27 09:46:44"
       },
       {
-        "id": 118630,
+        "id": 119609,
         "username": "SPT228",
         "display_name": "王添慶",
         "event_type": "LOGIN",
@@ -5068,7 +5098,7 @@
         "created_at": "2026-05-27 09:46:33"
       },
       {
-        "id": 118631,
+        "id": 119610,
         "username": "SPT228",
         "display_name": "羅丹",
         "event_type": "LOGIN",
@@ -5083,7 +5113,7 @@
         "created_at": "2026-05-27 09:46:17"
       },
       {
-        "id": 118632,
+        "id": 119611,
         "username": "SPT256",
         "display_name": "達文",
         "event_type": "LOGIN",
@@ -5098,7 +5128,7 @@
         "created_at": "2026-05-27 09:46:16"
       },
       {
-        "id": 118633,
+        "id": 119612,
         "username": "SPT256",
         "display_name": "達文",
         "event_type": "LOGIN",
@@ -5113,7 +5143,7 @@
         "created_at": "2026-05-27 09:46:12"
       },
       {
-        "id": 118634,
+        "id": 119613,
         "username": "SPT256",
         "display_name": "達文",
         "event_type": "LOGIN",
@@ -5128,7 +5158,7 @@
         "created_at": "2026-05-27 09:46:05"
       },
       {
-        "id": 118635,
+        "id": 119614,
         "username": "SPT243",
         "display_name": "羅丹",
         "event_type": "LOGOUT",
@@ -5143,7 +5173,7 @@
         "created_at": "2026-05-27 09:46:03"
       },
       {
-        "id": 118636,
+        "id": 119615,
         "username": "SPT241",
         "display_name": "達文",
         "event_type": "LOGOUT",
@@ -5158,7 +5188,7 @@
         "created_at": "2026-05-27 09:45:38"
       },
       {
-        "id": 118637,
+        "id": 119616,
         "username": "SPT241",
         "display_name": "達文",
         "event_type": "LOGIN",
@@ -5173,7 +5203,7 @@
         "created_at": "2026-05-27 09:43:37"
       },
       {
-        "id": 118638,
+        "id": 119617,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGIN",
@@ -5188,7 +5218,7 @@
         "created_at": "2026-05-27 09:43:31"
       },
       {
-        "id": 118639,
+        "id": 119618,
         "username": "SPT089",
         "display_name": "陳凱彥",
         "event_type": "LOGIN",
@@ -5203,7 +5233,7 @@
         "created_at": "2026-05-27 09:43:25"
       },
       {
-        "id": 118640,
+        "id": 119619,
         "username": "SPT243",
         "display_name": "羅丹",
         "event_type": "LOGIN",
@@ -5218,7 +5248,7 @@
         "created_at": "2026-05-27 09:43:13"
       },
       {
-        "id": 118641,
+        "id": 119620,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "LOGIN",
@@ -5233,7 +5263,7 @@
         "created_at": "2026-05-27 09:43:01"
       },
       {
-        "id": 118642,
+        "id": 119621,
         "username": "SPT243",
         "display_name": "羅丹",
         "event_type": "LOGOUT",
@@ -5248,7 +5278,7 @@
         "created_at": "2026-05-27 09:42:50"
       },
       {
-        "id": 118643,
+        "id": 119622,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "LOGIN",
@@ -5263,7 +5293,7 @@
         "created_at": "2026-05-27 09:42:42"
       },
       {
-        "id": 118644,
+        "id": 119623,
         "username": "B177",
         "display_name": "羅章淳",
         "event_type": "LOGIN",
@@ -5278,7 +5308,7 @@
         "created_at": "2026-05-27 09:41:04"
       },
       {
-        "id": 118645,
+        "id": 119624,
         "username": "SPT243",
         "display_name": "羅丹",
         "event_type": "LOGIN",
@@ -5293,7 +5323,7 @@
         "created_at": "2026-05-27 09:41:01"
       },
       {
-        "id": 118646,
+        "id": 119625,
         "username": "SPT220",
         "display_name": "劉韋廷",
         "event_type": "LOGOUT",
@@ -5308,7 +5338,7 @@
         "created_at": "2026-05-27 09:40:16"
       },
       {
-        "id": 118647,
+        "id": 119626,
         "username": "SPT243",
         "display_name": "羅丹",
         "event_type": "LOGIN",
@@ -5323,7 +5353,7 @@
         "created_at": "2026-05-27 09:38:40"
       },
       {
-        "id": 118648,
+        "id": 119627,
         "username": "spt243",
         "display_name": "佘銘訓",
         "event_type": "LOGIN",
@@ -5338,7 +5368,7 @@
         "created_at": "2026-05-27 09:38:37"
       },
       {
-        "id": 118649,
+        "id": 119628,
         "username": "SPT199",
         "display_name": "龍斯愷",
         "event_type": "PERMISSION_DENIED",
@@ -5353,7 +5383,7 @@
         "created_at": "2026-05-27 09:37:40"
       },
       {
-        "id": 118650,
+        "id": 119629,
         "username": "SPT034",
         "display_name": "陳長彥",
         "event_type": "LOGIN",
@@ -5368,7 +5398,7 @@
         "created_at": "2026-05-27 09:37:34"
       },
       {
-        "id": 118651,
+        "id": 119630,
         "username": "SPT092",
         "display_name": "林昶志",
         "event_type": "LOGIN",
@@ -5383,7 +5413,7 @@
         "created_at": "2026-05-27 09:37:01"
       },
       {
-        "id": 118652,
+        "id": 119631,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "LOGIN",
@@ -5398,7 +5428,7 @@
         "created_at": "2026-05-27 09:36:42"
       },
       {
-        "id": 118653,
+        "id": 119632,
         "username": "SPT220",
         "display_name": "劉韋廷",
         "event_type": "PASSWORD_CHANGE",
@@ -5413,7 +5443,7 @@
         "created_at": "2026-05-27 09:36:22"
       },
       {
-        "id": 118654,
+        "id": 119633,
         "username": "SPT220",
         "display_name": "劉韋廷",
         "event_type": "LOGIN",
@@ -5428,7 +5458,7 @@
         "created_at": "2026-05-27 09:36:09"
       },
       {
-        "id": 118655,
+        "id": 119634,
         "username": "B248",
         "display_name": "佘銘訓",
         "event_type": "LOGOUT",
@@ -5443,7 +5473,7 @@
         "created_at": "2026-05-27 09:36:03"
       },
       {
-        "id": 118656,
+        "id": 119635,
         "username": "SPT220",
         "display_name": "劉韋廷",
         "event_type": "LOGIN",
@@ -5458,7 +5488,7 @@
         "created_at": "2026-05-27 09:35:55"
       },
       {
-        "id": 118657,
+        "id": 119636,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "LOGIN",
@@ -5473,7 +5503,7 @@
         "created_at": "2026-05-27 09:35:52"
       },
       {
-        "id": 118658,
+        "id": 119637,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "POST_RECORD_LOGOUT",
@@ -5488,7 +5518,7 @@
         "created_at": "2026-05-27 09:35:39"
       },
       {
-        "id": 118659,
+        "id": 119638,
         "username": "B248",
         "display_name": "佘銘訓",
         "event_type": "LOGIN",
@@ -5503,7 +5533,7 @@
         "created_at": "2026-05-27 09:35:14"
       },
       {
-        "id": 118660,
+        "id": 119639,
         "username": "B248",
         "display_name": "佘銘訓",
         "event_type": "POST_RECORD_LOGOUT",
@@ -5518,7 +5548,7 @@
         "created_at": "2026-05-27 09:35:02"
       },
       {
-        "id": 118661,
+        "id": 119640,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "LOGIN",
@@ -5533,7 +5563,7 @@
         "created_at": "2026-05-27 09:34:44"
       },
       {
-        "id": 118662,
+        "id": 119641,
         "username": "B177",
         "display_name": "羅章淳",
         "event_type": "LOGIN",
@@ -5548,7 +5578,7 @@
         "created_at": "2026-05-27 09:34:33"
       },
       {
-        "id": 118663,
+        "id": 119642,
         "username": "B248",
         "display_name": "佘銘訓",
         "event_type": "LOGIN",
@@ -5563,7 +5593,7 @@
         "created_at": "2026-05-27 09:34:28"
       },
       {
-        "id": 118664,
+        "id": 119643,
         "username": "SPT199",
         "display_name": "龍斯愷",
         "event_type": "PERMISSION_DENIED",
@@ -5578,7 +5608,7 @@
         "created_at": "2026-05-27 09:34:28"
       },
       {
-        "id": 118665,
+        "id": 119644,
         "username": "SPT230",
         "display_name": "梁志宏",
         "event_type": "LOGOUT",
@@ -5593,7 +5623,7 @@
         "created_at": "2026-05-27 09:34:13"
       },
       {
-        "id": 118666,
+        "id": 119645,
         "username": "SPT230",
         "display_name": "梁志宏",
         "event_type": "LOGIN",
@@ -5608,7 +5638,7 @@
         "created_at": "2026-05-27 09:33:40"
       },
       {
-        "id": 118667,
+        "id": 119646,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "LOGIN",
@@ -5623,7 +5653,7 @@
         "created_at": "2026-05-27 09:33:36"
       },
       {
-        "id": 118668,
+        "id": 119647,
         "username": "B237",
         "display_name": "B237",
         "event_type": "LOGIN",
@@ -5638,7 +5668,7 @@
         "created_at": "2026-05-27 09:33:19"
       },
       {
-        "id": 118669,
+        "id": 119648,
         "username": "SPT230",
         "display_name": "梁志宏",
         "event_type": "PERMISSION_DENIED",
@@ -5653,7 +5683,7 @@
         "created_at": "2026-05-27 09:32:32"
       },
       {
-        "id": 118670,
+        "id": 119649,
         "username": "SPT230",
         "display_name": "梁志宏",
         "event_type": "PERMISSION_DENIED",
@@ -5668,7 +5698,7 @@
         "created_at": "2026-05-27 09:32:31"
       },
       {
-        "id": 118671,
+        "id": 119650,
         "username": "SPT199",
         "display_name": "龍斯愷",
         "event_type": "LOGIN",
@@ -5683,7 +5713,7 @@
         "created_at": "2026-05-27 09:32:11"
       },
       {
-        "id": 118672,
+        "id": 119651,
         "username": "SPT230",
         "display_name": "梁志宏",
         "event_type": "PERMISSION_DENIED",
@@ -5698,7 +5728,7 @@
         "created_at": "2026-05-27 09:32:09"
       },
       {
-        "id": 118673,
+        "id": 119652,
         "username": "SPT230",
         "display_name": "梁志宏",
         "event_type": "PERMISSION_DENIED",
@@ -5713,7 +5743,7 @@
         "created_at": "2026-05-27 09:32:08"
       },
       {
-        "id": 118674,
+        "id": 119653,
         "username": "SPT089",
         "display_name": "陳凱彥",
         "event_type": "LOGIN",
@@ -5728,7 +5758,7 @@
         "created_at": "2026-05-27 09:31:06"
       },
       {
-        "id": 118675,
+        "id": 119654,
         "username": "SPT089",
         "display_name": "陳凱彥",
         "event_type": "POST_RECORD_LOGOUT",
@@ -5743,7 +5773,7 @@
         "created_at": "2026-05-27 09:31:01"
       },
       {
-        "id": 118676,
+        "id": 119655,
         "username": "SPT230",
         "display_name": "梁志宏",
         "event_type": "LOGIN",
@@ -5758,7 +5788,7 @@
         "created_at": "2026-05-27 09:30:54"
       },
       {
-        "id": 118677,
+        "id": 119656,
         "username": "SPT243",
         "display_name": "羅丹",
         "event_type": "LOGOUT",
@@ -5773,7 +5803,7 @@
         "created_at": "2026-05-27 09:30:42"
       },
       {
-        "id": 118678,
+        "id": 119657,
         "username": "B249",
         "display_name": "劉翰霖",
         "event_type": "LOGIN",
@@ -5788,7 +5818,7 @@
         "created_at": "2026-05-27 09:30:23"
       },
       {
-        "id": 118679,
+        "id": 119658,
         "username": "B250",
         "display_name": "劉順榮",
         "event_type": "LOGOUT",
@@ -5803,7 +5833,7 @@
         "created_at": "2026-05-27 09:30:01"
       },
       {
-        "id": 118680,
+        "id": 119659,
         "username": "B250",
         "display_name": "劉順榮",
         "event_type": "PERMISSION_DENIED",
@@ -5818,7 +5848,7 @@
         "created_at": "2026-05-27 09:29:59"
       },
       {
-        "id": 118681,
+        "id": 119660,
         "username": "B250",
         "display_name": "劉順榮",
         "event_type": "PERMISSION_DENIED",
@@ -5833,7 +5863,7 @@
         "created_at": "2026-05-27 09:29:55"
       },
       {
-        "id": 118682,
+        "id": 119661,
         "username": "SPT243",
         "display_name": "羅丹",
         "event_type": "LOGIN",
@@ -5848,7 +5878,7 @@
         "created_at": "2026-05-27 09:29:53"
       },
       {
-        "id": 118683,
+        "id": 119662,
         "username": "B250",
         "display_name": "劉順榮",
         "event_type": "LOGIN",
@@ -5863,7 +5893,7 @@
         "created_at": "2026-05-27 09:29:07"
       },
       {
-        "id": 118684,
+        "id": 119663,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "LOGOUT",
@@ -5878,7 +5908,7 @@
         "created_at": "2026-05-27 09:28:54"
       },
       {
-        "id": 118685,
+        "id": 119664,
         "username": "SPT145",
         "display_name": "潘威捷",
         "event_type": "PERMISSION_DENIED",
@@ -5893,7 +5923,7 @@
         "created_at": "2026-05-27 09:28:34"
       },
       {
-        "id": 118686,
+        "id": 119665,
         "username": "SPT145",
         "display_name": "潘威捷",
         "event_type": "LOGIN",
@@ -5908,7 +5938,7 @@
         "created_at": "2026-05-27 09:28:33"
       },
       {
-        "id": 118687,
+        "id": 119666,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "LOGOUT",
@@ -5923,7 +5953,7 @@
         "created_at": "2026-05-27 09:28:23"
       },
       {
-        "id": 118688,
+        "id": 119667,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "LOGOUT",
@@ -5938,7 +5968,7 @@
         "created_at": "2026-05-27 09:28:22"
       },
       {
-        "id": 118689,
+        "id": 119668,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "LOGOUT",
@@ -5953,7 +5983,7 @@
         "created_at": "2026-05-27 09:28:20"
       },
       {
-        "id": 118690,
+        "id": 119669,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "LOGOUT",
@@ -5968,7 +5998,7 @@
         "created_at": "2026-05-27 09:28:19"
       },
       {
-        "id": 118691,
+        "id": 119670,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "PERMISSION_DENIED",
@@ -5983,7 +6013,7 @@
         "created_at": "2026-05-27 09:28:17"
       },
       {
-        "id": 118692,
+        "id": 119671,
         "username": "SPT089",
         "display_name": "陳凱彥",
         "event_type": "PERMISSION_DENIED",
@@ -5998,7 +6028,7 @@
         "created_at": "2026-05-27 09:27:41"
       },
       {
-        "id": 118693,
+        "id": 119672,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "PERMISSION_DENIED",
@@ -6013,7 +6043,7 @@
         "created_at": "2026-05-27 09:27:39"
       },
       {
-        "id": 118694,
+        "id": 119673,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "LOGIN",
@@ -6028,7 +6058,7 @@
         "created_at": "2026-05-27 09:27:32"
       },
       {
-        "id": 118695,
+        "id": 119674,
         "username": "SPT244",
         "display_name": "費南",
         "event_type": "PASSWORD_CHANGE",
@@ -6043,7 +6073,7 @@
         "created_at": "2026-05-27 09:27:25"
       },
       {
-        "id": 118696,
+        "id": 119675,
         "username": "SPT244",
         "display_name": "費南",
         "event_type": "LOGIN",
@@ -6058,7 +6088,7 @@
         "created_at": "2026-05-27 09:27:14"
       },
       {
-        "id": 118697,
+        "id": 119676,
         "username": "SPT089",
         "display_name": "陳凱彥",
         "event_type": "LOGIN",
@@ -6073,7 +6103,7 @@
         "created_at": "2026-05-27 09:26:45"
       },
       {
-        "id": 118698,
+        "id": 119677,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "LOGIN",
@@ -6088,7 +6118,7 @@
         "created_at": "2026-05-27 09:26:29"
       },
       {
-        "id": 118699,
+        "id": 119678,
         "username": "B250",
         "display_name": "劉順榮",
         "event_type": "LOGOUT",
@@ -6103,7 +6133,7 @@
         "created_at": "2026-05-27 09:26:13"
       },
       {
-        "id": 118700,
+        "id": 119679,
         "username": "SPT091",
         "display_name": "魏瑄毅",
         "event_type": "LOGIN",
@@ -6118,7 +6148,7 @@
         "created_at": "2026-05-27 09:26:11"
       },
       {
-        "id": 118701,
+        "id": 119680,
         "username": "SPT088",
         "display_name": "林建安",
         "event_type": "POST_RECORD_LOGOUT",
@@ -6133,7 +6163,7 @@
         "created_at": "2026-05-27 09:25:59"
       },
       {
-        "id": 118702,
+        "id": 119681,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "LOGOUT",
@@ -6148,7 +6178,7 @@
         "created_at": "2026-05-27 09:25:53"
       },
       {
-        "id": 118703,
+        "id": 119682,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "LOGOUT",
@@ -6163,7 +6193,7 @@
         "created_at": "2026-05-27 09:25:52"
       },
       {
-        "id": 118704,
+        "id": 119683,
         "username": "SPT239",
         "display_name": "麥可",
         "event_type": "PASSWORD_CHANGE",
@@ -6178,7 +6208,7 @@
         "created_at": "2026-05-27 09:25:14"
       },
       {
-        "id": 118705,
+        "id": 119684,
         "username": "SPT088",
         "display_name": "林建安",
         "event_type": "LOGIN",
@@ -6193,7 +6223,7 @@
         "created_at": "2026-05-27 09:25:04"
       },
       {
-        "id": 118706,
+        "id": 119685,
         "username": "SPT239",
         "display_name": "麥可",
         "event_type": "LOGIN",
@@ -6208,7 +6238,7 @@
         "created_at": "2026-05-27 09:25:03"
       },
       {
-        "id": 118707,
+        "id": 119686,
         "username": "SPT193",
         "display_name": "呂昰儒",
         "event_type": "POST_RECORD_LOGOUT",
@@ -6223,7 +6253,7 @@
         "created_at": "2026-05-27 09:24:42"
       },
       {
-        "id": 118708,
+        "id": 119687,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "POST_RECORD_LOGOUT",
@@ -6238,7 +6268,7 @@
         "created_at": "2026-05-27 09:24:01"
       },
       {
-        "id": 118709,
+        "id": 119688,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "PASSWORD_CHANGE",
@@ -6253,7 +6283,7 @@
         "created_at": "2026-05-27 09:23:47"
       },
       {
-        "id": 118710,
+        "id": 119689,
         "username": "SPT193",
         "display_name": "呂昰儒",
         "event_type": "PASSWORD_CHANGE",
@@ -6268,7 +6298,7 @@
         "created_at": "2026-05-27 09:23:31"
       },
       {
-        "id": 118711,
+        "id": 119690,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "LOGIN",
@@ -6283,7 +6313,7 @@
         "created_at": "2026-05-27 09:23:30"
       },
       {
-        "id": 118712,
+        "id": 119691,
         "username": "SPT172",
         "display_name": "胡瑄芸",
         "event_type": "LOGIN",
@@ -6298,7 +6328,7 @@
         "created_at": "2026-05-27 09:23:21"
       },
       {
-        "id": 118713,
+        "id": 119692,
         "username": "SPT193",
         "display_name": "呂昰儒",
         "event_type": "LOGIN",
@@ -6313,7 +6343,7 @@
         "created_at": "2026-05-27 09:23:15"
       },
       {
-        "id": 118714,
+        "id": 119693,
         "username": "SPT091",
         "display_name": "魏瑄毅",
         "event_type": "LOGOUT",
@@ -6328,7 +6358,7 @@
         "created_at": "2026-05-27 09:23:09"
       },
       {
-        "id": 118715,
+        "id": 119694,
         "username": "SPT193",
         "display_name": "牟育玄",
         "event_type": "LOGIN",
@@ -6343,7 +6373,7 @@
         "created_at": "2026-05-27 09:23:06"
       },
       {
-        "id": 118716,
+        "id": 119695,
         "username": "SPT174",
         "display_name": "龍才華",
         "event_type": "LOGOUT",
@@ -6358,7 +6388,7 @@
         "created_at": "2026-05-27 09:23:04"
       },
       {
-        "id": 118717,
+        "id": 119696,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "PASSWORD_CHANGE",
@@ -6373,7 +6403,7 @@
         "created_at": "2026-05-27 09:22:51"
       },
       {
-        "id": 118718,
+        "id": 119697,
         "username": "SPT087",
         "display_name": "牟育玄",
         "event_type": "POST_RECORD_LOGOUT",
@@ -6388,7 +6418,7 @@
         "created_at": "2026-05-27 09:22:48"
       },
       {
-        "id": 118719,
+        "id": 119698,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "LOGIN",
@@ -6403,7 +6433,7 @@
         "created_at": "2026-05-27 09:22:36"
       },
       {
-        "id": 118720,
+        "id": 119699,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "LOGIN",
@@ -6418,7 +6448,7 @@
         "created_at": "2026-05-27 09:22:34"
       },
       {
-        "id": 118721,
+        "id": 119700,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "LOGIN",
@@ -6433,7 +6463,7 @@
         "created_at": "2026-05-27 09:22:31"
       },
       {
-        "id": 118722,
+        "id": 119701,
         "username": "B250",
         "display_name": "劉順榮",
         "event_type": "LOGIN",
@@ -6448,7 +6478,7 @@
         "created_at": "2026-05-27 09:22:21"
       },
       {
-        "id": 118723,
+        "id": 119702,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "LOGOUT",
@@ -6463,7 +6493,7 @@
         "created_at": "2026-05-27 09:22:20"
       },
       {
-        "id": 118724,
+        "id": 119703,
         "username": "spt208",
         "display_name": "邱珍娜",
         "event_type": "LOGIN",
@@ -6478,7 +6508,7 @@
         "created_at": "2026-05-27 09:22:14"
       },
       {
-        "id": 118725,
+        "id": 119704,
         "username": "spt208",
         "display_name": "邱珍娜",
         "event_type": "LOGIN",
@@ -6493,7 +6523,7 @@
         "created_at": "2026-05-27 09:22:13"
       },
       {
-        "id": 118726,
+        "id": 119705,
         "username": "B249",
         "display_name": "劉翰霖",
         "event_type": "LOGOUT",
@@ -6508,7 +6538,7 @@
         "created_at": "2026-05-27 09:22:07"
       },
       {
-        "id": 118727,
+        "id": 119706,
         "username": "spt208",
         "display_name": "邱珍娜",
         "event_type": "LOGIN",
@@ -6523,7 +6553,7 @@
         "created_at": "2026-05-27 09:22:04"
       },
       {
-        "id": 118728,
+        "id": 119707,
         "username": "SPT087",
         "display_name": "牟育玄",
         "event_type": "PERMISSION_DENIED",
@@ -6538,7 +6568,7 @@
         "created_at": "2026-05-27 09:21:41"
       },
       {
-        "id": 118729,
+        "id": 119708,
         "username": "B249",
         "display_name": "劉翰霖",
         "event_type": "LOGIN",
@@ -6553,7 +6583,7 @@
         "created_at": "2026-05-27 09:21:12"
       },
       {
-        "id": 118730,
+        "id": 119709,
         "username": "SPT087",
         "display_name": "牟育玄",
         "event_type": "LOGIN",
@@ -6568,7 +6598,7 @@
         "created_at": "2026-05-27 09:21:11"
       },
       {
-        "id": 118731,
+        "id": 119710,
         "username": "SPT087",
         "display_name": "鍾明志",
         "event_type": "LOGIN",
@@ -6583,7 +6613,7 @@
         "created_at": "2026-05-27 09:21:02"
       },
       {
-        "id": 118732,
+        "id": 119711,
         "username": "SPT241",
         "display_name": "達文",
         "event_type": "LOGOUT",
@@ -6598,7 +6628,7 @@
         "created_at": "2026-05-27 09:20:57"
       },
       {
-        "id": 118733,
+        "id": 119712,
         "username": "SPT087",
         "display_name": "鍾明志",
         "event_type": "LOGIN",
@@ -6613,7 +6643,7 @@
         "created_at": "2026-05-27 09:20:51"
       },
       {
-        "id": 118734,
+        "id": 119713,
         "username": "SPT087",
         "display_name": "鍾明志",
         "event_type": "LOGIN",
@@ -6628,7 +6658,7 @@
         "created_at": "2026-05-27 09:20:49"
       },
       {
-        "id": 118735,
+        "id": 119714,
         "username": "SPT174",
         "display_name": "龍才華",
         "event_type": "LOGIN",
@@ -6643,7 +6673,7 @@
         "created_at": "2026-05-27 09:20:15"
       },
       {
-        "id": 118736,
+        "id": 119715,
         "username": "SPT174",
         "display_name": "劉定澤",
         "event_type": "LOGIN",
@@ -6658,7 +6688,7 @@
         "created_at": "2026-05-27 09:20:11"
       },
       {
-        "id": 118737,
+        "id": 119716,
         "username": "SPT091",
         "display_name": "魏瑄毅",
         "event_type": "LOGIN",
@@ -6673,7 +6703,7 @@
         "created_at": "2026-05-27 09:20:04"
       },
       {
-        "id": 118738,
+        "id": 119717,
         "username": "B002",
         "display_name": "張文品",
         "event_type": "LOGIN",
@@ -6688,7 +6718,7 @@
         "created_at": "2026-05-27 09:20:02"
       },
       {
-        "id": 118739,
+        "id": 119718,
         "username": "B135",
         "display_name": "鍾明志",
         "event_type": "POST_RECORD_LOGOUT",
@@ -6703,7 +6733,7 @@
         "created_at": "2026-05-27 09:19:49"
       },
       {
-        "id": 118740,
+        "id": 119719,
         "username": "SPT227",
         "display_name": "張佳銓",
         "event_type": "POST_RECORD_LOGOUT",
@@ -6718,7 +6748,7 @@
         "created_at": "2026-05-27 09:19:24"
       },
       {
-        "id": 118741,
+        "id": 119720,
         "username": "SPT241",
         "display_name": "達文",
         "event_type": "PASSWORD_CHANGE",
@@ -6733,7 +6763,7 @@
         "created_at": "2026-05-27 09:19:16"
       },
       {
-        "id": 118742,
+        "id": 119721,
         "username": "SPT138",
         "display_name": "蘇雍盛",
         "event_type": "LOGOUT",
@@ -6748,7 +6778,7 @@
         "created_at": "2026-05-27 09:19:00"
       },
       {
-        "id": 118743,
+        "id": 119722,
         "username": "B135",
         "display_name": "鍾明志",
         "event_type": "LOGIN",
@@ -6763,7 +6793,7 @@
         "created_at": "2026-05-27 09:18:16"
       },
       {
-        "id": 118744,
+        "id": 119723,
         "username": "SPT241",
         "display_name": "達文",
         "event_type": "LOGIN",
@@ -6778,7 +6808,7 @@
         "created_at": "2026-05-27 09:18:14"
       },
       {
-        "id": 118745,
+        "id": 119724,
         "username": "SPT240",
         "display_name": "吉爾",
         "event_type": "PASSWORD_CHANGE",
@@ -6793,7 +6823,7 @@
         "created_at": "2026-05-27 09:18:13"
       },
       {
-        "id": 118746,
+        "id": 119725,
         "username": "B135",
         "display_name": "潘信成",
         "event_type": "LOGIN",
@@ -6808,7 +6838,7 @@
         "created_at": "2026-05-27 09:18:02"
       },
       {
-        "id": 118747,
+        "id": 119726,
         "username": "SPT158",
         "display_name": "劉定澤",
         "event_type": "LOGOUT",
@@ -6823,7 +6853,7 @@
         "created_at": "2026-05-27 09:17:53"
       },
       {
-        "id": 118748,
+        "id": 119727,
         "username": "SPT240",
         "display_name": "吉爾",
         "event_type": "LOGIN",
@@ -6838,7 +6868,7 @@
         "created_at": "2026-05-27 09:17:49"
       },
       {
-        "id": 118749,
+        "id": 119728,
         "username": "B135",
         "display_name": "潘信成",
         "event_type": "LOGIN",
@@ -6853,7 +6883,7 @@
         "created_at": "2026-05-27 09:17:46"
       },
       {
-        "id": 118750,
+        "id": 119729,
         "username": "SPT240",
         "display_name": "吉爾",
         "event_type": "LOGIN",
@@ -6868,7 +6898,7 @@
         "created_at": "2026-05-27 09:17:38"
       },
       {
-        "id": 118751,
+        "id": 119730,
         "username": "SPT240",
         "display_name": "吉爾",
         "event_type": "LOGIN",
@@ -6883,7 +6913,7 @@
         "created_at": "2026-05-27 09:17:36"
       },
       {
-        "id": 118752,
+        "id": 119731,
         "username": "SPT240",
         "display_name": "吉爾",
         "event_type": "LOGIN",
@@ -6898,7 +6928,7 @@
         "created_at": "2026-05-27 09:17:17"
       },
       {
-        "id": 118753,
+        "id": 119732,
         "username": "SPT138",
         "display_name": "蘇雍盛",
         "event_type": "LOGIN",
@@ -6913,7 +6943,7 @@
         "created_at": "2026-05-27 09:16:56"
       },
       {
-        "id": 118754,
+        "id": 119733,
         "username": "SPT138",
         "display_name": "蘇雍盛",
         "event_type": "LOGIN",
@@ -6928,7 +6958,7 @@
         "created_at": "2026-05-27 09:16:45"
       },
       {
-        "id": 118755,
+        "id": 119734,
         "username": "SPT138",
         "display_name": "蘇雍盛",
         "event_type": "LOGIN",
@@ -6943,7 +6973,7 @@
         "created_at": "2026-05-27 09:16:35"
       },
       {
-        "id": 118756,
+        "id": 119735,
         "username": "SPT158",
         "display_name": "劉定澤",
         "event_type": "LOGIN",
@@ -6958,7 +6988,7 @@
         "created_at": "2026-05-27 09:16:19"
       },
       {
-        "id": 118757,
+        "id": 119736,
         "username": "SPT138",
         "display_name": "蘇雍盛",
         "event_type": "LOGIN",
@@ -6973,7 +7003,7 @@
         "created_at": "2026-05-27 09:16:17"
       },
       {
-        "id": 118758,
+        "id": 119737,
         "username": "SPT227",
         "display_name": "張佳銓",
         "event_type": "LOGIN",
@@ -6988,7 +7018,7 @@
         "created_at": "2026-05-27 09:16:14"
       },
       {
-        "id": 118759,
+        "id": 119738,
         "username": "SPT138",
         "display_name": "蘇雍盛",
         "event_type": "LOGIN",
@@ -7003,7 +7033,7 @@
         "created_at": "2026-05-27 09:16:08"
       },
       {
-        "id": 118760,
+        "id": 119739,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGIN",
@@ -7018,7 +7048,7 @@
         "created_at": "2026-05-27 09:15:56"
       },
       {
-        "id": 118761,
+        "id": 119740,
         "username": "SPT121",
         "display_name": "徐兆生",
         "event_type": "LOGOUT",
@@ -7033,7 +7063,7 @@
         "created_at": "2026-05-27 09:15:53"
       },
       {
-        "id": 118762,
+        "id": 119741,
         "username": "SPT121",
         "display_name": "徐兆生",
         "event_type": "LOGIN",
@@ -7048,7 +7078,7 @@
         "created_at": "2026-05-27 09:15:27"
       },
       {
-        "id": 118763,
+        "id": 119742,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "AUTO_LOGOUT",
@@ -7063,7 +7093,7 @@
         "created_at": "2026-05-27 09:15:20"
       },
       {
-        "id": 118764,
+        "id": 119743,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "AUTO_LOGOUT",
@@ -7078,7 +7108,7 @@
         "created_at": "2026-05-27 09:15:18"
       },
       {
-        "id": 118765,
+        "id": 119744,
         "username": "SPT121",
         "display_name": "徐兆生",
         "event_type": "POST_RECORD_LOGOUT",
@@ -7093,7 +7123,7 @@
         "created_at": "2026-05-27 09:15:16"
       },
       {
-        "id": 118766,
+        "id": 119745,
         "username": "SPT138",
         "display_name": "蘇雍盛",
         "event_type": "LOGIN",
@@ -7108,7 +7138,7 @@
         "created_at": "2026-05-27 09:14:58"
       },
       {
-        "id": 118767,
+        "id": 119746,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "PASSWORD_CHANGE",
@@ -7123,7 +7153,7 @@
         "created_at": "2026-05-27 09:14:50"
       },
       {
-        "id": 118768,
+        "id": 119747,
         "username": "SPT138",
         "display_name": "蘇雍盛",
         "event_type": "POST_RECORD_LOGOUT",
@@ -7138,7 +7168,7 @@
         "created_at": "2026-05-27 09:14:39"
       },
       {
-        "id": 118769,
+        "id": 119748,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "LOGIN",
@@ -7153,7 +7183,7 @@
         "created_at": "2026-05-27 09:14:37"
       },
       {
-        "id": 118770,
+        "id": 119749,
         "username": "SPT077",
         "display_name": "羅丹",
         "event_type": "LOGIN",
@@ -7168,7 +7198,7 @@
         "created_at": "2026-05-27 09:14:33"
       },
       {
-        "id": 118771,
+        "id": 119750,
         "username": "SPT243",
         "display_name": "羅丹",
         "event_type": "LOGOUT",
@@ -7183,7 +7213,7 @@
         "created_at": "2026-05-27 09:14:18"
       },
       {
-        "id": 118772,
+        "id": 119751,
         "username": "SPT105",
         "display_name": "劉秀鳳",
         "event_type": "LOGOUT",
@@ -7198,7 +7228,7 @@
         "created_at": "2026-05-27 09:14:16"
       },
       {
-        "id": 118773,
+        "id": 119752,
         "username": "SPT091",
         "display_name": "魏瑄毅",
         "event_type": "LOGIN",
@@ -7213,7 +7243,7 @@
         "created_at": "2026-05-27 09:14:13"
       },
       {
-        "id": 118774,
+        "id": 119753,
         "username": "SPT121",
         "display_name": "徐兆生",
         "event_type": "LOGIN",
@@ -7228,7 +7258,7 @@
         "created_at": "2026-05-27 09:14:05"
       },
       {
-        "id": 118775,
+        "id": 119754,
         "username": "SPT105",
         "display_name": "劉秀鳳",
         "event_type": "LOGIN",
@@ -7243,7 +7273,7 @@
         "created_at": "2026-05-27 09:13:16"
       },
       {
-        "id": 118776,
+        "id": 119755,
         "username": "SPT245",
         "display_name": "傑米",
         "event_type": "PASSWORD_CHANGE",
@@ -7258,7 +7288,7 @@
         "created_at": "2026-05-27 09:13:16"
       },
       {
-        "id": 118777,
+        "id": 119756,
         "username": "SPT245",
         "display_name": "傑米",
         "event_type": "LOGIN",
@@ -7273,7 +7303,7 @@
         "created_at": "2026-05-27 09:12:48"
       },
       {
-        "id": 118778,
+        "id": 119757,
         "username": "SPT138",
         "display_name": "蘇雍盛",
         "event_type": "LOGIN",
@@ -7288,7 +7318,7 @@
         "created_at": "2026-05-27 09:12:27"
       },
       {
-        "id": 118779,
+        "id": 119758,
         "username": "SPT243",
         "display_name": "羅丹",
         "event_type": "LOGIN",
@@ -7303,7 +7333,7 @@
         "created_at": "2026-05-27 09:12:25"
       },
       {
-        "id": 118780,
+        "id": 119759,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "POST_RECORD_LOGOUT",
@@ -7318,7 +7348,7 @@
         "created_at": "2026-05-27 09:12:19"
       },
       {
-        "id": 118781,
+        "id": 119760,
         "username": "SPT105",
         "display_name": "劉秀鳳",
         "event_type": "POST_RECORD_LOGOUT",
@@ -7333,7 +7363,7 @@
         "created_at": "2026-05-27 09:12:15"
       },
       {
-        "id": 118782,
+        "id": 119761,
         "username": "B227",
         "display_name": "潘信成",
         "event_type": "POST_RECORD_LOGOUT",
@@ -7348,7 +7378,7 @@
         "created_at": "2026-05-27 09:12:02"
       },
       {
-        "id": 118783,
+        "id": 119762,
         "username": "SPT230",
         "display_name": "梁志宏",
         "event_type": "POST_RECORD_LOGOUT",
@@ -7363,7 +7393,7 @@
         "created_at": "2026-05-27 09:12:00"
       },
       {
-        "id": 118784,
+        "id": 119763,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "PERMISSION_DENIED",
@@ -7378,7 +7408,7 @@
         "created_at": "2026-05-27 09:11:40"
       },
       {
-        "id": 118785,
+        "id": 119764,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "PERMISSION_DENIED",
@@ -7393,7 +7423,7 @@
         "created_at": "2026-05-27 09:11:38"
       },
       {
-        "id": 118786,
+        "id": 119765,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "PERMISSION_DENIED",
@@ -7408,7 +7438,7 @@
         "created_at": "2026-05-27 09:11:37"
       },
       {
-        "id": 118787,
+        "id": 119766,
         "username": "SPT230",
         "display_name": "梁志宏",
         "event_type": "PASSWORD_CHANGE",
@@ -7423,7 +7453,7 @@
         "created_at": "2026-05-27 09:11:28"
       },
       {
-        "id": 118788,
+        "id": 119767,
         "username": "B227",
         "display_name": "潘信成",
         "event_type": "PASSWORD_CHANGE",
@@ -7438,7 +7468,7 @@
         "created_at": "2026-05-27 09:11:26"
       },
       {
-        "id": 118789,
+        "id": 119768,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "LOGIN",
@@ -7453,7 +7483,7 @@
         "created_at": "2026-05-27 09:11:23"
       },
       {
-        "id": 118790,
+        "id": 119769,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "LOGIN",
@@ -7468,7 +7498,7 @@
         "created_at": "2026-05-27 09:11:22"
       },
       {
-        "id": 118791,
+        "id": 119770,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "LOGIN",
@@ -7483,7 +7513,7 @@
         "created_at": "2026-05-27 09:11:19"
       },
       {
-        "id": 118792,
+        "id": 119771,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "LOGIN",
@@ -7498,7 +7528,7 @@
         "created_at": "2026-05-27 09:11:14"
       },
       {
-        "id": 118793,
+        "id": 119772,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "LOGIN",
@@ -7513,7 +7543,7 @@
         "created_at": "2026-05-27 09:11:12"
       },
       {
-        "id": 118794,
+        "id": 119773,
         "username": "B227",
         "display_name": "潘信成",
         "event_type": "LOGIN",
@@ -7528,7 +7558,7 @@
         "created_at": "2026-05-27 09:11:11"
       },
       {
-        "id": 118795,
+        "id": 119774,
         "username": "SPT230",
         "display_name": "梁志宏",
         "event_type": "LOGIN",
@@ -7543,7 +7573,7 @@
         "created_at": "2026-05-27 09:11:10"
       },
       {
-        "id": 118796,
+        "id": 119775,
         "username": "SPT230",
         "display_name": "潘威捷",
         "event_type": "LOGIN",
@@ -7558,7 +7588,7 @@
         "created_at": "2026-05-27 09:11:05"
       },
       {
-        "id": 118797,
+        "id": 119776,
         "username": "SPT230",
         "display_name": "潘威捷",
         "event_type": "LOGIN",
@@ -7573,7 +7603,7 @@
         "created_at": "2026-05-27 09:11:02"
       },
       {
-        "id": 118798,
+        "id": 119777,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "LOGIN",
@@ -7588,7 +7618,7 @@
         "created_at": "2026-05-27 09:11:01"
       },
       {
-        "id": 118799,
+        "id": 119778,
         "username": "SPT105",
         "display_name": "劉秀鳳",
         "event_type": "LOGIN",
@@ -7603,7 +7633,7 @@
         "created_at": "2026-05-27 09:10:55"
       },
       {
-        "id": 118800,
+        "id": 119779,
         "username": "SPT148",
         "display_name": "羅立昕",
         "event_type": "LOGIN",
@@ -7618,7 +7648,7 @@
         "created_at": "2026-05-27 09:10:54"
       },
       {
-        "id": 118801,
+        "id": 119780,
         "username": "B227",
         "display_name": "周政龍",
         "event_type": "LOGIN",
@@ -7633,7 +7663,7 @@
         "created_at": "2026-05-27 09:10:53"
       },
       {
-        "id": 118802,
+        "id": 119781,
         "username": "SPT145",
         "display_name": "潘威捷",
         "event_type": "POST_RECORD_LOGOUT",
@@ -7648,7 +7678,7 @@
         "created_at": "2026-05-27 09:10:51"
       },
       {
-        "id": 118803,
+        "id": 119782,
         "username": "B227",
         "display_name": "周政龍",
         "event_type": "LOGIN",
@@ -7663,7 +7693,7 @@
         "created_at": "2026-05-27 09:10:48"
       },
       {
-        "id": 118804,
+        "id": 119783,
         "username": "B227",
         "display_name": "周政龍",
         "event_type": "LOGIN",
@@ -7678,7 +7708,7 @@
         "created_at": "2026-05-27 09:10:45"
       },
       {
-        "id": 118805,
+        "id": 119784,
         "username": "B226",
         "display_name": "周政龍",
         "event_type": "LOGOUT",
@@ -7693,7 +7723,7 @@
         "created_at": "2026-05-27 09:10:29"
       },
       {
-        "id": 118806,
+        "id": 119785,
         "username": "SPT145",
         "display_name": "潘威捷",
         "event_type": "PERMISSION_DENIED",
@@ -7708,7 +7738,7 @@
         "created_at": "2026-05-27 09:10:17"
       },
       {
-        "id": 118807,
+        "id": 119786,
         "username": "SPT145",
         "display_name": "潘威捷",
         "event_type": "LOGIN",
@@ -7723,7 +7753,7 @@
         "created_at": "2026-05-27 09:10:16"
       },
       {
-        "id": 118808,
+        "id": 119787,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "LOGOUT",
@@ -7738,7 +7768,7 @@
         "created_at": "2026-05-27 09:10:02"
       },
       {
-        "id": 118809,
+        "id": 119788,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "PERMISSION_DENIED",
@@ -7753,7 +7783,7 @@
         "created_at": "2026-05-27 09:09:59"
       },
       {
-        "id": 118810,
+        "id": 119789,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "PERMISSION_DENIED",
@@ -7768,7 +7798,7 @@
         "created_at": "2026-05-27 09:09:58"
       },
       {
-        "id": 118811,
+        "id": 119790,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "PERMISSION_DENIED",
@@ -7783,7 +7813,7 @@
         "created_at": "2026-05-27 09:09:57"
       },
       {
-        "id": 118812,
+        "id": 119791,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "PERMISSION_DENIED",
@@ -7798,7 +7828,7 @@
         "created_at": "2026-05-27 09:09:56"
       },
       {
-        "id": 118813,
+        "id": 119792,
         "username": "B164",
         "display_name": "B164",
         "event_type": "LOGIN",
@@ -7813,7 +7843,7 @@
         "created_at": "2026-05-27 09:09:54"
       },
       {
-        "id": 118814,
+        "id": 119793,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "PERMISSION_DENIED",
@@ -7828,7 +7858,7 @@
         "created_at": "2026-05-27 09:09:52"
       },
       {
-        "id": 118815,
+        "id": 119794,
         "username": "SPT077",
         "display_name": "謝宛庭",
         "event_type": "LOGIN",
@@ -7843,7 +7873,7 @@
         "created_at": "2026-05-27 09:09:25"
       },
       {
-        "id": 118816,
+        "id": 119795,
         "username": "SPT077",
         "display_name": "佘銘訓",
         "event_type": "LOGIN",
@@ -7858,7 +7888,7 @@
         "created_at": "2026-05-27 09:09:15"
       },
       {
-        "id": 118817,
+        "id": 119796,
         "username": "SPT077",
         "display_name": "佘銘訓",
         "event_type": "LOGIN",
@@ -7873,7 +7903,7 @@
         "created_at": "2026-05-27 09:09:13"
       },
       {
-        "id": 118818,
+        "id": 119797,
         "username": "SPT077",
         "display_name": "佘銘訓",
         "event_type": "LOGIN",
@@ -7888,7 +7918,7 @@
         "created_at": "2026-05-27 09:09:08"
       },
       {
-        "id": 118819,
+        "id": 119798,
         "username": "SPT077",
         "display_name": "佘銘訓",
         "event_type": "LOGIN",
@@ -7903,7 +7933,7 @@
         "created_at": "2026-05-27 09:09:02"
       },
       {
-        "id": 118820,
+        "id": 119799,
         "username": "SPT077",
         "display_name": "佘銘訓",
         "event_type": "LOGIN",
@@ -7918,7 +7948,7 @@
         "created_at": "2026-05-27 09:09:00"
       },
       {
-        "id": 118821,
+        "id": 119800,
         "username": "B226",
         "display_name": "周政龍",
         "event_type": "LOGIN",
@@ -7933,7 +7963,7 @@
         "created_at": "2026-05-27 09:08:26"
       },
       {
-        "id": 118822,
+        "id": 119801,
         "username": "B226",
         "display_name": "周政龍",
         "event_type": "LOGIN",
@@ -7948,7 +7978,7 @@
         "created_at": "2026-05-27 09:08:18"
       },
       {
-        "id": 118823,
+        "id": 119802,
         "username": "B259",
         "display_name": "鄧文誠",
         "event_type": "LOGOUT",
@@ -7963,7 +7993,7 @@
         "created_at": "2026-05-27 09:01:17"
       },
       {
-        "id": 118824,
+        "id": 119803,
         "username": "B237",
         "display_name": "佘銘訓",
         "event_type": "LOGIN",
@@ -7978,7 +8008,7 @@
         "created_at": "2026-05-27 09:00:32"
       },
       {
-        "id": 118825,
+        "id": 119804,
         "username": "B237",
         "display_name": "佘銘訓",
         "event_type": "LOGIN",
@@ -7993,7 +8023,7 @@
         "created_at": "2026-05-27 09:00:28"
       },
       {
-        "id": 118826,
+        "id": 119805,
         "username": "B248",
         "display_name": "佘銘訓",
         "event_type": "LOGOUT",
@@ -8008,7 +8038,7 @@
         "created_at": "2026-05-27 09:00:18"
       },
       {
-        "id": 118827,
+        "id": 119806,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGIN",
@@ -8023,7 +8053,7 @@
         "created_at": "2026-05-27 09:00:17"
       },
       {
-        "id": 118828,
+        "id": 119807,
         "username": "B248",
         "display_name": "佘銘訓",
         "event_type": "PERMISSION_DENIED",
@@ -8038,7 +8068,7 @@
         "created_at": "2026-05-27 09:00:14"
       },
       {
-        "id": 118829,
+        "id": 119808,
         "username": "B248",
         "display_name": "佘銘訓",
         "event_type": "PERMISSION_DENIED",
@@ -8053,7 +8083,7 @@
         "created_at": "2026-05-27 09:00:11"
       },
       {
-        "id": 118830,
+        "id": 119809,
         "username": "B248",
         "display_name": "佘銘訓",
         "event_type": "PASSWORD_CHANGE",
@@ -8068,7 +8098,7 @@
         "created_at": "2026-05-27 08:59:53"
       },
       {
-        "id": 118831,
+        "id": 119810,
         "username": "B248",
         "display_name": "佘銘訓",
         "event_type": "LOGIN",
@@ -8083,7 +8113,7 @@
         "created_at": "2026-05-27 08:59:12"
       },
       {
-        "id": 118832,
+        "id": 119811,
         "username": "B228",
         "display_name": "溫翠茹",
         "event_type": "LOGOUT",
@@ -8098,7 +8128,7 @@
         "created_at": "2026-05-27 08:59:01"
       },
       {
-        "id": 118833,
+        "id": 119812,
         "username": "SPT250",
         "display_name": "鄭至賢",
         "event_type": "LOGIN",
@@ -8113,7 +8143,7 @@
         "created_at": "2026-05-27 08:58:47"
       },
       {
-        "id": 118834,
+        "id": 119813,
         "username": "SPT250",
         "display_name": "劉家瑋",
         "event_type": "LOGIN",
@@ -8128,7 +8158,7 @@
         "created_at": "2026-05-27 08:58:41"
       },
       {
-        "id": 118835,
+        "id": 119814,
         "username": "SPT250",
         "display_name": "劉家瑋",
         "event_type": "LOGIN",
@@ -8143,7 +8173,7 @@
         "created_at": "2026-05-27 08:58:39"
       },
       {
-        "id": 118836,
+        "id": 119815,
         "username": "B259",
         "display_name": "鄧文誠",
         "event_type": "PASSWORD_CHANGE",
@@ -8158,7 +8188,7 @@
         "created_at": "2026-05-27 08:58:36"
       },
       {
-        "id": 118837,
+        "id": 119816,
         "username": "SPT250",
         "display_name": "劉家瑋",
         "event_type": "LOGIN",
@@ -8173,7 +8203,7 @@
         "created_at": "2026-05-27 08:58:32"
       },
       {
-        "id": 118838,
+        "id": 119817,
         "username": "SPT250",
         "display_name": "劉家瑋",
         "event_type": "LOGIN",
@@ -8188,7 +8218,7 @@
         "created_at": "2026-05-27 08:58:29"
       },
       {
-        "id": 118839,
+        "id": 119818,
         "username": "SPT250",
         "display_name": "劉家瑋",
         "event_type": "LOGIN",
@@ -8203,7 +8233,7 @@
         "created_at": "2026-05-27 08:58:28"
       },
       {
-        "id": 118840,
+        "id": 119819,
         "username": "B259",
         "display_name": "鄧文誠",
         "event_type": "LOGIN",
@@ -8218,7 +8248,7 @@
         "created_at": "2026-05-27 08:58:23"
       },
       {
-        "id": 118841,
+        "id": 119820,
         "username": "B228",
         "display_name": "溫翠茹",
         "event_type": "PERMISSION_DENIED",
@@ -8233,7 +8263,7 @@
         "created_at": "2026-05-27 08:57:13"
       },
       {
-        "id": 118842,
+        "id": 119821,
         "username": "B228",
         "display_name": "溫翠茹",
         "event_type": "LOGIN",
@@ -8248,7 +8278,7 @@
         "created_at": "2026-05-27 08:57:10"
       },
       {
-        "id": 118843,
+        "id": 119822,
         "username": "B228",
         "display_name": "黃承淮",
         "event_type": "LOGIN",
@@ -8263,7 +8293,7 @@
         "created_at": "2026-05-27 08:57:04"
       },
       {
-        "id": 118844,
+        "id": 119823,
         "username": "B246",
         "display_name": "湯詠棋",
         "event_type": "LOGOUT",
@@ -8278,7 +8308,7 @@
         "created_at": "2026-05-27 08:57:04"
       },
       {
-        "id": 118845,
+        "id": 119824,
         "username": "B210",
         "display_name": "黃承淮",
         "event_type": "LOGOUT",
@@ -8293,7 +8323,7 @@
         "created_at": "2026-05-27 08:56:54"
       },
       {
-        "id": 118846,
+        "id": 119825,
         "username": "B210",
         "display_name": "黃承淮",
         "event_type": "PERMISSION_DENIED",
@@ -8308,7 +8338,7 @@
         "created_at": "2026-05-27 08:56:48"
       },
       {
-        "id": 118847,
+        "id": 119826,
         "username": "B210",
         "display_name": "黃承淮",
         "event_type": "PERMISSION_DENIED",
@@ -8323,7 +8353,7 @@
         "created_at": "2026-05-27 08:56:47"
       },
       {
-        "id": 118848,
+        "id": 119827,
         "username": "B210",
         "display_name": "黃承淮",
         "event_type": "PERMISSION_DENIED",
@@ -8338,7 +8368,7 @@
         "created_at": "2026-05-27 08:56:45"
       },
       {
-        "id": 118849,
+        "id": 119828,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "POST_RECORD_LOGOUT",
@@ -8353,7 +8383,7 @@
         "created_at": "2026-05-27 08:56:43"
       },
       {
-        "id": 118850,
+        "id": 119829,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "PERMISSION_DENIED",
@@ -8368,7 +8398,7 @@
         "created_at": "2026-05-27 08:56:36"
       },
       {
-        "id": 118851,
+        "id": 119830,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "PERMISSION_DENIED",
@@ -8383,7 +8413,7 @@
         "created_at": "2026-05-27 08:56:34"
       },
       {
-        "id": 118852,
+        "id": 119831,
         "username": "B246",
         "display_name": "湯詠棋",
         "event_type": "PASSWORD_CHANGE",
@@ -8398,7 +8428,7 @@
         "created_at": "2026-05-27 08:54:54"
       },
       {
-        "id": 118853,
+        "id": 119832,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "PASSWORD_CHANGE",
@@ -8413,7 +8443,7 @@
         "created_at": "2026-05-27 08:54:37"
       },
       {
-        "id": 118854,
+        "id": 119833,
         "username": "B246",
         "display_name": "湯詠棋",
         "event_type": "LOGIN",
@@ -8428,7 +8458,7 @@
         "created_at": "2026-05-27 08:54:33"
       },
       {
-        "id": 118855,
+        "id": 119834,
         "username": "B210",
         "display_name": "黃承淮",
         "event_type": "PASSWORD_CHANGE",
@@ -8443,7 +8473,7 @@
         "created_at": "2026-05-27 08:54:31"
       },
       {
-        "id": 118856,
+        "id": 119835,
         "username": "B210",
         "display_name": "黃承淮",
         "event_type": "LOGIN",
@@ -8458,7 +8488,7 @@
         "created_at": "2026-05-27 08:54:16"
       },
       {
-        "id": 118857,
+        "id": 119836,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "LOGIN",
@@ -8473,7 +8503,7 @@
         "created_at": "2026-05-27 08:54:15"
       },
       {
-        "id": 118858,
+        "id": 119837,
         "username": "B210",
         "display_name": "鄭智鍵",
         "event_type": "LOGIN",
@@ -8488,7 +8518,7 @@
         "created_at": "2026-05-27 08:54:11"
       },
       {
-        "id": 118859,
+        "id": 119838,
         "username": "B210",
         "display_name": "鄭智鍵",
         "event_type": "LOGIN",
@@ -8503,7 +8533,7 @@
         "created_at": "2026-05-27 08:54:08"
       },
       {
-        "id": 118860,
+        "id": 119839,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "LOGIN",
@@ -8518,7 +8548,7 @@
         "created_at": "2026-05-27 08:54:07"
       },
       {
-        "id": 118861,
+        "id": 119840,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "LOGIN",
@@ -8533,7 +8563,7 @@
         "created_at": "2026-05-27 08:54:05"
       },
       {
-        "id": 118862,
+        "id": 119841,
         "username": "B210",
         "display_name": "鄭智鍵",
         "event_type": "LOGIN",
@@ -8548,7 +8578,7 @@
         "created_at": "2026-05-27 08:54:04"
       },
       {
-        "id": 118863,
+        "id": 119842,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "LOGIN",
@@ -8563,7 +8593,7 @@
         "created_at": "2026-05-27 08:54:03"
       },
       {
-        "id": 118864,
+        "id": 119843,
         "username": "SPT151",
         "display_name": "鄭智鍵",
         "event_type": "LOGOUT",
@@ -8578,7 +8608,7 @@
         "created_at": "2026-05-27 08:53:51"
       },
       {
-        "id": 118865,
+        "id": 119844,
         "username": "SPT151",
         "display_name": "鄭智鍵",
         "event_type": "LOGOUT",
@@ -8593,7 +8623,7 @@
         "created_at": "2026-05-27 08:53:50"
       },
       {
-        "id": 118866,
+        "id": 119845,
         "username": "B245",
         "display_name": "張維宏",
         "event_type": "LOGIN",
@@ -8608,7 +8638,7 @@
         "created_at": "2026-05-27 08:53:44"
       },
       {
-        "id": 118867,
+        "id": 119846,
         "username": "B244",
         "display_name": "范耀文",
         "event_type": "LOGOUT",
@@ -8623,7 +8653,7 @@
         "created_at": "2026-05-27 08:53:27"
       },
       {
-        "id": 118868,
+        "id": 119847,
         "username": "B244",
         "display_name": "范耀文",
         "event_type": "LOGIN",
@@ -8638,7 +8668,7 @@
         "created_at": "2026-05-27 08:51:52"
       },
       {
-        "id": 118869,
+        "id": 119848,
         "username": "SPT151",
         "display_name": "鄭智鍵",
         "event_type": "LOGIN",
@@ -8653,7 +8683,7 @@
         "created_at": "2026-05-27 08:50:07"
       },
       {
-        "id": 118870,
+        "id": 119849,
         "username": "SPT151",
         "display_name": "鄭智鍵",
         "event_type": "LOGOUT",
@@ -8668,7 +8698,7 @@
         "created_at": "2026-05-27 08:49:32"
       },
       {
-        "id": 118871,
+        "id": 119850,
         "username": "SPT151",
         "display_name": "鄭智鍵",
         "event_type": "LOGIN",
@@ -8683,7 +8713,7 @@
         "created_at": "2026-05-27 08:49:25"
       },
       {
-        "id": 118872,
+        "id": 119851,
         "username": "SPT151",
         "display_name": "溫翠茹",
         "event_type": "LOGIN",
@@ -8698,7 +8728,7 @@
         "created_at": "2026-05-27 08:49:15"
       },
       {
-        "id": 118873,
+        "id": 119852,
         "username": "SPT151",
         "display_name": "溫翠茹",
         "event_type": "LOGIN",
@@ -8713,7 +8743,7 @@
         "created_at": "2026-05-27 08:49:09"
       },
       {
-        "id": 118874,
+        "id": 119853,
         "username": "SPT151",
         "display_name": "溫翠茹",
         "event_type": "LOGIN",
@@ -8728,7 +8758,7 @@
         "created_at": "2026-05-27 08:49:06"
       },
       {
-        "id": 118875,
+        "id": 119854,
         "username": "SPT151",
         "display_name": "溫翠茹",
         "event_type": "LOGIN",
@@ -8743,7 +8773,7 @@
         "created_at": "2026-05-27 08:48:48"
       },
       {
-        "id": 118876,
+        "id": 119855,
         "username": "SPT151",
         "display_name": "溫翠茹",
         "event_type": "LOGIN",
@@ -8758,7 +8788,7 @@
         "created_at": "2026-05-27 08:48:46"
       },
       {
-        "id": 118877,
+        "id": 119856,
         "username": "SPT151",
         "display_name": "溫翠茹",
         "event_type": "LOGIN",
@@ -8773,7 +8803,7 @@
         "created_at": "2026-05-27 08:48:42"
       },
       {
-        "id": 118878,
+        "id": 119857,
         "username": "B228",
         "display_name": "溫翠茹",
         "event_type": "LOGOUT",
@@ -8788,7 +8818,7 @@
         "created_at": "2026-05-27 08:48:00"
       },
       {
-        "id": 118879,
+        "id": 119858,
         "username": "B228",
         "display_name": "溫翠茹",
         "event_type": "LOGIN",
@@ -8803,7 +8833,7 @@
         "created_at": "2026-05-27 08:47:48"
       },
       {
-        "id": 118880,
+        "id": 119859,
         "username": "B228",
         "display_name": "溫翠茹",
         "event_type": "LOGOUT",
@@ -8818,7 +8848,7 @@
         "created_at": "2026-05-27 08:47:39"
       },
       {
-        "id": 118881,
+        "id": 119860,
         "username": "B228",
         "display_name": "溫翠茹",
         "event_type": "PASSWORD_CHANGE",
@@ -8833,7 +8863,7 @@
         "created_at": "2026-05-27 08:47:21"
       },
       {
-        "id": 118882,
+        "id": 119861,
         "username": "B228",
         "display_name": "溫翠茹",
         "event_type": "LOGIN",
@@ -8848,7 +8878,7 @@
         "created_at": "2026-05-27 08:47:05"
       },
       {
-        "id": 118883,
+        "id": 119862,
         "username": "B228",
         "display_name": "溫翠茹",
         "event_type": "LOGIN",
@@ -8863,7 +8893,7 @@
         "created_at": "2026-05-27 08:46:52"
       },
       {
-        "id": 118884,
+        "id": 119863,
         "username": "SPT151",
         "display_name": "鄭智鍵",
         "event_type": "LOGIN",
@@ -8878,7 +8908,7 @@
         "created_at": "2026-05-27 08:46:38"
       },
       {
-        "id": 118885,
+        "id": 119864,
         "username": "SPT151",
         "display_name": "鄭智鍵",
         "event_type": "LOGIN",
@@ -8893,7 +8923,7 @@
         "created_at": "2026-05-27 08:46:33"
       },
       {
-        "id": 118886,
+        "id": 119865,
         "username": "SPT151",
         "display_name": "鄭智鍵",
         "event_type": "LOGIN",
@@ -8908,7 +8938,7 @@
         "created_at": "2026-05-27 08:46:30"
       },
       {
-        "id": 118887,
+        "id": 119866,
         "username": "SPT151",
         "display_name": "鄭智鍵",
         "event_type": "LOGIN",
@@ -8923,7 +8953,7 @@
         "created_at": "2026-05-27 08:46:00"
       },
       {
-        "id": 118888,
+        "id": 119867,
         "username": "B190",
         "display_name": "黃瑞翎",
         "event_type": "PASSWORD_CHANGE",
@@ -8938,7 +8968,7 @@
         "created_at": "2026-05-27 08:41:23"
       },
       {
-        "id": 118889,
+        "id": 119868,
         "username": "B190",
         "display_name": "黃瑞翎",
         "event_type": "LOGIN",
@@ -8953,7 +8983,7 @@
         "created_at": "2026-05-27 08:41:00"
       },
       {
-        "id": 118890,
+        "id": 119869,
         "username": "B246",
         "display_name": "湯詠棋",
         "event_type": "LOGOUT",
@@ -8968,7 +8998,7 @@
         "created_at": "2026-05-27 08:38:10"
       },
       {
-        "id": 118891,
+        "id": 119870,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "LOGIN",
@@ -8983,7 +9013,7 @@
         "created_at": "2026-05-27 08:37:41"
       },
       {
-        "id": 118892,
+        "id": 119871,
         "username": "B249",
         "display_name": "劉翰霖",
         "event_type": "LOGIN",
@@ -8998,7 +9028,7 @@
         "created_at": "2026-05-27 08:37:40"
       },
       {
-        "id": 118893,
+        "id": 119872,
         "username": "B126",
         "display_name": "戴鎰祥",
         "event_type": "LOGIN",
@@ -9013,7 +9043,7 @@
         "created_at": "2026-05-27 08:37:33"
       },
       {
-        "id": 118894,
+        "id": 119873,
         "username": "B251",
         "display_name": "胡昌叡",
         "event_type": "LOGOUT",
@@ -9028,7 +9058,7 @@
         "created_at": "2026-05-27 08:37:30"
       },
       {
-        "id": 118895,
+        "id": 119874,
         "username": "B189",
         "display_name": "羅文發",
         "event_type": "POST_RECORD_LOGOUT",
@@ -9043,7 +9073,7 @@
         "created_at": "2026-05-27 08:37:17"
       },
       {
-        "id": 118896,
+        "id": 119875,
         "username": "B164",
         "display_name": "B164",
         "event_type": "LOGIN",
@@ -9058,7 +9088,7 @@
         "created_at": "2026-05-27 08:37:14"
       },
       {
-        "id": 118897,
+        "id": 119876,
         "username": "B252",
         "display_name": "吳家穎",
         "event_type": "POST_RECORD_LOGOUT",
@@ -9073,7 +9103,7 @@
         "created_at": "2026-05-27 08:37:03"
       },
       {
-        "id": 118898,
+        "id": 119877,
         "username": "B252",
         "display_name": "吳家穎",
         "event_type": "PASSWORD_CHANGE",
@@ -9088,7 +9118,7 @@
         "created_at": "2026-05-27 08:36:39"
       },
       {
-        "id": 118899,
+        "id": 119878,
         "username": "B252",
         "display_name": "吳家穎",
         "event_type": "LOGIN",
@@ -9103,7 +9133,7 @@
         "created_at": "2026-05-27 08:36:28"
       },
       {
-        "id": 118900,
+        "id": 119879,
         "username": "B252",
         "display_name": "劉順榮",
         "event_type": "LOGIN",
@@ -9118,7 +9148,7 @@
         "created_at": "2026-05-27 08:36:21"
       },
       {
-        "id": 118901,
+        "id": 119880,
         "username": "B250",
         "display_name": "劉順榮",
         "event_type": "POST_RECORD_LOGOUT",
@@ -9133,7 +9163,7 @@
         "created_at": "2026-05-27 08:36:10"
       },
       {
-        "id": 118902,
+        "id": 119881,
         "username": "B250",
         "display_name": "劉順榮",
         "event_type": "PASSWORD_CHANGE",
@@ -9148,7 +9178,7 @@
         "created_at": "2026-05-27 08:35:44"
       },
       {
-        "id": 118903,
+        "id": 119882,
         "username": "B250",
         "display_name": "劉順榮",
         "event_type": "LOGIN",
@@ -9163,7 +9193,7 @@
         "created_at": "2026-05-27 08:35:33"
       },
       {
-        "id": 118904,
+        "id": 119883,
         "username": "B246",
         "display_name": "湯詠棋",
         "event_type": "LOGIN",
@@ -9178,7 +9208,7 @@
         "created_at": "2026-05-27 08:35:30"
       },
       {
-        "id": 118905,
+        "id": 119884,
         "username": "B250",
         "display_name": "劉翰霖",
         "event_type": "LOGIN",
@@ -9193,7 +9223,7 @@
         "created_at": "2026-05-27 08:35:24"
       },
       {
-        "id": 118906,
+        "id": 119885,
         "username": "B255",
         "display_name": "郭建佑",
         "event_type": "LOGOUT",
@@ -9208,7 +9238,7 @@
         "created_at": "2026-05-27 08:35:19"
       },
       {
-        "id": 118907,
+        "id": 119886,
         "username": "B255",
         "display_name": "郭建佑",
         "event_type": "LOGOUT",
@@ -9223,7 +9253,7 @@
         "created_at": "2026-05-27 08:35:17"
       },
       {
-        "id": 118908,
+        "id": 119887,
         "username": "B249",
         "display_name": "劉翰霖",
         "event_type": "POST_RECORD_LOGOUT",
@@ -9238,7 +9268,7 @@
         "created_at": "2026-05-27 08:35:14"
       },
       {
-        "id": 118909,
+        "id": 119888,
         "username": "B249",
         "display_name": "劉翰霖",
         "event_type": "LOGIN",
@@ -9253,7 +9283,7 @@
         "created_at": "2026-05-27 08:34:51"
       },
       {
-        "id": 118910,
+        "id": 119889,
         "username": "B255",
         "display_name": "郭建佑",
         "event_type": "LOGIN",
@@ -9268,7 +9298,7 @@
         "created_at": "2026-05-27 08:34:42"
       },
       {
-        "id": 118911,
+        "id": 119890,
         "username": "B251",
         "display_name": "胡昌叡",
         "event_type": "LOGOUT",
@@ -9283,7 +9313,7 @@
         "created_at": "2026-05-27 08:34:40"
       },
       {
-        "id": 118912,
+        "id": 119891,
         "username": "B259",
         "display_name": "鄧文誠",
         "event_type": "LOGOUT",
@@ -9298,7 +9328,7 @@
         "created_at": "2026-05-27 08:34:08"
       },
       {
-        "id": 118913,
+        "id": 119892,
         "username": "B259",
         "display_name": "鄧文誠",
         "event_type": "LOGIN",
@@ -9313,7 +9343,7 @@
         "created_at": "2026-05-27 08:33:49"
       },
       {
-        "id": 118914,
+        "id": 119893,
         "username": "B251",
         "display_name": "胡昌叡",
         "event_type": "LOGIN",
@@ -9328,7 +9358,7 @@
         "created_at": "2026-05-27 08:33:41"
       },
       {
-        "id": 118915,
+        "id": 119894,
         "username": "B251",
         "display_name": "胡昌叡",
         "event_type": "LOGIN",
@@ -9343,7 +9373,7 @@
         "created_at": "2026-05-27 08:33:32"
       },
       {
-        "id": 118916,
+        "id": 119895,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "LOGOUT",
@@ -9358,7 +9388,7 @@
         "created_at": "2026-05-27 08:33:30"
       },
       {
-        "id": 118917,
+        "id": 119896,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "PERMISSION_DENIED",
@@ -9373,7 +9403,7 @@
         "created_at": "2026-05-27 08:33:17"
       },
       {
-        "id": 118918,
+        "id": 119897,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "PERMISSION_DENIED",
@@ -9388,7 +9418,7 @@
         "created_at": "2026-05-27 08:33:17"
       },
       {
-        "id": 118919,
+        "id": 119898,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "PERMISSION_DENIED",
@@ -9403,7 +9433,7 @@
         "created_at": "2026-05-27 08:33:06"
       },
       {
-        "id": 118920,
+        "id": 119899,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "LOGIN",
@@ -9418,7 +9448,7 @@
         "created_at": "2026-05-27 08:32:30"
       },
       {
-        "id": 118921,
+        "id": 119900,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "LOGIN",
@@ -9433,7 +9463,7 @@
         "created_at": "2026-05-27 08:32:23"
       },
       {
-        "id": 118922,
+        "id": 119901,
         "username": "B247",
         "display_name": "劉家瑋",
         "event_type": "LOGIN",
@@ -9448,7 +9478,7 @@
         "created_at": "2026-05-27 08:32:16"
       },
       {
-        "id": 118923,
+        "id": 119902,
         "username": "B168",
         "display_name": "洪敏強",
         "event_type": "LOGIN",
@@ -9463,7 +9493,7 @@
         "created_at": "2026-05-27 08:31:27"
       },
       {
-        "id": 118924,
+        "id": 119903,
         "username": "b168",
         "display_name": "趙健浩",
         "event_type": "LOGIN",
@@ -9478,7 +9508,7 @@
         "created_at": "2026-05-27 08:31:04"
       },
       {
-        "id": 118925,
+        "id": 119904,
         "username": "b168",
         "display_name": "趙健浩",
         "event_type": "LOGIN",
@@ -9493,7 +9523,7 @@
         "created_at": "2026-05-27 08:30:54"
       },
       {
-        "id": 118926,
+        "id": 119905,
         "username": "b168",
         "display_name": "趙健浩",
         "event_type": "LOGIN",
@@ -9508,7 +9538,7 @@
         "created_at": "2026-05-27 08:30:45"
       },
       {
-        "id": 118927,
+        "id": 119906,
         "username": "b168",
         "display_name": "趙健浩",
         "event_type": "LOGIN",
@@ -9523,7 +9553,7 @@
         "created_at": "2026-05-27 08:30:34"
       },
       {
-        "id": 118928,
+        "id": 119907,
         "username": "b168",
         "display_name": "趙健浩",
         "event_type": "LOGIN",
@@ -9538,7 +9568,7 @@
         "created_at": "2026-05-27 08:30:32"
       },
       {
-        "id": 118929,
+        "id": 119908,
         "username": "B155",
         "display_name": "趙健浩",
         "event_type": "PERMISSION_DENIED",
@@ -9553,7 +9583,7 @@
         "created_at": "2026-05-27 08:29:43"
       },
       {
-        "id": 118930,
+        "id": 119909,
         "username": "B155",
         "display_name": "趙健浩",
         "event_type": "PERMISSION_DENIED",
@@ -9568,7 +9598,7 @@
         "created_at": "2026-05-27 08:29:39"
       },
       {
-        "id": 118931,
+        "id": 119910,
         "username": "B155",
         "display_name": "趙健浩",
         "event_type": "PERMISSION_DENIED",
@@ -9583,7 +9613,7 @@
         "created_at": "2026-05-27 08:29:36"
       },
       {
-        "id": 118932,
+        "id": 119911,
         "username": "B155",
         "display_name": "趙健浩",
         "event_type": "PERMISSION_DENIED",
@@ -9598,7 +9628,7 @@
         "created_at": "2026-05-27 08:29:33"
       },
       {
-        "id": 118933,
+        "id": 119912,
         "username": "B155",
         "display_name": "趙健浩",
         "event_type": "PERMISSION_DENIED",
@@ -9613,7 +9643,7 @@
         "created_at": "2026-05-27 08:29:22"
       },
       {
-        "id": 118934,
+        "id": 119913,
         "username": "B155",
         "display_name": "趙健浩",
         "event_type": "PERMISSION_DENIED",
@@ -9628,7 +9658,7 @@
         "created_at": "2026-05-27 08:29:19"
       },
       {
-        "id": 118935,
+        "id": 119914,
         "username": "B155",
         "display_name": "趙健浩",
         "event_type": "PERMISSION_DENIED",
@@ -9643,7 +9673,7 @@
         "created_at": "2026-05-27 08:29:16"
       },
       {
-        "id": 118936,
+        "id": 119915,
         "username": "B155",
         "display_name": "趙健浩",
         "event_type": "PERMISSION_DENIED",
@@ -9658,7 +9688,7 @@
         "created_at": "2026-05-27 08:29:12"
       },
       {
-        "id": 118937,
+        "id": 119916,
         "username": "B155",
         "display_name": "趙健浩",
         "event_type": "PERMISSION_DENIED",
@@ -9673,7 +9703,7 @@
         "created_at": "2026-05-27 08:29:09"
       },
       {
-        "id": 118938,
+        "id": 119917,
         "username": "B155",
         "display_name": "趙健浩",
         "event_type": "LOGIN",
@@ -9688,7 +9718,7 @@
         "created_at": "2026-05-27 08:28:37"
       },
       {
-        "id": 118939,
+        "id": 119918,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGIN",
@@ -9703,7 +9733,7 @@
         "created_at": "2026-05-26 23:23:49"
       },
       {
-        "id": 118940,
+        "id": 119919,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGIN",
@@ -9718,7 +9748,7 @@
         "created_at": "2026-05-26 23:23:49"
       },
       {
-        "id": 118941,
+        "id": 119920,
         "username": "admin",
         "display_name": "系統管理員",
         "event_type": "LOGIN",
@@ -16073,6 +16103,17 @@
         "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 25 筆，同步後 34 筆。",
         "detail": "",
         "level": "WARN"
+      },
+      {
+        "id": 5070,
+        "log_time": "2026-05-27 14:30:01",
+        "user_name": "SPT199",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 24 筆，同步後 34 筆。",
+        "detail": "",
+        "level": "WARN"
       }
     ],
     "system_settings": [
@@ -17092,7 +17133,7 @@
       {
         "id": 132,
         "record_key": "SPT199|26M0051-02|收機|2026-05-27 09:34:11|12c9619c",
-        "status": "作業中",
+        "status": "暫停",
         "work_order": "26M0051-02",
         "part_no": "PSRSC151-SB4L-05",
         "type_name": "RSC151-SB4L+Argus",
@@ -17101,20 +17142,20 @@
         "employee_name": "龍斯愷",
         "start_action": "開始",
         "start_timestamp": "2026-05-27 09:34:11",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": "",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-27 14:30:02",
+        "remark": "系統自動暫停：同一人員切換不同工段或不同日期作業",
         "start_date": "2026-05-27",
         "start_time": "09:34:11",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
+        "end_date": "2026-05-27",
+        "end_time": "14:30:02",
+        "work_hours": 3.68,
         "assembly_location": "竹東",
         "group_key": "SPT199|收機|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 09:34:11",
-        "updated_at": "2026-05-27 09:34:11"
+        "updated_at": "2026-05-27 14:30:02"
       },
       {
         "id": 136,
