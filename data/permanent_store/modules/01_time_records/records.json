@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 14:54:01",
-  "exported_at": "2026-05-27 14:54:01",
-  "reason": "today_records_v134_display_self_repair_01",
+  "updated_at": "2026-05-27 14:54:08",
+  "exported_at": "2026-05-27 14:54:08",
+  "reason": "start_work_v134_sqlite_to_0102_canonical_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1060,11 +1060,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 14:53:59",
         "updated_at": "2026-05-27 14:53:59"
+      },
+      {
+        "id": 209,
+        "record_key": "SPT158|26M0021-02|包機|2026-05-27 14:54:08|70017aa1",
+        "status": "作業中",
+        "work_order": "26M0021-02",
+        "part_no": "1GRSC150-003-04",
+        "type_name": "4 Port Frame Long-type EFEM",
+        "process_name": "包機",
+        "employee_id": "SPT158",
+        "employee_name": "劉定澤",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 14:54:08",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "14:54:08",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT158|包機|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 14:54:08",
+        "updated_at": "2026-05-27 14:54:08"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 39
+    "time_records": 40
   }
 }
