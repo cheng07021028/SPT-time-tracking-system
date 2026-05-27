@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 09:39:12",
-  "exported_at": "2026-05-27 09:39:12",
-  "reason": "today_records_v134_display_self_repair_01",
+  "updated_at": "2026-05-27 09:39:16",
+  "exported_at": "2026-05-27 09:39:16",
+  "reason": "start_work_v134_sqlite_to_0102_canonical_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -466,11 +466,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 09:38:29",
         "updated_at": "2026-05-27 09:38:29"
+      },
+      {
+        "id": 139,
+        "record_key": "SPT243|26N4001-03|模組|2026-05-27 09:39:15|8c9ecfb1",
+        "status": "作業中",
+        "work_order": "26N4001-03",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "模組",
+        "employee_id": "SPT243",
+        "employee_name": "羅丹",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 09:39:15",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "09:39:15",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT243|模組|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 09:39:15",
+        "updated_at": "2026-05-27 09:39:15"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 17
+    "time_records": 18
   }
 }
