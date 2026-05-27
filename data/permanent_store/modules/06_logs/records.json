@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 10:45:03",
-  "exported_at": "2026-05-27 10:45:03",
+  "updated_at": "2026-05-27 10:46:34",
+  "exported_at": "2026-05-27 10:46:34",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -11107,11 +11107,59 @@
         "detail": "",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 2892,
+        "log_time": "2026-05-27 10:46:09",
+        "user_name": "SPT236",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 17 筆，同步後 19 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 2893,
+        "log_time": "2026-05-27 10:46:13",
+        "user_name": "SPT236",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 17 筆，同步後 19 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 2894,
+        "log_time": "2026-05-27 10:46:16",
+        "user_name": "SPT236",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V89 權威檔優先：已儲存/更新歷史紀錄 5 筆，並同步 01/02 canonical。",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2912,
+        "log_time": "2026-05-27 10:46:34",
+        "user_name": "SPT236",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 17 筆，同步後 19 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 925
+    "system_logs": 929
   }
 }
