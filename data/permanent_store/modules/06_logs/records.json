@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 09:11:53",
-  "exported_at": "2026-05-27 09:11:53",
+  "updated_at": "2026-05-27 09:11:56",
+  "exported_at": "2026-05-27 09:11:56",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -1507,11 +1507,47 @@
         "detail": "",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 774,
+        "log_time": "2026-05-27 09:11:54",
+        "user_name": "SPT148",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 10 筆，同步後 16 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 776,
+        "log_time": "2026-05-27 09:11:56",
+        "user_name": "B227",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "93",
+        "message": "潘信成 開始 26M0051-10 / 骨架組立",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 775,
+        "log_time": "2026-05-27 09:11:56",
+        "user_name": "B227",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 125
+    "system_logs": 128
   }
 }
