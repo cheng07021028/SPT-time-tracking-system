@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 22:23:38",
-  "exported_at": "2026-05-27 22:23:38",
-  "reason": "v122_delete_system_logs_tombstone",
+  "updated_at": "2026-05-27 22:23:39",
+  "exported_at": "2026-05-27 22:23:39",
+  "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
     "system_logs": [
@@ -19,11 +19,23 @@
         "detail": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
         "level": "INFO",
         "source": "authority"
+      },
+      {
+        "id": 8217,
+        "log_time": "2026-05-27 22:23:39",
+        "user_name": "admin",
+        "action_type": "DELETE_LOG_RANGE",
+        "target_table": "system_logs",
+        "target_id": "2026-05-20~2026-05-27",
+        "message": "刪除 LOG 日期區間：2026-05-20 ~ 2026-05-27，刪除筆數：537",
+        "detail": "deleted_count=537;authority=06_logs.records.json;tombstone=delete_state.json",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1
+    "system_logs": 2
   }
 }
