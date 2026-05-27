@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 13:17:22",
-  "exported_at": "2026-05-27 13:17:22",
+  "updated_at": "2026-05-27 13:17:34",
+  "exported_at": "2026-05-27 13:17:34",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -15847,11 +15847,23 @@
         "detail": "",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 3957,
+        "log_time": "2026-05-27 13:17:34",
+        "user_name": "SPT059",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 20 筆，同步後 29 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1320
+    "system_logs": 1321
   }
 }
