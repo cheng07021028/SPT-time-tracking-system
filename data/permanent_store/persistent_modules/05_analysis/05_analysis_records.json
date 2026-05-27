@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 09:20:06",
+  "exported_at": "2026-05-27 09:23:13",
   "source": "db_service_write",
   "module_key": "05_analysis",
   "module_code": "05",
@@ -925,13 +925,40 @@
         "source": "streamlit",
         "created_at": "2026-05-27 09:16:53",
         "updated_at": "2026-05-27 09:16:53"
+      },
+      {
+        "id": 114,
+        "record_key": "B250|26M0051-02|配電|2026-05-27 09:22:44|fcbd3b6f",
+        "status": "暫停",
+        "work_order": "26M0051-02",
+        "part_no": "PSRSC151-SB4L-05",
+        "type_name": "RSC151-SB4L+Argus",
+        "process_name": "配電",
+        "employee_id": "B250",
+        "employee_name": "劉順榮",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 09:22:44",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-27 09:23:10",
+        "remark": null,
+        "start_date": "2026-05-27",
+        "start_time": "09:22:44",
+        "end_date": "2026-05-27",
+        "end_time": "09:23:10",
+        "work_hours": 0.01,
+        "assembly_location": "竹東",
+        "group_key": "B250|配電|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 09:22:44",
+        "updated_at": "2026-05-27 09:23:10"
       }
     ],
     "work_orders": [],
     "employees": []
   },
   "table_counts": {
-    "time_records": 34,
+    "time_records": 35,
     "work_orders": 0,
     "employees": 0
   }
