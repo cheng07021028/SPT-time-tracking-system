@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 13:49:26",
-  "exported_at": "2026-05-27 13:49:26",
+  "updated_at": "2026-05-27 13:50:35",
+  "exported_at": "2026-05-27 13:50:35",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -17707,11 +17707,131 @@
         "detail": "",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 4423,
+        "log_time": "2026-05-27 13:49:28",
+        "user_name": "SPT142",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 30 筆，同步後 37 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 4424,
+        "log_time": "2026-05-27 13:49:36",
+        "user_name": "SPT142",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 30 筆，同步後 37 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 4427,
+        "log_time": "2026-05-27 13:49:38",
+        "user_name": "SPT142",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "188",
+        "message": "黃沂澂 開始 22M0099-30 / 前置鈑金",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4426,
+        "log_time": "2026-05-27 13:49:38",
+        "user_name": "SPT142",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4425,
+        "log_time": "2026-05-27 13:49:38",
+        "user_name": "SPT142",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4428,
+        "log_time": "2026-05-27 13:49:38",
+        "user_name": "SPT142",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "188",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 1 筆，同步後 38 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 4429,
+        "log_time": "2026-05-27 13:49:40",
+        "user_name": "SPT142",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 31 筆，同步後 38 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 4430,
+        "log_time": "2026-05-27 13:49:48",
+        "user_name": "SPT172",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 31 筆，同步後 38 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 4432,
+        "log_time": "2026-05-27 13:50:35",
+        "user_name": "SPT142",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "181",
+        "message": "V96 結束工時紀錄 #181，同步結束=1筆，狀態=暫停",
+        "detail": "181",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4431,
+        "log_time": "2026-05-27 13:50:35",
+        "user_name": "SPT142",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1475
+    "system_logs": 1485
   }
 }
