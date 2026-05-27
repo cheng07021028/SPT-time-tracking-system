@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 10:38:37",
-  "exported_at": "2026-05-27 10:38:37",
-  "reason": "today_records_v134_display_self_repair_02",
+  "updated_at": "2026-05-27 10:38:50",
+  "exported_at": "2026-05-27 10:38:50",
+  "reason": "start_work_v134_sqlite_to_0102_canonical_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -520,11 +520,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 10:38:29",
         "updated_at": "2026-05-27 10:38:29"
+      },
+      {
+        "id": 155,
+        "record_key": "SPT203|25M0785-02|配電|2026-05-27 10:38:49|4dfabc6f",
+        "status": "作業中",
+        "work_order": "25M0785-02",
+        "part_no": "PSRSC131-N01-04",
+        "type_name": "PSRSC131-N01",
+        "process_name": "配電",
+        "employee_id": "SPT203",
+        "employee_name": "徐梓翔",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 10:38:49",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "10:38:49",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT203|配電|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 10:38:49",
+        "updated_at": "2026-05-27 10:38:49"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 19
+    "time_records": 20
   }
 }
