@@ -2,14 +2,14 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 17:35:40",
-  "exported_at": "2026-05-27 17:35:40",
+  "updated_at": "2026-05-27 17:35:42",
+  "exported_at": "2026-05-27 17:35:42",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
       {
-        "id": 172117,
+        "id": 172118,
         "source": "v103_merge",
         "username": "SPT149",
         "display_name": "江金福",
@@ -17,12 +17,12 @@
         "result": "FAIL",
         "message": "05_analysis:can_view; employee_id=SPT149; roles=operator",
         "module_code": "05_analysis",
-        "login_time": "2026-05-27 17:35:39",
+        "login_time": "2026-05-27 17:35:40",
         "logout_time": "",
         "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
-        "created_at": "2026-05-27 17:35:39"
+        "created_at": "2026-05-27 17:35:40"
       },
       {
         "id": 171922,
