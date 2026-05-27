@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 14:57:48",
-  "exported_at": "2026-05-27 14:57:48",
+  "updated_at": "2026-05-27 14:58:27",
+  "exported_at": "2026-05-27 14:58:27",
   "reason": "today_records_v134_display_self_repair_02",
   "empty_authoritative": false,
   "tables": {
@@ -1114,11 +1114,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 14:57:34",
         "updated_at": "2026-05-27 14:57:34"
+      },
+      {
+        "id": 213,
+        "record_key": "SPT063|26M0051-02|收機|2026-05-27 14:57:52|66f268e2",
+        "status": "作業中",
+        "work_order": "26M0051-02",
+        "part_no": "PSRSC151-SB4L-05",
+        "type_name": "RSC151-SB4L+Argus",
+        "process_name": "收機",
+        "employee_id": "SPT063",
+        "employee_name": "劉志偉",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 14:57:52",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "14:57:52",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT063|收機|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 14:57:52",
+        "updated_at": "2026-05-27 14:57:52"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 41
+    "time_records": 42
   }
 }
