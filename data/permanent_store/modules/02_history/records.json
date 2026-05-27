@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 16:01:15",
-  "exported_at": "2026-05-27 16:01:15",
-  "reason": "start_work_v137_identity_safe_upsert_02",
+  "updated_at": "2026-05-27 16:01:31",
+  "exported_at": "2026-05-27 16:01:31",
+  "reason": "start_work_v134_sqlite_to_0102_canonical_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -659,7 +659,7 @@
       {
         "id": 168,
         "record_key": "B211|26M0021-03|骨架組立|2026-05-27 11:28:08|1a0dde70",
-        "status": "作業中",
+        "status": "下班",
         "work_order": "26M0021-03",
         "part_no": "1GRSC150-003-04",
         "type_name": "4 Port Frame Long-type EFEM",
@@ -668,20 +668,20 @@
         "employee_name": "張瑀榛",
         "start_action": "開始",
         "start_timestamp": "2026-05-27 11:28:08",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "下班",
+        "end_timestamp": "2026-05-27 16:01:30",
         "remark": "",
         "start_date": "2026-05-27",
         "start_time": "11:28:08",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-27",
+        "end_time": "16:01:30",
+        "work_hours": 3.31,
         "assembly_location": "竹東",
         "group_key": "B211|骨架組立|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 11:28:08",
-        "updated_at": "2026-05-27 11:28:08"
+        "updated_at": "2026-05-27 16:01:30"
       },
       {
         "id": 171,
@@ -1302,7 +1302,7 @@
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-27 16:01:02",
-        "updated_at": "2026-05-27 16:01:14"
+        "updated_at": "2026-05-27 16:01:31"
       },
       {
         "id": 228,
@@ -1329,12 +1329,39 @@
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-27 16:01:14",
-        "updated_at": "2026-05-27 16:01:14"
+        "updated_at": "2026-05-27 16:01:31"
+      },
+      {
+        "id": 229,
+        "record_key": "SPT142|21M0241-03|前置鈑金|2026-05-27 16:01:31|08a9e463",
+        "status": "作業中",
+        "work_order": "21M0241-03",
+        "part_no": "4TRSC020-004-02",
+        "type_name": "NTB 3 PORT",
+        "process_name": "前置鈑金",
+        "employee_id": "SPT142",
+        "employee_name": "黃沂澂",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 16:01:31",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "16:01:31",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT142|前置鈑金|2026-05-27",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-27 16:01:31",
+        "updated_at": "2026-05-27 16:01:31"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 49
+    "time_records": 50
   }
 }
