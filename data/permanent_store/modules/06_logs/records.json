@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 18:10:13",
-  "exported_at": "2026-05-27 18:10:13",
+  "updated_at": "2026-05-27 18:15:01",
+  "exported_at": "2026-05-27 18:15:01",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -31123,11 +31123,95 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 7932,
+        "log_time": "2026-05-27 18:12:55",
+        "user_name": "SPT089",
+        "action_type": "V89_SQLITE_CACHE_SYNC_ERROR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 快取由權威檔覆蓋失敗：UNIQUE constraint failed: time_records.id",
+        "detail": "",
+        "level": "ERROR",
+        "source": "sqlite"
+      },
+      {
+        "id": 7934,
+        "log_time": "2026-05-27 18:13:30",
+        "user_name": "admin",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "245",
+        "message": "SSS 開始 26M0051-03 / 前置鈑金",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7933,
+        "log_time": "2026-05-27 18:13:29",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7935,
+        "log_time": "2026-05-27 18:13:30",
+        "user_name": "admin",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "245",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 1 筆，同步後 59 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 7936,
+        "log_time": "2026-05-27 18:14:58",
+        "user_name": "admin",
+        "action_type": "V89_SQLITE_CACHE_SYNC_ERROR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 快取由權威檔覆蓋失敗：UNIQUE constraint failed: time_records.id",
+        "detail": "",
+        "level": "ERROR",
+        "source": "sqlite"
+      },
+      {
+        "id": 7938,
+        "log_time": "2026-05-27 18:15:01",
+        "user_name": "admin",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_finish_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 1 筆",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7937,
+        "log_time": "2026-05-27 18:15:01",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2593
+    "system_logs": 2600
   }
 }
