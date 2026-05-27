@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 09:09:37",
+  "exported_at": "2026-05-27 09:13:42",
   "source": "db_service_write",
   "module_key": "07_missing_records",
   "module_code": "07",
@@ -872,11 +872,65 @@
         "source": "streamlit",
         "created_at": "2026-05-27 09:09:37",
         "updated_at": "2026-05-27 09:09:37"
+      },
+      {
+        "id": 94,
+        "record_key": "SPT105|26M0051-09|Packing|2026-05-27 09:12:06|38be26ef",
+        "status": "作業中",
+        "work_order": "26M0051-09",
+        "part_no": "PSRSC151-SB4L-05",
+        "type_name": "RSC151-SB4L+Argus",
+        "process_name": "Packing",
+        "employee_id": "SPT105",
+        "employee_name": "劉秀鳳",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 09:12:06",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
+        "start_date": "2026-05-27",
+        "start_time": "09:12:06",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT105|Packing|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 09:12:06",
+        "updated_at": "2026-05-27 09:12:06"
+      },
+      {
+        "id": 96,
+        "record_key": "SPT243|26N4001-03|模組|2026-05-27 09:13:42|fcdb9673",
+        "status": "作業中",
+        "work_order": "26N4001-03",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "模組",
+        "employee_id": "SPT243",
+        "employee_name": "羅丹",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 09:13:42",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "09:13:42",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT243|模組|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 09:13:42",
+        "updated_at": "2026-05-27 09:13:42"
       }
     ]
   },
   "table_counts": {
     "employees": 0,
-    "time_records": 32
+    "time_records": 34
   }
 }
