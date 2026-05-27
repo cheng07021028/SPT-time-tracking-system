@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 09:34:28",
-  "exported_at": "2026-05-27 09:34:28",
+  "updated_at": "2026-05-27 09:34:29",
+  "exported_at": "2026-05-27 09:34:29",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
@@ -17,6 +17,22 @@
         "result": "SUCCESS",
         "message": "role=operator;source=authority; employee_id=B248",
         "module_code": "LOGIN",
+        "login_time": "2026-05-27 09:34:28",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 09:34:28"
+      },
+      {
+        "id": 37769,
+        "source": "v103_merge",
+        "username": "SPT199",
+        "display_name": "龍斯愷",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "03_work_orders:can_view; employee_id=SPT199; roles=operator",
+        "module_code": "03_work_orders",
         "login_time": "2026-05-27 09:34:28",
         "logout_time": "",
         "idle_minutes": NaN,
@@ -4462,7 +4478,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 278,
+    "login_logs": 279,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
