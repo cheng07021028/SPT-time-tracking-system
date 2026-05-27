@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 21:00:41",
+  "exported_at": "2026-05-27 22:02:38",
   "source": "db_service_write",
   "module_key": "08_daily_hours",
   "module_code": "08",
@@ -9,11 +9,18 @@
   "tables": {
     "table_column_settings": [],
     "table_sort_settings": [],
-    "table_ui_settings": []
+    "table_ui_settings": [
+      {
+        "table_key": "01.time_records.main",
+        "widths_json": "{\"id\": 60, \"record_key\": 100, \"status\": 100, \"work_order\": 120, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 100, \"remark\": 250, \"start_date\": 140, \"start_time\": 140, \"end_date\": 140, \"end_time\": 140, \"work_hours\": 140, \"assembly_location\": 140, \"group_key\": 60, \"is_group_work\": 100, \"source\": 60, \"created_at\": 60, \"updated_at\": 180}",
+        "order_json": "[]",
+        "updated_at": "2026-05-27 14:02:38"
+      }
+    ]
   },
   "table_counts": {
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "table_ui_settings": 0
+    "table_ui_settings": 1
   }
 }
