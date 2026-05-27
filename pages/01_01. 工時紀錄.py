@@ -421,6 +421,98 @@ def _v141_active_matches_employee(active_row: dict | None, employee_id: str, emp
     return True
 # ===== END V141 SELECTED EMPLOYEE / ACTIVE WORK STRICT BINDING =====
 
+
+# ===== V143 ACTIVE WORK UI STRICT IDENTITY GUARD =====
+def _v143_ui_norm(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if text.lower() in {"none", "nan", "nat", "null", "<na>"}:
+        return ""
+    return text
+
+
+def _v143_ui_key(value) -> str:
+    return _v143_ui_norm(value).casefold()
+
+
+def _v143_ui_record_key_emp(row: dict) -> str:
+    rk = _v143_ui_norm(row.get("record_key") or row.get("紀錄鍵 / Record Key") or row.get("Record Key"))
+    return rk.split("|", 1)[0].strip() if "|" in rk else ""
+
+
+def _v143_ui_identity_values(row: dict, cols: list[str]) -> list[str]:
+    vals = []
+    for c in cols:
+        v = _v143_ui_norm(row.get(c))
+        if v and v not in vals:
+            vals.append(v)
+    return vals
+
+
+def _v143_ui_row_matches_selected(row: dict | pd.Series | None, employee_id: str, employee_name: str = "") -> bool:
+    if row is None:
+        return False
+    if hasattr(row, "to_dict"):
+        row = row.to_dict()
+    emp_id = _v143_ui_key(employee_id)
+    emp_name = _v143_ui_key(employee_name)
+    id_cols = ["employee_id", "工號 / Employee ID", "工號", "Employee ID", "員工編號", "人員工號"]
+    name_cols = ["employee_name", "姓名 / Name", "姓名", "Name", "員工姓名", "人員姓名"]
+    id_vals = _v143_ui_identity_values(row, id_cols)
+    rk_emp = _v143_ui_record_key_emp(row)
+    if rk_emp:
+        id_vals.append(rk_emp)
+    id_keys = {_v143_ui_key(v) for v in id_vals if _v143_ui_key(v)}
+    name_keys = {_v143_ui_key(v) for v in _v143_ui_identity_values(row, name_cols) if _v143_ui_key(v)}
+    if emp_id:
+        if not id_keys:
+            return False
+        if any(k != emp_id for k in id_keys):
+            return False
+    if emp_name and name_keys and any(k != emp_name for k in name_keys):
+        return False
+    return True
+
+
+def _v143_ui_filter_group_for_selected(group_df: pd.DataFrame, employee_id: str, employee_name: str = "") -> pd.DataFrame:
+    if group_df is None or not isinstance(group_df, pd.DataFrame) or group_df.empty:
+        return pd.DataFrame()
+    keep = []
+    for _, row in group_df.iterrows():
+        if _v143_ui_row_matches_selected(row, employee_id, employee_name):
+            keep.append(row.to_dict())
+    if not keep:
+        return pd.DataFrame(columns=group_df.columns)
+    out = pd.DataFrame(keep)
+    # 避免畫面上雙語欄位顯示舊人員：若欄位存在，強制與目前選擇人員一致。
+    for c in ["employee_id", "工號 / Employee ID", "工號", "Employee ID"]:
+        if c in out.columns:
+            out[c] = employee_id
+    for c in ["employee_name", "姓名 / Name", "姓名", "Name"]:
+        if c in out.columns and employee_name:
+            out[c] = employee_name
+    return out.reset_index(drop=True)
+
+
+def _v143_ui_identity_debug_text(row: dict | None) -> str:
+    if not row:
+        return ""
+    if hasattr(row, "to_dict"):
+        row = row.to_dict()
+    fields = []
+    for c in ["id", "employee_id", "工號 / Employee ID", "employee_name", "姓名 / Name", "record_key"]:
+        v = _v143_ui_norm(row.get(c))
+        if v:
+            fields.append(f"{c}={v}")
+    return "；".join(fields)
+# ===== END V143 ACTIVE WORK UI STRICT IDENTITY GUARD =====
+
 # V13: 01 opens from latest memory files/SQLite without doing heavy master restore inline.
 employees = load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
 work_orders = load_work_orders_for_time_record_fast(active_only=True)
@@ -543,17 +635,25 @@ with right:
         active2 = get_active_record(emp_id2, employee_name=_emp2_name)
     except TypeError:
         active2 = get_active_record(emp_id2)
-    if active2 and not _v141_active_matches_employee(active2, emp_id2, _emp2_name):
+    if active2 and (not _v141_active_matches_employee(active2, emp_id2, _emp2_name) or not _v143_ui_row_matches_selected(active2, emp_id2, _emp2_name)):
         st.error(
-            f"Active Work 人員不一致：目前選擇 {emp_id2} {_emp2_name}，但系統讀到 {active2.get('employee_id','')} {active2.get('employee_name','')}。已停止顯示，請重新整理或通知管理員。"
+            "Active Work 人員不一致，已停止顯示其他人員資料。"
+            f"目前選擇：{emp_id2} {_emp2_name}；讀到資料：{_v143_ui_identity_debug_text(active2)}。"
+            "請按重新整理；若仍出現，代表 01/02 權威檔有舊版身份欄位污染，需由管理員執行資料修復。"
         )
         active2 = None
     if not active2:
         st.success("此人員目前沒有未結束作業。")
     else:
-        group_df = get_active_group(int(active2["id"]))
-        st.markdown(
-            f"""
+        raw_group_df = get_active_group(int(active2["id"]))
+        group_df = _v143_ui_filter_group_for_selected(raw_group_df, emp_id2, _emp2_name)
+        if group_df.empty:
+            st.error(
+                "目前作業中資料已被擋下：系統讀到的群組資料不屬於目前選擇人員，為避免誤結束他人工時，已停止顯示。請重新整理；若仍出現，請由管理員檢查 01/02 權威檔身份欄位。"
+            )
+        else:
+            st.markdown(
+                f"""
 <div class="spt-card spt-glow">
 <b>目前作業中 / Active Work</b><br>
 選擇人員：{emp_id2} {_emp2_name}<br>
@@ -562,12 +662,12 @@ with right:
 說明：按下暫停、下班或完工時，會同步結束同一人員、同一天、同一工段的所有未結束計時，並平均分配工時。<br>
 </div>
 """,
-            unsafe_allow_html=True,
-        )
-        render_table(group_df, "active_parallel_group", editable=False, height=230)
-        end_remark = st.text_input("結束備註｜Finish Remark", key="end_remark")
+                unsafe_allow_html=True,
+            )
+            render_table(group_df, "active_parallel_group", editable=False, height=230)
+        end_remark = st.text_input("結束備註｜Finish Remark", key="end_remark", disabled=group_df.empty)
         c1, c2, c3 = st.columns(3)
-        if c1.button("⏸ 暫停 / Pause", use_container_width=True):
+        if c1.button("⏸ 暫停 / Pause", use_container_width=True, disabled=group_df.empty):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
@@ -581,7 +681,7 @@ with right:
                 n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=True)
                 trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。", title="工時已完工")
                 st.rerun()
-        if c3.button("◐ 下班 / Off Duty", use_container_width=True):
+        if c3.button("◐ 下班 / Off Duty", use_container_width=True, disabled=group_df.empty):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:

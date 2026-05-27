@@ -7538,3 +7538,353 @@ def repair_active_work_employee_filter_now(reason: str = "manual_v141_active_emp
     }
 
 # =================== END V141 STRICT SELECTED-EMPLOYEE ACTIVE WORK FILTER ===================
+
+# ===================== V143 ACTIVE WORK SELECTED-EMPLOYEE IDENTITY HARD GUARD =====================
+# 修正目的：
+# 1) 01 右側「結束目前作業 / Active Work」必須嚴格對應使用者選擇的人員。
+# 2) 若同一列同時存在 canonical 欄位與雙語顯示欄位，且兩者人員資訊不一致，視為污染列，不得顯示給其他人。
+# 3) record_key 內的工號也納入比對，防止 employee_id 欄被舊合併流程覆蓋但 record_key 仍屬其他人。
+# 4) 只修讀取/顯示/篩選防線，不重新編號、不刪歷史、不改 02 正式資料。
+
+_V143_EMPLOYEE_ID_COLS = [
+    "employee_id", "工號 / Employee ID", "工號", "Employee ID", "員工編號", "人員工號",
+]
+_V143_EMPLOYEE_NAME_COLS = [
+    "employee_name", "姓名 / Name", "姓名", "Name", "員工姓名", "人員姓名",
+]
+_V143_PROCESS_COLS = ["process_name", "工段名稱 / Process", "工段 / Process", "工段", "Process"]
+_V143_START_DATE_COLS = ["start_date", "開始日期 / Start Date", "開始日期", "Start Date"]
+_V143_STATUS_COLS = ["status", "狀態 / Status", "狀態", "Status"]
+_V143_END_TS_COLS = ["end_timestamp", "結束時間戳 / End Timestamp", "結束時間 / End Timestamp", "結束時間戳", "End Timestamp"]
+
+
+def _v143_norm(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    s = str(value).strip()
+    if s.lower() in {"none", "nan", "nat", "null", "<na>"}:
+        return ""
+    return s
+
+
+def _v143_key(value) -> str:
+    return _v143_norm(value).casefold()
+
+
+def _v143_existing_cols(df: pd.DataFrame, candidates: list[str]) -> list:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return []
+    exact = {str(c).strip(): c for c in df.columns}
+    folded = {str(c).strip().casefold(): c for c in df.columns}
+    out = []
+    for c in candidates:
+        found = None
+        if c in exact:
+            found = exact[c]
+        else:
+            found = folded.get(str(c).strip().casefold())
+        if found is not None and found not in out:
+            out.append(found)
+    return out
+
+
+def _v143_values_from_row(row: dict, cols: list[str]) -> list[str]:
+    vals: list[str] = []
+    for c in cols:
+        v = _v143_norm(row.get(c))
+        if v and v not in vals:
+            vals.append(v)
+    return vals
+
+
+def _v143_record_key_employee_id(row: dict) -> str:
+    rk = _v143_norm(row.get("record_key") or row.get("紀錄鍵 / Record Key") or row.get("Record Key"))
+    if not rk or "|" not in rk:
+        return ""
+    first = rk.split("|", 1)[0].strip()
+    return first if first and first.lower() not in {"none", "nan", "null"} else ""
+
+
+def _v143_add_canonical_columns(df: pd.DataFrame | None) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame):
+        return pd.DataFrame()
+    out = df.copy()
+    if out.empty:
+        return out
+    try:
+        out = out.loc[:, ~pd.Index(out.columns).duplicated()].copy()
+    except Exception:
+        pass
+
+    def _copy_if_missing(canonical: str, aliases: list[str]) -> None:
+        if canonical in out.columns:
+            return
+        for src in _v143_existing_cols(out, aliases):
+            out[canonical] = out[src]
+            return
+
+    _copy_if_missing("employee_id", _V143_EMPLOYEE_ID_COLS)
+    _copy_if_missing("employee_name", _V143_EMPLOYEE_NAME_COLS)
+    _copy_if_missing("process_name", _V143_PROCESS_COLS)
+    _copy_if_missing("start_date", _V143_START_DATE_COLS)
+    _copy_if_missing("status", _V143_STATUS_COLS)
+    _copy_if_missing("end_timestamp", _V143_END_TS_COLS)
+    return out.reset_index(drop=True)
+
+
+def _v143_is_active_row(row: dict) -> bool:
+    # 同時檢查 canonical 與雙語欄位；任一欄明確已結束，就不列為 Active Work。
+    statuses = _v143_values_from_row(row, _V143_STATUS_COLS)
+    end_values = _v143_values_from_row(row, _V143_END_TS_COLS)
+    ended_status = {"下班", "暫停", "完工", "已結束", "結束"}
+    if any(s in ended_status for s in statuses):
+        return False
+    if end_values:
+        return False
+    # 若有狀態，必須是作業中；若無狀態但沒有結束時間，仍視為可能未結束，交由人員篩選。
+    return (not statuses) or any(s == "作業中" for s in statuses)
+
+
+def _v143_identity_matches_selected(row: dict, employee_id: str | None, employee_name: str | None = None) -> bool:
+    """Strict identity check across canonical fields, display aliases, and record_key.
+
+    If the selected employee is SSS, a row showing SPT243 in any employee-id display
+    field is rejected even if another hidden/canonical field says SSS. This prevents
+    mixed rows from being shown in the wrong user's Active Work area.
+    """
+    selected_id = _v143_key(employee_id)
+    selected_name = _v143_key(employee_name)
+
+    id_values = _v143_values_from_row(row, _V143_EMPLOYEE_ID_COLS)
+    rk_emp = _v143_record_key_employee_id(row)
+    if rk_emp:
+        id_values.append(rk_emp)
+    id_keys = {_v143_key(v) for v in id_values if _v143_key(v)}
+
+    name_values = _v143_values_from_row(row, _V143_EMPLOYEE_NAME_COLS)
+    name_keys = {_v143_key(v) for v in name_values if _v143_key(v)}
+
+    if selected_id:
+        if not id_keys:
+            return False
+        # 任一非空工號欄位與選擇人員不一致，即視為污染列，不顯示。
+        if any(k != selected_id for k in id_keys):
+            return False
+    if selected_name:
+        # 姓名欄若存在，全部都必須一致；姓名全空時不擋，避免舊資料缺姓名造成無法結束。
+        if name_keys and any(k != selected_name for k in name_keys):
+            return False
+    return True
+
+
+def _v143_reconciled_active_source(reason: str = "v143_active_source") -> pd.DataFrame:
+    try:
+        if "_v139_repair_if_needed" in globals():
+            return _v143_add_canonical_columns(_v139_repair_if_needed(reason))
+    except Exception:
+        pass
+    try:
+        if "_v139_reconciled_df" in globals():
+            return _v143_add_canonical_columns(_v139_reconciled_df(include_sqlite=True))
+    except Exception:
+        pass
+    try:
+        return _v143_add_canonical_columns(query_df("SELECT * FROM time_records ORDER BY id"))
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v143_filter_active_df(
+    employee_id: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+    reason: str = "v143_filter_active",
+) -> pd.DataFrame:
+    emp_id = _v143_norm(employee_id)
+    emp_name = _v143_norm(employee_name)
+    proc = _v143_norm(process_name)
+    sdate = _v143_norm(start_date)
+    df = _v143_reconciled_active_source(reason)
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    rows = []
+    for _, rr in df.iterrows():
+        row = dict(rr.to_dict())
+        if not _v143_is_active_row(row):
+            continue
+        if emp_id and not _v143_identity_matches_selected(row, emp_id, emp_name):
+            continue
+        if proc:
+            proc_values = {_v143_key(v) for v in _v143_values_from_row(row, _V143_PROCESS_COLS) if _v143_key(v)}
+            if proc_values and _v143_key(proc) not in proc_values:
+                continue
+            if not proc_values:
+                continue
+        if sdate:
+            date_values = {_v143_norm(v) for v in _v143_values_from_row(row, _V143_START_DATE_COLS) if _v143_norm(v)}
+            if date_values and sdate not in date_values:
+                continue
+            if not date_values:
+                continue
+        rows.append(row)
+
+    out = _v143_add_canonical_columns(pd.DataFrame(rows)) if rows else pd.DataFrame(columns=df.columns)
+    if out.empty:
+        return out
+    try:
+        if "id" in out.columns:
+            out["_v143_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values("_v143_sort_id", ascending=True, kind="stable").drop(columns=["_v143_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    return _v143_filter_active_df(
+        employee_id=employee_id,
+        employee_name=employee_name,
+        process_name=process_name,
+        start_date=start_date,
+        reason="get_active_records_v143_all_identity_columns_strict",
+    )
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = _v143_filter_active_df(
+        employee_id=employee_id,
+        employee_name=employee_name,
+        reason="get_active_record_v143_all_identity_columns_strict",
+    )
+    if df.empty:
+        return None
+    try:
+        if "id" in df.columns:
+            df["_v143_sort_id"] = pd.to_numeric(df["id"], errors="coerce")
+            df = df.sort_values("_v143_sort_id", ascending=False, kind="stable").drop(columns=["_v143_sort_id"], errors="ignore")
+        row = df.iloc[0].where(pd.notna(df.iloc[0]), None).to_dict()
+        if not _v143_identity_matches_selected(row, employee_id, employee_name):
+            return None
+        return row
+    except Exception:
+        return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        rid = int(float(str(record_id).strip()))
+    except Exception:
+        return pd.DataFrame()
+    df = _v143_reconciled_active_source("get_active_group_v143_all_identity_columns_strict")
+    if df.empty or "id" not in df.columns:
+        return pd.DataFrame()
+    try:
+        base = df[df["id"].map(lambda x: int(float(str(x).strip())) if _v143_norm(x) else -1) == rid].copy()
+    except Exception:
+        base = pd.DataFrame()
+    if base.empty:
+        return pd.DataFrame()
+    base_row = dict(base.iloc[0].to_dict())
+    if not _v143_is_active_row(base_row):
+        return pd.DataFrame()
+    emp_id = _v143_norm(base_row.get("employee_id") or base_row.get("工號 / Employee ID") or _v143_record_key_employee_id(base_row))
+    emp_name = _v143_norm(base_row.get("employee_name") or base_row.get("姓名 / Name"))
+    if not emp_id or not _v143_identity_matches_selected(base_row, emp_id, emp_name):
+        # 資料列本身的身份欄位互相矛盾，不可拿來當結束群組基準。
+        return pd.DataFrame()
+    return _v143_filter_active_df(
+        employee_id=emp_id,
+        employee_name=emp_name or None,
+        process_name=_v143_norm(base_row.get("process_name") or base_row.get("工段名稱 / Process")) or None,
+        start_date=_v143_norm(base_row.get("start_date") or base_row.get("開始日期 / Start Date")) or None,
+        reason="get_active_group_v143_all_identity_columns_strict_group",
+    )
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = _v143_filter_active_df(
+        employee_id=employee_id,
+        employee_name=employee_name,
+        process_name=process_name,
+        start_date=start_date or today_text(),
+        reason="get_active_same_work_v143_all_identity_columns_strict",
+    )
+    if df.empty:
+        return None
+    # Work order may have aliases, so inspect both canonical and bilingual labels.
+    order_cols = ["work_order", "製令 / Work Order", "製令", "Work Order"]
+    target = _v143_key(work_order)
+    keep = []
+    for _, rr in df.iterrows():
+        row = dict(rr.to_dict())
+        vals = {_v143_key(v) for v in _v143_values_from_row(row, order_cols) if _v143_key(v)}
+        if target in vals:
+            keep.append(row)
+    if not keep:
+        return None
+    try:
+        return pd.DataFrame(keep).iloc[-1].where(pd.notna(pd.DataFrame(keep).iloc[-1]), None).to_dict()
+    except Exception:
+        return keep[-1]
+
+
+def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    start_date = start_date or today_text()
+    active = _v143_filter_active_df(
+        employee_id=employee_id,
+        employee_name=employee_name,
+        reason="get_conflicting_active_records_v143_all_identity_columns_strict",
+    )
+    if active.empty:
+        return pd.DataFrame()
+    rows = []
+    for _, rr in active.iterrows():
+        row = dict(rr.to_dict())
+        proc_values = {_v143_key(v) for v in _v143_values_from_row(row, _V143_PROCESS_COLS) if _v143_key(v)}
+        date_values = {_v143_norm(v) for v in _v143_values_from_row(row, _V143_START_DATE_COLS) if _v143_norm(v)}
+        if (_v143_key(process_name) not in proc_values) or (_v143_norm(start_date) not in date_values):
+            rows.append(row)
+    return _v143_add_canonical_columns(pd.DataFrame(rows)) if rows else pd.DataFrame()
+
+
+def inspect_active_work_identity_conflicts(employee_id: str | None = None, employee_name: str | None = None) -> pd.DataFrame:
+    """Diagnostic helper: list active rows whose identity columns conflict.
+
+    This is read-only and can be called from a temporary debug cell if needed.
+    """
+    df = _v143_reconciled_active_source("inspect_active_work_identity_conflicts_v143")
+    rows = []
+    for _, rr in df.iterrows():
+        row = dict(rr.to_dict())
+        if not _v143_is_active_row(row):
+            continue
+        id_vals = _v143_values_from_row(row, _V143_EMPLOYEE_ID_COLS)
+        rk = _v143_record_key_employee_id(row)
+        if rk:
+            id_vals.append(rk)
+        name_vals = _v143_values_from_row(row, _V143_EMPLOYEE_NAME_COLS)
+        id_keys = {_v143_key(v) for v in id_vals if _v143_key(v)}
+        name_keys = {_v143_key(v) for v in name_vals if _v143_key(v)}
+        conflict = len(id_keys) > 1 or len(name_keys) > 1
+        if employee_id and not _v143_identity_matches_selected(row, employee_id, employee_name):
+            conflict = True
+        if conflict:
+            rows.append({
+                "id": row.get("id"),
+                "record_key": row.get("record_key"),
+                "employee_id_values": " | ".join(id_vals),
+                "employee_name_values": " | ".join(name_vals),
+                "status_values": " | ".join(_v143_values_from_row(row, _V143_STATUS_COLS)),
+                "process": row.get("process_name") or row.get("工段名稱 / Process"),
+                "work_order": row.get("work_order") or row.get("製令 / Work Order"),
+            })
+    return pd.DataFrame(rows)
+
+# =================== END V143 ACTIVE WORK SELECTED-EMPLOYEE IDENTITY HARD GUARD ===================
