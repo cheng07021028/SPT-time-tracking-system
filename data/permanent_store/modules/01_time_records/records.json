@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 08:52:31",
-  "exported_at": "2026-05-27 08:52:31",
-  "reason": "today_records_v134_display_self_repair_01",
+  "updated_at": "2026-05-27 08:53:08",
+  "exported_at": "2026-05-27 08:53:08",
+  "reason": "start_work_v134_sqlite_to_0102_canonical_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -169,11 +169,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 08:51:52",
         "updated_at": "2026-05-27 08:51:52"
+      },
+      {
+        "id": 83,
+        "record_key": "B244|25MN0014-10|其他|2026-05-27 08:53:07|1a79a506",
+        "status": "作業中",
+        "work_order": "25MN0014-10",
+        "part_no": "BWS3200\nRSC2A2-BWN01-03",
+        "type_name": "9MRSC2A2-BWN01-03",
+        "process_name": "其他",
+        "employee_id": "B244",
+        "employee_name": "范耀文",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 08:53:07",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "市購件分料",
+        "start_date": "2026-05-27",
+        "start_time": "08:53:07",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B244|其他|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 08:53:07",
+        "updated_at": "2026-05-27 08:53:07"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 6
+    "time_records": 7
   }
 }
