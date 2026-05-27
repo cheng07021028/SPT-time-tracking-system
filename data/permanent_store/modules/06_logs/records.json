@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 16:09:49",
-  "exported_at": "2026-05-27 16:09:49",
+  "updated_at": "2026-05-27 16:11:59",
+  "exported_at": "2026-05-27 16:11:59",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -26047,11 +26047,215 @@
         "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 6328,
+        "log_time": "2026-05-27 16:11:31",
+        "user_name": "SSS",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "232",
+        "message": "SSS 開始 21M0241-02 / 前置鈑金",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6327,
+        "log_time": "2026-05-27 16:11:31",
+        "user_name": "SSS",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6326,
+        "log_time": "2026-05-27 16:11:31",
+        "user_name": "SSS",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6329,
+        "log_time": "2026-05-27 16:11:31",
+        "user_name": "SSS",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "232",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 1 筆，同步後 53 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 6332,
+        "log_time": "2026-05-27 16:11:43",
+        "user_name": "SSS",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "233",
+        "message": "SSS 開始 21M0241-03 / 前置鈑金",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6331,
+        "log_time": "2026-05-27 16:11:43",
+        "user_name": "SSS",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6330,
+        "log_time": "2026-05-27 16:11:43",
+        "user_name": "SSS",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6333,
+        "log_time": "2026-05-27 16:11:43",
+        "user_name": "SSS",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "233",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 1 筆，同步後 54 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 6335,
+        "log_time": "2026-05-27 16:11:45",
+        "user_name": "SPT220",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "136",
+        "message": "V137 結束工時紀錄 #136；同步結束=1筆；狀態=完工；群組總工時=5.05；平均工時=5.05",
+        "detail": "136",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6334,
+        "log_time": "2026-05-27 16:11:44",
+        "user_name": "SPT220",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6338,
+        "log_time": "2026-05-27 16:11:55",
+        "user_name": "SSS",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "234",
+        "message": "SSS 開始 21M0241-04 / 前置鈑金",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6337,
+        "log_time": "2026-05-27 16:11:55",
+        "user_name": "SSS",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6336,
+        "log_time": "2026-05-27 16:11:55",
+        "user_name": "SSS",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6339,
+        "log_time": "2026-05-27 16:11:55",
+        "user_name": "SSS",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "234",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 1 筆，同步後 55 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 6395,
+        "log_time": "2026-05-27 16:11:59",
+        "user_name": "SSS",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "get_active_same_work_v104_cache_repair: 已由 01/02 權威檔回填 SQLite cache 55 筆",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6394,
+        "log_time": "2026-05-27 16:11:59",
+        "user_name": "SSS",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6393,
+        "log_time": "2026-05-27 16:11:58",
+        "user_name": "SSS",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2170
+    "system_logs": 2187
   }
 }
