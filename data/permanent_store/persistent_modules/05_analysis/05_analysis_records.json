@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 14:15:03",
+  "exported_at": "2026-05-27 14:18:12",
   "source": "db_service_write",
   "module_key": "05_analysis",
   "module_code": "05",
@@ -1361,7 +1361,7 @@
       {
         "id": 176,
         "record_key": "SPT239|26M0095-09|清潔|2026-05-27 13:20:08|a8d08c26",
-        "status": "完工",
+        "status": "作業中",
         "work_order": "26M0095-09",
         "part_no": "4TRSC131-005-05",
         "type_name": "2LP Asymtek EFEM (wafer)(宏田)",
@@ -1370,20 +1370,20 @@
         "employee_name": "麥可",
         "start_action": "開始",
         "start_timestamp": "2026-05-27 13:20:08",
-        "end_action": "完工",
-        "end_timestamp": "2026-05-27 14:15:03",
+        "end_action": null,
+        "end_timestamp": null,
         "remark": "",
         "start_date": "2026-05-27",
         "start_time": "13:20:08",
-        "end_date": "2026-05-27",
-        "end_time": "14:15:03",
-        "work_hours": 0.92,
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
         "assembly_location": "宏田",
         "group_key": "SPT239|清潔|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 13:20:08",
-        "updated_at": "2026-05-27 14:15:03"
+        "updated_at": "2026-05-27 13:20:08"
       },
       {
         "id": 179,
