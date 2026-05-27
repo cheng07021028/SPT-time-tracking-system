@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 17:08:54",
-  "exported_at": "2026-05-27 17:08:54",
-  "reason": "start_work_v137_identity_safe_upsert_01",
+  "updated_at": "2026-05-27 17:11:08",
+  "exported_at": "2026-05-27 17:11:08",
+  "reason": "start_work_v134_sqlite_to_0102_canonical_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1465,11 +1465,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 17:08:51",
         "updated_at": "2026-05-27 17:08:51"
+      },
+      {
+        "id": 249,
+        "record_key": "SPT063|26M0051-03|包機|2026-05-27 17:11:08|e37124fa",
+        "status": "作業中",
+        "work_order": "26M0051-03",
+        "part_no": "PSRSC151-SB4L-05",
+        "type_name": "RSC151-SB4L+Argus",
+        "process_name": "包機",
+        "employee_id": "SPT063",
+        "employee_name": "劉志偉",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 17:11:08",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "17:11:08",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT063|包機|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 17:11:08",
+        "updated_at": "2026-05-27 17:11:08"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 54
+    "time_records": 55
   }
 }
