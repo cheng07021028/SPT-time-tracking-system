@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 09:11:12",
-  "exported_at": "2026-05-27 09:11:12",
+  "updated_at": "2026-05-27 09:11:13",
+  "exported_at": "2026-05-27 09:11:13",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 9628,
+        "source": "v103_merge",
+        "username": "SPT148",
+        "display_name": "羅立昕",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=SPT148; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 09:11:12",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 09:11:12"
+      },
       {
         "id": 9479,
         "source": "v103_merge",
@@ -2382,7 +2398,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 148,
+    "login_logs": 149,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
