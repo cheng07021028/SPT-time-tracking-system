@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 11:22:51",
+  "exported_at": "2026-05-27 11:28:08",
   "source": "db_service_write",
   "module_key": "01_time_records",
   "module_code": "01",
@@ -1276,10 +1276,37 @@
         "source": "streamlit",
         "created_at": "2026-05-27 11:22:50",
         "updated_at": "2026-05-27 11:22:50"
+      },
+      {
+        "id": 168,
+        "record_key": "B211|26M0021-03|骨架組立|2026-05-27 11:28:08|1a0dde70",
+        "status": "作業中",
+        "work_order": "26M0021-03",
+        "part_no": "1GRSC150-003-04",
+        "type_name": "4 Port Frame Long-type EFEM",
+        "process_name": "骨架組立",
+        "employee_id": "B211",
+        "employee_name": "張瑀榛",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 11:28:08",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "11:28:08",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B211|骨架組立|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 11:28:08",
+        "updated_at": "2026-05-27 11:28:08"
       }
     ]
   },
   "table_counts": {
-    "time_records": 47
+    "time_records": 48
   }
 }
