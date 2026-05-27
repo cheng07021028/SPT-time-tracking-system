@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 09:17:46",
-  "exported_at": "2026-05-27 09:17:46",
+  "updated_at": "2026-05-27 09:17:53",
+  "exported_at": "2026-05-27 09:17:53",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 17563,
+        "source": "v103_merge",
+        "username": "SPT158",
+        "display_name": "劉定澤",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=SPT158; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 09:17:53",
+        "logout_time": "2026-05-27 09:17:53",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 09:17:53"
+      },
+      {
+        "id": 17368,
+        "source": "v103_merge",
+        "username": "SPT240",
+        "display_name": "吉爾",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=SPT240",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 09:17:49",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 09:17:49"
+      },
       {
         "id": 17174,
         "source": "v103_merge",
@@ -3102,7 +3134,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 193,
+    "login_logs": 195,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
