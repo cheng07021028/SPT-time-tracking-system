@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 09:26:27",
-  "exported_at": "2026-05-27 09:26:27",
+  "updated_at": "2026-05-27 09:26:36",
+  "exported_at": "2026-05-27 09:26:36",
   "reason": "today_records_v134_display_self_repair_02",
   "empty_authoritative": false,
   "tables": {
@@ -273,10 +273,10 @@
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT077|其他|2026-05-27",
-        "is_group_work": 0,
+        "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-27 09:16:42",
-        "updated_at": "2026-05-27 09:16:42"
+        "updated_at": "2026-05-27 09:26:34"
       },
       {
         "id": 101,
@@ -574,11 +574,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 09:26:24",
         "updated_at": "2026-05-27 09:26:24"
+      },
+      {
+        "id": 124,
+        "record_key": "SPT077|21M0241-01|其他|2026-05-27 09:26:34|f4123ef9",
+        "status": "作業中",
+        "work_order": "21M0241-01",
+        "part_no": "4TRSC020-004-02",
+        "type_name": "NTB 3 PORT",
+        "process_name": "其他",
+        "employee_id": "SPT077",
+        "employee_name": "謝宛庭",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 09:26:34",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "前置線材加工",
+        "start_date": "2026-05-27",
+        "start_time": "09:26:34",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT077|其他|2026-05-27",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-27 09:26:34",
+        "updated_at": "2026-05-27 09:26:34"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 21
+    "time_records": 22
   }
 }
