@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "13_system_settings",
   "kind": "records",
-  "updated_at": "2026-05-26 15:05:40",
-  "exported_at": "2026-05-26 15:05:40",
-  "reason": "export_13_system_settings_page_apply_v85",
+  "updated_at": "2026-05-27 15:14:35",
+  "exported_at": "2026-05-27 15:14:35",
+  "reason": "save_process_options_v85",
   "empty_authoritative": false,
   "tables": {
     "process_categories": [
@@ -555,146 +555,6 @@
         "updated_at": "2026-05-22 12:01:07"
       },
       {
-        "id": 69,
-        "category_name": "BWBS",
-        "process_name": "Robot Z軸組立",
-        "is_active": 1,
-        "sort_order": 3,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 70,
-        "category_name": "BWBS",
-        "process_name": "左右塔組立",
-        "is_active": 1,
-        "sort_order": 4,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 71,
-        "category_name": "BWBS",
-        "process_name": "水平調整",
-        "is_active": 1,
-        "sort_order": 5,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 72,
-        "category_name": "BWBS",
-        "process_name": "模組組立",
-        "is_active": 1,
-        "sort_order": 6,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 73,
-        "category_name": "BWBS",
-        "process_name": "OPEN 配線",
-        "is_active": 1,
-        "sort_order": 7,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 74,
-        "category_name": "BWBS",
-        "process_name": "左右塔配線",
-        "is_active": 1,
-        "sort_order": 8,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 75,
-        "category_name": "BWBS",
-        "process_name": "左右塔外框結合",
-        "is_active": 1,
-        "sort_order": 9,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 76,
-        "category_name": "BWBS",
-        "process_name": "Packing",
-        "is_active": 1,
-        "sort_order": 10,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 77,
-        "category_name": "BWBS",
-        "process_name": "異常",
-        "is_active": 1,
-        "sort_order": 11,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 78,
-        "category_name": "BWBS",
-        "process_name": "設變",
-        "is_active": 1,
-        "sort_order": 12,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 79,
-        "category_name": "BWBS",
-        "process_name": "重工",
-        "is_active": 1,
-        "sort_order": 13,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 80,
-        "category_name": "BWBS",
-        "process_name": "教育訓練",
-        "is_active": 1,
-        "sort_order": 14,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 81,
-        "category_name": "BWBS",
-        "process_name": "IPQC",
-        "is_active": 1,
-        "sort_order": 15,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 82,
-        "category_name": "BWBS",
-        "process_name": "其他",
-        "is_active": 1,
-        "sort_order": 16,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
         "id": 84,
         "category_name": "Sorter/EFEM",
         "process_name": "前置鈑金",
@@ -1053,6 +913,156 @@
         "note": "",
         "created_at": "2026-05-22 12:02:45",
         "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 69,
+        "category_name": "BWBS",
+        "process_name": "Robot Z軸組立",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 70,
+        "category_name": "BWBS",
+        "process_name": "左右塔組立",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 71,
+        "category_name": "BWBS",
+        "process_name": "水平調整",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 72,
+        "category_name": "BWBS",
+        "process_name": "模組組立",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 73,
+        "category_name": "BWBS",
+        "process_name": "OPEN 配線",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 74,
+        "category_name": "BWBS",
+        "process_name": "左右塔配線",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 75,
+        "category_name": "BWBS",
+        "process_name": "左右塔外框結合",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 76,
+        "category_name": "BWBS",
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 77,
+        "category_name": "BWBS",
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 78,
+        "category_name": "BWBS",
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 79,
+        "category_name": "BWBS",
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 13,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 80,
+        "category_name": "BWBS",
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 81,
+        "category_name": "BWBS",
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 82,
+        "category_name": "BWBS",
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 101,
+        "category_name": "BWBS",
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-27 15:14:35",
+        "updated_at": "2026-05-27 15:14:35"
       }
     ],
     "process_options": [
@@ -1547,146 +1557,6 @@
         "updated_at": "2026-05-22 12:01:07"
       },
       {
-        "id": 69,
-        "category_name": "BWBS",
-        "process_name": "Robot Z軸組立",
-        "is_active": 1,
-        "sort_order": 3,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 70,
-        "category_name": "BWBS",
-        "process_name": "左右塔組立",
-        "is_active": 1,
-        "sort_order": 4,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 71,
-        "category_name": "BWBS",
-        "process_name": "水平調整",
-        "is_active": 1,
-        "sort_order": 5,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 72,
-        "category_name": "BWBS",
-        "process_name": "模組組立",
-        "is_active": 1,
-        "sort_order": 6,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 73,
-        "category_name": "BWBS",
-        "process_name": "OPEN 配線",
-        "is_active": 1,
-        "sort_order": 7,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 74,
-        "category_name": "BWBS",
-        "process_name": "左右塔配線",
-        "is_active": 1,
-        "sort_order": 8,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 75,
-        "category_name": "BWBS",
-        "process_name": "左右塔外框結合",
-        "is_active": 1,
-        "sort_order": 9,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 76,
-        "category_name": "BWBS",
-        "process_name": "Packing",
-        "is_active": 1,
-        "sort_order": 10,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 77,
-        "category_name": "BWBS",
-        "process_name": "異常",
-        "is_active": 1,
-        "sort_order": 11,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 78,
-        "category_name": "BWBS",
-        "process_name": "設變",
-        "is_active": 1,
-        "sort_order": 12,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 79,
-        "category_name": "BWBS",
-        "process_name": "重工",
-        "is_active": 1,
-        "sort_order": 13,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 80,
-        "category_name": "BWBS",
-        "process_name": "教育訓練",
-        "is_active": 1,
-        "sort_order": 14,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 81,
-        "category_name": "BWBS",
-        "process_name": "IPQC",
-        "is_active": 1,
-        "sort_order": 15,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
-        "id": 82,
-        "category_name": "BWBS",
-        "process_name": "其他",
-        "is_active": 1,
-        "sort_order": 16,
-        "note": "",
-        "created_at": "2026-05-22 12:03:29",
-        "updated_at": "2026-05-22 12:03:29"
-      },
-      {
         "id": 84,
         "category_name": "Sorter/EFEM",
         "process_name": "前置鈑金",
@@ -2045,6 +1915,156 @@
         "note": "",
         "created_at": "2026-05-22 12:02:45",
         "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 69,
+        "category_name": "BWBS",
+        "process_name": "Robot Z軸組立",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 70,
+        "category_name": "BWBS",
+        "process_name": "左右塔組立",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 71,
+        "category_name": "BWBS",
+        "process_name": "水平調整",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 72,
+        "category_name": "BWBS",
+        "process_name": "模組組立",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 73,
+        "category_name": "BWBS",
+        "process_name": "OPEN 配線",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 74,
+        "category_name": "BWBS",
+        "process_name": "左右塔配線",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 75,
+        "category_name": "BWBS",
+        "process_name": "左右塔外框結合",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 76,
+        "category_name": "BWBS",
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 77,
+        "category_name": "BWBS",
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 78,
+        "category_name": "BWBS",
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 79,
+        "category_name": "BWBS",
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 13,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 80,
+        "category_name": "BWBS",
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 81,
+        "category_name": "BWBS",
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 82,
+        "category_name": "BWBS",
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 101,
+        "category_name": "BWBS",
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-27 15:14:35",
+        "updated_at": "2026-05-27 15:14:35"
       }
     ],
     "rest_periods": [
@@ -2101,8 +2121,8 @@
   "settings": {},
   "table_counts": {
     "process_categories": 6,
-    "process_category_options": 99,
-    "process_options": 99,
+    "process_category_options": 100,
+    "process_options": 100,
     "rest_periods": 5,
     "app_settings": 1
   }
