@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 09:26:46",
+  "exported_at": "2026-05-27 09:26:55",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 35,
+  "business_row_count": 36,
   "table_counts": {
     "app_settings": 1,
     "auth_account_permissions": 130,
@@ -19,12 +19,12 @@
     "security_settings": 2,
     "security_user_roles": 9,
     "security_users": 9,
-    "system_logs": 190,
+    "system_logs": 192,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 0,
-    "time_records": 35,
+    "time_records": 36,
     "work_orders": 0
   },
   "tables": {
@@ -9627,6 +9627,28 @@
         "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 11 筆，同步後 13 筆。",
         "detail": "",
         "level": "WARN"
+      },
+      {
+        "id": 1651,
+        "log_time": "2026-05-27 09:26:49",
+        "user_name": "B126",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 11 筆，同步後 13 筆。",
+        "detail": "",
+        "level": "WARN"
+      },
+      {
+        "id": 1652,
+        "log_time": "2026-05-27 09:26:52",
+        "user_name": "SPT077",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 11 筆，同步後 13 筆。",
+        "detail": "",
+        "level": "WARN"
       }
     ],
     "system_settings": [
@@ -10615,6 +10637,33 @@
         "source": "streamlit",
         "created_at": "2026-05-27 09:22:44",
         "updated_at": "2026-05-27 09:23:10"
+      },
+      {
+        "id": 125,
+        "record_key": "SPT077|26N4001-05|其他|2026-05-27 09:26:55|c61be558",
+        "status": "作業中",
+        "work_order": "26N4001-05",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "其他",
+        "employee_id": "SPT077",
+        "employee_name": "謝宛庭",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 09:26:55",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "前置線材加工",
+        "start_date": "2026-05-27",
+        "start_time": "09:26:55",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT077|其他|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 09:26:55",
+        "updated_at": "2026-05-27 09:26:55"
       }
     ],
     "work_orders": []
