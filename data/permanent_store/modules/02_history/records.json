@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 18:44:21",
-  "exported_at": "2026-05-27 18:44:21",
-  "reason": "start_work_v139_final_state_reconcile_02",
+  "updated_at": "2026-05-27 18:46:01",
+  "exported_at": "2026-05-27 18:46:01",
+  "reason": "start_work_v137_identity_safe_upsert_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1330,11 +1330,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 18:44:16",
         "updated_at": "2026-05-27 18:44:16"
+      },
+      {
+        "id": 248,
+        "record_key": "SPT244|22M0162-92|清潔|2026-05-27 18:45:57|25c719ef",
+        "status": "作業中",
+        "work_order": "22M0162-92",
+        "part_no": "4TRSC020-004-02->4TRSC020-004-06",
+        "type_name": "NTB 3 LP +快拆+EMO",
+        "process_name": "清潔",
+        "employee_id": "SPT244",
+        "employee_name": "費南",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 18:45:57",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "18:45:57",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT244|清潔|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 18:45:57",
+        "updated_at": "2026-05-27 18:45:57"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 49
+    "time_records": 50
   }
 }
