@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 17:49:25",
-  "exported_at": "2026-05-27 17:49:25",
+  "updated_at": "2026-05-27 17:52:17",
+  "exported_at": "2026-05-27 17:52:17",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -30691,11 +30691,107 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 7409,
+        "log_time": "2026-05-27 17:52:17",
+        "user_name": "admin",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7408,
+        "log_time": "2026-05-27 17:52:17",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7407,
+        "log_time": "2026-05-27 17:52:17",
+        "user_name": "B252",
+        "action_type": "UPDATE",
+        "target_table": "security_users",
+        "target_id": "",
+        "message": "UPDATE security_users",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7406,
+        "log_time": "2026-05-27 17:52:17",
+        "user_name": "B252",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7398,
+        "log_time": "2026-05-27 17:52:17",
+        "user_name": "SPT121",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 1 筆",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7396,
+        "log_time": "2026-05-27 17:52:17",
+        "user_name": "SPT121",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7391,
+        "log_time": "2026-05-27 17:52:17",
+        "user_name": "SPT121",
+        "action_type": "DELETE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "DELETE time_records",
+        "detail": "DELETE FROM time_records",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7389,
+        "log_time": "2026-05-27 17:52:16",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2557
+    "system_logs": 2565
   }
 }
