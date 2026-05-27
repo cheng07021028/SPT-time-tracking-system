@@ -2,12 +2,60 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 17:45:05",
-  "exported_at": "2026-05-27 17:45:05",
+  "updated_at": "2026-05-27 17:45:31",
+  "exported_at": "2026-05-27 17:45:31",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 175843,
+        "source": "v103_merge",
+        "username": "B247",
+        "display_name": "劉家瑋",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "12_module_persistence:can_view; employee_id=B247; roles=operator",
+        "module_code": "12_module_persistence",
+        "login_time": "2026-05-27 17:45:31",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 17:45:31"
+      },
+      {
+        "id": 175594,
+        "source": "v103_merge",
+        "username": "B247",
+        "display_name": "劉家瑋",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "06_logs:can_view; employee_id=B247; roles=operator",
+        "module_code": "06_logs",
+        "login_time": "2026-05-27 17:45:06",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 17:45:06"
+      },
+      {
+        "id": 175718,
+        "source": "v103_merge",
+        "username": "B247",
+        "display_name": "劉家瑋",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "07_missing:can_view; employee_id=B247; roles=operator",
+        "module_code": "07_missing",
+        "login_time": "2026-05-27 17:45:06",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 17:45:06"
+      },
       {
         "id": 175471,
         "source": "v103_merge",
@@ -1966,7 +2014,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 122,
+    "login_logs": 125,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
