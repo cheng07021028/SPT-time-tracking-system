@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 09:38:55",
-  "exported_at": "2026-05-27 09:38:55",
-  "reason": "today_records_v134_display_self_repair_01",
+  "updated_at": "2026-05-27 09:39:02",
+  "exported_at": "2026-05-27 09:39:02",
+  "reason": "finish_work_v108_fast_local_sync_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -362,7 +362,7 @@
       {
         "id": 132,
         "record_key": "SPT199|26M0051-02|收機|2026-05-27 09:34:11|12c9619c",
-        "status": "作業中",
+        "status": "暫停",
         "work_order": "26M0051-02",
         "part_no": "PSRSC151-SB4L-05",
         "type_name": "RSC151-SB4L+Argus",
@@ -371,20 +371,20 @@
         "employee_name": "龍斯愷",
         "start_action": "開始",
         "start_timestamp": "2026-05-27 09:34:11",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-27 09:39:01",
         "remark": "",
         "start_date": "2026-05-27",
         "start_time": "09:34:11",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-27",
+        "end_time": "09:39:01",
+        "work_hours": 0.08,
         "assembly_location": "竹東",
         "group_key": "SPT199|收機|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 09:34:11",
-        "updated_at": "2026-05-27 09:34:11"
+        "updated_at": "2026-05-27 09:39:01"
       },
       {
         "id": 136,
