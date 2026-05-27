@@ -2,12 +2,60 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 17:02:39",
-  "exported_at": "2026-05-27 17:02:39",
+  "updated_at": "2026-05-27 17:02:56",
+  "exported_at": "2026-05-27 17:02:56",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 169039,
+        "source": "v103_merge",
+        "username": "SPT063",
+        "display_name": "劉志偉",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=SPT063",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 17:02:56",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 17:02:56"
+      },
+      {
+        "id": 168986,
+        "source": "v103_merge",
+        "username": "SPT063",
+        "display_name": "劉志偉",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置自動登出; employee_id=SPT063; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 17:02:41",
+        "logout_time": "2026-05-27 17:02:41",
+        "idle_minutes": 3.7333,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 17:02:41"
+      },
+      {
+        "id": 168934,
+        "source": "v103_merge",
+        "username": "SPT243",
+        "display_name": "羅丹",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=SPT243",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 17:02:39",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 17:02:39"
+      },
       {
         "id": 168883,
         "source": "v103_merge",
@@ -814,7 +862,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 50,
+    "login_logs": 53,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
