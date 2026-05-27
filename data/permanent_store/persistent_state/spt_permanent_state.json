@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 08:55:34",
+  "exported_at": "2026-05-27 08:55:41",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 28,
+  "business_row_count": 29,
   "table_counts": {
     "auth_account_permissions": 130,
     "auth_login_logs": 0,
@@ -21,7 +21,7 @@
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 0,
-    "time_records": 28,
+    "time_records": 29,
     "work_orders": 0
   },
   "tables": {
@@ -6910,6 +6910,33 @@
         "source": "streamlit",
         "created_at": "2026-05-27 08:55:34",
         "updated_at": "2026-05-27 08:55:34"
+      },
+      {
+        "id": 85,
+        "record_key": "B246|25MN0014-10|其他|2026-05-27 08:55:41|3bb015dd",
+        "status": "作業中",
+        "work_order": "25MN0014-10",
+        "part_no": "BWS3200\nRSC2A2-BWN01-03",
+        "type_name": "9MRSC2A2-BWN01-03",
+        "process_name": "其他",
+        "employee_id": "B246",
+        "employee_name": "湯詠棋",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 08:55:41",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "市購件分料",
+        "start_date": "2026-05-27",
+        "start_time": "08:55:41",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B246|其他|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 08:55:41",
+        "updated_at": "2026-05-27 08:55:41"
       }
     ],
     "work_orders": []
