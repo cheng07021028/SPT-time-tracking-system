@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 14:07:19",
-  "exported_at": "2026-05-27 14:07:19",
+  "updated_at": "2026-05-27 14:08:02",
+  "exported_at": "2026-05-27 14:08:02",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -18547,11 +18547,59 @@
         "detail": "",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 4630,
+        "log_time": "2026-05-27 14:07:24",
+        "user_name": "SPT105",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 23 筆，同步後 32 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 4631,
+        "log_time": "2026-05-27 14:07:27",
+        "user_name": "SPT208",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 23 筆，同步後 32 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 4632,
+        "log_time": "2026-05-27 14:07:39",
+        "user_name": "SPT208",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 23 筆，同步後 32 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 4650,
+        "log_time": "2026-05-27 14:08:02",
+        "user_name": "SPT034",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 23 筆，同步後 32 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1545
+    "system_logs": 1549
   }
 }
