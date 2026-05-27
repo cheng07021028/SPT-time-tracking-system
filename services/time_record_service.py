@@ -5791,3 +5791,646 @@ def load_records(start_date: str | None = None, end_date: str | None = None, emp
     return pd.DataFrame()
 
 # =================== END V134 LOG INSERT MISSING 01/02 CANONICAL REPAIR ===================
+
+# ===================== V137 50-USER HISTORY SAFE MERGE + PARALLEL FINISH FIX =====================
+# 目標：
+# - 01 同一人多筆同步作業結束時，02 歷史紀錄必須完整保留群組每一筆，不可只補第一筆。
+# - 02 歷史紀錄允許「同一製令 + 同一製程」多人同時紀錄，不可以被第二個人覆蓋。
+# - 合併主鍵一律使用 record_key；缺 record_key 時才用「工號+姓名+製令+製程+開始時間」；絕不只用製令+製程。
+# - 寫入 01/02 canonical 權威檔時加鎖，降低 50 人同時操作時的最後寫入覆蓋風險。
+
+import threading as _v137_threading
+
+_V137_AUTH_LOCK = _v137_threading.RLock()
+
+try:
+    _v137_prev_start_work = start_work
+except Exception:
+    _v137_prev_start_work = None
+try:
+    _v137_prev_delete_time_records = delete_time_records
+except Exception:
+    _v137_prev_delete_time_records = None
+try:
+    _v137_prev_import_time_records = import_time_records
+except Exception:
+    _v137_prev_import_time_records = None
+
+
+def _v137_blank(v) -> bool:
+    try:
+        if pd.isna(v):
+            return True
+    except Exception:
+        pass
+    if v is None:
+        return True
+    return str(v).strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _v137_text(v) -> str:
+    if _v137_blank(v):
+        return ""
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(v, date):
+        return v.strftime("%Y-%m-%d")
+    return str(v).strip()
+
+
+def _v137_int(v):
+    if _v137_blank(v):
+        return None
+    try:
+        return int(float(str(v).strip()))
+    except Exception:
+        return None
+
+
+def _v137_clean_df(df: pd.DataFrame | None) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame):
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        out = out.loc[:, ~pd.Index(out.columns).duplicated()].copy()
+        out = out.where(pd.notna(out), "")
+    except Exception:
+        pass
+    drop = []
+    ui_cols = {"刪除", "刪除 / Delete", "重算", "重算 / Recalc", "選取", "Select", "selected", "__selected__", "_selected", "_row_selected", "Delete", "Recalc"}
+    for c in out.columns:
+        if str(c).strip() in ui_cols:
+            drop.append(c)
+    if drop:
+        out = out.drop(columns=drop, errors="ignore")
+    return out.reset_index(drop=True)
+
+
+def _v137_row(row) -> dict:
+    if isinstance(row, dict):
+        return dict(row)
+    try:
+        return dict(row.to_dict())
+    except Exception:
+        return {}
+
+
+def _v137_identity(row: dict) -> str:
+    rk = _v137_text(row.get("record_key") or row.get("紀錄鍵 / Record Key"))
+    if rk:
+        return "rk:" + rk
+    emp_id = _v137_text(row.get("employee_id") or row.get("工號") or row.get("Employee ID"))
+    emp_name = _v137_text(row.get("employee_name") or row.get("姓名") or row.get("Employee Name"))
+    wo = _v137_text(row.get("work_order") or row.get("製令") or row.get("製令 / Work Order"))
+    proc = _v137_text(row.get("process_name") or row.get("工段") or row.get("製程") or row.get("Process"))
+    start_ts = _v137_text(row.get("start_timestamp") or row.get("Start Timestamp") or row.get("開始時間"))
+    if not start_ts:
+        start_ts = ( _v137_text(row.get("start_date")) + " " + _v137_text(row.get("start_time")) ).strip()
+    if emp_id or emp_name or wo or proc or start_ts:
+        return "biz:" + "|".join([emp_id, emp_name, wo, proc, start_ts])
+    rid = _v137_int(row.get("id") if "id" in row else row.get("ID"))
+    if rid is not None:
+        return "id:" + str(rid)
+    return "tmp:" + str(hash(str(sorted(row.items()))))
+
+
+def _v137_filter_deleted(df: pd.DataFrame) -> pd.DataFrame:
+    out = _v137_clean_df(df)
+    if out.empty:
+        return out
+    for name in ("_v97_filter_deleted_df", "_v94_filter_deleted_df", "_v96_filter_tombstone", "_v98_filter_deleted"):
+        try:
+            fn = globals().get(name)
+            if callable(fn):
+                tmp = fn(out)
+                if isinstance(tmp, pd.DataFrame):
+                    out = _v137_clean_df(tmp)
+        except Exception:
+            pass
+    return out.reset_index(drop=True)
+
+
+def _v137_authority_df(module_key: str) -> pd.DataFrame:
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df
+        return _v137_filter_deleted(_pa_df(module_key, "time_records"))
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v137_sqlite_df(ids: list[int] | None = None) -> pd.DataFrame:
+    try:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(DB_PATH, timeout=15) as conn:
+            conn.row_factory = sqlite3.Row
+            try:
+                conn.execute("PRAGMA busy_timeout=8000")
+            except Exception:
+                pass
+            if ids:
+                clean = [int(x) for x in ids if _v137_int(x) is not None]
+                if not clean:
+                    return pd.DataFrame()
+                ph = ",".join(["?"] * len(clean))
+                rows = conn.execute(f"SELECT * FROM time_records WHERE id IN ({ph}) ORDER BY id", clean).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM time_records ORDER BY id").fetchall()
+        return _v137_filter_deleted(pd.DataFrame([dict(r) for r in rows]))
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v137_assign_ids(df: pd.DataFrame) -> pd.DataFrame:
+    out = _v137_clean_df(df)
+    if out.empty:
+        return out
+    if "id" not in out.columns:
+        out.insert(0, "id", "")
+    existing = [_v137_int(x) for x in out["id"].tolist()]
+    existing = [int(x) for x in existing if x is not None]
+    next_id = (max(existing) + 1) if existing else 1
+    used: set[int] = set()
+    ids = []
+    for _, r in out.iterrows():
+        rid = _v137_int(r.get("id"))
+        if rid is None or rid in used:
+            while next_id in used:
+                next_id += 1
+            rid = next_id
+            next_id += 1
+        used.add(int(rid))
+        ids.append(int(rid))
+    out["id"] = ids
+    try:
+        out["_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+        out = out.sort_values("_sort_id", ascending=True, kind="stable").drop(columns=["_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v137_merge_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
+    chosen: dict[str, tuple[str, int, dict]] = {}
+    cols: list[str] = []
+    seq = 0
+    for rank, df in enumerate(frames, start=1):
+        df = _v137_filter_deleted(df)
+        if df.empty:
+            continue
+        for _, rr in df.iterrows():
+            r = _v137_row(rr)
+            key = _v137_identity(r)
+            for c in r.keys():
+                if c not in cols:
+                    cols.append(c)
+            score = _v137_text(r.get("updated_at") or r.get("created_at") or r.get("end_timestamp") or r.get("start_timestamp"))
+            old = chosen.get(key)
+            # 後面的 frame 通常是本次新增/更新資料，rank 較大可覆蓋同一 record_key 的舊資料。
+            if old is None or (score, rank, seq) >= (old[0], old[1], seq):
+                chosen[key] = (score, rank, r)
+            seq += 1
+    if "id" not in cols:
+        cols.insert(0, "id")
+    rows = [{c: r.get(c, "") for c in cols} for _, _, r in chosen.values()]
+    return _v137_assign_ids(pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols))
+
+
+def _v137_current_merged(include_sqlite: bool = False) -> pd.DataFrame:
+    frames = [_v137_authority_df("02_history"), _v137_authority_df("01_time_records")]
+    if include_sqlite:
+        frames.append(_v137_sqlite_df())
+    return _v137_merge_frames(frames)
+
+
+def _v137_rows_to_table(df: pd.DataFrame) -> list[dict]:
+    try:
+        from services.permanent_authority_service import table_from_df as _pa_table
+        return _pa_table(_v137_clean_df(df))
+    except Exception:
+        clean = _v137_clean_df(df)
+        return [dict(r) for _, r in clean.iterrows()]
+
+
+def _v137_save_0102(df: pd.DataFrame, reason: str, *, github: bool = False) -> int:
+    safe = _v137_assign_ids(_v137_filter_deleted(df))
+    rows = _v137_rows_to_table(safe)
+    with _V137_AUTH_LOCK:
+        try:
+            from services.permanent_authority_service import save_authority as _pa_save
+            _pa_save("01_time_records", records={"time_records": rows}, reason=f"{reason}_01", github=bool(github))
+            _pa_save("02_history", records={"time_records": rows}, reason=f"{reason}_02", github=bool(github))
+        except Exception as exc:
+            try:
+                write_log("V137_0102_AUTHORITY_SAVE_ERROR", f"V137 01/02 權威檔寫入失敗：{exc}", "time_records", level="ERROR")
+            except Exception:
+                pass
+    try:
+        clear_today_records_fast_cache()  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(len(rows))
+
+
+def _v137_upsert_rows(rows_df: pd.DataFrame, reason: str, *, github: bool = False) -> int:
+    rows_df = _v137_filter_deleted(rows_df)
+    if rows_df.empty:
+        return 0
+    with _V137_AUTH_LOCK:
+        base = _v137_current_merged(include_sqlite=False)
+        merged = _v137_merge_frames([base, rows_df])
+        return _v137_save_0102(merged, reason, github=github)
+
+
+def _v137_schedule_upload(reason: str) -> None:
+    try:
+        scheduler = globals().get("_v108_schedule_time_authority_upload")
+        if callable(scheduler):
+            scheduler(reason)
+    except Exception:
+        pass
+
+
+def _v137_group_ids(record_id: int) -> list[int]:
+    rid = _v137_int(record_id)
+    if rid is None:
+        return []
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (rid,))
+    if not rec:
+        try:
+            if "_v104_hydrate_sqlite_from_authority" in globals():
+                _v104_hydrate_sqlite_from_authority(active_only=False, reason="v137_group_pre_hydrate")
+        except Exception:
+            pass
+        rec = query_one("SELECT * FROM time_records WHERE id=?", (rid,))
+    if not rec:
+        return []
+    emp_id = _v137_text(rec.get("employee_id"))
+    emp_name = _v137_text(rec.get("employee_name"))
+    proc = _v137_text(rec.get("process_name"))
+    sdate = _v137_text(rec.get("start_date"))
+    if not emp_id or not emp_name or not proc or not sdate:
+        return [rid]
+    try:
+        df = get_active_records(employee_id=emp_id, employee_name=emp_name, process_name=proc, start_date=sdate)
+    except Exception:
+        df = pd.DataFrame()
+    if df is None or df.empty:
+        return [rid]
+    ids = []
+    for x in df.get("id", pd.Series(dtype=object)).tolist():
+        ix = _v137_int(x)
+        if ix is not None and ix not in ids:
+            ids.append(int(ix))
+    return ids or [rid]
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v137_prev_start_work):
+        raise RuntimeError("start_work core implementation is unavailable")
+    rid = int(_v137_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        rows = _v137_sqlite_df([rid])
+        if rows.empty:
+            rows = _v137_sqlite_df()
+        _v137_upsert_rows(rows[rows["id"].map(_v137_int).eq(rid)] if (not rows.empty and "id" in rows.columns) else rows, "start_work_v137_identity_safe_upsert", github=False)
+        _v137_schedule_upload("start_work_v137_async_publish")
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    rid0 = _v137_int(record_id)
+    if rid0 is None:
+        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (rid0,))
+    if not rec:
+        try:
+            if "_v104_hydrate_sqlite_from_authority" in globals():
+                _v104_hydrate_sqlite_from_authority(active_only=False, reason="finish_work_v137_pre_hydrate")
+        except Exception:
+            pass
+        rec = query_one("SELECT * FROM time_records WHERE id=?", (rid0,))
+    if not rec:
+        raise ValueError("找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。")
+    if not _v137_blank(rec.get("end_timestamp")):
+        return 0
+
+    # 關鍵修正：先抓完整同步群組 id，再一次更新全部筆數，再把全部更新列 upsert 到 01/02。
+    group_ids = _v137_group_ids(rid0) if finish_parallel_group else [rid0]
+    if not group_ids:
+        group_ids = [rid0]
+    group_df = _v137_sqlite_df(group_ids)
+    if group_df.empty:
+        group_df = pd.DataFrame([rec])
+        group_ids = [rid0]
+
+    emp_id = _v137_text(rec.get("employee_id"))
+    emp_name = _v137_text(rec.get("employee_name"))
+    proc = _v137_text(rec.get("process_name"))
+    sdate = _v137_text(rec.get("start_date"))
+    if finish_parallel_group and not group_df.empty:
+        for c in ["employee_id", "employee_name", "process_name", "start_date", "end_timestamp"]:
+            if c not in group_df.columns:
+                group_df[c] = ""
+        mask = (
+            group_df["employee_id"].astype(str).str.strip().eq(emp_id)
+            & group_df["employee_name"].astype(str).str.strip().eq(emp_name)
+            & group_df["process_name"].astype(str).str.strip().eq(proc)
+            & group_df["start_date"].astype(str).str.strip().eq(sdate)
+            & group_df["end_timestamp"].map(_v137_blank)
+        )
+        group_df = group_df.loc[mask].copy()
+        group_ids = [int(x) for x in group_df.get("id", pd.Series(dtype=object)).map(_v137_int).dropna().tolist()]
+    if not group_ids:
+        group_ids = [rid0]
+        group_df = pd.DataFrame([rec])
+
+    now = _now()
+    end_date, end_time = split_timestamp(now)
+    status = end_action if end_action in ("下班", "暫停", "完工") else "已結束"
+    starts = [str(x) for x in group_df.get("start_timestamp", pd.Series(dtype=object)).dropna().tolist() if _v137_text(x)]
+    earliest_start = min(starts) if starts else _v137_text(rec.get("start_timestamp")) or now
+    total_hours = calculate_work_hours(earliest_start, now)
+    avg_hours = round(total_hours / max(len(group_ids), 1), 2)
+    is_group = 1 if len(group_ids) > 1 else int(rec.get("is_group_work") or 0)
+    group_key = rec.get("group_key") or f"{rec.get('employee_id')}|{rec.get('process_name')}|{rec.get('start_date')}"
+
+    updated: list[int] = []
+    for rid in group_ids:
+        old = query_one("SELECT remark FROM time_records WHERE id=?", (int(rid),)) or {}
+        new_remark = old.get("remark") or ""
+        append = remark or ""
+        if len(group_ids) > 1:
+            append = (append + "；" if append else "") + f"同步作業平均分配：{len(group_ids)}筆，群組總工時={total_hours:.2f}，平均={avg_hours:.2f}"
+        if append:
+            new_remark = (new_remark + "；" if new_remark else "") + append
+        execute(
+            """
+            UPDATE time_records
+            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
+            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')
+            """,
+            (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, is_group, now, int(rid)),
+        )
+        updated.append(int(rid))
+
+    rows = _v137_sqlite_df(updated)
+    _v137_upsert_rows(rows, "finish_work_v137_all_parallel_rows_upsert", github=False)
+    try:
+        write_log(
+            "END_WORK_GROUP" if len(updated) > 1 else "END_WORK",
+            f"V137 結束工時紀錄 #{rid0}；同步結束={len(updated)}筆；狀態={status}；群組總工時={total_hours:.2f}；平均工時={avg_hours:.2f}",
+            "time_records",
+            rid0,
+            detail=",".join(str(x) for x in updated),
+        )
+    except Exception:
+        pass
+    try:
+        clear_today_records_fast_cache()  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    _v137_schedule_upload("finish_work_v137_async_publish")
+    return int(len(updated))
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = _v137_current_merged(include_sqlite=True)
+    if df.empty:
+        return pd.DataFrame()
+    # V134 延伸：如果 SQLite 有但 02 canonical 漏資料，載入時補回本機 canonical。
+    try:
+        if len(df) > len(_v137_authority_df("02_history")):
+            _v137_save_0102(df, "load_records_v137_display_repair", github=False)
+            _v137_schedule_upload("load_records_v137_async_publish")
+    except Exception:
+        pass
+    out = df.copy()
+    if start_date and "start_date" in out.columns:
+        out = out[out["start_date"].astype(str) >= str(start_date)]
+    if end_date and "start_date" in out.columns:
+        out = out[out["start_date"].astype(str) <= str(end_date)]
+    if employee_id and "employee_id" in out.columns:
+        out = out[out["employee_id"].astype(str) == str(employee_id)]
+    if work_order and "work_order" in out.columns:
+        out = out[out["work_order"].astype(str) == str(work_order)]
+    try:
+        out["_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+        out = out.sort_values("_sort_id", ascending=False, kind="stable").drop(columns=["_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    df = _v137_current_merged(include_sqlite=True)
+    if df.empty:
+        return pd.DataFrame()
+    try:
+        if len(df) > len(_v137_authority_df("01_time_records")):
+            _v137_save_0102(df, "today_records_v137_display_repair", github=False)
+            _v137_schedule_upload("today_records_v137_async_publish")
+    except Exception:
+        pass
+    out = df.copy()
+    status = out.get("status", pd.Series("", index=out.index)).fillna("").astype(str).str.strip()
+    end_ts = out.get("end_timestamp", pd.Series("", index=out.index)).fillna("").astype(str).str.strip().str.lower()
+    unfinished = status.eq("作業中") & (end_ts.eq("") | end_ts.eq("none") | end_ts.eq("nan") | end_ts.eq("nat"))
+    if unfinished_only:
+        out = out.loc[unfinished].copy()
+    else:
+        try:
+            cycle_start = _business_cycle_start_date()
+        except Exception:
+            cycle_start = today_text()
+        if "start_date" in out.columns:
+            out = out.loc[(out["start_date"].astype(str) >= str(cycle_start)) | unfinished].copy()
+    try:
+        out["_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+        out = out.sort_values("_sort_id", ascending=False, kind="stable").drop(columns=["_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    edit = _v137_clean_df(df)
+    if edit.empty:
+        return 0
+    try:
+        cols = [c for c in edit.columns if str(c).lower() != "id"]
+        if cols:
+            edit = edit.loc[edit[cols].apply(lambda r: any(not _v137_blank(v) for v in r), axis=1)].copy()
+    except Exception:
+        pass
+    if edit.empty:
+        return 0
+    rows = []
+    for _, rr in edit.iterrows():
+        r = _v137_row(rr)
+        if recalc_edited_timestamps:
+            try:
+                r.update(normalize_record_datetime_fields(r, recalc_work_hours=True))
+            except Exception:
+                pass
+        if not _v137_text(r.get("record_key")):
+            try:
+                r["record_key"] = make_record_key(_v137_text(r.get("employee_id")), _v137_text(r.get("work_order")), _v137_text(r.get("process_name")), _v137_text(r.get("start_timestamp")))
+            except Exception:
+                r["record_key"] = uuid.uuid4().hex
+        r["updated_at"] = _now()
+        rows.append(r)
+    edit = pd.DataFrame(rows)
+    with _V137_AUTH_LOCK:
+        base = _v137_current_merged(include_sqlite=False)
+        merged = _v137_merge_frames([base, edit])
+        _v137_save_0102(merged, "save_time_records_v137_identity_safe", github=True)
+        try:
+            if "_v89_sync_sqlite_cache_from_authority" in globals():
+                _v89_sync_sqlite_cache_from_authority(merged)
+        except Exception:
+            pass
+    try:
+        write_log("SAVE_TIME_RECORDS", f"V137 已安全合併儲存 {len(edit)} 筆；多人同製令同製程不覆蓋。", "time_records")
+    except Exception:
+        pass
+    return int(len(edit))
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    df = _v137_current_merged(include_sqlite=True)
+    if df.empty or "id" not in df.columns:
+        return 0
+    ids = {_v137_int(x) for x in (record_ids or [])}
+    ids = {int(x) for x in ids if x is not None}
+    mask = df["id"].map(_v137_int).isin(ids) if ids else pd.Series([True] * len(df), index=df.index)
+    count = 0
+    for idx in df.loc[mask].index:
+        r = _v137_row(df.loc[idx])
+        if _v137_blank(r.get("start_timestamp")) or _v137_blank(r.get("end_timestamp")):
+            continue
+        try:
+            normalized = normalize_record_datetime_fields(r, recalc_work_hours=True)
+        except Exception:
+            normalized = {}
+        if not normalized:
+            continue
+        for c, v in normalized.items():
+            if c not in df.columns:
+                df[c] = ""
+            df.at[idx, c] = v
+        if "status" not in df.columns:
+            df["status"] = ""
+        if _v137_text(df.at[idx, "status"]) == "作業中":
+            df.at[idx, "status"] = r.get("end_action") or "已結束"
+        if "updated_at" not in df.columns:
+            df["updated_at"] = ""
+        df.at[idx, "updated_at"] = _now()
+        count += 1
+    if count:
+        _v137_save_0102(df, "recalculate_time_records_v137_identity_safe", github=True)
+        try:
+            if "_v89_sync_sqlite_cache_from_authority" in globals():
+                _v89_sync_sqlite_cache_from_authority(df)
+        except Exception:
+            pass
+    return int(count)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = {_v137_int(x) for x in (record_ids or [])}
+    ids = {int(x) for x in ids if x is not None}
+    if not ids:
+        return 0
+    prev_n = 0
+    try:
+        if callable(_v137_prev_delete_time_records):
+            prev_n = int(_v137_prev_delete_time_records(list(ids), reason=reason) or 0)
+    except Exception:
+        prev_n = 0
+    df = _v137_current_merged(include_sqlite=False)
+    if "id" in df.columns:
+        before = len(df)
+        df = df.loc[~df["id"].map(_v137_int).isin(ids)].copy()
+        deleted = before - len(df)
+    else:
+        deleted = 0
+    _v137_save_0102(df, "delete_time_records_v137_identity_safe", github=True)
+    try:
+        if "_v89_sync_sqlite_cache_from_authority" in globals():
+            _v89_sync_sqlite_cache_from_authority(df)
+    except Exception:
+        pass
+    return int(max(prev_n, deleted, len(ids)))
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    result = _v137_prev_import_time_records(df, recalc=recalc, source=source) if callable(_v137_prev_import_time_records) else {"inserted": 0, "updated": 0, "skipped": 0, "errors": []}
+    try:
+        merged = _v137_current_merged(include_sqlite=True)
+        _v137_save_0102(merged, "import_time_records_v137_identity_safe", github=True)
+        if isinstance(result, dict):
+            result["authority_synced"] = int(len(merged))
+    except Exception as exc:
+        if isinstance(result, dict):
+            result.setdefault("errors", []).append(f"V137 authority sync failed: {exc}")
+    return result
+
+
+def sync_time_records_01_02_now(reason: str = "v137_manual_0102_sync", *, github: bool = True) -> int:  # type: ignore[override]
+    merged = _v137_current_merged(include_sqlite=True)
+    n = _v137_save_0102(merged, reason, github=bool(github))
+    try:
+        if "_v89_sync_sqlite_cache_from_authority" in globals():
+            _v89_sync_sqlite_cache_from_authority(merged)
+    except Exception:
+        pass
+    return int(n)
+
+# =================== END V137 50-USER HISTORY SAFE MERGE + PARALLEL FINISH FIX ===================
+
+# ===================== V137B SAME-GROUP FINISH LOCK WRAPPER =====================
+# 補強：V137 已直接處理同步群組全部結束；此段只把最終 finish_work 再包一次同人員群組鎖，
+# 避免兩個頁面同時對同一人員群組按結束造成重複更新。
+try:
+    _v137b_prev_finish_work = finish_work
+except Exception:
+    _v137b_prev_finish_work = None
+
+
+def _v137b_finish_lock_key(record_id) -> str:
+    rid = _v137_int(record_id) if "_v137_int" in globals() else None
+    if rid is None:
+        return f"finish:{record_id}"
+    try:
+        rec = query_one("SELECT * FROM time_records WHERE id=?", (int(rid),)) or {}
+        emp_id = _v137_text(rec.get("employee_id")) if "_v137_text" in globals() else str(rec.get("employee_id") or "").strip()
+        emp_name = _v137_text(rec.get("employee_name")) if "_v137_text" in globals() else str(rec.get("employee_name") or "").strip()
+        proc = _v137_text(rec.get("process_name")) if "_v137_text" in globals() else str(rec.get("process_name") or "").strip()
+        sdate = _v137_text(rec.get("start_date")) if "_v137_text" in globals() else str(rec.get("start_date") or "").strip()
+        if emp_id or emp_name:
+            return f"finish:{emp_id}|{emp_name}|{proc}|{sdate}"
+    except Exception:
+        pass
+    return f"finish_record:{rid}"
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v137b_prev_finish_work):
+        raise RuntimeError("finish_work core implementation is unavailable")
+    key = _v137b_finish_lock_key(record_id)
+    try:
+        lock = _v123_time_lock(key) if "_v123_time_lock" in globals() else _V137_AUTH_LOCK
+    except Exception:
+        lock = _V137_AUTH_LOCK
+    with lock:
+        return int(_v137b_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+# =================== END V137B SAME-GROUP FINISH LOCK WRAPPER ===================
