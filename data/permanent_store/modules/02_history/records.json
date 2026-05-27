@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 09:19:21",
-  "exported_at": "2026-05-27 09:19:21",
-  "reason": "today_records_v134_display_self_repair_02",
+  "updated_at": "2026-05-27 09:19:29",
+  "exported_at": "2026-05-27 09:19:29",
+  "reason": "start_work_v134_sqlite_to_0102_canonical_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -651,10 +651,10 @@
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT077|其他|2026-05-27",
-        "is_group_work": 0,
+        "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-27 09:16:42",
-        "updated_at": "2026-05-27 09:16:42"
+        "updated_at": "2026-05-27 09:19:28"
       },
       {
         "id": 101,
@@ -790,11 +790,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 09:19:18",
         "updated_at": "2026-05-27 09:19:18"
+      },
+      {
+        "id": 106,
+        "record_key": "SPT077|26N4001-04|其他|2026-05-27 09:19:28|a3d6b631",
+        "status": "作業中",
+        "work_order": "26N4001-04",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "其他",
+        "employee_id": "SPT077",
+        "employee_name": "謝宛庭",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 09:19:28",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "前置線材加工",
+        "start_date": "2026-05-27",
+        "start_time": "09:19:28",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT077|其他|2026-05-27",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-27 09:19:28",
+        "updated_at": "2026-05-27 09:19:28"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 29
+    "time_records": 30
   }
 }
