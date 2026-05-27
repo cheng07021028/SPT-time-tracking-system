@@ -367,7 +367,7 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
         new_remark = old.get("remark") or ""
         append = remark or ""
         if len(group_ids) > 1:
-            append = (append + "；" if append else "") + f"同步作業平均分配：{len(group_ids)}筆，群組總工時={total_hours:.2f}，平均={avg_hours:.2f}"
+            append = (append + "；" if append else "") + _v138_parallel_summary_text(len(group_ids), total_hours, avg_hours)
         if append:
             new_remark = (new_remark + "；" if new_remark else "") + append
         execute(
@@ -382,7 +382,7 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
 
     write_log(
         "END_WORK_GROUP" if len(group_ids) > 1 else "END_WORK",
-        f"結束工時紀錄 #{record_id}，同步結束={len(group_ids)}筆，狀態={status}，群組總工時={total_hours:.2f}，平均工時={avg_hours:.2f}",
+        f"結束工時紀錄 #{record_id}，同步結束={len(group_ids)}筆，狀態={status}，群組總工時={_v138_hours_to_hms_label(total_hours)}，平均工時={_v138_hours_to_hms_label(avg_hours)}",
         "time_records",
         record_id,
         detail=",".join(str(x) for x in group_ids),
@@ -3433,7 +3433,7 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
         new_remark = old.get("remark") or ""
         append = remark or ""
         if len(group_ids) > 1:
-            append = (append + "；" if append else "") + f"同步作業平均分配：{len(group_ids)}筆，群組總工時={total_hours:.2f}，平均={avg_hours:.2f}"
+            append = (append + "；" if append else "") + _v138_parallel_summary_text(len(group_ids), total_hours, avg_hours)
         if append:
             new_remark = (new_remark + "；" if new_remark else "") + append
         try:
@@ -3469,7 +3469,7 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
     try:
         write_log(
             "END_WORK_GROUP" if len(updated_ids) > 1 else "END_WORK",
-            f"V90 結束工時紀錄 #{rid0}，同步結束={len(updated_ids)}筆，狀態={status}，群組總工時={total_hours:.2f}，平均工時={avg_hours:.2f}",
+            f"V90 結束工時紀錄 #{rid0}，同步結束={len(updated_ids)}筆，狀態={status}，群組總工時={_v138_hours_to_hms_label(total_hours)}，平均工時={_v138_hours_to_hms_label(avg_hours)}",
             "time_records",
             rid0,
             detail=",".join(str(x) for x in updated_ids),
@@ -3900,7 +3900,7 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
         new_remark = old.get("remark") or ""
         append = remark or ""
         if len(group_ids) > 1:
-            append = (append + "；" if append else "") + f"同步作業平均分配：{len(group_ids)}筆，群組總工時={total_hours:.2f}，平均={avg_hours:.2f}"
+            append = (append + "；" if append else "") + _v138_parallel_summary_text(len(group_ids), total_hours, avg_hours)
         if append:
             new_remark = (new_remark + "；" if new_remark else "") + append
         execute(
@@ -6164,7 +6164,7 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
         new_remark = old.get("remark") or ""
         append = remark or ""
         if len(group_ids) > 1:
-            append = (append + "；" if append else "") + f"同步作業平均分配：{len(group_ids)}筆，群組總工時={total_hours:.2f}，平均={avg_hours:.2f}"
+            append = (append + "；" if append else "") + _v138_parallel_summary_text(len(group_ids), total_hours, avg_hours)
         if append:
             new_remark = (new_remark + "；" if new_remark else "") + append
         execute(
@@ -6183,7 +6183,7 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
     try:
         write_log(
             "END_WORK_GROUP" if len(updated) > 1 else "END_WORK",
-            f"V137 結束工時紀錄 #{rid0}；同步結束={len(updated)}筆；狀態={status}；群組總工時={total_hours:.2f}；平均工時={avg_hours:.2f}",
+            f"V137 結束工時紀錄 #{rid0}；同步結束={len(updated)}筆；狀態={status}；群組總工時={_v138_hours_to_hms_label(total_hours)}；平均工時={_v138_hours_to_hms_label(avg_hours)}",
             "time_records",
             rid0,
             detail=",".join(str(x) for x in updated),
@@ -6434,3 +6434,175 @@ def finish_work(record_id: int, end_action: str, remark: str = "", finish_parall
     with lock:
         return int(_v137b_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
 # =================== END V137B SAME-GROUP FINISH LOCK WRAPPER ===================
+
+
+# ===================== V138B PARALLEL WORK HOURS HMS DISPLAY FIX =====================
+# 目的：
+# 1) 01 工時紀錄、02 歷史紀錄中「同步作業平均分配」說明不再顯示 0.08 / 0.02 這類十進位小時。
+# 2) 統一顯示為 00:00:00，不在文字中顯示「時:分:秒」。
+# 3) work_hours 欄位仍保留 decimal hours 供計算、重算、平均分攤使用；只改備註/畫面文字表示。
+# 4) 舊資料若備註已經存在「群組總工時=0.xx，平均=0.xx」或 V138 的「HH:MM:SS時:分:秒」，在 01/02 顯示時也會自動轉為 HH:MM:SS。
+
+try:
+    _v138_prev_finish_work = finish_work
+except Exception:
+    _v138_prev_finish_work = None
+try:
+    _v138_prev_load_records = load_records
+except Exception:
+    _v138_prev_load_records = None
+try:
+    _v138_prev_today_records = today_records
+except Exception:
+    _v138_prev_today_records = None
+
+
+def _v138_hours_to_hms_label(hours_value) -> str:
+    """Convert decimal hours to 'HH:MM:SS'."""
+    try:
+        if hours_value is None:
+            total_seconds = 0
+        else:
+            text = str(hours_value).strip()
+            # Already HH:MM:SS-like.
+            if ":" in text:
+                base = text.split("時")[0].strip()
+                parts = base.split(":")
+                if len(parts) >= 3:
+                    h = int(float(parts[0] or 0)); m = int(float(parts[1] or 0)); sec = int(float(parts[2] or 0))
+                    return f"{h:02d}:{m:02d}:{sec:02d}"
+            total_seconds = int(round(float(text) * 3600))
+    except Exception:
+        total_seconds = 0
+    if total_seconds < 0:
+        total_seconds = 0
+    h = total_seconds // 3600
+    m = (total_seconds % 3600) // 60
+    s = total_seconds % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
+def _v138_parallel_summary_text(count: int, total_hours, avg_hours) -> str:
+    return (
+        f"同步作業平均分配：{int(count)}筆，"
+        f"群組總工時={_v138_hours_to_hms_label(total_hours)}，"
+        f"平均={_v138_hours_to_hms_label(avg_hours)}"
+    )
+
+
+def _v138_convert_parallel_remark_text(value):
+    """Convert old decimal-hour parallel summary text inside remark to HH:MM:SS display."""
+    try:
+        if value is None:
+            return value
+        try:
+            if pd.isna(value):
+                return value
+        except Exception:
+            pass
+        text = str(value)
+        if "同步作業平均分配" not in text:
+            return value
+        import re as _re
+        pattern = _re.compile(r"同步作業平均分配：\s*(\d+)\s*筆，\s*群組總工時\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*，\s*平均\s*=\s*([0-9]+(?:\.[0-9]+)?)")
+        def _repl(m):
+            return _v138_parallel_summary_text(int(m.group(1)), m.group(2), m.group(3))
+        converted = pattern.sub(_repl, text)
+        # V138B: remove the explanatory suffix that V138 briefly appended.
+        converted = converted.replace("時:分:秒", "")
+        return converted
+    except Exception:
+        return value
+
+
+def _v138_format_remark_column(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    out = df.copy()
+    for col in ["remark", "備註", "備註 / Remark"]:
+        if col in out.columns:
+            try:
+                out[col] = out[col].map(_v138_convert_parallel_remark_text)
+            except Exception:
+                pass
+    return out
+
+
+def _v138_update_sqlite_and_authority_remarks(record_ids) -> None:
+    """After legacy finish_work writes decimal remark, convert affected rows and sync 01/02."""
+    clean_ids = []
+    for x in record_ids or []:
+        try:
+            ix = int(float(str(x).strip()))
+            if ix > 0 and ix not in clean_ids:
+                clean_ids.append(ix)
+        except Exception:
+            continue
+    if not clean_ids:
+        return
+    for rid in clean_ids:
+        try:
+            row = query_one("SELECT remark FROM time_records WHERE id=?", (rid,)) or {}
+            old_remark = row.get("remark")
+            new_remark = _v138_convert_parallel_remark_text(old_remark)
+            if new_remark != old_remark:
+                execute("UPDATE time_records SET remark=?, updated_at=? WHERE id=?", (new_remark, _now(), int(rid)))
+        except Exception:
+            pass
+    try:
+        if "_v137_sqlite_df" in globals() and "_v137_upsert_rows" in globals():
+            rows = _v137_sqlite_df(clean_ids)
+            if isinstance(rows, pd.DataFrame) and not rows.empty:
+                _v137_upsert_rows(rows, "finish_work_v138_hms_remark_upsert", github=False)
+    except Exception:
+        pass
+    try:
+        scheduler = globals().get("_v108_schedule_time_authority_upload") or globals().get("_v137_schedule_upload")
+        if callable(scheduler):
+            scheduler("finish_work_v138_hms_remark_async_publish")
+    except Exception:
+        pass
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v138_prev_finish_work):
+        raise RuntimeError("finish_work core implementation is unavailable")
+    # 先記住可能受影響群組，因為舊 finish_work 完成後就不再是 active group。
+    affected_ids = []
+    try:
+        if finish_parallel_group and "_v137_group_ids" in globals():
+            affected_ids = list(_v137_group_ids(int(float(str(record_id).strip()))))
+    except Exception:
+        affected_ids = []
+    if not affected_ids:
+        try:
+            affected_ids = [int(float(str(record_id).strip()))]
+        except Exception:
+            affected_ids = []
+
+    n = int(_v138_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n:
+        _v138_update_sqlite_and_authority_remarks(affected_ids)
+        try:
+            clear_today_records_fast_cache()  # type: ignore[name-defined]
+        except Exception:
+            pass
+        try:
+            clear_query_cache()
+        except Exception:
+            pass
+    return n
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    if not callable(_v138_prev_load_records):
+        return pd.DataFrame()
+    return _v138_format_remark_column(_v138_prev_load_records(start_date, end_date, employee_id, work_order))
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    if not callable(_v138_prev_today_records):
+        return pd.DataFrame()
+    return _v138_format_remark_column(_v138_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only))
+
+# =================== END V138B PARALLEL WORK HOURS HMS DISPLAY FIX ===================
