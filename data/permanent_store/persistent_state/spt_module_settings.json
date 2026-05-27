@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 19:30:35",
+  "exported_at": "2026-05-27 19:41:27",
   "source": "db_service_write",
   "tables": {
     "system_settings": [
@@ -52,7 +52,7 @@
         "sort_order": 1,
         "note": "所有類別共用工段",
         "created_at": "2026-05-20 14:24:53",
-        "updated_at": "2026-05-22 17:14:19"
+        "updated_at": "2026-05-27 19:40:22"
       },
       {
         "id": 2,
@@ -61,7 +61,7 @@
         "sort_order": 2,
         "note": "",
         "created_at": "2026-05-20 14:25:52",
-        "updated_at": "2026-05-22 17:14:19"
+        "updated_at": "2026-05-27 19:40:22"
       },
       {
         "id": 3,
@@ -70,7 +70,7 @@
         "sort_order": 3,
         "note": "",
         "created_at": "2026-05-20 14:43:35",
-        "updated_at": "2026-05-22 17:14:19"
+        "updated_at": "2026-05-27 19:40:22"
       },
       {
         "id": 4,
@@ -79,7 +79,7 @@
         "sort_order": 4,
         "note": "",
         "created_at": "2026-05-22 09:54:34",
-        "updated_at": "2026-05-22 17:14:19"
+        "updated_at": "2026-05-27 19:40:22"
       },
       {
         "id": 5,
@@ -88,7 +88,7 @@
         "sort_order": 5,
         "note": "",
         "created_at": "2026-05-22 09:54:34",
-        "updated_at": "2026-05-22 17:14:19"
+        "updated_at": "2026-05-27 19:40:22"
       },
       {
         "id": 6,
@@ -97,7 +97,16 @@
         "sort_order": 6,
         "note": "",
         "created_at": "2026-05-22 09:54:34",
-        "updated_at": "2026-05-22 17:14:19"
+        "updated_at": "2026-05-27 19:40:22"
+      },
+      {
+        "id": 7,
+        "category_name": "6S",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-27 19:40:22",
+        "updated_at": "2026-05-27 19:40:22"
       }
     ],
     "process_category_options": [
@@ -412,16 +421,6 @@
         "updated_at": "2026-05-27 19:00:01"
       },
       {
-        "id": 33,
-        "category_name": "NTB",
-        "process_name": "6S",
-        "is_active": 1,
-        "sort_order": 19,
-        "note": "",
-        "created_at": "2026-05-22 09:55:40",
-        "updated_at": "2026-05-27 19:00:01"
-      },
-      {
         "id": 34,
         "category_name": "FCLP",
         "process_name": "前置鈑金",
@@ -429,7 +428,7 @@
         "sort_order": 3,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 35,
@@ -439,7 +438,7 @@
         "sort_order": 4,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 36,
@@ -449,7 +448,7 @@
         "sort_order": 5,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 37,
@@ -459,7 +458,7 @@
         "sort_order": 6,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 38,
@@ -469,7 +468,7 @@
         "sort_order": 7,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 39,
@@ -479,7 +478,7 @@
         "sort_order": 8,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 40,
@@ -489,7 +488,7 @@
         "sort_order": 9,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 41,
@@ -499,7 +498,7 @@
         "sort_order": 10,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 42,
@@ -509,7 +508,7 @@
         "sort_order": 11,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 43,
@@ -519,7 +518,7 @@
         "sort_order": 12,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 44,
@@ -529,7 +528,7 @@
         "sort_order": 14,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 45,
@@ -539,7 +538,7 @@
         "sort_order": 15,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 46,
@@ -549,7 +548,7 @@
         "sort_order": 16,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 47,
@@ -559,7 +558,7 @@
         "sort_order": 17,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 48,
@@ -569,17 +568,7 @@
         "sort_order": 18,
         "note": "",
         "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 49,
-        "category_name": "FCLP",
-        "process_name": "其他",
-        "is_active": 1,
-        "sort_order": 19,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
         "id": 50,
@@ -922,16 +911,6 @@
         "updated_at": "2026-05-27 15:14:35"
       },
       {
-        "id": 102,
-        "category_name": "Sorter/EFEM",
-        "process_name": "6S",
-        "is_active": 1,
-        "sort_order": 19,
-        "note": "",
-        "created_at": "2026-05-27 18:56:45",
-        "updated_at": "2026-05-27 19:01:49"
-      },
-      {
         "id": 103,
         "category_name": "NTB",
         "process_name": "其他",
@@ -949,7 +928,7 @@
         "sort_order": 3,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 105,
@@ -959,7 +938,7 @@
         "sort_order": 4,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 106,
@@ -969,7 +948,7 @@
         "sort_order": 5,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 107,
@@ -979,7 +958,7 @@
         "sort_order": 6,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 108,
@@ -989,7 +968,7 @@
         "sort_order": 7,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 109,
@@ -999,7 +978,7 @@
         "sort_order": 8,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 110,
@@ -1009,7 +988,7 @@
         "sort_order": 9,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 111,
@@ -1019,7 +998,7 @@
         "sort_order": 10,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 112,
@@ -1029,7 +1008,7 @@
         "sort_order": 11,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 113,
@@ -1039,7 +1018,7 @@
         "sort_order": 12,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 114,
@@ -1049,7 +1028,7 @@
         "sort_order": 13,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 115,
@@ -1059,7 +1038,7 @@
         "sort_order": 14,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 116,
@@ -1069,7 +1048,7 @@
         "sort_order": 15,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
         "id": 117,
@@ -1079,167 +1058,430 @@
         "sort_order": 16,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:01:49"
+        "updated_at": "2026-05-27 19:38:55"
+      },
+      {
+        "id": 119,
+        "category_name": "FCLP",
+        "process_name": "6S",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-27 19:37:08",
+        "updated_at": "2026-05-27 19:37:08"
+      },
+      {
+        "id": 120,
+        "category_name": "6S",
+        "process_name": "6S",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-27 19:41:11",
+        "updated_at": "2026-05-27 19:41:11"
       }
     ],
     "process_options": [
       {
-        "id": 1,
+        "id": 603,
         "process_name": "前置鈑金",
         "is_active": 1,
-        "sort_order": 1,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
-        "id": 2,
+        "id": 604,
         "process_name": "LP改造",
         "is_active": 1,
-        "sort_order": 2,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
       },
       {
-        "id": 3,
+        "id": 605,
         "process_name": "骨架組立",
         "is_active": 1,
         "sort_order": 3,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 4,
+        "id": 606,
         "process_name": "配電",
         "is_active": 1,
         "sort_order": 4,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 5,
+        "id": 607,
         "process_name": "模組",
         "is_active": 1,
-        "sort_order": 5,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:37:08"
       },
       {
-        "id": 6,
+        "id": 608,
         "process_name": "水平",
         "is_active": 1,
-        "sort_order": 6,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 7,
+        "id": 609,
         "process_name": "S.T.",
         "is_active": 1,
-        "sort_order": 7,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 8,
+        "id": 610,
         "process_name": "清潔",
         "is_active": 1,
         "sort_order": 8,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 9,
+        "id": 611,
         "process_name": "收機",
         "is_active": 1,
         "sort_order": 9,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 10,
+        "id": 612,
         "process_name": "包機",
         "is_active": 1,
         "sort_order": 10,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 11,
+        "id": 613,
         "process_name": "Packing",
         "is_active": 1,
-        "sort_order": 11,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 12,
+        "id": 614,
         "process_name": "異常",
         "is_active": 1,
-        "sort_order": 12,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 13,
+        "id": 615,
         "process_name": "設變",
         "is_active": 1,
-        "sort_order": 13,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 14,
+        "id": 616,
         "process_name": "重工",
         "is_active": 1,
-        "sort_order": 14,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "sort_order": 13,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 15,
+        "id": 617,
         "process_name": "教育訓練",
         "is_active": 1,
-        "sort_order": 15,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 16,
+        "id": 618,
         "process_name": "IPQC",
         "is_active": 1,
-        "sort_order": 16,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
       },
       {
-        "id": 17,
+        "id": 619,
         "process_name": "其他",
         "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-27 19:38:55"
+      },
+      {
+        "id": 620,
+        "process_name": "機台定位水平調整(含連結)",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 621,
+        "process_name": "ETH 模組組裝",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 622,
+        "process_name": "CVTR 模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 623,
+        "process_name": "LDCV 模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 624,
+        "process_name": "UDCV 模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 625,
+        "process_name": "LTLT模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 626,
+        "process_name": "UTLT模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 627,
+        "process_name": "LBTR模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 628,
+        "process_name": "UBTR模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 629,
+        "process_name": "機構調整(滑軌模組)",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 630,
+        "process_name": "unit 安裝調整 (Robot  /LP / FFU)",
+        "is_active": 1,
+        "sort_order": 13,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 631,
+        "process_name": "GPTC Robot Teaching機構調整",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 632,
+        "process_name": "主機 / 次系統管路製作",
+        "is_active": 0,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 633,
+        "process_name": "管路檢測",
+        "is_active": 0,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 634,
+        "process_name": "管路流量調整",
+        "is_active": 0,
         "sort_order": 17,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-26 13:18:53",
-        "updated_at": "2026-05-26 13:18:53"
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 635,
+        "process_name": "上盤日",
+        "is_active": 0,
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 636,
+        "process_name": "主機 /次系統管路製作",
+        "is_active": 0,
+        "sort_order": 19,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 637,
+        "process_name": "POWER ON",
+        "is_active": 0,
+        "sort_order": 20,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 638,
+        "process_name": "IO Test",
+        "is_active": 0,
+        "sort_order": 21,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 639,
+        "process_name": "Robot Z軸組立",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 640,
+        "process_name": "左右塔組立",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 641,
+        "process_name": "水平調整",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 642,
+        "process_name": "模組組立",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 643,
+        "process_name": "OPEN 配線",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 644,
+        "process_name": "左右塔配線",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 645,
+        "process_name": "左右塔外框結合",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-27 15:14:35"
+      },
+      {
+        "id": 684,
+        "process_name": "6S",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-27 19:37:08",
+        "updated_at": "2026-05-27 19:41:11"
       }
     ],
     "rest_periods": [
       {
-        "id": 1,
+        "id": 11,
         "name": "上午休息",
         "start_time": "10:30",
         "end_time": "10:45",
@@ -1247,7 +1489,7 @@
         "sort_order": 1
       },
       {
-        "id": 2,
+        "id": 12,
         "name": "午休",
         "start_time": "12:00",
         "end_time": "13:00",
@@ -1255,7 +1497,7 @@
         "sort_order": 2
       },
       {
-        "id": 3,
+        "id": 13,
         "name": "下午休息",
         "start_time": "15:00",
         "end_time": "15:15",
@@ -1263,7 +1505,7 @@
         "sort_order": 3
       },
       {
-        "id": 4,
+        "id": 14,
         "name": "晚餐休息",
         "start_time": "18:00",
         "end_time": "18:30",
@@ -1271,7 +1513,7 @@
         "sort_order": 4
       },
       {
-        "id": 5,
+        "id": 15,
         "name": "晚上休息",
         "start_time": "20:00",
         "end_time": "20:15",
@@ -3697,9 +3939,9 @@
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 0,
-    "process_categories": 6,
-    "process_category_options": 98,
-    "process_options": 17,
+    "process_categories": 7,
+    "process_category_options": 97,
+    "process_options": 44,
     "rest_periods": 5,
     "app_settings": 1,
     "auth_users": 11,
