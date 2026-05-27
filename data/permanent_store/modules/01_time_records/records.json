@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 15:56:21",
-  "exported_at": "2026-05-27 15:56:21",
-  "reason": "delete_time_records_v96_0102_sync_01",
+  "updated_at": "2026-05-27 15:56:23",
+  "exported_at": "2026-05-27 15:56:23",
+  "reason": "delete_time_records_v98_write_through_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1143,60 +1143,6 @@
         "updated_at": "2026-05-27 15:23:05"
       },
       {
-        "id": 220,
-        "record_key": "SPT208|26M0021-03|前置鈑金|2026-05-27 15:47:20|5ed95455",
-        "status": "完工",
-        "work_order": "26M0021-03",
-        "part_no": "1GRSC150-003-04",
-        "type_name": "4 Port Frame Long-type EFEM",
-        "process_name": "前置鈑金",
-        "employee_id": "SPT208",
-        "employee_name": "邱珍娜",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 15:47:20",
-        "end_action": "完工",
-        "end_timestamp": "2026-05-27 15:47:43",
-        "remark": "FINISHED",
-        "start_date": "2026-05-27",
-        "start_time": "15:47:20",
-        "end_date": "2026-05-27",
-        "end_time": "15:47:43",
-        "work_hours": 0.01,
-        "assembly_location": "竹東",
-        "group_key": "SPT208|前置鈑金|2026-05-27",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-27 15:47:20",
-        "updated_at": "2026-05-27 15:47:43"
-      },
-      {
-        "id": 221,
-        "record_key": "SPT208|26N4001-06|前置鈑金|2026-05-27 15:48:22|d3649078",
-        "status": "作業中",
-        "work_order": "26N4001-06",
-        "part_no": "1SLP01S-FCA1-01",
-        "type_name": "FCLP EFEM",
-        "process_name": "前置鈑金",
-        "employee_id": "SPT208",
-        "employee_name": "邱珍娜",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 15:48:22",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
-        "start_date": "2026-05-27",
-        "start_time": "15:48:22",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SPT208|前置鈑金|2026-05-27",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-27 15:48:22",
-        "updated_at": "2026-05-27 15:48:22"
-      },
-      {
         "id": 222,
         "record_key": "SPT243|22M0162-92|收機|2026-05-27 15:55:16|01d6a1ce",
         "status": "作業中",
@@ -1227,6 +1173,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 45
+    "time_records": 43
   }
 }
