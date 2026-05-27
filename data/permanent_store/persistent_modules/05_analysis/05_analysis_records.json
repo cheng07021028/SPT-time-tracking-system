@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 09:34:12",
+  "exported_at": "2026-05-27 09:37:53",
   "source": "db_service_write",
   "module_key": "05_analysis",
   "module_code": "05",
@@ -1006,13 +1006,40 @@
         "source": "streamlit",
         "created_at": "2026-05-27 09:34:11",
         "updated_at": "2026-05-27 09:34:11"
+      },
+      {
+        "id": 136,
+        "record_key": "SPT220|26M0095-08|S.T.|2026-05-27 09:37:52|6df74486",
+        "status": "作業中",
+        "work_order": "26M0095-08",
+        "part_no": "4TRSC131-005-05",
+        "type_name": "2LP Asymtek EFEM (wafer)(宏田)",
+        "process_name": "S.T.",
+        "employee_id": "SPT220",
+        "employee_name": "劉韋廷",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 09:37:52",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "09:37:52",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "宏田",
+        "group_key": "SPT220|S.T.|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 09:37:52",
+        "updated_at": "2026-05-27 09:37:52"
       }
     ],
     "work_orders": [],
     "employees": []
   },
   "table_counts": {
-    "time_records": 37,
+    "time_records": 38,
     "work_orders": 0,
     "employees": 0
   }
