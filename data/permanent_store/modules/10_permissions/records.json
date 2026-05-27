@@ -2,9 +2,9 @@
   "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-27 22:25:11",
+  "updated_at": "2026-05-27 22:25:14",
   "exported_at": "2026-05-27 17:53:19",
-  "reason": "save_account_master_pre_delete_v96",
+  "reason": "save_users_v96",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -20,7 +20,7 @@
         "force_password_change": 0,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "manager",
@@ -30,11 +30,11 @@
         "display_name": "製造主管",
         "email": "manager",
         "role_code": "manager",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "leader",
@@ -44,11 +44,11 @@
         "display_name": "現場幹部",
         "email": "leader",
         "role_code": "leader",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "operator",
@@ -58,11 +58,11 @@
         "display_name": "作業人員",
         "email": "operator",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "viewer",
@@ -72,11 +72,11 @@
         "display_name": "查詢者",
         "email": "viewer",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "auditor",
@@ -86,11 +86,11 @@
         "display_name": "稽核",
         "email": "auditor",
         "role_code": "auditor",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B002",
@@ -100,11 +100,11 @@
         "display_name": "張文品",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B126",
@@ -114,11 +114,11 @@
         "display_name": "戴鎰祥",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B135",
@@ -128,11 +128,11 @@
         "display_name": "鍾明志",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B155",
@@ -142,11 +142,11 @@
         "display_name": "趙健浩",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B168",
@@ -156,11 +156,11 @@
         "display_name": "洪敏強",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B177",
@@ -170,11 +170,11 @@
         "display_name": "羅章淳",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B189",
@@ -184,11 +184,11 @@
         "display_name": "羅文發",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B190",
@@ -198,11 +198,11 @@
         "display_name": "黃瑞翎",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B203",
@@ -212,11 +212,11 @@
         "display_name": "蕭桓惟",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B204",
@@ -226,11 +226,11 @@
         "display_name": "周棟榮",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B210",
@@ -240,11 +240,11 @@
         "display_name": "黃承淮",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B226",
@@ -254,11 +254,11 @@
         "display_name": "周政龍",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B227",
@@ -268,11 +268,11 @@
         "display_name": "潘信成",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B228",
@@ -282,11 +282,11 @@
         "display_name": "溫翠茹",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B229",
@@ -296,11 +296,11 @@
         "display_name": "姚奕舟",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B230",
@@ -310,11 +310,11 @@
         "display_name": "姜智翔",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B235",
@@ -324,11 +324,11 @@
         "display_name": "徐聖淇",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B243",
@@ -338,11 +338,11 @@
         "display_name": "周美琪",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B244",
@@ -352,11 +352,11 @@
         "display_name": "范耀文",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B245",
@@ -366,11 +366,11 @@
         "display_name": "張維宏",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B246",
@@ -380,11 +380,11 @@
         "display_name": "湯詠棋",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B247",
@@ -394,11 +394,11 @@
         "display_name": "劉家瑋",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B248",
@@ -408,11 +408,11 @@
         "display_name": "佘銘訓",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B249",
@@ -422,11 +422,11 @@
         "display_name": "劉翰霖",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B250",
@@ -436,11 +436,11 @@
         "display_name": "劉順榮",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B251",
@@ -450,11 +450,11 @@
         "display_name": "胡昌叡",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B252",
@@ -464,11 +464,11 @@
         "display_name": "吳家穎",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B253",
@@ -478,11 +478,11 @@
         "display_name": "呂定樺",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B254",
@@ -492,11 +492,11 @@
         "display_name": "陳展榮",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B255",
@@ -506,11 +506,11 @@
         "display_name": "郭建佑",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B256",
@@ -520,11 +520,11 @@
         "display_name": "莊翔宇",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B257",
@@ -534,11 +534,11 @@
         "display_name": "彭紹恩",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B258",
@@ -548,11 +548,11 @@
         "display_name": "羅仕君",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B259",
@@ -562,11 +562,11 @@
         "display_name": "鄧文誠",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B260",
@@ -576,11 +576,11 @@
         "display_name": "莊仕琦",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "Ethan",
@@ -590,11 +590,11 @@
         "display_name": "Ethan",
         "email": "",
         "role_code": "admin",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT003",
@@ -604,11 +604,11 @@
         "display_name": "林威呈",
         "email": "",
         "role_code": "manager",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT005",
@@ -618,11 +618,11 @@
         "display_name": "張景智",
         "email": "",
         "role_code": "manager",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT015",
@@ -632,11 +632,11 @@
         "display_name": "陳文山",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT024",
@@ -646,11 +646,11 @@
         "display_name": "陳德文",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT031",
@@ -660,11 +660,11 @@
         "display_name": "吳政昌",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT034",
@@ -674,11 +674,11 @@
         "display_name": "陳長彥",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT048",
@@ -688,11 +688,11 @@
         "display_name": "李俊霖",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT059",
@@ -702,11 +702,11 @@
         "display_name": "蘇萬紘",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT063",
@@ -716,11 +716,11 @@
         "display_name": "劉志偉",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT077",
@@ -730,11 +730,11 @@
         "display_name": "謝宛庭",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT084",
@@ -744,11 +744,11 @@
         "display_name": "陳育信",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT087",
@@ -758,11 +758,11 @@
         "display_name": "牟育玄",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT088",
@@ -772,11 +772,11 @@
         "display_name": "林建安",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT089",
@@ -786,11 +786,11 @@
         "display_name": "陳凱彥",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT091",
@@ -800,11 +800,11 @@
         "display_name": "魏瑄毅",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT092",
@@ -814,11 +814,11 @@
         "display_name": "林昶志",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT105",
@@ -828,11 +828,11 @@
         "display_name": "劉秀鳳",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT118",
@@ -842,11 +842,11 @@
         "display_name": "郭家吟",
         "email": "",
         "role_code": "manager",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT120",
@@ -856,11 +856,11 @@
         "display_name": "彭雅琴",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT121",
@@ -870,11 +870,11 @@
         "display_name": "徐兆生",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT138",
@@ -884,11 +884,11 @@
         "display_name": "蘇雍盛",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT142",
@@ -898,11 +898,11 @@
         "display_name": "黃沂澂",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT145",
@@ -912,11 +912,11 @@
         "display_name": "潘威捷",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT148",
@@ -926,11 +926,11 @@
         "display_name": "羅立昕",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT149",
@@ -940,11 +940,11 @@
         "display_name": "江金福",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT150",
@@ -954,11 +954,11 @@
         "display_name": "李守益",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT151",
@@ -968,11 +968,11 @@
         "display_name": "鄭智鍵",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT158",
@@ -982,11 +982,11 @@
         "display_name": "劉定澤",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT160",
@@ -996,11 +996,11 @@
         "display_name": "邱信維",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT172",
@@ -1010,11 +1010,11 @@
         "display_name": "胡瑄芸",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT173",
@@ -1024,11 +1024,11 @@
         "display_name": "吳芷熙",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT174",
@@ -1038,11 +1038,11 @@
         "display_name": "龍才華",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT183",
@@ -1052,11 +1052,11 @@
         "display_name": "蕭詩瓊",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT189",
@@ -1066,11 +1066,11 @@
         "display_name": "劉欣惠",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT193",
@@ -1080,11 +1080,11 @@
         "display_name": "呂昰儒",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT195",
@@ -1094,11 +1094,11 @@
         "display_name": "姜治銘",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT196",
@@ -1108,11 +1108,11 @@
         "display_name": "黃建堃",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT199",
@@ -1122,11 +1122,11 @@
         "display_name": "龍斯愷",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT201",
@@ -1136,11 +1136,11 @@
         "display_name": "彭毓萱",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT203",
@@ -1150,11 +1150,11 @@
         "display_name": "徐梓翔",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT208",
@@ -1164,11 +1164,11 @@
         "display_name": "邱珍娜",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT220",
@@ -1178,11 +1178,11 @@
         "display_name": "劉韋廷",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT227",
@@ -1192,11 +1192,11 @@
         "display_name": "張佳銓",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT228",
@@ -1206,11 +1206,11 @@
         "display_name": "王添慶",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT229",
@@ -1220,11 +1220,11 @@
         "display_name": "彭子芸",
         "email": "",
         "role_code": "manager",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT230",
@@ -1234,11 +1234,11 @@
         "display_name": "梁志宏",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT231",
@@ -1248,11 +1248,11 @@
         "display_name": "陳建勳",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT235",
@@ -1262,11 +1262,11 @@
         "display_name": "曾純鈺",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT236",
@@ -1276,11 +1276,11 @@
         "display_name": "賴智文",
         "email": "",
         "role_code": "admin",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT239",
@@ -1290,11 +1290,11 @@
         "display_name": "麥可",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT240",
@@ -1304,11 +1304,11 @@
         "display_name": "吉爾",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT241",
@@ -1318,11 +1318,11 @@
         "display_name": "達文",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT242",
@@ -1332,11 +1332,11 @@
         "display_name": "保羅",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT243",
@@ -1346,11 +1346,11 @@
         "display_name": "羅丹",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT244",
@@ -1360,11 +1360,11 @@
         "display_name": "費南",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT245",
@@ -1374,11 +1374,11 @@
         "display_name": "傑米",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT250",
@@ -1388,11 +1388,11 @@
         "display_name": "鄭至賢",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT252",
@@ -1402,11 +1402,11 @@
         "display_name": "許佩瑜",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SPT256",
@@ -1416,11 +1416,11 @@
         "display_name": "阿杰",
         "email": "operator",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-27 10:05:01",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B164",
@@ -1430,11 +1430,11 @@
         "display_name": "陳宛廷",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-27 10:23:13",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B211",
@@ -1444,11 +1444,11 @@
         "display_name": "張瑀榛",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-27 10:24:13",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "B237",
@@ -1458,11 +1458,11 @@
         "display_name": "彭紹恩",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-27 10:24:48",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       },
       {
         "username": "SSS",
@@ -1472,11 +1472,11 @@
         "display_name": "SSS",
         "email": "",
         "role_code": "operator",
-        "is_active": 1,
+        "is_active": 0,
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-27 16:05:48",
-        "updated_at": "2026-05-27 18:27:16"
+        "updated_at": "2026-05-27 22:25:14"
       }
     ],
     "auth_account_permissions": [
