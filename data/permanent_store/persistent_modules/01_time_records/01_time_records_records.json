@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 09:59:37",
+  "exported_at": "2026-05-27 10:23:53",
   "source": "db_service_write",
   "module_key": "01_time_records",
   "module_code": "01",
@@ -1037,7 +1037,7 @@
       {
         "id": 151,
         "record_key": "B203|26M0043-01|模組|2026-05-27 09:59:37|3bcbbdb0",
-        "status": "作業中",
+        "status": "暫停",
         "work_order": "26M0043-01",
         "part_no": "PSRSC131-N01-04",
         "type_name": "PSRSC131-N01",
@@ -1046,20 +1046,20 @@
         "employee_name": "蕭桓惟",
         "start_action": "開始",
         "start_timestamp": "2026-05-27 09:59:37",
-        "end_action": null,
-        "end_timestamp": null,
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-27 10:23:53",
         "remark": "",
         "start_date": "2026-05-27",
         "start_time": "09:59:37",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
+        "end_date": "2026-05-27",
+        "end_time": "10:23:53",
+        "work_hours": 0.4,
         "assembly_location": "竹東",
         "group_key": "B203|模組|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 09:59:37",
-        "updated_at": "2026-05-27 09:59:37"
+        "updated_at": "2026-05-27 10:23:53"
       }
     ]
   },
