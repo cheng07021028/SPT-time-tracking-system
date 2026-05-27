@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 18:57:47",
-  "exported_at": "2026-05-27 18:57:47",
+  "updated_at": "2026-05-27 18:59:13",
+  "exported_at": "2026-05-27 18:59:13",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -33127,11 +33127,143 @@
         "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM process_categories",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 7893,
+        "log_time": "2026-05-27 18:59:13",
+        "user_name": "admin",
+        "action_type": "SAVE_PROCESS_OPTIONS",
+        "target_table": "13_system_settings",
+        "target_id": "",
+        "message": "儲存工段設定 18 筆，影響類別：NTB, Sorter/EFEM",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7892,
+        "log_time": "2026-05-27 18:59:13",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "app_settings",
+        "target_id": "",
+        "message": "INSERT app_settings",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; INSERT OR REPLACE INTO app_settings(setting_key, setting_value, note, updated_at) VALUES (?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7891,
+        "log_time": "2026-05-27 18:59:13",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "rest_periods",
+        "target_id": "",
+        "message": "INSERT rest_periods",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; INSERT INTO rest_periods(id, name, start_time, end_time, is_active, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7890,
+        "log_time": "2026-05-27 18:59:13",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "process_options",
+        "target_id": "",
+        "message": "INSERT process_options",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; \n                INSERT INTO process_options(process_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, ?, ?, ?, ?, ?)\n                ON CONFLICT(process_name) DO UPDATE SET\n                    is_active=excluded.is_active,\n                    sort_order=excluded.sort_order,\n                    note=excluded.note,\n                    updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7889,
+        "log_time": "2026-05-27 18:59:13",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; \n                INSERT INTO process_category_options(id, category_name, process_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n                ON CONFLICT(category_name, process_name) DO UPDATE SET\n                    is_active=excluded.is_active,\n                    sort_order=excluded.sort_order,\n                    note=excluded.note,\n                    updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7888,
+        "log_time": "2026-05-27 18:59:13",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; \n                INSERT INTO process_categories(id, category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, ?, ?, ?, ?, ?, ?)\n                ON CONFLICT(category_name) DO UPDATE SET\n                    is_active=excluded.is_active,\n                    sort_order=excluded.sort_order,\n                    note=excluded.note,\n                    updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7887,
+        "log_time": "2026-05-27 18:59:13",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "app_settings",
+        "target_id": "",
+        "message": "DELETE app_settings",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM app_settings",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7886,
+        "log_time": "2026-05-27 18:59:13",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "rest_periods",
+        "target_id": "",
+        "message": "DELETE rest_periods",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM rest_periods",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7885,
+        "log_time": "2026-05-27 18:59:13",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "process_options",
+        "target_id": "",
+        "message": "DELETE process_options",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM process_options",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7884,
+        "log_time": "2026-05-27 18:59:13",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "DELETE process_category_options",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM process_category_options",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7883,
+        "log_time": "2026-05-27 18:59:13",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "DELETE process_categories",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM process_categories",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2760
+    "system_logs": 2771
   }
 }
