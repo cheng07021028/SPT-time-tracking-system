@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 20:56:47",
+  "exported_at": "2026-05-27 20:57:37",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 5,
@@ -11,7 +11,7 @@
     "auth_security_settings": 2,
     "auth_users": 11,
     "employees": 0,
-    "login_logs": 339,
+    "login_logs": 340,
     "process_categories": 7,
     "process_category_options": 97,
     "process_options": 44,
@@ -7524,6 +7524,21 @@
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-27 16:17:28"
+      },
+      {
+        "id": 25841,
+        "username": "SPT239",
+        "display_name": "麥可",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=SPT239; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 20:57:37",
+        "logout_time": "2026-05-27 20:57:37",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 20:57:37"
       }
     ],
     "process_categories": [
@@ -17804,7 +17819,7 @@
       {
         "id": 190,
         "record_key": "SPT241|24N4001-24|收機|2026-05-27 20:28:51|0c0ce35f",
-        "status": "作業中",
+        "status": "下班",
         "work_order": "24N4001-24",
         "part_no": "1SLP01S-FCA1-01",
         "type_name": "FCLP EFEM",
@@ -17813,20 +17828,20 @@
         "employee_name": "達文",
         "start_action": "開始",
         "start_timestamp": "2026-05-27 20:28:51",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": "",
+        "end_action": "下班",
+        "end_timestamp": "2026-05-27 20:57:37",
+        "remark": "OFF DUTY",
         "start_date": "2026-05-27",
         "start_time": "20:28:51",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
+        "end_date": "2026-05-27",
+        "end_time": "20:57:37",
+        "work_hours": 0.48,
         "assembly_location": "竹東",
         "group_key": "SPT241|收機|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 20:28:51",
-        "updated_at": "2026-05-27 20:28:51"
+        "updated_at": "2026-05-27 20:57:37"
       }
     ],
     "work_orders": []
