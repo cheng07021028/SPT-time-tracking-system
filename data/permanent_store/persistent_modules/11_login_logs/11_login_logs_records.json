@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 09:48:50",
+  "exported_at": "2026-05-27 09:49:23",
   "source": "db_service_write",
   "module_key": "11_login_logs",
   "module_code": "11",
@@ -4585,19 +4585,19 @@
         "created_at": "2026-05-26 23:10:23"
       },
       {
-        "id": 49112,
-        "username": "SPT160",
-        "display_name": "邱信維",
-        "event_type": "PASSWORD_CHANGE",
+        "id": 49430,
+        "username": "SPT149",
+        "display_name": "江金福",
+        "event_type": "LOGIN",
         "result": "SUCCESS",
-        "message": "force_password_change_completed; employee_id=SPT160; roles=operator",
-        "module_code": "10_permissions",
-        "login_time": "2026-05-27 09:48:49",
+        "message": "role=operator;source=authority; employee_id=SPT149",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 09:49:23",
         "logout_time": "",
         "idle_minutes": null,
         "ip_address": "",
         "user_agent": "streamlit",
-        "created_at": "2026-05-27 09:48:49"
+        "created_at": "2026-05-27 09:49:23"
       }
     ]
   },
