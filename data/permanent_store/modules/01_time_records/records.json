@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 10:46:17",
-  "exported_at": "2026-05-27 10:46:17",
-  "reason": "save_time_records_v98_write_through_01",
+  "updated_at": "2026-05-27 10:46:43",
+  "exported_at": "2026-05-27 10:46:43",
+  "reason": "load_records_v134_display_self_repair_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -276,7 +276,7 @@
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-27 09:16:42",
-        "updated_at": "2026-05-27 10:46:14"
+        "updated_at": "2026-05-27 10:41:03"
       },
       {
         "id": 101,
@@ -357,7 +357,7 @@
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-27 09:26:55",
-        "updated_at": "2026-05-27 10:46:14"
+        "updated_at": "2026-05-27 10:41:03"
       },
       {
         "id": 132,
@@ -465,7 +465,7 @@
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-27 10:36:26",
-        "updated_at": "2026-05-27 10:46:14"
+        "updated_at": "2026-05-27 10:41:03"
       },
       {
         "id": 156,
@@ -492,7 +492,7 @@
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-27 10:41:03",
-        "updated_at": "2026-05-27 10:46:14"
+        "updated_at": "2026-05-27 10:41:03"
       },
       {
         "id": 157,
@@ -516,7 +516,7 @@
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT077|其他|2026-05-27",
-        "is_group_work": 1,
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 10:44:28",
         "updated_at": "2026-05-27 10:44:28"
