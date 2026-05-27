@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 08:35:14",
-  "exported_at": "2026-05-27 08:35:14",
+  "updated_at": "2026-05-27 08:35:19",
+  "exported_at": "2026-05-27 08:35:19",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 518,
+        "source": "v103_merge",
+        "username": "B255",
+        "display_name": "郭建佑",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=B255; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 08:35:19",
+        "logout_time": "2026-05-27 08:35:19",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 08:35:19"
+      },
+      {
+        "id": 482,
+        "source": "v103_merge",
+        "username": "B255",
+        "display_name": "郭建佑",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=B255; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 08:35:17",
+        "logout_time": "2026-05-27 08:35:17",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 08:35:17"
+      },
       {
         "id": 447,
         "source": "v103_merge",
@@ -558,7 +590,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 34,
+    "login_logs": 36,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
