@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 18:41:38",
-  "exported_at": "2026-05-27 18:41:38",
-  "reason": "finish_work_v139_final_state_reconcile_01",
+  "updated_at": "2026-05-27 18:42:19",
+  "exported_at": "2026-05-27 18:42:19",
+  "reason": "get_active_records_v141_strict_selected_employee_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1440,6 +1440,33 @@
         "updated_at": "2026-05-27 17:07:04"
       },
       {
+        "id": 246,
+        "record_key": "SPT208|22M0162-92|清潔|2026-05-27 18:42:16|2fa6ee19",
+        "status": "作業中",
+        "work_order": "22M0162-92",
+        "part_no": "4TRSC020-004-02->4TRSC020-004-06",
+        "type_name": "NTB 3 LP +快拆+EMO",
+        "process_name": "清潔",
+        "employee_id": "SPT208",
+        "employee_name": "邱珍娜",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 18:42:16",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "18:42:16",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT208|清潔|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 18:42:16",
+        "updated_at": "2026-05-27 18:42:16"
+      },
+      {
         "id": 247,
         "record_key": "SPT158|26M0051-02|包機|2026-05-27 17:07:26|d03173f3",
         "status": "完工",
@@ -1632,6 +1659,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 60
+    "time_records": 61
   }
 }
