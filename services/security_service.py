@@ -3924,3 +3924,183 @@ def log_security_event(username: str | None, event_type: str, result: str, messa
         pass
 
 # =================== END V132 LOGIN PERSONNEL AUTHORITY WRITE-THROUGH FIX ===================
+
+# ===================== V142 HARD GUARD FOR 10 PERMISSION MANAGEMENT =====================
+# 問題修正：10｜權限管理是權限來源本體，不能只依賴一般 can_view/can_manage 快取或舊 session。
+# 曾出現 operator 帳號仍可進入 10 權限管理，原因可能是：
+# - session_state / SQLite / 舊權限快取殘留；
+# - 權限表缺帳號列時 fallback 到角色預設；
+# - 權限檔與登入帳號來源不同步；
+# - Streamlit rerun 後頁面只靠一般 module permission 判斷。
+# V142：10 權限管理採用「權威帳號角色」硬性判斷，只允許 role_code=admin 或 username=admin。
+#       不再讓 operator / leader / manager / viewer / auditor 因快取、can_view、can_manage 舊值誤入。
+
+try:
+    _v142_prev_check_permission = check_permission
+except Exception:  # pragma: no cover
+    _v142_prev_check_permission = None
+try:
+    _v142_prev_require_module_access = require_module_access
+except Exception:  # pragma: no cover
+    _v142_prev_require_module_access = None
+
+_V142_PERMISSION_MODULE_NOS = {"10"}
+
+
+def _v142_clean_text(value) -> str:
+    try:
+        if value is None:
+            return ""
+        s = str(value).strip()
+        if s.lower() in {"none", "nan", "nat", "null", "<na>"}:
+            return ""
+        return s
+    except Exception:
+        return ""
+
+
+def _v142_bool(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    try:
+        if isinstance(value, (int, float)):
+            return float(value) != 0
+    except Exception:
+        pass
+    s = _v142_clean_text(value).lower()
+    if s in {"1", "true", "t", "yes", "y", "on", "啟用", "是", "active", "checked", "勾選"}:
+        return True
+    if s in {"0", "false", "f", "no", "n", "off", "停用", "否", "inactive", "unchecked", ""}:
+        return False
+    return default
+
+
+def _v142_module_no(module_code: str) -> str:
+    try:
+        if "_v125_module_no" in globals():
+            return _v125_module_no(module_code)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    s = _v142_clean_text(module_code)
+    aliases = {
+        "10_permissions": "10", "permissions": "10", "permission": "10",
+        "權限管理": "10", "10": "10",
+    }
+    if s in aliases:
+        return aliases[s]
+    if len(s) >= 2 and s[:2].isdigit():
+        return s[:2]
+    return s.zfill(2)
+
+
+def _v142_load_permission_tables_direct() -> dict:
+    """Read 10_permissions authority records directly, bypassing runtime permission cache."""
+    paths = []
+    try:
+        paths.append(PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json")
+        paths.append(PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json")
+        paths.append(PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_records.json")
+    except Exception:
+        return {}
+    for p in paths:
+        try:
+            if p.exists() and p.stat().st_size > 2:
+                payload = json.loads(p.read_text(encoding="utf-8"))
+                tables = payload.get("tables") if isinstance(payload, dict) and isinstance(payload.get("tables"), dict) else {}
+                if tables:
+                    return tables
+        except Exception:
+            continue
+    return {}
+
+
+def _v142_authoritative_user_role(username: str) -> tuple[str, bool]:
+    """Return (role_code, active) from the authority account master, then SQLite fallback.
+
+    This intentionally does NOT trust st.session_state['auth_roles'] for module 10,
+    because session/cache leftovers are exactly what can let the wrong user into 10.
+    """
+    uname = _v142_clean_text(username).lower()
+    if not uname:
+        return "", False
+
+    tables = _v142_load_permission_tables_direct()
+    for table_name in ("auth_users", "security_users", "users", "account_master", "accounts"):
+        rows = tables.get(table_name, []) if isinstance(tables, dict) else []
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            ru = _v142_clean_text(row.get("username") or row.get("帳號") or row.get("帳號 / Username") or row.get("user")).lower()
+            if ru != uname:
+                continue
+            role = _v142_clean_text(row.get("role_code") or row.get("role") or row.get("角色") or row.get("角色 / Role")).lower()
+            active = _v142_bool(row.get("is_active", row.get("啟用", row.get("啟用 / Active", True))), True)
+            return role or "operator", bool(active)
+
+    # SQLite fallback only if authority file does not contain the account.
+    # Still never trusts session role for 10 權限管理.
+    try:
+        row = query_one("SELECT role_code, is_active FROM auth_users WHERE lower(username)=lower(?)", (uname,)) or {}
+        if row:
+            return _v142_clean_text(row.get("role_code")).lower() or "operator", _v142_bool(row.get("is_active"), False)
+    except Exception:
+        pass
+    try:
+        row = query_one("SELECT role_code, is_active FROM security_users WHERE lower(username)=lower(?)", (uname,)) or {}
+        if row:
+            return _v142_clean_text(row.get("role_code")).lower() or "operator", _v142_bool(row.get("is_active"), False)
+    except Exception:
+        pass
+
+    # Fail closed for all non-admin accounts.  For emergency bootstrap, the literal
+    # admin login remains allowed after successful login.
+    if uname == "admin":
+        return "admin", True
+    return "", False
+
+
+def _v142_is_permission_management_admin(username: str | None = None) -> bool:
+    uname = _v142_clean_text(username or st.session_state.get("auth_username", "")).lower()
+    if not uname:
+        return False
+    role, active = _v142_authoritative_user_role(uname)
+    if not active:
+        return False
+    return bool(uname == "admin" or role == "admin")
+
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    module_no = _v142_module_no(module_code)
+    if module_no in _V142_PERMISSION_MODULE_NOS:
+        # 10 權限管理：硬性只允許權威帳號角色 admin。
+        return _v142_is_permission_management_admin(st.session_state.get("auth_username", ""))
+    if callable(_v142_prev_check_permission):
+        return bool(_v142_prev_check_permission(module_code, action))
+    return False
+
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    require_login(module_code)
+    module_no = _v142_module_no(module_code)
+    if module_no in _V142_PERMISSION_MODULE_NOS and not _v142_is_permission_management_admin(st.session_state.get("auth_username", "")):
+        try:
+            log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"V142 hard deny {module_code}:{action}; role must be admin", module_code)
+        except Exception:
+            pass
+        st.error("權限不足：10. 權限管理只允許系統管理員（admin 角色）進入。")
+        st.stop()
+    if not check_permission(module_code, action):
+        try:
+            log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
+        except Exception:
+            pass
+        st.error("權限不足：你的帳號未被授權使用此模組或功能。")
+        st.stop()
+
+
+require_permission = require_module_access
+# =================== END V142 HARD GUARD FOR 10 PERMISSION MANAGEMENT ===================
