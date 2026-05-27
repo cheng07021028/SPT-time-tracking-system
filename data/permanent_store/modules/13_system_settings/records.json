@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "13_system_settings",
   "kind": "records",
-  "updated_at": "2026-05-27 19:01:50",
-  "exported_at": "2026-05-27 19:01:50",
-  "reason": "export_13_system_settings_page_apply_v85",
+  "updated_at": "2026-05-27 19:36:28",
+  "exported_at": "2026-05-27 19:36:28",
+  "reason": "save_process_options_v85",
   "empty_authoritative": false,
   "tables": {
     "process_categories": [
@@ -235,166 +235,6 @@
         "updated_at": "2026-05-22 09:54:55"
       },
       {
-        "id": 34,
-        "category_name": "FCLP",
-        "process_name": "前置鈑金",
-        "is_active": 1,
-        "sort_order": 3,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 35,
-        "category_name": "FCLP",
-        "process_name": "模組",
-        "is_active": 1,
-        "sort_order": 4,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 36,
-        "category_name": "FCLP",
-        "process_name": "骨架組立",
-        "is_active": 1,
-        "sort_order": 5,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 37,
-        "category_name": "FCLP",
-        "process_name": "配電",
-        "is_active": 1,
-        "sort_order": 6,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 38,
-        "category_name": "FCLP",
-        "process_name": "水平",
-        "is_active": 1,
-        "sort_order": 7,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 39,
-        "category_name": "FCLP",
-        "process_name": "S.T.",
-        "is_active": 1,
-        "sort_order": 8,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 40,
-        "category_name": "FCLP",
-        "process_name": "Packing",
-        "is_active": 1,
-        "sort_order": 9,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 41,
-        "category_name": "FCLP",
-        "process_name": "清潔",
-        "is_active": 1,
-        "sort_order": 10,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 42,
-        "category_name": "FCLP",
-        "process_name": "收機",
-        "is_active": 1,
-        "sort_order": 11,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 43,
-        "category_name": "FCLP",
-        "process_name": "包機",
-        "is_active": 1,
-        "sort_order": 12,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 44,
-        "category_name": "FCLP",
-        "process_name": "異常",
-        "is_active": 1,
-        "sort_order": 14,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 45,
-        "category_name": "FCLP",
-        "process_name": "設變",
-        "is_active": 1,
-        "sort_order": 15,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 46,
-        "category_name": "FCLP",
-        "process_name": "重工",
-        "is_active": 1,
-        "sort_order": 16,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 47,
-        "category_name": "FCLP",
-        "process_name": "教育訓練",
-        "is_active": 1,
-        "sort_order": 17,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 48,
-        "category_name": "FCLP",
-        "process_name": "IPQC",
-        "is_active": 1,
-        "sort_order": 18,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 49,
-        "category_name": "FCLP",
-        "process_name": "其他",
-        "is_active": 1,
-        "sort_order": 19,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
         "id": 50,
         "category_name": "GPTC",
         "process_name": "機台定位水平調整(含連結)",
@@ -1043,6 +883,176 @@
         "note": "",
         "created_at": "2026-05-27 19:01:49",
         "updated_at": "2026-05-27 19:01:49"
+      },
+      {
+        "id": 34,
+        "category_name": "FCLP",
+        "process_name": "前置鈑金",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 35,
+        "category_name": "FCLP",
+        "process_name": "模組",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 36,
+        "category_name": "FCLP",
+        "process_name": "骨架組立",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 37,
+        "category_name": "FCLP",
+        "process_name": "配電",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 38,
+        "category_name": "FCLP",
+        "process_name": "水平",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 39,
+        "category_name": "FCLP",
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 40,
+        "category_name": "FCLP",
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 41,
+        "category_name": "FCLP",
+        "process_name": "清潔",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 42,
+        "category_name": "FCLP",
+        "process_name": "收機",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 43,
+        "category_name": "FCLP",
+        "process_name": "包機",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 44,
+        "category_name": "FCLP",
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 45,
+        "category_name": "FCLP",
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 46,
+        "category_name": "FCLP",
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 47,
+        "category_name": "FCLP",
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 48,
+        "category_name": "FCLP",
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 49,
+        "category_name": "FCLP",
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 19,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 118,
+        "category_name": "FCLP",
+        "process_name": "6S",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-27 19:36:28",
+        "updated_at": "2026-05-27 19:36:28"
       }
     ],
     "process_options": [
@@ -1217,166 +1227,6 @@
         "updated_at": "2026-05-22 09:54:55"
       },
       {
-        "id": 34,
-        "category_name": "FCLP",
-        "process_name": "前置鈑金",
-        "is_active": 1,
-        "sort_order": 3,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 35,
-        "category_name": "FCLP",
-        "process_name": "模組",
-        "is_active": 1,
-        "sort_order": 4,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 36,
-        "category_name": "FCLP",
-        "process_name": "骨架組立",
-        "is_active": 1,
-        "sort_order": 5,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 37,
-        "category_name": "FCLP",
-        "process_name": "配電",
-        "is_active": 1,
-        "sort_order": 6,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 38,
-        "category_name": "FCLP",
-        "process_name": "水平",
-        "is_active": 1,
-        "sort_order": 7,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 39,
-        "category_name": "FCLP",
-        "process_name": "S.T.",
-        "is_active": 1,
-        "sort_order": 8,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 40,
-        "category_name": "FCLP",
-        "process_name": "Packing",
-        "is_active": 1,
-        "sort_order": 9,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 41,
-        "category_name": "FCLP",
-        "process_name": "清潔",
-        "is_active": 1,
-        "sort_order": 10,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 42,
-        "category_name": "FCLP",
-        "process_name": "收機",
-        "is_active": 1,
-        "sort_order": 11,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 43,
-        "category_name": "FCLP",
-        "process_name": "包機",
-        "is_active": 1,
-        "sort_order": 12,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 44,
-        "category_name": "FCLP",
-        "process_name": "異常",
-        "is_active": 1,
-        "sort_order": 14,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 45,
-        "category_name": "FCLP",
-        "process_name": "設變",
-        "is_active": 1,
-        "sort_order": 15,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 46,
-        "category_name": "FCLP",
-        "process_name": "重工",
-        "is_active": 1,
-        "sort_order": 16,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 47,
-        "category_name": "FCLP",
-        "process_name": "教育訓練",
-        "is_active": 1,
-        "sort_order": 17,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 48,
-        "category_name": "FCLP",
-        "process_name": "IPQC",
-        "is_active": 1,
-        "sort_order": 18,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
-        "id": 49,
-        "category_name": "FCLP",
-        "process_name": "其他",
-        "is_active": 1,
-        "sort_order": 19,
-        "note": "",
-        "created_at": "2026-05-22 12:01:07",
-        "updated_at": "2026-05-22 12:01:07"
-      },
-      {
         "id": 50,
         "category_name": "GPTC",
         "process_name": "機台定位水平調整(含連結)",
@@ -2025,6 +1875,176 @@
         "note": "",
         "created_at": "2026-05-27 19:01:49",
         "updated_at": "2026-05-27 19:01:49"
+      },
+      {
+        "id": 34,
+        "category_name": "FCLP",
+        "process_name": "前置鈑金",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 35,
+        "category_name": "FCLP",
+        "process_name": "模組",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 36,
+        "category_name": "FCLP",
+        "process_name": "骨架組立",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 37,
+        "category_name": "FCLP",
+        "process_name": "配電",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 38,
+        "category_name": "FCLP",
+        "process_name": "水平",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 39,
+        "category_name": "FCLP",
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 40,
+        "category_name": "FCLP",
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 41,
+        "category_name": "FCLP",
+        "process_name": "清潔",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 42,
+        "category_name": "FCLP",
+        "process_name": "收機",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 43,
+        "category_name": "FCLP",
+        "process_name": "包機",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 44,
+        "category_name": "FCLP",
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 45,
+        "category_name": "FCLP",
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 46,
+        "category_name": "FCLP",
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 47,
+        "category_name": "FCLP",
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 48,
+        "category_name": "FCLP",
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 49,
+        "category_name": "FCLP",
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 19,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-27 19:36:28"
+      },
+      {
+        "id": 118,
+        "category_name": "FCLP",
+        "process_name": "6S",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-27 19:36:28",
+        "updated_at": "2026-05-27 19:36:28"
       }
     ],
     "rest_periods": [
@@ -2081,8 +2101,8 @@
   "settings": {},
   "table_counts": {
     "process_categories": 6,
-    "process_category_options": 98,
-    "process_options": 98,
+    "process_category_options": 99,
+    "process_options": 99,
     "rest_periods": 5,
     "app_settings": 1
   }
