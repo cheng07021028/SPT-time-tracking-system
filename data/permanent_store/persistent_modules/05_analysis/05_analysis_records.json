@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 18:52:40",
+  "exported_at": "2026-05-27 19:15:28",
   "source": "db_service_write",
   "module_key": "05_analysis",
   "module_code": "05",
@@ -1924,40 +1924,13 @@
         "source": "streamlit",
         "created_at": "2026-05-27 17:28:04",
         "updated_at": "2026-05-27 17:28:04"
-      },
-      {
-        "id": 245,
-        "record_key": "SSS|26M0051-03|前置鈑金|2026-05-27 18:12:50|adbb5a18",
-        "status": "作業中",
-        "work_order": "26M0051-03",
-        "part_no": "PSRSC151-SB4L-05",
-        "type_name": "RSC151-SB4L+Argus",
-        "process_name": "前置鈑金",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 18:12:50",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": "",
-        "start_date": "2026-05-27",
-        "start_time": "18:12:50",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SSS|前置鈑金|2026-05-27",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-27 18:12:50",
-        "updated_at": "2026-05-27 18:12:50"
       }
     ],
     "work_orders": [],
     "employees": []
   },
   "table_counts": {
-    "time_records": 72,
+    "time_records": 71,
     "work_orders": 0,
     "employees": 0
   }
