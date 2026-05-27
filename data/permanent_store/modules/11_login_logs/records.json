@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 17:58:41",
-  "exported_at": "2026-05-27 17:58:41",
+  "updated_at": "2026-05-27 17:58:46",
+  "exported_at": "2026-05-27 17:58:46",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 188885,
+        "source": "v103_merge",
+        "username": "B2374",
+        "display_name": "黃承淮",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "帳號不存在",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 17:58:46",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 17:58:46"
+      },
       {
         "id": 188676,
         "source": "v103_merge",
@@ -3342,7 +3358,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 208,
+    "login_logs": 209,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
