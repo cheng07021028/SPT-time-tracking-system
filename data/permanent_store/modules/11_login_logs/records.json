@@ -2,21 +2,37 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 14:07:17",
-  "exported_at": "2026-05-27 14:07:17",
+  "updated_at": "2026-05-27 14:07:19",
+  "exported_at": "2026-05-27 14:07:19",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
       {
-        "id": 103820,
+        "id": 104278,
         "source": "v103_merge",
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "PERMISSION_DENIED",
         "result": "FAIL",
-        "message": "05_analysis:can_view; employee_id=SPT208; roles=operator",
-        "module_code": "05_analysis",
+        "message": "06_logs:can_view; employee_id=SPT208; roles=operator",
+        "module_code": "06_logs",
+        "login_time": "2026-05-27 14:07:17",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 14:07:17"
+      },
+      {
+        "id": 103362,
+        "source": "v103_merge",
+        "username": "SPT105",
+        "display_name": "胡瑄芸",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=SPT105; roles=operator",
+        "module_code": "LOGIN",
         "login_time": "2026-05-27 14:07:15",
         "logout_time": "",
         "idle_minutes": NaN,
@@ -7326,7 +7342,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 457,
+    "login_logs": 458,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
