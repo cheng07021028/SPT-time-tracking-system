@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 17:35:53",
-  "exported_at": "2026-05-27 17:35:53",
+  "updated_at": "2026-05-27 17:36:01",
+  "exported_at": "2026-05-27 17:36:01",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -30211,11 +30211,47 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 7441,
+        "log_time": "2026-05-27 17:35:58",
+        "user_name": "SPT158",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "247",
+        "message": "V137 結束工時紀錄 #247；同步結束=1筆；狀態=完工；群組總工時=00:28:31；平均工時=00:28:48",
+        "detail": "247",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7440,
+        "log_time": "2026-05-27 17:35:57",
+        "user_name": "SPT158",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7442,
+        "log_time": "2026-05-27 17:36:01",
+        "user_name": "SPT158",
+        "action_type": "V89_SQLITE_CACHE_SYNC_ERROR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 快取由權威檔覆蓋失敗：UNIQUE constraint failed: time_records.id",
+        "detail": "",
+        "level": "ERROR",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2517
+    "system_logs": 2520
   }
 }
