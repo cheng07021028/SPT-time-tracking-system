@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 18:54:22",
-  "exported_at": "2026-05-27 18:54:22",
-  "reason": "start_work_v139_final_state_reconcile_01",
+  "updated_at": "2026-05-27 19:16:09",
+  "exported_at": "2026-05-27 19:16:09",
+  "reason": "delete_time_records_v96_0102_sync_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1278,33 +1278,6 @@
         "updated_at": "2026-05-27 17:28:04"
       },
       {
-        "id": 245,
-        "record_key": "SSS|26M0051-03|前置鈑金|2026-05-27 18:12:50|adbb5a18",
-        "status": "完工",
-        "work_order": "26M0051-03",
-        "part_no": "PSRSC151-SB4L-05",
-        "type_name": "RSC151-SB4L+Argus",
-        "process_name": "前置鈑金",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 18:12:50",
-        "end_action": "完工",
-        "end_timestamp": "2026-05-27 18:49:41",
-        "remark": "",
-        "start_date": "2026-05-27",
-        "start_time": "18:12:50",
-        "end_date": "2026-05-27",
-        "end_time": "18:49:41",
-        "work_hours": 0.33,
-        "assembly_location": "竹東",
-        "group_key": "SSS|前置鈑金|2026-05-27",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-27 18:12:50",
-        "updated_at": "2026-05-27 18:49:41"
-      },
-      {
         "id": 247,
         "record_key": "SPT239|22M0162-92|清潔|2026-05-27 18:44:16|6c2a61a8",
         "status": "作業中",
@@ -1359,33 +1332,6 @@
         "updated_at": "2026-05-27 18:45:57"
       },
       {
-        "id": 249,
-        "record_key": "SSS|22M0162-92|收機|2026-05-27 18:50:25|63d6c3ba",
-        "status": "完工",
-        "work_order": "22M0162-92",
-        "part_no": "4TRSC020-004-02->4TRSC020-004-06",
-        "type_name": "NTB 3 LP +快拆+EMO",
-        "process_name": "收機",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 18:50:25",
-        "end_action": "完工",
-        "end_timestamp": "2026-05-27 18:51:03",
-        "remark": "",
-        "start_date": "2026-05-27",
-        "start_time": "18:50:25",
-        "end_date": "2026-05-27",
-        "end_time": "18:51:03",
-        "work_hours": 0.01,
-        "assembly_location": "竹東",
-        "group_key": "SSS|收機|2026-05-27",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-27 18:50:25",
-        "updated_at": "2026-05-27 18:51:03"
-      },
-      {
         "id": 250,
         "record_key": "SPT241|22M0162-92|清潔|2026-05-27 18:50:50|f8156aa2",
         "status": "作業中",
@@ -1411,38 +1357,11 @@
         "source": "streamlit",
         "created_at": "2026-05-27 18:50:50",
         "updated_at": "2026-05-27 18:50:50"
-      },
-      {
-        "id": 251,
-        "record_key": "SSS|NA|其他|2026-05-27 18:54:18|2e033bed",
-        "status": "作業中",
-        "work_order": "NA",
-        "part_no": "",
-        "type_name": "",
-        "process_name": "其他",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 18:54:18",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
-        "start_date": "2026-05-27",
-        "start_time": "18:54:18",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
-        "assembly_location": "",
-        "group_key": "SSS|其他|2026-05-27",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-27 18:54:18",
-        "updated_at": "2026-05-27 18:54:18"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 53
+    "time_records": 50
   }
 }
