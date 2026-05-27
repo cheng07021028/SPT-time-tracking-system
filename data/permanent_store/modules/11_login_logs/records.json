@@ -2,27 +2,27 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 18:00:10",
-  "exported_at": "2026-05-27 18:00:10",
+  "updated_at": "2026-05-27 18:00:11",
+  "exported_at": "2026-05-27 18:00:11",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
       {
-        "id": 190812,
+        "id": 191249,
         "source": "v103_merge",
-        "username": "B190",
-        "display_name": "黃瑞翎",
-        "event_type": "LOGIN",
-        "result": "SUCCESS",
-        "message": "role=operator;source=authority; employee_id=B190",
-        "module_code": "LOGIN",
-        "login_time": "2026-05-27 18:00:07",
+        "username": "B237",
+        "display_name": "彭紹恩",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "05_analysis:can_view; employee_id=B237; roles=operator",
+        "module_code": "05_analysis",
+        "login_time": "2026-05-27 18:00:08",
         "logout_time": "",
         "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
-        "created_at": "2026-05-27 18:00:07"
+        "created_at": "2026-05-27 18:00:08"
       },
       {
         "id": 190593,
