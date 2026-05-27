@@ -2,27 +2,43 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 17:52:20",
-  "exported_at": "2026-05-27 17:52:20",
+  "updated_at": "2026-05-27 17:52:40",
+  "exported_at": "2026-05-27 17:52:40",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
       {
-        "id": 178460,
+        "id": 178776,
         "source": "v103_merge",
-        "username": "B252",
-        "display_name": "吳家穎",
+        "username": "B002",
+        "display_name": "張文品",
+        "event_type": "POST_RECORD_LOGOUT",
+        "result": "SUCCESS",
+        "message": "完成工時後選擇不繼續記錄，自動登出; employee_id=B002; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 17:52:40",
+        "logout_time": "2026-05-27 17:52:40",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 17:52:40"
+      },
+      {
+        "id": 178461,
+        "source": "v103_merge",
+        "username": "admin",
+        "display_name": "系統管理員",
         "event_type": "LOGIN",
         "result": "SUCCESS",
-        "message": "role=operator;source=authority; employee_id=B252",
+        "message": "role=admin;source=authority",
         "module_code": "LOGIN",
-        "login_time": "2026-05-27 17:52:19",
+        "login_time": "2026-05-27 17:52:20",
         "logout_time": "",
         "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
-        "created_at": "2026-05-27 17:52:19"
+        "created_at": "2026-05-27 17:52:20"
       },
       {
         "id": 178303,
@@ -2526,7 +2542,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 157,
+    "login_logs": 158,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
