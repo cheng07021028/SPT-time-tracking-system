@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 13:55:16",
-  "exported_at": "2026-05-27 13:55:16",
-  "reason": "today_records_v134_display_self_repair_02",
+  "updated_at": "2026-05-27 13:56:34",
+  "exported_at": "2026-05-27 13:56:34",
+  "reason": "start_work_v134_sqlite_to_0102_canonical_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -817,11 +817,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 13:46:31",
         "updated_at": "2026-05-27 13:50:01"
+      },
+      {
+        "id": 189,
+        "record_key": "SPT105|25M0115-20|Packing|2026-05-27 13:56:00|a9abc13e",
+        "status": "作業中",
+        "work_order": "25M0115-20",
+        "part_no": "4TRSC150-003-01",
+        "type_name": "12\" UFO EFEM(宏田)",
+        "process_name": "Packing",
+        "employee_id": "SPT105",
+        "employee_name": "劉秀鳳",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 13:56:00",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "13:56:00",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "宏田",
+        "group_key": "SPT105|Packing|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 13:56:00",
+        "updated_at": "2026-05-27 13:56:00"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 30
+    "time_records": 31
   }
 }
