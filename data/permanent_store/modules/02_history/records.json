@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 11:13:54",
-  "exported_at": "2026-05-27 11:13:54",
+  "updated_at": "2026-05-27 11:18:36",
+  "exported_at": "2026-05-27 11:18:36",
   "reason": "today_records_v134_display_self_repair_02",
   "empty_authoritative": false,
   "tables": {
@@ -578,7 +578,7 @@
       {
         "id": 161,
         "record_key": "SPT121|24N4001-24|其他|2026-05-27 10:54:48|43389027",
-        "status": "作業中",
+        "status": "完工",
         "work_order": "24N4001-24",
         "part_no": "1SLP01S-FCA1-01",
         "type_name": "FCLP EFEM",
@@ -587,20 +587,20 @@
         "employee_name": "徐兆生",
         "start_action": "開始",
         "start_timestamp": "2026-05-27 10:54:48",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "完工",
+        "end_timestamp": "2026-05-27 11:18:00",
         "remark": "通電量測",
         "start_date": "2026-05-27",
         "start_time": "10:54:48",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-27",
+        "end_time": "11:18:00",
+        "work_hours": 0.39,
         "assembly_location": "竹東",
         "group_key": "SPT121|其他|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 10:54:48",
-        "updated_at": "2026-05-27 10:54:48"
+        "updated_at": "2026-05-27 11:18:00"
       },
       {
         "id": 164,
@@ -628,38 +628,11 @@
         "source": "streamlit",
         "created_at": "2026-05-27 11:00:59",
         "updated_at": "2026-05-27 11:01:52"
-      },
-      {
-        "id": 165,
-        "record_key": "B203|26M0021-03|骨架組立|2026-05-27 11:06:08|fc104803",
-        "status": "作業中",
-        "work_order": "26M0021-03",
-        "part_no": "1GRSC150-003-04",
-        "type_name": "4 Port Frame Long-type EFEM",
-        "process_name": "骨架組立",
-        "employee_id": "B203",
-        "employee_name": "蕭桓惟",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 11:06:08",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
-        "start_date": "2026-05-27",
-        "start_time": "11:06:08",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "B203|骨架組立|2026-05-27",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-27 11:06:08",
-        "updated_at": "2026-05-27 11:06:08"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 24
+    "time_records": 23
   }
 }
