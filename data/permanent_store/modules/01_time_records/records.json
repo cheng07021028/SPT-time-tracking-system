@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 13:48:39",
-  "exported_at": "2026-05-27 13:48:39",
-  "reason": "today_records_v134_display_self_repair_01",
+  "updated_at": "2026-05-27 13:48:45",
+  "exported_at": "2026-05-27 13:48:45",
+  "reason": "start_work_v134_sqlite_to_0102_canonical_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -843,7 +843,7 @@
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-27 13:46:31",
-        "updated_at": "2026-05-27 13:48:16"
+        "updated_at": "2026-05-27 13:48:45"
       },
       {
         "id": 182,
@@ -924,7 +924,7 @@
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-27 13:48:00",
-        "updated_at": "2026-05-27 13:48:16"
+        "updated_at": "2026-05-27 13:48:45"
       },
       {
         "id": 185,
@@ -951,12 +951,39 @@
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-27 13:48:16",
-        "updated_at": "2026-05-27 13:48:16"
+        "updated_at": "2026-05-27 13:48:45"
+      },
+      {
+        "id": 186,
+        "record_key": "SPT142|22M0027-06|前置鈑金|2026-05-27 13:48:45|ab9072e5",
+        "status": "作業中",
+        "work_order": "22M0027-06",
+        "part_no": "1ARSC110-010-12",
+        "type_name": "1+1 EFEM FOR 2U COMPUTER #12120(御弘)",
+        "process_name": "前置鈑金",
+        "employee_id": "SPT142",
+        "employee_name": "黃沂澂",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 13:48:45",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "13:48:45",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "御弘",
+        "group_key": "SPT142|前置鈑金|2026-05-27",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-27 13:48:45",
+        "updated_at": "2026-05-27 13:48:45"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 35
+    "time_records": 36
   }
 }
