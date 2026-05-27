@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "04_employees",
   "kind": "records",
-  "updated_at": "2026-05-27 11:12:41",
-  "exported_at": "2026-05-27 11:12:41",
+  "updated_at": "2026-05-27 11:13:13",
+  "exported_at": "2026-05-27 11:13:13",
   "reason": "crud_save_employees_v113_normalize_id",
   "empty_authoritative": false,
   "tables": {
@@ -1190,37 +1190,11 @@
         "note": "",
         "created_at": "",
         "updated_at": ""
-      },
-      {
-        "id": 90,
-        "employee_id": "B146",
-        "employee_name": "謝宛廷",
-        "department": "製造一課",
-        "title": "晟銘",
-        "is_active": true,
-        "is_in_factory": true,
-        "is_today_attendance": true,
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
-      },
-      {
-        "id": 93,
-        "employee_id": "B146",
-        "employee_name": "謝宛廷",
-        "department": "製造一課",
-        "title": "晟銘",
-        "is_active": true,
-        "is_in_factory": true,
-        "is_today_attendance": true,
-        "note": "",
-        "created_at": "",
-        "updated_at": ""
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "employees": 93
+    "employees": 91
   }
 }
