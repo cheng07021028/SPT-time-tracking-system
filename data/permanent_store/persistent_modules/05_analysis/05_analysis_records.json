@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 17:58:50",
+  "exported_at": "2026-05-27 18:02:09",
   "source": "db_service_write",
   "module_key": "05_analysis",
   "module_code": "05",
@@ -1658,7 +1658,7 @@
       {
         "id": 208,
         "record_key": "SPT059|22M0162-92|收機|2026-05-27 14:53:59|74e612c2",
-        "status": "作業中",
+        "status": "完工",
         "work_order": "22M0162-92",
         "part_no": "4TRSC020-004-02->4TRSC020-004-06",
         "type_name": "NTB 3 LP +快拆+EMO",
@@ -1667,20 +1667,20 @@
         "employee_name": "蘇萬紘",
         "start_action": "開始",
         "start_timestamp": "2026-05-27 14:53:59",
-        "end_action": null,
-        "end_timestamp": null,
+        "end_action": "完工",
+        "end_timestamp": "2026-05-27 18:02:09",
         "remark": "",
         "start_date": "2026-05-27",
         "start_time": "14:53:59",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
+        "end_date": "2026-05-27",
+        "end_time": "18:02:09",
+        "work_hours": 2.85,
         "assembly_location": "竹東",
         "group_key": "SPT059|收機|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 14:53:59",
-        "updated_at": "2026-05-27 14:53:59"
+        "updated_at": "2026-05-27 18:02:09"
       },
       {
         "id": 209,
