@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 22:02:38",
+  "exported_at": "2026-05-27 22:06:13",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -8653,10 +8653,76 @@
         "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 1 筆",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 8210,
+        "log_time": "2026-05-27 22:03:18",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 8211,
+        "log_time": "2026-05-27 22:03:22",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 8212,
+        "log_time": "2026-05-27 22:04:28",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 8213,
+        "log_time": "2026-05-27 22:04:32",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 8214,
+        "log_time": "2026-05-27 22:05:34",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 8215,
+        "log_time": "2026-05-27 22:05:38",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 786
+    "system_logs": 792
   }
 }
