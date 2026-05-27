@@ -2,12 +2,25 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "04_employees",
   "kind": "records",
-  "updated_at": "2026-05-27 11:36:58",
-  "exported_at": "2026-05-27 11:36:58",
+  "updated_at": "2026-05-27 13:56:26",
+  "exported_at": "2026-05-27 13:56:26",
   "reason": "crud_save_employees_v113_normalize_id",
   "empty_authoritative": false,
   "tables": {
     "employees": [
+      {
+        "id": 90,
+        "employee_id": "SS",
+        "employee_name": "SS",
+        "department": "SS",
+        "title": "SS",
+        "is_active": true,
+        "is_in_factory": true,
+        "is_today_attendance": true,
+        "note": "",
+        "created_at": "",
+        "updated_at": ""
+      },
       {
         "id": 87,
         "employee_id": "B234",
@@ -1195,6 +1208,6 @@
   },
   "settings": {},
   "table_counts": {
-    "employees": 91
+    "employees": 92
   }
 }
