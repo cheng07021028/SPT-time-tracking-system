@@ -913,6 +913,7 @@ def _render_history_view_table(view_df: pd.DataFrame, table_key: str = "history_
         table_key,
         editable=False,
         height=height,
+        show_width_settings=False,  # V145: page already has one dedicated history width setting block.
     )
 
 

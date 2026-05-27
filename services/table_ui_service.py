@@ -1564,3 +1564,211 @@ def save_column_order(table_key: str, order: Iterable[str]) -> None:  # type: ig
     _v72_prev_save_column_order(table_key, order)
     _v72_clear_table_ui_cache(table_key)
 # ======================= END V72 Table UI Speed and Reboot Persistence Guard =======================
+
+
+# ===================== V145 TABLE WIDTH ORDER SAFE CLAMP + NO DUPLICATE 02 SETTINGS =====================
+# 修正目的：
+# 1) 02 歷史紀錄欄寬/欄位順序設定曾儲存 31、32... 等舊順序值；
+#    目前表格只剩 29 欄時，st.number_input(value=31, max_value=29) 會直接拋出
+#    StreamlitValueAboveMaxError，造成整頁崩潰。
+# 2) 02 歷史紀錄已在頁面上方有專用「02 歷史明細編輯欄寬設定」，
+#    render_table 唯讀表格又自動產生一次「欄寬設定」，所以畫面多一組設定。
+# 3) 本段只修表格 UI 設定，不改任何業務資料、不改 01/02 工時同步、不改權威檔內容。
+
+
+def _v145_to_int(value, default: int) -> int:
+    try:
+        if value is None:
+            return int(default)
+        return int(float(str(value).strip()))
+    except Exception:
+        return int(default)
+
+
+def _v145_clamp_int(value, minimum: int, maximum: int, default: int) -> int:
+    try:
+        iv = _v145_to_int(value, default)
+        return max(int(minimum), min(int(maximum), int(iv)))
+    except Exception:
+        return int(default)
+
+
+def _v145_normalized_current_order(table_key: str, df: pd.DataFrame) -> list[str]:
+    """Return saved order filtered to current columns and renumbered implicitly.
+
+    The stored order is a list of column names, but its old position can be larger
+    than current column count after columns were removed/hidden.  We never pass
+    that stale position directly into st.number_input.
+    """
+    if df is None or df.empty:
+        return []
+    current = [str(c) for c in df.columns]
+    current_set = set(current)
+    try:
+        saved = load_column_order(table_key)
+    except Exception:
+        saved = []
+    out: list[str] = []
+    seen: set[str] = set()
+    for c in saved or []:
+        s = str(c).strip()
+        if s in current_set and s not in seen:
+            out.append(s)
+            seen.add(s)
+    for s in current:
+        if s not in seen:
+            out.append(s)
+            seen.add(s)
+    return out
+
+
+def _v145_sanitize_widget_int(key: str, minimum: int, maximum: int, default: int) -> int:
+    value = st.session_state.get(key, default)
+    safe = _v145_clamp_int(value, minimum, maximum, default)
+    if key in st.session_state and st.session_state.get(key) != safe:
+        try:
+            st.session_state[key] = safe
+        except Exception:
+            pass
+    return safe
+
+
+def render_width_settings(table_key: str, df: pd.DataFrame, title: str = "欄寬設定 / Column Width Settings") -> None:  # type: ignore[override]
+    """V145 safe width/order editor.
+
+    Replaces the old width editor to guarantee default order <= current column count.
+    This prevents StreamlitValueAboveMaxError when a persisted order was created
+    with more columns than the current table.
+    """
+    if df is None or df.empty:
+        return
+    try:
+        instance_key = _width_settings_instance_key(table_key, title)
+    except Exception:
+        instance_key = _safe_widget_key_part(f"{table_key}_{title}")
+    show_key = f"show_widths_{instance_key}"
+    show = st.toggle(f"⌬️ 顯示{title}", value=False, key=show_key)
+    if not show:
+        return
+
+    widths = load_widths(table_key)
+    current_cols = list(df.columns)
+    current_order_keys = _v145_normalized_current_order(table_key, df)
+    order_index = {str(c): i + 1 for i, c in enumerate(current_order_keys)}
+    max_order = max(len(current_cols), 1)
+
+    with st.expander(title, expanded=True):
+        st.caption("欄寬與欄位順序會永久保存。順序數字越小越靠左；若欄位數變少，舊順序會自動壓回有效範圍，避免頁面崩潰。")
+        new_widths: dict[str, int] = {}
+        new_orders: dict[str, int] = {}
+        cols = st.columns(4)
+        for idx, col in enumerate(current_cols):
+            col_str = str(col)
+            col_key = _safe_widget_key_part(col_str)
+            width_key = f"width_{instance_key}_{idx}_{col_key}"
+            order_key = f"order_{instance_key}_{idx}_{col_key}"
+            default_width = _v145_clamp_int(widths.get(col_str, DEFAULT_WIDTHS.get(col_str, 140)), 60, 700, 140)
+            default_order = _v145_clamp_int(order_index.get(col_str, idx + 1), 1, max_order, idx + 1)
+            with cols[idx % 4]:
+                st.markdown(f"**{label_for(col_str)}**")
+                safe_width = _v145_sanitize_widget_int(width_key, 60, 700, default_width)
+                new_widths[col_str] = st.number_input(
+                    "欄寬",
+                    min_value=60,
+                    max_value=700,
+                    value=safe_width,
+                    step=10,
+                    key=width_key,
+                )
+                safe_order = _v145_sanitize_widget_int(order_key, 1, max_order, default_order)
+                new_orders[col_str] = st.number_input(
+                    "順序",
+                    min_value=1,
+                    max_value=max_order,
+                    value=safe_order,
+                    step=1,
+                    key=order_key,
+                )
+        if st.button("儲存欄位設定 / Save Column Settings", key=f"save_widths_{instance_key}", use_container_width=True):
+            save_widths(table_key, new_widths)
+            ordered_cols = [c for c, _ in sorted(new_orders.items(), key=lambda kv: (int(kv[1]), str(kv[0])))]
+            save_column_order(table_key, ordered_cols)
+            try:
+                _v72_clear_table_ui_cache(table_key)
+            except Exception:
+                pass
+            st.success("已永久儲存欄寬與欄位順序設定。")
+            st.rerun()
+
+
+def render_table(
+    df: pd.DataFrame,
+    table_key: str,
+    *,
+    editable: bool = False,
+    disabled: Iterable[str] | None = None,
+    key: str | None = None,
+    height: int | None = None,
+    num_rows: str = "fixed",
+    show_width_settings: bool = True,
+) -> pd.DataFrame | None:  # type: ignore[override]
+    """V145 final table renderer with optional width settings.
+
+    Existing callers are unchanged.  Pages that already render a custom width
+    setting block can pass show_width_settings=False to avoid duplicate controls.
+    """
+    if df is None:
+        st.info("目前沒有資料 / No data")
+        return None
+    if df.empty and not editable:
+        st.info("目前沒有資料 / No data")
+        return None
+
+    if not editable and show_width_settings:
+        render_width_settings(table_key, df)
+
+    source_df = df.copy() if isinstance(df, pd.DataFrame) else df
+    if isinstance(source_df, pd.DataFrame):
+        source_df = apply_column_order(table_key, source_df)
+        if not editable:
+            source_df = _v370_fill_readonly_id_for_display(source_df, editable=False)
+        display_df = _format_duration_columns_for_display(source_df)
+        display_df = _prepare_display_dataframe(display_df)
+    else:
+        display_df = source_df
+
+    cfg = build_column_config(table_key, display_df) if isinstance(display_df, pd.DataFrame) else {}
+    disabled_cols = list(disabled or [])
+    for c in ("work_hours", "total_hours", "avg_hours"):
+        if isinstance(display_df, pd.DataFrame) and c in display_df.columns and c not in disabled_cols:
+            disabled_cols.append(c)
+    if editable:
+        for c in ("id", "ID / ID"):
+            if isinstance(display_df, pd.DataFrame) and c in display_df.columns and c not in disabled_cols:
+                disabled_cols.append(c)
+    visual_order = [str(c) for c in display_df.columns] if isinstance(display_df, pd.DataFrame) else None
+
+    if editable:
+        return st.data_editor(
+            display_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config=cfg,
+            column_order=visual_order,
+            disabled=disabled_cols,
+            num_rows=num_rows,
+            key=key or f"editor_{table_key}",
+            height=height,
+        )
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config=cfg,
+        column_order=visual_order,
+        height=height,
+        key=key or f"frame_{table_key}",
+    )
+    return None
+
+# =================== END V145 TABLE WIDTH ORDER SAFE CLAMP + NO DUPLICATE 02 SETTINGS ===================
