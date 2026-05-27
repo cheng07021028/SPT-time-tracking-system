@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 17:55:51",
-  "exported_at": "2026-05-27 17:55:51",
+  "updated_at": "2026-05-27 17:56:01",
+  "exported_at": "2026-05-27 17:56:01",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 184314,
+        "source": "v103_merge",
+        "username": "SPP228",
+        "display_name": "佘銘訓",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "帳號不存在",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 17:56:01",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 17:56:01"
+      },
       {
         "id": 183941,
         "source": "v103_merge",
@@ -2990,7 +3006,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 186,
+    "login_logs": 187,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
