@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 20:28:52",
+  "exported_at": "2026-05-27 20:57:37",
   "source": "db_service_write",
   "module_key": "11_login_logs",
   "module_code": "11",
@@ -5093,11 +5093,26 @@
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-27 16:17:28"
+      },
+      {
+        "id": 25841,
+        "username": "SPT239",
+        "display_name": "麥可",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=SPT239; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 20:57:37",
+        "logout_time": "2026-05-27 20:57:37",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 20:57:37"
       }
     ]
   },
   "table_counts": {
     "auth_login_logs": 0,
-    "login_logs": 339
+    "login_logs": 340
   }
 }
