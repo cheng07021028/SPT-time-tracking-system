@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 16:15:45",
-  "exported_at": "2026-05-27 16:15:45",
+  "updated_at": "2026-05-27 16:16:01",
+  "exported_at": "2026-05-27 16:16:01",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 167049,
+        "source": "v103_merge",
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=admin;source=authority",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 16:16:00",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 16:16:00"
+      },
+      {
+        "id": 166467,
+        "source": "v103_merge",
+        "username": "SSS",
+        "display_name": "SSS",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置自動登出; employee_id=SSS; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 16:15:47",
+        "logout_time": "2026-05-27 16:15:47",
+        "idle_minutes": 3.4167,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 16:15:47"
+      },
       {
         "id": 165886,
         "source": "v103_merge",
@@ -9294,7 +9326,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 580,
+    "login_logs": 582,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
