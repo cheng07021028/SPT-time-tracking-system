@@ -2,12 +2,60 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 10:57:02",
-  "exported_at": "2026-05-27 10:57:02",
+  "updated_at": "2026-05-27 11:02:35",
+  "exported_at": "2026-05-27 11:02:35",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 64412,
+        "source": "v103_merge",
+        "username": "B203",
+        "display_name": "蕭桓惟",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置超過 3 分鐘，自動登出; employee_id=B203; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 11:02:34",
+        "logout_time": "2026-05-27 11:02:34",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 11:02:34"
+      },
+      {
+        "id": 64050,
+        "source": "v103_merge",
+        "username": "B126",
+        "display_name": "戴鎰祥",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=B126",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 10:59:46",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 10:59:46"
+      },
+      {
+        "id": 63689,
+        "source": "v103_merge",
+        "username": "SPT256",
+        "display_name": "阿杰",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=SPT256; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 10:58:42",
+        "logout_time": "2026-05-27 10:58:42",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 10:58:42"
+      },
       {
         "id": 63329,
         "source": "v103_merge",
@@ -5758,7 +5806,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 359,
+    "login_logs": 362,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
