@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 10:59:12",
+  "exported_at": "2026-05-27 11:02:21",
   "source": "db_service_write",
   "module_key": "07_missing_records",
   "module_code": "07",
@@ -1146,7 +1146,7 @@
       {
         "id": 158,
         "record_key": "SPT172|25M0115-17|Packing|2026-05-27 10:48:46|f28ad7e5",
-        "status": "作業中",
+        "status": "暫停",
         "work_order": "25M0115-17",
         "part_no": "4TRSC150-003-01",
         "type_name": "12\" UFO EFEM",
@@ -1155,20 +1155,20 @@
         "employee_name": "胡瑄芸",
         "start_action": "開始",
         "start_timestamp": "2026-05-27 10:48:46",
-        "end_action": null,
-        "end_timestamp": null,
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-27 11:00:16",
         "remark": null,
         "start_date": "2026-05-27",
         "start_time": "10:48:46",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
+        "end_date": "2026-05-27",
+        "end_time": "11:00:16",
+        "work_hours": 0.19,
         "assembly_location": "竹東",
         "group_key": "SPT172|Packing|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 10:48:46",
-        "updated_at": "2026-05-27 10:48:46"
+        "updated_at": "2026-05-27 11:00:16"
       },
       {
         "id": 159,
@@ -1223,11 +1223,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 10:54:48",
         "updated_at": "2026-05-27 10:54:48"
+      },
+      {
+        "id": 164,
+        "record_key": "SPT172|26M0021-03|Packing|2026-05-27 11:00:59|6e9c2880",
+        "status": "暫停",
+        "work_order": "26M0021-03",
+        "part_no": "1GRSC150-003-04",
+        "type_name": "4 Port Frame Long-type EFEM",
+        "process_name": "Packing",
+        "employee_id": "SPT172",
+        "employee_name": "胡瑄芸",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 11:00:59",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-27 11:01:52",
+        "remark": null,
+        "start_date": "2026-05-27",
+        "start_time": "11:00:59",
+        "end_date": "2026-05-27",
+        "end_time": "11:01:52",
+        "work_hours": 0.01,
+        "assembly_location": "竹東",
+        "group_key": "SPT172|Packing|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 11:00:59",
+        "updated_at": "2026-05-27 11:01:52"
       }
     ]
   },
   "table_counts": {
     "employees": 0,
-    "time_records": 45
+    "time_records": 46
   }
 }
