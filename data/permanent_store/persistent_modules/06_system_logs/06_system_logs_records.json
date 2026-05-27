@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 15:55:43",
+  "exported_at": "2026-05-27 16:02:49",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -6873,30 +6873,96 @@
         "level": "WARN"
       },
       {
-        "id": 6067,
-        "log_time": "2026-05-27 15:55:32",
-        "user_name": "admin",
-        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "id": 6179,
+        "log_time": "2026-05-27 16:01:39",
+        "user_name": "SPT142",
+        "action_type": "INSERT",
         "target_table": "time_records",
         "target_id": "",
-        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 29 筆，同步後 46 筆。",
-        "detail": "",
-        "level": "WARN"
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
       },
       {
-        "id": 6068,
-        "log_time": "2026-05-27 15:55:40",
-        "user_name": "admin",
-        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "id": 6180,
+        "log_time": "2026-05-27 16:01:39",
+        "user_name": "SPT142",
+        "action_type": "INSERT",
         "target_table": "time_records",
         "target_id": "",
-        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 29 筆，同步後 46 筆。",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 6181,
+        "log_time": "2026-05-27 16:01:39",
+        "user_name": "SPT142",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 6182,
+        "log_time": "2026-05-27 16:01:39",
+        "user_name": "SPT142",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 3 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 6183,
+        "log_time": "2026-05-27 16:01:42",
+        "user_name": "SPT142",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 6184,
+        "log_time": "2026-05-27 16:01:42",
+        "user_name": "SPT142",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL",
+        "level": "INFO"
+      },
+      {
+        "id": 6185,
+        "log_time": "2026-05-27 16:01:42",
+        "user_name": "SPT142",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "230",
+        "message": "黃沂澂 開始 21M0241-04 / 前置鈑金",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 6186,
+        "log_time": "2026-05-27 16:01:42",
+        "user_name": "SPT142",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "230",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 1 筆，同步後 51 筆。",
         "detail": "",
         "level": "WARN"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 626
+    "system_logs": 632
   }
 }
