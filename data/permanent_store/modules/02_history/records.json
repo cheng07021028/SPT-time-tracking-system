@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 09:11:59",
-  "exported_at": "2026-05-27 09:11:59",
-  "reason": "today_records_v134_display_self_repair_02",
+  "updated_at": "2026-05-27 09:12:07",
+  "exported_at": "2026-05-27 09:12:07",
+  "reason": "start_work_v134_sqlite_to_0102_canonical_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -466,11 +466,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 09:11:55",
         "updated_at": "2026-05-27 09:11:55"
+      },
+      {
+        "id": 94,
+        "record_key": "SPT105|26M0051-09|Packing|2026-05-27 09:12:06|38be26ef",
+        "status": "作業中",
+        "work_order": "26M0051-09",
+        "part_no": "PSRSC151-SB4L-05",
+        "type_name": "RSC151-SB4L+Argus",
+        "process_name": "Packing",
+        "employee_id": "SPT105",
+        "employee_name": "劉秀鳳",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 09:12:06",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "09:12:06",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT105|Packing|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 09:12:06",
+        "updated_at": "2026-05-27 09:12:06"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 17
+    "time_records": 18
   }
 }
