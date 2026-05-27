@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 17:16:00",
-  "exported_at": "2026-05-27 17:16:00",
-  "reason": "start_work_v137_identity_safe_upsert_02",
+  "updated_at": "2026-05-27 17:20:36",
+  "exported_at": "2026-05-27 17:20:36",
+  "reason": "finish_work_v138_hms_remark_upsert_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -686,7 +686,7 @@
       {
         "id": 171,
         "record_key": "SPT031|25M0694-01|S.T.|2026-05-27 13:07:47|018a2777",
-        "status": "作業中",
+        "status": "完工",
         "work_order": "25M0694-01",
         "part_no": "4TRSC122-SB2-13",
         "type_name": "SORTER RSC121 SB (RR757)",
@@ -695,20 +695,20 @@
         "employee_name": "吳政昌",
         "start_action": "開始",
         "start_timestamp": "2026-05-27 13:07:47",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "完工",
+        "end_timestamp": "2026-05-27 17:20:34",
         "remark": "樂華軟體DEBUG結束後RE-TEACHING",
         "start_date": "2026-05-27",
         "start_time": "13:07:47",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-27",
+        "end_time": "17:20:34",
+        "work_hours": 3.96,
         "assembly_location": "竹東",
         "group_key": "SPT031|S.T.|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 13:07:47",
-        "updated_at": "2026-05-27 13:07:47"
+        "updated_at": "2026-05-27 17:20:34"
       },
       {
         "id": 172,
