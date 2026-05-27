@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 14:33:21",
+  "exported_at": "2026-05-27 14:38:18",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -4957,10 +4957,43 @@
         "message": "V96 結束工時紀錄 #176，同步結束=1筆，狀態=完工",
         "detail": "176",
         "level": "INFO"
+      },
+      {
+        "id": 5185,
+        "log_time": "2026-05-27 14:37:22",
+        "user_name": "SPT244",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 23 筆，同步後 34 筆。",
+        "detail": "",
+        "level": "WARN"
+      },
+      {
+        "id": 5186,
+        "log_time": "2026-05-27 14:38:09",
+        "user_name": "SPT244",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 23 筆，同步後 34 筆。",
+        "detail": "",
+        "level": "WARN"
+      },
+      {
+        "id": 5187,
+        "log_time": "2026-05-27 14:38:16",
+        "user_name": "SPT244",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 23 筆，同步後 34 筆。",
+        "detail": "",
+        "level": "WARN"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 450
+    "system_logs": 453
   }
 }
