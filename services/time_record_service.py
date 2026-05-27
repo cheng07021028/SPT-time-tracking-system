@@ -6606,3 +6606,641 @@ def today_records(include_finished: bool = True, unfinished_only: bool = False) 
     return _v138_format_remark_column(_v138_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only))
 
 # =================== END V138B PARALLEL WORK HOURS HMS DISPLAY FIX ===================
+
+# ===================== V139 01/02 FINAL STATE RECONCILIATION + ACTIVE DISPLAY FIX =====================
+# 修正目的：
+# 1) 01 今日工時紀錄仍顯示「作業中」，但 02 歷史紀錄同一筆已經是「下班/暫停/完工」時，
+#    以已結束狀態為準，避免 01 與 Active Work 顯示假作業中。
+# 2) SQLite / 01_time_records / 02_history 三方可能短暫不同步；V139 以 record_key / 業務主鍵合併，
+#    已結束版本永遠優先於同一筆的舊作業中版本。
+# 3) Active Work、get_active_records、get_active_group 改讀調和後資料，防止已下班的同步作業仍出現在目前作業中。
+# 4) 保留 Today Records 當日明細顯示規則：已結束紀錄可以留在今日表，但狀態必須正確顯示為下班/暫停/完工。
+
+try:
+    _v139_prev_today_records = today_records
+except Exception:
+    _v139_prev_today_records = None
+try:
+    _v139_prev_load_records = load_records
+except Exception:
+    _v139_prev_load_records = None
+try:
+    _v139_prev_get_active_records = get_active_records
+except Exception:
+    _v139_prev_get_active_records = None
+try:
+    _v139_prev_get_active_record = get_active_record
+except Exception:
+    _v139_prev_get_active_record = None
+try:
+    _v139_prev_get_active_group = get_active_group
+except Exception:
+    _v139_prev_get_active_group = None
+try:
+    _v139_prev_get_active_same_work = get_active_same_work
+except Exception:
+    _v139_prev_get_active_same_work = None
+try:
+    _v139_prev_get_conflicting_active_records = get_conflicting_active_records
+except Exception:
+    _v139_prev_get_conflicting_active_records = None
+try:
+    _v139_prev_finish_work = finish_work
+except Exception:
+    _v139_prev_finish_work = None
+try:
+    _v139_prev_start_work = start_work
+except Exception:
+    _v139_prev_start_work = None
+
+_V139_TERMINAL_STATUS = {"下班", "暫停", "完工", "已結束", "結束", "停止"}
+
+
+def _v139_blank(value) -> bool:
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    if value is None:
+        return True
+    return str(value).strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _v139_text(value) -> str:
+    if _v139_blank(value):
+        return ""
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
+    return str(value).strip()
+
+
+def _v139_int(value):
+    if _v139_blank(value):
+        return None
+    try:
+        return int(float(str(value).strip()))
+    except Exception:
+        return None
+
+
+def _v139_float(value, default: float = 0.0) -> float:
+    try:
+        if _v139_blank(value):
+            return default
+        text = str(value).strip()
+        if ":" in text:
+            return hms_to_hours(text)
+        return float(text)
+    except Exception:
+        return default
+
+
+def _v139_clean_df(df: pd.DataFrame | None) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame):
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        out = out.loc[:, ~pd.Index(out.columns).duplicated()].copy()
+        out = out.where(pd.notna(out), "")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v139_table_df(module_key: str) -> pd.DataFrame:
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df
+        df = _pa_df(module_key, "time_records")
+        return _v139_clean_df(df)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v139_sqlite_all_df() -> pd.DataFrame:
+    try:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(DB_PATH, timeout=15) as conn:
+            conn.row_factory = sqlite3.Row
+            try:
+                conn.execute("PRAGMA busy_timeout=8000")
+            except Exception:
+                pass
+            rows = conn.execute("SELECT * FROM time_records ORDER BY id").fetchall()
+        return _v139_clean_df(pd.DataFrame([dict(r) for r in rows]))
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v139_filter_deleted(df: pd.DataFrame) -> pd.DataFrame:
+    out = _v139_clean_df(df)
+    if out.empty:
+        return out
+    for name in ("_v97_filter_deleted_df", "_v94_filter_deleted_df", "_v96_filter_tombstone", "_v98_filter_deleted", "_v137_filter_deleted"):
+        try:
+            fn = globals().get(name)
+            if callable(fn):
+                tmp = fn(out)
+                if isinstance(tmp, pd.DataFrame):
+                    out = _v139_clean_df(tmp)
+        except Exception:
+            pass
+    return out.reset_index(drop=True)
+
+
+def _v139_identity(row: dict) -> str:
+    # record_key 是最準的跨 01/02 同筆識別。
+    rk = _v139_text(row.get("record_key") or row.get("紀錄鍵 / Record Key"))
+    if rk:
+        return "rk:" + rk
+    emp_id = _v139_text(row.get("employee_id") or row.get("工號") or row.get("Employee ID"))
+    emp_name = _v139_text(row.get("employee_name") or row.get("姓名") or row.get("Employee Name"))
+    wo = _v139_text(row.get("work_order") or row.get("製令") or row.get("製令 / Work Order"))
+    proc = _v139_text(row.get("process_name") or row.get("工段") or row.get("製程") or row.get("Process"))
+    start_ts = _v139_text(row.get("start_timestamp") or row.get("Start Timestamp") or row.get("開始時間戳") or row.get("開始時間"))
+    if not start_ts:
+        start_ts = (_v139_text(row.get("start_date")) + " " + _v139_text(row.get("start_time"))).strip()
+    if emp_id or emp_name or wo or proc or start_ts:
+        return "biz:" + "|".join([emp_id, emp_name, wo, proc, start_ts])
+    rid = _v139_int(row.get("id") if "id" in row else row.get("ID"))
+    if rid is not None:
+        return "id:" + str(rid)
+    return "tmp:" + str(hash(str(sorted(row.items()))))
+
+
+def _v139_is_terminal_row(row: dict) -> bool:
+    status = _v139_text(row.get("status") or row.get("狀態") or row.get("Status"))
+    end_action = _v139_text(row.get("end_action") or row.get("結束動作") or row.get("End Action"))
+    end_ts = _v139_text(row.get("end_timestamp") or row.get("End Timestamp") or row.get("結束時間戳") or row.get("結束時間"))
+    if status in _V139_TERMINAL_STATUS:
+        return True
+    if end_action in _V139_TERMINAL_STATUS:
+        return True
+    if end_ts:
+        return True
+    return False
+
+
+def _v139_is_active_row(row: dict) -> bool:
+    status = _v139_text(row.get("status") or row.get("狀態") or row.get("Status"))
+    end_ts = _v139_text(row.get("end_timestamp") or row.get("End Timestamp") or row.get("結束時間戳") or row.get("結束時間"))
+    if status and status != "作業中":
+        return False
+    return not bool(end_ts)
+
+
+def _v139_score(row: dict, source_rank: int, seq: int) -> tuple:
+    # 已結束狀態優先，避免 01 舊作業中覆蓋 02 已下班。
+    terminal = 1 if _v139_is_terminal_row(row) else 0
+    # 完整欄位多者優先，可避免空列覆蓋完整列。
+    completeness = sum(1 for v in row.values() if not _v139_blank(v))
+    time_score = "|".join([
+        _v139_text(row.get("updated_at")),
+        _v139_text(row.get("end_timestamp")),
+        _v139_text(row.get("created_at")),
+        _v139_text(row.get("start_timestamp")),
+    ])
+    return (terminal, time_score, completeness, source_rank, seq)
+
+
+def _v139_merge_sources(frames: list[tuple[str, pd.DataFrame]]) -> pd.DataFrame:
+    chosen: dict[str, tuple[tuple, dict]] = {}
+    cols: list[str] = []
+    seq = 0
+    for source_rank, (_name, df) in enumerate(frames, start=1):
+        df = _v139_filter_deleted(df)
+        if df.empty:
+            continue
+        for _, rr in df.iterrows():
+            try:
+                row = dict(rr.to_dict())
+            except Exception:
+                row = {}
+            if not row:
+                continue
+            # 忽略完全空白列。
+            if not any(not _v139_blank(v) for v in row.values()):
+                continue
+            for c in row.keys():
+                if c not in cols:
+                    cols.append(c)
+            key = _v139_identity(row)
+            score = _v139_score(row, source_rank, seq)
+            old = chosen.get(key)
+            if old is None or score >= old[0]:
+                chosen[key] = (score, row)
+            seq += 1
+    if "id" not in cols:
+        cols.insert(0, "id")
+    rows = [{c: row.get(c, "") for c in cols} for _score, row in chosen.values()]
+    out = pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
+    try:
+        if "id" in out.columns:
+            out["_v139_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values("_v139_sort_id", ascending=True, kind="stable").drop(columns=["_v139_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return _v139_filter_deleted(out).reset_index(drop=True)
+
+
+def _v139_reconciled_df(include_sqlite: bool = True) -> pd.DataFrame:
+    frames: list[tuple[str, pd.DataFrame]] = [
+        ("01_time_records", _v139_table_df("01_time_records")),
+        ("02_history", _v139_table_df("02_history")),
+    ]
+    if include_sqlite:
+        frames.append(("sqlite", _v139_sqlite_all_df()))
+    return _v139_merge_sources(frames)
+
+
+def _v139_rows_to_table(df: pd.DataFrame) -> list[dict]:
+    try:
+        from services.permanent_authority_service import table_from_df as _pa_table
+        return _pa_table(_v139_clean_df(df))
+    except Exception:
+        clean = _v139_clean_df(df)
+        return [dict(r) for _, r in clean.iterrows()]
+
+
+def _v139_save_reconciled(df: pd.DataFrame, reason: str = "v139_reconcile_0102", *, github: bool = False, sync_sqlite: bool = True) -> int:
+    safe = _v139_filter_deleted(df)
+    rows = _v139_rows_to_table(safe)
+    try:
+        from services.permanent_authority_service import save_authority as _pa_save
+        _pa_save("01_time_records", records={"time_records": rows}, reason=f"{reason}_01", github=bool(github))
+        _pa_save("02_history", records={"time_records": rows}, reason=f"{reason}_02", github=bool(github))
+    except Exception as exc:
+        try:
+            write_log("V139_0102_RECONCILE_SAVE_ERROR", f"V139 01/02 調和權威檔寫入失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    if sync_sqlite:
+        try:
+            if "_v89_sync_sqlite_cache_from_authority" in globals():
+                _v89_sync_sqlite_cache_from_authority(safe)
+        except Exception:
+            pass
+    try:
+        clear_today_records_fast_cache()  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(len(rows))
+
+
+def _v139_repair_if_needed(reason: str = "v139_display_repair") -> pd.DataFrame:
+    df = _v139_reconciled_df(include_sqlite=True)
+    if df.empty:
+        return df
+    # 若 01 / 02 與調和後資料不同，立即以調和結果覆蓋兩邊本機 canonical。
+    try:
+        df01 = _v139_table_df("01_time_records")
+        df02 = _v139_table_df("02_history")
+        n = len(df)
+        mismatch = (len(df01) != n) or (len(df02) != n)
+        if not mismatch:
+            # 快速檢查作業中/已結束狀態是否一致。
+            rec_map = {}
+            for _, r in df.iterrows():
+                row = dict(r.to_dict())
+                rec_map[_v139_identity(row)] = _v139_is_terminal_row(row)
+            for source_df in (df01, df02):
+                for _, rr in source_df.iterrows():
+                    row = dict(rr.to_dict())
+                    key = _v139_identity(row)
+                    if key in rec_map and rec_map[key] != _v139_is_terminal_row(row):
+                        mismatch = True
+                        break
+                if mismatch:
+                    break
+        if mismatch:
+            _v139_save_reconciled(df, reason, github=False, sync_sqlite=True)
+            try:
+                scheduler = globals().get("_v108_schedule_time_authority_upload") or globals().get("_v137_schedule_upload")
+                if callable(scheduler):
+                    scheduler(f"{reason}_async_publish")
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return df
+
+
+def _v139_filter_params(df: pd.DataFrame, start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:
+    out = _v139_clean_df(df)
+    if out.empty:
+        return out
+    if start_date:
+        col = "start_date" if "start_date" in out.columns else ("work_date" if "work_date" in out.columns else "")
+        if col:
+            out = out[out[col].astype(str) >= str(start_date)]
+    if end_date:
+        col = "start_date" if "start_date" in out.columns else ("work_date" if "work_date" in out.columns else "")
+        if col:
+            out = out[out[col].astype(str) <= str(end_date)]
+    if employee_id and "employee_id" in out.columns:
+        out = out[out["employee_id"].astype(str).str.strip() == str(employee_id).strip()]
+    if work_order and "work_order" in out.columns:
+        out = out[out["work_order"].astype(str).str.strip() == str(work_order).strip()]
+    try:
+        out["_v139_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+        out = out.sort_values("_v139_sort_id", ascending=False, kind="stable").drop(columns=["_v139_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v139_active_df(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:
+    df = _v139_repair_if_needed("v139_active_repair")
+    if df.empty:
+        return pd.DataFrame()
+    rows = []
+    for _, rr in df.iterrows():
+        row = dict(rr.to_dict())
+        if _v139_is_active_row(row):
+            rows.append(row)
+    out = pd.DataFrame(rows) if rows else pd.DataFrame(columns=df.columns)
+    if out.empty:
+        return out
+    if employee_id and "employee_id" in out.columns:
+        out = out[out["employee_id"].astype(str).str.strip() == str(employee_id).strip()]
+    if employee_name and "employee_name" in out.columns:
+        out = out[out["employee_name"].astype(str).str.strip() == str(employee_name).strip()]
+    if process_name and "process_name" in out.columns:
+        out = out[out["process_name"].astype(str).str.strip() == str(process_name).strip()]
+    if start_date and "start_date" in out.columns:
+        out = out[out["start_date"].astype(str).str.strip() == str(start_date).strip()]
+    try:
+        out["_v139_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+        out = out.sort_values("_v139_sort_id", ascending=True, kind="stable").drop(columns=["_v139_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    df = _v139_repair_if_needed("today_records_v139_final_state_reconcile")
+    if df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    active_mask = out.apply(lambda r: _v139_is_active_row(dict(r.to_dict())), axis=1)
+    if unfinished_only:
+        out = out.loc[active_mask].copy()
+    else:
+        try:
+            cycle_start = _business_cycle_start_date()
+        except Exception:
+            cycle_start = today_text()
+        if "start_date" in out.columns:
+            out = out.loc[(out["start_date"].astype(str) >= str(cycle_start)) | active_mask].copy()
+    try:
+        if "_v138_format_remark_column" in globals():
+            out = _v138_format_remark_column(out)
+    except Exception:
+        pass
+    try:
+        out["_v139_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+        out = out.sort_values("_v139_sort_id", ascending=False, kind="stable").drop(columns=["_v139_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = _v139_repair_if_needed("load_records_v139_final_state_reconcile")
+    out = _v139_filter_params(df, start_date, end_date, employee_id, work_order)
+    try:
+        if "_v138_format_remark_column" in globals():
+            out = _v138_format_remark_column(out)
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    return _v139_active_df(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+
+
+def get_active_record(employee_id: str) -> dict | None:  # type: ignore[override]
+    df = _v139_active_df(employee_id=employee_id)
+    if df.empty:
+        return None
+    try:
+        if "id" in df.columns:
+            df["_v139_sort_id"] = pd.to_numeric(df["id"], errors="coerce")
+            df = df.sort_values("_v139_sort_id", ascending=False, kind="stable").drop(columns=["_v139_sort_id"], errors="ignore")
+        return df.iloc[0].where(pd.notna(df.iloc[0]), None).to_dict()
+    except Exception:
+        return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    rid = _v139_int(record_id)
+    if rid is None:
+        return pd.DataFrame()
+    df = _v139_repair_if_needed("get_active_group_v139_final_state_reconcile")
+    if df.empty or "id" not in df.columns:
+        return pd.DataFrame()
+    recs = df[df["id"].map(_v139_int) == int(rid)].copy()
+    if recs.empty:
+        return pd.DataFrame()
+    row = dict(recs.iloc[0].to_dict())
+    if not _v139_is_active_row(row):
+        return pd.DataFrame()
+    emp_id = _v139_text(row.get("employee_id"))
+    emp_name = _v139_text(row.get("employee_name"))
+    proc = _v139_text(row.get("process_name"))
+    sdate = _v139_text(row.get("start_date"))
+    if not emp_id or not emp_name or not proc or not sdate:
+        return recs.reset_index(drop=True)
+    return _v139_active_df(employee_id=emp_id, employee_name=emp_name, process_name=proc, start_date=sdate)
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = _v139_active_df(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date or today_text())
+    if df.empty or "work_order" not in df.columns:
+        return None
+    df = df[df["work_order"].astype(str).str.strip() == str(work_order).strip()].copy()
+    if df.empty:
+        return None
+    try:
+        return df.iloc[-1].where(pd.notna(df.iloc[-1]), None).to_dict()
+    except Exception:
+        return None
+
+
+def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    start_date = start_date or today_text()
+    active = _v139_active_df(employee_id=employee_id, employee_name=employee_name)
+    if active.empty:
+        return pd.DataFrame()
+    for c in ["process_name", "start_date"]:
+        if c not in active.columns:
+            active[c] = ""
+    return active[(active["process_name"].astype(str) != str(process_name)) | (active["start_date"].astype(str) != str(start_date))].copy().reset_index(drop=True)
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v139_prev_start_work):
+        raise RuntimeError("start_work core implementation is unavailable")
+    rid = int(_v139_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        df = _v139_reconciled_df(include_sqlite=True)
+        _v139_save_reconciled(df, "start_work_v139_final_state_reconcile", github=False, sync_sqlite=False)
+        try:
+            scheduler = globals().get("_v108_schedule_time_authority_upload") or globals().get("_v137_schedule_upload")
+            if callable(scheduler):
+                scheduler("start_work_v139_async_publish")
+        except Exception:
+            pass
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v139_prev_finish_work):
+        raise RuntimeError("finish_work core implementation is unavailable")
+    n = int(_v139_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n:
+        df = _v139_reconciled_df(include_sqlite=True)
+        _v139_save_reconciled(df, "finish_work_v139_final_state_reconcile", github=False, sync_sqlite=True)
+        try:
+            scheduler = globals().get("_v108_schedule_time_authority_upload") or globals().get("_v137_schedule_upload")
+            if callable(scheduler):
+                scheduler("finish_work_v139_async_publish")
+        except Exception:
+            pass
+    return n
+
+
+def reconcile_time_records_final_state_now(reason: str = "manual_v139_reconcile", *, github: bool = True) -> int:
+    """Manual helper for 01/02: reconcile SQLite + 01 canonical + 02 canonical and save same final state to both."""
+    df = _v139_reconciled_df(include_sqlite=True)
+    return _v139_save_reconciled(df, reason, github=bool(github), sync_sqlite=True)
+
+# =================== END V139 01/02 FINAL STATE RECONCILIATION + ACTIVE DISPLAY FIX ===================
+
+# ===================== V140 HISTORY ID INTEGRITY + NON-DESTRUCTIVE 01/02 SAVE GUARD =====================
+# 修正目的：
+# 1) 02 歷史資料不應因 01/02/SQLite 任一來源的暫時空表、篩選表或舊快取而被整批覆蓋消失。
+# 2) ID / ID 是資料庫 surrogate row id，不保證連號；但已存在的歷史列必須保留，不可被弱主鍵合併誤刪。
+# 3) 任何非刪除類同步，都先把既有 02_history canonical 納入合併，再寫回 01/02。
+# 4) 刪除類操作仍尊重 tombstone，不會把已刪除資料救回。
+
+try:
+    _v140_prev_v139_save_reconciled = _v139_save_reconciled  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v140_prev_v139_save_reconciled = None
+
+_V140_DELETE_REASON_WORDS = (
+    "delete", "deleted", "tombstone", "purge", "remove", "clear_history", "clear_time_records",
+    "刪除", "清除"
+)
+
+
+def _v140_is_delete_reason(reason: str | None) -> bool:
+    text = str(reason or "").lower()
+    return any(word.lower() in text for word in _V140_DELETE_REASON_WORDS)
+
+
+def _v140_nonempty_df(df) -> bool:
+    return isinstance(df, pd.DataFrame) and not df.empty
+
+
+def _v140_history_preserve_merge(incoming_df: pd.DataFrame, reason: str = "v140_preserve") -> pd.DataFrame:
+    """Merge incoming data with existing 01/02 authority before non-delete saves.
+
+    This is the core guard against history disappearing.  If a page passes a partial
+    dataframe, the existing 02_history rows are preserved unless they are explicitly
+    removed through delete/tombstone paths.
+    """
+    incoming = _v139_clean_df(incoming_df) if "_v139_clean_df" in globals() else (incoming_df.copy() if isinstance(incoming_df, pd.DataFrame) else pd.DataFrame())
+    if _v140_is_delete_reason(reason):
+        return incoming
+
+    frames: list[tuple[str, pd.DataFrame]] = []
+    try:
+        df02 = _v139_table_df("02_history") if "_v139_table_df" in globals() else pd.DataFrame()
+        if _v140_nonempty_df(df02):
+            frames.append(("existing_02_history", df02))
+    except Exception:
+        pass
+    try:
+        df01 = _v139_table_df("01_time_records") if "_v139_table_df" in globals() else pd.DataFrame()
+        if _v140_nonempty_df(df01):
+            frames.append(("existing_01_time_records", df01))
+    except Exception:
+        pass
+    if _v140_nonempty_df(incoming):
+        frames.append(("incoming", incoming))
+    if not frames:
+        return pd.DataFrame()
+    try:
+        merged = _v139_merge_sources(frames) if "_v139_merge_sources" in globals() else pd.concat([x[1] for x in frames], ignore_index=True)
+    except Exception:
+        try:
+            merged = pd.concat([x[1] for x in frames if isinstance(x[1], pd.DataFrame)], ignore_index=True)
+        except Exception:
+            merged = incoming
+    try:
+        if "_v139_filter_deleted" in globals():
+            merged = _v139_filter_deleted(merged)
+    except Exception:
+        pass
+    return merged.reset_index(drop=True) if isinstance(merged, pd.DataFrame) else pd.DataFrame()
+
+
+def _v139_save_reconciled(df: pd.DataFrame, reason: str = "v139_reconcile_0102", *, github: bool = False, sync_sqlite: bool = True) -> int:  # type: ignore[override]
+    """V140 override: all non-delete 01/02 saves are non-destructive.
+
+    The previous reconciler could write the currently visible/repaired set back to
+    authority.  If one source was temporarily incomplete, visible history looked as
+    if many ID rows disappeared.  V140 always preserves existing 02_history rows
+    unless the reason is an explicit delete/tombstone operation.
+    """
+    safe_df = _v140_history_preserve_merge(df, reason=reason)
+    if callable(_v140_prev_v139_save_reconciled):
+        return int(_v140_prev_v139_save_reconciled(safe_df, reason=reason, github=github, sync_sqlite=sync_sqlite) or 0)
+    return int(len(safe_df) if isinstance(safe_df, pd.DataFrame) else 0)
+
+
+def diagnose_time_record_id_gaps(start_date: str | None = None, end_date: str | None = None) -> dict:
+    """Diagnostic helper for 02 History ID gaps.
+
+    ID gaps alone do not mean data loss because SQLite row ids are not business
+    sequence numbers.  This helper reports gaps and row counts so admins can compare
+    them with delete logs / tombstones.
+    """
+    try:
+        df = load_records(start_date=start_date, end_date=end_date)  # type: ignore[misc]
+    except Exception:
+        df = pd.DataFrame()
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty or "id" not in df.columns:
+        return {"row_count": 0, "min_id": None, "max_id": None, "missing_count": 0, "missing_ids": []}
+    ids = []
+    for v in df["id"].tolist():
+        try:
+            i = int(float(str(v).strip()))
+            if i > 0:
+                ids.append(i)
+        except Exception:
+            continue
+    if not ids:
+        return {"row_count": len(df), "min_id": None, "max_id": None, "missing_count": 0, "missing_ids": []}
+    existing = set(ids)
+    missing = [i for i in range(min(existing), max(existing) + 1) if i not in existing]
+    return {
+        "row_count": int(len(df)),
+        "id_count": int(len(ids)),
+        "min_id": int(min(existing)),
+        "max_id": int(max(existing)),
+        "missing_count": int(len(missing)),
+        "missing_ids": missing[:500],
+        "note": "ID 是資料庫流水號，不保證連續；若 missing_count 增加，需比對 DELETE_TIME_RECORDS / tombstone / 匯入覆蓋紀錄。V140 已加上非刪除同步保護，避免部分資料表覆蓋完整歷史。",
+    }
+
+# =================== END V140 HISTORY ID INTEGRITY + NON-DESTRUCTIVE 01/02 SAVE GUARD ===================

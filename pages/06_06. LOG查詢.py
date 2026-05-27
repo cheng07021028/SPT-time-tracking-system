@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+import io
 
+import pandas as pd
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
@@ -27,6 +29,52 @@ if _log_auth_status:
         f"權威筆數：{_log_auth_status.get('count', 0)}｜SQLite快取：{_log_auth_status.get('db_count', 0)}｜"
         f"DeletedKeys：{_log_auth_status.get('deleted_keys', 0)}｜Path：{_log_auth_status.get('path', '-')}"
     )
+
+
+def _make_logs_excel_bytes(raw_df, display_df, filters: dict) -> bytes:
+    """Build Excel file for current 06 LOG query result."""
+    raw = raw_df.copy() if isinstance(raw_df, pd.DataFrame) else pd.DataFrame()
+    disp = display_df.copy() if isinstance(display_df, pd.DataFrame) else pd.DataFrame()
+    output = io.BytesIO()
+    meta = pd.DataFrame([
+        ["匯出時間 / Export Time", str(log_service.now_text() if hasattr(log_service, "now_text") else "")],
+        ["開始日期 / Start Date", str(filters.get("start_date", ""))],
+        ["結束日期 / End Date", str(filters.get("end_date", ""))],
+        ["動作類型 / Action Type", str(filters.get("action_type", ""))],
+        ["等級 / Level", str(filters.get("level", ""))],
+        ["關鍵字 / Keyword", str(filters.get("keyword", ""))],
+        ["匯出筆數 / Rows", len(disp)],
+    ], columns=["項目 / Item", "內容 / Value"])
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        disp.to_excel(writer, sheet_name="LOG查詢", index=False)
+        meta.to_excel(writer, sheet_name="匯出資訊", index=False)
+        raw.to_excel(writer, sheet_name="原始資料", index=False)
+        workbook = writer.book
+        header_fmt = workbook.add_format({"bold": True, "bg_color": "#D9EAF7", "border": 1})
+        body_fmt = workbook.add_format({"text_wrap": True, "valign": "top"})
+        for sheet_name, data in (("LOG查詢", disp), ("原始資料", raw), ("匯出資訊", meta)):
+            ws = writer.sheets[sheet_name]
+            try:
+                ws.freeze_panes(1, 0)
+                ws.autofilter(0, 0, max(len(data), 1), max(len(data.columns) - 1, 0))
+            except Exception:
+                pass
+            for col_idx, col in enumerate(list(data.columns)):
+                try:
+                    ws.write(0, col_idx, str(col), header_fmt)
+                    max_len = max([len(str(col))] + [len(str(x)) for x in data[col].head(300).tolist()]) if not data.empty else len(str(col))
+                    width = min(max(max_len + 2, 12), 48)
+                    ws.set_column(col_idx, col_idx, width, body_fmt)
+                except Exception:
+                    pass
+    output.seek(0)
+    return output.getvalue()
+
+
+def _safe_log_export_filename(filters: dict) -> str:
+    s = str(filters.get("start_date", "")).replace("/", "-")[:10] or "start"
+    e = str(filters.get("end_date", "")).replace("/", "-")[:10] or "end"
+    return f"SPT_LOG查詢_{s}_{e}.xlsx"
 
 
 def _default_filters() -> dict:
@@ -124,6 +172,14 @@ if not df.empty:
         legacy_count = int(display_df["帳號 / User"].astype(str).str.lower().isin(["appuser", "adminuser"]).sum())
         if legacy_count > 0:
             st.caption(f"注意：目前查詢內有 {legacy_count} 筆舊版 OS 帳號紀錄；V78 後新紀錄會寫入實際登入帳號。")
+
+    st.download_button(
+        "▣ 下載目前查詢結果 Excel / Download Current LOG Excel",
+        data=_make_logs_excel_bytes(df, display_df, filters),
+        file_name=_safe_log_export_filename(filters),
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
     render_table(display_df, "system_logs", editable=False, height=620)
 else:
     st.info("此條件下尚無 LOG / No logs for current filters")
