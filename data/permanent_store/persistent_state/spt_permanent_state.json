@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 22:02:38",
+  "exported_at": "2026-05-27 22:06:13",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 5,
@@ -16,7 +16,7 @@
     "process_category_options": 97,
     "process_options": 44,
     "rest_periods": 5,
-    "system_logs": 786,
+    "system_logs": 792,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
@@ -18399,6 +18399,72 @@
         "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 1 筆",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 8210,
+        "log_time": "2026-05-27 22:03:18",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 8211,
+        "log_time": "2026-05-27 22:03:22",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 8212,
+        "log_time": "2026-05-27 22:04:28",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 8213,
+        "log_time": "2026-05-27 22:04:32",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 8214,
+        "log_time": "2026-05-27 22:05:34",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 8215,
+        "log_time": "2026-05-27 22:05:38",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "table_ui_settings",
+        "target_id": "",
+        "message": "INSERT table_ui_settings",
+        "detail": "INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)\n            VALUES (?, ?, ?, datetime('now','localtime'))\n            ON CONFLICT(table_key) DO UPDATE SET\n                widths_json=excluded.widths_json,\n                order_json=excluded.order_json,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
       }
     ],
     "system_settings": [
@@ -18444,9 +18510,9 @@
     "table_ui_settings": [
       {
         "table_key": "01.time_records.main",
-        "widths_json": "{\"id\": 60, \"record_key\": 100, \"status\": 100, \"work_order\": 120, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 100, \"remark\": 250, \"start_date\": 140, \"start_time\": 140, \"end_date\": 140, \"end_time\": 140, \"work_hours\": 140, \"assembly_location\": 140, \"group_key\": 60, \"is_group_work\": 100, \"source\": 60, \"created_at\": 60, \"updated_at\": 180}",
-        "order_json": "[]",
-        "updated_at": "2026-05-27 14:02:38"
+        "widths_json": "{\"id\": 60, \"record_key\": 100, \"status\": 100, \"work_order\": 120, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 100, \"remark\": 250, \"start_date\": 140, \"start_time\": 140, \"end_date\": 140, \"end_time\": 160, \"work_hours\": 140, \"assembly_location\": 140, \"group_key\": 60, \"is_group_work\": 140, \"source\": 60, \"created_at\": 60, \"updated_at\": 180}",
+        "order_json": "[\"id\", \"employee_id\", \"employee_name\", \"status\", \"work_order\", \"part_no\", \"is_group_work\", \"type_name\", \"process_name\", \"start_action\", \"start_timestamp\", \"end_action\", \"end_timestamp\", \"remark\", \"start_date\", \"start_time\", \"end_date\", \"end_time\", \"work_hours\", \"assembly_location\", \"group_key\", \"source\", \"created_at\", \"record_key\", \"updated_at\"]",
+        "updated_at": "2026-05-27 14:06:12"
       }
     ],
     "time_records": [
