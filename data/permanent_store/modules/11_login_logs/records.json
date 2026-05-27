@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-27 17:59:46",
-  "exported_at": "2026-05-27 17:59:46",
+  "updated_at": "2026-05-27 17:59:52",
+  "exported_at": "2026-05-27 17:59:52",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 189731,
+        "source": "v103_merge",
+        "username": "B237",
+        "display_name": "彭紹恩",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "11_login_logs:can_view; employee_id=B237; roles=operator",
+        "module_code": "11_login_logs",
+        "login_time": "2026-05-27 17:59:51",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 17:59:51"
+      },
+      {
+        "id": 189518,
+        "source": "v103_merge",
+        "username": "B237",
+        "display_name": "彭紹恩",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "12_module_persistence:can_view; employee_id=B237; roles=operator",
+        "module_code": "12_module_persistence",
+        "login_time": "2026-05-27 17:59:50",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 17:59:50"
+      },
       {
         "id": 189306,
         "source": "v103_merge",
@@ -3390,7 +3422,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 211,
+    "login_logs": 213,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
