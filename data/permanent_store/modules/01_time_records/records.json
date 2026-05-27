@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 09:35:37",
-  "exported_at": "2026-05-27 09:35:37",
-  "reason": "load_records_v134_display_self_repair_01",
+  "updated_at": "2026-05-27 09:35:43",
+  "exported_at": "2026-05-27 09:35:43",
+  "reason": "today_records_v134_display_self_repair_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -38,7 +38,7 @@
       {
         "id": 80,
         "record_key": "B126|26M0021-01|配電|2026-05-27 08:36:20|8b1517e9",
-        "status": "完工",
+        "status": "作業中",
         "work_order": "26M0021-01",
         "part_no": "1GRSC150-003-04",
         "type_name": "4 Port Frame Long-type EFEM",
@@ -47,20 +47,20 @@
         "employee_name": "戴鎰祥",
         "start_action": "開始",
         "start_timestamp": "2026-05-27 08:36:20",
-        "end_action": "完工",
-        "end_timestamp": "2026-05-27 09:35:05",
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "",
         "start_date": "2026-05-27",
         "start_time": "08:36:20",
-        "end_date": "2026-05-27",
-        "end_time": "09:35:05",
-        "work_hours": 0.98,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "B126|配電|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 08:36:20",
-        "updated_at": "2026-05-27 09:35:05"
+        "updated_at": "2026-05-27 08:36:20"
       },
       {
         "id": 81,
