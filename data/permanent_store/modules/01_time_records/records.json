@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-27 14:24:06",
-  "exported_at": "2026-05-27 14:24:06",
-  "reason": "today_records_v134_display_self_repair_01",
+  "updated_at": "2026-05-27 14:26:39",
+  "exported_at": "2026-05-27 14:26:39",
+  "reason": "finish_work_v108_fast_local_sync_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -848,7 +848,7 @@
       {
         "id": 191,
         "record_key": "SPT208|26M0095-09|清潔|2026-05-27 14:11:01|fd942b78",
-        "status": "作業中",
+        "status": "完工",
         "work_order": "26M0095-09",
         "part_no": "4TRSC131-005-05",
         "type_name": "2LP Asymtek EFEM (wafer)(宏田)",
@@ -857,20 +857,20 @@
         "employee_name": "邱珍娜",
         "start_action": "開始",
         "start_timestamp": "2026-05-27 14:11:01",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
+        "end_action": "完工",
+        "end_timestamp": "2026-05-27 14:26:05",
+        "remark": "FINISH CLEANING",
         "start_date": "2026-05-27",
         "start_time": "14:11:01",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-27",
+        "end_time": "14:26:05",
+        "work_hours": 0.25,
         "assembly_location": "宏田",
         "group_key": "SPT208|清潔|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 14:11:01",
-        "updated_at": "2026-05-27 14:11:01"
+        "updated_at": "2026-05-27 14:26:05"
       },
       {
         "id": 195,
@@ -898,38 +898,11 @@
         "source": "streamlit",
         "created_at": "2026-05-27 14:14:37",
         "updated_at": "2026-05-27 14:14:37"
-      },
-      {
-        "id": 196,
-        "record_key": "SPT239|26M0021-03|前置鈑金|2026-05-27 14:17:11|1ac6be69",
-        "status": "作業中",
-        "work_order": "26M0021-03",
-        "part_no": "1GRSC150-003-04",
-        "type_name": "4 Port Frame Long-type EFEM",
-        "process_name": "前置鈑金",
-        "employee_id": "SPT239",
-        "employee_name": "麥可",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 14:17:11",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
-        "start_date": "2026-05-27",
-        "start_time": "14:17:11",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SPT239|前置鈑金|2026-05-27",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-27 14:17:11",
-        "updated_at": "2026-05-27 14:17:11"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 34
+    "time_records": 33
   }
 }
