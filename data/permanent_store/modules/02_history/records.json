@@ -2,15 +2,43 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 19:57:23",
-  "exported_at": "2026-05-27 19:57:23",
-  "reason": "delete_time_records_v98_write_through_02",
-  "empty_authoritative": true,
+  "updated_at": "2026-05-27 20:25:53",
+  "exported_at": "2026-05-27 20:25:53",
+  "reason": "start_work_v108_fast_local_upsert_02",
+  "empty_authoritative": false,
   "tables": {
-    "time_records": []
+    "time_records": [
+      {
+        "id": 187,
+        "record_key": "SPT208|24N4001-24|收機|2026-05-27 20:25:05|42f361e4",
+        "status": "作業中",
+        "work_order": "24N4001-24",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "收機",
+        "employee_id": "SPT208",
+        "employee_name": "邱珍娜",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 20:25:05",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "20:25:05",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT208|收機|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 20:25:05",
+        "updated_at": "2026-05-27 20:25:05"
+      }
+    ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 0
+    "time_records": 1
   }
 }
