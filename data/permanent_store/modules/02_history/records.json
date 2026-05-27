@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-27 19:51:25",
-  "exported_at": "2026-05-27 19:51:25",
-  "reason": "finish_work_v139_final_state_reconcile_02",
+  "updated_at": "2026-05-27 19:53:01",
+  "exported_at": "2026-05-27 19:53:01",
+  "reason": "start_work_v139_final_state_reconcile_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -88,11 +88,38 @@
         "source": "streamlit",
         "created_at": "2026-05-27 19:50:46",
         "updated_at": "2026-05-27 19:51:23"
+      },
+      {
+        "id": 185,
+        "record_key": "B211|NA|6S|2026-05-27 19:52:19|45dc3006",
+        "status": "作業中",
+        "work_order": "NA",
+        "part_no": "NA",
+        "type_name": "NA",
+        "process_name": "6S",
+        "employee_id": "B211",
+        "employee_name": "張瑀榛",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 19:52:19",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-27",
+        "start_time": "19:52:19",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "NA",
+        "group_key": "B211|6S|2026-05-27",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-27 19:52:19",
+        "updated_at": "2026-05-27 19:52:19"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 3
+    "time_records": 4
   }
 }
