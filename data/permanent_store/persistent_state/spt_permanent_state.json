@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 16:31:59",
+  "exported_at": "2026-05-27 16:36:04",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 75,
+  "business_row_count": 69,
   "table_counts": {
     "app_settings": 1,
     "auth_account_permissions": 130,
@@ -11,7 +11,7 @@
     "auth_security_settings": 2,
     "auth_users": 10,
     "employees": 0,
-    "login_logs": 24,
+    "login_logs": 28,
     "process_categories": 6,
     "process_category_options": 100,
     "process_options": 17,
@@ -24,7 +24,7 @@
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 0,
-    "time_records": 75,
+    "time_records": 69,
     "work_orders": 0
   },
   "tables": {
@@ -2428,7 +2428,67 @@
     "employees": [],
     "login_logs": [
       {
-        "id": 167956,
+        "id": 168062,
+        "username": "SPT199",
+        "display_name": "龍斯愷",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=SPT199",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 16:35:56",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 16:35:56"
+      },
+      {
+        "id": 168063,
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=admin;source=authority",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-27 16:35:34",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 16:35:34"
+      },
+      {
+        "id": 168064,
+        "username": "SSS",
+        "display_name": "SSS",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=SSS; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 16:35:24",
+        "logout_time": "2026-05-27 16:35:24",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 16:35:24"
+      },
+      {
+        "id": 168065,
+        "username": "B002",
+        "display_name": "張文品",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=B002; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-27 16:33:24",
+        "logout_time": "2026-05-27 16:33:24",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-27 16:33:24"
+      },
+      {
+        "id": 168066,
         "username": "SSS",
         "display_name": "SSS",
         "event_type": "PERMISSION_DENIED",
@@ -2443,7 +2503,7 @@
         "created_at": "2026-05-27 16:31:32"
       },
       {
-        "id": 167957,
+        "id": 168067,
         "username": "B002",
         "display_name": "張文品",
         "event_type": "LOGIN",
@@ -2458,7 +2518,7 @@
         "created_at": "2026-05-27 16:31:16"
       },
       {
-        "id": 167958,
+        "id": 168068,
         "username": "B168",
         "display_name": "洪敏強",
         "event_type": "LOGOUT",
@@ -2473,7 +2533,7 @@
         "created_at": "2026-05-27 16:30:56"
       },
       {
-        "id": 167959,
+        "id": 168069,
         "username": "B168",
         "display_name": "洪敏強",
         "event_type": "LOGIN",
@@ -2488,7 +2548,7 @@
         "created_at": "2026-05-27 16:29:44"
       },
       {
-        "id": 167960,
+        "id": 168070,
         "username": "B168",
         "display_name": "洪敏強",
         "event_type": "LOGOUT",
@@ -2503,7 +2563,7 @@
         "created_at": "2026-05-27 16:29:22"
       },
       {
-        "id": 167961,
+        "id": 168071,
         "username": "B204",
         "display_name": "周棟榮",
         "event_type": "LOGOUT",
@@ -2518,7 +2578,7 @@
         "created_at": "2026-05-27 16:29:22"
       },
       {
-        "id": 167962,
+        "id": 168072,
         "username": "B204",
         "display_name": "周棟榮",
         "event_type": "PASSWORD_CHANGE",
@@ -2533,7 +2593,7 @@
         "created_at": "2026-05-27 16:27:37"
       },
       {
-        "id": 167963,
+        "id": 168073,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "LOGOUT",
@@ -2548,7 +2608,7 @@
         "created_at": "2026-05-27 16:27:22"
       },
       {
-        "id": 167964,
+        "id": 168074,
         "username": "B204",
         "display_name": "周棟榮",
         "event_type": "LOGIN",
@@ -2563,7 +2623,7 @@
         "created_at": "2026-05-27 16:27:16"
       },
       {
-        "id": 167965,
+        "id": 168075,
         "username": "B204",
         "display_name": "周政龍",
         "event_type": "LOGIN",
@@ -2578,7 +2638,7 @@
         "created_at": "2026-05-27 16:27:08"
       },
       {
-        "id": 167966,
+        "id": 168076,
         "username": "B168",
         "display_name": "洪敏強",
         "event_type": "LOGIN",
@@ -2593,7 +2653,7 @@
         "created_at": "2026-05-27 16:27:03"
       },
       {
-        "id": 167967,
+        "id": 168077,
         "username": "B168",
         "display_name": "洪敏強",
         "event_type": "LOGIN",
@@ -2608,7 +2668,7 @@
         "created_at": "2026-05-27 16:26:57"
       },
       {
-        "id": 167968,
+        "id": 168078,
         "username": "B168",
         "display_name": "洪敏強",
         "event_type": "LOGIN",
@@ -2623,7 +2683,7 @@
         "created_at": "2026-05-27 16:26:54"
       },
       {
-        "id": 167969,
+        "id": 168079,
         "username": "B226",
         "display_name": "周政龍",
         "event_type": "LOGOUT",
@@ -2638,7 +2698,7 @@
         "created_at": "2026-05-27 16:26:53"
       },
       {
-        "id": 167970,
+        "id": 168080,
         "username": "B168",
         "display_name": "洪敏強",
         "event_type": "LOGIN",
@@ -2653,7 +2713,7 @@
         "created_at": "2026-05-27 16:26:53"
       },
       {
-        "id": 167971,
+        "id": 168081,
         "username": "B168",
         "display_name": "洪敏強",
         "event_type": "LOGIN",
@@ -2668,7 +2728,7 @@
         "created_at": "2026-05-27 16:26:51"
       },
       {
-        "id": 167972,
+        "id": 168082,
         "username": "B168",
         "display_name": "洪敏強",
         "event_type": "LOGIN",
@@ -2683,7 +2743,7 @@
         "created_at": "2026-05-27 16:26:48"
       },
       {
-        "id": 167973,
+        "id": 168083,
         "username": "B168",
         "display_name": "洪敏強",
         "event_type": "LOGIN",
@@ -2698,7 +2758,7 @@
         "created_at": "2026-05-27 16:26:45"
       },
       {
-        "id": 167974,
+        "id": 168084,
         "username": "B168",
         "display_name": "洪敏強",
         "event_type": "LOGIN",
@@ -2713,7 +2773,7 @@
         "created_at": "2026-05-27 16:26:34"
       },
       {
-        "id": 167975,
+        "id": 168085,
         "username": "SPT208",
         "display_name": "邱珍娜",
         "event_type": "LOGIN",
@@ -2728,7 +2788,7 @@
         "created_at": "2026-05-27 16:25:30"
       },
       {
-        "id": 167976,
+        "id": 168086,
         "username": "SSS",
         "display_name": "SSS",
         "event_type": "LOGIN",
@@ -2743,7 +2803,7 @@
         "created_at": "2026-05-27 16:24:48"
       },
       {
-        "id": 167977,
+        "id": 168087,
         "username": "B226",
         "display_name": "周政龍",
         "event_type": "PASSWORD_CHANGE",
@@ -2758,7 +2818,7 @@
         "created_at": "2026-05-27 16:24:11"
       },
       {
-        "id": 167978,
+        "id": 168088,
         "username": "B226",
         "display_name": "周政龍",
         "event_type": "LOGIN",
@@ -2773,7 +2833,7 @@
         "created_at": "2026-05-27 16:23:48"
       },
       {
-        "id": 167979,
+        "id": 168089,
         "username": "SPT239",
         "display_name": "麥可",
         "event_type": "LOGOUT",
@@ -13036,168 +13096,6 @@
         "source": "streamlit",
         "created_at": "2026-05-27 15:55:16",
         "updated_at": "2026-05-27 15:55:16"
-      },
-      {
-        "id": 227,
-        "record_key": "SPT142|21M0241-01|前置鈑金|2026-05-27 16:01:02|abeb9611",
-        "status": "暫停",
-        "work_order": "21M0241-01",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "前置鈑金",
-        "employee_id": "SPT142",
-        "employee_name": "黃沂澂",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 16:01:02",
-        "end_action": "暫停",
-        "end_timestamp": "2026-05-27 16:02:49",
-        "remark": "同步作業平均分配：4筆，群組總工時=0.03，平均=0.01",
-        "start_date": "2026-05-27",
-        "start_time": "16:01:02",
-        "end_date": "2026-05-27",
-        "end_time": "16:02:49",
-        "work_hours": 0.01,
-        "assembly_location": "竹東",
-        "group_key": "SPT142|前置鈑金|2026-05-27",
-        "is_group_work": 1,
-        "source": "streamlit",
-        "created_at": "2026-05-27 16:01:02",
-        "updated_at": "2026-05-27 16:02:49"
-      },
-      {
-        "id": 228,
-        "record_key": "SPT142|21M0241-02|前置鈑金|2026-05-27 16:01:14|7f1641a3",
-        "status": "作業中",
-        "work_order": "21M0241-02",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "前置鈑金",
-        "employee_id": "SPT142",
-        "employee_name": "黃沂澂",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 16:01:14",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": null,
-        "start_date": "2026-05-27",
-        "start_time": "16:01:14",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SPT142|前置鈑金|2026-05-27",
-        "is_group_work": 1,
-        "source": "streamlit",
-        "created_at": "2026-05-27 16:01:14",
-        "updated_at": "2026-05-27 16:01:42"
-      },
-      {
-        "id": 229,
-        "record_key": "SPT142|21M0241-03|前置鈑金|2026-05-27 16:01:31|08a9e463",
-        "status": "作業中",
-        "work_order": "21M0241-03",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "前置鈑金",
-        "employee_id": "SPT142",
-        "employee_name": "黃沂澂",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 16:01:31",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": null,
-        "start_date": "2026-05-27",
-        "start_time": "16:01:31",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SPT142|前置鈑金|2026-05-27",
-        "is_group_work": 1,
-        "source": "streamlit",
-        "created_at": "2026-05-27 16:01:31",
-        "updated_at": "2026-05-27 16:01:42"
-      },
-      {
-        "id": 230,
-        "record_key": "SPT142|21M0241-04|前置鈑金|2026-05-27 16:01:42|18b7b6f6",
-        "status": "作業中",
-        "work_order": "21M0241-04",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "前置鈑金",
-        "employee_id": "SPT142",
-        "employee_name": "黃沂澂",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 16:01:42",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": "",
-        "start_date": "2026-05-27",
-        "start_time": "16:01:42",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SPT142|前置鈑金|2026-05-27",
-        "is_group_work": 1,
-        "source": "streamlit",
-        "created_at": "2026-05-27 16:01:42",
-        "updated_at": "2026-05-27 16:01:42"
-      },
-      {
-        "id": 231,
-        "record_key": "SSS|21M0241-01|前置鈑金|2026-05-27 16:07:28|bdbe185f",
-        "status": "作業中",
-        "work_order": "21M0241-01",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "前置鈑金",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 16:07:28",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": "",
-        "start_date": "2026-05-27",
-        "start_time": "16:07:28",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SSS|前置鈑金|2026-05-27",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-27 16:07:28",
-        "updated_at": "2026-05-27 16:07:28"
-      },
-      {
-        "id": 232,
-        "record_key": "SSS|21M0241-02|前置鈑金|2026-05-27 16:10:48|b9e6ff3d",
-        "status": "作業中",
-        "work_order": "21M0241-02",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "前置鈑金",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-27 16:10:48",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": "",
-        "start_date": "2026-05-27",
-        "start_time": "16:10:48",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SSS|前置鈑金|2026-05-27",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-27 16:10:48",
-        "updated_at": "2026-05-27 16:10:48"
       },
       {
         "id": 236,
