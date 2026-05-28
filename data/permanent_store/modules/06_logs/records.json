@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 01:38:06",
-  "exported_at": "2026-05-29 01:38:06",
+  "updated_at": "2026-05-29 01:40:35",
+  "exported_at": "2026-05-29 01:40:35",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -619,11 +619,35 @@
         "detail": "",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 148,
+        "log_time": "2026-05-29 01:40:31",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V178B",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：已刪除/封鎖 1 筆；02刪除=0，01刪除=1，SQLite刪除=0，tombstone=1。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 147,
+        "log_time": "2026-05-29 01:40:31",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V178",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：已建立刪除 tombstone，01/02 顯示同步；刪除 1 筆，同步保留 0 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 51
+    "system_logs": 53
   }
 }
