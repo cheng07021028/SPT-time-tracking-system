@@ -17,6 +17,7 @@ from services.backup_queue_status_service import (
 from services.time_record_integrity_service import (
     audit_time_record_integrity,
     repair_0102_authority_non_destructive,
+    recover_log_only_start_records_to_pending,
     export_audit_excel_bytes,
 )
 from services.regression_test_service import (
@@ -608,6 +609,49 @@ if result:
             else:
                 st.error(f"修復未執行或失敗：{repair_result.get('reason')}")
             st.json(repair_result)
+
+    st.markdown("### LOG-only 待補還原 / LOG-only Pending Recovery")
+    st.caption(
+        "上方可自動修復 = NO 的 LOG_START_MISSING_TIME_RECORD，代表只剩 LOG 能證明曾按下開始，"
+        "但 LOG 不含完整 INSERT 參數，所以不能直接算成正式工時。此功能只會新增『待人工確認』補登列，"
+        "不刪除、不覆蓋、不重新編號，補回後請到 01/02 檢查 P/N、機型、組立地點、結束時間與工時。"
+    )
+    if not CAN_REPAIR:
+        st.info("你的帳號沒有 14 模組管理權限，因此不能從 LOG 建立待補還原紀錄。")
+    else:
+        log_recovery_confirm = st.checkbox(
+            "我確認從 LOG 建立待人工確認的補登紀錄",
+            key="v164b_confirm_log_only_recovery",
+        )
+        if st.button(
+            "🧩 從 LOG 建立待補工時紀錄",
+            use_container_width=True,
+            disabled=not log_recovery_confirm,
+            key="v164b_log_only_recovery_button",
+        ):
+            with st.spinner("正在從 LOG 產生待補還原紀錄..."):
+                log_recovery_result = recover_log_only_start_records_to_pending(
+                    github=bool(github_backup),
+                    start_date=str(start_date),
+                    end_date=str(end_date),
+                    dry_run=bool(dry_run),
+                )
+            st.session_state["v164b_log_recovery_result"] = log_recovery_result
+            if log_recovery_result.get("ok"):
+                st.success(
+                    "LOG 待補還原流程完成。"
+                    + ("（Dry Run，未寫入）" if log_recovery_result.get("dry_run") else "")
+                    + f" 候選 {log_recovery_result.get('candidate_count', 0)} 筆，"
+                    + f"01 新增 {log_recovery_result.get('created_01_count', 0)} 筆，"
+                    + f"02 新增 {log_recovery_result.get('created_02_count', 0)} 筆。"
+                )
+            else:
+                st.error(f"LOG 待補還原失敗：{log_recovery_result.get('reason')}")
+            st.json(log_recovery_result)
+
+    if st.session_state.get("v164b_log_recovery_result"):
+        with st.expander("V164B LOG 待補還原結果", expanded=False):
+            st.json(st.session_state.get("v164b_log_recovery_result"))
 
 if b3.button("🧹 清除本頁檢查結果", use_container_width=True, key="v153_clear_result"):
     st.session_state["v153_audit_result"] = None

@@ -683,6 +683,170 @@ def repair_0102_authority_non_destructive(*, github: bool = True, start_date: st
         return {"ok": False, "reason": str(exc), "merged_count": merged_count, "existing_02_count": base_count, "source_counts": source_counts}
 
 
+
+def _make_log_recovery_record(parsed: dict[str, Any]) -> dict[str, Any]:
+    """Build a conservative placeholder row from a START_WORK log.
+
+    This is deliberately marked as pending/manual-confirmation instead of normal
+    active/finished work, because LOG rows do not carry the full INSERT parameter
+    set needed to calculate final work hours safely.
+    """
+    start_ts = _timestamp_text(parsed.get("log_time")) or _now_text()
+    start_date = _date_part(start_ts)
+    start_time = start_ts[11:19] if len(start_ts) >= 19 else ""
+    emp = _clean(parsed.get("employee_id"))
+    name = _clean(parsed.get("employee_name"))
+    wo = _clean(parsed.get("work_order"))
+    proc = _clean(parsed.get("process_name"))
+    target_id = parsed.get("target_id")
+    raw_key = f"LOGRECOVERY|{emp}|{wo}|{proc}|{start_ts}|{target_id or ''}"
+    rec_key = re.sub(r"\s+", " ", raw_key).strip()
+    now = _now_text()
+    row: dict[str, Any] = {
+        "id": target_id or "",
+        "record_key": rec_key,
+        "status": "待人工確認",
+        "work_order": wo,
+        "part_no": "",
+        "type_name": "",
+        "process_name": proc,
+        "employee_id": emp,
+        "employee_name": name,
+        "start_action": "開始",
+        "start_timestamp": start_ts,
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "V164B_LOG_ONLY_RECOVERY：由 LOG START_WORK 補回。LOG 不含完整 INSERT 參數，請人工確認 P/N、機型、組立地點、結束時間與工時後再轉正式紀錄。",
+        "start_date": start_date,
+        "start_time": start_time,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "",
+        "assembly_location": "",
+        "group_key": f"{emp}|{proc}|{start_date}" if emp or proc or start_date else "",
+        "is_group_work": 0,
+        "source": "V164B_LOG_ONLY_RECOVERY",
+        "created_at": start_ts,
+        "updated_at": now,
+        "recovery_status": "待人工確認",
+        "recovery_note": _clean(parsed.get("message")),
+    }
+    return row
+
+
+def _log_only_missing_candidates(start_date: str | None = None, end_date: str | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int]]:
+    """Return candidate rows that exist only as START_WORK logs.
+
+    The first list contains safe-to-stage candidate records. The second list
+    contains skipped rows with reasons. No writes are performed here.
+    """
+    start_date = _date_part(start_date) if start_date else None
+    end_date = _date_part(end_date) if end_date else None
+    merged_df, source_counts = merge_time_records_non_destructive(start_date=start_date, end_date=end_date)
+    merged_rows = merged_df.to_dict(orient="records") if not merged_df.empty else []
+    merged_idx = _records_index(merged_rows)
+    existing_keys = {_strong_key(r) for r in merged_rows}
+    candidates: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    seen_candidate_keys: set[str] = set()
+
+    for log in _log_start_rows(start_date, end_date):
+        parsed = _parse_start_log(log)
+        found = False
+        if parsed["target_id"] is not None and str(parsed["target_id"]) in merged_idx["id"]:
+            found = True
+        weak = "|".join([parsed.get("employee_id", ""), parsed.get("work_order", ""), parsed.get("process_name", ""), _date_part(parsed.get("log_time"))])
+        if weak.strip("|") and weak in merged_idx["biz_weak"]:
+            found = True
+        if found:
+            continue
+
+        missing = []
+        if not _clean(parsed.get("employee_id")):
+            missing.append("工號")
+        if not _clean(parsed.get("employee_name")):
+            missing.append("姓名")
+        if not _clean(parsed.get("work_order")):
+            missing.append("製令")
+        if not _clean(parsed.get("process_name")):
+            missing.append("工段")
+        if not _clean(parsed.get("log_time")):
+            missing.append("開始時間")
+        if missing:
+            skipped.append({**parsed, "skip_reason": "LOG 欄位不足，缺少：" + ", ".join(missing)})
+            continue
+
+        row = _make_log_recovery_record(parsed)
+        sk = _strong_key(row)
+        if sk in existing_keys or sk in seen_candidate_keys:
+            continue
+        seen_candidate_keys.add(sk)
+        candidates.append(row)
+
+    return candidates, skipped, source_counts
+
+
+def recover_log_only_start_records_to_pending(*, github: bool = True, start_date: str | None = None, end_date: str | None = None, dry_run: bool = True) -> dict[str, Any]:
+    """Stage LOG-only START_WORK rows as pending records in 01/02 authority files.
+
+    Safety rules:
+    - Only appends missing records; never deletes, overwrites, or renumbers.
+    - Restored rows are marked status='待人工確認' and source='V164B_LOG_ONLY_RECOVERY'.
+    - Rows are intentionally not marked 作業中/下班 because LOG alone cannot prove
+      whether the work was later finished or how work_hours should be calculated.
+    """
+    candidates, skipped, source_counts = _log_only_missing_candidates(start_date=start_date, end_date=end_date)
+    if not candidates:
+        return {
+            "ok": True,
+            "dry_run": bool(dry_run),
+            "created_count": 0,
+            "skipped_count": len(skipped),
+            "reason": "no_log_only_candidates",
+            "source_counts": source_counts,
+            "skipped_preview": skipped[:50],
+        }
+
+    existing_01 = _authority_rows("01_time_records")
+    existing_02 = _authority_rows("02_history")
+    existing_keys_01 = {_strong_key(r) for r in existing_01}
+    existing_keys_02 = {_strong_key(r) for r in existing_02}
+
+    append_01 = [r for r in candidates if _strong_key(r) not in existing_keys_01]
+    append_02 = [r for r in candidates if _strong_key(r) not in existing_keys_02]
+    rows_01 = list(existing_01) + append_01
+    rows_02 = list(existing_02) + append_02
+
+    result = {
+        "ok": True,
+        "dry_run": bool(dry_run),
+        "candidate_count": len(candidates),
+        "created_01_count": len(append_01),
+        "created_02_count": len(append_02),
+        "skipped_count": len(skipped),
+        "existing_01_count": len(existing_01),
+        "existing_02_count": len(existing_02),
+        "after_01_count": len(rows_01),
+        "after_02_count": len(rows_02),
+        "source_counts": source_counts,
+        "created_preview": candidates[:50],
+        "skipped_preview": skipped[:50],
+    }
+    if dry_run:
+        return result
+
+    try:
+        from services.permanent_authority_service import save_authority  # type: ignore
+        r1 = save_authority("01_time_records", records={TIME_RECORD_TABLE: rows_01}, reason="v164b_log_only_pending_recovery_01", github=bool(github))
+        r2 = save_authority("02_history", records={TIME_RECORD_TABLE: rows_02}, reason="v164b_log_only_pending_recovery_02", github=bool(github))
+        result["save_01"] = r1
+        result["save_02"] = r2
+        return result
+    except Exception as exc:
+        result["ok"] = False
+        result["reason"] = str(exc)
+        return result
+
 def export_audit_excel_bytes(audit_result: dict[str, Any]) -> bytes:
     output = io.BytesIO()
     summary = audit_result.get("summary", {}) if isinstance(audit_result, dict) else {}
@@ -703,3 +867,4 @@ def export_audit_excel_bytes(audit_result: dict[str, Any]) -> bytes:
 # English aliases for scripts/tests.
 audit = audit_time_record_integrity
 repair = repair_0102_authority_non_destructive
+recover_log_only = recover_log_only_start_records_to_pending
