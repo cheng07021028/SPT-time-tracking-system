@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 08:52:40",
-  "exported_at": "2026-05-28 08:52:40",
+  "updated_at": "2026-05-28 08:52:47",
+  "exported_at": "2026-05-28 08:52:47",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -271,11 +271,35 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 8381,
+        "log_time": "2026-05-28 08:52:47",
+        "user_name": "B249",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "200",
+        "message": "劉翰霖 開始 26M0051-09 / 配電",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 8380,
+        "log_time": "2026-05-28 08:52:44",
+        "user_name": "B249",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 22
+    "system_logs": 24
   }
 }
