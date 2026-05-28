@@ -1,0 +1,47 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "ef4f6a62afc2420ea885f33171a8b6bf",
+  "event_type": "OFF_DUTY",
+  "event_time": "2026-05-28 18:12:24",
+  "record_id": "227",
+  "record_key": "SPT091|26M0021-02|收機|2026-05-28 09:26:39|80f421c1",
+  "operator_account": "SPT091",
+  "reason": "finish_work_v152_event_journal",
+  "row": {
+    "id": "227",
+    "record_key": "SPT091|26M0021-02|收機|2026-05-28 09:26:39|80f421c1",
+    "status": "下班",
+    "work_order": "26M0021-02",
+    "part_no": "1GRSC150-003-04",
+    "type_name": "4 Port Frame Long-type EFEM",
+    "process_name": "收機",
+    "employee_id": "SPT091",
+    "employee_name": "魏瑄毅",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-28 09:26:39",
+    "end_action": "下班",
+    "end_timestamp": "2026-05-28 18:11:39",
+    "remark": "",
+    "start_date": "2026-05-28",
+    "start_time": "09:26:39",
+    "end_date": "2026-05-28",
+    "end_time": "18:11:39",
+    "work_hours": "7.06",
+    "assembly_location": "竹東",
+    "group_key": "SPT091|收機|2026-05-28",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-28 09:26:39",
+    "updated_at": "2026-05-28 18:11:39"
+  },
+  "extra": {
+    "end_action": "下班",
+    "remark": "",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      227
+    ]
+  },
+  "previous_checksum": "08f110a498bde7474b8d2e1dead04d00c30bca6652e9fec99a6ea5ba156c514b",
+  "checksum": "015a73eaf29aa8efacb8a880c4a20ce8601386a6bfe4ffda2cc05679eaa3376e"
+}
