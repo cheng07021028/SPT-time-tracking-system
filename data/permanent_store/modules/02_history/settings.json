@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "settings",
-  "updated_at": "2026-05-27 19:56:35",
-  "exported_at": "2026-05-27 19:56:35",
+  "updated_at": "2026-05-28 10:45:02",
+  "exported_at": "2026-05-28 10:45:02",
   "reason": "v94_history_delete_tombstone",
   "empty_authoritative": false,
   "tables": {},
@@ -110,7 +110,8 @@
       239,
       242,
       243,
-      245
+      245,
+      261
     ],
     "deleted_record_keys": [
       "B002|21M0241-01|6S|2026-05-27 19:41:26|29955ee5",
@@ -222,10 +223,11 @@
       "SPT250|25MN0014-06|其他|2026-05-27 08:59:15|3aa6da0d",
       "SPT256|26M0043-01|模組|2026-05-27 11:22:50|b60df7ea",
       "SSS|21M0241-01|前置鈑金|2026-05-27 16:07:28|bdbe185f",
+      "SSS|21M0241-01|前置鈑金|2026-05-28 10:34:05|fd0aeb61",
       "SSS|21M0241-02|前置鈑金|2026-05-27 16:10:48|b9e6ff3d",
       "SSS|26M0051-03|前置鈑金|2026-05-27 18:12:50|adbb5a18"
     ],
-    "delete_tombstone_updated_at": "2026-05-27 19:56:35",
+    "delete_tombstone_updated_at": "2026-05-28 10:45:02",
     "table_settings": {
       "history_records": {
         "widths": {
