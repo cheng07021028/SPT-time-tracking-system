@@ -463,3 +463,106 @@ def force_delete_time_records(record_ids: Iterable[Any], *, reason: str = "V196 
 
 
 # V198 hard delete guard compatibility marker: supports 02 editor strict delete with bilingual columns.
+
+
+# =================== V199 02-HISTORY DELETE SAME-LANE GUARD ===================
+# Purpose:
+# - 01 deletion already survives Reboot because it calls the latest delete_time_records lane.
+# - 02 page still could call older delete_time_records_v178b_strict in some deployments.
+# - This function is the single authority rewrite/delete guard for both 01 and 02.
+
+def _v199_strip_ui_columns(df: pd.DataFrame | None) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame() if df is None else df
+    drop_cols = [
+        "刪除 / Delete", "重算 / Recalc", "刪除", "重算",
+        "Delete", "Recalc", "_selected", "_delete", "_recalc",
+    ]
+    return df.drop(columns=[c for c in drop_cols if c in df.columns], errors="ignore").copy()
+
+
+def _v199_dedupe_df(df: pd.DataFrame | None) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame() if df is None else df
+    by_key: dict[str, dict[str, Any]] = {}
+    for _, rr in df.iterrows():
+        row = dict(rr.to_dict())
+        ids = sorted(identities_for_row(row))
+        key = ids[0] if ids else json.dumps(row, ensure_ascii=False, sort_keys=True)
+        by_key[key] = row
+    return pd.DataFrame(list(by_key.values())) if by_key else pd.DataFrame()
+
+
+def _v199_authority_frames() -> list[pd.DataFrame]:
+    frames: list[pd.DataFrame] = []
+    try:
+        from services.permanent_authority_service import df_from_table
+        for module in ("02_history", "01_time_records"):
+            try:
+                f = df_from_table(module, "time_records")
+                if isinstance(f, pd.DataFrame) and not f.empty:
+                    frames.append(_v199_strip_ui_columns(f))
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return frames
+
+
+def force_delete_time_records_v199(record_ids: Iterable[Any], *, reason: str = "V199 hard delete", source_df: pd.DataFrame | None = None, github: bool = True) -> dict[str, Any]:
+    """Hard delete one or more time records and make the delete survive Reboot App.
+
+    Difference from older V178/V178B lanes:
+    - Always writes durable hard-delete guard entries.
+    - Rewrites 01_time_records and 02_history from authority frames only.
+    - Uses source_df only as deletion evidence, never as the replacement authority table.
+    - Strips editor-only checkbox columns before writing authority files.
+    """
+    ids = sorted({int(x) for x in (_to_int(v) for v in (record_ids or [])) if x is not None and x > 0})
+    src = source_df.copy() if isinstance(source_df, pd.DataFrame) else pd.DataFrame()
+    selected_rows = pd.DataFrame()
+    if not src.empty:
+        id_col = _id_col(src)
+        if id_col and ids:
+            selected_rows = src.loc[src[id_col].map(_to_int).isin(set(ids))].copy()
+        elif id_col and not ids:
+            # Allow callers that pass only selected rows as source_df.
+            selected_rows = src.copy()
+            ids = sorted({int(x) for x in (selected_rows[id_col].map(_to_int).tolist()) if x is not None and x > 0})
+    if not ids and (selected_rows is None or selected_rows.empty):
+        return {"ok": False, "deleted_count": 0, "reason": "no_ids_or_rows", "ids": []}
+
+    add_deleted_rows(_v199_strip_ui_columns(selected_rows), ids, reason=reason, github=github)
+    sqlite_deleted = _delete_from_sqlite(ids)
+
+    written = 0
+    before = 0
+    try:
+        from services.permanent_authority_service import table_from_df, update_tables
+        frames = _v199_authority_frames()
+        merged = pd.concat([f for f in frames if isinstance(f, pd.DataFrame) and not f.empty], ignore_index=True) if frames else pd.DataFrame()
+        before = int(len(merged)) if isinstance(merged, pd.DataFrame) else 0
+        remaining = filter_deleted_rows(_v199_strip_ui_columns(merged))
+        remaining = _v199_dedupe_df(remaining)
+        rows = table_from_df(remaining)
+        for module in ("01_time_records", "02_history"):
+            update_tables(module, {"time_records": rows}, reason="V199 hard delete rewrite 01/02", github=github)
+        written = int(len(rows))
+    except Exception:
+        pass
+
+    try:
+        from services.log_service import write_log
+        write_log(
+            "DELETE_TIME_RECORDS_V199",
+            f"{reason}：V199 01/02 same-lane reboot-proof hard delete；ids={ids}；sqlite_deleted={sqlite_deleted}；authority_before={before}；remaining={written}",
+            "time_records",
+            target_id=",".join(map(str, ids)),
+            level="WARN",
+        )
+    except Exception:
+        pass
+    clear_cache()
+    return {"ok": True, "deleted_count": int(len(ids)), "ids": ids, "sqlite_deleted": sqlite_deleted, "authority_before": before, "authority_remaining": written}
+
+# =================== END V199 02-HISTORY DELETE SAME-LANE GUARD ===================

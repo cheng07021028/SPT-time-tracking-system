@@ -13445,3 +13445,167 @@ def audit_v198_02_delete_route() -> dict:
         out["error"] = str(exc)
     return out
 
+
+
+# =================== V199 01/02 DELETE SAME-LANE FIX ===================
+# Root cause fixed:
+# - 01 admin delete calls delete_time_records(), which already used the newest hard-delete guard.
+# - 02 History editor was still able to call delete_time_records_v178b_strict(), and older
+#   deployed versions logged DELETE_TIME_RECORDS_V178B with tombstone=0.
+# - Therefore 02-deleted rows could come back after Reboot App.
+# V199 forces both 01 and 02 delete buttons through the same V199 hard-delete guard.
+
+try:
+    _v199_prev_delete_time_records = delete_time_records
+except Exception:
+    _v199_prev_delete_time_records = None
+try:
+    _v199_prev_delete_time_records_from_editor_df = delete_time_records_from_editor_df
+except Exception:
+    _v199_prev_delete_time_records_from_editor_df = None
+
+
+def _v199_to_int(value):
+    try:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text or text.lower() in {"nan", "none", "null", "nat"}:
+            return None
+        return int(float(text))
+    except Exception:
+        return None
+
+
+def _v199_checked(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    return text in {"true", "1", "yes", "y", "on", "勾選", "是", "selected", "checked"}
+
+
+def _v199_id_col(df: pd.DataFrame | None) -> str:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return ""
+    for col in ("id", "ID", "ID / ID", "ID / ID / ID", "紀錄編號", "record_id"):
+        if col in df.columns:
+            return col
+    return ""
+
+
+def _v199_extract_selected_ids(editor_df: pd.DataFrame | None, delete_column: str = "刪除 / Delete") -> list[int]:
+    df = editor_df.copy() if isinstance(editor_df, pd.DataFrame) else pd.DataFrame()
+    if df.empty:
+        return []
+    id_col = _v199_id_col(df)
+    if not id_col:
+        return []
+    if delete_column in df.columns:
+        try:
+            mask = df[delete_column].map(_v199_checked)
+            values = df.loc[mask, id_col].tolist()
+        except Exception:
+            values = []
+    else:
+        values = df[id_col].tolist()
+    ids: list[int] = []
+    for v in values:
+        i = _v199_to_int(v)
+        if i is not None and i > 0 and i not in ids:
+            ids.append(i)
+    return ids
+
+
+def _v199_source_for_delete() -> pd.DataFrame:
+    try:
+        if "_v194_current_merged" in globals() and callable(globals().get("_v194_current_merged")):
+            return globals()["_v194_current_merged"](include_sqlite=True)
+    except Exception:
+        pass
+    try:
+        if callable(_v199_prev_delete_time_records):
+            # no source available; guard can still write id-only tombstones
+            pass
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v199_force_delete(ids: list[int], *, reason: str, source_df: pd.DataFrame | None = None, github: bool = True) -> dict:
+    ids = [i for i in (_v199_to_int(x) for x in (ids or [])) if i is not None and i > 0]
+    ids = sorted(set(ids))
+    if not ids:
+        return {"ok": False, "deleted_count": 0, "ids": [], "reason": "no_ids"}
+    try:
+        from services import time_record_hard_delete_guard_service as _guard
+        if hasattr(_guard, "force_delete_time_records_v199"):
+            res = _guard.force_delete_time_records_v199(ids, reason=reason, source_df=source_df, github=github)
+        else:
+            res = _guard.force_delete_time_records(ids, reason=reason, source_df=source_df, github=github)
+        try:
+            _guard.clear_cache()
+        except Exception:
+            pass
+    except Exception as exc:
+        try:
+            write_log("DELETE_TIME_RECORDS_V199_ERROR", f"{reason}：V199 hard delete failed：{exc}", "time_records", target_id=",".join(map(str, ids)), level="ERROR")
+        except Exception:
+            pass
+        if callable(_v199_prev_delete_time_records):
+            n = int(_v199_prev_delete_time_records(ids, reason=reason) or 0)
+            return {"ok": bool(n), "deleted_count": n, "ids": ids, "fallback": True}
+        return {"ok": False, "deleted_count": 0, "ids": ids, "error": str(exc)}
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+    return res if isinstance(res, dict) else {"ok": True, "deleted_count": int(res or len(ids)), "ids": ids}
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = [i for i in (_v199_to_int(x) for x in (record_ids or [])) if i is not None and i > 0]
+    if not ids:
+        return 0
+    source = _v199_source_for_delete()
+    res = _v199_force_delete(ids, reason=f"{reason} / V199 same-lane delete", source_df=source, github=True)
+    return int((res or {}).get("deleted_count") or 0)
+
+
+def delete_time_records_from_editor_df(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete", reason: str = "01 管理員維護表刪除") -> int:  # type: ignore[override]
+    ids = _v199_extract_selected_ids(editor_df, delete_column=delete_column)
+    if not ids:
+        return 0
+    res = _v199_force_delete(ids, reason=f"{reason} / V199 editor same-lane delete", source_df=editor_df, github=True)
+    return int((res or {}).get("deleted_count") or 0)
+
+
+def delete_time_records_from_02_history_editor(editor_df: pd.DataFrame, record_ids: list[int] | None = None, delete_column: str = "刪除 / Delete", reason: str = "02 歷史紀錄刪除") -> dict:
+    ids = [i for i in (_v199_to_int(x) for x in (record_ids or [])) if i is not None and i > 0]
+    if not ids:
+        ids = _v199_extract_selected_ids(editor_df, delete_column=delete_column)
+    if not ids:
+        return {"ok": False, "deleted_count": 0, "ids": [], "reason": "no_checked_ids"}
+    return _v199_force_delete(ids, reason=f"{reason} / V199 02 history same-lane delete", source_df=editor_df, github=True)
+
+
+def delete_time_records_v178b_strict(record_ids: list[int], reason: str = "02 歷史紀錄嚴格刪除", editor_df=None) -> dict:  # type: ignore[override]
+    # Compatibility shim: any old page still calling V178B is forced into the V199 lane.
+    return delete_time_records_from_02_history_editor(editor_df if isinstance(editor_df, pd.DataFrame) else pd.DataFrame(), record_ids=record_ids, delete_column="刪除 / Delete", reason=reason)
+
+
+def audit_v199_delete_lane() -> dict:
+    out = {"version": "V199", "same_lane_delete": True}
+    try:
+        from services import time_record_hard_delete_guard_service as _guard
+        entries = _guard.load_deleted_entries()
+        out["hard_delete_guard_entries"] = len(entries or [])
+        out["guard_has_v199"] = hasattr(_guard, "force_delete_time_records_v199")
+    except Exception as exc:
+        out["guard_error"] = str(exc)[:300]
+    return out
+
+# =================== END V199 01/02 DELETE SAME-LANE FIX ===================

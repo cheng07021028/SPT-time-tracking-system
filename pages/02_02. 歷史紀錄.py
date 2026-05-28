@@ -1515,9 +1515,14 @@ with tab1:
                         rerun()
                     else:
                         try:
-                            from services.time_record_service import delete_time_records_v178b_strict
-                            _v178b_delete_result = delete_time_records_v178b_strict(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除", editor_df=edited)
-                            count = int((_v178b_delete_result or {}).get("deleted_count") or 0)
+                            from services.time_record_service import delete_time_records_from_02_history_editor
+                            _v199_delete_result = delete_time_records_from_02_history_editor(
+                                edited,
+                                record_ids=delete_ids,
+                                delete_column=delete_col_label,
+                                reason="02 歷史紀錄啟動編輯後整列刪除",
+                            )
+                            count = int((_v199_delete_result or {}).get("deleted_count") or 0)
                         except Exception:
                             count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
                         st.session_state[delete_select_key] = []
