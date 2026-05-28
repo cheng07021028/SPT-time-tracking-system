@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-28 17:10:13",
-  "exported_at": "2026-05-28 17:10:13",
-  "reason": "load_records_v139_final_state_reconcile_02",
+  "updated_at": "2026-05-28 17:13:33",
+  "exported_at": "2026-05-28 17:13:33",
+  "reason": "start_work_v137_identity_safe_upsert_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -3787,11 +3787,46 @@
         "recovery_note": "",
         "is_deleted": "",
         "deleted_at": ""
+      },
+      {
+        "id": 312,
+        "record_key": "SPT172|26M0021-01|Packing|2026-05-28 17:13:21|ad3b5589",
+        "status": "作業中",
+        "work_order": "26M0021-01",
+        "part_no": "1GRSC150-003-04",
+        "type_name": "4 Port Frame Long-type EFEM",
+        "process_name": "Packing",
+        "employee_id": "SPT172",
+        "employee_name": "胡瑄芸",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 17:13:21",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "17:13:21",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT172|Packing|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 17:13:21",
+        "updated_at": "2026-05-28 17:13:21",
+        "department": "",
+        "title": "",
+        "department_emp": "",
+        "title_emp": "",
+        "recovery_status": "",
+        "recovery_note": "",
+        "is_deleted": "",
+        "deleted_at": ""
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 108
+    "time_records": 109
   }
 }
