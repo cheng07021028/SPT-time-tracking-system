@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 10:58:15",
-  "exported_at": "2026-05-28 10:58:15",
+  "updated_at": "2026-05-28 10:58:36",
+  "exported_at": "2026-05-28 10:58:36",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -10771,11 +10771,47 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 9680,
+        "log_time": "2026-05-28 10:58:32",
+        "user_name": "SPT077",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "267",
+        "message": "謝宛庭 開始 26N4001-03 / 其他",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9679,
+        "log_time": "2026-05-28 10:58:32",
+        "user_name": "SPT077",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9678,
+        "log_time": "2026-05-28 10:58:32",
+        "user_name": "SPT077",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 897
+    "system_logs": 900
   }
 }
