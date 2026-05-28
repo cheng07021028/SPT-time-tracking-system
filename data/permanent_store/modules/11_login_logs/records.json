@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 10:03:02",
-  "exported_at": "2026-05-28 10:03:02",
+  "updated_at": "2026-05-28 10:03:04",
+  "exported_at": "2026-05-28 10:03:04",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 5245,
+        "source": "v103_merge",
+        "username": "SPT243",
+        "display_name": "羅丹",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置自動登出; employee_id=SPT243; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-28 10:03:03",
+        "logout_time": "2026-05-28 10:03:03",
+        "idle_minutes": 3.5,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 10:03:03"
+      },
       {
         "id": 5056,
         "source": "v103_merge",
@@ -19,7 +35,7 @@
         "module_code": "",
         "login_time": "2026-05-28 10:03:01",
         "logout_time": "2026-05-28 10:03:01",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 10:03:01"
@@ -35,7 +51,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:59:01",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:59:01"
@@ -51,7 +67,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:58:18",
         "logout_time": "2026-05-28 09:58:18",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:58:18"
@@ -67,7 +83,7 @@
         "module_code": "06_logs",
         "login_time": "2026-05-28 09:56:38",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:56:38"
@@ -83,7 +99,7 @@
         "module_code": "07_missing",
         "login_time": "2026-05-28 09:56:37",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:56:37"
@@ -99,7 +115,7 @@
         "module_code": "05_analysis",
         "login_time": "2026-05-28 09:56:36",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:56:36"
@@ -115,7 +131,7 @@
         "module_code": "06_logs",
         "login_time": "2026-05-28 09:56:33",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:56:33"
@@ -131,7 +147,7 @@
         "module_code": "07_missing",
         "login_time": "2026-05-28 09:56:30",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:56:30"
@@ -147,7 +163,7 @@
         "module_code": "03_work_orders",
         "login_time": "2026-05-28 09:56:24",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:56:24"
@@ -163,7 +179,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:56:23",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:56:23"
@@ -179,7 +195,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:55:54",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:55:54"
@@ -195,7 +211,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:55:29",
         "logout_time": "2026-05-28 09:55:29",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:55:29"
@@ -211,7 +227,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:55:04",
         "logout_time": "2026-05-28 09:55:04",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:55:04"
@@ -227,7 +243,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:54:26",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:54:26"
@@ -243,7 +259,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:54:09",
         "logout_time": "2026-05-28 09:54:09",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:54:09"
@@ -259,7 +275,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:53:41",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:53:41"
@@ -275,7 +291,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:53:33",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:53:33"
@@ -291,7 +307,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:53:24",
         "logout_time": "2026-05-28 09:53:24",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:53:24"
@@ -307,7 +323,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:52:29",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:52:29"
@@ -323,7 +339,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:52:25",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:52:25"
@@ -339,7 +355,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:52:15",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:52:15"
@@ -355,7 +371,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:52:07",
         "logout_time": "2026-05-28 09:52:07",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:52:07"
@@ -371,7 +387,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:51:05",
         "logout_time": "2026-05-28 09:51:05",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:51:05"
@@ -387,7 +403,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:50:08",
         "logout_time": "2026-05-28 09:50:08",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:50:08"
@@ -403,7 +419,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:49:52",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:49:52"
@@ -419,7 +435,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:49:39",
         "logout_time": "2026-05-28 09:49:39",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:49:39"
@@ -435,7 +451,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:48:42",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:48:42"
@@ -451,7 +467,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:48:40",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:48:40"
@@ -467,7 +483,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:48:26",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:48:26"
@@ -483,7 +499,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:48:13",
         "logout_time": "2026-05-28 09:48:13",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:48:13"
@@ -499,7 +515,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:47:05",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:47:05"
@@ -515,7 +531,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:46:38",
         "logout_time": "2026-05-28 09:46:38",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:46:38"
@@ -531,7 +547,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:45:51",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:45:51"
@@ -547,7 +563,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:45:39",
         "logout_time": "2026-05-28 09:45:39",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:45:39"
@@ -563,7 +579,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:43:28",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:43:28"
@@ -579,7 +595,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:43:07",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:43:07"
@@ -595,7 +611,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:41:24",
         "logout_time": "2026-05-28 09:41:24",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:41:24"
@@ -611,7 +627,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:39:53",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:39:53"
@@ -627,7 +643,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:37:15",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:37:15"
@@ -643,7 +659,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:37:10",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:37:10"
@@ -659,7 +675,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:37:01",
         "logout_time": "2026-05-28 09:37:01",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:37:01"
@@ -675,7 +691,7 @@
         "module_code": "10_permissions",
         "login_time": "2026-05-28 09:36:21",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:36:21"
@@ -691,7 +707,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:36:18",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:36:18"
@@ -707,7 +723,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:36:16",
         "logout_time": "2026-05-28 09:36:16",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:36:16"
@@ -723,7 +739,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:36:13",
         "logout_time": "2026-05-28 09:36:13",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:36:13"
@@ -739,7 +755,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:36:06",
         "logout_time": "2026-05-28 09:36:06",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:36:06"
@@ -755,7 +771,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:34:37",
         "logout_time": "2026-05-28 09:34:37",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:34:37"
@@ -771,7 +787,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:34:36",
         "logout_time": "2026-05-28 09:34:36",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:34:36"
@@ -787,7 +803,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:34:13",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:34:13"
@@ -803,7 +819,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:33:22",
         "logout_time": "2026-05-28 09:33:22",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:33:22"
@@ -819,7 +835,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:33:21",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:33:21"
@@ -835,7 +851,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:33:13",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:33:13"
@@ -851,7 +867,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:33:11",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:33:11"
@@ -867,7 +883,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:32:52",
         "logout_time": "2026-05-28 09:32:52",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:32:52"
@@ -883,7 +899,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:32:38",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:32:38"
@@ -899,7 +915,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:32:34",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:32:34"
@@ -915,7 +931,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:32:19",
         "logout_time": "2026-05-28 09:32:19",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:32:19"
@@ -931,7 +947,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:30:46",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:30:46"
@@ -947,7 +963,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:30:16",
         "logout_time": "2026-05-28 09:30:16",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:30:16"
@@ -963,7 +979,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:30:09",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:30:09"
@@ -979,7 +995,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:30:08",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:30:08"
@@ -995,7 +1011,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:29:47",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:29:47"
@@ -1011,7 +1027,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:29:11",
         "logout_time": "2026-05-28 09:29:11",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:29:11"
@@ -1027,7 +1043,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:28:22",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:28:22"
@@ -1043,7 +1059,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:28:16",
         "logout_time": "2026-05-28 09:28:16",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:28:16"
@@ -1059,7 +1075,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:27:50",
         "logout_time": "2026-05-28 09:27:50",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:27:50"
@@ -1075,7 +1091,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:27:29",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:27:29"
@@ -1091,7 +1107,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:27:16",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:27:16"
@@ -1107,7 +1123,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:26:55",
         "logout_time": "2026-05-28 09:26:55",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:26:55"
@@ -1123,7 +1139,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:26:42",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:26:42"
@@ -1139,7 +1155,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:26:14",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:26:14"
@@ -1155,7 +1171,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:26:07",
         "logout_time": "2026-05-28 09:26:07",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:26:07"
@@ -1171,7 +1187,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:26:06",
         "logout_time": "2026-05-28 09:26:06",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:26:06"
@@ -1187,7 +1203,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:25:50",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:25:50"
@@ -1203,7 +1219,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:25:24",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:25:24"
@@ -1219,7 +1235,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:24:48",
         "logout_time": "2026-05-28 09:24:48",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:24:48"
@@ -1235,7 +1251,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:23:41",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:23:41"
@@ -1251,7 +1267,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:23:38",
         "logout_time": "2026-05-28 09:23:38",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:23:38"
@@ -1267,7 +1283,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:21:53",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:21:53"
@@ -1283,7 +1299,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:21:34",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:21:34"
@@ -1299,7 +1315,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:21:21",
         "logout_time": "2026-05-28 09:21:21",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:21:21"
@@ -1315,7 +1331,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:21:16",
         "logout_time": "2026-05-28 09:21:16",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:21:16"
@@ -1331,7 +1347,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:21:07",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:21:07"
@@ -1347,7 +1363,7 @@
         "module_code": "07_missing",
         "login_time": "2026-05-28 09:20:49",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:20:49"
@@ -1363,7 +1379,7 @@
         "module_code": "07_missing",
         "login_time": "2026-05-28 09:20:46",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:20:46"
@@ -1379,7 +1395,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:20:45",
         "logout_time": "2026-05-28 09:20:45",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:20:45"
@@ -1395,7 +1411,7 @@
         "module_code": "07_missing",
         "login_time": "2026-05-28 09:20:26",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:20:26"
@@ -1411,7 +1427,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:20:17",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:20:17"
@@ -1427,7 +1443,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:20:14",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:20:14"
@@ -1443,7 +1459,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:20:14",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:20:14"
@@ -1459,7 +1475,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:19:43",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:19:43"
@@ -1475,7 +1491,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:19:37",
         "logout_time": "2026-05-28 09:19:37",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:19:37"
@@ -1491,7 +1507,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:19:28",
         "logout_time": "2026-05-28 09:19:28",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:19:28"
@@ -1507,7 +1523,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:18:45",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:18:45"
@@ -1523,7 +1539,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:18:44",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:18:44"
@@ -1539,7 +1555,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:18:43",
         "logout_time": "2026-05-28 09:18:43",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:18:43"
@@ -1555,7 +1571,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:18:36",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:18:36"
@@ -1571,7 +1587,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:18:30",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:18:30"
@@ -1587,7 +1603,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:18:26",
         "logout_time": "2026-05-28 09:18:26",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:18:26"
@@ -1603,7 +1619,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:18:20",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:18:20"
@@ -1619,7 +1635,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:18:13",
         "logout_time": "2026-05-28 09:18:13",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:18:13"
@@ -1635,7 +1651,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:18:09",
         "logout_time": "2026-05-28 09:18:09",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:18:09"
@@ -1651,7 +1667,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:16:59",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:16:59"
@@ -1667,7 +1683,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:16:53",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:16:53"
@@ -1683,7 +1699,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:16:12",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:16:12"
@@ -1699,7 +1715,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:16:12",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:16:12"
@@ -1715,7 +1731,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:15:31",
         "logout_time": "2026-05-28 09:15:31",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:15:31"
@@ -1731,7 +1747,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:15:26",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:15:26"
@@ -1747,7 +1763,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:15:14",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:15:14"
@@ -1763,7 +1779,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:15:01",
         "logout_time": "2026-05-28 09:15:01",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:15:01"
@@ -1779,7 +1795,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:14:58",
         "logout_time": "2026-05-28 09:14:58",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:14:58"
@@ -1795,7 +1811,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:14:45",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:14:45"
@@ -1811,7 +1827,7 @@
         "module_code": "04_employees",
         "login_time": "2026-05-28 09:14:40",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:14:40"
@@ -1827,7 +1843,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:14:06",
         "logout_time": "2026-05-28 09:14:06",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:14:06"
@@ -1843,7 +1859,7 @@
         "module_code": "03_work_orders",
         "login_time": "2026-05-28 09:14:00",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:14:00"
@@ -1859,7 +1875,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:13:53",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:13:53"
@@ -1875,7 +1891,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:12:33",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:12:33"
@@ -1891,7 +1907,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:12:33",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:12:33"
@@ -1907,7 +1923,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:12:22",
         "logout_time": "2026-05-28 09:12:22",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:12:22"
@@ -1923,7 +1939,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:12:21",
         "logout_time": "2026-05-28 09:12:21",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:12:21"
@@ -1939,7 +1955,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:12:18",
         "logout_time": "2026-05-28 09:12:18",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:12:18"
@@ -1955,7 +1971,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:12:06",
         "logout_time": "2026-05-28 09:12:06",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:12:06"
@@ -1971,7 +1987,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:11:25",
         "logout_time": "2026-05-28 09:11:25",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:11:25"
@@ -1987,7 +2003,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:10:51",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:10:51"
@@ -2003,7 +2019,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:10:46",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:10:46"
@@ -2019,7 +2035,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:10:29",
         "logout_time": "2026-05-28 09:10:29",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:10:29"
@@ -2035,7 +2051,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:10:22",
         "logout_time": "2026-05-28 09:10:22",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:10:22"
@@ -2051,7 +2067,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:10:20",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:10:20"
@@ -2067,7 +2083,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:10:02",
         "logout_time": "2026-05-28 09:10:02",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:10:02"
@@ -2083,7 +2099,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:09:13",
         "logout_time": "2026-05-28 09:09:13",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:09:13"
@@ -2099,7 +2115,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:08:36",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:08:36"
@@ -2115,7 +2131,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:08:25",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:08:25"
@@ -2131,7 +2147,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:08:05",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:08:05"
@@ -2147,7 +2163,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:08:04",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:08:04"
@@ -2163,7 +2179,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:07:59",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:07:59"
@@ -2179,7 +2195,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:07:51",
         "logout_time": "2026-05-28 09:07:51",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:07:51"
@@ -2195,7 +2211,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:07:50",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:07:50"
@@ -2211,7 +2227,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:05:35",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:05:35"
@@ -2227,7 +2243,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:05:33",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:05:33"
@@ -2243,7 +2259,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:05:22",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:05:22"
@@ -2259,7 +2275,7 @@
         "module_code": "",
         "login_time": "2026-05-28 09:04:58",
         "logout_time": "2026-05-28 09:04:58",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:04:58"
@@ -2275,7 +2291,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:04:25",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:04:25"
@@ -2291,7 +2307,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:04:00",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:04:00"
@@ -2307,7 +2323,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 09:03:10",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 09:03:10"
@@ -2323,7 +2339,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:58:12",
         "logout_time": "2026-05-28 08:58:12",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:58:12"
@@ -2339,7 +2355,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:56:53",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:56:53"
@@ -2355,7 +2371,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:56:43",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:56:43"
@@ -2371,7 +2387,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:56:42",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:56:42"
@@ -2387,7 +2403,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:56:41",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:56:41"
@@ -2403,7 +2419,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:56:22",
         "logout_time": "2026-05-28 08:56:22",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:56:22"
@@ -2419,7 +2435,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:56:20",
         "logout_time": "2026-05-28 08:56:20",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:56:20"
@@ -2435,7 +2451,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:56:14",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:56:14"
@@ -2451,7 +2467,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:55:24",
         "logout_time": "2026-05-28 08:55:24",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:55:24"
@@ -2467,7 +2483,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:54:05",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:54:05"
@@ -2483,7 +2499,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:53:49",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:53:49"
@@ -2499,7 +2515,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:53:41",
         "logout_time": "2026-05-28 08:53:41",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:53:41"
@@ -2515,7 +2531,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:53:40",
         "logout_time": "2026-05-28 08:53:40",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:53:40"
@@ -2531,7 +2547,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:53:23",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:53:23"
@@ -2547,7 +2563,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:53:04",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:53:04"
@@ -2563,7 +2579,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:52:53",
         "logout_time": "2026-05-28 08:52:53",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:52:53"
@@ -2579,7 +2595,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:52:02",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:52:02"
@@ -2595,7 +2611,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:51:50",
         "logout_time": "2026-05-28 08:51:50",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:51:50"
@@ -2611,7 +2627,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:51:16",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:51:16"
@@ -2627,7 +2643,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:50:58",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:50:58"
@@ -2643,7 +2659,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:50:50",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:50:50"
@@ -2659,7 +2675,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:50:39",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:50:39"
@@ -2675,7 +2691,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:50:37",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:50:37"
@@ -2691,7 +2707,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:37:22",
         "logout_time": "2026-05-28 08:37:22",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:37:22"
@@ -2707,7 +2723,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:36:39",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:36:39"
@@ -2723,7 +2739,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:36:34",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:36:34"
@@ -2739,7 +2755,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:35:23",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:35:23"
@@ -2755,7 +2771,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:35:05",
         "logout_time": "2026-05-28 08:35:05",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:35:05"
@@ -2771,7 +2787,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:32:20",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:32:20"
@@ -2787,7 +2803,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:32:15",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:32:15"
@@ -2803,7 +2819,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:31:49",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:31:49"
@@ -2819,7 +2835,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:31:43",
         "logout_time": "2026-05-28 08:31:43",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:31:43"
@@ -2835,7 +2851,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:31:21",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:31:21"
@@ -2851,7 +2867,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:31:11",
         "logout_time": "2026-05-28 08:31:11",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:31:11"
@@ -2867,7 +2883,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:30:47",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:30:47"
@@ -2883,7 +2899,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:30:42",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:30:42"
@@ -2899,7 +2915,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:30:35",
         "logout_time": "2026-05-28 08:30:35",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:30:35"
@@ -2915,7 +2931,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:29:21",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:29:21"
@@ -2931,7 +2947,7 @@
         "module_code": "",
         "login_time": "2026-05-28 08:27:04",
         "logout_time": "2026-05-28 08:27:04",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:27:04"
@@ -2947,7 +2963,7 @@
         "module_code": "04_employees",
         "login_time": "2026-05-28 08:23:56",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:23:56"
@@ -2963,7 +2979,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-28 08:21:56",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 08:21:56"
@@ -2979,7 +2995,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-27 22:46:55",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-27 22:46:55"
@@ -2995,7 +3011,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-27 22:41:09",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-27 22:41:09"
@@ -3011,7 +3027,7 @@
         "module_code": "LOGIN",
         "login_time": "2026-05-27 22:20:37",
         "logout_time": "",
-        "idle_minutes": null,
+        "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-27 22:20:37"
@@ -3022,7 +3038,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 188,
+    "login_logs": 189,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
