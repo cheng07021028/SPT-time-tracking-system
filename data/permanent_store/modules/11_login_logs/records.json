@@ -2,12 +2,60 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 18:06:18",
-  "exported_at": "2026-05-28 18:06:18",
+  "updated_at": "2026-05-28 18:13:57",
+  "exported_at": "2026-05-28 18:13:57",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 9151,
+        "source": "v103_merge",
+        "username": "B135",
+        "display_name": "鍾明志",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=B135",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-28 18:13:57",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 18:13:57"
+      },
+      {
+        "id": 8568,
+        "source": "v103_merge",
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=admin;source=authority",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-28 18:08:15",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 18:08:15"
+      },
+      {
+        "id": 7986,
+        "source": "v103_merge",
+        "username": "SPT091",
+        "display_name": "魏瑄毅",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=SPT091",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-28 18:08:13",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 18:08:13"
+      },
       {
         "id": 7405,
         "source": "v103_merge",
@@ -9294,7 +9342,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 580,
+    "login_logs": 583,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
