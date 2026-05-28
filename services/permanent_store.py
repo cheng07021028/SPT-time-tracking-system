@@ -205,17 +205,3 @@ def store_health() -> dict[str, Any]:
     return {"root": str(STORE_ROOT.relative_to(PROJECT_ROOT)), "modules": modules}
 
 ensure_store()
-
-# =================== V171 PERFORMANCE PROFILER HOOKS ===================
-try:
-    from services.performance_profiler_service import wrap_function, mark_installed
-    if mark_installed("permanent_store"):
-        read_json = wrap_function(read_json, category="json_store", name="permanent_store.read_json", threshold_ms=300, detail_factory=lambda a,k: {"path": str(a[0] if a else k.get("path", ""))[-220:]})  # type: ignore[assignment]
-        load_records = wrap_function(load_records, category="json_store", name="permanent_store.load_records", threshold_ms=400, detail_factory=lambda a,k: {"module_key": str(a[0] if a else k.get("module_key", ""))[:120]})  # type: ignore[assignment]
-        save_records = wrap_function(save_records, category="json_store_write", name="permanent_store.save_records", threshold_ms=800, detail_factory=lambda a,k: {"module_key": str(a[0] if a else k.get("module_key", ""))[:120]})  # type: ignore[assignment]
-        load_settings = wrap_function(load_settings, category="json_store", name="permanent_store.load_settings", threshold_ms=300, detail_factory=lambda a,k: {"module_key": str(a[0] if a else k.get("module_key", ""))[:120]})  # type: ignore[assignment]
-        save_settings = wrap_function(save_settings, category="json_store_write", name="permanent_store.save_settings", threshold_ms=600, detail_factory=lambda a,k: {"module_key": str(a[0] if a else k.get("module_key", ""))[:120]})  # type: ignore[assignment]
-except Exception:
-    pass
-# =================== END V171 PERFORMANCE PROFILER HOOKS ===================
-

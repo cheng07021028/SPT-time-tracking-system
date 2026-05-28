@@ -16,11 +16,6 @@ from services.time_record_service import (
     recalculate_time_records,
     import_time_records,
 )
-try:
-    from services.time_record_service import load_history_records_sql_filtered, count_history_records_sql_filtered
-except Exception:
-    load_history_records_sql_filtered = None
-    count_history_records_sql_filtered = None
 from services.master_data_service import load_employees, load_work_orders
 from services.table_ui_service import render_table, label_for, render_width_settings
 from services.duration_service import hours_to_hms
@@ -74,80 +69,6 @@ def rerun():
 
 
 _show_history_results()
-
-
-def _work_hours_value_to_decimal_hours(value) -> float:
-    """Convert mixed work_hours values to decimal hours without changing stored data.
-
-    V154: 02 history may receive decimal hours (0.16), HH:MM:SS text
-    (00:09:36), or old display text that accidentally carried the explanatory
-    suffix.  Pandas Series.sum() will crash on mixed strings/floats, so all KPI
-    totals must use this read-only converter.
-    """
-    try:
-        if pd.isna(value):
-            return 0.0
-    except Exception:
-        pass
-    if value is None:
-        return 0.0
-    if isinstance(value, bool):
-        return 0.0
-    if isinstance(value, (int, float)):
-        try:
-            return float(value)
-        except Exception:
-            return 0.0
-    text = str(value).strip()
-    if not text or text.lower() in {"none", "nan", "nat", "null", "<na>"}:
-        return 0.0
-    # Clean legacy display-only suffixes.  These strings should never affect data.
-    text = (
-        text.replace("時:分:秒", "")
-            .replace("時：分：秒", "")
-            .replace("（時:分:秒）", "")
-            .replace("(時:分:秒)", "")
-            .strip()
-    )
-    text = text.replace(",", "").replace(" ", "")
-    # HH:MM:SS / H:MM / full-width colon.
-    if ":" in text or "：" in text:
-        parts = re.split(r"[:：]", text)
-        try:
-            sign = -1 if parts[0].startswith("-") else 1
-            h = abs(int(float(parts[0] or 0)))
-            m = int(float(parts[1] or 0)) if len(parts) > 1 else 0
-            s = int(float(parts[2] or 0)) if len(parts) > 2 else 0
-            return sign * ((h * 3600 + m * 60 + s) / 3600.0)
-        except Exception:
-            return 0.0
-    # Chinese text such as 1時02分03秒.
-    m = re.match(r"^(-?\d+)\s*(?:時|小時|h|H)\s*(\d{1,2})?\s*(?:分|m|M)?\s*(\d{1,2})?\s*(?:秒|s|S)?$", text)
-    if m:
-        try:
-            sign = -1 if m.group(1).startswith("-") else 1
-            h = abs(int(m.group(1)))
-            minute = int(m.group(2) or 0)
-            sec = int(m.group(3) or 0)
-            return sign * ((h * 3600 + minute * 60 + sec) / 3600.0)
-        except Exception:
-            return 0.0
-    try:
-        return float(text)
-    except Exception:
-        return 0.0
-
-
-def _safe_work_hours_total_hms(df: pd.DataFrame) -> str:
-    """Read-only KPI total for mixed decimal/HMS work_hours values."""
-    if df is None or df.empty or "work_hours" not in df.columns:
-        return "00:00:00"
-    total_hours = 0.0
-    try:
-        total_hours = sum(_work_hours_value_to_decimal_hours(v) for v in df["work_hours"].tolist())
-    except Exception:
-        total_hours = 0.0
-    return hours_to_hms(total_hours)
 
 
 def _normalize_text(v) -> str:
@@ -1219,25 +1140,7 @@ _seed_start, _seed_end = _date_range_from_preset(
     _history_filter_seed.get("start_date"),
     _history_filter_seed.get("end_date"),
 )
-# V174：02 大表先用 SQL 下推日期與已套用的篩選條件，再保留原本 pandas 異常/跨日判斷。
-# 不改畫面、不改表格渲染、不改儲存/刪除/重算流程。
-try:
-    _v174_limit = int(_history_filter_seed.get("detail_limit") or 1000)
-except Exception:
-    _v174_limit = 1000
-if callable(load_history_records_sql_filtered):
-    try:
-        base_df = load_history_records_sql_filtered(
-            _history_filter_seed,
-            start_date=str(_seed_start),
-            end_date=str(_seed_end),
-            limit=_v174_limit,
-            offset=0,
-        )
-    except Exception:
-        base_df = load_records(str(_seed_start), str(_seed_end), None, None)
-else:
-    base_df = load_records(str(_seed_start), str(_seed_end), None, None)
+base_df = load_records(str(_seed_start), str(_seed_end), None, None)
 df, history_filters = _render_history_filter_panel(base_df, employees, work_orders)
 
 start = history_filters.get("start_date", str(_seed_start))
@@ -1245,7 +1148,7 @@ end = history_filters.get("end_date", str(_seed_end))
 
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("篩選筆數 / Records", f"{len(df):,}")
-m2.metric("總工時 / Total Time", _safe_work_hours_total_hms(df))
+m2.metric("總工時 / Total Time", hours_to_hms(df['work_hours'].sum()) if not df.empty and 'work_hours' in df.columns else "00:00:00")
 if not df.empty:
     _ended_metric = _has_end_info_df(df)
     m3.metric("未結束 / Open", f"{(~_ended_metric).sum():,}")

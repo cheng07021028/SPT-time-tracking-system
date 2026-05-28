@@ -90,19 +90,8 @@ def _default_filters() -> dict:
 
 
 def _load_logs_safely(filters: dict):
-    """Call V174 SQL page query when available; fall back to old load_logs safely."""
+    """Call new load_logs signature; fall back to old load_logs(limit) if user missed service update."""
     try:
-        loader = getattr(log_service, "load_logs_page", None)
-        if callable(loader):
-            return loader(
-                limit=int(filters.get("limit", 1000)),
-                offset=0,
-                start_date=filters.get("start_date"),
-                end_date=filters.get("end_date"),
-                action_type=str(filters.get("action_type", "")).strip() or None,
-                level=str(filters.get("level", "ALL")),
-                keyword=str(filters.get("keyword", "")).strip() or None,
-            )
         return log_service.load_logs(
             limit=int(filters.get("limit", 1000)),
             start_date=filters.get("start_date"),
@@ -116,21 +105,9 @@ def _load_logs_safely(filters: dict):
 
 
 def _count_logs_safely(start_date, end_date) -> int:
-    counter = getattr(log_service, "count_logs_filtered", None)
-    if callable(counter):
-        try:
-            f = st.session_state.get("log_query_filters", {}) or {}
-            return int(counter(
-                start_date=start_date,
-                end_date=end_date,
-                action_type=str(f.get("action_type", "")).strip() or None,
-                level=str(f.get("level", "ALL")),
-                keyword=str(f.get("keyword", "")).strip() or None,
-            ) or 0)
-        except Exception:
-            pass
     if hasattr(log_service, "count_logs_by_date_range"):
         return int(log_service.count_logs_by_date_range(start_date, end_date) or 0)
+    # fallback: old service cannot count by date; avoid crashing page
     return 0
 
 

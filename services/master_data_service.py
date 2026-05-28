@@ -746,18 +746,3 @@ def has_master_data_for_time_record_fast(employees=None, work_orders=None):  # t
         return {"has_employees_master": has_emp, "has_work_orders_master": has_wo, "employees_count": len(emp_df) if emp_df is not None else 0, "work_orders_count": len(wo_df) if wo_df is not None else 0}
     return has_emp, has_wo
 # =================== END V127 MULTI-USER EMPLOYEE FAST CACHE ISOLATION ===================
-
-# =================== V171 PERFORMANCE PROFILER HOOKS ===================
-try:
-    from services.performance_profiler_service import wrap_function, mark_installed
-    if mark_installed("master_data_service"):
-        for _name in ("load_work_orders", "load_employees", "load_employees_for_time_record_fast", "load_work_orders_for_time_record_fast"):
-            if _name in globals() and callable(globals()[_name]):
-                globals()[_name] = wrap_function(globals()[_name], category="master_data", name="master_data_service." + _name, threshold_ms=400)  # type: ignore[index]
-        for _name in ("save_work_orders_df", "save_employees_df", "import_work_orders_df", "import_employees_df", "upsert_work_order", "upsert_employee"):
-            if _name in globals() and callable(globals()[_name]):
-                globals()[_name] = wrap_function(globals()[_name], category="master_data_write", name="master_data_service." + _name, threshold_ms=800)  # type: ignore[index]
-except Exception:
-    pass
-# =================== END V171 PERFORMANCE PROFILER HOOKS ===================
-

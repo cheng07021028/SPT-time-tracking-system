@@ -1565,35 +1565,3 @@ def execute_transaction(
         pass
     return ids
 # ===== END V24 LIGHTWEIGHT SYSTEM LOG AUDIT FOR ALL DB WRITES =====
-
-# =================== V171 PERFORMANCE PROFILER HOOKS ===================
-try:
-    from services.performance_profiler_service import wrap_function, sql_summary, mark_installed
-    if mark_installed("db_service"):
-        def _v171_sql_detail(args, kwargs):
-            sql = args[0] if args else kwargs.get("sql", "")
-            detail = sql_summary(sql)
-            try:
-                params = args[1] if len(args) > 1 else kwargs.get("params", None)
-                if params is not None:
-                    detail["param_count"] = len(params) if hasattr(params, "__len__") else 1
-            except Exception:
-                pass
-            return detail
-        query_df = wrap_function(query_df, category="sqlite", name="db_service.query_df", threshold_ms=250, detail_factory=_v171_sql_detail)  # type: ignore[assignment]
-        query_one = wrap_function(query_one, category="sqlite", name="db_service.query_one", threshold_ms=250, detail_factory=_v171_sql_detail)  # type: ignore[assignment]
-        execute = wrap_function(execute, category="sqlite_write", name="db_service.execute", threshold_ms=350, detail_factory=_v171_sql_detail)  # type: ignore[assignment]
-        executemany = wrap_function(executemany, category="sqlite_write", name="db_service.executemany", threshold_ms=600, detail_factory=_v171_sql_detail)  # type: ignore[assignment]
-        if "execute_transaction" in globals():
-            def _v171_tx_detail(args, kwargs):
-                ops = args[0] if args else kwargs.get("operations", [])
-                try:
-                    n = len(ops or [])
-                except Exception:
-                    n = 0
-                return {"operation_count": n, "source_sql": str(kwargs.get("source_sql", ""))[:160]}
-            execute_transaction = wrap_function(execute_transaction, category="sqlite_write", name="db_service.execute_transaction", threshold_ms=800, detail_factory=_v171_tx_detail)  # type: ignore[assignment]
-except Exception:
-    pass
-# =================== END V171 PERFORMANCE PROFILER HOOKS ===================
-
