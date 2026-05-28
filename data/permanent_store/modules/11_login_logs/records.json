@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 12:12:20",
-  "exported_at": "2026-05-28 12:12:20",
+  "updated_at": "2026-05-28 12:12:24",
+  "exported_at": "2026-05-28 12:12:24",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 21109,
+        "source": "v103_merge",
+        "username": "SPT174",
+        "display_name": "龍才華",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "09_persistence:can_view; employee_id=SPT174; roles=operator",
+        "module_code": "09_persistence",
+        "login_time": "2026-05-28 12:12:23",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 12:12:23"
+      },
       {
         "id": 20786,
         "source": "v103_merge",
@@ -5166,7 +5182,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 322,
+    "login_logs": 323,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
