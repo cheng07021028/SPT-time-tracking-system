@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 13:56:25",
+  "exported_at": "2026-05-28 14:07:43",
   "source": "db_service_write",
   "module_key": "05_analysis",
   "module_code": "05",
@@ -49,7 +49,7 @@
         "start_timestamp": "2026-05-27 20:26:57",
         "end_action": "下班",
         "end_timestamp": "2026-05-27 21:00:41",
-        "remark": "",
+        "remark": null,
         "start_date": "2026-05-27",
         "start_time": "20:26:57",
         "end_date": "2026-05-27",
@@ -1438,13 +1438,40 @@
         "source": "streamlit",
         "created_at": "2026-05-28 13:51:27",
         "updated_at": "2026-05-28 13:55:18"
+      },
+      {
+        "id": 290,
+        "record_key": "SPT172|25M0115-17|Packing|2026-05-28 14:00:06|2a25315c",
+        "status": "作業中",
+        "work_order": "25M0115-17",
+        "part_no": "4TRSC150-003-01",
+        "type_name": "12\" UFO EFEM",
+        "process_name": "Packing",
+        "employee_id": "SPT172",
+        "employee_name": "胡瑄芸",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 14:00:06",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
+        "start_date": "2026-05-28",
+        "start_time": "14:00:06",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT172|Packing|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 14:00:06",
+        "updated_at": "2026-05-28 14:00:06"
       }
     ],
     "work_orders": [],
     "employees": []
   },
   "table_counts": {
-    "time_records": 53,
+    "time_records": 54,
     "work_orders": 0,
     "employees": 0
   }
