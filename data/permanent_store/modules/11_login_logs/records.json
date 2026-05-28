@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 16:12:33",
-  "exported_at": "2026-05-28 16:12:33",
+  "updated_at": "2026-05-28 16:12:36",
+  "exported_at": "2026-05-28 16:12:36",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 4117,
+        "source": "v103_merge",
+        "username": "SPT034",
+        "display_name": "陳長彥",
+        "event_type": "AUTO_LOGOUT",
+        "result": "SUCCESS",
+        "message": "閒置自動登出; employee_id=SPT034; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-28 16:12:35",
+        "logout_time": "2026-05-28 16:12:35",
+        "idle_minutes": 10.6667,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 16:12:35"
+      },
       {
         "id": 3658,
         "source": "v103_merge",
@@ -7342,7 +7358,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 458,
+    "login_logs": 459,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
