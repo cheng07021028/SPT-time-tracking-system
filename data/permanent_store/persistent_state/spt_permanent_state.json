@@ -1,10 +1,11 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 01:19:29",
+  "exported_at": "2026-05-29 01:29:13",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 1,
   "table_counts": {
+    "app_settings": 1,
     "auth_account_permissions": 118,
     "auth_login_logs": 0,
     "auth_security_settings": 2,
@@ -21,12 +22,18 @@
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 0,
-    "time_record_delete_tombstones": 0,
-    "time_record_transaction_guard": 0,
     "time_records": 1,
     "work_orders": 0
   },
   "tables": {
+    "app_settings": [
+      {
+        "setting_key": "live_page_manual_refresh_timestamp",
+        "setting_value": "20260529_012913",
+        "note": "01 工時紀錄手動重新整理顯示截止時間；依系統設定時間判斷，只影響 01 顯示，不刪除 02 歷史紀錄",
+        "updated_at": "2026-05-29 01:29:13"
+      }
+    ],
     "auth_account_permissions": [
       {
         "id": 1,
@@ -3038,8 +3045,6 @@
     "table_column_settings": [],
     "table_sort_settings": [],
     "table_ui_settings": [],
-    "time_record_delete_tombstones": [],
-    "time_record_transaction_guard": [],
     "time_records": [
       {
         "id": 328,
