@@ -12951,3 +12951,205 @@ def audit_v195_0102_consistency() -> dict:
     }
 
 # =================== END V195 01/02 DISPLAY CONSISTENCY FINAL DEDUPE PATCH =====================
+
+
+# =================== V196 REBOOT-PROOF HARD DELETE GUARD ===================
+# Fix: rows deleted in 01/02 came back after Reboot App because older delete/tombstone
+# state was not durable across all sources. V196 adds an independent hard-delete
+# guard stored in permanent authority files and filters every 01/02 display path.
+try:
+    from services import time_record_hard_delete_guard_service as _v196_guard
+except Exception:  # pragma: no cover
+    _v196_guard = None
+
+try:
+    _v196_prev_v194_current_merged = _v194_current_merged
+except Exception:
+    _v196_prev_v194_current_merged = None
+try:
+    _v196_prev_v194_filter_deleted = _v194_filter_deleted
+except Exception:
+    _v196_prev_v194_filter_deleted = None
+try:
+    _v196_prev_v195_dedupe_records = _v195_dedupe_records
+except Exception:
+    _v196_prev_v195_dedupe_records = None
+try:
+    _v196_prev_load_records = load_records
+except Exception:
+    _v196_prev_load_records = None
+try:
+    _v196_prev_today_records = today_records
+except Exception:
+    _v196_prev_today_records = None
+try:
+    _v196_prev_get_active_records = get_active_records
+except Exception:
+    _v196_prev_get_active_records = None
+try:
+    _v196_prev_get_active_record = get_active_record
+except Exception:
+    _v196_prev_get_active_record = None
+try:
+    _v196_prev_get_active_same_work = get_active_same_work
+except Exception:
+    _v196_prev_get_active_same_work = None
+try:
+    _v196_prev_save_time_records = save_time_records
+except Exception:
+    _v196_prev_save_time_records = None
+try:
+    _v196_prev_sync_time_records_01_02_now = sync_time_records_01_02_now
+except Exception:
+    _v196_prev_sync_time_records_01_02_now = None
+
+
+def _v196_filter_hard_deleted(df: pd.DataFrame | None) -> pd.DataFrame:
+    try:
+        if _v196_guard is not None and hasattr(_v196_guard, "filter_deleted_rows"):
+            return _v196_guard.filter_deleted_rows(df)
+    except Exception:
+        pass
+    return pd.DataFrame() if df is None else df
+
+
+def _v194_filter_deleted(df: pd.DataFrame) -> pd.DataFrame:  # type: ignore[override]
+    out = df
+    try:
+        if callable(_v196_prev_v194_filter_deleted):
+            out = _v196_prev_v194_filter_deleted(out)
+    except Exception:
+        pass
+    return _v196_filter_hard_deleted(out).reset_index(drop=True)
+
+
+def _v195_dedupe_records(df: pd.DataFrame) -> pd.DataFrame:  # type: ignore[override]
+    out = df
+    try:
+        if callable(_v196_prev_v195_dedupe_records):
+            out = _v196_prev_v195_dedupe_records(out)
+    except Exception:
+        pass
+    return _v196_filter_hard_deleted(out).reset_index(drop=True)
+
+
+def _v194_current_merged(include_sqlite: bool = True) -> pd.DataFrame:  # type: ignore[override]
+    if callable(_v196_prev_v194_current_merged):
+        out = _v196_prev_v194_current_merged(include_sqlite=include_sqlite)
+    else:
+        out = pd.DataFrame()
+    return _v196_filter_hard_deleted(out).reset_index(drop=True)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = []
+    for x in record_ids or []:
+        try:
+            ix = int(float(str(x).strip()))
+            if ix > 0 and ix not in ids:
+                ids.append(ix)
+        except Exception:
+            continue
+    if not ids:
+        return 0
+    if _v196_guard is None or not hasattr(_v196_guard, "force_delete_time_records"):
+        # Last safe fallback: do not call old wrapper chains that may resurrect data.
+        return 0
+    try:
+        source_df = _v196_prev_v194_current_merged(include_sqlite=True) if callable(_v196_prev_v194_current_merged) else pd.DataFrame()
+    except Exception:
+        source_df = pd.DataFrame()
+    result = _v196_guard.force_delete_time_records(ids, reason=f"{reason} / V196 reboot-proof hard delete", source_df=source_df, github=True)
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+    return int(result.get("deleted_count", 0) if isinstance(result, dict) else 0)
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    if callable(_v196_prev_load_records):
+        out = _v196_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+    else:
+        out = pd.DataFrame()
+    return _v196_filter_hard_deleted(out).reset_index(drop=True)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    if callable(_v196_prev_today_records):
+        out = _v196_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+    else:
+        out = pd.DataFrame()
+    return _v196_filter_hard_deleted(out).reset_index(drop=True)
+
+
+def get_active_records(employee_id: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    if callable(_v196_prev_get_active_records):
+        out = _v196_prev_get_active_records(employee_id=employee_id)
+    else:
+        out = pd.DataFrame()
+    return _v196_filter_hard_deleted(out).reset_index(drop=True)
+
+
+def get_active_record(employee_id: str) -> dict | None:  # type: ignore[override]
+    rec = _v196_prev_get_active_record(employee_id) if callable(_v196_prev_get_active_record) else None
+    if not rec:
+        return rec
+    try:
+        if _v196_guard is not None and _v196_guard.row_is_deleted(dict(rec)):
+            return None
+    except Exception:
+        pass
+    return rec
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str) -> pd.DataFrame:  # type: ignore[override]
+    if callable(_v196_prev_get_active_same_work):
+        out = _v196_prev_get_active_same_work(employee_id, work_order, process_name)
+    else:
+        out = pd.DataFrame()
+    return _v196_filter_hard_deleted(out).reset_index(drop=True)
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    safe_df = _v196_filter_hard_deleted(df)
+    if callable(_v196_prev_save_time_records):
+        return int(_v196_prev_save_time_records(safe_df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    return 0
+
+
+def sync_time_records_01_02_now(reason: str = "v196_manual_sync", *, github: bool = False) -> int:  # type: ignore[override]
+    if callable(_v196_prev_sync_time_records_01_02_now):
+        n = int(_v196_prev_sync_time_records_01_02_now(reason=reason, github=github) or 0)
+        # Rewrite once more through filtered current view to prevent deleted rows from being republished.
+        try:
+            merged = _v196_filter_hard_deleted(_v196_prev_v194_current_merged(include_sqlite=True)) if callable(_v196_prev_v194_current_merged) else pd.DataFrame()
+            if "_v194_save_0102_local" in globals() and callable(globals().get("_v194_save_0102_local")):
+                globals()["_v194_save_0102_local"](merged, reason + "_v196_filtered")
+        except Exception:
+            pass
+        return n
+    return 0
+
+
+def audit_v196_delete_guard() -> dict:
+    try:
+        entries = _v196_guard.load_deleted_entries() if _v196_guard is not None else []
+    except Exception:
+        entries = []
+    try:
+        visible_n = len(load_records())
+    except Exception:
+        visible_n = -1
+    return {
+        "version": "V196",
+        "hard_deleted_entries": len(entries),
+        "visible_records_after_filter": visible_n,
+        "guard_service": bool(_v196_guard is not None),
+    }
+
+# ================= END V196 REBOOT-PROOF HARD DELETE GUARD =================
