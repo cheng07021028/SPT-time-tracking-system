@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 15:49:25",
+  "exported_at": "2026-05-28 15:59:19",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -1789,10 +1789,21 @@
         "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 1 筆",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 196,
+        "log_time": "2026-05-28 15:58:06",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V137 已安全合併儲存 106 筆；多人同製令同製程不覆蓋。",
+        "detail": "",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 162
+    "system_logs": 163
   }
 }
