@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 13:33:17",
+  "exported_at": "2026-05-28 13:35:14",
   "source": "db_service_write",
   "module_key": "01_time_records",
   "module_code": "01",
@@ -9,50 +9,48 @@
   "tables": {
     "table_column_settings": [],
     "table_sort_settings": [],
-    "table_ui_settings": [],
     "system_settings": [
       {
         "setting_key": "company_name",
         "setting_value": "超慧科技",
         "note": "公司名稱",
-        "updated_at": "2026-05-26 13:18:53"
+        "updated_at": "2026-05-28 13:34:49"
       },
       {
         "setting_key": "system_name",
         "setting_value": "製造部智慧工時紀錄系統",
         "note": "系統名稱",
-        "updated_at": "2026-05-26 13:18:53"
+        "updated_at": "2026-05-28 13:34:49"
       },
       {
         "setting_key": "standard_work_start",
         "setting_value": "09:00",
         "note": "標準上班時間",
-        "updated_at": "2026-05-26 13:18:53"
+        "updated_at": "2026-05-28 13:34:49"
       },
       {
         "setting_key": "standard_work_end",
         "setting_value": "18:00",
         "note": "標準下班時間",
-        "updated_at": "2026-05-26 13:18:53"
+        "updated_at": "2026-05-28 13:34:49"
       },
       {
         "setting_key": "daily_expected_hours_min",
         "setting_value": "7.0",
         "note": "每日最低合理工時",
-        "updated_at": "2026-05-26 13:18:53"
+        "updated_at": "2026-05-28 13:34:49"
       },
       {
         "setting_key": "daily_expected_hours_max",
         "setting_value": "7.5",
         "note": "每日最高合理工時",
-        "updated_at": "2026-05-26 13:18:53"
+        "updated_at": "2026-05-28 13:34:49"
       }
     ]
   },
   "table_counts": {
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "table_ui_settings": 0,
     "system_settings": 6
   }
 }
