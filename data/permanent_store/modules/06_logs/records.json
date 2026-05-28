@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 17:26:06",
-  "exported_at": "2026-05-28 17:26:06",
+  "updated_at": "2026-05-28 17:27:08",
+  "exported_at": "2026-05-28 17:27:08",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -20911,11 +20911,35 @@
         "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM process_categories",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 488,
+        "log_time": "2026-05-28 17:27:04",
+        "user_name": "SPT034",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "281",
+        "message": "V137 結束工時紀錄 #281；同步結束=1筆；狀態=暫停；群組總工時=03:40:26；平均工時=03:40:12",
+        "detail": "281",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 487,
+        "log_time": "2026-05-28 17:27:03",
+        "user_name": "SPT034",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1742
+    "system_logs": 1744
   }
 }
