@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 10:45:22",
+  "exported_at": "2026-05-28 10:56:51",
   "source": "db_service_write",
   "module_key": "01_time_records",
   "module_code": "01",
@@ -1195,10 +1195,37 @@
         "source": "streamlit",
         "created_at": "2026-05-28 10:34:47",
         "updated_at": "2026-05-28 10:45:22"
+      },
+      {
+        "id": 265,
+        "record_key": "SPT077|26N4001-01|其他|2026-05-28 10:56:51|a1c838fd",
+        "status": "作業中",
+        "work_order": "26N4001-01",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "其他",
+        "employee_id": "SPT077",
+        "employee_name": "謝宛庭",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 10:56:51",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "前置線材加工",
+        "start_date": "2026-05-28",
+        "start_time": "10:56:51",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT077|其他|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 10:56:51",
+        "updated_at": "2026-05-28 10:56:51"
       }
     ]
   },
   "table_counts": {
-    "time_records": 44
+    "time_records": 45
   }
 }
