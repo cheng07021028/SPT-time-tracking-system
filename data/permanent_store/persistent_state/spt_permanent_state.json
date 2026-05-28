@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 00:14:26",
+  "exported_at": "2026-05-29 00:41:14",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 98,
@@ -20,8 +20,9 @@
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
+    "table_ui_settings": 0,
     "time_record_delete_tombstones": 0,
-    "time_record_transaction_guard": 1,
+    "time_record_transaction_guard": 3,
     "time_records": 98,
     "work_orders": 0
   },
@@ -2793,6 +2794,7 @@
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
+    "table_ui_settings": [],
     "time_record_delete_tombstones": [],
     "time_record_transaction_guard": [
       {
@@ -2806,6 +2808,30 @@
         "result_count": 0,
         "hit_count": 0,
         "payload": "{\"employee\": {\"id\": 90, \"employee_id\": \"SSS\", \"employee_name\": \"SSS\", \"department\": \"SSS\", \"title\": \"SSS\", \"is_active\": true, \"is_in_factory\": true, \"is_today_attendance\": true, \"note\": \"\", \"created_at\": \"\", \"updated_at\": \"\"}, \"work_order\": {\"work_order\": \"NA\", \"part_no\": \"\", \"type_name\": \"\", \"assembly_location\": \"\"}, \"process_name\": \"6S\"}"
+      },
+      {
+        "op_key": "56ec8b6004c83dd3976adadf2f714779765d4cff",
+        "op_type": "START_WORK",
+        "first_at": "2026-05-29 00:41:14",
+        "last_at": "2026-05-29 00:41:14",
+        "ttl_seconds": 10,
+        "status": "CLAIMED",
+        "result_id": null,
+        "result_count": 0,
+        "hit_count": 0,
+        "payload": "{\"employee\": {\"id\": 90, \"employee_id\": \"SSS\", \"employee_name\": \"SSS\", \"department\": \"SSS\", \"title\": \"SSS\", \"is_active\": true, \"is_in_factory\": true, \"is_today_attendance\": true, \"note\": \"\", \"created_at\": \"\", \"updated_at\": \"\"}, \"work_order\": {\"id\": \"180\", \"work_order\": \"21M0241-01\", \"part_no\": \"4TRSC020-004-02\", \"type_name\": \"NTB 3 PORT\", \"assembly_location\": \"竹東\", \"customer\": \"TSMC 12P8->TSMC 18\", \"note\": \"\", \"is_active\": true, \"created_at\": \"2026-05-26 23:24:58\", \"updated_at\": \"2026-05-26 23:24:58\"}, \"process_name\": \"前置鈑金\"}"
+      },
+      {
+        "op_key": "8ad859a0d673e91aebda45c0134565e7e4093c9d",
+        "op_type": "FINISH_WORK",
+        "first_at": "2026-05-29 00:41:14",
+        "last_at": "2026-05-29 00:41:14",
+        "ttl_seconds": 10,
+        "status": "CLAIMED",
+        "result_id": null,
+        "result_count": 0,
+        "hit_count": 0,
+        "payload": "{\"record_id\": 324, \"end_action\": \"暫停\"}"
       }
     ],
     "time_records": [
@@ -5431,7 +5457,7 @@
       {
         "id": 324,
         "record_key": "SSS|NA|6S|2026-05-29 00:14:26|b5c196cd",
-        "status": "作業中",
+        "status": "暫停",
         "work_order": "NA",
         "part_no": "",
         "type_name": "",
@@ -5440,20 +5466,20 @@
         "employee_name": "SSS",
         "start_action": "開始",
         "start_timestamp": "2026-05-29 00:14:26",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": "",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-29 00:41:14",
+        "remark": "系統自動暫停：同一人員切換不同工段或不同日期作業",
         "start_date": "2026-05-29",
         "start_time": "00:14:26",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
+        "end_date": "2026-05-29",
+        "end_time": "00:41:14",
+        "work_hours": 0.45,
         "assembly_location": "",
         "group_key": "SSS|6S|2026-05-29",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-29 00:14:26",
-        "updated_at": "2026-05-29 00:14:26"
+        "updated_at": "2026-05-29 00:41:14"
       }
     ],
     "work_orders": []
