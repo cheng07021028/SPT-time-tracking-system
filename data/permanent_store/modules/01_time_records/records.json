@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-28 22:41:52",
-  "exported_at": "2026-05-28 22:41:52",
-  "reason": "save_time_records_v137_identity_safe_01",
+  "updated_at": "2026-05-28 22:50:12",
+  "exported_at": "2026-05-28 22:50:12",
+  "reason": "delete_time_records_v96_0102_sync_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -3693,49 +3693,11 @@
         "work_hours_hms": "",
         "recovery_closed_at": "",
         "recovery_closed_source": ""
-      },
-      {
-        "id": 324,
-        "employee_id": "SPT244",
-        "status": "下班",
-        "employee_name": "費南",
-        "work_order": "24N4001-24",
-        "department": "",
-        "title": "",
-        "part_no": "1SLP01S-FCA1-01",
-        "type_name": "FCLP EFEM",
-        "process_name": "包機",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 20:28:21",
-        "end_action": "下班",
-        "end_timestamp": "2026-05-28 20:28:43",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "20:28:21",
-        "end_date": "2026-05-28",
-        "end_time": "20:28:43",
-        "work_hours": "0.01",
-        "assembly_location": "竹東",
-        "group_key": "SPT244|包機|2026-05-28",
-        "is_group_work": "0",
-        "source": "streamlit",
-        "created_at": "2026-05-28 20:28:21",
-        "updated_at": "2026-05-28 22:41:51",
-        "record_key": "SPT244|24N4001-24|包機|2026-05-28 20:28:21|76ec6b74",
-        "department_emp": "",
-        "title_emp": "",
-        "recovery_status": "",
-        "recovery_note": "",
-        "is_deleted": "",
-        "deleted_at": "",
-        "work_hours_hms": "",
-        "recovery_closed_at": "",
-        "recovery_closed_source": ""
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 98
+    "time_records": 97
   }
 }
