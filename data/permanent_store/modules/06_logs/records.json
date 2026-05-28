@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 09:06:19",
-  "exported_at": "2026-05-28 09:06:19",
+  "updated_at": "2026-05-28 09:06:26",
+  "exported_at": "2026-05-28 09:06:26",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -715,11 +715,35 @@
         "detail": "",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 8611,
+        "log_time": "2026-05-28 09:06:26",
+        "user_name": "SPT208",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "209",
+        "message": "邱珍娜 開始 22M0162-91 / 清潔",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 8610,
+        "log_time": "2026-05-28 09:06:19",
+        "user_name": "SPT208",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 59
+    "system_logs": 61
   }
 }
