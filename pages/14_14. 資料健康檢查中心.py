@@ -19,6 +19,11 @@ from services.time_record_integrity_service import (
     repair_0102_authority_non_destructive,
     export_audit_excel_bytes,
 )
+from services.regression_test_service import (
+    run_v157_regression_suite,
+    export_v157_regression_excel_bytes,
+    compact_result_rows,
+)
 
 MODULE_CODE = "14_data_health"
 
@@ -101,6 +106,79 @@ with st.expander("備份佇列詳細資料 / Backup Queue Details", expanded=Fal
 if "v155_flush_result" in st.session_state:
     with st.expander("最近一次手動補送結果 / Last Manual Flush Result", expanded=False):
         st.json(st.session_state["v155_flush_result"])
+
+
+st.markdown("### V157 自動回歸測試 / 50人壓力模擬")
+st.caption(
+    "此測試完全在暫存沙盒資料庫中執行，不寫正式工時資料、不寫 GitHub、不刪除、不重算。"
+    "目的：更新後快速驗證多人同時紀錄、多筆同步作業、事件紀錄、row shard 與 Active Work 防呆是否仍正常。"
+)
+
+v157_c1, v157_c2, v157_c3 = st.columns([1, 1, 2])
+v157_workers = v157_c1.number_input("模擬人數 / Simulated Users", min_value=1, max_value=200, value=50, step=1, key="v157_workers")
+v157_parallel = v157_c2.number_input("每人同步作業筆數", min_value=1, max_value=5, value=2, step=1, key="v157_parallel")
+v157_c3.info("建議正式部署後先跑 50 人 × 每人 2 筆。測試結果只代表核心資料邏輯與併發保護，不會修改正式資料。")
+
+if "v157_regression_result" not in st.session_state:
+    st.session_state["v157_regression_result"] = None
+
+run_disabled = not CAN_REPAIR
+if st.button("🧪 執行 V157 回歸測試 + 壓力模擬", use_container_width=True, disabled=run_disabled, key="v157_run_regression"):
+    if run_disabled:
+        st.error("你的帳號沒有 14 模組 can_manage 權限，不能執行壓力模擬。")
+    else:
+        progress_bar = st.progress(0.0)
+        progress_text = st.empty()
+        def _v157_progress(pct: float, msg: str) -> None:
+            try:
+                progress_bar.progress(min(max(float(pct), 0.0), 1.0))
+                progress_text.caption(msg)
+            except Exception:
+                pass
+        with st.spinner("V157 正在執行非破壞式沙盒壓力測試..."):
+            st.session_state["v157_regression_result"] = run_v157_regression_suite(
+                worker_count=int(v157_workers),
+                works_per_worker=int(v157_parallel),
+                include_import_checks=True,
+                progress_callback=_v157_progress,
+            )
+        st.rerun()
+
+if run_disabled:
+    st.info("你的帳號沒有 14 模組 can_manage 權限，因此只能查看本區說明，不能執行壓力模擬。")
+
+v157_result = st.session_state.get("v157_regression_result")
+if v157_result:
+    v157_summary = v157_result.get("summary", {}) if isinstance(v157_result.get("summary"), dict) else {}
+    r1, r2, r3, r4, r5 = st.columns(5)
+    r1.metric("PASS", v157_summary.get("pass_count", 0))
+    r2.metric("WARN", v157_summary.get("warn_count", 0))
+    r3.metric("FAIL", v157_summary.get("fail_count", 0))
+    r4.metric("模擬紀錄數", v157_summary.get("expected_records", 0))
+    r5.metric("耗時秒", v157_result.get("elapsed_seconds", 0))
+    if bool(v157_result.get("ok")):
+        st.success("V157 回歸測試通過：沙盒壓力測試未發現資料遺失、覆蓋或假作業中。")
+    else:
+        st.error("V157 回歸測試發現 FAIL，請展開檢查結果確認。")
+    v157_rows = compact_result_rows(v157_result)
+    if v157_rows:
+        st.dataframe(pd.DataFrame(v157_rows), use_container_width=True, hide_index=True, height=360)
+    v157_excel = export_v157_regression_excel_bytes(v157_result)
+    st.download_button(
+        "⬇️ 下載 V157 測試報告 Excel",
+        data=v157_excel,
+        file_name=f"SPT_V157_回歸測試_50人壓力模擬_{today_date()}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        disabled=not CAN_EXPORT,
+        help=None if CAN_EXPORT else "你的帳號沒有 14 模組匯出權限。",
+        key="v157_download_excel",
+    )
+    with st.expander("V157 原始測試結果 JSON", expanded=False):
+        safe = dict(v157_result)
+        if isinstance(safe.get("checks"), pd.DataFrame):
+            safe["checks"] = safe["checks"].to_dict(orient="records")
+        st.json(safe)
 
 st.divider()
 
