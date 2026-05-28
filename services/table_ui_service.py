@@ -1883,3 +1883,157 @@ def save_column_order(table_key: str, order: Iterable[str]) -> None:  # type: ig
     _v156_prev_save_column_order(table_key, order)
     clear_table_ui_light_cache(table_key)
 # =================== END V156 TABLE UI LIGHTWEIGHT CACHE ===================
+
+# ===================== V161 GLOBAL LARGE TABLE LAZY DISPLAY =====================
+# 目的：改善所有模組大表格顯示速度。此層只影響「唯讀顯示」的資料切片與渲染，
+# 不改原始 DataFrame、不改儲存/刪除/重算/匯出資料、不改 01/02 工時寫入邏輯。
+# 小表格完全維持原行為；大表格預設分頁，避免 Streamlit 一次渲染大量列造成卡頓。
+try:
+    import math as _v161_math
+    import os as _v161_os
+except Exception:  # pragma: no cover
+    _v161_math = None
+    _v161_os = None
+
+try:
+    _v161_prev_render_table = render_table
+except Exception:  # pragma: no cover
+    _v161_prev_render_table = None
+
+
+def _v161_int_env(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        raw = (_v161_os.environ.get(name) if _v161_os is not None else None) or ""
+        val = int(float(str(raw).strip())) if raw.strip() else int(default)
+    except Exception:
+        val = int(default)
+    return max(int(minimum), min(int(maximum), int(val)))
+
+
+def _v161_bool_session(key: str, default: bool = False) -> bool:
+    try:
+        return bool(st.session_state.get(key, default))
+    except Exception:
+        return bool(default)
+
+
+def _v161_safe_widget_key(*parts) -> str:
+    try:
+        return "_".join(_safe_widget_key_part(str(p)) for p in parts if str(p) != "")[:180]
+    except Exception:
+        txt = "_".join(str(p) for p in parts if str(p) != "")
+        return re.sub(r"[^0-9A-Za-z_]+", "_", txt)[:180]
+
+
+def _v161_is_large_readonly_table(df: pd.DataFrame, editable: bool, table_key: str) -> bool:
+    if editable:
+        return False
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return False
+    # 01 Active Work、少量 KPI 表不需要分頁。全模組只在大表才啟動。
+    threshold = _v161_int_env("SPT_TABLE_LAZY_THRESHOLD", 300, 50, 5000)
+    return int(len(df)) > threshold
+
+
+def _v161_slice_large_table_for_display(df: pd.DataFrame, table_key: str) -> pd.DataFrame:
+    """Return a display slice for large readonly tables.
+
+    Safety: this never mutates df. It only reduces rows passed to st.dataframe.
+    Excel export, save, delete, recalc, and page-level DataFrame logic keep using
+    the original data owned by each page.
+    """
+    total = int(len(df)) if isinstance(df, pd.DataFrame) else 0
+    if total <= 0:
+        return df
+
+    instance = _v161_safe_widget_key("v161_lazy", table_key)
+    full_key = f"{instance}_show_full"
+    page_size_key = f"{instance}_page_size"
+    page_key = f"{instance}_page"
+
+    st.caption(
+        f"V161 大表分頁顯示：目前資料 {total:,} 筆。為提升畫面速度，預設只渲染目前頁；查詢、下載、儲存資料不受影響。"
+    )
+    c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.2, 2.4])
+    with c1:
+        show_full = st.checkbox(
+            "顯示全部 / Show all",
+            value=_v161_bool_session(full_key, False),
+            key=full_key,
+            help="只影響畫面渲染。資料量大時顯示全部可能較慢。",
+        )
+    if show_full:
+        st.info("已切換為顯示全部資料；若畫面變慢，可取消『顯示全部』恢復分頁。")
+        return df.copy()
+
+    options = [100, 200, 500, 1000]
+    default_size = _v161_int_env("SPT_TABLE_LAZY_PAGE_SIZE", 200, 50, 5000)
+    if default_size not in options:
+        options.append(default_size)
+        options = sorted(set(options))
+    with c2:
+        page_size = int(st.selectbox(
+            "每頁筆數 / Rows",
+            options=options,
+            index=options.index(default_size) if default_size in options else 0,
+            key=page_size_key,
+        ))
+    total_pages = max(1, int((total + page_size - 1) // page_size))
+    current_default = int(st.session_state.get(page_key, 1) or 1)
+    current_default = max(1, min(total_pages, current_default))
+    with c3:
+        page = int(st.number_input(
+            "頁次 / Page",
+            min_value=1,
+            max_value=total_pages,
+            value=current_default,
+            step=1,
+            key=page_key,
+        ))
+    start = max(0, (page - 1) * page_size)
+    end = min(total, start + page_size)
+    with c4:
+        st.markdown(
+            f"<div style='padding-top: 1.9rem; opacity: .82;'>顯示第 {start + 1:,}～{end:,} 筆，共 {total:,} 筆；第 {page:,}/{total_pages:,} 頁</div>",
+            unsafe_allow_html=True,
+        )
+    try:
+        return df.iloc[start:end].copy()
+    except Exception:
+        return df.head(page_size).copy()
+
+
+def render_table(
+    df: pd.DataFrame,
+    table_key: str,
+    *,
+    editable: bool = False,
+    disabled: Iterable[str] | None = None,
+    key: str | None = None,
+    height: int | None = None,
+    num_rows: str = "fixed",
+    show_width_settings: bool = True,
+) -> pd.DataFrame | None:  # type: ignore[override]
+    """V161 global large-table lazy renderer.
+
+    This keeps every caller compatible.  For editable tables and small tables it
+    delegates exactly to the existing V145/V156 renderer.  For large readonly
+    tables it displays a safe page slice only, reducing Streamlit render time.
+    """
+    if not callable(_v161_prev_render_table):
+        return None
+    display_df = df
+    if _v161_is_large_readonly_table(df, bool(editable), str(table_key or "")):
+        display_df = _v161_slice_large_table_for_display(df, str(table_key or "table"))
+    return _v161_prev_render_table(
+        display_df,
+        table_key,
+        editable=editable,
+        disabled=disabled,
+        key=key,
+        height=height,
+        num_rows=num_rows,
+        show_width_settings=show_width_settings,
+    )
+
+# =================== END V161 GLOBAL LARGE TABLE LAZY DISPLAY ===================
