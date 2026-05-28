@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 20:08:03",
-  "exported_at": "2026-05-28 20:08:03",
+  "updated_at": "2026-05-28 20:08:21",
+  "exported_at": "2026-05-28 20:08:21",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -26671,11 +26671,35 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 215,
+        "log_time": "2026-05-28 20:08:17",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01 工時紀錄管理員維護區刪除：V96 已刪除 SQLite 0 筆、01/02 權威檔 0 筆，並建立 tombstone。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 214,
+        "log_time": "2026-05-28 20:08:14",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "DELETE time_records",
+        "detail": "DELETE FROM time_records WHERE id IN (?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2222
+    "system_logs": 2224
   }
 }
