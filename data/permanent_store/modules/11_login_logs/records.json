@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 09:03:10",
-  "exported_at": "2026-05-28 09:03:10",
+  "updated_at": "2026-05-28 09:04:25",
+  "exported_at": "2026-05-28 09:04:25",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 1093,
+        "source": "v103_merge",
+        "username": "SPT105",
+        "display_name": "劉秀鳳",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=SPT105",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-28 09:04:25",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 09:04:25"
+      },
+      {
+        "id": 1046,
+        "source": "v103_merge",
+        "username": "SPT138",
+        "display_name": "蘇雍盛",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=SPT138",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-28 09:04:00",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 09:04:00"
+      },
       {
         "id": 1000,
         "source": "v103_merge",
@@ -734,7 +766,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 45,
+    "login_logs": 47,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
