@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 23:39:49",
-  "exported_at": "2026-05-28 23:39:49",
+  "updated_at": "2026-05-29 00:15:08",
+  "exported_at": "2026-05-29 00:15:08",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -19,11 +19,95 @@
         "detail": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
         "level": "INFO",
         "source": "authority"
+      },
+      {
+        "id": 145,
+        "log_time": "2026-05-29 00:15:04",
+        "user_name": "admin",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "324",
+        "message": "SSS 開始 NA / 6S",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 00:15:04\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"324\",\"target_ids\":[324],\"message\":\"SSS 開始 NA / 6S\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":0,\"authority_02_history\":0,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SSS|NA|6S|2026-05-29 00:14:26|b5c196cd\",\"identity_key\":\"record_key:SSS|NA|6S|2026-05-29 00:14:26|b5c196cd\",\"id\":\"324\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 00:14:26\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":324,\"record_key\":\"SSS|NA|6S|2026-05-29 00:14:26|b5c196cd\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 00:14:26\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"00:14:26\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 00:14:26\",\"updated_at\":\"2026-05-29 00:14:26\",\"_snapshot_source\":\"sqlite.time_records\"}],\"sqlite_time_records\":[{\"id\":324,\"record_key\":\"SSS|NA|6S|2026-05-29 00:14:26|b5c196cd\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 00:14:26\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"00:14:26\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 00:14:26\",\"updated_at\":\"2026-05-29 00:14:26\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[],\"authority_02_history\":[]},\"snapshot_hash\":\"3afdb89ada3d7817bb692269fe164e865a6f203fdd8b88ef701689a5c271d966\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 143,
+        "log_time": "2026-05-28 22:41:54",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V137 已安全合併儲存 98 筆；多人同製令同製程不覆蓋。",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 142,
+        "log_time": "2026-05-28 22:41:39",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01 工時紀錄管理員維護區刪除：V96 已刪除 SQLite 0 筆、01/02 權威檔 0 筆，並建立 tombstone。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 141,
+        "log_time": "2026-05-28 22:41:36",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "DELETE time_records",
+        "detail": "DELETE FROM time_records WHERE id IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 140,
+        "log_time": "2026-05-28 22:41:02",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：V96 已刪除 SQLite 0 筆、01/02 權威檔 118 筆，並建立 tombstone。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 139,
+        "log_time": "2026-05-28 22:40:59",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "DELETE time_records",
+        "detail": "DELETE FROM time_records WHERE id IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 138,
+        "log_time": "2026-05-28 22:38:52",
+        "user_name": "admin",
+        "action_type": "DELETE_LOG_RANGE",
+        "target_table": "system_logs",
+        "target_id": "2026-05-21~2026-05-28",
+        "message": "刪除 LOG 日期區間：2026-05-21 ~ 2026-05-28，刪除筆數：27",
+        "detail": "deleted_count=27;authority=06_logs.records.json;tombstone=delete_state.json",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1
+    "system_logs": 8
   }
 }
