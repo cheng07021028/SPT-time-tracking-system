@@ -343,6 +343,286 @@ def _build_missing_today_df(employee_df: pd.DataFrame, target_date: str) -> pd.D
     return out[base_cols].sort_values("employee_id")
 
 
+# ===================== V150 Missing Today multi-source hard compare =====================
+# 問題修正：07 今日未紀錄名單不能只依賴 load_records(start_date=today,end_date=today)。
+# 原因：02/01 權威檔、SQLite cache、today_records 顯示來源可能在不同修補層被過濾或欄名不同，
+# 造成明明 01/02 有今日紀錄的人仍被列為未紀錄。V150 改成只讀、多來源比對，不寫入、不覆蓋。
+
+_V150_EMP_ID_CANDIDATES = [
+    "employee_id", "工號 / Employee ID", "工號 / Employee", "工號 / Emp ID", "工號",
+    "Employee ID", "Employee", "員工編號", "人員工號", "工號/Employee ID",
+]
+_V150_EMP_NAME_CANDIDATES = [
+    "employee_name", "姓名 / Name", "姓名 / Employee Name", "姓名", "Name",
+    "員工姓名", "人員姓名", "Employee Name", "姓名/Name",
+]
+_V150_DATE_CANDIDATES = [
+    "start_date", "工作日期 / Work Date", "work_date", "日期 / Date", "日期", "工作日期",
+    "開始日期 / Start Date", "開始日期", "Start Date", "Work Date",
+]
+_V150_TIMESTAMP_CANDIDATES = [
+    "start_timestamp", "開始時間戳 / Start Timestamp", "開始時間 / Start Timestamp",
+    "開始時間", "Start Timestamp", "created_at", "建立時間 / Created At",
+]
+_V150_START_TIME_CANDIDATES = [
+    "start_timestamp", "開始時間戳 / Start Timestamp", "開始時間 / Start Timestamp", "開始時間",
+    "start_time", "開始時刻 / Start Time", "Start Time",
+]
+
+
+def _v150_safe_df(df) -> pd.DataFrame:
+    return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+
+
+def _v150_first_series(df: pd.DataFrame, candidates: list[str]) -> pd.Series:
+    if df is None or df.empty:
+        return pd.Series(dtype=str)
+    # 精準欄名優先。
+    for c in candidates:
+        if c in df.columns:
+            return df[c].map(_v148_clean_text)
+    # 再做寬鬆比對，處理欄名被截斷或中英順序不同。
+    norm_cols = {str(c).lower().replace(" ", "").replace("/", ""): c for c in df.columns}
+    for cand in candidates:
+        key = str(cand).lower().replace(" ", "").replace("/", "")
+        if key in norm_cols:
+            return df[norm_cols[key]].map(_v148_clean_text)
+    return pd.Series([""] * len(df), index=df.index, dtype=str)
+
+
+def _v148_record_employee_id_series(df: pd.DataFrame) -> pd.Series:  # type: ignore[override]
+    emp = _v150_first_series(df, _V150_EMP_ID_CANDIDATES)
+    missing = emp.eq("")
+    if missing.any():
+        rk_emp = _v148_record_key_employee_series(df)
+        emp = emp.mask(missing, rk_emp)
+    return emp.map(lambda x: str(x).strip())
+
+
+def _v148_record_employee_name_series(df: pd.DataFrame) -> pd.Series:  # type: ignore[override]
+    return _v150_first_series(df, _V150_EMP_NAME_CANDIDATES).map(lambda x: str(x).strip())
+
+
+def _v150_date_from_series(s: pd.Series, *, require_date_like: bool = False) -> pd.Series:
+    if s is None or s.empty:
+        return pd.Series(dtype=str)
+    txt = s.map(_v148_clean_text).astype(str)
+    if require_date_like:
+        # 純時間如 16:10:48 不能被 pandas 解析成今天，否則會把無日期資料誤算成今日。
+        has_date = txt.str.contains(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}", regex=True)
+        txt = txt.where(has_date, "")
+    try:
+        dt = pd.to_datetime(txt, errors="coerce")
+        out = dt.dt.strftime("%Y-%m-%d").fillna("").astype(str)
+        if out.ne("").any():
+            return out
+    except Exception:
+        pass
+    return txt.str.replace("/", "-", regex=False).str.slice(0, 10)
+
+
+def _v148_record_date_series(df: pd.DataFrame) -> pd.Series:  # type: ignore[override]
+    if df is None or df.empty:
+        return pd.Series(dtype=str)
+    # 日期欄優先。
+    for c in _V150_DATE_CANDIDATES:
+        if c in df.columns:
+            out = _v150_date_from_series(df[c], require_date_like=False)
+            if out.ne("").any():
+                return out
+    # 時間戳欄次之，必須真的含日期。
+    for c in _V150_TIMESTAMP_CANDIDATES:
+        if c in df.columns:
+            out = _v150_date_from_series(df[c], require_date_like=True)
+            if out.ne("").any():
+                return out
+    return pd.Series([""] * len(df), index=df.index, dtype=str)
+
+
+def _v150_read_authority_time_records(module_key: str) -> pd.DataFrame:
+    try:
+        from services.permanent_authority_service import df_from_table
+        df = df_from_table(module_key, "time_records")
+        return _v150_safe_df(df)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v150_read_sqlite_time_records() -> pd.DataFrame:
+    try:
+        from services.db_service import query_df
+        df = query_df("SELECT * FROM time_records")
+        return _v150_safe_df(df)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v150_not_deleted_filter(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame() if df is None else df
+    out = df.copy()
+    for c in ["status", "狀態 / Status", "狀態"]:
+        if c in out.columns:
+            s = out[c].map(_v148_clean_text).astype(str).str.lower()
+            out = out.loc[~s.isin({"刪除", "已刪除", "deleted", "delete", "removed"})].copy()
+            break
+    return out.reset_index(drop=True)
+
+
+def _v148_combine_record_sources(target_date: str) -> pd.DataFrame:  # type: ignore[override]
+    """V150: read 01/02/SQLite/today sources directly, then filter locally.
+
+    This function is read-only.  It does not call any save/sync/delete/recalc path,
+    so it cannot make history disappear or overwrite records.  It only prevents
+    employees with real today records from being listed as missing.
+    """
+    frames: list[pd.DataFrame] = []
+
+    # 02/01 canonical authority are the most important sources for Reboot-safe data.
+    for module_key in ("02_history", "01_time_records"):
+        df = _v150_read_authority_time_records(module_key)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            df = df.copy()
+            df["__v150_source"] = module_key
+            frames.append(df)
+
+    # Existing service functions may include display repairs / caches; read them too, but don't depend on them alone.
+    try:
+        hist_all = load_records()
+        if isinstance(hist_all, pd.DataFrame) and not hist_all.empty:
+            hist_all = hist_all.copy()
+            hist_all["__v150_source"] = "load_records_all"
+            frames.append(hist_all)
+    except Exception:
+        pass
+    try:
+        hist_day = load_records(start_date=target_date, end_date=target_date)
+        if isinstance(hist_day, pd.DataFrame) and not hist_day.empty:
+            hist_day = hist_day.copy()
+            hist_day["__v150_source"] = "load_records_day"
+            frames.append(hist_day)
+    except Exception:
+        pass
+    try:
+        today_df = today_records(include_finished=True, unfinished_only=False)
+        if isinstance(today_df, pd.DataFrame) and not today_df.empty:
+            today_df = today_df.copy()
+            today_df["__v150_source"] = "today_records"
+            frames.append(today_df)
+    except Exception:
+        pass
+
+    # SQLite is runtime cache.  It is read-only here and only used as an additional evidence source.
+    sqlite_df = _v150_read_sqlite_time_records()
+    if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty:
+        sqlite_df = sqlite_df.copy()
+        sqlite_df["__v150_source"] = "sqlite_time_records"
+        frames.append(sqlite_df)
+
+    if not frames:
+        return pd.DataFrame()
+
+    out = pd.concat(frames, ignore_index=True, sort=False)
+    out = _v150_not_deleted_filter(out)
+    if out.empty:
+        return out
+
+    # 先在合併後建立標準欄，讓後續去重和日期篩選不受欄名影響。
+    out["__v150_emp_id"] = _v148_record_employee_id_series(out)
+    out["__v150_emp_name"] = _v148_record_employee_name_series(out)
+    out["__v150_date"] = _v148_record_date_series(out)
+    out["__v150_rk"] = _v150_first_series(out, ["record_key", "紀錄鍵 / Record Key", "Record Key"])
+
+    # 只留下目標日期且能辨識人員的資料；這裡才做日期過濾，避免 service 層過濾失準。
+    out = out[(out["__v150_date"] == str(target_date)) & ((out["__v150_emp_id"] != "") | (out["__v150_emp_name"] != ""))].copy()
+    if out.empty:
+        return out
+
+    # 去重只為了統計不要被多來源重複放大；不能用單一 id 直接覆蓋不同人。
+    if "__v150_rk" in out.columns and out["__v150_rk"].astype(str).str.strip().ne("").any():
+        has_key = out["__v150_rk"].astype(str).str.strip().ne("")
+        keyed = out.loc[has_key].drop_duplicates(subset=["__v150_rk"], keep="last")
+        unkeyed = out.loc[~has_key]
+        out = pd.concat([keyed, unkeyed], ignore_index=True, sort=False)
+    # 對沒有 record_key 的資料，用業務鍵去重，不用單獨 id，避免 SQLite id 重用或不同來源 id 撞號誤蓋。
+    biz_cols = ["__v150_emp_id", "__v150_emp_name", "work_order", "製令 / Work Order", "process_name", "工段名稱 / Process", "start_timestamp", "開始時間戳 / Start Timestamp"]
+    existing_biz_cols = [c for c in biz_cols if c in out.columns]
+    if existing_biz_cols:
+        out = out.drop_duplicates(subset=existing_biz_cols, keep="last")
+    return out.reset_index(drop=True)
+
+
+def _build_missing_today_df(employee_df: pd.DataFrame, target_date: str) -> pd.DataFrame:  # type: ignore[override]
+    """V150: Missing Today calculation based on real current-day time records.
+
+    A person is NOT missing if any read-only evidence source has a time record for
+    the employee today: 02_history, 01_time_records, load_records, today_records,
+    or SQLite time_records.  The function never writes back to any authority file.
+    """
+    emp = ensure_cols(employee_df)
+    base_cols = ["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]
+    if emp.empty:
+        return pd.DataFrame(columns=base_cols)
+    for c in BOOL_INTERNAL_COLS:
+        emp[c] = emp[c].map(_to_bool_value).fillna(False).astype(bool)
+    emp = emp[(emp["is_active"]) & (emp["is_in_factory"]) & (emp["is_today_attendance"])].copy()
+    emp["employee_id"] = emp["employee_id"].map(_v148_clean_text)
+    emp["employee_name"] = emp["employee_name"].map(_v148_clean_text)
+    emp = emp[emp["employee_id"] != ""].copy()
+    if emp.empty:
+        out = emp.copy()
+        out["last_start_time"] = ""
+        out["today_record_count"] = 0
+        return out[base_cols]
+
+    rec = _v148_combine_record_sources(target_date)
+    if rec is None or not isinstance(rec, pd.DataFrame) or rec.empty:
+        emp["last_start_time"] = ""
+        emp["today_record_count"] = 0
+        return emp[base_cols].sort_values("employee_id")
+
+    rec = rec.copy()
+    rec["__emp_id"] = rec.get("__v150_emp_id", _v148_record_employee_id_series(rec)).map(_v148_clean_text)
+    rec["__emp_name"] = rec.get("__v150_emp_name", _v148_record_employee_name_series(rec)).map(_v148_clean_text)
+    rec["__record_date"] = rec.get("__v150_date", _v148_record_date_series(rec)).map(_v148_clean_text)
+    rec["__start_time"] = _v150_first_series(rec, _V150_START_TIME_CANDIDATES)
+    rec = rec[(rec["__record_date"] == str(target_date)) & ((rec["__emp_id"] != "") | (rec["__emp_name"] != ""))].copy()
+
+    emp["__emp_key"] = emp["employee_id"].astype(str).str.strip().str.casefold()
+    emp["__name_key"] = emp["employee_name"].astype(str).str.strip().str.casefold()
+    rec["__emp_key"] = rec["__emp_id"].astype(str).str.strip().str.casefold()
+    rec["__name_key"] = rec["__emp_name"].astype(str).str.strip().str.casefold()
+
+    # 工號為主；若紀錄缺工號但有姓名，才用姓名補判斷。
+    id_grp = rec[rec["__emp_key"] != ""].groupby("__emp_key", dropna=False).agg(
+        last_start_time=("__start_time", "max"),
+        today_record_count=("__emp_key", "size"),
+    ).reset_index()
+    out = emp.merge(id_grp, on="__emp_key", how="left")
+
+    missing_count = pd.to_numeric(out["today_record_count"], errors="coerce").fillna(0).astype(int)
+    need_name_fallback = missing_count.eq(0)
+    if need_name_fallback.any():
+        name_grp = rec[(rec["__emp_key"] == "") & (rec["__name_key"] != "")].groupby("__name_key", dropna=False).agg(
+            last_start_time_by_name=("__start_time", "max"),
+            today_record_count_by_name=("__name_key", "size"),
+        ).reset_index()
+        out = out.merge(name_grp, on="__name_key", how="left")
+        by_name_count = pd.to_numeric(out.get("today_record_count_by_name", 0), errors="coerce").fillna(0).astype(int)
+        by_name_time = out.get("last_start_time_by_name", "")
+        out["today_record_count"] = missing_count.mask(need_name_fallback, by_name_count)
+        out["last_start_time"] = out["last_start_time"].fillna("").astype(str).mask(need_name_fallback, by_name_time.fillna("").astype(str))
+    else:
+        out["today_record_count"] = missing_count
+        out["last_start_time"] = out["last_start_time"].fillna("").astype(str)
+
+    out["today_record_count"] = pd.to_numeric(out["today_record_count"], errors="coerce").fillna(0).astype(int)
+    out["last_start_time"] = out["last_start_time"].fillna("").astype(str)
+    out = out[out["today_record_count"] == 0].copy()
+    return out[base_cols].sort_values("employee_id")
+# =================== END V150 Missing Today multi-source hard compare ===================
+
+
 if STATE_KEY not in st.session_state:
     reload_employees()
 
