@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 09:24:00",
-  "exported_at": "2026-05-28 09:24:00",
+  "updated_at": "2026-05-28 09:24:54",
+  "exported_at": "2026-05-28 09:24:54",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -1855,11 +1855,59 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 9339,
+        "log_time": "2026-05-28 09:24:54",
+        "user_name": "B126",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "224",
+        "message": "戴鎰祥 開始 26M0051-09 / 配電",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9338,
+        "log_time": "2026-05-28 09:24:54",
+        "user_name": "SPT220",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "225",
+        "message": "劉韋廷 開始 24N4001-33 / S.T.",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9337,
+        "log_time": "2026-05-28 09:24:49",
+        "user_name": "SPT220",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9336,
+        "log_time": "2026-05-28 09:24:49",
+        "user_name": "B126",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 154
+    "system_logs": 158
   }
 }
