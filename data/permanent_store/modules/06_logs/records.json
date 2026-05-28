@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 23:34:46",
-  "exported_at": "2026-05-28 23:34:46",
+  "updated_at": "2026-05-28 23:36:48",
+  "exported_at": "2026-05-28 23:36:48",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -235,11 +235,23 @@
         "detail": "DELETE FROM time_records WHERE id IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 144,
+        "log_time": "2026-05-28 23:36:48",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V137 已安全合併儲存 14 筆；多人同製令同製程不覆蓋。",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 19
+    "system_logs": 20
   }
 }
