@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 17:07:21",
+  "exported_at": "2026-05-28 17:10:51",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 108,
@@ -13,12 +13,12 @@
     "login_logs": 506,
     "process_options": 17,
     "rest_periods": 5,
-    "system_logs": 175,
+    "system_logs": 191,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "table_ui_settings": 0,
-    "time_record_events": 2,
+    "time_record_events": 3,
     "time_record_outbox": 0,
     "time_records": 108,
     "work_orders": 0
@@ -12162,6 +12162,182 @@
         "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 2 筆",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 424,
+        "log_time": "2026-05-28 17:08:04",
+        "user_name": "SPT121",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 425,
+        "log_time": "2026-05-28 17:08:04",
+        "user_name": "SPT121",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 426,
+        "log_time": "2026-05-28 17:08:04",
+        "user_name": "SPT121",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 427,
+        "log_time": "2026-05-28 17:08:04",
+        "user_name": "SPT121",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 428,
+        "log_time": "2026-05-28 17:08:04",
+        "user_name": "SPT121",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 4 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 429,
+        "log_time": "2026-05-28 17:08:36",
+        "user_name": "SPT172",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
+        "level": "INFO"
+      },
+      {
+        "id": 430,
+        "log_time": "2026-05-28 17:08:37",
+        "user_name": "SPT172",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "290",
+        "message": "V137 結束工時紀錄 #290；同步結束=1筆；狀態=完工；群組總工時=02:53:30；平均工時=02:53:24",
+        "detail": "290",
+        "level": "INFO"
+      },
+      {
+        "id": 431,
+        "log_time": "2026-05-28 17:08:57",
+        "user_name": "SPT172",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 432,
+        "log_time": "2026-05-28 17:08:57",
+        "user_name": "SPT172",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 433,
+        "log_time": "2026-05-28 17:08:57",
+        "user_name": "SPT172",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 434,
+        "log_time": "2026-05-28 17:08:57",
+        "user_name": "SPT172",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 3 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 435,
+        "log_time": "2026-05-28 17:09:08",
+        "user_name": "SPT121",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 436,
+        "log_time": "2026-05-28 17:09:08",
+        "user_name": "SPT121",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 437,
+        "log_time": "2026-05-28 17:09:08",
+        "user_name": "SPT121",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 438,
+        "log_time": "2026-05-28 17:09:08",
+        "user_name": "SPT121",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 439,
+        "log_time": "2026-05-28 17:09:08",
+        "user_name": "SPT121",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 4 筆",
+        "detail": "",
+        "level": "INFO"
       }
     ],
     "system_settings": [
@@ -12241,6 +12417,24 @@
         "previous_checksum": "6cbe711684de445c254294d444b8c39e400bcf7432c4029dd48403d674927a04",
         "source": "streamlit",
         "created_at": "2026-05-28 16:13:20"
+      },
+      {
+        "event_id": "2c06a62c2ecc4070b4c7be4167a01d1d",
+        "record_key": "SPT172|25M0115-17|Packing|2026-05-28 14:00:06|2a25315c",
+        "record_id": "290",
+        "event_type": "FINISH_WORK",
+        "event_time": "2026-05-28 17:08:46",
+        "employee_id": "SPT172",
+        "employee_name": "胡瑄芸",
+        "work_order": "25M0115-17",
+        "process_name": "Packing",
+        "start_timestamp": "2026-05-28 14:00:06",
+        "operator_account": "SPT172",
+        "payload_json": "{\"schema\": \"SPT-TimeRecordEvent-V152\", \"event_id\": \"2c06a62c2ecc4070b4c7be4167a01d1d\", \"event_type\": \"FINISH_WORK\", \"event_time\": \"2026-05-28 17:08:46\", \"record_id\": \"290\", \"record_key\": \"SPT172|25M0115-17|Packing|2026-05-28 14:00:06|2a25315c\", \"operator_account\": \"SPT172\", \"reason\": \"finish_work_v152_event_journal\", \"row\": {\"id\": \"290\", \"record_key\": \"SPT172|25M0115-17|Packing|2026-05-28 14:00:06|2a25315c\", \"status\": \"完工\", \"work_order\": \"25M0115-17\", \"part_no\": \"4TRSC150-003-01\", \"type_name\": \"12\\\" UFO EFEM\", \"process_name\": \"Packing\", \"employee_id\": \"SPT172\", \"employee_name\": \"胡瑄芸\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-28 14:00:06\", \"end_action\": \"完工\", \"end_timestamp\": \"2026-05-28 17:08:36\", \"remark\": \"\", \"start_date\": \"2026-05-28\", \"start_time\": \"14:00:06\", \"end_date\": \"2026-05-28\", \"end_time\": \"17:08:36\", \"work_hours\": \"2.89\", \"assembly_location\": \"竹東\", \"group_key\": \"SPT172|Packing|2026-05-28\", \"is_group_work\": \"0\", \"source\": \"streamlit\", \"created_at\": \"2026-05-28 14:00:06\", \"updated_at\": \"2026-05-28 17:08:36\"}, \"extra\": {\"end_action\": \"完工\", \"remark\": \"\", \"finish_parallel_group\": true, \"affected_ids\": [290]}, \"previous_checksum\": \"09d3df959519812002c914370a6118e13f73a71d61c7ed18b0c3a45257f5b95f\", \"checksum\": \"145973b306c4c9574d60beed0925f2207c3b5e4675ee56f48fcd598ea1a0c777\"}",
+        "checksum": "145973b306c4c9574d60beed0925f2207c3b5e4675ee56f48fcd598ea1a0c777",
+        "previous_checksum": "09d3df959519812002c914370a6118e13f73a71d61c7ed18b0c3a45257f5b95f",
+        "source": "streamlit",
+        "created_at": "2026-05-28 17:08:46"
       }
     ],
     "time_record_outbox": [],
@@ -12270,7 +12464,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-27 10:41:34",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 164,
@@ -12324,7 +12518,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-27 19:42:08",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 187,
@@ -12351,7 +12545,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 20:25:05",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 188,
@@ -12378,7 +12572,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 20:26:57",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 189,
@@ -12405,7 +12599,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 20:27:51",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 190,
@@ -12432,7 +12626,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 20:28:51",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 191,
@@ -12459,7 +12653,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:29:48",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 192,
@@ -12486,7 +12680,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:31:03",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 193,
@@ -12502,7 +12696,7 @@
         "start_timestamp": "2026-05-28 08:31:35",
         "end_action": "暫停",
         "end_timestamp": "2026-05-28 11:00:04",
-        "remark": null,
+        "remark": "",
         "start_date": "2026-05-28",
         "start_time": "08:31:35",
         "end_date": "2026-05-28",
@@ -12540,7 +12734,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:33:24",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 195,
@@ -12567,7 +12761,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:34:57",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 196,
@@ -12594,7 +12788,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:36:42",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 197,
@@ -12621,7 +12815,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:37:32",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 198,
@@ -12648,7 +12842,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:51:03",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 199,
@@ -12675,7 +12869,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:52:19",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 200,
@@ -12702,7 +12896,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:52:41",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 201,
@@ -12729,7 +12923,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:53:25",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 202,
@@ -12756,7 +12950,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:54:04",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 203,
@@ -12783,7 +12977,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:54:17",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 204,
@@ -12810,7 +13004,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:55:54",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 205,
@@ -12837,7 +13031,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:57:21",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 206,
@@ -12864,7 +13058,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:04:37",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 207,
@@ -12891,7 +13085,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:05:10",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 208,
@@ -12918,7 +13112,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:06:06",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 209,
@@ -12945,7 +13139,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:06:08",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 210,
@@ -12972,7 +13166,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:08:06",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 211,
@@ -12993,13 +13187,13 @@
         "start_time": "09:09:24",
         "end_date": "",
         "end_time": "",
-        "work_hours": "00:00:00",
+        "work_hours": 0.0,
         "assembly_location": "",
         "group_key": "SPT172|Packing|2026-05-28",
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:09:24",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 212,
@@ -13026,7 +13220,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:09:50",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 213,
@@ -13053,7 +13247,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:10:23",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 215,
@@ -13080,29 +13274,29 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:12:27",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 216,
         "record_key": "LOGRECOVERY|SPT227|26M0051-04|異常|2026-05-28 09:13:03|216",
         "status": "作業中",
         "work_order": "26M0051-04",
-        "part_no": null,
-        "type_name": null,
+        "part_no": "",
+        "type_name": "",
         "process_name": "異常",
         "employee_id": "SPT227",
         "employee_name": "張佳銓",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 09:13:03",
-        "end_action": null,
-        "end_timestamp": null,
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "V164B_LOG_ONLY_RECOVERY：由 LOG START_WORK 補回。LOG 不含完整 INSERT 參數，請人工確認 P/N、機型、組立地點、結束時間與工時後再轉正式紀錄。",
         "start_date": "2026-05-28",
         "start_time": "09:13:03",
-        "end_date": null,
-        "end_time": null,
+        "end_date": "",
+        "end_time": "",
         "work_hours": 0.0,
-        "assembly_location": null,
+        "assembly_location": "",
         "group_key": "SPT227|異常|2026-05-28",
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
@@ -13134,7 +13328,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:13:03",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 218,
@@ -13161,7 +13355,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:16:05",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 219,
@@ -13188,29 +13382,29 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:16:24",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 221,
         "record_key": "LOGRECOVERY|SPT121|24N4001-29|前置鈑金|2026-05-28 09:18:30|221",
         "status": "作業中",
         "work_order": "24N4001-29",
-        "part_no": null,
-        "type_name": null,
+        "part_no": "",
+        "type_name": "",
         "process_name": "前置鈑金",
         "employee_id": "SPT121",
         "employee_name": "徐兆生",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 09:18:30",
-        "end_action": null,
-        "end_timestamp": null,
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "V164B_LOG_ONLY_RECOVERY：由 LOG START_WORK 補回。LOG 不含完整 INSERT 參數，請人工確認 P/N、機型、組立地點、結束時間與工時後再轉正式紀錄。",
         "start_date": "2026-05-28",
         "start_time": "09:18:30",
-        "end_date": null,
-        "end_time": null,
+        "end_date": "",
+        "end_time": "",
         "work_hours": 0.0,
-        "assembly_location": null,
+        "assembly_location": "",
         "group_key": "SPT121|前置鈑金|2026-05-28",
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
@@ -13242,7 +13436,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:20:23",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 223,
@@ -13269,7 +13463,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:21:39",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 224,
@@ -13296,7 +13490,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:24:44",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 225,
@@ -13323,7 +13517,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:24:54",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 226,
@@ -13350,7 +13544,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:25:26",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 227,
@@ -13377,7 +13571,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:26:39",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 229,
@@ -13404,7 +13598,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:29:09",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 230,
@@ -13431,7 +13625,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:30:48",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 231,
@@ -13458,29 +13652,29 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:31:08",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 232,
         "record_key": "LOGRECOVERY|B189|26M0043-01|配電|2026-05-28 09:31:26|232",
         "status": "作業中",
         "work_order": "26M0043-01",
-        "part_no": null,
-        "type_name": null,
+        "part_no": "",
+        "type_name": "",
         "process_name": "配電",
         "employee_id": "B189",
         "employee_name": "羅文發",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 09:31:26",
-        "end_action": null,
-        "end_timestamp": null,
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "V164B_LOG_ONLY_RECOVERY：由 LOG START_WORK 補回。LOG 不含完整 INSERT 參數，請人工確認 P/N、機型、組立地點、結束時間與工時後再轉正式紀錄。",
         "start_date": "2026-05-28",
         "start_time": "09:31:26",
-        "end_date": null,
-        "end_time": null,
+        "end_date": "",
+        "end_time": "",
         "work_hours": 0.0,
-        "assembly_location": null,
+        "assembly_location": "",
         "group_key": "B189|配電|2026-05-28",
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
@@ -13501,7 +13695,7 @@
         "start_timestamp": "2026-05-28 09:32:09",
         "end_action": "暫停",
         "end_timestamp": "2026-05-28 13:22:14",
-        "remark": null,
+        "remark": "",
         "start_date": "2026-05-28",
         "start_time": "09:32:09",
         "end_date": "2026-05-28",
@@ -13512,7 +13706,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:32:09",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 234,
@@ -13539,7 +13733,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:32:22",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 235,
@@ -13560,13 +13754,13 @@
         "start_time": "09:33:15",
         "end_date": "",
         "end_time": "",
-        "work_hours": "00:00:00",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT148|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:33:15",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 236,
@@ -13587,13 +13781,13 @@
         "start_time": "09:33:59",
         "end_date": "",
         "end_time": "",
-        "work_hours": "00:00:00",
+        "work_hours": 0.0,
         "assembly_location": "",
         "group_key": "B190|配電|2026-05-28",
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:33:59",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 237,
@@ -13620,7 +13814,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:36:00",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 239,
@@ -13647,7 +13841,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:39:05",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 240,
@@ -13674,7 +13868,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:40:40",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 241,
@@ -13701,7 +13895,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:49:05",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 243,
@@ -13728,34 +13922,34 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:50:20",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 244,
         "record_key": "LOGRECOVERY|SPT193|25M0785-02|模組|2026-05-28 09:51:49|244",
         "status": "作業中",
         "work_order": "25M0785-02",
-        "part_no": null,
-        "type_name": null,
+        "part_no": "",
+        "type_name": "",
         "process_name": "模組",
         "employee_id": "SPT193",
         "employee_name": "呂昰儒",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 09:51:49",
-        "end_action": null,
-        "end_timestamp": null,
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "V164B_LOG_ONLY_RECOVERY：由 LOG START_WORK 補回。LOG 不含完整 INSERT 參數，請人工確認 P/N、機型、組立地點、結束時間與工時後再轉正式紀錄。",
         "start_date": "2026-05-28",
         "start_time": "09:51:49",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
-        "assembly_location": null,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
+        "assembly_location": "",
         "group_key": "SPT193|模組|2026-05-28",
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:51:49",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 247,
@@ -13782,29 +13976,29 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:53:28",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 248,
         "record_key": "LOGRECOVERY|B248|26N4001-03|配電|2026-05-28 09:54:11|248",
         "status": "作業中",
         "work_order": "26N4001-03",
-        "part_no": null,
-        "type_name": null,
+        "part_no": "",
+        "type_name": "",
         "process_name": "配電",
         "employee_id": "B248",
         "employee_name": "佘銘訓",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 09:54:11",
-        "end_action": null,
-        "end_timestamp": null,
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "V164B_LOG_ONLY_RECOVERY：由 LOG START_WORK 補回。LOG 不含完整 INSERT 參數，請人工確認 P/N、機型、組立地點、結束時間與工時後再轉正式紀錄。",
         "start_date": "2026-05-28",
         "start_time": "09:54:11",
-        "end_date": null,
-        "end_time": null,
+        "end_date": "",
+        "end_time": "",
         "work_hours": 0.0,
-        "assembly_location": null,
+        "assembly_location": "",
         "group_key": "B248|配電|2026-05-28",
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
@@ -13836,7 +14030,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:57:04",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 251,
@@ -13863,7 +14057,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 09:58:09",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 252,
@@ -13890,7 +14084,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:05:59",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 253,
@@ -13917,7 +14111,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:10:32",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 254,
@@ -13931,13 +14125,13 @@
         "employee_name": "潘威捷",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 10:27:37",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": null,
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
         "start_date": "2026-05-28",
         "start_time": "10:27:37",
-        "end_date": null,
-        "end_time": null,
+        "end_date": "",
+        "end_time": "",
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT145|模組|2026-05-28",
@@ -13971,7 +14165,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 10:28:10",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 256,
@@ -13998,7 +14192,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 10:28:34",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 257,
@@ -14025,7 +14219,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 10:29:09",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 259,
@@ -14052,7 +14246,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 10:30:35",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 260,
@@ -14079,7 +14273,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:30:56",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 261,
@@ -14106,7 +14300,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 10:31:37",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 262,
@@ -14133,7 +14327,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:34:47",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 264,
@@ -14160,7 +14354,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 10:45:52",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 265,
@@ -14187,7 +14381,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:56:51",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 266,
@@ -14214,7 +14408,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 10:57:35",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 267,
@@ -14241,7 +14435,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 10:58:32",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 268,
@@ -14268,7 +14462,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 11:02:52",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 269,
@@ -14295,7 +14489,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 11:04:27",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 270,
@@ -14322,34 +14516,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 11:05:09",
-        "updated_at": "2026-05-28 16:04:53"
-      },
-      {
-        "id": 271,
-        "record_key": "LOGRECOVERY|SSS|21M0241-01|6S|2026-05-28 11:08:03|271",
-        "status": "作業中",
-        "work_order": "21M0241-01",
-        "part_no": "",
-        "type_name": "",
-        "process_name": "6S",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 11:08:03",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "V164B_LOG_ONLY_RECOVERY：由 LOG START_WORK 補回。LOG 不含完整 INSERT 參數，請人工確認 P/N、機型、組立地點、結束時間與工時後再轉正式紀錄。",
-        "start_date": "2026-05-28",
-        "start_time": "11:08:03",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": "00:00:00",
-        "assembly_location": "",
-        "group_key": "SSS|6S|2026-05-28",
-        "is_group_work": 0,
-        "source": "V164B_LOG_ONLY_RECOVERY",
-        "created_at": "2026-05-28 11:08:03",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 272,
@@ -14376,34 +14543,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 11:08:19",
-        "updated_at": "2026-05-28 16:04:53"
-      },
-      {
-        "id": 273,
-        "record_key": "LOGRECOVERY|SSS|NA|6S|2026-05-28 11:08:44|273",
-        "status": "作業中",
-        "work_order": "NA",
-        "part_no": "",
-        "type_name": "",
-        "process_name": "6S",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 11:08:44",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "V164B_LOG_ONLY_RECOVERY：由 LOG START_WORK 補回。LOG 不含完整 INSERT 參數，請人工確認 P/N、機型、組立地點、結束時間與工時後再轉正式紀錄。",
-        "start_date": "2026-05-28",
-        "start_time": "11:08:44",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": "00:00:00",
-        "assembly_location": "",
-        "group_key": "SSS|6S|2026-05-28",
-        "is_group_work": 0,
-        "source": "V164B_LOG_ONLY_RECOVERY",
-        "created_at": "2026-05-28 11:08:44",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 274,
@@ -14430,7 +14570,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 11:09:32",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 278,
@@ -14457,7 +14597,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 11:17:36",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 279,
@@ -14478,13 +14618,13 @@
         "start_time": "11:51:02",
         "end_date": "2026-05-28",
         "end_time": "15:28:46",
-        "work_hours": "01:11:24",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT121|其他|2026-05-28",
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-28 11:51:02",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 280,
@@ -14511,7 +14651,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:05:22",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 281,
@@ -14538,7 +14678,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:31:37",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 282,
@@ -14565,7 +14705,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 11:55:23",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 283,
@@ -14592,7 +14732,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:23:53",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 284,
@@ -14619,7 +14759,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:33:54",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 285,
@@ -14646,7 +14786,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:39:25",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 286,
@@ -14673,7 +14813,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:47:04",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 288,
@@ -14700,7 +14840,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:51:27",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 289,
@@ -14727,12 +14867,12 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:56:54",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 290,
         "record_key": "SPT172|25M0115-17|Packing|2026-05-28 14:00:06|2a25315c",
-        "status": "作業中",
+        "status": "完工",
         "work_order": "25M0115-17",
         "part_no": "4TRSC150-003-01",
         "type_name": "12\" UFO EFEM",
@@ -14741,20 +14881,20 @@
         "employee_name": "胡瑄芸",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 14:00:06",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "完工",
+        "end_timestamp": "2026-05-28 17:08:36",
         "remark": "",
         "start_date": "2026-05-28",
         "start_time": "14:00:06",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": "00:00:00",
+        "end_date": "2026-05-28",
+        "end_time": "17:08:36",
+        "work_hours": 2.89,
         "assembly_location": "竹東",
         "group_key": "SPT172|Packing|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 14:00:06",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 17:08:36"
       },
       {
         "id": 291,
@@ -14781,7 +14921,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 14:21:17",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 292,
@@ -14808,7 +14948,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 14:25:05",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 293,
@@ -14835,7 +14975,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 14:34:50",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 294,
@@ -14862,7 +15002,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 14:57:23",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 295,
@@ -14889,7 +15029,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 15:24:09",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 296,
@@ -14910,18 +15050,18 @@
         "start_time": "15:26:35",
         "end_date": "2026-05-28",
         "end_time": "15:28:46",
-        "work_hours": "01:11:24",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT121|其他|2026-05-28",
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-28 15:26:35",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 297,
         "record_key": "SPT121|24N4001-32|其他|2026-05-28 15:31:56|e85922bb",
-        "status": "作業中",
+        "status": "完工",
         "work_order": "24N4001-32",
         "part_no": "1SLP01S-FCA1-01",
         "type_name": "FCLP EFEM",
@@ -14930,20 +15070,20 @@
         "employee_name": "徐兆生",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 15:31:56",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "完工",
+        "end_timestamp": "2026-05-28 17:10:00",
         "remark": "通電量測",
         "start_date": "2026-05-28",
         "start_time": "15:31:56",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": "00:00:00",
+        "end_date": "2026-05-28",
+        "end_time": "17:10:00",
+        "work_hours": 1.63,
         "assembly_location": "竹東",
         "group_key": "SPT121|其他|2026-05-28",
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-28 15:31:56",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 17:10:00"
       },
       {
         "id": 298,
@@ -14964,13 +15104,13 @@
         "start_time": "15:49:15",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT087|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 15:49:15",
-        "updated_at": "2026-05-28 15:49:15"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 303,
@@ -14991,13 +15131,13 @@
         "start_time": "15:59:04",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT088|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 15:59:04",
-        "updated_at": "2026-05-28 15:59:04"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 304,
@@ -15024,7 +15164,7 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-27 14:57:34",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 305,
@@ -15051,29 +15191,29 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-27 16:01:42",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 306,
         "record_key": "LOGRECOVERY|B002|V3151026|機台定位水平調整(含連結)|2026-05-28 11:01:10|266",
         "status": "作業中",
         "work_order": "V3151026",
-        "part_no": null,
-        "type_name": null,
+        "part_no": "",
+        "type_name": "",
         "process_name": "機台定位水平調整(含連結)",
         "employee_id": "B002",
         "employee_name": "張文品",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 11:01:10",
-        "end_action": null,
-        "end_timestamp": null,
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "V164B_LOG_ONLY_RECOVERY：由 LOG START_WORK 補回。LOG 不含完整 INSERT 參數，請人工確認 P/N、機型、組立地點、結束時間與工時後再轉正式紀錄。",
         "start_date": "2026-05-28",
         "start_time": "11:01:10",
-        "end_date": null,
-        "end_time": null,
+        "end_date": "",
+        "end_time": "",
         "work_hours": 0.0,
-        "assembly_location": null,
+        "assembly_location": "",
         "group_key": "B002|機台定位水平調整(含連結)|2026-05-28",
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
@@ -15105,7 +15245,34 @@
         "is_group_work": 0,
         "source": "V164B_LOG_ONLY_RECOVERY",
         "created_at": "2026-05-28 11:02:00",
-        "updated_at": "2026-05-28 16:04:53"
+        "updated_at": "2026-05-28 16:15:37"
+      },
+      {
+        "id": 308,
+        "record_key": "SPT193|25M0541-02|骨架組立|2026-05-28 16:07:24|371ff2b0",
+        "status": "作業中",
+        "work_order": "25M0541-02",
+        "part_no": "PSRSC150-SB4L-06",
+        "type_name": "RSC150 Frame sorter",
+        "process_name": "骨架組立",
+        "employee_id": "SPT193",
+        "employee_name": "呂昰儒",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 16:07:24",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "16:07:24",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
+        "assembly_location": "竹東",
+        "group_key": "SPT193|骨架組立|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 16:07:24",
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 309,
@@ -15119,13 +15286,13 @@
         "employee_name": "羅文發",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 16:34:34",
-        "end_action": null,
-        "end_timestamp": null,
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "",
         "start_date": "2026-05-28",
         "start_time": "16:34:34",
-        "end_date": null,
-        "end_time": null,
+        "end_date": "",
+        "end_time": "",
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "B189|配電|2026-05-28",
@@ -15137,7 +15304,7 @@
       {
         "id": 310,
         "record_key": "SPT150|26M0051-07|S.T.|2026-05-28 16:34:44|6cfd3abe",
-        "status": "作業中",
+        "status": "暫停",
         "work_order": "26M0051-07",
         "part_no": "PSRSC151-SB4L-05",
         "type_name": "RSC151-SB4L+Argus",
@@ -15146,20 +15313,47 @@
         "employee_name": "李守益",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 16:34:44",
-        "end_action": null,
-        "end_timestamp": null,
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-28 16:57:25",
         "remark": "",
         "start_date": "2026-05-28",
         "start_time": "16:34:44",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
+        "end_date": "2026-05-28",
+        "end_time": "16:57:25",
+        "work_hours": 0.38,
         "assembly_location": "竹東",
         "group_key": "SPT150|S.T.|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 16:34:44",
-        "updated_at": "2026-05-28 16:34:44"
+        "updated_at": "2026-05-28 16:57:25"
+      },
+      {
+        "id": 311,
+        "record_key": "B190|26M0051-10|配電|2026-05-28 16:39:20|22b6cf96",
+        "status": "作業中",
+        "work_order": "26M0051-10",
+        "part_no": "PSRSC151-SB4L-05",
+        "type_name": "RSC151-SB4L+Argus",
+        "process_name": "配電",
+        "employee_id": "B190",
+        "employee_name": "黃瑞翎",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 16:39:20",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "16:39:20",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B190|配電|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 16:39:20",
+        "updated_at": "2026-05-28 16:39:20"
       }
     ],
     "work_orders": []
