@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 19:32:15",
-  "exported_at": "2026-05-28 19:32:15",
-  "reason": "logout_v133_time_authority_flush_log_flush",
+  "updated_at": "2026-05-28 19:33:31",
+  "exported_at": "2026-05-28 19:33:31",
+  "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
     "system_logs": [
@@ -25483,11 +25483,47 @@
         "detail": "",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 580,
+        "log_time": "2026-05-28 19:33:28",
+        "user_name": "SSS",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "319",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 1 筆，同步後 114 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 579,
+        "log_time": "2026-05-28 19:33:27",
+        "user_name": "SSS",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "319",
+        "message": "SSS 開始 NA / 6S",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 578,
+        "log_time": "2026-05-28 19:33:27",
+        "user_name": "SSS",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2123
+    "system_logs": 2126
   }
 }
