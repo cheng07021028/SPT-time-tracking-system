@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 19:32:51",
+  "exported_at": "2026-05-28 19:50:40",
   "source": "db_service_write",
   "module_key": "02_history",
   "module_code": "02",
@@ -130,12 +130,12 @@
         "start_timestamp": "2026-05-27 20:26:57",
         "end_action": "下班",
         "end_timestamp": "2026-05-27 21:00:41",
-        "remark": "",
+        "remark": null,
         "start_date": "2026-05-27",
         "start_time": "20:26:57",
         "end_date": "2026-05-27",
         "end_time": "21:00:41",
-        "work_hours": "00:33:44",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT239|收機|2026-05-27",
         "is_group_work": 0,
@@ -2977,37 +2977,10 @@
         "source": "streamlit",
         "created_at": "2026-05-28 17:16:14",
         "updated_at": "2026-05-28 17:51:46"
-      },
-      {
-        "id": 319,
-        "record_key": "SSS|NA|6S|2026-05-28 19:32:51|48960586",
-        "status": "作業中",
-        "work_order": "NA",
-        "part_no": "",
-        "type_name": "",
-        "process_name": "6S",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 19:32:51",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "19:32:51",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
-        "assembly_location": "",
-        "group_key": "SSS|6S|2026-05-28",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-28 19:32:51",
-        "updated_at": "2026-05-28 19:32:51"
       }
     ]
   },
   "table_counts": {
-    "time_records": 111
+    "time_records": 110
   }
 }
