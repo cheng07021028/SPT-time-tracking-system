@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 01:19:29",
+  "exported_at": "2026-05-29 01:29:13",
   "source": "db_service_write",
   "tables": {
     "system_settings": [
@@ -239,6 +239,14 @@
         "end_time": "20:15",
         "is_active": 1,
         "sort_order": 5
+      }
+    ],
+    "app_settings": [
+      {
+        "setting_key": "live_page_manual_refresh_timestamp",
+        "setting_value": "20260529_012913",
+        "note": "01 工時紀錄手動重新整理顯示截止時間；依系統設定時間判斷，只影響 01 顯示，不刪除 02 歷史紀錄",
+        "updated_at": "2026-05-29 01:29:13"
       }
     ],
     "auth_users": [
@@ -2606,6 +2614,7 @@
     "table_ui_settings": 0,
     "process_options": 17,
     "rest_periods": 5,
+    "app_settings": 1,
     "auth_users": 9,
     "auth_account_permissions": 118,
     "auth_security_settings": 2,
