@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 13:34:02",
-  "exported_at": "2026-05-28 13:34:02",
+  "updated_at": "2026-05-28 13:35:48",
+  "exported_at": "2026-05-28 13:35:48",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -14707,11 +14707,215 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 234,
+        "log_time": "2026-05-28 13:35:44",
+        "user_name": "SPT149",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 2 筆",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 233,
+        "log_time": "2026-05-28 13:35:44",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 231,
+        "log_time": "2026-05-28 13:35:22",
+        "user_name": "admin",
+        "action_type": "UPDATE",
+        "target_table": "security_users",
+        "target_id": "",
+        "message": "UPDATE security_users",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 230,
+        "log_time": "2026-05-28 13:35:22",
+        "user_name": "admin",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 229,
+        "log_time": "2026-05-28 13:35:22",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 215,
+        "log_time": "2026-05-28 13:35:22",
+        "user_name": "appuser",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 214,
+        "log_time": "2026-05-28 13:35:22",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 213,
+        "log_time": "2026-05-28 13:35:05",
+        "user_name": "SPT149",
+        "action_type": "UPDATE",
+        "target_table": "security_users",
+        "target_id": "",
+        "message": "UPDATE security_users",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 212,
+        "log_time": "2026-05-28 13:35:05",
+        "user_name": "SPT149",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 211,
+        "log_time": "2026-05-28 13:35:05",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 197,
+        "log_time": "2026-05-28 13:35:05",
+        "user_name": "appuser",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 196,
+        "log_time": "2026-05-28 13:35:05",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 195,
+        "log_time": "2026-05-28 13:34:50",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "security_settings",
+        "target_id": "",
+        "message": "INSERT security_settings",
+        "detail": "INSERT OR IGNORE INTO security_settings (setting_key, setting_value, note, updated_at)\n        VALUES ('idle_timeout_minutes', ?, '閒置多久自動登出，單位分鐘', ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 194,
+        "log_time": "2026-05-28 13:34:50",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "security_user_roles",
+        "target_id": "",
+        "message": "INSERT security_user_roles",
+        "detail": "INSERT OR IGNORE INTO security_user_roles (username, role_code, created_at)\n            VALUES (?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 186,
+        "log_time": "2026-05-28 13:34:50",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "security_module_permissions",
+        "target_id": "",
+        "message": "INSERT security_module_permissions",
+        "detail": "INSERT OR IGNORE INTO security_module_permissions (role_code, module_code, module_no, module_name, module_name_en, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 13,
+        "log_time": "2026-05-28 13:34:50",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "security_roles",
+        "target_id": "",
+        "message": "INSERT security_roles",
+        "detail": "INSERT OR IGNORE INTO security_roles\n            (role_code, role_name, role_name_en, description, is_system_role, created_at, updated_at)\n            VALUES (?, ?, ?, ?, 1, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-28 13:34:49",
+        "user_name": "SYSTEM",
+        "action_type": "AUTO_INIT_DATABASE",
+        "target_table": "ALL",
+        "target_id": "",
+        "message": "自動初始化資料庫完成",
+        "detail": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1225
+    "system_logs": 1242
   }
 }
