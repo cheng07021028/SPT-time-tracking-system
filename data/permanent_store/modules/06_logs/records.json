@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 13:22:21",
-  "exported_at": "2026-05-28 13:22:21",
+  "updated_at": "2026-05-28 13:22:26",
+  "exported_at": "2026-05-28 13:22:26",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -14083,11 +14083,35 @@
         "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 9858,
+        "log_time": "2026-05-28 13:22:25",
+        "user_name": "SPT034",
+        "action_type": "V89_SQLITE_CACHE_SYNC_ERROR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 快取由權威檔覆蓋失敗：UNIQUE constraint failed: time_records.id",
+        "detail": "",
+        "level": "ERROR",
+        "source": "sqlite"
+      },
+      {
+        "id": 9857,
+        "log_time": "2026-05-28 13:22:21",
+        "user_name": "SPT034",
+        "action_type": "V89_SQLITE_CACHE_SYNC_ERROR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 快取由權威檔覆蓋失敗：UNIQUE constraint failed: time_records.id",
+        "detail": "",
+        "level": "ERROR",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1173
+    "system_logs": 1175
   }
 }
