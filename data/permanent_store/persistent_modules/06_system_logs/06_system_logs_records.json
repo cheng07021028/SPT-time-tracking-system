@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 22:40:21",
+  "exported_at": "2026-05-29 00:58:45",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -29,10 +29,65 @@
         "message": "刪除 LOG 日期區間：2026-05-21 ~ 2026-05-28，刪除筆數：27",
         "detail": "deleted_count=27;authority=06_logs.records.json;tombstone=delete_state.json",
         "level": "WARN"
+      },
+      {
+        "id": 139,
+        "log_time": "2026-05-28 22:40:59",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "DELETE time_records",
+        "detail": "DELETE FROM time_records WHERE id IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 140,
+        "log_time": "2026-05-28 22:41:02",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：V96 已刪除 SQLite 0 筆、01/02 權威檔 118 筆，並建立 tombstone。",
+        "detail": "",
+        "level": "WARN"
+      },
+      {
+        "id": 141,
+        "log_time": "2026-05-28 22:41:36",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "DELETE time_records",
+        "detail": "DELETE FROM time_records WHERE id IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 142,
+        "log_time": "2026-05-28 22:41:39",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01 工時紀錄管理員維護區刪除：V96 已刪除 SQLite 0 筆、01/02 權威檔 0 筆，並建立 tombstone。",
+        "detail": "",
+        "level": "WARN"
+      },
+      {
+        "id": 143,
+        "log_time": "2026-05-28 22:41:54",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V137 已安全合併儲存 98 筆；多人同製令同製程不覆蓋。",
+        "detail": "",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 2
+    "system_logs": 7
   }
 }
