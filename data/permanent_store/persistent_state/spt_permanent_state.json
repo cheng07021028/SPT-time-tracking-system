@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 14:07:43",
+  "exported_at": "2026-05-28 14:10:52",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 54,
@@ -20,7 +20,7 @@
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "time_record_events": 0,
+    "time_record_events": 1,
     "time_record_outbox": 0,
     "time_records": 54,
     "work_orders": 0
@@ -8631,7 +8631,26 @@
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
-    "time_record_events": [],
+    "time_record_events": [
+      {
+        "event_id": "177ed7fb18da4008bb696114c7609055",
+        "record_key": "B135|26M0021-03|骨架組立|2026-05-28 09:16:05|afe76197",
+        "record_id": "218",
+        "event_type": "PAUSE_WORK",
+        "event_time": "2026-05-28 14:10:40",
+        "employee_id": "B135",
+        "employee_name": "鍾明志",
+        "work_order": "26M0021-03",
+        "process_name": "骨架組立",
+        "start_timestamp": "2026-05-28 09:16:05",
+        "operator_account": "B135",
+        "payload_json": "{\"schema\": \"SPT-TimeRecordEvent-V152\", \"event_id\": \"177ed7fb18da4008bb696114c7609055\", \"event_type\": \"PAUSE_WORK\", \"event_time\": \"2026-05-28 14:10:40\", \"record_id\": \"218\", \"record_key\": \"B135|26M0021-03|骨架組立|2026-05-28 09:16:05|afe76197\", \"operator_account\": \"B135\", \"reason\": \"finish_work_v152_event_journal\", \"row\": {\"id\": \"218\", \"record_key\": \"B135|26M0021-03|骨架組立|2026-05-28 09:16:05|afe76197\", \"status\": \"暫停\", \"work_order\": \"26M0021-03\", \"part_no\": \"1GRSC150-003-04\", \"type_name\": \"4 Port Frame Long-type EFEM\", \"process_name\": \"骨架組立\", \"employee_id\": \"B135\", \"employee_name\": \"鍾明志\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-28 09:16:05\", \"end_action\": \"暫停\", \"end_timestamp\": \"2026-05-28 14:10:31\", \"remark\": \"\", \"start_date\": \"2026-05-28\", \"start_time\": \"09:16:05\", \"end_date\": \"2026-05-28\", \"end_time\": \"14:10:31\", \"work_hours\": \"3.66\", \"assembly_location\": \"竹東\", \"group_key\": \"B135|骨架組立|2026-05-28\", \"is_group_work\": \"0\", \"source\": \"streamlit\", \"created_at\": \"2026-05-28 09:16:05\", \"updated_at\": \"2026-05-28 14:10:31\"}, \"extra\": {\"end_action\": \"暫停\", \"remark\": \"\", \"finish_parallel_group\": true, \"affected_ids\": [218]}, \"previous_checksum\": \"\", \"checksum\": \"fdb80f5704c255066dbf4f7615f5ee40abb60174a7fb2469948635df48acd24e\"}",
+        "checksum": "fdb80f5704c255066dbf4f7615f5ee40abb60174a7fb2469948635df48acd24e",
+        "previous_checksum": "",
+        "source": "streamlit",
+        "created_at": "2026-05-28 14:10:40"
+      }
+    ],
     "time_record_outbox": [],
     "time_records": [
       {
