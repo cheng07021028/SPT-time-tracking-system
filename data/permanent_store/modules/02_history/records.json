@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-28 09:49:05",
-  "exported_at": "2026-05-28 09:49:05",
+  "updated_at": "2026-05-28 09:49:18",
+  "exported_at": "2026-05-28 09:49:18",
   "reason": "start_work_v108_fast_local_upsert_02",
   "empty_authoritative": false,
   "tables": {
@@ -1195,11 +1195,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 09:49:05",
         "updated_at": "2026-05-28 09:49:05"
+      },
+      {
+        "id": 242,
+        "record_key": "SPT150|25M0115-18|S.T.|2026-05-28 09:49:18|323a04b1",
+        "status": "作業中",
+        "work_order": "25M0115-18",
+        "part_no": "4TRSC150-003-01",
+        "type_name": "12\" UFO EFEM(宏田)",
+        "process_name": "S.T.",
+        "employee_id": "SPT150",
+        "employee_name": "李守益",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 09:49:18",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "09:49:18",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "宏田",
+        "group_key": "SPT150|S.T.|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 09:49:18",
+        "updated_at": "2026-05-28 09:49:18"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 44
+    "time_records": 45
   }
 }
