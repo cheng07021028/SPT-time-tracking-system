@@ -1,0 +1,47 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "80389519d40a448aa798208ab8d6785b",
+  "event_type": "PAUSE_WORK",
+  "event_time": "2026-05-28 19:34:56",
+  "record_id": "319",
+  "record_key": "SSS|NA|6S|2026-05-28 19:32:51|48960586",
+  "operator_account": "SSS",
+  "reason": "finish_work_v152_event_journal",
+  "row": {
+    "id": "319",
+    "record_key": "SSS|NA|6S|2026-05-28 19:32:51|48960586",
+    "status": "暫停",
+    "work_order": "NA",
+    "part_no": "",
+    "type_name": "",
+    "process_name": "6S",
+    "employee_id": "SSS",
+    "employee_name": "SSS",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-28 19:32:51",
+    "end_action": "暫停",
+    "end_timestamp": "2026-05-28 19:34:50",
+    "remark": "",
+    "start_date": "2026-05-28",
+    "start_time": "19:32:51",
+    "end_date": "2026-05-28",
+    "end_time": "19:34:50",
+    "work_hours": "0.03",
+    "assembly_location": "",
+    "group_key": "SSS|6S|2026-05-28",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-28 19:32:51",
+    "updated_at": "2026-05-28 19:34:50"
+  },
+  "extra": {
+    "end_action": "暫停",
+    "remark": "",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      319
+    ]
+  },
+  "previous_checksum": "511c354a8b5d60b0a05f86305fdee316ef71ee3b54f809149e2c078436bc7eb0",
+  "checksum": "037e9e47e2069f9345a81d349fca9abc587b9a069a9781b8f735777f0d266e2b"
+}
