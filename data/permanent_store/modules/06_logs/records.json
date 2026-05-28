@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 11:53:23",
-  "exported_at": "2026-05-28 11:53:23",
+  "updated_at": "2026-05-28 11:54:41",
+  "exported_at": "2026-05-28 11:54:41",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -13843,11 +13843,23 @@
         "detail": "",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-28 11:54:41",
+        "user_name": "SYSTEM",
+        "action_type": "AUTO_INIT_DATABASE",
+        "target_table": "ALL",
+        "target_id": "",
+        "message": "自動初始化資料庫完成",
+        "detail": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1153
+    "system_logs": 1154
   }
 }
