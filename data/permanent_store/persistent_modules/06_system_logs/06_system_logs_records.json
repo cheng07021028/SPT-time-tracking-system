@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 00:58:45",
+  "exported_at": "2026-05-29 01:10:53",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -84,10 +84,43 @@
         "message": "V137 已安全合併儲存 98 筆；多人同製令同製程不覆蓋。",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 144,
+        "log_time": "2026-05-29 01:10:38",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "326,327",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：V177 已刪除 2 筆，01 Today Records / 02 Editable History / SQLite 快取同步完成。",
+        "detail": "",
+        "level": "WARN"
+      },
+      {
+        "id": 145,
+        "log_time": "2026-05-29 01:10:38",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V178",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：已建立刪除 tombstone，01/02 顯示同步；刪除 2 筆，同步保留 0 筆。",
+        "detail": "",
+        "level": "WARN"
+      },
+      {
+        "id": 146,
+        "log_time": "2026-05-29 01:10:38",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V178B",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：已刪除/封鎖 2 筆；02刪除=0，01刪除=2，SQLite刪除=0，tombstone=0。",
+        "detail": "",
+        "level": "WARN"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 7
+    "system_logs": 10
   }
 }
