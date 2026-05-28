@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 09:23:40",
-  "exported_at": "2026-05-28 09:23:40",
+  "updated_at": "2026-05-28 09:24:50",
+  "exported_at": "2026-05-28 09:24:50",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 6661,
+        "source": "v103_merge",
+        "username": "SPT199",
+        "display_name": "龍斯愷",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=SPT199; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-28 09:24:48",
+        "logout_time": "2026-05-28 09:24:48",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 09:24:48"
+      },
+      {
+        "id": 6548,
+        "source": "v103_merge",
+        "username": "B126",
+        "display_name": "戴鎰祥",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=B126",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-28 09:23:41",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 09:23:41"
+      },
       {
         "id": 6436,
         "source": "v103_merge",
@@ -1790,7 +1822,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 111,
+    "login_logs": 113,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
