@@ -1480,3 +1480,162 @@ try:
 except Exception:
     pass
 # =================== END V147 50-USER PERFORMANCE SAFE GITHUB QUEUE ===================
+
+# ===================== V156 AUTHORITY READ CACHE + SAFE INVALIDATION =====================
+# 目的：改善所有模組開頁與切換速度。多數頁面會重複讀取同一批 canonical records/settings；
+# V156 將讀取結果依檔案 mtime/size 快取，任何 save_authority/atomic_write 後立即清除。
+# 正確性原則：只快取讀取結果，回傳 copy；不改資料、不略過寫入、不以快取覆蓋權威檔。
+try:
+    import copy as _v156_copy
+    import threading as _v156_threading
+except Exception:  # pragma: no cover
+    _v156_copy = None
+    _v156_threading = None
+
+_V156_AUTH_CACHE_LOCK = _v156_threading.RLock() if _v156_threading is not None else None
+_V156_AUTH_CACHE: dict[tuple, tuple[tuple, object]] = {}
+
+
+def _v156_cache_lock():
+    class _Dummy:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+    return _V156_AUTH_CACHE_LOCK or _Dummy()
+
+
+def _v156_file_sig(path: Path) -> tuple:
+    try:
+        stt = path.stat()
+        return (str(path), int(stt.st_mtime_ns), int(stt.st_size))
+    except Exception:
+        return (str(path), 0, -1)
+
+
+def _v156_authority_sig(module_key: str, kind: str) -> tuple:
+    try:
+        return _v156_file_sig(canonical_path(module_key, kind))
+    except Exception:
+        return (str(module_key), str(kind), 0, -1)
+
+
+def _v156_safe_copy(value):
+    try:
+        if hasattr(value, 'copy'):
+            return value.copy(deep=True) if value.__class__.__name__ == 'DataFrame' else value.copy()
+    except Exception:
+        pass
+    try:
+        return _v156_copy.deepcopy(value) if _v156_copy is not None else value
+    except Exception:
+        return value
+
+
+def _v156_cache_get(key: tuple, sig: tuple):
+    try:
+        with _v156_cache_lock():
+            got = _V156_AUTH_CACHE.get(key)
+            if got and got[0] == sig:
+                return _v156_safe_copy(got[1])
+    except Exception:
+        pass
+    return None
+
+
+def _v156_cache_set(key: tuple, sig: tuple, value) -> None:
+    try:
+        with _v156_cache_lock():
+            _V156_AUTH_CACHE[key] = (sig, _v156_safe_copy(value))
+            # 防止長時間運行 cache 無上限增長。
+            if len(_V156_AUTH_CACHE) > 128:
+                for k in list(_V156_AUTH_CACHE.keys())[:32]:
+                    _V156_AUTH_CACHE.pop(k, None)
+    except Exception:
+        pass
+
+
+def clear_authority_read_cache(module_key: str | None = None) -> None:
+    try:
+        with _v156_cache_lock():
+            if not module_key:
+                _V156_AUTH_CACHE.clear(); return
+            prefix = str(module_key)
+            for k in list(_V156_AUTH_CACHE.keys()):
+                if len(k) > 1 and str(k[1]) == prefix:
+                    _V156_AUTH_CACHE.pop(k, None)
+    except Exception:
+        pass
+
+
+_v156_prev_load_authority = load_authority
+_v156_prev_load_tables = load_tables
+_v156_prev_load_settings = load_settings
+_v156_prev_df_from_table = df_from_table
+_v156_prev_save_authority = save_authority
+_v156_prev_atomic_write_json = atomic_write_json
+
+
+def load_authority(module_key: str, kind: str = "records") -> dict[str, Any]:  # type: ignore[override]
+    mk = str(module_key or '')
+    kd = 'settings' if str(kind).lower().startswith('set') else 'records'
+    sig = _v156_authority_sig(mk, kd)
+    key = ('load_authority', mk, kd)
+    cached = _v156_cache_get(key, sig)
+    if isinstance(cached, dict):
+        return cached
+    payload = _v156_prev_load_authority(mk, kd)
+    _v156_cache_set(key, sig, payload)
+    return _v156_safe_copy(payload)
+
+
+def load_tables(module_key: str, kind: str = "records") -> dict[str, list[dict[str, Any]]]:  # type: ignore[override]
+    mk = str(module_key or '')
+    kd = 'settings' if str(kind).lower().startswith('set') else 'records'
+    sig = _v156_authority_sig(mk, kd)
+    key = ('load_tables', mk, kd)
+    cached = _v156_cache_get(key, sig)
+    if isinstance(cached, dict):
+        return cached
+    tables = _v156_prev_load_tables(mk, kd)
+    _v156_cache_set(key, sig, tables)
+    return _v156_safe_copy(tables)
+
+
+def load_settings(module_key: str) -> dict[str, Any]:  # type: ignore[override]
+    mk = str(module_key or '')
+    sig = _v156_authority_sig(mk, 'settings')
+    key = ('load_settings', mk)
+    cached = _v156_cache_get(key, sig)
+    if isinstance(cached, dict):
+        return cached
+    settings = _v156_prev_load_settings(mk)
+    _v156_cache_set(key, sig, settings)
+    return _v156_safe_copy(settings)
+
+
+def df_from_table(module_key: str, table: str, *, columns: Iterable[str] | None = None, active_col: str | None = None, active_only: bool = False):  # type: ignore[override]
+    mk = str(module_key or '')
+    tbl = str(table or '')
+    cols_key = tuple(str(c) for c in (columns or []))
+    sig = _v156_authority_sig(mk, 'records')
+    key = ('df_from_table', mk, tbl, cols_key, str(active_col or ''), bool(active_only))
+    cached = _v156_cache_get(key, sig)
+    if cached is not None:
+        return cached
+    df = _v156_prev_df_from_table(mk, tbl, columns=columns, active_col=active_col, active_only=active_only)
+    _v156_cache_set(key, sig, df)
+    return _v156_safe_copy(df)
+
+
+def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    res = _v156_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=github)
+    clear_authority_read_cache(str(module_key or ''))
+    return res
+
+
+def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:  # type: ignore[override]
+    _v156_prev_atomic_write_json(path, payload)
+    try:
+        clear_authority_read_cache()
+    except Exception:
+        pass
+# =================== END V156 AUTHORITY READ CACHE + SAFE INVALIDATION ===================

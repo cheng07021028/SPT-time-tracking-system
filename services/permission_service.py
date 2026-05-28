@@ -5977,3 +5977,134 @@ try:
 except Exception:
     pass
 # =================== END V153B REGISTER MODULE 14 DATA HEALTH PERMISSIONS ===================
+
+# ===================== V156 PERMISSION READ CACHE =====================
+# 目的：各頁面每次 rerun 都會檢查權限，V156 將帳號/模組權限/安全設定以
+# 權威檔 mtime 作為 signature 快取。儲存、刪除、套用權限後立即清除。
+try:
+    import copy as _v156_perm_copy
+    from pathlib import Path as _V156Path
+except Exception:
+    _v156_perm_copy = None
+    _V156Path = None
+
+_V156_PERMISSION_CACHE: dict[tuple, tuple[tuple, object]] = {}
+
+
+def _v156_perm_sig() -> tuple:
+    try:
+        from services.permanent_authority_service import canonical_path as _pa_path
+        paths = [_pa_path('10_permissions', 'records'), _pa_path('10_permissions', 'settings')]
+        out = []
+        for p in paths:
+            try:
+                stt = p.stat(); out.append((str(p), int(stt.st_mtime_ns), int(stt.st_size)))
+            except Exception:
+                out.append((str(p), 0, -1))
+        return tuple(out)
+    except Exception:
+        return ('permission-no-sig',)
+
+
+def _v156_perm_copy_value(value):
+    try:
+        return _v156_perm_copy.deepcopy(value) if _v156_perm_copy is not None else value
+    except Exception:
+        return value
+
+
+def _v156_perm_get(key: tuple):
+    sig = _v156_perm_sig()
+    got = _V156_PERMISSION_CACHE.get(key)
+    if got and got[0] == sig:
+        return _v156_perm_copy_value(got[1])
+    return None
+
+
+def _v156_perm_set(key: tuple, value) -> None:
+    try:
+        _V156_PERMISSION_CACHE[key] = (_v156_perm_sig(), _v156_perm_copy_value(value))
+    except Exception:
+        pass
+
+
+def clear_permission_read_cache() -> None:
+    try:
+        _V156_PERMISSION_CACHE.clear()
+    except Exception:
+        pass
+
+
+_v156_prev_get_users = get_users
+_v156_prev_get_account_permissions = get_account_permissions
+_v156_prev_get_security_settings = get_security_settings
+_v156_prev_save_users = save_users
+_v156_prev_save_account_permissions = save_account_permissions
+_v156_prev_save_security_settings = save_security_settings
+try:
+    _v156_prev_save_account_master = save_account_master
+except Exception:
+    _v156_prev_save_account_master = None
+try:
+    _v156_prev_delete_users = delete_users
+except Exception:
+    _v156_prev_delete_users = None
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    cached = _v156_perm_get(('users',))
+    if isinstance(cached, list):
+        return cached
+    val = _v156_prev_get_users()
+    _v156_perm_set(('users',), val)
+    return _v156_perm_copy_value(val)
+
+
+def get_account_permissions() -> List[dict]:  # type: ignore[override]
+    cached = _v156_perm_get(('account_permissions',))
+    if isinstance(cached, list):
+        return cached
+    val = _v156_prev_get_account_permissions()
+    _v156_perm_set(('account_permissions',), val)
+    return _v156_perm_copy_value(val)
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    cached = _v156_perm_get(('security_settings',))
+    if isinstance(cached, dict):
+        return cached
+    val = _v156_prev_get_security_settings()
+    _v156_perm_set(('security_settings',), val)
+    return _v156_perm_copy_value(val)
+
+
+def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
+    res = _v156_prev_save_users(rows)
+    clear_permission_read_cache()
+    return res
+
+
+def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
+    res = _v156_prev_save_account_permissions(rows)
+    clear_permission_read_cache()
+    return res
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    res = _v156_prev_save_security_settings(settings)
+    clear_permission_read_cache()
+    return res
+
+
+if callable(_v156_prev_save_account_master):
+    def save_account_master(rows: Iterable[dict], delete_usernames: Iterable[str] | None = None) -> dict:  # type: ignore[override]
+        res = _v156_prev_save_account_master(rows, delete_usernames=delete_usernames)
+        clear_permission_read_cache()
+        return res
+
+if callable(_v156_prev_delete_users):
+    def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
+        res = _v156_prev_delete_users(usernames)
+        clear_permission_read_cache()
+        return res
+# =================== END V156 PERMISSION READ CACHE ===================

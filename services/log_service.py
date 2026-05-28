@@ -837,3 +837,90 @@ def get_log_batch_status() -> dict[str, Any]:
     except Exception:
         return {"running": False, "pending": False, "last_error": "status_unavailable"}
 # =================== END V147 HIGH-FREQUENCY LOG BATCHING ===================
+
+# ===================== V156 LOG QUERY CACHE =====================
+# 目的：06 LOG 查詢與各模組寫 LOG 後 rerun 時，避免短時間重複掃描 LOG 來源。
+# 正確性：cache signature 包含 SQLite DB mtime 與 06_logs 權威檔 mtime；write/delete 後立即清除。
+try:
+    import copy as _v156_log_copy
+    from pathlib import Path as _v156_log_Path
+except Exception:
+    _v156_log_copy = None
+    _v156_log_Path = None
+
+_V156_LOG_CACHE: dict[tuple, tuple[tuple, object]] = {}
+
+
+def _v156_log_sig() -> tuple:
+    out = []
+    try:
+        from services.db_service import DB_PATH as _DB_PATH
+        p = _DB_PATH
+        stt = p.stat(); out.append((str(p), int(stt.st_mtime_ns), int(stt.st_size)))
+    except Exception:
+        out.append(('db', 0, -1))
+    try:
+        from services.permanent_authority_service import canonical_path as _pa_path
+        for module_key in ('06_logs', '06_system_logs'):
+            p = _pa_path(module_key, 'records')
+            try:
+                stt = p.stat(); out.append((str(p), int(stt.st_mtime_ns), int(stt.st_size)))
+            except Exception:
+                out.append((str(p), 0, -1))
+    except Exception:
+        pass
+    return tuple(out)
+
+
+def _v156_log_copy_value(v):
+    try:
+        if hasattr(v, 'copy'):
+            return v.copy(deep=True) if v.__class__.__name__ == 'DataFrame' else v.copy()
+    except Exception:
+        pass
+    try:
+        return _v156_log_copy.deepcopy(v) if _v156_log_copy is not None else v
+    except Exception:
+        return v
+
+
+def clear_log_query_cache() -> None:
+    try:
+        _V156_LOG_CACHE.clear()
+    except Exception:
+        pass
+
+
+_v156_prev_write_log = write_log
+_v156_prev_load_logs = load_logs
+_v156_prev_delete_logs_by_date_range = delete_logs_by_date_range
+
+
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    res = _v156_prev_write_log(action_type, message, target_table, target_id, detail, level, user_name)
+    clear_log_query_cache()
+    return res
+
+
+def load_logs(limit: int = 500, start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None):  # type: ignore[override]
+    key = ('load_logs', int(limit or 0), str(start_date or ''), str(end_date or ''), str(action_type or ''), str(level or ''), str(keyword or ''))
+    sig = _v156_log_sig()
+    got = _V156_LOG_CACHE.get(key)
+    if got and got[0] == sig:
+        return _v156_log_copy_value(got[1])
+    val = _v156_prev_load_logs(limit=limit, start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword)
+    try:
+        _V156_LOG_CACHE[key] = (sig, _v156_log_copy_value(val))
+        if len(_V156_LOG_CACHE) > 48:
+            for k in list(_V156_LOG_CACHE.keys())[:16]:
+                _V156_LOG_CACHE.pop(k, None)
+    except Exception:
+        pass
+    return _v156_log_copy_value(val)
+
+
+def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit: bool = True, user_name: str | None = None) -> int:  # type: ignore[override]
+    n = _v156_prev_delete_logs_by_date_range(start_date, end_date, keep_delete_audit=keep_delete_audit, user_name=user_name)
+    clear_log_query_cache()
+    return n
+# =================== END V156 LOG QUERY CACHE ===================

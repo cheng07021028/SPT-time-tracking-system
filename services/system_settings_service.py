@@ -4175,3 +4175,120 @@ def delete_process_categories(ids: Iterable[int]) -> int:  # type: ignore[overri
     return len(removed_names)
 
 # ===================== END V88 13 SYSTEM SETTINGS SPEED + DELETE COMMON CATEGORY FIX =====================
+
+# ===================== V156 SYSTEM SETTINGS READ CACHE =====================
+# 目的：01/03/13 等頁面頻繁讀取工段、類別、休息時間設定。這些設定讀多寫少，
+# 依 13_system_settings 權威檔 mtime 快取可降低切頁與下拉載入時間。資料寫入後檔案 mtime 變更即自動失效。
+try:
+    import copy as _v156_sys_copy
+except Exception:
+    _v156_sys_copy = None
+
+_V156_SYS_CACHE: dict[tuple, tuple[tuple, object]] = {}
+
+
+def _v156_sys_sig() -> tuple:
+    try:
+        from services.permanent_authority_service import canonical_path as _pa_path
+        paths = [_pa_path('13_system_settings', 'records'), _pa_path('13_system_settings', 'settings')]
+        out = []
+        for p in paths:
+            try:
+                stt = p.stat(); out.append((str(p), int(stt.st_mtime_ns), int(stt.st_size)))
+            except Exception:
+                out.append((str(p), 0, -1))
+        return tuple(out)
+    except Exception:
+        return ('system-settings-no-sig',)
+
+
+def _v156_sys_copy_value(v):
+    try:
+        if hasattr(v, 'copy'):
+            return v.copy(deep=True) if v.__class__.__name__ == 'DataFrame' else v.copy()
+    except Exception:
+        pass
+    try:
+        return _v156_sys_copy.deepcopy(v) if _v156_sys_copy is not None else v
+    except Exception:
+        return v
+
+
+def _v156_sys_cached(key: tuple, loader):
+    sig = _v156_sys_sig()
+    got = _V156_SYS_CACHE.get(key)
+    if got and got[0] == sig:
+        return _v156_sys_copy_value(got[1])
+    val = loader()
+    try:
+        _V156_SYS_CACHE[key] = (sig, _v156_sys_copy_value(val))
+    except Exception:
+        pass
+    return _v156_sys_copy_value(val)
+
+
+def clear_system_settings_read_cache() -> None:
+    try:
+        _V156_SYS_CACHE.clear()
+    except Exception:
+        pass
+
+
+_v156_prev_load_process_categories_df = load_process_categories_df
+_v156_prev_load_process_options_df = load_process_options_df
+_v156_prev_load_rest_periods_df = load_rest_periods_df
+_v156_prev_load_process_category_choices = load_process_category_choices
+_v156_prev_get_process_options_by_category = get_process_options_by_category
+_v156_prev_get_process_options_by_category_exact = get_process_options_by_category_exact
+_v156_prev_get_process_options = get_process_options
+_v156_prev_get_live_page_reset_time = get_live_page_reset_time
+try:
+    _v156_prev_load_process_model_choices = load_process_model_choices
+except Exception:
+    _v156_prev_load_process_model_choices = None
+try:
+    _v156_prev_get_process_options_by_model = get_process_options_by_model
+except Exception:
+    _v156_prev_get_process_options_by_model = None
+
+
+def load_process_categories_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    return _v156_sys_cached(('categories_df', bool(active_only)), lambda: _v156_prev_load_process_categories_df(active_only=active_only))
+
+
+def load_process_options_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    return _v156_sys_cached(('process_options_df', bool(active_only)), lambda: _v156_prev_load_process_options_df(active_only=active_only))
+
+
+def load_rest_periods_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    return _v156_sys_cached(('rest_periods_df', bool(active_only)), lambda: _v156_prev_load_rest_periods_df(active_only=active_only))
+
+
+def load_process_category_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    return _v156_sys_cached(('category_choices', bool(include_common)), lambda: _v156_prev_load_process_category_choices(include_common=include_common))
+
+
+def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
+    return _v156_sys_cached(('options_by_category', str(category_name or ''), bool(include_common)), lambda: _v156_prev_get_process_options_by_category(category_name=category_name, include_common=include_common))
+
+
+def get_process_options_by_category_exact(category_name: str | None = None) -> list[str]:  # type: ignore[override]
+    return _v156_sys_cached(('options_by_category_exact', str(category_name or '')), lambda: _v156_prev_get_process_options_by_category_exact(category_name=category_name))
+
+
+def get_process_options() -> list[str]:  # type: ignore[override]
+    return _v156_sys_cached(('process_options',), lambda: _v156_prev_get_process_options())
+
+
+def get_live_page_reset_time() -> str:  # type: ignore[override]
+    return _v156_sys_cached(('live_page_reset_time',), lambda: _v156_prev_get_live_page_reset_time())
+
+
+if callable(_v156_prev_load_process_model_choices):
+    def load_process_model_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+        return _v156_sys_cached(('model_choices', bool(include_common)), lambda: _v156_prev_load_process_model_choices(include_common=include_common))
+
+if callable(_v156_prev_get_process_options_by_model):
+    def get_process_options_by_model(type_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
+        return _v156_sys_cached(('options_by_model', str(type_name or ''), bool(include_common)), lambda: _v156_prev_get_process_options_by_model(type_name=type_name, include_common=include_common))
+# =================== END V156 SYSTEM SETTINGS READ CACHE ===================

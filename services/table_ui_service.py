@@ -1772,3 +1772,114 @@ def render_table(
     return None
 
 # =================== END V145 TABLE WIDTH ORDER SAFE CLAMP + NO DUPLICATE 02 SETTINGS ===================
+
+# ===================== V156 TABLE UI LIGHTWEIGHT CACHE =====================
+# 目的：改善各模組表格顯示速度。欄寬、欄位順序、column_config 是純 UI 設定，
+# 可安全短期快取；儲存欄寬/順序時會立即清除，不影響資料內容與權威檔。
+try:
+    import time as _v156_time
+except Exception:  # pragma: no cover
+    _v156_time = None
+
+_V156_TABLE_UI_CACHE: dict[tuple, tuple[float, object]] = {}
+_V156_TABLE_UI_TTL = 20.0
+
+
+def _v156_ui_now() -> float:
+    try:
+        return float(_v156_time.time()) if _v156_time is not None else 0.0
+    except Exception:
+        return 0.0
+
+
+def _v156_ui_get(key: tuple):
+    now = _v156_ui_now()
+    got = _V156_TABLE_UI_CACHE.get(key)
+    if got and now and (now - got[0] <= _V156_TABLE_UI_TTL):
+        value = got[1]
+        try:
+            return value.copy()
+        except Exception:
+            return value
+    return None
+
+
+def _v156_ui_set(key: tuple, value) -> None:
+    try:
+        _V156_TABLE_UI_CACHE[key] = (_v156_ui_now(), value.copy() if hasattr(value, 'copy') else value)
+        if len(_V156_TABLE_UI_CACHE) > 256:
+            for k in list(_V156_TABLE_UI_CACHE.keys())[:64]:
+                _V156_TABLE_UI_CACHE.pop(k, None)
+    except Exception:
+        pass
+
+
+def clear_table_ui_light_cache(table_key: str | None = None) -> None:
+    try:
+        if not table_key:
+            _V156_TABLE_UI_CACHE.clear(); return
+        tk = str(table_key)
+        for k in list(_V156_TABLE_UI_CACHE.keys()):
+            if len(k) > 1 and str(k[1]) == tk:
+                _V156_TABLE_UI_CACHE.pop(k, None)
+    except Exception:
+        pass
+
+
+_v156_prev_load_widths = load_widths
+_v156_prev_load_column_order = load_column_order
+_v156_prev_build_column_config = build_column_config
+_v156_prev_save_widths = save_widths
+_v156_prev_save_column_order = save_column_order
+
+
+def load_widths(table_key: str) -> dict[str, int]:  # type: ignore[override]
+    tk = str(table_key or '')
+    cached = _v156_ui_get(('widths', tk))
+    if isinstance(cached, dict):
+        return cached
+    val = _v156_prev_load_widths(tk)
+    _v156_ui_set(('widths', tk), val)
+    return dict(val or {})
+
+
+def load_column_order(table_key: str) -> list[str]:  # type: ignore[override]
+    tk = str(table_key or '')
+    cached = _v156_ui_get(('order', tk))
+    if isinstance(cached, list):
+        return list(cached)
+    val = _v156_prev_load_column_order(tk)
+    _v156_ui_set(('order', tk), list(val or []))
+    return list(val or [])
+
+
+def _v156_df_signature(df: pd.DataFrame) -> tuple:
+    try:
+        return (tuple(str(c) for c in df.columns), tuple(str(t) for t in df.dtypes.astype(str).tolist()))
+    except Exception:
+        return (tuple(str(c) for c in getattr(df, 'columns', [])),)
+
+
+def build_column_config(table_key: str, df: pd.DataFrame) -> dict:  # type: ignore[override]
+    tk = str(table_key or '')
+    sig = _v156_df_signature(df) if isinstance(df, pd.DataFrame) else ()
+    widths = load_widths(tk)
+    width_sig = tuple(sorted((str(k), int(v)) for k, v in widths.items() if str(k)))
+    key = ('column_config', tk, sig, width_sig)
+    cached = _v156_ui_get(key)
+    if isinstance(cached, dict):
+        return cached
+    cfg = _v156_prev_build_column_config(tk, df)
+    _v156_ui_set(key, cfg)
+    return dict(cfg or {})
+
+
+def save_widths(table_key: str, widths: dict[str, int]) -> None:  # type: ignore[override]
+    _v156_prev_save_widths(table_key, widths)
+    clear_table_ui_light_cache(table_key)
+
+
+def save_column_order(table_key: str, order: Iterable[str]) -> None:  # type: ignore[override]
+    _v156_prev_save_column_order(table_key, order)
+    clear_table_ui_light_cache(table_key)
+# =================== END V156 TABLE UI LIGHTWEIGHT CACHE ===================
