@@ -71,6 +71,80 @@ def rerun():
 _show_history_results()
 
 
+def _work_hours_value_to_decimal_hours(value) -> float:
+    """Convert mixed work_hours values to decimal hours without changing stored data.
+
+    V154: 02 history may receive decimal hours (0.16), HH:MM:SS text
+    (00:09:36), or old display text that accidentally carried the explanatory
+    suffix.  Pandas Series.sum() will crash on mixed strings/floats, so all KPI
+    totals must use this read-only converter.
+    """
+    try:
+        if pd.isna(value):
+            return 0.0
+    except Exception:
+        pass
+    if value is None:
+        return 0.0
+    if isinstance(value, bool):
+        return 0.0
+    if isinstance(value, (int, float)):
+        try:
+            return float(value)
+        except Exception:
+            return 0.0
+    text = str(value).strip()
+    if not text or text.lower() in {"none", "nan", "nat", "null", "<na>"}:
+        return 0.0
+    # Clean legacy display-only suffixes.  These strings should never affect data.
+    text = (
+        text.replace("時:分:秒", "")
+            .replace("時：分：秒", "")
+            .replace("（時:分:秒）", "")
+            .replace("(時:分:秒)", "")
+            .strip()
+    )
+    text = text.replace(",", "").replace(" ", "")
+    # HH:MM:SS / H:MM / full-width colon.
+    if ":" in text or "：" in text:
+        parts = re.split(r"[:：]", text)
+        try:
+            sign = -1 if parts[0].startswith("-") else 1
+            h = abs(int(float(parts[0] or 0)))
+            m = int(float(parts[1] or 0)) if len(parts) > 1 else 0
+            s = int(float(parts[2] or 0)) if len(parts) > 2 else 0
+            return sign * ((h * 3600 + m * 60 + s) / 3600.0)
+        except Exception:
+            return 0.0
+    # Chinese text such as 1時02分03秒.
+    m = re.match(r"^(-?\d+)\s*(?:時|小時|h|H)\s*(\d{1,2})?\s*(?:分|m|M)?\s*(\d{1,2})?\s*(?:秒|s|S)?$", text)
+    if m:
+        try:
+            sign = -1 if m.group(1).startswith("-") else 1
+            h = abs(int(m.group(1)))
+            minute = int(m.group(2) or 0)
+            sec = int(m.group(3) or 0)
+            return sign * ((h * 3600 + minute * 60 + sec) / 3600.0)
+        except Exception:
+            return 0.0
+    try:
+        return float(text)
+    except Exception:
+        return 0.0
+
+
+def _safe_work_hours_total_hms(df: pd.DataFrame) -> str:
+    """Read-only KPI total for mixed decimal/HMS work_hours values."""
+    if df is None or df.empty or "work_hours" not in df.columns:
+        return "00:00:00"
+    total_hours = 0.0
+    try:
+        total_hours = sum(_work_hours_value_to_decimal_hours(v) for v in df["work_hours"].tolist())
+    except Exception:
+        total_hours = 0.0
+    return hours_to_hms(total_hours)
+
+
 def _normalize_text(v) -> str:
     if v is None:
         return ""
@@ -1148,7 +1222,7 @@ end = history_filters.get("end_date", str(_seed_end))
 
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("篩選筆數 / Records", f"{len(df):,}")
-m2.metric("總工時 / Total Time", hours_to_hms(df['work_hours'].sum()) if not df.empty and 'work_hours' in df.columns else "00:00:00")
+m2.metric("總工時 / Total Time", _safe_work_hours_total_hms(df))
 if not df.empty:
     _ended_metric = _has_end_info_df(df)
     m3.metric("未結束 / Open", f"{(~_ended_metric).sum():,}")
