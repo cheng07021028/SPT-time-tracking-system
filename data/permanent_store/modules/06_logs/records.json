@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 09:09:21",
-  "exported_at": "2026-05-28 09:09:21",
+  "updated_at": "2026-05-28 09:09:24",
+  "exported_at": "2026-05-28 09:09:24",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -823,11 +823,23 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 8701,
+        "log_time": "2026-05-28 09:09:24",
+        "user_name": "SPT172",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "211",
+        "message": "胡瑄芸 開始 26M0021-01 / Packing",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 68
+    "system_logs": 69
   }
 }
