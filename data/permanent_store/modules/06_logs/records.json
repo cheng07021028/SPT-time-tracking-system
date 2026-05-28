@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 19:53:32",
-  "exported_at": "2026-05-28 19:53:32",
+  "updated_at": "2026-05-28 19:54:38",
+  "exported_at": "2026-05-28 19:54:38",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -25963,11 +25963,35 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 574,
+        "log_time": "2026-05-28 19:54:34",
+        "user_name": "SPT239",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "293",
+        "message": "V137 結束工時紀錄 #293；同步結束=1筆；狀態=暫停；群組總工時=04:34:07；平均工時=04:34:12",
+        "detail": "293\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-28 19:54:34\",\"action_type\":\"END_WORK\",\"target_table\":\"time_records\",\"target_id\":\"293\",\"target_ids\":[293],\"message\":\"V137 結束工時紀錄 #293；同步結束=1筆；狀態=暫停；群組總工時=04:34:07；平均工時=04:34:12\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT239|26N4001-07|前置鈑金|2026-05-28 14:34:50|f633725a\",\"identity_key\":\"record_key:SPT239|26N4001-07|前置鈑金|2026-05-28 14:34:50|f633725a\",\"id\":\"293\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"work_order\":\"26N4001-07\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"前置鈑金\",\"status\":\"暫停\",\"start_timestamp\":\"2026-05-28 14:34:50\",\"end_timestamp\":\"2026-05-28 19:53:57\",\"work_hours\":\"4.57\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":293,\"record_key\":\"SPT239|26N4001-07|前置鈑金|2026-05-28 14:34:50|f633725a\",\"status\":\"暫停\",\"work_order\":\"26N4001-07\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 14:34:50\",\"end_action\":\"暫停\",\"end_timestamp\":\"2026-05-28 19:53:57\",\"remark\":\"系統自動暫停：同一人員切換不同工段或不同日期作業\",\"start_date\":\"2026-05-28\",\"start_time\":\"14:34:50\",\"end_date\":\"2026-05-28\",\"end_time\":\"19:53:57\",\"work_hours\":4.57,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|前置鈑金|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 14:34:50\",\"updated_at\":\"2026-05-28 19:53:57\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":293,\"record_key\":\"SPT239|26N4001-07|前置鈑金|2026-05-28 14:34:50|f633725a\",\"status\":\"暫停\",\"work_order\":\"26N4001-07\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 14:34:50\",\"end_action\":\"暫停\",\"end_timestamp\":\"2026-05-28 19:53:57\",\"remark\":\"系統自動暫停：同一人員切換不同工段或不同日期作業\",\"start_date\":\"2026-05-28\",\"start_time\":\"14:34:50\",\"end_date\":\"2026-05-28\",\"end_time\":\"19:53:57\",\"work_hours\":4.57,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|前置鈑金|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 14:34:50\",\"updated_at\":\"2026-05-28 19:53:57\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":293,\"record_key\":\"SPT239|26N4001-07|前置鈑金|2026-05-28 14:34:50|f633725a\",\"status\":\"暫停\",\"work_order\":\"26N4001-07\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 14:34:50\",\"end_action\":\"暫停\",\"end_timestamp\":\"2026-05-28 19:53:57\",\"remark\":\"系統自動暫停：同一人員切換不同工段或不同日期作業\",\"start_date\":\"2026-05-28\",\"start_time\":\"14:34:50\",\"end_date\":\"2026-05-28\",\"end_time\":\"19:53:57\",\"work_hours\":4.57,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|前置鈑金|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 14:34:50\",\"updated_at\":\"2026-05-28 19:53:57\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":293,\"record_key\":\"SPT239|26N4001-07|前置鈑金|2026-05-28 14:34:50|f633725a\",\"status\":\"暫停\",\"work_order\":\"26N4001-07\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 14:34:50\",\"end_action\":\"暫停\",\"end_timestamp\":\"2026-05-28 19:53:57\",\"remark\":\"系統自動暫停：同一人員切換不同工段或不同日期作業\",\"start_date\":\"2026-05-28\",\"start_time\":\"14:34:50\",\"end_date\":\"2026-05-28\",\"end_time\":\"19:53:57\",\"work_hours\":4.57,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|前置鈑金|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 14:34:50\",\"updated_at\":\"2026-05-28 19:53:57\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"b886155dd8b15e6ca7aae5c7adbee73d3c49b6e4dcadd9578c0092d60d8f4c8e\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 573,
+        "log_time": "2026-05-28 19:54:33",
+        "user_name": "SPT239",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2163
+    "system_logs": 2165
   }
 }
