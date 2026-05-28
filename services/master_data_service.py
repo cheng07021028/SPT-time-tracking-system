@@ -746,31 +746,3 @@ def has_master_data_for_time_record_fast(employees=None, work_orders=None):  # t
         return {"has_employees_master": has_emp, "has_work_orders_master": has_wo, "employees_count": len(emp_df) if emp_df is not None else 0, "work_orders_count": len(wo_df) if wo_df is not None else 0}
     return has_emp, has_wo
 # =================== END V127 MULTI-USER EMPLOYEE FAST CACHE ISOLATION ===================
-
-
-# ======================= V166E MASTER DATA DUPLICATE GUARD =======================
-try:
-    _v166e_prev_save_work_orders_df = save_work_orders_df
-except Exception:  # pragma: no cover
-    _v166e_prev_save_work_orders_df = None
-try:
-    _v166e_prev_save_employees_df = save_employees_df
-except Exception:  # pragma: no cover
-    _v166e_prev_save_employees_df = None
-
-
-def save_work_orders_df(df: pd.DataFrame) -> int:  # type: ignore[override]
-    from services.duplicate_guard_service import dedupe_work_orders_dataframe
-    clean = dedupe_work_orders_dataframe(df)
-    if _v166e_prev_save_work_orders_df is not None:
-        return int(_v166e_prev_save_work_orders_df(clean))
-    return int(len(clean))
-
-
-def save_employees_df(df: pd.DataFrame) -> int:  # type: ignore[override]
-    from services.duplicate_guard_service import dedupe_employees_dataframe
-    clean = dedupe_employees_dataframe(df)
-    if _v166e_prev_save_employees_df is not None:
-        return int(_v166e_prev_save_employees_df(clean))
-    return int(len(clean))
-# ===================== END V166E MASTER DATA DUPLICATE GUARD =====================
