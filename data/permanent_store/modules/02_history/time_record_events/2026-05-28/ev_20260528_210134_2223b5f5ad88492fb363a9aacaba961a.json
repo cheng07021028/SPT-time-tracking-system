@@ -1,0 +1,47 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "2223b5f5ad88492fb363a9aacaba961a",
+  "event_type": "OFF_DUTY",
+  "event_time": "2026-05-28 21:01:34",
+  "record_id": "196",
+  "record_key": "B211|26M0021-03|骨架組立|2026-05-28 08:36:42|4aee49f7",
+  "operator_account": "B211",
+  "reason": "finish_work_v152_event_journal",
+  "row": {
+    "id": "196",
+    "record_key": "B211|26M0021-03|骨架組立|2026-05-28 08:36:42|4aee49f7",
+    "status": "下班",
+    "work_order": "26M0021-03",
+    "part_no": "1GRSC150-003-04",
+    "type_name": "4 Port Frame Long-type EFEM",
+    "process_name": "骨架組立",
+    "employee_id": "B211",
+    "employee_name": "張瑀榛",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-28 08:36:42",
+    "end_action": "下班",
+    "end_timestamp": "2026-05-28 21:01:28",
+    "remark": "",
+    "start_date": "2026-05-28",
+    "start_time": "08:36:42",
+    "end_date": "2026-05-28",
+    "end_time": "21:01:28",
+    "work_hours": "10.16",
+    "assembly_location": "竹東",
+    "group_key": "B211|骨架組立|2026-05-28",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-28 08:36:42",
+    "updated_at": "2026-05-28 21:01:28"
+  },
+  "extra": {
+    "end_action": "下班",
+    "remark": "",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      196
+    ]
+  },
+  "previous_checksum": "d31dd3e69ba34fcec71027a396e28a8ef53f6f1012211a11dca61497a4c64f66",
+  "checksum": "f1263122253de501333aa49f0bc9a6da2af3356cae6b968601fb6037fb2a24d1"
+}
