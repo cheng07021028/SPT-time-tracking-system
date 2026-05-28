@@ -603,3 +603,347 @@ def export_log_snapshot_candidates_excel_bytes(snapshot: dict[str, Any]) -> byte
             "rule": "non_destructive_merge_only",
         }]).to_excel(writer, index=False, sheet_name="摘要")
     return bio.getvalue()
+
+
+# ===================== V166D LOG SNAPSHOT COVERAGE + EXPLICIT DURABLE MIRROR =====================
+def _coerce_time_record_rows(rows: Any) -> list[dict[str, Any]]:
+    """Normalize rows from DataFrame / dict / list into clean dictionaries."""
+    out: list[dict[str, Any]] = []
+    if rows is None:
+        return out
+    if isinstance(rows, pd.DataFrame):
+        if rows.empty:
+            return out
+        try:
+            clean_df = rows.copy().where(pd.notna(rows), "")
+            for _, rr in clean_df.iterrows():
+                out.append(_row_to_clean_dict(rr))
+            return out
+        except Exception:
+            return out
+    if isinstance(rows, pd.Series):
+        return [_row_to_clean_dict(rows)]
+    if isinstance(rows, dict):
+        return [_row_to_clean_dict(rows)]
+    if isinstance(rows, list):
+        for r in rows:
+            if isinstance(r, (dict, pd.Series)):
+                out.append(_row_to_clean_dict(r))
+        return out
+    return out
+
+
+def build_explicit_time_record_snapshot_payload(
+    rows: Any,
+    *,
+    action_type: str = "V166D_DURABLE_SNAPSHOT",
+    message: str = "",
+    target_table: str = "time_records",
+    target_id: str = "",
+    reason: str = "",
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Build a V166C-compatible snapshot payload from explicit rows.
+
+    V166D 不再只靠 LOG 的 target_id 回查資料；交易層若已經持有 DataFrame，
+    會直接把該批 rows 寫入可還原 LOG 快照。schema_version 維持 V166C，
+    讓既有 V166C 復原器可直接解析。
+    """
+    clean_rows = _dedupe_rows(_coerce_time_record_rows(rows))
+    if not clean_rows:
+        return None
+    for r in clean_rows:
+        r.setdefault("_snapshot_source", "v166d_explicit_durable_layer")
+    payload = {
+        "schema_version": SNAPSHOT_SCHEMA_VERSION,
+        "capture_version": "V166D",
+        "snapshot_type": SNAPSHOT_TYPE,
+        "captured_at": _now_text(),
+        "action_type": _clean(action_type),
+        "target_table": _clean(target_table or "time_records"),
+        "target_id": _clean(target_id),
+        "target_ids": _parse_candidate_ids(target_id),
+        "message": _clean(message),
+        "reason": _clean(reason),
+        "extra": extra or {},
+        "recovery_priority": ["row_shard", "time_record_events", "v166d_explicit_log_snapshot", "v166c_log_snapshot", "log_only_text"],
+        "snapshot_counts": {
+            "explicit_rows": len(clean_rows),
+            "best_rows": len(clean_rows),
+        },
+        "best_summaries": [_row_summary(r) for r in clean_rows],
+        "rows": {
+            "best_rows": clean_rows,
+            "v166d_explicit_rows": clean_rows,
+            "sqlite_time_records": [],
+            "authority_01_time_records": [],
+            "authority_02_history": [],
+        },
+    }
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+    payload["snapshot_hash"] = hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()
+    return payload
+
+
+def explicit_snapshot_detail(
+    rows: Any,
+    *,
+    action_type: str = "V166D_DURABLE_SNAPSHOT",
+    message: str = "",
+    target_table: str = "time_records",
+    target_id: str = "",
+    reason: str = "",
+    extra: dict[str, Any] | None = None,
+    detail_prefix: str = "",
+) -> str:
+    payload = build_explicit_time_record_snapshot_payload(
+        rows,
+        action_type=action_type,
+        message=message,
+        target_table=target_table,
+        target_id=target_id,
+        reason=reason,
+        extra=extra,
+    )
+    prefix = _clean(detail_prefix)
+    if not payload:
+        return prefix
+    blob = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str)
+    base = prefix + "\n" if prefix else ""
+    return f"{base}{SNAPSHOT_BEGIN}\n{blob}\n{SNAPSHOT_END}"
+
+
+def write_explicit_time_record_snapshot_log(
+    rows: Any,
+    *,
+    action_type: str = "V166D_DURABLE_SNAPSHOT",
+    message: str = "V166D 工時交易完整快照鏡像",
+    target_id: str = "",
+    reason: str = "",
+    extra: dict[str, Any] | None = None,
+    level: str = "INFO",
+) -> dict[str, Any]:
+    """Write a dedicated LOG row that contains a full time-record snapshot.
+
+    此函式只新增 LOG 稽核資料，不改 01/02 正式資料、不刪除、不重算。
+    """
+    payload = build_explicit_time_record_snapshot_payload(
+        rows,
+        action_type=action_type,
+        message=message,
+        target_table="time_records",
+        target_id=target_id,
+        reason=reason,
+        extra=extra,
+    )
+    if not payload:
+        return {"ok": True, "written": False, "reason": "no_rows"}
+    detail = f"reason={_clean(reason)};row_count={payload.get('snapshot_counts', {}).get('best_rows', 0)}\n{SNAPSHOT_BEGIN}\n"
+    detail += json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str)
+    detail += f"\n{SNAPSHOT_END}"
+    try:
+        from services.log_service import write_log  # type: ignore
+        write_log(
+            action_type,
+            message,
+            target_table="time_records",
+            target_id=target_id,
+            detail=detail,
+            level=level,
+        )
+        return {
+            "ok": True,
+            "written": True,
+            "row_count": int(payload.get("snapshot_counts", {}).get("best_rows", 0) or 0),
+            "snapshot_hash": payload.get("snapshot_hash", ""),
+        }
+    except Exception as exc:
+        return {"ok": False, "written": False, "reason": str(exc)[:500]}
+
+
+def _is_time_related_log_row(row: dict[str, Any]) -> bool:
+    if SNAPSHOT_BEGIN in _clean(row.get("detail")):
+        return True
+    return _is_time_record_log(row.get("action_type"), row.get("target_table"))
+
+
+def get_log_snapshot_coverage_status(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 10000,
+) -> dict[str, Any]:
+    """Return LOG snapshot coverage metrics for 14 dashboard."""
+    try:
+        from services.log_service import load_logs  # type: ignore
+        logs = load_logs(limit=max(1, int(limit)), start_date=start_date, end_date=end_date)
+    except Exception as exc:
+        return {"ok": False, "reason": str(exc), "rows": [], "checked_at": _now_text()}
+    rows: list[dict[str, Any]] = []
+    if isinstance(logs, pd.DataFrame) and not logs.empty:
+        for _, rr in logs.iterrows():
+            r = _row_to_clean_dict(rr)
+            if not _is_time_related_log_row(r):
+                continue
+            has_snapshot = SNAPSHOT_BEGIN in _clean(r.get("detail"))
+            rows.append({
+                "log_id": _clean(r.get("id")),
+                "log_time": _clean(r.get("log_time")),
+                "action_type": _clean(r.get("action_type")),
+                "target_table": _clean(r.get("target_table")),
+                "target_id": _clean(r.get("target_id")),
+                "message": _clean(r.get("message")),
+                "has_snapshot": bool(has_snapshot),
+                "detail_size": len(_clean(r.get("detail"))),
+                "source": _clean(r.get("source")),
+            })
+    total = len(rows)
+    with_snapshot = sum(1 for r in rows if r.get("has_snapshot"))
+    without_snapshot = total - with_snapshot
+    coverage = round((with_snapshot / total) * 100, 2) if total else 0.0
+    action_counts: dict[str, int] = {}
+    missing_action_counts: dict[str, int] = {}
+    for r in rows:
+        a = str(r.get("action_type") or "")
+        action_counts[a] = action_counts.get(a, 0) + 1
+        if not r.get("has_snapshot"):
+            missing_action_counts[a] = missing_action_counts.get(a, 0) + 1
+    return {
+        "ok": True,
+        "version": "V166D_log_snapshot_coverage",
+        "checked_at": _now_text(),
+        "start_date": start_date or "",
+        "end_date": end_date or "",
+        "limit": int(limit),
+        "time_related_log_count": total,
+        "with_snapshot_count": with_snapshot,
+        "without_snapshot_count": without_snapshot,
+        "coverage_percent": coverage,
+        "action_counts": action_counts,
+        "missing_action_counts": missing_action_counts,
+        "rows": rows,
+        "read_only": True,
+        "production_write_path_changed": False,
+    }
+
+
+def backfill_missing_log_snapshots(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 10000,
+    *,
+    dry_run: bool = True,
+    github: bool = False,
+) -> dict[str, Any]:
+    """Append V166C-compatible snapshot JSON to old time-related LOG rows when rows can be found.
+
+    寫入範圍只限 06 LOG detail；不會修改 01/02 工時紀錄。
+    """
+    try:
+        from services.log_service import load_logs  # type: ignore
+        logs = load_logs(limit=max(1, int(limit)), start_date=start_date, end_date=end_date)
+    except Exception as exc:
+        return {"ok": False, "reason": str(exc), "updated_count": 0, "dry_run": bool(dry_run)}
+    candidates: list[dict[str, Any]] = []
+    if isinstance(logs, pd.DataFrame) and not logs.empty:
+        for _, rr in logs.iterrows():
+            r = _row_to_clean_dict(rr)
+            if SNAPSHOT_BEGIN in _clean(r.get("detail")):
+                continue
+            if not _is_time_record_log(r.get("action_type"), r.get("target_table")):
+                continue
+            new_detail = append_snapshot_to_detail(
+                detail=_clean(r.get("detail")),
+                action_type=_clean(r.get("action_type")),
+                message=_clean(r.get("message")),
+                target_table=_clean(r.get("target_table")),
+                target_id=_clean(r.get("target_id")),
+            )
+            if new_detail and new_detail != _clean(r.get("detail")) and SNAPSHOT_BEGIN in new_detail:
+                x = dict(r)
+                x["new_detail"] = new_detail
+                candidates.append(x)
+    result = {
+        "ok": True,
+        "version": "V166D_log_snapshot_backfill",
+        "checked_at": _now_text(),
+        "dry_run": bool(dry_run),
+        "candidate_count": len(candidates),
+        "updated_count": 0,
+        "github": bool(github),
+        "production_time_record_changed": False,
+        "production_log_detail_changed": not bool(dry_run) and bool(candidates),
+        "preview": [
+            {"log_id": c.get("id"), "log_time": c.get("log_time"), "action_type": c.get("action_type"), "target_id": c.get("target_id")}
+            for c in candidates[:50]
+        ],
+    }
+    if dry_run or not candidates:
+        result["updated_count"] = len(candidates)
+        return result
+    try:
+        from services.db_service import execute  # type: ignore
+        import services.log_service as ls  # type: ignore
+        updated = 0
+        for c in candidates:
+            log_id = _clean(c.get("id"))
+            if not log_id:
+                continue
+            try:
+                execute("UPDATE system_logs SET detail=? WHERE id=?", (c.get("new_detail", ""), log_id))
+                updated += 1
+            except Exception:
+                # 有些 authority-only log 沒有 SQLite id 對應，下面會更新 authority。
+                pass
+        # 同步 authority 內同一筆 LOG 的 detail，避免 Reboot 後舊 detail 復活。
+        try:
+            auth_rows = ls._v122_read_authority_log_rows() if hasattr(ls, "_v122_read_authority_log_rows") else []
+            sqlite_rows = ls._v122_sqlite_log_rows(limit=300000) if hasattr(ls, "_v122_sqlite_log_rows") else []
+            by_id = {str(c.get("id")): c.get("new_detail", "") for c in candidates if _clean(c.get("id"))}
+            def _patch(row: dict[str, Any]) -> dict[str, Any]:
+                rr = dict(row)
+                rid = _clean(rr.get("id"))
+                if rid in by_id:
+                    rr["detail"] = by_id[rid]
+                return rr
+            merged_rows = [_patch(r) for r in auth_rows] + [_patch(r) for r in sqlite_rows]
+            if hasattr(ls, "_v122_save_authority_log_rows"):
+                ls._v122_save_authority_log_rows(merged_rows, reason="v166d_backfill_log_snapshot_detail", github=bool(github))
+        except Exception as exc:
+            result["authority_warning"] = str(exc)[:500]
+        try:
+            if hasattr(ls, "clear_log_query_cache"):
+                ls.clear_log_query_cache()
+            elif hasattr(ls, "clear_query_cache"):
+                ls.clear_query_cache()
+        except Exception:
+            pass
+        result["updated_count"] = updated
+        return result
+    except Exception as exc:
+        result["ok"] = False
+        result["reason"] = str(exc)[:800]
+        return result
+
+
+def export_log_snapshot_coverage_excel_bytes(status: dict[str, Any]) -> bytes:
+    rows = (status or {}).get("rows", []) or []
+    bio = BytesIO()
+    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
+        pd.DataFrame(rows).to_excel(writer, index=False, sheet_name="V166D_LOG快照覆蓋率")
+        pd.DataFrame([{
+            "version": (status or {}).get("version", "V166D"),
+            "checked_at": (status or {}).get("checked_at", ""),
+            "time_related_log_count": (status or {}).get("time_related_log_count", 0),
+            "with_snapshot_count": (status or {}).get("with_snapshot_count", 0),
+            "without_snapshot_count": (status or {}).get("without_snapshot_count", 0),
+            "coverage_percent": (status or {}).get("coverage_percent", 0),
+        }]).to_excel(writer, index=False, sheet_name="摘要")
+        try:
+            pd.DataFrame([
+                {"action_type": k, "count": v}
+                for k, v in ((status or {}).get("missing_action_counts") or {}).items()
+            ]).to_excel(writer, index=False, sheet_name="未覆蓋動作統計")
+        except Exception:
+            pass
+    return bio.getvalue()
+# =================== END V166D LOG SNAPSHOT COVERAGE ===================

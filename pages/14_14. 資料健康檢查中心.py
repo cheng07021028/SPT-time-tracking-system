@@ -44,15 +44,62 @@ from services.log_only_pending_close_service import (
     export_pending_close_excel_bytes,
 )
 
-from services.log_snapshot_service import (
-    collect_log_snapshot_recovery_candidates,
-    recover_records_from_log_snapshots,
-    export_log_snapshot_candidates_excel_bytes,
-    get_log_snapshot_status,
-    get_log_snapshot_coverage_status,
-    backfill_missing_log_snapshots,
-    export_log_snapshot_coverage_excel_bytes,
-)
+# V166E2: import V166C/V166D LOG snapshot helpers in a dependency-safe way.
+# 部署時若只套到 page 檔、service 檔尚未同步，不能讓 14 頁整頁崩潰。
+try:
+    from services.log_snapshot_service import (
+        collect_log_snapshot_recovery_candidates,
+        recover_records_from_log_snapshots,
+        export_log_snapshot_candidates_excel_bytes,
+        get_log_snapshot_status,
+        get_log_snapshot_coverage_status,
+        backfill_missing_log_snapshots,
+        export_log_snapshot_coverage_excel_bytes,
+    )
+    V166C_LOG_SNAPSHOT_IMPORT_OK = True
+    V166C_LOG_SNAPSHOT_IMPORT_ERROR = ""
+except Exception as _v166c_log_snapshot_import_error:  # pragma: no cover - deployment guard
+    V166C_LOG_SNAPSHOT_IMPORT_OK = False
+    V166C_LOG_SNAPSHOT_IMPORT_ERROR = str(_v166c_log_snapshot_import_error)
+
+    def _v166e2_missing_log_snapshot_result(*_args, **_kwargs):
+        return {
+            "ok": False,
+            "version": "V166E2_missing_log_snapshot_dependency_guard",
+            "reason": "V166C/V166D LOG snapshot service dependency is missing or outdated: " + V166C_LOG_SNAPSHOT_IMPORT_ERROR,
+            "rows": [],
+            "candidate_count": 0,
+            "missing_count": 0,
+            "time_related_log_count": 0,
+            "with_snapshot_count": 0,
+            "without_snapshot_count": 0,
+            "coverage_percent": 0.0,
+            "updated_count": 0,
+            "recovered_count": 0,
+            "read_only": True,
+            "production_write_path_changed": False,
+        }
+
+    def _v166e2_empty_excel_bytes(*_args, **_kwargs):
+        from io import BytesIO
+        import pandas as _pd
+        bio = BytesIO()
+        _pd.DataFrame([
+            {
+                "status": "V166C/V166D LOG snapshot service dependency is missing or outdated",
+                "reason": V166C_LOG_SNAPSHOT_IMPORT_ERROR,
+            }
+        ]).to_excel(bio, index=False)
+        bio.seek(0)
+        return bio.getvalue()
+
+    collect_log_snapshot_recovery_candidates = _v166e2_missing_log_snapshot_result
+    recover_records_from_log_snapshots = _v166e2_missing_log_snapshot_result
+    get_log_snapshot_status = _v166e2_missing_log_snapshot_result
+    get_log_snapshot_coverage_status = _v166e2_missing_log_snapshot_result
+    backfill_missing_log_snapshots = _v166e2_missing_log_snapshot_result
+    export_log_snapshot_candidates_excel_bytes = _v166e2_empty_excel_bytes
+    export_log_snapshot_coverage_excel_bytes = _v166e2_empty_excel_bytes
 
 from services.page_hygiene_service import (
     collect_page_hygiene_status,
@@ -971,6 +1018,12 @@ if st.session_state.get("v166b_pending_close_result"):
 
 
 st.divider()
+if not V166C_LOG_SNAPSHOT_IMPORT_OK:
+    st.warning(
+        "V166C/V166D LOG 快照服務檔案尚未同步或版本過舊。"
+        "本頁其他健康檢查仍可使用；請套用 V166E2 依賴修復包後重新部署 / Reboot App。"
+    )
+
 st.markdown("### V166C LOG 完整快照保存與精準還原 / LOG Full Snapshot Recovery")
 st.caption(
     "V166C 會在新的 time_records LOG 明細中保存完整 JSON 快照。"
