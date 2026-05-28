@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-28 09:31:01",
-  "exported_at": "2026-05-28 09:31:01",
-  "reason": "start_work_v139_final_state_reconcile_01",
+  "updated_at": "2026-05-28 09:31:07",
+  "exported_at": "2026-05-28 09:31:07",
+  "reason": "get_active_same_work_v143_all_identity_columns_strict_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -898,11 +898,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 09:30:39",
         "updated_at": "2026-05-28 09:30:39"
+      },
+      {
+        "id": 231,
+        "record_key": "B126|26M0051-10|配電|2026-05-28 09:30:52|43f1cf8b",
+        "status": "作業中",
+        "work_order": "26M0051-10",
+        "part_no": "PSRSC151-SB4L-05",
+        "type_name": "RSC151-SB4L+Argus",
+        "process_name": "配電",
+        "employee_id": "B126",
+        "employee_name": "戴鎰祥",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 09:30:52",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "09:30:52",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B126|配電|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 09:30:52",
+        "updated_at": "2026-05-28 09:30:52"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 33
+    "time_records": 34
   }
 }
