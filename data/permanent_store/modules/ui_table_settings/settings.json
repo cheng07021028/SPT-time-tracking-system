@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-28 10:35:47",
-  "exported_at": "2026-05-28 10:35:47",
-  "reason": "v116_v369_save_widths_today_finished_records_for_selected_employee_v148",
+  "updated_at": "2026-05-28 10:35:49",
+  "exported_at": "2026-05-28 10:35:49",
+  "reason": "v369_save_column_order_v72_ui_mirror",
   "empty_authoritative": false,
   "tables": {},
   "settings": {
@@ -167,8 +167,35 @@
           "created_at": 180,
           "updated_at": 180
         },
-        "updated_at": "2026-05-28 10:35:44",
-        "reason": "v369_save_widths"
+        "updated_at": "2026-05-28 10:35:48",
+        "reason": "v369_save_column_order",
+        "order": [
+          "id",
+          "status",
+          "work_order",
+          "part_no",
+          "type_name",
+          "process_name",
+          "employee_id",
+          "employee_name",
+          "start_action",
+          "start_timestamp",
+          "end_action",
+          "end_timestamp",
+          "remark",
+          "start_date",
+          "start_time",
+          "end_date",
+          "end_time",
+          "work_hours",
+          "assembly_location",
+          "group_key",
+          "is_group_work",
+          "source",
+          "created_at",
+          "record_key",
+          "updated_at"
+        ]
       }
     },
     "column_settings": {
