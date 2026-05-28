@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-28 10:43:30",
-  "exported_at": "2026-05-28 10:43:30",
-  "reason": "finish_work_v108_fast_local_sync_02",
+  "updated_at": "2026-05-28 10:45:04",
+  "exported_at": "2026-05-28 10:45:04",
+  "reason": "delete_time_records_v96_0102_sync_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1143,33 +1143,6 @@
         "updated_at": "2026-05-28 10:30:56"
       },
       {
-        "id": 261,
-        "record_key": "SSS|21M0241-01|前置鈑金|2026-05-28 10:34:05|fd0aeb61",
-        "status": "暫停",
-        "work_order": "21M0241-01",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "前置鈑金",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 10:34:05",
-        "end_action": "暫停",
-        "end_timestamp": "2026-05-28 10:42:18",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "10:34:05",
-        "end_date": "2026-05-28",
-        "end_time": "10:42:18",
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SSS|前置鈑金|2026-05-28",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-28 10:34:05",
-        "updated_at": "2026-05-28 10:42:18"
-      },
-      {
         "id": 262,
         "record_key": "SPT240|26M0021-03|前置鈑金|2026-05-28 10:34:47|0b9f24a0",
         "status": "作業中",
@@ -1195,38 +1168,11 @@
         "source": "streamlit",
         "created_at": "2026-05-28 10:34:47",
         "updated_at": "2026-05-28 10:34:47"
-      },
-      {
-        "id": 263,
-        "record_key": "SSS|21M0241-01|前置鈑金|2026-05-28 10:43:16|f2a710ca",
-        "status": "暫停",
-        "work_order": "21M0241-01",
-        "part_no": "4TRSC020-004-02",
-        "type_name": "NTB 3 PORT",
-        "process_name": "前置鈑金",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 10:43:16",
-        "end_action": "暫停",
-        "end_timestamp": "2026-05-28 10:43:30",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "10:43:16",
-        "end_date": "2026-05-28",
-        "end_time": "10:43:30",
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SSS|前置鈑金|2026-05-28",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-28 10:43:16",
-        "updated_at": "2026-05-28 10:43:30"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 45
+    "time_records": 43
   }
 }
