@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 10:27:37",
+  "exported_at": "2026-05-28 10:30:56",
   "source": "db_service_write",
   "module_key": "07_missing_records",
   "module_code": "07",
@@ -1115,11 +1115,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 10:27:37",
         "updated_at": "2026-05-28 10:27:37"
+      },
+      {
+        "id": 260,
+        "record_key": "SPT230|26N4001-04|模組|2026-05-28 10:30:56|cb69e7d6",
+        "status": "作業中",
+        "work_order": "26N4001-04",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "模組",
+        "employee_id": "SPT230",
+        "employee_name": "梁志宏",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 10:30:56",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "10:30:56",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT230|模組|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 10:30:56",
+        "updated_at": "2026-05-28 10:30:56"
       }
     ]
   },
   "table_counts": {
     "employees": 0,
-    "time_records": 41
+    "time_records": 42
   }
 }
