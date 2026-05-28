@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 21:57:38",
+  "exported_at": "2026-05-28 22:01:16",
   "source": "db_service_write",
   "module_key": "01_time_records",
   "module_code": "01",
@@ -63,6 +63,33 @@
         "updated_at": "2026-05-28 17:21:18"
       },
       {
+        "id": 182,
+        "record_key": "LOGRECOVERY|admin|21M0241-01|6S|2026-05-27 19:42:08|182",
+        "status": "作業中",
+        "work_order": "21M0241-01",
+        "part_no": "",
+        "type_name": "",
+        "process_name": "6S",
+        "employee_id": "admin",
+        "employee_name": "張文品",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-27 19:42:08",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "V164B_LOG_ONLY_RECOVERY：由 LOG START_WORK 補回。LOG 不含完整 INSERT 參數，請人工確認 P/N、機型、組立地點、結束時間與工時後再轉正式紀錄。",
+        "start_date": "2026-05-27",
+        "start_time": "19:42:08",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
+        "assembly_location": "",
+        "group_key": "admin|6S|2026-05-27",
+        "is_group_work": 0,
+        "source": "V164B_LOG_ONLY_RECOVERY",
+        "created_at": "2026-05-27 19:42:08",
+        "updated_at": "2026-05-28 16:15:37"
+      },
+      {
         "id": 187,
         "record_key": "SPT208|24N4001-24|收機|2026-05-27 20:25:05|42f361e4",
         "status": "下班",
@@ -76,7 +103,7 @@
         "start_timestamp": "2026-05-27 20:25:05",
         "end_action": "下班",
         "end_timestamp": "2026-05-27 20:59:44",
-        "remark": "",
+        "remark": null,
         "start_date": "2026-05-27",
         "start_time": "20:25:05",
         "end_date": "2026-05-27",
@@ -103,7 +130,7 @@
         "start_timestamp": "2026-05-27 20:26:57",
         "end_action": "下班",
         "end_timestamp": "2026-05-27 21:00:41",
-        "remark": "",
+        "remark": null,
         "start_date": "2026-05-27",
         "start_time": "20:26:57",
         "end_date": "2026-05-27",
@@ -130,7 +157,7 @@
         "start_timestamp": "2026-05-27 20:27:51",
         "end_action": "下班",
         "end_timestamp": "2026-05-27 20:59:10",
-        "remark": "",
+        "remark": null,
         "start_date": "2026-05-27",
         "start_time": "20:27:51",
         "end_date": "2026-05-27",
@@ -195,7 +222,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:29:48",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 192,
@@ -222,7 +249,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:31:03",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 193,
@@ -238,7 +265,7 @@
         "start_timestamp": "2026-05-28 08:31:35",
         "end_action": "暫停",
         "end_timestamp": "2026-05-28 11:00:04",
-        "remark": "",
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "08:31:35",
         "end_date": "2026-05-28",
@@ -276,7 +303,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:33:24",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 195,
@@ -303,12 +330,12 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:34:57",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 196,
         "record_key": "B211|26M0021-03|骨架組立|2026-05-28 08:36:42|4aee49f7",
-        "status": "下班",
+        "status": "作業中",
         "work_order": "26M0021-03",
         "part_no": "1GRSC150-003-04",
         "type_name": "4 Port Frame Long-type EFEM",
@@ -317,20 +344,20 @@
         "employee_name": "張瑀榛",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 08:36:42",
-        "end_action": "下班",
-        "end_timestamp": "2026-05-28 21:01:28",
-        "remark": "",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "08:36:42",
-        "end_date": "2026-05-28",
-        "end_time": "21:01:28",
-        "work_hours": 10.16,
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "B211|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:36:42",
-        "updated_at": "2026-05-28 21:01:28"
+        "updated_at": "2026-05-28 20:14:18"
       },
       {
         "id": 197,
@@ -357,7 +384,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:37:32",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 198,
@@ -384,12 +411,12 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:51:03",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 199,
         "record_key": "SPT151|24N4001-32|水平|2026-05-28 08:52:19|29c56b39",
-        "status": "完工",
+        "status": "作業中",
         "work_order": "24N4001-32",
         "part_no": "1SLP01S-FCA1-01",
         "type_name": "FCLP EFEM",
@@ -398,20 +425,20 @@
         "employee_name": "鄭智鍵",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 08:52:19",
-        "end_action": "完工",
-        "end_timestamp": "2026-05-28 20:18:33",
-        "remark": "",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "08:52:19",
-        "end_date": "2026-05-28",
-        "end_time": "20:18:33",
-        "work_hours": 9.19,
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT151|水平|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:52:19",
-        "updated_at": "2026-05-28 20:18:33"
+        "updated_at": "2026-05-28 20:14:18"
       },
       {
         "id": 200,
@@ -438,7 +465,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:52:41",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 201,
@@ -465,7 +492,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:53:25",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 202,
@@ -492,7 +519,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:54:04",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 203,
@@ -519,7 +546,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:54:17",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 204,
@@ -546,7 +573,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:55:54",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 205,
@@ -573,7 +600,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:57:21",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 206,
@@ -594,13 +621,13 @@
         "start_time": "09:04:37",
         "end_date": "2026-05-28",
         "end_time": "14:11:56",
-        "work_hours": 0.0,
+        "work_hours": "03:52:19",
         "assembly_location": "竹東",
         "group_key": "SPT239|清潔|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:04:37",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 207,
@@ -627,7 +654,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:05:10",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 208,
@@ -654,7 +681,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:06:06",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 209,
@@ -670,7 +697,7 @@
         "start_timestamp": "2026-05-28 09:06:08",
         "end_action": "完工",
         "end_timestamp": "2026-05-28 18:49:13",
-        "remark": "",
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "09:06:08",
         "end_date": "2026-05-28",
@@ -681,7 +708,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:06:08",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 18:49:13"
       },
       {
         "id": 210,
@@ -708,7 +735,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:08:06",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 211,
@@ -735,7 +762,7 @@
         "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:09:24",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 212,
@@ -762,12 +789,12 @@
         "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:09:50",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 213,
         "record_key": "SPT243|26N4001-03|骨架組立|2026-05-28 09:10:23|7605cbda",
-        "status": "下班",
+        "status": "作業中",
         "work_order": "26N4001-03",
         "part_no": "1SLP01S-FCA1-01",
         "type_name": "FCLP EFEM",
@@ -776,20 +803,20 @@
         "employee_name": "羅丹",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 09:10:23",
-        "end_action": "下班",
-        "end_timestamp": "2026-05-28 21:56:04",
-        "remark": "",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "09:10:23",
-        "end_date": "2026-05-28",
-        "end_time": "21:56:04",
-        "work_hours": 10.51,
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT243|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:10:23",
-        "updated_at": "2026-05-28 21:56:04"
+        "updated_at": "2026-05-28 20:14:18"
       },
       {
         "id": 215,
@@ -816,7 +843,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:12:27",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 216,
@@ -843,15 +870,15 @@
         "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:13:03",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 217,
         "record_key": "LOGRECOVERY|SPT193|25M0785-02|其他|2026-05-28 09:13:03|217",
         "status": "暫停",
         "work_order": "25M0785-02",
-        "part_no": "",
-        "type_name": "",
+        "part_no": null,
+        "type_name": null,
         "process_name": "其他",
         "employee_id": "SPT193",
         "employee_name": "呂昰儒",
@@ -865,7 +892,7 @@
         "end_date": "2026-05-28",
         "end_time": "09:51:49",
         "work_hours": 0.646111,
-        "assembly_location": "",
+        "assembly_location": null,
         "group_key": "SPT193|其他|2026-05-28",
         "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
@@ -886,7 +913,7 @@
         "start_timestamp": "2026-05-28 09:16:05",
         "end_action": "暫停",
         "end_timestamp": "2026-05-28 14:10:31",
-        "remark": "",
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "09:16:05",
         "end_date": "2026-05-28",
@@ -897,7 +924,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:16:05",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 219,
@@ -924,7 +951,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:16:24",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 221,
@@ -951,7 +978,7 @@
         "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:18:30",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 222,
@@ -978,7 +1005,7 @@
         "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:20:23",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 223,
@@ -1005,7 +1032,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:21:39",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 224,
@@ -1021,7 +1048,7 @@
         "start_timestamp": "2026-05-28 09:24:44",
         "end_action": "暫停",
         "end_timestamp": "2026-05-28 09:28:29",
-        "remark": "",
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "09:24:44",
         "end_date": "2026-05-28",
@@ -1032,7 +1059,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:24:44",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 225,
@@ -1059,15 +1086,15 @@
         "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:24:54",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 226,
         "record_key": "LOGRECOVERY|SPT228|26N4001-04|骨架組立|2026-05-28 09:25:26|226",
         "status": "暫停",
         "work_order": "26N4001-04",
-        "part_no": "",
-        "type_name": "",
+        "part_no": null,
+        "type_name": null,
         "process_name": "骨架組立",
         "employee_id": "SPT228",
         "employee_name": "王添慶",
@@ -1081,7 +1108,7 @@
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
         "work_hours": 2.326111,
-        "assembly_location": "",
+        "assembly_location": null,
         "group_key": "SPT228|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
@@ -1113,7 +1140,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:26:39",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 18:11:39"
       },
       {
         "id": 229,
@@ -1137,10 +1164,10 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT092|S.T.|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:29:09",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 230,
@@ -1161,21 +1188,21 @@
         "start_time": "09:30:48",
         "end_date": "2026-05-28",
         "end_time": "14:57:23",
-        "work_hours": "04:11:35",
+        "work_hours": 4.193056,
         "assembly_location": "",
         "group_key": "SPT031|S.T.|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:30:48",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 231,
         "record_key": "LOGRECOVERY|B126|26M0051-10|配電|2026-05-28 09:31:08|231",
         "status": "暫停",
         "work_order": "26M0051-10",
-        "part_no": "",
-        "type_name": "",
+        "part_no": null,
+        "type_name": null,
         "process_name": "配電",
         "employee_id": "B126",
         "employee_name": "戴鎰祥",
@@ -1188,13 +1215,13 @@
         "start_time": "09:31:08",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": "02:13:52",
-        "assembly_location": "",
+        "work_hours": 2.231111,
+        "assembly_location": null,
         "group_key": "B126|配電|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:31:08",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 232,
@@ -1215,13 +1242,13 @@
         "start_time": "09:31:26",
         "end_date": "2026-05-28",
         "end_time": "16:34:34",
-        "work_hours": "05:33:08",
+        "work_hours": 5.552222,
         "assembly_location": "",
         "group_key": "B189|配電|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:31:26",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 233,
@@ -1242,13 +1269,13 @@
         "start_time": "09:32:09",
         "end_date": "2026-05-28",
         "end_time": "13:22:14",
-        "work_hours": "00:00:00",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT034|S.T.|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:32:09",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 234,
@@ -1269,13 +1296,13 @@
         "start_time": "09:32:22",
         "end_date": "2026-05-28",
         "end_time": "10:34:47",
-        "work_hours": "00:57:38",
+        "work_hours": 0.960556,
         "assembly_location": "",
         "group_key": "SPT240|骨架組立|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:32:22",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 235,
@@ -1296,13 +1323,13 @@
         "start_time": "09:33:15",
         "end_date": "",
         "end_time": "",
-        "work_hours": "00:00:00",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT148|骨架組立|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:33:15",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 236,
@@ -1323,13 +1350,13 @@
         "start_time": "09:33:59",
         "end_date": "2026-05-28",
         "end_time": "16:39:20",
-        "work_hours": "05:35:21",
+        "work_hours": 5.589167,
         "assembly_location": "",
         "group_key": "B190|配電|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:33:59",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 237,
@@ -1350,13 +1377,13 @@
         "start_time": "09:36:00",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": "02:09:00",
+        "work_hours": 2.15,
         "assembly_location": "",
         "group_key": "B203|骨架組立|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:36:00",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 239,
@@ -1377,13 +1404,13 @@
         "start_time": "09:39:05",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": "02:05:55",
+        "work_hours": 2.098611,
         "assembly_location": "",
         "group_key": "B177|配電|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:39:05",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 240,
@@ -1404,13 +1431,13 @@
         "start_time": "09:40:40",
         "end_date": "",
         "end_time": "",
-        "work_hours": "00:00:00",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "B237|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:40:40",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 241,
@@ -1431,13 +1458,13 @@
         "start_time": "09:49:05",
         "end_date": "2026-05-28",
         "end_time": "13:51:27",
-        "work_hours": "02:47:22",
+        "work_hours": 2.789444,
         "assembly_location": "",
         "group_key": "SPT256|設變|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:49:05",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 243,
@@ -1461,10 +1488,10 @@
         "work_hours": "02:27:40",
         "assembly_location": "竹東",
         "group_key": "SPT149|設變|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:50:20",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 244,
@@ -1485,13 +1512,13 @@
         "start_time": "09:51:49",
         "end_date": "2026-05-28",
         "end_time": "16:07:24",
-        "work_hours": 0.0,
+        "work_hours": 4.759722,
         "assembly_location": "",
         "group_key": "SPT193|模組|2026-05-28",
         "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:51:49",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 247,
@@ -1515,10 +1542,10 @@
         "work_hours": "02:29:09",
         "assembly_location": "竹東",
         "group_key": "SPT160|設變|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:53:28",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 248,
@@ -1539,13 +1566,13 @@
         "start_time": "09:54:11",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": "01:50:49",
+        "work_hours": 1.846944,
         "assembly_location": "",
         "group_key": "B248|配電|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:54:11",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 250,
@@ -1569,10 +1596,10 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT230|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:57:04",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 251,
@@ -1593,13 +1620,13 @@
         "start_time": "09:58:09",
         "end_date": "2026-05-28",
         "end_time": "10:30:35",
-        "work_hours": "00:31:51",
+        "work_hours": 0.530833,
         "assembly_location": "",
         "group_key": "SPT230|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 09:58:09",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 252,
@@ -1620,13 +1647,13 @@
         "start_time": "10:05:59",
         "end_date": "",
         "end_time": "",
-        "work_hours": "00:00:00",
+        "work_hours": 0.0,
         "assembly_location": "",
         "group_key": "SPT138|機台定位水平調整(含連結)|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:05:59",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 253,
@@ -1650,10 +1677,10 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT203|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:10:32",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 254,
@@ -1667,13 +1694,13 @@
         "employee_name": "潘威捷",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 10:27:37",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "10:27:37",
-        "end_date": "",
-        "end_time": "",
+        "end_date": null,
+        "end_time": null,
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT145|模組|2026-05-28",
@@ -1701,13 +1728,13 @@
         "start_time": "10:28:10",
         "end_date": "2026-05-28",
         "end_time": "10:28:34",
-        "work_hours": "00:00:24",
+        "work_hours": 0.006667,
         "assembly_location": "",
         "group_key": "SPT145|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 10:28:10",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 256,
@@ -1728,13 +1755,13 @@
         "start_time": "10:28:34",
         "end_date": "2026-05-28",
         "end_time": "10:29:09",
-        "work_hours": "00:00:35",
+        "work_hours": 0.009722,
         "assembly_location": "",
         "group_key": "SPT145|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 10:28:34",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 257,
@@ -1755,13 +1782,13 @@
         "start_time": "10:29:09",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": "01:15:51",
+        "work_hours": 1.264167,
         "assembly_location": "",
         "group_key": "SPT145|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 10:29:09",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 259,
@@ -1782,13 +1809,13 @@
         "start_time": "10:30:35",
         "end_date": "2026-05-28",
         "end_time": "10:30:56",
-        "work_hours": "00:00:00",
+        "work_hours": 0.0,
         "assembly_location": "",
         "group_key": "SPT230|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 10:30:35",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 260,
@@ -1812,10 +1839,10 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT230|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:30:56",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 261,
@@ -1836,13 +1863,13 @@
         "start_time": "10:31:37",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": "01:15:00",
+        "work_hours": 1.25,
         "assembly_location": "",
         "group_key": "SPT230|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 10:31:37",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 262,
@@ -1866,10 +1893,10 @@
         "work_hours": "00:00:22",
         "assembly_location": "竹東",
         "group_key": "SPT240|前置鈑金|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:34:47",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 264,
@@ -1890,18 +1917,18 @@
         "start_time": "10:45:52",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": "01:14:08",
+        "work_hours": 1.235556,
         "assembly_location": "",
         "group_key": "SPT240|骨架組立|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 10:45:52",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 265,
         "record_key": "SPT077|26N4001-01|其他|2026-05-28 10:56:51|a1c838fd",
-        "status": "下班",
+        "status": "作業中",
         "work_order": "26N4001-01",
         "part_no": "1SLP01S-FCA1-01",
         "type_name": "FCLP EFEM",
@@ -1910,20 +1937,20 @@
         "employee_name": "謝宛庭",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 10:56:51",
-        "end_action": "下班",
-        "end_timestamp": "2026-05-28 21:57:23",
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "前置線材加工",
         "start_date": "2026-05-28",
         "start_time": "10:56:51",
-        "end_date": "2026-05-28",
-        "end_time": "21:57:23",
-        "work_hours": 9.01,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT077|其他|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:56:51",
-        "updated_at": "2026-05-28 21:57:23"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 266,
@@ -1944,13 +1971,13 @@
         "start_time": "10:57:35",
         "end_date": "2026-05-28",
         "end_time": "10:58:32",
-        "work_hours": "00:00:57",
+        "work_hours": 0.015833,
         "assembly_location": "",
         "group_key": "SPT077|其他|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 10:57:35",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 267,
@@ -1971,13 +1998,13 @@
         "start_time": "10:58:32",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": "01:01:28",
+        "work_hours": 1.024444,
         "assembly_location": "",
         "group_key": "SPT077|其他|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 10:58:32",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 268,
@@ -1998,13 +2025,13 @@
         "start_time": "11:02:52",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": "00:57:08",
+        "work_hours": 0.952222,
         "assembly_location": "",
         "group_key": "B168|機台定位水平調整(含連結)|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 11:02:52",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 269,
@@ -2025,13 +2052,13 @@
         "start_time": "11:04:27",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": "00:55:33",
+        "work_hours": 0.925833,
         "assembly_location": "",
         "group_key": "B260|機台定位水平調整(含連結)|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 11:04:27",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 270,
@@ -2052,13 +2079,13 @@
         "start_time": "11:05:09",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": "00:54:51",
+        "work_hours": 0.914167,
         "assembly_location": "",
         "group_key": "B234|機台定位水平調整(含連結)|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 11:05:09",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 272,
@@ -2079,21 +2106,21 @@
         "start_time": "11:08:19",
         "end_date": "2026-05-28",
         "end_time": "11:55:23",
-        "work_hours": "00:47:04",
+        "work_hours": 0.784444,
         "assembly_location": "",
         "group_key": "SPT105|Packing|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 11:08:19",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 274,
         "record_key": "LOGRECOVERY|SPT208|26N4001-07|前置鈑金|2026-05-28 11:09:32|274",
         "status": "暫停",
         "work_order": "26N4001-07",
-        "part_no": "",
-        "type_name": "",
+        "part_no": null,
+        "type_name": null,
         "process_name": "前置鈑金",
         "employee_id": "SPT208",
         "employee_name": "邱珍娜",
@@ -2106,13 +2133,13 @@
         "start_time": "11:09:32",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": 0.0,
-        "assembly_location": "",
+        "work_hours": 0.841111,
+        "assembly_location": null,
         "group_key": "SPT208|前置鈑金|2026-05-28",
         "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 11:09:32",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 278,
@@ -2133,13 +2160,13 @@
         "start_time": "11:17:36",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": 0.0,
+        "work_hours": 0.706667,
         "assembly_location": "",
         "group_key": "SPT244|前置鈑金|2026-05-28",
         "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 11:17:36",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 279,
@@ -2160,13 +2187,13 @@
         "start_time": "11:51:02",
         "end_date": "2026-05-28",
         "end_time": "15:28:46",
-        "work_hours": "00:00:00",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT121|其他|2026-05-28",
-        "is_group_work": "True",
+        "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-28 11:51:02",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 280,
@@ -2187,13 +2214,13 @@
         "start_time": "13:05:22",
         "end_date": "2026-05-28",
         "end_time": "17:42:52",
-        "work_hours": "04:22:48",
+        "work_hours": 4.38,
         "assembly_location": "竹東",
         "group_key": "SPT231|收機|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:05:22",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:42:52"
       },
       {
         "id": 281,
@@ -2214,13 +2241,13 @@
         "start_time": "13:31:37",
         "end_date": "2026-05-28",
         "end_time": "17:27:03",
-        "work_hours": "03:40:12",
+        "work_hours": 3.67,
         "assembly_location": "竹東",
         "group_key": "SPT034|S.T.|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:31:37",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:27:03"
       },
       {
         "id": 282,
@@ -2244,10 +2271,10 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT105|Packing|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 11:55:23",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 283,
@@ -2271,10 +2298,10 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT220|S.T.|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:23:53",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 284,
@@ -2298,10 +2325,10 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT149|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:33:54",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 285,
@@ -2325,15 +2352,15 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT160|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:39:25",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 286,
         "record_key": "SPT241|25M0785-02|模組|2026-05-28 13:47:04|7c2fb94a",
-        "status": "暫停",
+        "status": "作業中",
         "work_order": "25M0785-02",
         "part_no": "PSRSC131-N01-04",
         "type_name": "PSRSC131-N01",
@@ -2342,20 +2369,20 @@
         "employee_name": "達文",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 13:47:04",
-        "end_action": "暫停",
-        "end_timestamp": "2026-05-28 19:00:50",
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "",
         "start_date": "2026-05-28",
         "start_time": "13:47:04",
-        "end_date": "2026-05-28",
-        "end_time": "19:00:50",
-        "work_hours": 0.0,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT241|模組|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:47:04",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 288,
@@ -2376,18 +2403,18 @@
         "start_time": "13:51:27",
         "end_date": "2026-05-28",
         "end_time": "13:55:18",
-        "work_hours": "00:00:00",
+        "work_hours": "00:03:51",
         "assembly_location": "竹東",
         "group_key": "SPT256|模組|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:51:27",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 289,
         "record_key": "SPT256|25M0785-02|模組|2026-05-28 13:56:54|d9a6b07a",
-        "status": "暫停",
+        "status": "作業中",
         "work_order": "25M0785-02",
         "part_no": "PSRSC131-N01-04",
         "type_name": "PSRSC131-N01",
@@ -2396,20 +2423,20 @@
         "employee_name": "阿杰",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 13:56:54",
-        "end_action": "暫停",
-        "end_timestamp": "2026-05-28 19:04:59",
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "",
         "start_date": "2026-05-28",
         "start_time": "13:56:54",
-        "end_date": "2026-05-28",
-        "end_time": "19:04:59",
-        "work_hours": 0.0,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT256|模組|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:56:54",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 290,
@@ -2430,13 +2457,13 @@
         "start_time": "14:00:06",
         "end_date": "2026-05-28",
         "end_time": "17:08:36",
-        "work_hours": "02:53:24",
+        "work_hours": 2.89,
         "assembly_location": "竹東",
         "group_key": "SPT172|Packing|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 14:00:06",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:08:36"
       },
       {
         "id": 291,
@@ -2463,7 +2490,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 14:21:17",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 292,
@@ -2487,10 +2514,10 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT158|收機|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 14:25:05",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 293,
@@ -2517,7 +2544,7 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 14:34:50",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 19:53:57"
       },
       {
         "id": 294,
@@ -2541,15 +2568,15 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT031|S.T.|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 14:57:23",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 295,
         "record_key": "B135|25M0694-01|收機|2026-05-28 15:24:09|90e7b9d7",
-        "status": "完工",
+        "status": "作業中",
         "work_order": "25M0694-01",
         "part_no": "4TRSC122-SB2-13",
         "type_name": "SORTER RSC121 SB (RR757)",
@@ -2558,20 +2585,20 @@
         "employee_name": "鍾明志",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 15:24:09",
-        "end_action": "完工",
-        "end_timestamp": "2026-05-28 18:15:54",
-        "remark": "",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "15:24:09",
-        "end_date": "2026-05-28",
-        "end_time": "18:15:54",
-        "work_hours": "02:36:00",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "B135|收機|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 15:24:09",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 296,
@@ -2592,13 +2619,13 @@
         "start_time": "15:26:35",
         "end_date": "2026-05-28",
         "end_time": "15:28:46",
-        "work_hours": "00:00:00",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT121|其他|2026-05-28",
-        "is_group_work": "True",
+        "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-28 15:26:35",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 297,
@@ -2619,13 +2646,13 @@
         "start_time": "15:31:56",
         "end_date": "2026-05-28",
         "end_time": "17:10:00",
-        "work_hours": "01:37:48",
+        "work_hours": 1.63,
         "assembly_location": "竹東",
         "group_key": "SPT121|其他|2026-05-28",
-        "is_group_work": "True",
+        "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-28 15:31:56",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:10:00"
       },
       {
         "id": 298,
@@ -2646,18 +2673,18 @@
         "start_time": "15:49:15",
         "end_date": "2026-05-28",
         "end_time": "18:10:11",
-        "work_hours": "02:10:48",
+        "work_hours": 2.18,
         "assembly_location": "竹東",
         "group_key": "SPT087|骨架組立|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 15:49:15",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 18:10:11"
       },
       {
         "id": 303,
         "record_key": "SPT088|25M0541-02|骨架組立|2026-05-28 15:59:04|a3a92e5c",
-        "status": "下班",
+        "status": "作業中",
         "work_order": "25M0541-02",
         "part_no": "PSRSC150-SB4L-06",
         "type_name": "RSC150 Frame sorter",
@@ -2666,20 +2693,20 @@
         "employee_name": "林建安",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 15:59:04",
-        "end_action": "下班",
-        "end_timestamp": "2026-05-28 20:22:38",
-        "remark": "",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "15:59:04",
-        "end_date": "2026-05-28",
-        "end_time": "20:22:38",
-        "work_hours": 3.64,
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT088|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 15:59:04",
-        "updated_at": "2026-05-28 20:22:38"
+        "updated_at": "2026-05-28 20:14:18"
       },
       {
         "id": 304,
@@ -2740,8 +2767,8 @@
         "record_key": "LOGRECOVERY|B002|V3151026|機台定位水平調整(含連結)|2026-05-28 11:01:10|266",
         "status": "暫停",
         "work_order": "V3151026",
-        "part_no": "",
-        "type_name": "",
+        "part_no": null,
+        "type_name": null,
         "process_name": "機台定位水平調整(含連結)",
         "employee_id": "B002",
         "employee_name": "張文品",
@@ -2754,13 +2781,13 @@
         "start_time": "11:01:10",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": 0.0,
-        "assembly_location": "",
+        "work_hours": 0.980556,
+        "assembly_location": null,
         "group_key": "B002|機台定位水平調整(含連結)|2026-05-28",
         "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 11:01:10",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:18"
       },
       {
         "id": 307,
@@ -2781,18 +2808,18 @@
         "start_time": "11:02:00",
         "end_date": "2026-05-28",
         "end_time": "12:00:00",
-        "work_hours": "00:58:00",
+        "work_hours": 0.966667,
         "assembly_location": "",
         "group_key": "B155|機台定位水平調整(含連結)|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "V166B_LOG_ONLY_MANUAL_CLOSED",
         "created_at": "2026-05-28 11:02:00",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:21:19"
       },
       {
         "id": 308,
         "record_key": "SPT193|25M0541-02|骨架組立|2026-05-28 16:07:24|371ff2b0",
-        "status": "下班",
+        "status": "作業中",
         "work_order": "25M0541-02",
         "part_no": "PSRSC150-SB4L-06",
         "type_name": "RSC150 Frame sorter",
@@ -2801,20 +2828,20 @@
         "employee_name": "呂昰儒",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 16:07:24",
-        "end_action": "下班",
-        "end_timestamp": "2026-05-28 20:25:51",
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "",
         "start_date": "2026-05-28",
         "start_time": "16:07:24",
-        "end_date": "2026-05-28",
-        "end_time": "20:25:51",
-        "work_hours": 3.56,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT193|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 16:07:24",
-        "updated_at": "2026-05-28 20:25:51"
+        "updated_at": "2026-05-28 16:15:37"
       },
       {
         "id": 309,
@@ -2835,13 +2862,13 @@
         "start_time": "16:34:34",
         "end_date": "",
         "end_time": "",
-        "work_hours": "00:00:00",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "B189|配電|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 16:34:34",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:34:34"
       },
       {
         "id": 310,
@@ -2862,13 +2889,13 @@
         "start_time": "16:34:44",
         "end_date": "2026-05-28",
         "end_time": "16:57:25",
-        "work_hours": "00:22:48",
+        "work_hours": 0.38,
         "assembly_location": "竹東",
         "group_key": "SPT150|S.T.|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 16:34:44",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:57:25"
       },
       {
         "id": 311,
@@ -2889,18 +2916,18 @@
         "start_time": "16:39:20",
         "end_date": "",
         "end_time": "",
-        "work_hours": "00:00:00",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "B190|配電|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 16:39:20",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 16:39:20"
       },
       {
         "id": 312,
         "record_key": "SPT172|26M0021-01|Packing|2026-05-28 17:13:21|ad3b5589",
-        "status": "暫停",
+        "status": "作業中",
         "work_order": "26M0021-01",
         "part_no": "1GRSC150-003-04",
         "type_name": "4 Port Frame Long-type EFEM",
@@ -2909,20 +2936,20 @@
         "employee_name": "胡瑄芸",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 17:13:21",
-        "end_action": "暫停",
-        "end_timestamp": "2026-05-28 18:13:40",
+        "end_action": "",
+        "end_timestamp": "",
         "remark": "",
         "start_date": "2026-05-28",
         "start_time": "17:13:21",
-        "end_date": "2026-05-28",
-        "end_time": "18:13:40",
-        "work_hours": "00:46:48",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT172|Packing|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 17:13:21",
-        "updated_at": "2026-05-28 20:14:18"
+        "updated_at": "2026-05-28 17:13:21"
       },
       {
         "id": 313,
@@ -2943,99 +2970,18 @@
         "start_time": "17:16:14",
         "end_date": "2026-05-28",
         "end_time": "17:51:46",
-        "work_hours": "00:35:24",
+        "work_hours": 0.59,
         "assembly_location": "竹東",
         "group_key": "SPT121|其他|2026-05-28",
-        "is_group_work": "False",
+        "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 17:16:14",
-        "updated_at": "2026-05-28 20:14:18"
-      },
-      {
-        "id": 314,
-        "record_key": "B135|25M0541-02|骨架組立|2026-05-28 18:17:04|5be420b4",
-        "status": "作業中",
-        "work_order": "25M0541-02",
-        "part_no": "PSRSC150-SB4L-06",
-        "type_name": "RSC150 Frame sorter",
-        "process_name": "骨架組立",
-        "employee_id": "B135",
-        "employee_name": "鍾明志",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 18:17:04",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "18:17:04",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": "00:00:00",
-        "assembly_location": "竹東",
-        "group_key": "B135|骨架組立|2026-05-28",
-        "is_group_work": "False",
-        "source": "streamlit",
-        "created_at": "2026-05-28 18:17:04",
-        "updated_at": "2026-05-28 20:14:18"
-      },
-      {
-        "id": 316,
-        "record_key": "SPT241|26M0021-03|骨架組立|2026-05-28 19:02:46|a14ec194",
-        "status": "下班",
-        "work_order": "26M0021-03",
-        "part_no": "1GRSC150-003-04",
-        "type_name": "4 Port Frame Long-type EFEM",
-        "process_name": "骨架組立",
-        "employee_id": "SPT241",
-        "employee_name": "達文",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 19:02:46",
-        "end_action": "下班",
-        "end_timestamp": "2026-05-28 20:58:30",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "19:02:46",
-        "end_date": "2026-05-28",
-        "end_time": "20:58:30",
-        "work_hours": 1.68,
-        "assembly_location": "竹東",
-        "group_key": "SPT241|骨架組立|2026-05-28",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-28 19:02:46",
-        "updated_at": "2026-05-28 20:58:30"
-      },
-      {
-        "id": 317,
-        "record_key": "SPT256|26M0021-03|骨架組立|2026-05-28 19:06:10|b8dd795e",
-        "status": "下班",
-        "work_order": "26M0021-03",
-        "part_no": "1GRSC150-003-04",
-        "type_name": "4 Port Frame Long-type EFEM",
-        "process_name": "骨架組立",
-        "employee_id": "SPT256",
-        "employee_name": "阿杰",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 19:06:10",
-        "end_action": "下班",
-        "end_timestamp": "2026-05-28 20:59:21",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "19:06:10",
-        "end_date": "2026-05-28",
-        "end_time": "20:59:21",
-        "work_hours": 1.64,
-        "assembly_location": "竹東",
-        "group_key": "SPT256|骨架組立|2026-05-28",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-28 19:06:10",
-        "updated_at": "2026-05-28 20:59:21"
+        "updated_at": "2026-05-28 17:51:46"
       },
       {
         "id": 320,
         "record_key": "SSS|21M0241-01|前置鈑金|2026-05-28 19:35:36|5887a1dd",
-        "status": "完工",
+        "status": "作業中",
         "work_order": "21M0241-01",
         "part_no": "4TRSC020-004-02",
         "type_name": "NTB 3 PORT",
@@ -3044,128 +2990,20 @@
         "employee_name": "SSS",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 19:35:36",
-        "end_action": "完工",
-        "end_timestamp": "2026-05-28 20:18:47",
-        "remark": "",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "19:35:36",
-        "end_date": "2026-05-28",
-        "end_time": "20:18:47",
-        "work_hours": 0.47,
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SSS|前置鈑金|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 19:35:36",
-        "updated_at": "2026-05-28 20:18:47"
-      },
-      {
-        "id": 321,
-        "record_key": "SPT239|24N4001-24|前置鈑金|2026-05-28 18:57:40|5518e765",
-        "status": "作業中",
-        "work_order": "24N4001-24",
-        "part_no": "1SLP01S-FCA1-01",
-        "type_name": "FCLP EFEM",
-        "process_name": "前置鈑金",
-        "employee_id": "SPT239",
-        "employee_name": "麥可",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 18:57:40",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "18:57:40",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SPT239|前置鈑金|2026-05-28",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-28 18:57:40",
         "updated_at": "2026-05-28 20:14:18"
-      },
-      {
-        "id": 322,
-        "record_key": "SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c",
-        "status": "下班",
-        "work_order": "24N4001-24",
-        "part_no": "1SLP01S-FCA1-01",
-        "type_name": "FCLP EFEM",
-        "process_name": "包機",
-        "employee_id": "SPT239",
-        "employee_name": "麥可",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 19:53:57",
-        "end_action": "下班",
-        "end_timestamp": "2026-05-28 20:26:32",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "19:53:57",
-        "end_date": "2026-05-28",
-        "end_time": "20:26:32",
-        "work_hours": 0.29,
-        "assembly_location": "竹東",
-        "group_key": "SPT239|包機|2026-05-28",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-28 19:53:57",
-        "updated_at": "2026-05-28 20:26:32"
-      },
-      {
-        "id": 323,
-        "record_key": "SPT208|25M0541-02|前置鈑金|2026-05-28 20:25:16|f6e23113",
-        "status": "下班",
-        "work_order": "25M0541-02",
-        "part_no": "PSRSC150-SB4L-06",
-        "type_name": "RSC150 Frame sorter",
-        "process_name": "前置鈑金",
-        "employee_id": "SPT208",
-        "employee_name": "邱珍娜",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 20:25:16",
-        "end_action": "下班",
-        "end_timestamp": "2026-05-28 20:25:36",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "20:25:16",
-        "end_date": "2026-05-28",
-        "end_time": "20:25:36",
-        "work_hours": 0.01,
-        "assembly_location": "竹東",
-        "group_key": "SPT208|前置鈑金|2026-05-28",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-28 20:25:16",
-        "updated_at": "2026-05-28 20:25:36"
-      },
-      {
-        "id": 324,
-        "record_key": "SPT244|24N4001-24|包機|2026-05-28 20:28:21|76ec6b74",
-        "status": "下班",
-        "work_order": "24N4001-24",
-        "part_no": "1SLP01S-FCA1-01",
-        "type_name": "FCLP EFEM",
-        "process_name": "包機",
-        "employee_id": "SPT244",
-        "employee_name": "費南",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 20:28:21",
-        "end_action": "下班",
-        "end_timestamp": "2026-05-28 20:28:43",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "20:28:21",
-        "end_date": "2026-05-28",
-        "end_time": "20:28:43",
-        "work_hours": 0.01,
-        "assembly_location": "竹東",
-        "group_key": "SPT244|包機|2026-05-28",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-28 20:28:21",
-        "updated_at": "2026-05-28 20:28:43"
       },
       {
         "id": 325,
@@ -3197,6 +3035,6 @@
     ]
   },
   "table_counts": {
-    "time_records": 118
+    "time_records": 112
   }
 }
