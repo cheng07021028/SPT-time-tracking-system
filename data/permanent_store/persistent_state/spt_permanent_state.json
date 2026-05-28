@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 20:12:18",
+  "exported_at": "2026-05-28 20:16:04",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 110,
@@ -13,13 +13,12 @@
     "login_logs": 625,
     "process_options": 17,
     "rest_periods": 5,
-    "security_settings": 2,
-    "security_user_roles": 9,
-    "security_users": 9,
     "system_logs": 213,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
+    "time_record_events": 0,
+    "time_record_outbox": 52,
     "time_records": 110,
     "work_orders": 0
   },
@@ -11768,195 +11767,6 @@
         "sort_order": 5
       }
     ],
-    "security_settings": [
-      {
-        "setting_key": "idle_timeout_minutes",
-        "setting_value": "15",
-        "note": "V1.69 synchronized security setting",
-        "updated_at": "2026-05-15 11:23:50"
-      },
-      {
-        "setting_key": "ask_continue_after_record",
-        "setting_value": "1",
-        "note": "V1.69 synchronized security setting",
-        "updated_at": "2026-05-15 11:23:50"
-      }
-    ],
-    "security_user_roles": [
-      {
-        "id": 10,
-        "username": "admin",
-        "role_code": "admin",
-        "created_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 11,
-        "username": "manager",
-        "role_code": "manager",
-        "created_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 12,
-        "username": "leader",
-        "role_code": "leader",
-        "created_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 13,
-        "username": "operator",
-        "role_code": "operator",
-        "created_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 14,
-        "username": "viewer",
-        "role_code": "viewer",
-        "created_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 15,
-        "username": "auditor",
-        "role_code": "auditor",
-        "created_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 16,
-        "username": "spt142",
-        "role_code": "operator",
-        "created_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 17,
-        "username": "B211",
-        "role_code": "operator",
-        "created_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 18,
-        "username": "Ethan",
-        "role_code": "admin",
-        "created_at": "2026-05-19 17:35:07"
-      }
-    ],
-    "security_users": [
-      {
-        "id": 1,
-        "username": "admin",
-        "password_hash": "pbkdf2_sha256$3a6f3a7befa0885e8c08cc2eb15a9859$4c37ee557e8e94cd84ddf1e2c31156cdb5fed35b9880b147e7e72302444f72ee",
-        "employee_id": "nan",
-        "display_name": "系統管理員",
-        "email": "Admin",
-        "is_active": 1,
-        "force_password_change": 0,
-        "last_login_at": "2026-05-28 20:05:30",
-        "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-28 20:05:30"
-      },
-      {
-        "id": 2,
-        "username": "manager",
-        "password_hash": "pbkdf2_sha256$10ba828719f2b82390101445bbcf4386$f6814b12a67e894cc25729467ebeb5b931c0a2e962c9be78011f0a7c96bed7ec",
-        "employee_id": "nan",
-        "display_name": "製造主管",
-        "email": "Manager",
-        "is_active": 1,
-        "force_password_change": 0,
-        "last_login_at": null,
-        "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 3,
-        "username": "leader",
-        "password_hash": "pbkdf2_sha256$820402735ad1b2eea21d45fe0dde7d92$61071ad17632fe72811f7954a9f0285315dc41cc9ad744a0f91696a25d427cbf",
-        "employee_id": "nan",
-        "display_name": "現場幹部",
-        "email": "Leader",
-        "is_active": 1,
-        "force_password_change": 0,
-        "last_login_at": null,
-        "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 4,
-        "username": "operator",
-        "password_hash": "pbkdf2_sha256$4d4520bfc0e2c72ba9b6139d26256b67$8b16d1dc77c04c2a285e5e1f21ec03dccc169bf0db45f2c1612d80ecd0b7dc40",
-        "employee_id": "nan",
-        "display_name": "作業人員",
-        "email": "Operator",
-        "is_active": 1,
-        "force_password_change": 0,
-        "last_login_at": null,
-        "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 5,
-        "username": "viewer",
-        "password_hash": "pbkdf2_sha256$205d2b7f07efb7edb59124464db1b85c$496673a805306de4f438898de0dc6178c71b9a83cd2b10242fa20f3bef738859",
-        "employee_id": "nan",
-        "display_name": "查詢者",
-        "email": "Viewer",
-        "is_active": 1,
-        "force_password_change": 0,
-        "last_login_at": null,
-        "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 6,
-        "username": "auditor",
-        "password_hash": "pbkdf2_sha256$f0810956eb383df03a679f2fc23e5bd0$11465b9812094ab5ff80cc844dbf555a2b107fc534cd7bd9f46db3122d43425d",
-        "employee_id": "nan",
-        "display_name": "稽核",
-        "email": "Auditor",
-        "is_active": 1,
-        "force_password_change": 0,
-        "last_login_at": null,
-        "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 7,
-        "username": "spt142",
-        "password_hash": "pbkdf2_sha256$767f80cda95ff0103ed131ffe8f43d95$77c112f466cb74aa5de47ce378f2e30b3a3360228948301569e8c1cd894df5d9",
-        "employee_id": "",
-        "display_name": "spt142",
-        "email": "",
-        "is_active": 1,
-        "force_password_change": 0,
-        "last_login_at": "2026-05-15 11:18:26",
-        "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 8,
-        "username": "B211",
-        "password_hash": "pbkdf2_sha256$80bd0fbcd7f99be462a491ef162f8803$fb7e693d3fb4e38b3738297e723e7026fe406e31ea35a42f207fab1ce914f09c",
-        "employee_id": "",
-        "display_name": "B211",
-        "email": "",
-        "is_active": 1,
-        "force_password_change": 0,
-        "last_login_at": "2026-05-15 11:21:46",
-        "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-19 17:35:07"
-      },
-      {
-        "id": 9,
-        "username": "Ethan",
-        "password_hash": "pbkdf2_sha256$4a2137fb90480f1b82a4721549f178ff$e85de92dedccb2791d7c297a55882100182babccdb5fd0485b63bfa5ac24bca0",
-        "employee_id": "SPT142",
-        "display_name": "Ethan",
-        "email": "",
-        "is_active": 1,
-        "force_password_change": 0,
-        "last_login_at": null,
-        "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-19 17:35:07"
-      }
-    ],
     "system_logs": [
       {
         "id": 1,
@@ -14342,6 +14152,529 @@
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
+    "time_record_events": [],
+    "time_record_outbox": [
+      {
+        "task_id": "7f3958091a5bc562c9dbc479",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_97d495bcc9b043fa9f4d1126c993a425.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "cbac23126bf07f941699d553",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_d0847fb98a9548879fb3c529efca3d02.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "1bcee6ac8a8a193091978772",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_0099c0cd5cdd402992e253de0647303d.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "d838dac6c64e5cd6a8f6a8a6",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_b8dc0a62302c43a395111a0e7d3f8e92.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "76679eef85d451788e070c32",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_1f66d0f6ebc9442bb630e58ea1072e6f.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "1fa91d7ed9f281b355c8abfd",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_047808155e0e459097375cc4e4645414.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "0b8478d93be5159fd94fbe09",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_c4b93caa976d4a9f8ae00819f016f931.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "59f95ce05f4a4c68e86dc1d0",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_3a3396374fc8436198fe7fddcbb3c298.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "fd678f1758a80e8acb7b8ed3",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_c07619bb81cf47938ebd552b120a94e5.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "eea0dc34f677236a0f061106",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_37a486cb8cec405cab1c140ecc47078e.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "ca36336bb4a2fcbe02a58116",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_a88462fb66834ca29540c418d62f51b3.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "fe22d00bf0fc7ebaa7bb95c0",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_1670039195bc4e6a854ee8bd65f6ac8c.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "868b0440cc74fe908d51a427",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_470ef4acb8f8435695cf434ffb225ec7.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "768c41cf27111fa0459e5f2c",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_c80e129769b54ee4a8b07edc99971ede.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "633267979e0f973ac05a2604",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_6e6e8a514e064df5a8884638b5cf13c5.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "3ed67c7084a39ba4b0eb1265",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_8976ca8467684b38b87582d8bf546201.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "435b4f2b0c859512efbfad2e",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_c11e39b5c9a14593975a56beb10dc725.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "9228841fb3ab76c53d22023b",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_f5cdf7a178c8438bb25b739e24671297.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "38941a192f9b561e89029115",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_3493f0d510cc460886f148166d45f0a8.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "8ba81bc51e6d24a5e71bc5ac",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_dd1421a449a24a97a1af55d8002252cd.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "5f15a6f3f7ceee7f8957a550",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_e9bb74b14a3b48818af4ab567924ee2b.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "15ec4f65bc520976e6726834",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_b10ddcc7aa98474980a77ddf271dedb8.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "9f244d8b440adf9af53c8ffa",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_7fc10b22b3b94d0da3394622ae66526e.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "6ca651a33f25386f3c766b44",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_b8f10ac3846c486b86ca6142f9146c0e.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "4a1878a34b38e9d72d69183d",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_95c16bbbc1244b00afcf8db5cb987aba.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "33362e2f1dd7796d46dec67f",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_02cae09cd262492da8241ba6e7f0ed8d.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "b8772d73f777a48b8913402e",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_a85bb6b2d03d44768bcea1d50e254928.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "9d35df461f904426e05252e8",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_27ef563034724dad80e72e7facfd0e28.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "72caaf93d1c70ef50dcab13f",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_a5e6431d188f4e91982845a3d5cb27b4.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "df897292ed7e5801489fe4ca",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_096be1c7114b44b7a47de134289796a7.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "be639f322e733cdcd75b635a",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_6962108752244abd97fa3bc44e83dafc.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "1cc131f770e3bb274e233e0c",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_7c2d18a6daae4170b1b47523380147c7.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "7d494302bb007dddbc35bea7",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_caf9fe0d452a498c8241786e40d803fd.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "4320d257bbcc2bb3a730be3f",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_185344f4147f43c7b12b5d00f180d518.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "12a33b1b81fe5ae175b1c50c",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_06268145310f45809a57f87c108e63e8.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "6ca947b30fba28ef834e82b6",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_dda7ad12c6244dda9c569a2eda7fa83d.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "2fba11403ae32bdd4374d6b1",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_d1fcfc4583a34dcaaaa2a5ed2bcfdfe5.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "3ddcdffa81e09ec304c4a31d",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_6c8f5ccb679e4d36a206a0a356ef7ee0.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "5832d5328a68edbd7a32ff73",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_dd4afae3fa3c49f5a5383da862014857.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "7ce7461a63625e9f0b7ad2f5",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_911c483da71647738859e2257c829e52.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "6c6449b3cd8e04401cbfe673",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_d029647b196641c0ad2d2d3e906e2dde.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "3c58e10b44105ca5a4365b56",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_7ce4e94b4b024ecaac6164d46d53db0f.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "19ba51def66b6c18dbbdd6cf",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_c1a6c7782cb942699b7bd95a65c6246e.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "d746f99bcc732639f613f343",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_6bef797ebf0b48e3b17e507740828506.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "d9f6bcd7c1a0c31be8c5daa1",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_b1c3f216d1374f93b9e4318de6131aa4.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "c5ab0f1c4f0b1940e0ffd3b4",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_c570cc204b9141cd9322e6bd8d623e89.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "4d62356a288fdc5c65bbd312",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_9101b73381e940f2a5aadfb362e7fff4.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "d3e27ba176c768125b216638",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_d84c2f2f5eb84d6b9b55ab148f659ff2.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "28e28bf5822a23d3ea2bdaa2",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_996aed4e59a24924ab0f7fbabbb5dc97.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "71f16f9b8d787588560b7c2f",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_6d00973a551048279ef1f0bcd8bf927b.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "2a1bf5753647de6a772dc5e7",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_8dde444c8eb642ef9e66f918badb29b3.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      },
+      {
+        "task_id": "cf6dcde02d246a2440d175fd",
+        "task_type": "github_upload_event",
+        "local_path": "/mount/src/spt-time-tracking-system/data/permanent_store/modules/02_history/time_record_events/2026-05-28/ev_20260528_201427_4d2db6d9e5d24cfa95dc55ac192530a8.json",
+        "status": "pending",
+        "try_count": 0,
+        "last_error": null,
+        "created_at": "2026-05-28 20:14:27",
+        "updated_at": "2026-05-28 20:14:27"
+      }
+    ],
     "time_records": [
       {
         "id": 156,
@@ -14760,20 +15093,20 @@
         "employee_name": "鄭智鍵",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 08:52:19",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "08:52:19",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": "00:00:00",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT151|水平|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:52:19",
-        "updated_at": "2026-05-28 16:15:37"
+        "updated_at": "2026-05-28 20:14:18"
       },
       {
         "id": 200,
