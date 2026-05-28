@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 09:37:18",
+  "exported_at": "2026-05-28 09:40:41",
   "source": "db_service_write",
   "module_key": "05_analysis",
   "module_code": "05",
@@ -898,13 +898,40 @@
         "source": "streamlit",
         "created_at": "2026-05-28 09:33:15",
         "updated_at": "2026-05-28 09:33:15"
+      },
+      {
+        "id": 240,
+        "record_key": "B237|26N4001-06|模組|2026-05-28 09:40:40|72b46e68",
+        "status": "作業中",
+        "work_order": "26N4001-06",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "模組",
+        "employee_id": "B237",
+        "employee_name": "彭紹恩",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 09:40:40",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "09:40:40",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B237|模組|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 09:40:40",
+        "updated_at": "2026-05-28 09:40:40"
       }
     ],
     "work_orders": [],
     "employees": []
   },
   "table_counts": {
-    "time_records": 33,
+    "time_records": 34,
     "work_orders": 0,
     "employees": 0
   }
