@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-28 13:50:25",
-  "exported_at": "2026-05-28 13:50:25",
-  "reason": "today_records_v139_final_state_reconcile_02",
+  "updated_at": "2026-05-28 13:51:33",
+  "exported_at": "2026-05-28 13:51:33",
+  "reason": "start_work_v137_identity_safe_upsert_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1411,11 +1411,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 13:47:04",
         "updated_at": "2026-05-28 13:47:04"
+      },
+      {
+        "id": 288,
+        "record_key": "SPT256|21M0241-01|模組|2026-05-28 13:51:27|45d70ab0",
+        "status": "作業中",
+        "work_order": "21M0241-01",
+        "part_no": "4TRSC020-004-02",
+        "type_name": "NTB 3 PORT",
+        "process_name": "模組",
+        "employee_id": "SPT256",
+        "employee_name": "阿杰",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 13:51:27",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "13:51:27",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT256|模組|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 13:51:27",
+        "updated_at": "2026-05-28 13:51:27"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 52
+    "time_records": 53
   }
 }
