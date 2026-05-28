@@ -13153,3 +13153,183 @@ def audit_v196_delete_guard() -> dict:
     }
 
 # ================= END V196 REBOOT-PROOF HARD DELETE GUARD =================
+
+# ================= BEGIN V197 ACTIVE WORK SIGNATURE COMPATIBILITY FIX =================
+# Purpose:
+#   V196 reboot-proof delete guard wrapped get_active_same_work/get_active_records with
+#   narrower signatures. pages/01_01. 工時紀錄.py calls get_active_same_work(...,
+#   employee_name=...), so Streamlit raised TypeError before the start-work form could render.
+# Rules:
+#   - No visual/CSS/page change.
+#   - Keep V196 hard-delete filtering.
+#   - Preserve expected return shape: get_active_same_work returns dict | None.
+try:
+    _v197_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v197_prev_get_active_records = None
+try:
+    _v197_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v197_prev_get_active_record = None
+try:
+    _v197_prev_get_active_same_work = get_active_same_work
+except Exception:  # pragma: no cover
+    _v197_prev_get_active_same_work = None
+
+
+def _v197_as_dataframe(obj) -> pd.DataFrame:
+    try:
+        if obj is None:
+            return pd.DataFrame()
+        if isinstance(obj, pd.DataFrame):
+            return obj.copy()
+        if isinstance(obj, dict):
+            return pd.DataFrame([obj])
+        if isinstance(obj, list):
+            return pd.DataFrame(obj)
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v197_filter_hard_deleted(df: pd.DataFrame | None) -> pd.DataFrame:
+    out = pd.DataFrame() if df is None else df.copy()
+    try:
+        if "_v196_filter_hard_deleted" in globals() and callable(globals().get("_v196_filter_hard_deleted")):
+            out = globals()["_v196_filter_hard_deleted"](out)
+    except Exception:
+        pass
+    return pd.DataFrame() if out is None else out.reset_index(drop=True)
+
+
+def _v197_filter_active_params(
+    df: pd.DataFrame,
+    *,
+    employee_id: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+    work_order: str | None = None,
+) -> pd.DataFrame:
+    out = _v197_as_dataframe(df)
+    if out.empty:
+        return out
+    try:
+        if employee_id and "employee_id" in out.columns:
+            out = out.loc[out["employee_id"].astype(str).str.strip() == str(employee_id).strip()].copy()
+        if employee_name and "employee_name" in out.columns:
+            out = out.loc[out["employee_name"].astype(str).str.strip() == str(employee_name).strip()].copy()
+        if process_name and "process_name" in out.columns:
+            out = out.loc[out["process_name"].astype(str).str.strip() == str(process_name).strip()].copy()
+        if work_order and "work_order" in out.columns:
+            out = out.loc[out["work_order"].astype(str).str.strip() == str(work_order).strip()].copy()
+        if start_date:
+            sd = str(start_date).strip().replace("/", "-")[:10]
+            if "start_date" in out.columns:
+                out = out.loc[out["start_date"].astype(str).str.replace("/", "-", regex=False).str[:10] == sd].copy()
+            elif "start_timestamp" in out.columns:
+                out = out.loc[out["start_timestamp"].astype(str).str.replace("/", "-", regex=False).str[:10] == sd].copy()
+    except Exception:
+        pass
+    return _v197_filter_hard_deleted(out).reset_index(drop=True)
+
+
+def get_active_records(
+    employee_id: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+) -> pd.DataFrame:  # type: ignore[override]
+    """Return active records with V197-compatible full signature.
+
+    This keeps older wrappers working even when callers pass process_name/start_date/
+    employee_name.  It intentionally does not publish or sync anything; it is read-only.
+    """
+    raw = pd.DataFrame()
+    if callable(_v197_prev_get_active_records):
+        try:
+            raw = _v197_prev_get_active_records(
+                employee_id=employee_id,
+                process_name=process_name,
+                start_date=start_date,
+                employee_name=employee_name,
+            )
+        except TypeError:
+            try:
+                raw = _v197_prev_get_active_records(employee_id=employee_id)
+            except TypeError:
+                try:
+                    raw = _v197_prev_get_active_records(employee_id)
+                except Exception:
+                    raw = pd.DataFrame()
+            except Exception:
+                raw = pd.DataFrame()
+        except Exception:
+            raw = pd.DataFrame()
+    return _v197_filter_active_params(
+        raw,
+        employee_id=employee_id,
+        process_name=process_name,
+        start_date=start_date,
+        employee_name=employee_name,
+    )
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        if "id" in df.columns:
+            tmp = df.copy()
+            tmp["_v197_id"] = pd.to_numeric(tmp["id"], errors="coerce")
+            tmp = tmp.sort_values("_v197_id", ascending=False, kind="stable").drop(columns=["_v197_id"], errors="ignore")
+            return dict(tmp.iloc[0])
+        return dict(df.iloc[0])
+    except Exception:
+        return None
+
+
+def get_active_same_work(
+    employee_id: str,
+    work_order: str,
+    process_name: str,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+) -> dict | None:  # type: ignore[override]
+    """Return one active same-work record or None.
+
+    pages/01 expects this function to be truth-testable; returning a DataFrame here
+    can break UI logic.  V197 therefore always returns dict | None.
+    """
+    df = get_active_records(
+        employee_id=employee_id,
+        process_name=process_name,
+        start_date=start_date,
+        employee_name=employee_name,
+    )
+    df = _v197_filter_active_params(df, work_order=work_order)
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        if "id" in df.columns:
+            tmp = df.copy()
+            tmp["_v197_id"] = pd.to_numeric(tmp["id"], errors="coerce")
+            tmp = tmp.sort_values("_v197_id", ascending=False, kind="stable").drop(columns=["_v197_id"], errors="ignore")
+            return dict(tmp.iloc[0])
+        return dict(df.iloc[0])
+    except Exception:
+        return None
+
+
+def audit_v197_active_signature_compatibility() -> dict:
+    return {
+        "version": "V197",
+        "get_active_records_accepts_employee_name": True,
+        "get_active_record_accepts_employee_name": True,
+        "get_active_same_work_accepts_employee_name": True,
+        "get_active_same_work_return_type": "dict_or_none",
+        "visual_change": False,
+    }
+
+# ================= END V197 ACTIVE WORK SIGNATURE COMPATIBILITY FIX =================
