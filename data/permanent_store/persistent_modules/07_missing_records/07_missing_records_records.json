@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 09:50:20",
+  "exported_at": "2026-05-28 09:53:28",
   "source": "db_service_write",
   "module_key": "07_missing_records",
   "module_code": "07",
@@ -980,11 +980,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 09:50:20",
         "updated_at": "2026-05-28 09:50:20"
+      },
+      {
+        "id": 247,
+        "record_key": "SPT160|26M0242-01|設變|2026-05-28 09:53:28|4e6dc89d",
+        "status": "作業中",
+        "work_order": "26M0242-01",
+        "part_no": "PSRSC151-SB4L-06",
+        "type_name": "RSC151 (Standalone) SB4L+Argus",
+        "process_name": "設變",
+        "employee_id": "SPT160",
+        "employee_name": "邱信維",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 09:53:28",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "09:53:28",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT160|設變|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 09:53:28",
+        "updated_at": "2026-05-28 09:53:28"
       }
     ]
   },
   "table_counts": {
     "employees": 0,
-    "time_records": 36
+    "time_records": 37
   }
 }
