@@ -1360,3 +1360,114 @@ else:
             st.info("你的帳號沒有 14 模組匯出權限，因此不能下載 V182 Excel。")
     else:
         st.info("尚未執行 V182-V188 一次彙整檢查。")
+
+# -----------------------------------------------------------------------------
+# V189-V190 backend pagination and database migration assessment
+# -----------------------------------------------------------------------------
+st.markdown("---")
+st.markdown("### V189-V190 大表後端分頁與正式資料庫轉換評估 / Backend Pagination & DB Migration Assessment")
+st.caption(
+    "本區只做讀取檢查與評估，不切換資料庫、不改 01/02 交易流程、不改畫面樣式。"
+    "V189 提供 SQL LIMIT/OFFSET 後端分頁檢查；V190 評估 PostgreSQL / SQL Server 轉換準備度。"
+)
+
+try:
+    from services.large_table_backend_pagination_service import (
+        collect_v189_large_table_report,
+        export_v189_report_excel_bytes,
+    )
+    _v189_import_error = ""
+except Exception as _v189_exc:
+    collect_v189_large_table_report = None
+    export_v189_report_excel_bytes = None
+    _v189_import_error = str(_v189_exc)
+
+try:
+    from services.database_migration_assessment_service import (
+        collect_v190_database_migration_assessment,
+        export_v190_assessment_excel_bytes,
+    )
+    _v190_import_error = ""
+except Exception as _v190_exc:
+    collect_v190_database_migration_assessment = None
+    export_v190_assessment_excel_bytes = None
+    _v190_import_error = str(_v190_exc)
+
+v189190_c1, v189190_c2, v189190_c3 = st.columns([1, 1, 2])
+v189_page_size = v189190_c1.number_input("V189 後端分頁測試筆數", min_value=100, max_value=5000, value=500, step=100, key="v189_page_size")
+v189_run = v189190_c2.button("⚡ 執行 V189 大表後端分頁檢查", use_container_width=True, key="v189_run_backend_pagination")
+v190_run = v189190_c3.button("🧭 執行 V190 PostgreSQL / SQL Server 轉換評估", use_container_width=True, key="v190_run_migration_assessment")
+
+if _v189_import_error:
+    st.error("V189 後端分頁服務尚未正確載入：" + _v189_import_error)
+elif v189_run and callable(collect_v189_large_table_report):
+    with st.spinner("正在執行 V189 大表後端分頁檢查..."):
+        st.session_state["v189_large_table_report"] = collect_v189_large_table_report(page_size=int(v189_page_size))
+
+if _v190_import_error:
+    st.error("V190 資料庫轉換評估服務尚未正確載入：" + _v190_import_error)
+elif v190_run and callable(collect_v190_database_migration_assessment):
+    with st.spinner("正在執行 V190 PostgreSQL / SQL Server 轉換評估..."):
+        st.session_state["v190_database_migration_assessment"] = collect_v190_database_migration_assessment()
+
+v189_report = st.session_state.get("v189_large_table_report")
+if v189_report:
+    st.markdown("#### V189 大表後端分頁檢查結果")
+    v189_k1, v189_k2, v189_k3, v189_k4 = st.columns(4)
+    v189_k1.metric("正式寫入路徑改變", "否" if not v189_report.get("production_write_path_changed") else "是")
+    v189_k2.metric("畫面樣式改變", "否" if not v189_report.get("visual_changed") else "是")
+    v189_k3.metric("測試頁筆數", int(v189_report.get("page_size", 0) or 0))
+    v189_k4.metric("檢查秒數", v189_report.get("elapsed_seconds", 0))
+    tabs_v189 = st.tabs(["資料表", "查詢煙霧測試", "建議"])
+    with tabs_v189[0]:
+        st.dataframe(pd.DataFrame(v189_report.get("table_checks", [])), use_container_width=True, hide_index=True)
+    with tabs_v189[1]:
+        st.dataframe(pd.DataFrame(v189_report.get("smoke_results", [])), use_container_width=True, hide_index=True)
+    with tabs_v189[2]:
+        for rec in v189_report.get("recommendations", []) or []:
+            st.write(f"- {rec}")
+    if CAN_EXPORT and callable(export_v189_report_excel_bytes):
+        st.download_button(
+            "⬇️ 下載 V189 大表後端分頁檢查 Excel",
+            data=export_v189_report_excel_bytes(v189_report),
+            file_name=f"SPT_V189_大表後端分頁檢查_{str(v189_report.get('generated_at','')).replace(':','').replace(' ','_')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="v189_download_report",
+        )
+else:
+    st.info("尚未執行 V189 大表後端分頁檢查。")
+
+v190_report = st.session_state.get("v190_database_migration_assessment")
+if v190_report:
+    st.markdown("#### V190 PostgreSQL / SQL Server 轉換前評估")
+    summary = v190_report.get("summary", {}) or {}
+    v190_k1, v190_k2, v190_k3, v190_k4 = st.columns(4)
+    v190_k1.metric("SQLite資料表", int(summary.get("sqlite_table_count", 0) or 0))
+    v190_k2.metric("SQLite總列數", f"{int(summary.get('sqlite_total_rows', 0) or 0):,}")
+    v190_k3.metric("外部DB已啟用", "否" if not v190_report.get("external_database_enabled") else "是")
+    v190_k4.metric("現在可直接切正式DB", "否" if not v190_report.get("safe_to_switch_live_database_now") else "是")
+    if not v190_report.get("safe_to_switch_live_database_now"):
+        st.warning("V190 評估結論：目前不建議直接切 PostgreSQL / SQL Server。建議先做 dual-write shadow mode，穩定比對後再切換。")
+    tabs_v190 = st.tabs(["Schema", "JSON權威檔", "轉換步驟", "DB選型", "風險"])
+    with tabs_v190[0]:
+        st.dataframe(pd.DataFrame(v190_report.get("schema_rows", [])), use_container_width=True, hide_index=True)
+    with tabs_v190[1]:
+        st.dataframe(pd.DataFrame(v190_report.get("json_authority_rows", [])), use_container_width=True, hide_index=True)
+    with tabs_v190[2]:
+        st.dataframe(pd.DataFrame(v190_report.get("migration_steps", [])), use_container_width=True, hide_index=True)
+    with tabs_v190[3]:
+        st.dataframe(pd.DataFrame(v190_report.get("backend_recommendations", [])), use_container_width=True, hide_index=True)
+    with tabs_v190[4]:
+        st.dataframe(pd.DataFrame(v190_report.get("risk_rows", [])), use_container_width=True, hide_index=True)
+    if CAN_EXPORT and callable(export_v190_assessment_excel_bytes):
+        st.download_button(
+            "⬇️ 下載 V190 資料庫轉換評估 Excel",
+            data=export_v190_assessment_excel_bytes(v190_report),
+            file_name=f"SPT_V190_DB轉換評估_{str(v190_report.get('generated_at','')).replace(':','').replace(' ','_')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="v190_download_report",
+        )
+else:
+    st.info("尚未執行 V190 PostgreSQL / SQL Server 轉換前評估。")
