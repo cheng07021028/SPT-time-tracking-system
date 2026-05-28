@@ -1,0 +1,47 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "12db09ad8f11427d96fe683a3365f5c0",
+  "event_type": "FINISH_WORK",
+  "event_time": "2026-05-28 14:12:55",
+  "record_id": "206",
+  "record_key": "SPT239|22M0162-91|清潔|2026-05-28 09:04:37|cc5818b1",
+  "operator_account": "SPT239",
+  "reason": "finish_work_v152_event_journal",
+  "row": {
+    "id": "206",
+    "record_key": "SPT239|22M0162-91|清潔|2026-05-28 09:04:37|cc5818b1",
+    "status": "完工",
+    "work_order": "22M0162-91",
+    "part_no": "4TRSC020-004-02->4TRSC020-004-06",
+    "type_name": "NTB 3 LP +快拆+EMO",
+    "process_name": "清潔",
+    "employee_id": "SPT239",
+    "employee_name": "麥可",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-28 09:04:37",
+    "end_action": "完工",
+    "end_timestamp": "2026-05-28 14:11:56",
+    "remark": "FINISHED",
+    "start_date": "2026-05-28",
+    "start_time": "09:04:37",
+    "end_date": "2026-05-28",
+    "end_time": "14:11:56",
+    "work_hours": "3.87",
+    "assembly_location": "竹東",
+    "group_key": "SPT239|清潔|2026-05-28",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-28 09:04:37",
+    "updated_at": "2026-05-28 14:11:56"
+  },
+  "extra": {
+    "end_action": "完工",
+    "remark": "FINISHED",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      206
+    ]
+  },
+  "previous_checksum": "fdb80f5704c255066dbf4f7615f5ee40abb60174a7fb2469948635df48acd24e",
+  "checksum": "4674617f2641de42f52b30fa1424812223cda78de2b9d06816f9e12c4157f318"
+}
