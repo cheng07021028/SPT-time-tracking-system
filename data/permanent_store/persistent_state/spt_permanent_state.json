@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 13:22:37",
+  "exported_at": "2026-05-28 13:26:17",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 47,
@@ -20,8 +20,6 @@
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "time_record_events": 1,
-    "time_record_outbox": 0,
     "time_records": 47,
     "work_orders": 0
   },
@@ -17767,27 +17765,6 @@
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
-    "time_record_events": [
-      {
-        "event_id": "5dbf4ae9464740e0947fa97fa721acaa",
-        "record_key": "SPT034|24N4001-36|S.T.|2026-05-28 09:32:09|26760489",
-        "record_id": "233",
-        "event_type": "PAUSE_WORK",
-        "event_time": "2026-05-28 13:22:25",
-        "employee_id": "SPT034",
-        "employee_name": "陳長彥",
-        "work_order": "24N4001-36",
-        "process_name": "S.T.",
-        "start_timestamp": "2026-05-28 09:32:09",
-        "operator_account": "SPT034",
-        "payload_json": "{\"schema\": \"SPT-TimeRecordEvent-V152\", \"event_id\": \"5dbf4ae9464740e0947fa97fa721acaa\", \"event_type\": \"PAUSE_WORK\", \"event_time\": \"2026-05-28 13:22:25\", \"record_id\": \"233\", \"record_key\": \"SPT034|24N4001-36|S.T.|2026-05-28 09:32:09|26760489\", \"operator_account\": \"SPT034\", \"reason\": \"finish_work_v152_event_journal\", \"row\": {\"id\": \"233\", \"record_key\": \"SPT034|24N4001-36|S.T.|2026-05-28 09:32:09|26760489\", \"status\": \"暫停\", \"work_order\": \"24N4001-36\", \"part_no\": \"1SLP01S-FCA1-01\", \"type_name\": \"FCLP EFEM\", \"process_name\": \"S.T.\", \"employee_id\": \"SPT034\", \"employee_name\": \"陳長彥\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-28 09:32:09\", \"end_action\": \"暫停\", \"end_timestamp\": \"2026-05-28 13:22:14\", \"remark\": \"\", \"start_date\": \"2026-05-28\", \"start_time\": \"09:32:09\", \"end_date\": \"2026-05-28\", \"end_time\": \"13:22:14\", \"work_hours\": \"1.33\", \"assembly_location\": \"竹東\", \"group_key\": \"SPT034|S.T.|2026-05-28\", \"is_group_work\": \"0\", \"source\": \"streamlit\", \"created_at\": \"2026-05-28 09:32:09\", \"updated_at\": \"2026-05-28 13:22:14\"}, \"extra\": {\"end_action\": \"暫停\", \"remark\": \"\", \"finish_parallel_group\": true, \"affected_ids\": [233]}, \"previous_checksum\": \"\", \"checksum\": \"0320b3477eb6a790eb142cf5a8229a24c45aeb2f901b37407b172b9a091f2131\"}",
-        "checksum": "0320b3477eb6a790eb142cf5a8229a24c45aeb2f901b37407b172b9a091f2131",
-        "previous_checksum": "",
-        "source": "streamlit",
-        "created_at": "2026-05-28 13:22:25"
-      }
-    ],
-    "time_record_outbox": [],
     "time_records": [
       {
         "id": 187,
