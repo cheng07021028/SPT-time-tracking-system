@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 18:51:23",
-  "exported_at": "2026-05-28 18:51:23",
-  "reason": "logout_v133_time_authority_flush_log_flush",
+  "updated_at": "2026-05-28 18:52:17",
+  "exported_at": "2026-05-28 18:52:17",
+  "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
     "system_logs": [
@@ -23911,11 +23911,23 @@
         "detail": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 542,
+        "log_time": "2026-05-28 18:52:07",
+        "user_name": "SPT208",
+        "action_type": "V134_SQLITE_REPAIR_READ_ERROR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V134 直接讀取 SQLite time_records 失敗：database disk image is malformed",
+        "detail": "",
+        "level": "ERROR",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1992
+    "system_logs": 1993
   }
 }
