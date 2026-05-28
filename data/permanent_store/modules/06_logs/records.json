@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 18:10:19",
-  "exported_at": "2026-05-28 18:10:19",
+  "updated_at": "2026-05-28 18:10:38",
+  "exported_at": "2026-05-28 18:10:38",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -22651,11 +22651,47 @@
         "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 479,
+        "log_time": "2026-05-28 18:10:34",
+        "user_name": "SPT087",
+        "action_type": "V166D_DURABLE_SNAPSHOT",
+        "target_table": "time_records",
+        "target_id": "298",
+        "message": "V166D durable snapshot：OFF_DUTY / finish_work_v152_event_journal / rows=1",
+        "detail": "reason=finish_work_v152_event_journal;row_count=1\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"capture_version\":\"V166D\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-28 18:10:34\",\"action_type\":\"V166D_DURABLE_SNAPSHOT\",\"target_table\":\"time_records\",\"target_id\":\"298\",\"target_ids\":[298],\"message\":\"V166D durable snapshot：OFF_DUTY / finish_work_v152_event_journal / rows=1\",\"reason\":\"finish_work_v152_event_journal\",\"extra\":{\"event_type\":\"OFF_DUTY\",\"github\":false,\"extra\":{\"end_action\":\"下班\",\"remark\":\"\",\"finish_parallel_group\":true,\"affected_ids\":[298]}},\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166d_explicit_log_snapshot\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"explicit_rows\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-28 15:49:15|003c07af\",\"identity_key\":\"record_key:SPT087|25M0541-02|骨架組立|2026-05-28 15:49:15|003c07af\",\"id\":\"298\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"status\":\"下班\",\"start_timestamp\":\"2026-05-28 15:49:15\",\"end_timestamp\":\"2026-05-28 18:10:11\",\"work_hours\":\"2.18\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":298,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-28 15:49:15|003c07af\",\"status\":\"下班\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 15:49:15\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 18:10:11\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"15:49:15\",\"end_date\":\"2026-05-28\",\"end_time\":\"18:10:11\",\"work_hours\":2.18,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 15:49:15\",\"updated_at\":\"2026-05-28 18:10:11\",\"_snapshot_source\":\"v166d_explicit_durable_layer\"}],\"v166d_explicit_rows\":[{\"id\":298,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-28 15:49:15|003c07af\",\"status\":\"下班\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 15:49:15\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 18:10:11\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"15:49:15\",\"end_date\":\"2026-05-28\",\"end_time\":\"18:10:11\",\"work_hours\":2.18,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 15:49:15\",\"updated_at\":\"2026-05-28 18:10:11\",\"_snapshot_source\":\"v166d_explicit_durable_layer\"}],\"sqlite_time_records\":[],\"authority_01_time_records\":[],\"authority_02_history\":[]},\"snapshot_hash\":\"ba3784b54cb71b2ee199ac5ec2786726126cdc83a8608d953e429a69226cbea2\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 478,
+        "log_time": "2026-05-28 18:10:34",
+        "user_name": "SPT091",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_finish_active_visible_v141: 已由 01/02 權威檔回填 SQLite cache 1 筆",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 477,
+        "log_time": "2026-05-28 18:10:34",
+        "user_name": "SPT091",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1887
+    "system_logs": 1890
   }
 }
