@@ -11546,3 +11546,434 @@ def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工
                 pass
     return int(_v180_prev_delete_time_records(record_ids, reason=reason) or 0)
 # ================= END V180 EMERGENCY LOCAL DELETE OVERRIDE =================
+
+# =================== V193 INTENTIONAL RESET REBUILD DISPLAY PATCH ===================
+# 目的：正式清空重新統計後，舊 tombstone 必須保留，但清空後新開始的資料不能只留在 SQLite，
+# 導致 01 Today Records / 02 History 都顯示空白。
+# 原則：
+# - 不恢復已刪除舊資料；
+# - 只讓未被 tombstone 擋住的目前 SQLite time_records 重新同步到 01/02 canonical；
+# - 不改 CSS/theme/pages/table rendering；
+# - LOGRECOVERY 待補資料不自動當作一般 Active Work。
+try:
+    _v193_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v193_prev_start_work = None
+try:
+    _v193_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v193_prev_finish_work = None
+try:
+    _v193_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v193_prev_load_records = None
+try:
+    _v193_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v193_prev_today_records = None
+try:
+    _v193_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v193_prev_get_active_records = None
+try:
+    _v193_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v193_prev_get_active_record = None
+try:
+    _v193_prev_get_active_same_work = get_active_same_work
+except Exception:  # pragma: no cover
+    _v193_prev_get_active_same_work = None
+
+
+def _v193_safe_log(action: str, message: str, level: str = "INFO") -> None:
+    try:
+        write_log(action, message, "time_records", level=level)
+    except Exception:
+        pass
+
+
+def _v193_query_sqlite_records(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    employee_id: str | None = None,
+    work_order: str | None = None,
+) -> pd.DataFrame:
+    """Read current SQLite time_records without touching UI. Return empty on any DB issue."""
+    try:
+        from services import db_service as _db
+    except Exception:
+        return pd.DataFrame()
+    where = []
+    params: list = []
+    if start_date:
+        where.append("COALESCE(start_date, substr(start_timestamp,1,10)) >= ?")
+        params.append(str(start_date))
+    if end_date:
+        where.append("COALESCE(start_date, substr(start_timestamp,1,10)) <= ?")
+        params.append(str(end_date))
+    if employee_id:
+        where.append("employee_id = ?")
+        params.append(str(employee_id))
+    if work_order:
+        where.append("work_order = ?")
+        params.append(str(work_order))
+    sql = "SELECT * FROM time_records"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY COALESCE(start_timestamp, created_at, updated_at, '') ASC, id ASC"
+    try:
+        df = _db.query_df(sql, params)
+        if df is None or not isinstance(df, pd.DataFrame):
+            return pd.DataFrame()
+        return df.copy()
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v193_filter_unresolved_log_recovery(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep formal records; keep recovered records only after manual close/finish."""
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame() if df is None else df
+    out = df.copy()
+    try:
+        src = out.get("source", pd.Series([""] * len(out), index=out.index)).astype(str).str.upper()
+        key = out.get("record_key", pd.Series([""] * len(out), index=out.index)).astype(str).str.upper()
+        status = out.get("status", pd.Series([""] * len(out), index=out.index)).astype(str)
+        recovery_status = out.get("recovery_status", pd.Series([""] * len(out), index=out.index)).astype(str)
+        end_ts = out.get("end_timestamp", pd.Series([""] * len(out), index=out.index)).astype(str)
+        is_recovery = src.str.contains("LOGRECOVERY|V164B_LOG_ONLY_RECOVERY", regex=True, na=False) | key.str.startswith("LOGRECOVERY", na=False)
+        is_closed = end_ts.str.strip().ne("") | status.str.contains("下班|暫停|完工|結束|補登結束|已結束", regex=True, na=False) | recovery_status.str.contains("已人工結算|CLOSED|MANUAL_CLOSED", regex=True, na=False)
+        out = out.loc[(~is_recovery) | is_closed].copy()
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v193_filter_deleted(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame() if df is None else df
+    out = df.copy()
+    # Apply all known tombstone filters.  These filters must stay because the user intentionally cleared old records.
+    for fn_name in (
+        "_v179_filter_deleted_rows",
+        "_v178_filter_df",
+        "_v139_filter_deleted",
+        "_v137_filter_deleted",
+        "_v98_filter_deleted",
+        "_v97_filter_deleted_df",
+        "_v96_filter_tombstone",
+        "_v94_filter_deleted_df",
+        "_v134_filter_deleted",
+    ):
+        fn = globals().get(fn_name)
+        if callable(fn):
+            try:
+                out = fn(out)
+            except Exception:
+                pass
+    try:
+        from services.time_record_delete_unifier_service import filter_deleted_rows as _filter_deleted_rows
+        out = _filter_deleted_rows(out)
+    except Exception:
+        pass
+    out = _v193_filter_unresolved_log_recovery(out)
+    return out.reset_index(drop=True)
+
+
+def _v193_key_for_row(row: dict) -> str:
+    rk = str(row.get("record_key") or "").strip()
+    if rk:
+        return "record_key:" + rk
+    rid = str(row.get("id") or "").strip()
+    if rid and rid.lower() not in ("nan", "none"):
+        return "id:" + rid
+    return "biz:" + "|".join([
+        str(row.get("employee_id") or "").strip(),
+        str(row.get("employee_name") or "").strip(),
+        str(row.get("work_order") or "").strip(),
+        str(row.get("process_name") or "").strip(),
+        str(row.get("start_timestamp") or row.get("start_date") or "").strip(),
+    ])
+
+
+def _v193_merge_records(*frames: pd.DataFrame) -> pd.DataFrame:
+    rows_by_key: dict[str, dict] = {}
+    ordered_keys: list[str] = []
+    for df in frames:
+        if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+            continue
+        for raw in df.to_dict("records"):
+            if not isinstance(raw, dict):
+                continue
+            key = _v193_key_for_row(raw)
+            if key not in rows_by_key:
+                rows_by_key[key] = dict(raw)
+                ordered_keys.append(key)
+            else:
+                base = rows_by_key[key]
+                # Newer/source-complete rows fill blank fields but do not erase existing values with blanks.
+                for c, v in raw.items():
+                    if str(v) not in ("", "nan", "None") or str(base.get(c, "")) in ("", "nan", "None"):
+                        base[c] = v
+    if not ordered_keys:
+        return pd.DataFrame()
+    out = pd.DataFrame([rows_by_key[k] for k in ordered_keys])
+    try:
+        if "id" in out.columns:
+            out["_v193_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values(["_v193_sort_id"], ascending=True, kind="stable").drop(columns=["_v193_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v193_save_0102(df: pd.DataFrame, reason: str = "v193_sync_sqlite_to_0102", github: bool = False) -> int:
+    safe = _v193_filter_deleted(df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame())
+    try:
+        if callable(globals().get("_v134_save_0102_authority")):
+            return int(_v134_save_0102_authority(safe, reason, github=bool(github)) or 0)
+    except Exception:
+        pass
+    try:
+        from services.permanent_authority_service import table_from_df, update_tables
+        rows = table_from_df(safe) if not safe.empty else []
+        for module_key in ("01_time_records", "02_history"):
+            try:
+                update_tables(module_key, {"time_records": rows}, reason=f"{reason}_{module_key}", github=bool(github))
+            except TypeError:
+                update_tables(module_key, {"time_records": rows}, reason=f"{reason}_{module_key}")
+        return int(len(rows))
+    except Exception as exc:
+        _v193_safe_log("V193_AUTHORITY_SAVE_ERROR", f"V193 01/02 權威檔寫入失敗：{exc}", level="ERROR")
+        return 0
+
+
+def _v193_authority_df(module_key: str = "02_history") -> pd.DataFrame:
+    for fn_name in ("_v139_table_df", "_v134_authority_df", "_v89_authority_df", "_v84_load_time_authority_df"):
+        fn = globals().get(fn_name)
+        if callable(fn):
+            try:
+                df = fn(module_key)
+                if isinstance(df, pd.DataFrame):
+                    return df.copy()
+            except Exception:
+                pass
+    try:
+        from services.permanent_authority_service import load_authority, table_to_df
+        data = load_authority(module_key) or {}
+        df = table_to_df((data.get("records") or {}).get("time_records") or [])
+        return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v193_sync_sqlite_current_to_authority(reason: str = "v193_sync_sqlite_current_to_authority", github: bool = False) -> int:
+    sqlite_df = _v193_filter_deleted(_v193_query_sqlite_records())
+    auth_df = _v193_filter_deleted(_v193_authority_df("02_history"))
+    merged = _v193_filter_deleted(_v193_merge_records(auth_df, sqlite_df))
+    if merged.empty:
+        return _v193_save_0102(merged, reason=reason, github=github)
+    return _v193_save_0102(merged, reason=reason, github=github)
+
+
+def _v193_needs_sqlite_fallback(prev_df: pd.DataFrame, sqlite_df: pd.DataFrame) -> bool:
+    if sqlite_df is None or not isinstance(sqlite_df, pd.DataFrame) or sqlite_df.empty:
+        return False
+    if prev_df is None or not isinstance(prev_df, pd.DataFrame) or prev_df.empty:
+        return True
+    try:
+        prev_keys = {_v193_key_for_row(r) for r in prev_df.to_dict("records")}
+        sqlite_keys = {_v193_key_for_row(r) for r in sqlite_df.to_dict("records")}
+        return bool(sqlite_keys - prev_keys)
+    except Exception:
+        return False
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v193_prev_start_work):
+        raise RuntimeError("start_work core implementation unavailable")
+    rid = int(_v193_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        try:
+            _v193_sync_sqlite_current_to_authority("start_work_v193_reset_safe_sync", github=False)
+        except Exception as exc:
+            _v193_safe_log("V193_START_SYNC_ERROR", f"V193 開始作業後同步 01/02 失敗：{exc}", level="ERROR")
+        for fn_name in ("clear_query_cache", "clear_today_records_fast_cache", "_v171_clear_time_record_caches"):
+            fn = globals().get(fn_name)
+            if callable(fn):
+                try:
+                    fn()
+                except Exception:
+                    pass
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v193_prev_finish_work):
+        raise RuntimeError("finish_work core implementation unavailable")
+    n = int(_v193_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n:
+        try:
+            _v193_sync_sqlite_current_to_authority("finish_work_v193_reset_safe_sync", github=False)
+        except Exception as exc:
+            _v193_safe_log("V193_FINISH_SYNC_ERROR", f"V193 結束作業後同步 01/02 失敗：{exc}", level="ERROR")
+        for fn_name in ("clear_query_cache", "clear_today_records_fast_cache", "_v171_clear_time_record_caches"):
+            fn = globals().get(fn_name)
+            if callable(fn):
+                try:
+                    fn()
+                except Exception:
+                    pass
+    return n
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    prev = pd.DataFrame()
+    if callable(_v193_prev_load_records):
+        try:
+            prev = _v193_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+        except Exception:
+            prev = pd.DataFrame()
+    prev = _v193_filter_deleted(prev)
+    sqlite_df = _v193_filter_deleted(_v193_query_sqlite_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order))
+    if _v193_needs_sqlite_fallback(prev, sqlite_df):
+        merged = _v193_filter_deleted(_v193_merge_records(prev, sqlite_df))
+        # If authority was empty after intentional reset, republish current non-deleted SQLite rows so 01/02 show the same records.
+        try:
+            _v193_save_0102(merged, reason="load_records_v193_reset_safe_sqlite_publish", github=False)
+        except Exception:
+            pass
+        return merged
+    return prev
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    prev = pd.DataFrame()
+    if callable(_v193_prev_today_records):
+        try:
+            prev = _v193_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+        except Exception:
+            prev = pd.DataFrame()
+    prev = _v193_filter_deleted(prev)
+    # Use current records as fallback, but restrict to today-like rows to keep Today Records light.
+    try:
+        from datetime import datetime as _dt
+        today = _dt.now().strftime("%Y-%m-%d")
+    except Exception:
+        today = ""
+    sqlite_df = _v193_filter_deleted(_v193_query_sqlite_records(start_date=today if today else None, end_date=today if today else None))
+    if unfinished_only and not sqlite_df.empty:
+        try:
+            end_ts = sqlite_df.get("end_timestamp", pd.Series([""] * len(sqlite_df), index=sqlite_df.index)).astype(str).str.strip()
+            status = sqlite_df.get("status", pd.Series([""] * len(sqlite_df), index=sqlite_df.index)).astype(str)
+            active = end_ts.eq("") & ~status.str.contains("下班|暫停|完工|結束|已結束", regex=True, na=False)
+            sqlite_df = sqlite_df.loc[active].copy()
+        except Exception:
+            pass
+    if not include_finished and not sqlite_df.empty:
+        try:
+            end_ts = sqlite_df.get("end_timestamp", pd.Series([""] * len(sqlite_df), index=sqlite_df.index)).astype(str).str.strip()
+            status = sqlite_df.get("status", pd.Series([""] * len(sqlite_df), index=sqlite_df.index)).astype(str)
+            active = end_ts.eq("") & ~status.str.contains("下班|暫停|完工|結束|已結束", regex=True, na=False)
+            sqlite_df = sqlite_df.loc[active].copy()
+        except Exception:
+            pass
+    if _v193_needs_sqlite_fallback(prev, sqlite_df):
+        return _v193_filter_deleted(_v193_merge_records(prev, sqlite_df))
+    return prev
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    prev = pd.DataFrame()
+    if callable(_v193_prev_get_active_records):
+        try:
+            prev = _v193_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+        except Exception:
+            prev = pd.DataFrame()
+    prev = _v193_filter_deleted(prev)
+    sqlite_df = _v193_filter_deleted(_v193_query_sqlite_records(start_date=start_date, employee_id=employee_id))
+    if not sqlite_df.empty:
+        try:
+            end_ts = sqlite_df.get("end_timestamp", pd.Series([""] * len(sqlite_df), index=sqlite_df.index)).astype(str).str.strip()
+            status = sqlite_df.get("status", pd.Series([""] * len(sqlite_df), index=sqlite_df.index)).astype(str)
+            active = end_ts.eq("") & ~status.str.contains("下班|暫停|完工|結束|已結束|待人工確認", regex=True, na=False)
+            sqlite_df = sqlite_df.loc[active].copy()
+            if process_name and "process_name" in sqlite_df.columns:
+                sqlite_df = sqlite_df.loc[sqlite_df["process_name"].astype(str) == str(process_name)].copy()
+            if employee_name and "employee_name" in sqlite_df.columns:
+                sqlite_df = sqlite_df.loc[sqlite_df["employee_name"].astype(str) == str(employee_name)].copy()
+        except Exception:
+            pass
+    if _v193_needs_sqlite_fallback(prev, sqlite_df):
+        return _v193_filter_deleted(_v193_merge_records(prev, sqlite_df))
+    return prev
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        if "id" in df.columns:
+            df = df.copy()
+            df["_v193_id"] = pd.to_numeric(df["id"], errors="coerce")
+            df = df.sort_values("_v193_id", ascending=False, kind="stable").drop(columns=["_v193_id"], errors="ignore")
+        return dict(df.iloc[0])
+    except Exception:
+        return None
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    rec = None
+    if callable(_v193_prev_get_active_same_work):
+        try:
+            rec = _v193_prev_get_active_same_work(employee_id, work_order, process_name, start_date=start_date, employee_name=employee_name)
+        except TypeError:
+            try:
+                rec = _v193_prev_get_active_same_work(employee_id, work_order, process_name, start_date=start_date)
+            except Exception:
+                rec = None
+        except Exception:
+            rec = None
+    if rec:
+        try:
+            test_df = _v193_filter_deleted(pd.DataFrame([rec]))
+            if not test_df.empty:
+                return dict(test_df.iloc[0])
+        except Exception:
+            return rec
+    df = get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        if "work_order" in df.columns:
+            df = df.loc[df["work_order"].astype(str) == str(work_order)].copy()
+        if df.empty:
+            return None
+        if "id" in df.columns:
+            df["_v193_id"] = pd.to_numeric(df["id"], errors="coerce")
+            df = df.sort_values("_v193_id", ascending=False, kind="stable").drop(columns=["_v193_id"], errors="ignore")
+        return dict(df.iloc[0])
+    except Exception:
+        return None
+
+
+def sync_time_records_01_02_now(reason: str = "v193_manual_sync_sqlite_current_to_0102", *, github: bool = True) -> int:  # type: ignore[override]
+    return _v193_sync_sqlite_current_to_authority(reason=reason, github=bool(github))
+
+
+def audit_v193_reset_display_state() -> dict:
+    sqlite_df = _v193_filter_deleted(_v193_query_sqlite_records())
+    auth_df = _v193_filter_deleted(_v193_authority_df("02_history"))
+    today_df = today_records()
+    active_df = get_active_records()
+    return {
+        "version": "V193",
+        "sqlite_visible_rows": int(len(sqlite_df)) if isinstance(sqlite_df, pd.DataFrame) else 0,
+        "history_authority_visible_rows": int(len(auth_df)) if isinstance(auth_df, pd.DataFrame) else 0,
+        "today_visible_rows": int(len(today_df)) if isinstance(today_df, pd.DataFrame) else 0,
+        "active_visible_rows": int(len(active_df)) if isinstance(active_df, pd.DataFrame) else 0,
+        "note": "V193 keeps intentional-delete tombstones, but republishes non-deleted SQLite current rows into 01/02 after reset.",
+    }
+
+# ================= END V193 INTENTIONAL RESET REBUILD DISPLAY PATCH =================
