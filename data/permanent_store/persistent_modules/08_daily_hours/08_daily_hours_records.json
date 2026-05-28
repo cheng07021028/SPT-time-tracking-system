@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 09:57:04",
+  "exported_at": "2026-05-28 10:05:59",
   "source": "db_service_write",
   "module_key": "08_daily_hours",
   "module_code": "08",
@@ -1034,11 +1034,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 09:57:04",
         "updated_at": "2026-05-28 09:57:04"
+      },
+      {
+        "id": 252,
+        "record_key": "SPT138|V3150126|機台定位水平調整(含連結)|2026-05-28 10:05:59|0334119b",
+        "status": "作業中",
+        "work_order": "V3150126",
+        "part_no": "",
+        "type_name": "",
+        "process_name": "機台定位水平調整(含連結)",
+        "employee_id": "SPT138",
+        "employee_name": "蘇雍盛",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 10:05:59",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "10:05:59",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "",
+        "group_key": "SPT138|機台定位水平調整(含連結)|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 10:05:59",
+        "updated_at": "2026-05-28 10:05:59"
       }
     ]
   },
   "table_counts": {
     "employees": 0,
-    "time_records": 38
+    "time_records": 39
   }
 }
