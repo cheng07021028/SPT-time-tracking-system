@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 16:26:54",
-  "exported_at": "2026-05-28 16:26:54",
+  "updated_at": "2026-05-28 16:28:45",
+  "exported_at": "2026-05-28 16:28:45",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -20095,11 +20095,35 @@
         "detail": "",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 371,
+        "log_time": "2026-05-28 16:28:40",
+        "user_name": "admin",
+        "action_type": "V89_SQLITE_CACHE_SYNC_ERROR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 快取由權威檔覆蓋失敗：UNIQUE constraint failed: time_records.id",
+        "detail": "",
+        "level": "ERROR",
+        "source": "sqlite"
+      },
+      {
+        "id": 370,
+        "log_time": "2026-05-28 16:28:35",
+        "user_name": "SPT227",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1674
+    "system_logs": 1676
   }
 }
