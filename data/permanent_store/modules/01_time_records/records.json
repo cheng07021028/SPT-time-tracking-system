@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-28 19:02:53",
-  "exported_at": "2026-05-28 19:02:53",
-  "reason": "start_work_v137_identity_safe_upsert_01",
+  "updated_at": "2026-05-28 19:02:54",
+  "exported_at": "2026-05-28 19:02:54",
+  "reason": "start_work_v139_final_state_reconcile_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -255,7 +255,7 @@
         "start_time": "20:28:51",
         "end_date": "2026-05-27",
         "end_time": "20:57:37",
-        "work_hours": "00:28:46",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT241|收機|2026-05-27",
         "is_group_work": 0,
