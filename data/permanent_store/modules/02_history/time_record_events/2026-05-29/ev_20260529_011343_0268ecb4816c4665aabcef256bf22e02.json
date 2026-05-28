@@ -1,0 +1,46 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "0268ecb4816c4665aabcef256bf22e02",
+  "event_type": "OFF_DUTY",
+  "event_time": "2026-05-29 01:13:43",
+  "record_id": "329",
+  "record_key": "SSS|21M0241-04|前置鈑金|2026-05-29 01:12:54|f6c70b50",
+  "operator_account": "SSS",
+  "reason": "finish_work_v176_fast_transaction",
+  "row": {
+    "id": "329",
+    "record_key": "SSS|21M0241-04|前置鈑金|2026-05-29 01:12:54|f6c70b50",
+    "status": "下班",
+    "work_order": "21M0241-04",
+    "part_no": "4TRSC020-004-02",
+    "type_name": "NTB 3 PORT",
+    "process_name": "前置鈑金",
+    "employee_id": "SSS",
+    "employee_name": "SSS",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-29 01:12:54",
+    "end_action": "下班",
+    "end_timestamp": "2026-05-29 01:13:43",
+    "remark": "",
+    "start_date": "2026-05-29",
+    "start_time": "01:12:54",
+    "end_date": "2026-05-29",
+    "end_time": "01:13:43",
+    "work_hours": "0.01",
+    "assembly_location": "竹東",
+    "group_key": "SSS|前置鈑金|2026-05-29",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-29 01:12:54",
+    "updated_at": "2026-05-29 01:13:43"
+  },
+  "extra": {
+    "end_action": "下班",
+    "remark": "",
+    "affected_ids": [
+      329
+    ]
+  },
+  "previous_checksum": "ac3f0f1340a36f29ab596ba9e2c0b47abf668229b0c822fad959a7c82f7a3595",
+  "checksum": "6c889be0bafcb25afbd80bb873c74f97399ad905b10d6638d2c52cd92802b349"
+}
