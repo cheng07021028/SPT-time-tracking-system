@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "settings",
-  "updated_at": "2026-05-28 16:13:29",
-  "exported_at": "2026-05-28 16:13:29",
+  "updated_at": "2026-05-28 16:15:03",
+  "exported_at": "2026-05-28 16:15:03",
   "reason": "v94_history_delete_tombstone",
   "empty_authoritative": false,
   "tables": {},
@@ -112,7 +112,9 @@
       243,
       245,
       261,
-      263
+      263,
+      271,
+      273
     ],
     "deleted_record_keys": [
       "B002|21M0241-01|6S|2026-05-27 19:41:26|29955ee5",
@@ -159,7 +161,9 @@
       "B257|26N4001-02|模組|2026-05-27 10:50:57|6f67324f",
       "B259|25MN0014-10|其他|2026-05-27 08:59:36|e477a129",
       "B260|V3141247|unit 安裝調整 (Robot  /LP / FFU)|2026-05-26 08:35:43|5c659088",
+      "LOGRECOVERY|SSS|21M0241-01|6S|2026-05-28 11:08:03|271",
       "LOGRECOVERY|SSS|21M0241-01|前置鈑金|2026-05-28 10:43:16|263",
+      "LOGRECOVERY|SSS|NA|6S|2026-05-28 11:08:44|273",
       "SPT031|24N4001-34|S.T.|2026-05-26 09:43:42|8dda16ac",
       "SPT031|25M0694-01|S.T.|2026-05-27 13:07:47|018a2777",
       "SPT034|25M0694-02|S.T.|2026-05-27 14:14:37|fdedb06d",
@@ -229,7 +233,7 @@
       "SSS|21M0241-02|前置鈑金|2026-05-27 16:10:48|b9e6ff3d",
       "SSS|26M0051-03|前置鈑金|2026-05-27 18:12:50|adbb5a18"
     ],
-    "delete_tombstone_updated_at": "2026-05-28 16:13:29",
+    "delete_tombstone_updated_at": "2026-05-28 16:15:03",
     "table_settings": {
       "history_records": {
         "widths": {
