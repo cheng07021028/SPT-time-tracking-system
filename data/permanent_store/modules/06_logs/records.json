@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 18:12:23",
-  "exported_at": "2026-05-28 18:12:23",
+  "updated_at": "2026-05-28 18:12:36",
+  "exported_at": "2026-05-28 18:12:36",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -22759,11 +22759,59 @@
         "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 491,
+        "log_time": "2026-05-28 18:12:32",
+        "user_name": "SPT091",
+        "action_type": "V166D_DURABLE_SNAPSHOT",
+        "target_table": "time_records",
+        "target_id": "227",
+        "message": "V166D durable snapshot：OFF_DUTY / finish_work_v152_event_journal / rows=1",
+        "detail": "reason=finish_work_v152_event_journal;row_count=1\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"capture_version\":\"V166D\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-28 18:12:32\",\"action_type\":\"V166D_DURABLE_SNAPSHOT\",\"target_table\":\"time_records\",\"target_id\":\"227\",\"target_ids\":[227],\"message\":\"V166D durable snapshot：OFF_DUTY / finish_work_v152_event_journal / rows=1\",\"reason\":\"finish_work_v152_event_journal\",\"extra\":{\"event_type\":\"OFF_DUTY\",\"github\":false,\"extra\":{\"end_action\":\"下班\",\"remark\":\"\",\"finish_parallel_group\":true,\"affected_ids\":[227]}},\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166d_explicit_log_snapshot\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"explicit_rows\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT091|26M0021-02|收機|2026-05-28 09:26:39|80f421c1\",\"identity_key\":\"record_key:SPT091|26M0021-02|收機|2026-05-28 09:26:39|80f421c1\",\"id\":\"227\",\"employee_id\":\"SPT091\",\"employee_name\":\"魏瑄毅\",\"work_order\":\"26M0021-02\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"收機\",\"status\":\"下班\",\"start_timestamp\":\"2026-05-28 09:26:39\",\"end_timestamp\":\"2026-05-28 18:11:39\",\"work_hours\":\"7.06\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":227,\"record_key\":\"SPT091|26M0021-02|收機|2026-05-28 09:26:39|80f421c1\",\"status\":\"下班\",\"work_order\":\"26M0021-02\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"收機\",\"employee_id\":\"SPT091\",\"employee_name\":\"魏瑄毅\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 09:26:39\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 18:11:39\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"09:26:39\",\"end_date\":\"2026-05-28\",\"end_time\":\"18:11:39\",\"work_hours\":7.06,\"assembly_location\":\"竹東\",\"group_key\":\"SPT091|收機|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 09:26:39\",\"updated_at\":\"2026-05-28 18:11:39\",\"_snapshot_source\":\"v166d_explicit_durable_layer\"}],\"v166d_explicit_rows\":[{\"id\":227,\"record_key\":\"SPT091|26M0021-02|收機|2026-05-28 09:26:39|80f421c1\",\"status\":\"下班\",\"work_order\":\"26M0021-02\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"收機\",\"employee_id\":\"SPT091\",\"employee_name\":\"魏瑄毅\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 09:26:39\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 18:11:39\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"09:26:39\",\"end_date\":\"2026-05-28\",\"end_time\":\"18:11:39\",\"work_hours\":7.06,\"assembly_location\":\"竹東\",\"group_key\":\"SPT091|收機|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 09:26:39\",\"updated_at\":\"2026-05-28 18:11:39\",\"_snapshot_source\":\"v166d_explicit_durable_layer\"}],\"sqlite_time_records\":[],\"authority_01_time_records\":[],\"authority_02_history\":[]},\"snapshot_hash\":\"401d2eb2ec8bb1426c69046657d1c1e6cb4acf6e48e9db492c567fa91a7dd793\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 490,
+        "log_time": "2026-05-28 18:12:32",
+        "user_name": "admin",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 2 筆",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 489,
+        "log_time": "2026-05-28 18:12:32",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 488,
+        "log_time": "2026-05-28 18:12:24",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1896
+    "system_logs": 1900
   }
 }
