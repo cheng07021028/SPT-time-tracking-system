@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-28 10:06:34",
-  "exported_at": "2026-05-28 10:06:34",
+  "updated_at": "2026-05-28 10:28:10",
+  "exported_at": "2026-05-28 10:28:10",
   "reason": "start_work_v108_fast_local_upsert_02",
   "empty_authoritative": false,
   "tables": {
@@ -1168,11 +1168,65 @@
         "source": "streamlit",
         "created_at": "2026-05-28 10:05:59",
         "updated_at": "2026-05-28 10:05:59"
+      },
+      {
+        "id": 254,
+        "record_key": "SPT145|26N4001-02|模組|2026-05-28 10:27:37|b9293103",
+        "status": "作業中",
+        "work_order": "26N4001-02",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "模組",
+        "employee_id": "SPT145",
+        "employee_name": "潘威捷",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 10:27:37",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "10:27:37",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT145|模組|2026-05-28",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-28 10:27:37",
+        "updated_at": "2026-05-28 10:28:09"
+      },
+      {
+        "id": 255,
+        "record_key": "SPT145|26N4001-03|模組|2026-05-28 10:28:09|74be0ead",
+        "status": "作業中",
+        "work_order": "26N4001-03",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "模組",
+        "employee_id": "SPT145",
+        "employee_name": "潘威捷",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 10:28:09",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "10:28:09",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT145|模組|2026-05-28",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-28 10:28:09",
+        "updated_at": "2026-05-28 10:28:09"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 43
+    "time_records": 45
   }
 }
