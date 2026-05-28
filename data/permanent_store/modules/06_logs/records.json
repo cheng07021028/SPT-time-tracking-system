@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 09:54:06",
-  "exported_at": "2026-05-28 09:54:06",
-  "reason": "logout_v133_time_authority_flush_log_flush",
+  "updated_at": "2026-05-28 09:54:15",
+  "exported_at": "2026-05-28 09:54:15",
+  "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
     "system_logs": [
@@ -10063,11 +10063,35 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 9696,
+        "log_time": "2026-05-28 09:54:11",
+        "user_name": "B248",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "248",
+        "message": "佘銘訓 開始 26N4001-03 / 配電",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9695,
+        "log_time": "2026-05-28 09:54:11",
+        "user_name": "B248",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 838
+    "system_logs": 840
   }
 }
