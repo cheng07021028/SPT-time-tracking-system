@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 14:24:08",
+  "exported_at": "2026-05-28 14:27:44",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 54,
+  "business_row_count": 55,
   "table_counts": {
     "auth_account_permissions": 125,
     "auth_login_logs": 0,
@@ -13,13 +13,14 @@
     "login_logs": 403,
     "process_options": 17,
     "rest_periods": 5,
+    "security_settings": 2,
+    "security_user_roles": 9,
+    "security_users": 9,
     "system_logs": 156,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "time_record_events": 1,
-    "time_record_outbox": 0,
-    "time_records": 54,
+    "time_records": 55,
     "work_orders": 0
   },
   "tables": {
@@ -8572,6 +8573,195 @@
         "sort_order": 5
       }
     ],
+    "security_settings": [
+      {
+        "setting_key": "idle_timeout_minutes",
+        "setting_value": "15",
+        "note": "V1.69 synchronized security setting",
+        "updated_at": "2026-05-15 11:23:50"
+      },
+      {
+        "setting_key": "ask_continue_after_record",
+        "setting_value": "1",
+        "note": "V1.69 synchronized security setting",
+        "updated_at": "2026-05-15 11:23:50"
+      }
+    ],
+    "security_user_roles": [
+      {
+        "id": 10,
+        "username": "admin",
+        "role_code": "admin",
+        "created_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 11,
+        "username": "manager",
+        "role_code": "manager",
+        "created_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 12,
+        "username": "leader",
+        "role_code": "leader",
+        "created_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 13,
+        "username": "operator",
+        "role_code": "operator",
+        "created_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 14,
+        "username": "viewer",
+        "role_code": "viewer",
+        "created_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 15,
+        "username": "auditor",
+        "role_code": "auditor",
+        "created_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 16,
+        "username": "spt142",
+        "role_code": "operator",
+        "created_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 17,
+        "username": "B211",
+        "role_code": "operator",
+        "created_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 18,
+        "username": "Ethan",
+        "role_code": "admin",
+        "created_at": "2026-05-19 17:35:07"
+      }
+    ],
+    "security_users": [
+      {
+        "id": 1,
+        "username": "admin",
+        "password_hash": "pbkdf2_sha256$3a6f3a7befa0885e8c08cc2eb15a9859$4c37ee557e8e94cd84ddf1e2c31156cdb5fed35b9880b147e7e72302444f72ee",
+        "employee_id": "nan",
+        "display_name": "系統管理員",
+        "email": "Admin",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-15 11:23:39",
+        "created_at": "2026-05-15 03:46:58",
+        "updated_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 2,
+        "username": "manager",
+        "password_hash": "pbkdf2_sha256$10ba828719f2b82390101445bbcf4386$f6814b12a67e894cc25729467ebeb5b931c0a2e962c9be78011f0a7c96bed7ec",
+        "employee_id": "nan",
+        "display_name": "製造主管",
+        "email": "Manager",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-15 03:46:58",
+        "updated_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 3,
+        "username": "leader",
+        "password_hash": "pbkdf2_sha256$820402735ad1b2eea21d45fe0dde7d92$61071ad17632fe72811f7954a9f0285315dc41cc9ad744a0f91696a25d427cbf",
+        "employee_id": "nan",
+        "display_name": "現場幹部",
+        "email": "Leader",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-15 03:46:58",
+        "updated_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 4,
+        "username": "operator",
+        "password_hash": "pbkdf2_sha256$4d4520bfc0e2c72ba9b6139d26256b67$8b16d1dc77c04c2a285e5e1f21ec03dccc169bf0db45f2c1612d80ecd0b7dc40",
+        "employee_id": "nan",
+        "display_name": "作業人員",
+        "email": "Operator",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-15 03:46:58",
+        "updated_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 5,
+        "username": "viewer",
+        "password_hash": "pbkdf2_sha256$205d2b7f07efb7edb59124464db1b85c$496673a805306de4f438898de0dc6178c71b9a83cd2b10242fa20f3bef738859",
+        "employee_id": "nan",
+        "display_name": "查詢者",
+        "email": "Viewer",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-15 03:46:58",
+        "updated_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 6,
+        "username": "auditor",
+        "password_hash": "pbkdf2_sha256$f0810956eb383df03a679f2fc23e5bd0$11465b9812094ab5ff80cc844dbf555a2b107fc534cd7bd9f46db3122d43425d",
+        "employee_id": "nan",
+        "display_name": "稽核",
+        "email": "Auditor",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-15 03:46:58",
+        "updated_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 7,
+        "username": "spt142",
+        "password_hash": "pbkdf2_sha256$767f80cda95ff0103ed131ffe8f43d95$77c112f466cb74aa5de47ce378f2e30b3a3360228948301569e8c1cd894df5d9",
+        "employee_id": "",
+        "display_name": "spt142",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-15 11:18:26",
+        "created_at": "2026-05-15 10:48:48",
+        "updated_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 8,
+        "username": "B211",
+        "password_hash": "pbkdf2_sha256$80bd0fbcd7f99be462a491ef162f8803$fb7e693d3fb4e38b3738297e723e7026fe406e31ea35a42f207fab1ce914f09c",
+        "employee_id": "",
+        "display_name": "B211",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-15 11:21:46",
+        "created_at": "2026-05-15 10:58:31",
+        "updated_at": "2026-05-19 17:35:07"
+      },
+      {
+        "id": 9,
+        "username": "Ethan",
+        "password_hash": "pbkdf2_sha256$4a2137fb90480f1b82a4721549f178ff$e85de92dedccb2791d7c297a55882100182babccdb5fd0485b63bfa5ac24bca0",
+        "employee_id": "SPT142",
+        "display_name": "Ethan",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-16 14:29:55",
+        "updated_at": "2026-05-19 17:35:07"
+      }
+    ],
     "system_logs": [
       {
         "id": 1,
@@ -10330,27 +10520,6 @@
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
-    "time_record_events": [
-      {
-        "event_id": "1c1c7228f5994c0d970ae0640090358f",
-        "record_key": "SPT199|26M0021-01|收機|2026-05-28 14:21:17|9da50173",
-        "record_id": "291",
-        "event_type": "START_WORK",
-        "event_time": "2026-05-28 14:21:29",
-        "employee_id": "SPT199",
-        "employee_name": "龍斯愷",
-        "work_order": "26M0021-01",
-        "process_name": "收機",
-        "start_timestamp": "2026-05-28 14:21:17",
-        "operator_account": "SPT199",
-        "payload_json": "{\"schema\": \"SPT-TimeRecordEvent-V152\", \"event_id\": \"1c1c7228f5994c0d970ae0640090358f\", \"event_type\": \"START_WORK\", \"event_time\": \"2026-05-28 14:21:29\", \"record_id\": \"291\", \"record_key\": \"SPT199|26M0021-01|收機|2026-05-28 14:21:17|9da50173\", \"operator_account\": \"SPT199\", \"reason\": \"start_work_v152_event_journal\", \"row\": {\"id\": \"291\", \"record_key\": \"SPT199|26M0021-01|收機|2026-05-28 14:21:17|9da50173\", \"status\": \"作業中\", \"work_order\": \"26M0021-01\", \"part_no\": \"1GRSC150-003-04\", \"type_name\": \"4 Port Frame Long-type EFEM\", \"process_name\": \"收機\", \"employee_id\": \"SPT199\", \"employee_name\": \"龍斯愷\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-28 14:21:17\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-28\", \"start_time\": \"14:21:17\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": \"0.0\", \"assembly_location\": \"竹東\", \"group_key\": \"SPT199|收機|2026-05-28\", \"is_group_work\": \"0\", \"source\": \"streamlit\", \"created_at\": \"2026-05-28 14:21:17\", \"updated_at\": \"2026-05-28 14:21:17\"}, \"extra\": {\"employee\": {\"id\": 33, \"employee_id\": \"SPT199\", \"employee_name\": \"龍斯愷\", \"department\": \"製造一課\", \"title\": \"技術員\", \"is_active\": true, \"is_in_factory\": true, \"is_today_attendance\": true, \"note\": \"\", \"created_at\": \"\", \"updated_at\": \"\"}, \"work_order\": {\"id\": \"12\", \"work_order\": \"26M0021-01\", \"part_no\": \"1GRSC150-003-04\", \"type_name\": \"4 Port Frame Long-type EFEM\", \"assembly_location\": \"竹東\", \"customer\": \"GPTC\", \"note\": \"I100%\", \"is_active\": true, \"created_at\": \"2026-05-26 23:24:58\", \"updated_at\": \"2026-05-26 23:24:58\"}, \"process_name\": \"收機\"}, \"previous_checksum\": \"\", \"checksum\": \"e1a25d68146fc59e0f6f119a2713b45288500f6f29450e4a2e0e2a7122ea00e4\"}",
-        "checksum": "e1a25d68146fc59e0f6f119a2713b45288500f6f29450e4a2e0e2a7122ea00e4",
-        "previous_checksum": "",
-        "source": "streamlit",
-        "created_at": "2026-05-28 14:21:29"
-      }
-    ],
-    "time_record_outbox": [],
     "time_records": [
       {
         "id": 187,
@@ -11809,6 +11978,33 @@
         "source": "streamlit",
         "created_at": "2026-05-28 14:00:06",
         "updated_at": "2026-05-28 14:00:06"
+      },
+      {
+        "id": 292,
+        "record_key": "SPT158|26M0021-01|收機|2026-05-28 14:25:05|43605a5e",
+        "status": "作業中",
+        "work_order": "26M0021-01",
+        "part_no": "1GRSC150-003-04",
+        "type_name": "4 Port Frame Long-type EFEM",
+        "process_name": "收機",
+        "employee_id": "SPT158",
+        "employee_name": "劉定澤",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 14:25:05",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
+        "start_date": "2026-05-28",
+        "start_time": "14:25:05",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT158|收機|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 14:25:05",
+        "updated_at": "2026-05-28 14:25:05"
       }
     ],
     "work_orders": []
