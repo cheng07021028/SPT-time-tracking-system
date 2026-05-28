@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-28 08:33:58",
-  "exported_at": "2026-05-28 08:33:58",
-  "reason": "start_work_v139_final_state_reconcile_01",
+  "updated_at": "2026-05-28 08:35:00",
+  "exported_at": "2026-05-28 08:35:00",
+  "reason": "start_work_v108_fast_local_upsert_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -223,11 +223,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 08:33:24",
         "updated_at": "2026-05-28 08:33:24"
+      },
+      {
+        "id": 195,
+        "record_key": "B260|V3150125|機台定位水平調整(含連結)|2026-05-28 08:34:57|9f6b1545",
+        "status": "作業中",
+        "work_order": "V3150125",
+        "part_no": "PP411390041",
+        "type_name": "BENCH 300 LPR Stripper Auto 2C 1Q 2D",
+        "process_name": "機台定位水平調整(含連結)",
+        "employee_id": "B260",
+        "employee_name": "莊仕琦",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 08:34:57",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "08:34:57",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B260|機台定位水平調整(含連結)|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 08:34:57",
+        "updated_at": "2026-05-28 08:34:57"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 8
+    "time_records": 9
   }
 }
