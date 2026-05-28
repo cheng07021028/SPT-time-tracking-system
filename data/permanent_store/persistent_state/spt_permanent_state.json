@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 22:44:34",
+  "exported_at": "2026-05-28 22:49:33",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 98,
+  "business_row_count": 97,
   "table_counts": {
     "auth_account_permissions": 118,
     "auth_login_logs": 0,
@@ -20,10 +20,9 @@
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "table_ui_settings": 0,
-    "time_record_events": 0,
+    "time_record_events": 1,
     "time_record_outbox": 0,
-    "time_records": 98,
+    "time_records": 97,
     "work_orders": 0
   },
   "tables": {
@@ -2794,8 +2793,26 @@
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
-    "table_ui_settings": [],
-    "time_record_events": [],
+    "time_record_events": [
+      {
+        "event_id": "fb955f26c4fb4d7cac35c610a677e0fd",
+        "record_key": "SPT244|24N4001-24|包機|2026-05-28 20:28:21|76ec6b74",
+        "record_id": "324",
+        "event_type": "DELETE_MARK",
+        "event_time": "2026-05-28 22:49:23",
+        "employee_id": "SPT244",
+        "employee_name": "費南",
+        "work_order": "24N4001-24",
+        "process_name": "包機",
+        "start_timestamp": "2026-05-28 20:28:21",
+        "operator_account": "admin",
+        "payload_json": "{\"schema\": \"SPT-TimeRecordEvent-V152\", \"event_id\": \"fb955f26c4fb4d7cac35c610a677e0fd\", \"event_type\": \"DELETE_MARK\", \"event_time\": \"2026-05-28 22:49:23\", \"record_id\": \"324\", \"record_key\": \"SPT244|24N4001-24|包機|2026-05-28 20:28:21|76ec6b74\", \"operator_account\": \"admin\", \"reason\": \"delete_time_records_v152_before_delete\", \"row\": {\"id\": \"324\", \"record_key\": \"SPT244|24N4001-24|包機|2026-05-28 20:28:21|76ec6b74\", \"status\": \"下班\", \"work_order\": \"24N4001-24\", \"part_no\": \"1SLP01S-FCA1-01\", \"type_name\": \"FCLP EFEM\", \"process_name\": \"包機\", \"employee_id\": \"SPT244\", \"employee_name\": \"費南\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-28 20:28:21\", \"end_action\": \"下班\", \"end_timestamp\": \"2026-05-28 20:28:43\", \"remark\": \"\", \"start_date\": \"2026-05-28\", \"start_time\": \"20:28:21\", \"end_date\": \"2026-05-28\", \"end_time\": \"20:28:43\", \"work_hours\": \"0.01\", \"assembly_location\": \"竹東\", \"group_key\": \"SPT244|包機|2026-05-28\", \"is_group_work\": \"0\", \"source\": \"streamlit\", \"created_at\": \"2026-05-28 20:28:21\", \"updated_at\": \"2026-05-28 22:41:51\"}, \"extra\": {\"reason\": \"02 歷史紀錄啟動編輯後整列刪除\", \"record_ids\": [324]}, \"previous_checksum\": \"\", \"checksum\": \"0b01eabccc5c68076608895937f9a03fed2eb8d1f53466a4bc556fc7ee04a84e\"}",
+        "checksum": "0b01eabccc5c68076608895937f9a03fed2eb8d1f53466a4bc556fc7ee04a84e",
+        "previous_checksum": "",
+        "source": "streamlit",
+        "created_at": "2026-05-28 22:49:23"
+      }
+    ],
     "time_record_outbox": [],
     "time_records": [
       {
@@ -5415,33 +5432,6 @@
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 20:25:16",
-        "updated_at": "2026-05-28 22:41:51"
-      },
-      {
-        "id": 324,
-        "record_key": "SPT244|24N4001-24|包機|2026-05-28 20:28:21|76ec6b74",
-        "status": "下班",
-        "work_order": "24N4001-24",
-        "part_no": "1SLP01S-FCA1-01",
-        "type_name": "FCLP EFEM",
-        "process_name": "包機",
-        "employee_id": "SPT244",
-        "employee_name": "費南",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 20:28:21",
-        "end_action": "下班",
-        "end_timestamp": "2026-05-28 20:28:43",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "20:28:21",
-        "end_date": "2026-05-28",
-        "end_time": "20:28:43",
-        "work_hours": 0.01,
-        "assembly_location": "竹東",
-        "group_key": "SPT244|包機|2026-05-28",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-28 20:28:21",
         "updated_at": "2026-05-28 22:41:51"
       }
     ],
