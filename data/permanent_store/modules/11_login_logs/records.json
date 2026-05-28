@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 14:11:51",
-  "exported_at": "2026-05-28 14:11:51",
+  "updated_at": "2026-05-28 14:13:34",
+  "exported_at": "2026-05-28 14:13:34",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 3160,
+        "source": "v103_merge",
+        "username": "SPT031",
+        "display_name": "吳政昌",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=SPT031",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-28 14:13:31",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 14:13:31"
+      },
+      {
+        "id": 3159,
+        "source": "v103_merge",
+        "username": "B135",
+        "display_name": "鍾明志",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "06_logs:can_view; employee_id=B135; roles=operator",
+        "module_code": "06_logs",
+        "login_time": "2026-05-28 14:13:29",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 14:13:29"
+      },
       {
         "id": 2766,
         "source": "v103_merge",
@@ -6286,7 +6318,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 392,
+    "login_logs": 394,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
