@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-28 13:47:30",
-  "exported_at": "2026-05-28 13:47:30",
-  "reason": "start_work_v152_event_journal_01",
+  "updated_at": "2026-05-28 13:50:16",
+  "exported_at": "2026-05-28 13:50:16",
+  "reason": "start_work_v108_fast_local_repair_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1384,38 +1384,11 @@
         "source": "streamlit",
         "created_at": "2026-05-28 13:39:25",
         "updated_at": "2026-05-28 13:39:25"
-      },
-      {
-        "id": 286,
-        "record_key": "SPT241|25M0785-02|模組|2026-05-28 13:47:04|7c2fb94a",
-        "status": "作業中",
-        "work_order": "25M0785-02",
-        "part_no": "PSRSC131-N01-04",
-        "type_name": "PSRSC131-N01",
-        "process_name": "模組",
-        "employee_id": "SPT241",
-        "employee_name": "達文",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 13:47:04",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "13:47:04",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
-        "assembly_location": "竹東",
-        "group_key": "SPT241|模組|2026-05-28",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-28 13:47:04",
-        "updated_at": "2026-05-28 13:47:04"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 52
+    "time_records": 51
   }
 }
