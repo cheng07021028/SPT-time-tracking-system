@@ -32,6 +32,12 @@ from services.backup_restore_service import (
     backup_manifest_rows,
 )
 
+from services.page_hygiene_service import (
+    collect_page_hygiene_status,
+    cleanup_duplicate_mojibake_pages,
+    page_hygiene_rows,
+)
+
 MODULE_CODE = "14_data_health"
 
 st.set_page_config(page_title="14. 資料健康檢查中心", page_icon="🛡️", layout="wide")
@@ -59,6 +65,66 @@ st.warning(
 st.caption(
     "權限說明：進入本頁需 14 模組 can_view；下載 Excel 需 can_export；執行非破壞式修復需 can_manage。"
 )
+
+
+st.markdown("### V159 頁面路由健康檢查 / Page Route Hygiene")
+st.caption(
+    "此區檢查 pages 目錄是否仍有 #Uxxxx 舊亂碼頁面。若同一模組同時存在舊亂碼頁與正常中文頁，"
+    "Streamlit 會多掃描舊頁面，還可能載入舊邏輯，造成頁面變慢或修正看似未生效。"
+)
+if "v159_page_hygiene_status" not in st.session_state:
+    try:
+        st.session_state["v159_page_hygiene_status"] = collect_page_hygiene_status()
+    except Exception as exc:
+        st.session_state["v159_page_hygiene_status"] = {"status": "ERROR", "items": [], "error": str(exc)}
+
+v159_c1, v159_c2, v159_c3 = st.columns([1, 1, 2])
+if v159_c1.button("🔄 重新檢查頁面路由", use_container_width=True, key="v159_refresh_page_hygiene"):
+    st.session_state["v159_page_hygiene_status"] = collect_page_hygiene_status()
+    st.rerun()
+
+v159_confirm_cleanup = v159_c2.checkbox(
+    "確認清理安全重複頁",
+    value=False,
+    disabled=not CAN_REPAIR,
+    key="v159_confirm_cleanup",
+    help="只會清理已有正常中文頁面對應的 #Uxxxx 舊頁面。",
+)
+if v159_c3.button(
+    "🧹 清理重複 #U 舊頁面",
+    use_container_width=True,
+    disabled=(not CAN_REPAIR) or (not v159_confirm_cleanup),
+    key="v159_apply_page_cleanup",
+):
+    st.session_state["v159_page_hygiene_cleanup_result"] = cleanup_duplicate_mojibake_pages(apply=True)
+    st.session_state["v159_page_hygiene_status"] = collect_page_hygiene_status()
+    st.rerun()
+
+v159_status = st.session_state.get("v159_page_hygiene_status") or {}
+v159_summary_cols = st.columns(4)
+v159_summary_cols[0].metric("頁面檔總數", v159_status.get("total_py_pages", 0))
+v159_summary_cols[1].metric("#U 舊頁面", v159_status.get("mojibake_pages", 0))
+v159_summary_cols[2].metric("可安全清理", v159_status.get("safe_to_remove", 0))
+v159_summary_cols[3].metric("需暫時保留", v159_status.get("must_keep", 0))
+
+if str(v159_status.get("status") or "") == "OK":
+    st.success("頁面路由正常：沒有偵測到 #Uxxxx 舊亂碼頁面。")
+elif int(v159_status.get("safe_to_remove", 0) or 0) > 0:
+    st.warning("偵測到可安全清理的重複 #U 舊頁面。建議清理後 Commit / Push，再 Reboot App。")
+elif int(v159_status.get("must_keep", 0) or 0) > 0:
+    st.info("仍有 #U 頁面，但目前沒有正常中文頁面可替代，因此系統暫時保留，避免模組消失。")
+
+v159_rows = v159_status.get("items", [])
+if v159_rows:
+    with st.expander("V159 頁面路由檢查明細", expanded=False):
+        st.dataframe(pd.DataFrame(v159_rows), use_container_width=True, hide_index=True, height=260)
+
+v159_cleanup_result = st.session_state.get("v159_page_hygiene_cleanup_result")
+if isinstance(v159_cleanup_result, dict) and v159_cleanup_result:
+    with st.expander("最近一次 V159 清理結果", expanded=False):
+        st.json(v159_cleanup_result)
+
+st.divider()
 
 
 st.markdown("### V158 一鍵備份 / 還原中心")
@@ -407,4 +473,4 @@ if b3.button("🧹 清除本頁檢查結果", use_container_width=True, key="v15
     st.session_state.pop("v153_repair_result", None)
     st.rerun()
 
-st.caption("V158：資料健康檢查中心已加入一鍵備份 / 還原中心。建議每次大版本更新前先建立完整備份，再執行 V157 測試與資料健康檢查。")
+st.caption("V159：已加入頁面路由健康檢查，建議清除已存在正常中文對應頁的 #Uxxxx 舊頁面，避免 Streamlit 掃描舊頁與載入舊邏輯。")
