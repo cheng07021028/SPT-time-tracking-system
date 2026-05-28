@@ -1272,3 +1272,91 @@ if b3.button("🧹 清除本頁檢查結果", use_container_width=True, key="v15
     st.rerun()
 
 st.caption("V159：已加入頁面路由健康檢查，建議清除已存在正常中文對應頁的 #Uxxxx 舊頁面，避免 Streamlit 掃描舊頁與載入舊邏輯。")
+
+# -----------------------------------------------------------------------------
+# V182-V188 consolidated audit center (direct overwrite, read-only by default)
+# -----------------------------------------------------------------------------
+st.markdown("---")
+st.markdown("### V182-V188 一次彙整檢查中心 / Consolidated Diagnostics")
+st.caption(
+    "本區把 01/02/SQLite 一致性、舊重複資料、LOGRECOVERY、06 LOG 錯誤分類、備份狀態提示、版本健康檢查集中在同一份報告。"
+    "預設只讀，不刪除、不覆蓋、不重新編號。"
+)
+
+try:
+    from services.data_consistency_audit_service import (
+        collect_v182_consolidated_audit,
+        export_v182_audit_excel_bytes,
+    )
+    _v182_import_error = ""
+except Exception as _v182_exc:  # deployment guard
+    collect_v182_consolidated_audit = None
+    export_v182_audit_excel_bytes = None
+    _v182_import_error = str(_v182_exc)
+
+if _v182_import_error:
+    st.error("V182 一次彙整檢查服務尚未正確載入：" + _v182_import_error)
+else:
+    v182_c1, v182_c2, v182_c3 = st.columns([1, 1, 2])
+    v182_limit = v182_c1.number_input("最多列出異常筆數", min_value=100, max_value=10000, value=1000, step=100, key="v182_limit_rows")
+    v182_run = v182_c2.button("🔍 執行 V182-V188 一次彙整檢查", use_container_width=True, key="v182_run_consolidated_audit")
+    v182_c3.info("勾選、切換或輸入不會自動運算；只有按下執行才會讀取資料並產生報告。")
+
+    if v182_run:
+        with st.spinner("正在執行 01/02/SQLite/tombstone/LOGRECOVERY/LOG 錯誤/版本健康彙整檢查..."):
+            st.session_state["v182_consolidated_audit_report"] = collect_v182_consolidated_audit(limit_rows=int(v182_limit))
+
+    v182_report = st.session_state.get("v182_consolidated_audit_report")
+    if v182_report:
+        s1, s2, s3, s4 = st.columns(4)
+        severity_rows = v182_report.get("severity_summary", []) or []
+        sev_map = {str(x.get("severity")): int(x.get("count", 0) or 0) for x in severity_rows if isinstance(x, dict)}
+        s1.metric("CRITICAL", sev_map.get("CRITICAL", 0))
+        s2.metric("HIGH", sev_map.get("HIGH", 0))
+        s3.metric("檢查秒數", v182_report.get("elapsed_seconds", 0))
+        s4.metric("寫入正式資料", "否" if not v182_report.get("production_write_path_changed") else "是")
+
+        if v182_report.get("recommendations"):
+            st.warning("\n".join([f"- {x}" for x in v182_report.get("recommendations", [])]))
+
+        tabs = st.tabs([
+            "來源數量",
+            "異常摘要",
+            "異常明細",
+            "重複資料",
+            "LOG錯誤分類",
+            "版本健康",
+            "備份狀態提示",
+        ])
+        with tabs[0]:
+            st.dataframe(pd.DataFrame(v182_report.get("source_counts", [])), use_container_width=True, hide_index=True)
+        with tabs[1]:
+            c1, c2 = st.columns(2)
+            c1.dataframe(pd.DataFrame(v182_report.get("severity_summary", [])), use_container_width=True, hide_index=True)
+            c2.dataframe(pd.DataFrame(v182_report.get("issue_summary", [])), use_container_width=True, hide_index=True)
+        with tabs[2]:
+            st.dataframe(pd.DataFrame(v182_report.get("issue_rows", [])), use_container_width=True, hide_index=True)
+        with tabs[3]:
+            st.dataframe(pd.DataFrame(v182_report.get("duplicate_rows", [])), use_container_width=True, hide_index=True)
+        with tabs[4]:
+            c1, c2 = st.columns([1, 2])
+            c1.dataframe(pd.DataFrame(v182_report.get("log_error_summary", [])), use_container_width=True, hide_index=True)
+            c2.dataframe(pd.DataFrame(v182_report.get("log_error_rows", [])), use_container_width=True, hide_index=True)
+        with tabs[5]:
+            st.dataframe(pd.DataFrame(v182_report.get("version_rows", [])), use_container_width=True, hide_index=True)
+        with tabs[6]:
+            st.dataframe(pd.DataFrame(v182_report.get("backup_rows", [])), use_container_width=True, hide_index=True)
+
+        if CAN_EXPORT and export_v182_audit_excel_bytes is not None:
+            st.download_button(
+                "⬇️ 下載 V182-V188 一次彙整檢查 Excel",
+                data=export_v182_audit_excel_bytes(v182_report),
+                file_name=f"SPT_V182_一次彙整檢查_{v182_report.get('generated_at','').replace(':','').replace(' ','_')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="v182_download_excel",
+            )
+        elif not CAN_EXPORT:
+            st.info("你的帳號沒有 14 模組匯出權限，因此不能下載 V182 Excel。")
+    else:
+        st.info("尚未執行 V182-V188 一次彙整檢查。")
