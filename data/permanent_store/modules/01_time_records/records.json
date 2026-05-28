@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-28 10:45:52",
-  "exported_at": "2026-05-28 10:45:52",
+  "updated_at": "2026-05-28 10:57:35",
+  "exported_at": "2026-05-28 10:57:35",
   "reason": "start_work_v108_fast_local_upsert_01",
   "empty_authoritative": false,
   "tables": {
@@ -1195,11 +1195,65 @@
         "source": "streamlit",
         "created_at": "2026-05-28 10:45:22",
         "updated_at": "2026-05-28 10:45:22"
+      },
+      {
+        "id": 265,
+        "record_key": "SPT077|26N4001-01|其他|2026-05-28 10:56:51|a1c838fd",
+        "status": "作業中",
+        "work_order": "26N4001-01",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "其他",
+        "employee_id": "SPT077",
+        "employee_name": "謝宛庭",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 10:56:51",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "前置線材加工",
+        "start_date": "2026-05-28",
+        "start_time": "10:56:51",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT077|其他|2026-05-28",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-28 10:56:51",
+        "updated_at": "2026-05-28 10:57:35"
+      },
+      {
+        "id": 266,
+        "record_key": "SPT077|26N4001-02|其他|2026-05-28 10:57:35|89e30f92",
+        "status": "作業中",
+        "work_order": "26N4001-02",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "其他",
+        "employee_id": "SPT077",
+        "employee_name": "謝宛庭",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 10:57:35",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "前置線材加工",
+        "start_date": "2026-05-28",
+        "start_time": "10:57:35",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT077|其他|2026-05-28",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-28 10:57:35",
+        "updated_at": "2026-05-28 10:57:35"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 44
+    "time_records": 46
   }
 }
