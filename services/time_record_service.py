@@ -12560,3 +12560,394 @@ def sync_time_records_01_02_now(reason: str = "v194_manual_local_sync", *, githu
     return int(n)
 
 # =================== END V194 LOCAL-FIRST CONFIRM ACTION FAST PATH =====================
+
+# ===================== V195 01/02 DISPLAY CONSISTENCY FINAL DEDUPE PATCH =====================
+# 目的：
+# 1) 修正 01 Today Records 與 02 Editable History 顯示不一致。
+# 2) 修正同一筆資料因 01/02 authority + SQLite 混合讀取而在 02 重複顯示。
+# 3) 不改 UI / CSS / theme / page layout，只改後端讀取去重與一致性判斷。
+# 4) 保留 V194 local-first 速度，不讓查詢階段寫 GitHub 或做全量修復。
+
+try:
+    _v195_prev_v194_merge_frames = _v194_merge_frames  # type: ignore[name-defined]
+except Exception:
+    _v195_prev_v194_merge_frames = None
+
+
+def _v195_parse_dt(value):
+    text = _v194_text(value) if '_v194_text' in globals() else ('' if value is None else str(value).strip())
+    if not text:
+        return ''
+    try:
+        return pd.to_datetime(text, errors='coerce')
+    except Exception:
+        return ''
+
+
+def _v195_row_is_terminal(row: dict) -> bool:
+    try:
+        status = _v194_text(row.get('status') or row.get('狀態') or row.get('Status'))
+        end_ts = _v194_text(row.get('end_timestamp') or row.get('End Timestamp') or row.get('結束時間戳') or row.get('結束時間'))
+    except Exception:
+        status = str(row.get('status') or '').strip()
+        end_ts = str(row.get('end_timestamp') or '').strip()
+    if end_ts:
+        return True
+    return bool(status and any(x in status for x in ['下班', '暫停', '完工', '結束', '已結束']))
+
+
+def _v195_row_completeness(row: dict) -> int:
+    important = [
+        'id', 'record_key', 'employee_id', 'employee_name', 'work_order', 'part_no',
+        'type_name', 'process_name', 'start_timestamp', 'end_timestamp', 'work_hours',
+        'work_hours_hms', 'start_date', 'start_time', 'end_date', 'end_time', 'status',
+    ]
+    score = 0
+    for c in important:
+        try:
+            if not _v194_blank(row.get(c)):
+                score += 1
+        except Exception:
+            if row.get(c) not in (None, ''):
+                score += 1
+    return score
+
+
+def _v195_source_rank(row: dict) -> int:
+    src = ''
+    for c in ['_snapshot_source', 'source', '_source', '__source']:
+        try:
+            src += ' ' + _v194_text(row.get(c))
+        except Exception:
+            src += ' ' + str(row.get(c) or '')
+    src = src.lower()
+    # SQLite is the immediate transaction source.  If it says the row is closed, it must win over stale 01/02 authority.
+    if 'sqlite' in src:
+        return 40
+    if '02_history' in src:
+        return 30
+    if '01_time_records' in src:
+        return 20
+    return 10
+
+
+def _v195_best_sort_tuple(row: dict) -> tuple:
+    updated = _v195_parse_dt(row.get('updated_at'))
+    end_ts = _v195_parse_dt(row.get('end_timestamp'))
+    start_ts = _v195_parse_dt(row.get('start_timestamp'))
+    # Use string fallback so tuple comparison remains stable even if timestamp parsing fails.
+    def _ts_key(x):
+        try:
+            if hasattr(x, 'timestamp') and not pd.isna(x):
+                return float(x.timestamp())
+        except Exception:
+            pass
+        return 0.0
+    return (
+        1 if _v195_row_is_terminal(row) else 0,
+        _ts_key(updated),
+        _ts_key(end_ts),
+        _ts_key(start_ts),
+        _v195_row_completeness(row),
+        _v195_source_rank(row),
+    )
+
+
+def _v195_identity_candidates(row: dict) -> list[str]:
+    candidates: list[str] = []
+    try:
+        rid = _v194_int(row.get('id') if 'id' in row else row.get('ID'))
+    except Exception:
+        rid = None
+    if rid is not None:
+        candidates.append('id:' + str(int(rid)))
+    try:
+        rk = _v194_text(row.get('record_key') or row.get('紀錄鍵 / Record Key'))
+    except Exception:
+        rk = str(row.get('record_key') or '').strip()
+    if rk:
+        candidates.append('rk:' + rk)
+    try:
+        emp_id = _v194_text(row.get('employee_id') or row.get('工號') or row.get('Employee ID'))
+        emp_name = _v194_text(row.get('employee_name') or row.get('姓名') or row.get('Employee Name'))
+        wo = _v194_text(row.get('work_order') or row.get('製令') or row.get('製令 / Work Order'))
+        proc = _v194_text(row.get('process_name') or row.get('工段') or row.get('製程') or row.get('Process'))
+        start_ts = _v194_text(row.get('start_timestamp') or row.get('Start Timestamp') or row.get('開始時間戳') or row.get('開始時間'))
+        if not start_ts:
+            start_ts = (_v194_text(row.get('start_date')) + ' ' + _v194_text(row.get('start_time'))).strip()
+    except Exception:
+        emp_id = str(row.get('employee_id') or '').strip()
+        emp_name = str(row.get('employee_name') or '').strip()
+        wo = str(row.get('work_order') or '').strip()
+        proc = str(row.get('process_name') or '').strip()
+        start_ts = str(row.get('start_timestamp') or '').strip()
+    if emp_id or emp_name or wo or proc or start_ts:
+        candidates.append('biz:' + '|'.join([emp_id, emp_name, wo, proc, start_ts]))
+    if not candidates:
+        candidates.append('tmp:' + str(hash(str(sorted(row.items())))))
+    return candidates
+
+
+def _v195_dedupe_records(df: pd.DataFrame | None) -> pd.DataFrame:
+    clean = _v194_clean_df(df) if '_v194_clean_df' in globals() else (df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame())
+    if clean.empty:
+        return clean
+
+    rows: list[dict] = []
+    cols: list[str] = []
+    for _, rr in clean.iterrows():
+        try:
+            row = dict(rr.to_dict())
+        except Exception:
+            continue
+        if not any(not _v194_blank(v) for v in row.values()):
+            continue
+        for c in row.keys():
+            if c not in cols:
+                cols.append(c)
+        rows.append(row)
+
+    # Union-find identities: if two rows share id OR record_key OR business key, they are the same logical row.
+    parent = list(range(len(rows)))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    seen: dict[str, int] = {}
+    for i, row in enumerate(rows):
+        for key in _v195_identity_candidates(row):
+            if key in seen:
+                union(i, seen[key])
+            else:
+                seen[key] = i
+
+    groups: dict[int, list[dict]] = {}
+    for i, row in enumerate(rows):
+        groups.setdefault(find(i), []).append(row)
+
+    result: list[dict] = []
+    for group_rows in groups.values():
+        best = max(group_rows, key=_v195_best_sort_tuple)
+        # Merge missing fields from other copies into the best row without overriding authoritative values.
+        merged = dict(best)
+        for other in sorted(group_rows, key=_v195_best_sort_tuple, reverse=True):
+            for c, v in other.items():
+                if c not in cols:
+                    cols.append(c)
+                try:
+                    if _v194_blank(merged.get(c)) and not _v194_blank(v):
+                        merged[c] = v
+                except Exception:
+                    if (merged.get(c) in (None, '')) and v not in (None, ''):
+                        merged[c] = v
+        # If the best row is terminal, force terminal fields to stay from the terminal source.
+        if _v195_row_is_terminal(best):
+            for c in ['status', 'end_action', 'end_timestamp', 'end_date', 'end_time', 'work_hours', 'work_hours_hms', 'updated_at']:
+                if c in best:
+                    merged[c] = best.get(c)
+        result.append(merged)
+
+    if 'id' not in cols:
+        cols.insert(0, 'id')
+    out = pd.DataFrame([{c: r.get(c, '') for c in cols} for r in result], columns=cols) if result else pd.DataFrame(columns=cols)
+    try:
+        if 'id' in out.columns:
+            out['_v195_sort_id'] = pd.to_numeric(out['id'], errors='coerce')
+            out = out.sort_values('_v195_sort_id', ascending=False, kind='stable').drop(columns=['_v195_sort_id'], errors='ignore')
+    except Exception:
+        pass
+    try:
+        out = _v194_filter_deleted(out)
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v194_identity(row: dict) -> str:  # type: ignore[override]
+    """V195: prefer stable numeric ID first to prevent same row duplicating when record_key differs across sources."""
+    try:
+        keys = _v195_identity_candidates(row)
+        return keys[0]
+    except Exception:
+        return 'tmp:' + str(hash(str(sorted(row.items()))))
+
+
+def _v194_merge_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:  # type: ignore[override]
+    """V195 final merge: combine 02 authority + 01 authority + SQLite, then de-duplicate by ID/rk/business key."""
+    all_frames: list[pd.DataFrame] = []
+    for df in frames or []:
+        try:
+            clean = _v194_filter_deleted(_v194_clean_df(df))
+        except Exception:
+            clean = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+        if clean is not None and not clean.empty:
+            all_frames.append(clean)
+    if not all_frames:
+        return pd.DataFrame()
+    try:
+        combined = pd.concat(all_frames, ignore_index=True, sort=False)
+    except Exception:
+        combined = all_frames[0]
+    return _v195_dedupe_records(combined)
+
+
+def _v194_current_merged(include_sqlite: bool = True) -> pd.DataFrame:  # type: ignore[override]
+    frames = []
+    try:
+        frames.append(_v194_authority_df('02_history'))
+    except Exception:
+        pass
+    try:
+        frames.append(_v194_authority_df('01_time_records'))
+    except Exception:
+        pass
+    if include_sqlite:
+        try:
+            frames.append(_v194_sqlite_df())
+        except Exception:
+            pass
+    return _v194_merge_frames(frames)
+
+
+def _v195_republish_current_local(reason: str = 'v195_consistency_republish') -> int:
+    """Best-effort local 01/02 consistency write. No GitHub. Used after start/finish/save/delete only."""
+    try:
+        current = _v194_current_merged(include_sqlite=True)
+        if current.empty:
+            return 0
+        return int(_v194_save_0102_local(_v195_dedupe_records(current), reason))
+    except Exception as exc:
+        try:
+            write_log('V195_CONSISTENCY_SAVE_ERROR', f'V195 01/02 一致性回寫失敗：{exc}', 'time_records', level='ERROR')
+        except Exception:
+            pass
+    return 0
+
+
+# Wrap write actions once more so the display state is consistent after every confirmed operation.
+try:
+    _v195_prev_start_work = start_work
+except Exception:
+    _v195_prev_start_work = None
+try:
+    _v195_prev_finish_work = finish_work
+except Exception:
+    _v195_prev_finish_work = None
+try:
+    _v195_prev_save_time_records = save_time_records
+except Exception:
+    _v195_prev_save_time_records = None
+try:
+    _v195_prev_delete_time_records = delete_time_records
+except Exception:
+    _v195_prev_delete_time_records = None
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = '', auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v195_prev_start_work):
+        raise RuntimeError('start_work implementation is unavailable')
+    rid = int(_v195_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        _v195_republish_current_local('start_work_v195_consistency')
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = '', finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v195_prev_finish_work):
+        raise RuntimeError('finish_work implementation is unavailable')
+    n = int(_v195_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n:
+        _v195_republish_current_local('finish_work_v195_consistency')
+    return n
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    if not callable(_v195_prev_save_time_records):
+        return 0
+    safe_df = _v195_dedupe_records(df)
+    n = int(_v195_prev_save_time_records(safe_df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    _v195_republish_current_local('save_time_records_v195_consistency')
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = '管理員刪除工時紀錄') -> int:  # type: ignore[override]
+    if not callable(_v195_prev_delete_time_records):
+        return 0
+    n = int(_v195_prev_delete_time_records(record_ids, reason=reason) or 0)
+    _v195_republish_current_local('delete_time_records_v195_consistency')
+    return n
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = _v194_current_merged(include_sqlite=True)
+    out = _v194_filter_params(_v195_dedupe_records(df), start_date, end_date, employee_id, work_order)
+    try:
+        if '_v138_format_remark_column' in globals():
+            out = _v138_format_remark_column(out)
+    except Exception:
+        pass
+    return _v195_dedupe_records(out).reset_index(drop=True)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    df = _v195_dedupe_records(_v194_current_merged(include_sqlite=True))
+    if df.empty:
+        return pd.DataFrame()
+    try:
+        active_mask = df.apply(lambda r: _v194_is_active_row(dict(r.to_dict())), axis=1)
+    except Exception:
+        active_mask = pd.Series([False] * len(df), index=df.index)
+    if unfinished_only:
+        out = df.loc[active_mask].copy()
+    elif include_finished:
+        try:
+            cycle_start = _business_cycle_start_date()
+        except Exception:
+            cycle_start = today_text()
+        if 'start_date' in df.columns:
+            out = df.loc[(df['start_date'].astype(str) >= str(cycle_start)) | active_mask].copy()
+        else:
+            out = df.copy()
+    else:
+        out = df.loc[active_mask].copy()
+    try:
+        if '_v138_format_remark_column' in globals():
+            out = _v138_format_remark_column(out)
+    except Exception:
+        pass
+    return _v194_filter_params(_v195_dedupe_records(out))
+
+
+def audit_v195_0102_consistency() -> dict:
+    try:
+        sqlite_n = int(len(_v194_sqlite_df()))
+    except Exception:
+        sqlite_n = -1
+    try:
+        h01_n = int(len(_v194_authority_df('01_time_records')))
+    except Exception:
+        h01_n = -1
+    try:
+        h02_n = int(len(_v194_authority_df('02_history')))
+    except Exception:
+        h02_n = -1
+    merged = _v194_current_merged(include_sqlite=True)
+    return {
+        'version': 'V195',
+        'sqlite_rows': sqlite_n,
+        'authority_01_rows': h01_n,
+        'authority_02_rows': h02_n,
+        'merged_visible_rows': int(len(merged)) if isinstance(merged, pd.DataFrame) else 0,
+        'duplicate_visible_rows_removed': max(0, (sqlite_n if sqlite_n > 0 else 0) + (h01_n if h01_n > 0 else 0) + (h02_n if h02_n > 0 else 0) - (int(len(merged)) if isinstance(merged, pd.DataFrame) else 0)),
+        'note': 'V195 de-duplicates 01/02/SQLite by ID, record_key, and business key; terminal SQLite rows override stale authority rows.',
+    }
+
+# =================== END V195 01/02 DISPLAY CONSISTENCY FINAL DEDUPE PATCH =====================
