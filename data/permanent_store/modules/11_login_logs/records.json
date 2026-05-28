@@ -2,14 +2,14 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 17:53:14",
-  "exported_at": "2026-05-28 17:53:14",
+  "updated_at": "2026-05-28 17:53:16",
+  "exported_at": "2026-05-28 17:53:16",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
       {
-        "id": 1678,
+        "id": 1677,
         "source": "v103_merge",
         "username": "B210",
         "display_name": "黃承淮",
@@ -17,12 +17,12 @@
         "result": "FAIL",
         "message": "密碼錯誤; employee_id=B210; roles=operator",
         "module_code": "LOGIN",
-        "login_time": "2026-05-28 17:53:13",
+        "login_time": "2026-05-28 17:53:11",
         "logout_time": "",
         "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
-        "created_at": "2026-05-28 17:53:13"
+        "created_at": "2026-05-28 17:53:11"
       },
       {
         "id": 1,
