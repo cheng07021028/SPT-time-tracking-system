@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-28 10:43:16",
-  "exported_at": "2026-05-28 10:43:16",
-  "reason": "start_work_v108_fast_local_upsert_01",
+  "updated_at": "2026-05-28 10:43:30",
+  "exported_at": "2026-05-28 10:43:30",
+  "reason": "finish_work_v108_fast_local_sync_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1199,7 +1199,7 @@
       {
         "id": 263,
         "record_key": "SSS|21M0241-01|前置鈑金|2026-05-28 10:43:16|f2a710ca",
-        "status": "作業中",
+        "status": "暫停",
         "work_order": "21M0241-01",
         "part_no": "4TRSC020-004-02",
         "type_name": "NTB 3 PORT",
@@ -1208,20 +1208,20 @@
         "employee_name": "SSS",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 10:43:16",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-28 10:43:30",
         "remark": "",
         "start_date": "2026-05-28",
         "start_time": "10:43:16",
-        "end_date": "",
-        "end_time": "",
+        "end_date": "2026-05-28",
+        "end_time": "10:43:30",
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SSS|前置鈑金|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:43:16",
-        "updated_at": "2026-05-28 10:43:16"
+        "updated_at": "2026-05-28 10:43:30"
       }
     ]
   },
