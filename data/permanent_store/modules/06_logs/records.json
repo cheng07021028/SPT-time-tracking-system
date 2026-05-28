@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 01:32:00",
-  "exported_at": "2026-05-29 01:32:00",
+  "updated_at": "2026-05-29 01:37:31",
+  "exported_at": "2026-05-29 01:37:31",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -571,11 +571,23 @@
         "detail": "",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 147,
+        "log_time": "2026-05-29 01:37:27",
+        "user_name": "admin",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "329",
+        "message": "陳宛廷 開始 22M0100-28 / 配電",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 01:37:27\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"329\",\"target_ids\":[329],\"message\":\"陳宛廷 開始 22M0100-28 / 配電\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"B164|22M0100-28|配電|2026-05-29 01:36:52|ce0645bc\",\"identity_key\":\"record_key:B164|22M0100-28|配電|2026-05-29 01:36:52|ce0645bc\",\"id\":\"329\",\"employee_id\":\"B164\",\"employee_name\":\"陳宛廷\",\"work_order\":\"22M0100-28\",\"part_no\":\"4TRSC020-005-03\",\"type_name\":\"NTB 4Port\",\"process_name\":\"配電\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 01:36:52\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":329,\"record_key\":\"B164|22M0100-28|配電|2026-05-29 01:36:52|ce0645bc\",\"status\":\"作業中\",\"work_order\":\"22M0100-28\",\"part_no\":\"4TRSC020-005-03\",\"type_name\":\"NTB 4Port\",\"process_name\":\"配電\",\"employee_id\":\"B164\",\"employee_name\":\"陳宛廷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 01:36:52\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"01:36:52\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B164|配電|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 01:36:52\",\"updated_at\":\"2026-05-29 01:36:52\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":329,\"record_key\":\"B164|22M0100-28|配電|2026-05-29 01:36:52|ce0645bc\",\"status\":\"作業中\",\"work_order\":\"22M0100-28\",\"part_no\":\"4TRSC020-005-03\",\"type_name\":\"NTB 4Port\",\"process_name\":\"配電\",\"employee_id\":\"B164\",\"employee_name\":\"陳宛廷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 01:36:52\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"01:36:52\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B164|配電|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 01:36:52\",\"updated_at\":\"2026-05-29 01:36:52\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":329,\"record_key\":\"B164|22M0100-28|配電|2026-05-29 01:36:52|ce0645bc\",\"status\":\"作業中\",\"work_order\":\"22M0100-28\",\"part_no\":\"4TRSC020-005-03\",\"type_name\":\"NTB 4Port\",\"process_name\":\"配電\",\"employee_id\":\"B164\",\"employee_name\":\"陳宛廷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 01:36:52\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"01:36:52\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B164|配電|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 01:36:52\",\"updated_at\":\"2026-05-29 01:36:52\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":329,\"record_key\":\"B164|22M0100-28|配電|2026-05-29 01:36:52|ce0645bc\",\"status\":\"作業中\",\"work_order\":\"22M0100-28\",\"part_no\":\"4TRSC020-005-03\",\"type_name\":\"NTB 4Port\",\"process_name\":\"配電\",\"employee_id\":\"B164\",\"employee_name\":\"陳宛廷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 01:36:52\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"01:36:52\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B164|配電|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 01:36:52\",\"updated_at\":\"2026-05-29 01:36:52\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"5dd061762ed51f752b6d0cdc45b57a84a44c0998c2485fe0b3488efb36c4fcae\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 47
+    "system_logs": 48
   }
 }
