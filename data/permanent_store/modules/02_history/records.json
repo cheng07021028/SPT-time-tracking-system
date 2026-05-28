@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-28 09:35:16",
-  "exported_at": "2026-05-28 09:35:16",
-  "reason": "finish_work_v139_final_state_reconcile_02",
+  "updated_at": "2026-05-28 09:36:01",
+  "exported_at": "2026-05-28 09:36:01",
+  "reason": "start_work_v108_fast_local_upsert_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1060,11 +1060,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 09:33:52",
         "updated_at": "2026-05-28 09:33:52"
+      },
+      {
+        "id": 237,
+        "record_key": "B203|26M0021-03|骨架組立|2026-05-28 09:35:54|b41321c1",
+        "status": "作業中",
+        "work_order": "26M0021-03",
+        "part_no": "1GRSC150-003-04",
+        "type_name": "4 Port Frame Long-type EFEM",
+        "process_name": "骨架組立",
+        "employee_id": "B203",
+        "employee_name": "蕭桓惟",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 09:35:54",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "09:35:54",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B203|骨架組立|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 09:35:54",
+        "updated_at": "2026-05-28 09:35:54"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 39
+    "time_records": 40
   }
 }
