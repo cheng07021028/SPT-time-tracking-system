@@ -924,3 +924,32 @@ def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit:
     clear_log_query_cache()
     return n
 # =================== END V156 LOG QUERY CACHE ===================
+
+# ===================== V166C TIME RECORD FULL SNAPSHOT LOGGING =====================
+# 目的：讓 06 LOG 不只是人類可讀文字，也保存 time_records 完整 JSON 快照。
+# 後續資料遺失時，修復優先序為 row shard / event journal / V166C LOG snapshot / LOG-only text。
+# 此 wrapper 只增強 detail 內容，不改原本 LOG 寫入、刪除 tombstone、V147 批次同步與 V156 cache 行為。
+try:
+    _v166c_prev_write_log = write_log
+except Exception:  # pragma: no cover
+    _v166c_prev_write_log = None
+
+
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    new_detail = detail
+    try:
+        from services.log_snapshot_service import append_snapshot_to_detail
+        new_detail = append_snapshot_to_detail(
+            detail=detail,
+            action_type=action_type,
+            message=message,
+            target_table=target_table,
+            target_id=str(target_id or ""),
+        )
+    except Exception:
+        new_detail = detail
+    if callable(_v166c_prev_write_log):
+        return _v166c_prev_write_log(action_type, message, target_table, target_id, new_detail, level, user_name)
+    return None
+
+# =================== END V166C TIME RECORD FULL SNAPSHOT LOGGING ===================
