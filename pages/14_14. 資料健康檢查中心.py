@@ -49,6 +49,9 @@ from services.log_snapshot_service import (
     recover_records_from_log_snapshots,
     export_log_snapshot_candidates_excel_bytes,
     get_log_snapshot_status,
+    get_log_snapshot_coverage_status,
+    backfill_missing_log_snapshots,
+    export_log_snapshot_coverage_excel_bytes,
 )
 
 from services.page_hygiene_service import (
@@ -101,19 +104,18 @@ st.caption(
 )
 
 if "v166_monitoring_snapshot" not in st.session_state:
-    try:
-        st.session_state["v166_monitoring_snapshot"] = collect_system_monitoring_snapshot()
-    except Exception as exc:
-        st.session_state["v166_monitoring_snapshot"] = {
-            "version": "V166_system_monitoring_dashboard",
-            "level": "ERROR",
-            "risk_score": 100,
-            "warnings": [str(exc)],
-            "metrics": {},
-            "summary_rows": [],
-            "read_only": True,
-            "production_write_path_changed": False,
-        }
+    # V166E: do not run monitoring automatically when the page loads or a checkbox/editor reruns.
+    # The snapshot is collected only after pressing 「刷新系統監控」.
+    st.session_state["v166_monitoring_snapshot"] = {
+        "version": "V166_system_monitoring_dashboard",
+        "level": "IDLE",
+        "risk_score": 0,
+        "warnings": ["尚未執行系統監控；請按『刷新系統監控』。"],
+        "metrics": {},
+        "summary_rows": [],
+        "read_only": True,
+        "production_write_path_changed": False,
+    }
 
 v166_c1, v166_c2, v166_c3, v166_c4 = st.columns([1, 1, 1, 1])
 v166_work_date = v166_c1.date_input("監控日期 / Monitor Date", value=today_date(), key="v166_monitor_date")
@@ -141,6 +143,8 @@ if v166_level == "OK":
     st.success(f"系統監控狀態 OK｜檢查時間：{v166_snapshot.get('checked_at', '')}")
 elif v166_level == "WARN":
     st.warning(f"系統監控有需注意項目｜風險分數：{v166_snapshot.get('risk_score', 0)}｜檢查時間：{v166_snapshot.get('checked_at', '')}")
+elif v166_level == "IDLE":
+    st.info("V166E：本區改為手動刷新；勾選選項或編輯表格不會自動啟動監控運算。")
 else:
     st.error(f"系統監控發現高風險或檢查錯誤｜風險分數：{v166_snapshot.get('risk_score', 0)}｜檢查時間：{v166_snapshot.get('checked_at', '')}")
 
@@ -808,12 +812,6 @@ if "v166b_pending_close_snapshot" not in st.session_state:
     st.session_state["v166b_pending_close_snapshot"] = None
 if "v166b_pending_close_result" not in st.session_state:
     st.session_state["v166b_pending_close_result"] = None
-# V166B2: use a changing editor key so bulk select / clear buttons can safely reset
-# the checkbox column without touching persisted 01/02 data.
-if "v166b_pending_close_select_default" not in st.session_state:
-    st.session_state["v166b_pending_close_select_default"] = False
-if "v166b_pending_close_editor_nonce" not in st.session_state:
-    st.session_state["v166b_pending_close_editor_nonce"] = 0
 
 v166b_refresh_col, v166b_export_col = st.columns([1, 1])
 if v166b_refresh_col.button("🔄 重新讀取待補結算清單", use_container_width=True, key="v166b_refresh_pending_close"):
@@ -823,19 +821,15 @@ if v166b_refresh_col.button("🔄 重新讀取待補結算清單", use_container
             end_date=str(end_date),
             suggestion_max_hours=int(v166b_suggest_hours),
         )
-    st.session_state["v166b_pending_close_select_default"] = False
-    st.session_state["v166b_pending_close_editor_nonce"] = int(st.session_state.get("v166b_pending_close_editor_nonce", 0) or 0) + 1
+        st.session_state.pop("v166b_pending_close_effective_df", None)
     st.rerun()
 
 if st.session_state.get("v166b_pending_close_snapshot") is None:
-    try:
-        st.session_state["v166b_pending_close_snapshot"] = collect_log_only_pending_close_candidates(
-            start_date=str(start_date),
-            end_date=str(end_date),
-            suggestion_max_hours=int(v166b_suggest_hours),
-        )
-    except Exception as exc:
-        st.session_state["v166b_pending_close_snapshot"] = {"ok": False, "reason": str(exc), "rows": [], "pending_count": 0}
+    # V166E: no automatic query on page load/editor rerun. Press reload button to collect candidates.
+    st.session_state["v166b_pending_close_snapshot"] = {
+        "ok": True, "manual_refresh_required": True, "rows": [], "pending_count": 0,
+        "suggested_count": 0, "checked_at": "尚未讀取，請按『重新讀取待補結算清單』"
+    }
 
 v166b_snapshot = st.session_state.get("v166b_pending_close_snapshot") or {}
 v166b_rows = v166b_snapshot.get("rows", []) if isinstance(v166b_snapshot, dict) else []
@@ -854,22 +848,6 @@ else:
         "請確認每筆結束時間。若『建議結束時間』空白，請手動輸入；"
         "若系統用同工號下一筆開始時間建議，仍需由管理員確認現場事實。"
     )
-
-    # V166B2: bulk selection helpers for the pending close table.
-    # These buttons only change the temporary data_editor checkbox state; they do not
-    # write to 01/02, LOG, event journal, row shard, or GitHub until the user confirms
-    # and presses the real close button below.
-    v166b_sel_all_col, v166b_sel_none_col, v166b_sel_note_col = st.columns([1, 1, 2])
-    if v166b_sel_all_col.button("☑️ 結算全部勾選", use_container_width=True, key="v166b_select_all_pending_close"):
-        st.session_state["v166b_pending_close_select_default"] = True
-        st.session_state["v166b_pending_close_editor_nonce"] = int(st.session_state.get("v166b_pending_close_editor_nonce", 0) or 0) + 1
-        st.rerun()
-    if v166b_sel_none_col.button("⬜ 結算全部取消勾選", use_container_width=True, key="v166b_clear_all_pending_close"):
-        st.session_state["v166b_pending_close_select_default"] = False
-        st.session_state["v166b_pending_close_editor_nonce"] = int(st.session_state.get("v166b_pending_close_editor_nonce", 0) or 0) + 1
-        st.rerun()
-    v166b_sel_note_col.caption("全選 / 全不選只影響本畫面勾選狀態；仍需勾選確認並按下人工結算，才會正式寫入。")
-
     v166b_df = pd.DataFrame(v166b_rows)
     editable_cols = [
         "結算 / Close", "identity_key", "record_key", "id", "工號 / Employee ID", "姓名 / Name",
@@ -880,9 +858,6 @@ else:
         if col not in v166b_df.columns:
             v166b_df[col] = ""
     v166b_df = v166b_df[editable_cols]
-    v166b_select_default = bool(st.session_state.get("v166b_pending_close_select_default", False))
-    if not v166b_df.empty:
-        v166b_df["結算 / Close"] = v166b_select_default
     column_config = {}
     try:
         column_config = {
@@ -895,20 +870,48 @@ else:
         }
     except Exception:
         column_config = {}
-    v166b_edit_df = st.data_editor(
-        v166b_df,
-        use_container_width=True,
-        hide_index=True,
-        height=420,
-        key=f"v166b_pending_close_editor_{int(st.session_state.get('v166b_pending_close_editor_nonce', 0) or 0)}",
-        column_config=column_config,
-        disabled=[
-            "identity_key", "record_key", "id", "工號 / Employee ID", "姓名 / Name",
-            "製令 / Work Order", "工段 / Process", "開始時間 / Start", "建議結束時間 / Suggested End", "建議來源 / Suggestion"
-        ],
-    )
+    # V166E: keep the editor inside a form, so checkbox/cell edits do not rerun the page
+    # or trigger expensive collection logic.  Changes are committed only by pressing the form submit.
+    stored_v166b_df = st.session_state.get("v166b_pending_close_effective_df")
+    if isinstance(stored_v166b_df, pd.DataFrame) and set(["identity_key", "record_key"]).issubset(stored_v166b_df.columns):
+        try:
+            current_keys = set(v166b_df["identity_key"].astype(str).tolist())
+            stored_keys = set(stored_v166b_df["identity_key"].astype(str).tolist())
+            if current_keys == stored_keys:
+                v166b_df = stored_v166b_df.copy()
+        except Exception:
+            pass
 
-    selected_df = v166b_edit_df[v166b_edit_df["結算 / Close"].astype(bool)].copy() if isinstance(v166b_edit_df, pd.DataFrame) and not v166b_edit_df.empty else pd.DataFrame()
+    sb1, sb2, sb3 = st.columns([1, 1, 2])
+    if sb1.button("☑️ 結算全部勾選", use_container_width=True, key="v166b2_select_all_pending_close"):
+        v166b_df["結算 / Close"] = True
+        st.session_state["v166b_pending_close_effective_df"] = v166b_df.copy()
+        st.rerun()
+    if sb2.button("⬜ 結算全部取消勾選", use_container_width=True, key="v166b2_clear_all_pending_close"):
+        v166b_df["結算 / Close"] = False
+        st.session_state["v166b_pending_close_effective_df"] = v166b_df.copy()
+        st.rerun()
+    sb3.caption("V166E：勾選或填入結束時間後，先按下方『暫存勾選與結束時間』，不會自動執行結算。")
+
+    with st.form("v166e_v166b_pending_close_editor_form", clear_on_submit=False):
+        v166b_edit_df = st.data_editor(
+            v166b_df,
+            use_container_width=True,
+            hide_index=True,
+            height=420,
+            key="v166b_pending_close_editor",
+            column_config=column_config,
+            disabled=[
+                "identity_key", "record_key", "id", "工號 / Employee ID", "姓名 / Name",
+                "製令 / Work Order", "工段 / Process", "開始時間 / Start", "建議結束時間 / Suggested End", "建議來源 / Suggestion"
+            ],
+        )
+        v166b_editor_commit = st.form_submit_button("💾 暫存勾選與結束時間 / Update Selection", use_container_width=True)
+    if v166b_editor_commit and isinstance(v166b_edit_df, pd.DataFrame):
+        st.session_state["v166b_pending_close_effective_df"] = v166b_edit_df.copy()
+    v166b_effective_df = st.session_state.get("v166b_pending_close_effective_df") if isinstance(st.session_state.get("v166b_pending_close_effective_df"), pd.DataFrame) else v166b_edit_df
+
+    selected_df = v166b_effective_df[v166b_effective_df["結算 / Close"].astype(bool)].copy() if isinstance(v166b_effective_df, pd.DataFrame) and not v166b_effective_df.empty else pd.DataFrame()
     st.caption(f"已勾選 {len(selected_df)} 筆。正式結算前請確認結束時間不可空白，且結束時間必須大於開始時間。")
 
     v166b_confirm = st.checkbox(
@@ -993,17 +996,15 @@ if v166c_b1.button("🔎 掃描 V166C LOG 快照", use_container_width=True, key
             end_date=str(end_date),
             limit=int(v166c_limit),
         )
+        st.session_state.pop("v166c_log_snapshot_effective_df", None)
     st.rerun()
 
 if st.session_state.get("v166c_log_snapshot_result") is None:
-    try:
-        st.session_state["v166c_log_snapshot_result"] = collect_log_snapshot_recovery_candidates(
-            start_date=str(start_date),
-            end_date=str(end_date),
-            limit=int(v166c_limit),
-        )
-    except Exception as exc:
-        st.session_state["v166c_log_snapshot_result"] = {"ok": False, "reason": str(exc), "rows": [], "candidate_count": 0, "missing_count": 0}
+    # V166E: no automatic LOG scan on page load/editor rerun. Press scan button to collect candidates.
+    st.session_state["v166c_log_snapshot_result"] = {
+        "ok": True, "manual_scan_required": True, "rows": [], "candidate_count": 0,
+        "missing_count": 0, "checked_at": "尚未掃描，請按『掃描 V166C LOG 快照』"
+    }
 
 v166c_snapshot = st.session_state.get("v166c_log_snapshot_result") or {}
 v166c_rows = v166c_snapshot.get("rows", []) if isinstance(v166c_snapshot, dict) else []
@@ -1038,16 +1039,29 @@ else:
         }
     except Exception:
         v166c_column_config = {}
-    v166c_edit_df = st.data_editor(
-        v166c_df,
-        use_container_width=True,
-        hide_index=True,
-        height=420,
-        key="v166c_log_snapshot_recovery_editor",
-        column_config=v166c_column_config,
-        disabled=[c for c in display_cols if c != "復原 / Recover"],
-    )
-    v166c_selected = v166c_edit_df[v166c_edit_df["復原 / Recover"].astype(bool)].copy() if isinstance(v166c_edit_df, pd.DataFrame) and not v166c_edit_df.empty else pd.DataFrame()
+    # V166E: keep LOG snapshot recovery editor in a form; edits are committed only by submit.
+    stored_v166c_df = st.session_state.get("v166c_log_snapshot_effective_df")
+    if isinstance(stored_v166c_df, pd.DataFrame) and "identity_key" in stored_v166c_df.columns:
+        try:
+            if set(stored_v166c_df["identity_key"].astype(str).tolist()) == set(v166c_df["identity_key"].astype(str).tolist()):
+                v166c_df = stored_v166c_df.copy()
+        except Exception:
+            pass
+    with st.form("v166e_v166c_log_snapshot_recovery_form", clear_on_submit=False):
+        v166c_edit_df = st.data_editor(
+            v166c_df,
+            use_container_width=True,
+            hide_index=True,
+            height=420,
+            key="v166c_log_snapshot_recovery_editor",
+            column_config=v166c_column_config,
+            disabled=[c for c in display_cols if c != "復原 / Recover"],
+        )
+        v166c_editor_commit = st.form_submit_button("💾 暫存復原勾選 / Update Recovery Selection", use_container_width=True)
+    if v166c_editor_commit and isinstance(v166c_edit_df, pd.DataFrame):
+        st.session_state["v166c_log_snapshot_effective_df"] = v166c_edit_df.copy()
+    v166c_effective_df = st.session_state.get("v166c_log_snapshot_effective_df") if isinstance(st.session_state.get("v166c_log_snapshot_effective_df"), pd.DataFrame) else v166c_edit_df
+    v166c_selected = v166c_effective_df[v166c_effective_df["復原 / Recover"].astype(bool)].copy() if isinstance(v166c_effective_df, pd.DataFrame) and not v166c_effective_df.empty else pd.DataFrame()
     st.caption(f"已勾選 {len(v166c_selected)} 筆。V166C 正式復原只會做非破壞式合併，不會刪除、不重新編號、不覆蓋既有資料。")
 
     v166c_confirm = st.checkbox(
@@ -1096,6 +1110,107 @@ if not CAN_REPAIR:
 if st.session_state.get("v166c_log_snapshot_recovery_result"):
     with st.expander("V166C 最近一次 LOG 快照還原結果", expanded=False):
         st.json(st.session_state.get("v166c_log_snapshot_recovery_result"))
+
+
+st.divider()
+st.markdown("### V166D LOG 快照覆蓋率補強 / Snapshot Coverage Guard")
+st.caption(
+    "V166D 會在 V152 durable layer 已持有完整工時 rows 時，額外寫入一筆含完整 JSON 快照的 LOG，"
+    "提高後續精準還原成功率。此區可檢查 LOG 快照覆蓋率，並可把可回查到完整資料的舊 LOG 補上快照。"
+)
+
+if "v166d_log_snapshot_coverage" not in st.session_state:
+    st.session_state["v166d_log_snapshot_coverage"] = None
+if "v166d_log_snapshot_backfill_result" not in st.session_state:
+    st.session_state["v166d_log_snapshot_backfill_result"] = None
+
+v166d_c1, v166d_c2, v166d_c3 = st.columns([1, 1, 2])
+v166d_limit = v166d_c1.number_input("V166D LOG覆蓋率掃描上限", min_value=500, max_value=100000, value=10000, step=500, key="v166d_log_snapshot_coverage_limit")
+v166d_c2.metric("目前模式", "Dry Run" if dry_run else "正式寫入")
+v166d_c3.info("正式補強只會更新 06 LOG detail，加上可還原快照；不會修改 01/02 工時資料。")
+
+v166d_b1, v166d_b2, v166d_b3 = st.columns([1, 1, 1])
+if v166d_b1.button("📊 檢查 V166D LOG 快照覆蓋率", use_container_width=True, key="v166d_check_log_snapshot_coverage"):
+    with st.spinner("正在檢查 time_records 相關 LOG 的快照覆蓋率..."):
+        st.session_state["v166d_log_snapshot_coverage"] = get_log_snapshot_coverage_status(
+            start_date=str(start_date),
+            end_date=str(end_date),
+            limit=int(v166d_limit),
+        )
+    st.rerun()
+
+if st.session_state.get("v166d_log_snapshot_coverage") is None:
+    # V166E: no automatic coverage scan on page load/editor rerun. Press check button to collect coverage.
+    st.session_state["v166d_log_snapshot_coverage"] = {
+        "ok": True, "manual_scan_required": True, "rows": [],
+        "time_related_log_count": 0, "with_snapshot_count": 0, "without_snapshot_count": 0,
+        "coverage_percent": 0.0, "checked_at": "尚未檢查，請按『檢查 V166D LOG 快照覆蓋率』"
+    }
+
+v166d_cov = st.session_state.get("v166d_log_snapshot_coverage") or {}
+v166d_k1, v166d_k2, v166d_k3, v166d_k4 = st.columns(4)
+v166d_k1.metric("工時相關LOG", int(v166d_cov.get("time_related_log_count", 0) or 0))
+v166d_k2.metric("已有快照", int(v166d_cov.get("with_snapshot_count", 0) or 0))
+v166d_k3.metric("尚未覆蓋", int(v166d_cov.get("without_snapshot_count", 0) or 0))
+v166d_k4.metric("覆蓋率", f"{float(v166d_cov.get('coverage_percent', 0) or 0):.2f}%")
+
+if not v166d_cov.get("ok", True):
+    st.error(f"V166D 覆蓋率檢查失敗：{v166d_cov.get('reason', '')}")
+else:
+    v166d_rows = v166d_cov.get("rows", []) or []
+    if v166d_rows:
+        v166d_df = pd.DataFrame(v166d_rows)
+        v166d_show_cols = ["log_id", "log_time", "action_type", "target_table", "target_id", "has_snapshot", "detail_size", "source", "message"]
+        for col in v166d_show_cols:
+            if col not in v166d_df.columns:
+                v166d_df[col] = ""
+        st.dataframe(v166d_df[v166d_show_cols].head(500), use_container_width=True, hide_index=True, height=260)
+    else:
+        st.info("目前日期範圍內沒有找到 time_records 相關 LOG。")
+
+v166d_confirm = st.checkbox(
+    "我確認只補強 06 LOG detail 快照，不修改 01/02 工時資料",
+    disabled=not CAN_REPAIR,
+    key="v166d_confirm_backfill_log_snapshot",
+)
+v166d_disabled = (not CAN_REPAIR) or (not v166d_confirm)
+if v166d_b2.button("🧩 補強舊 LOG 快照", use_container_width=True, disabled=v166d_disabled, key="v166d_backfill_missing_log_snapshots"):
+    with st.spinner("正在把可回查到完整資料的舊 LOG 補上 V166C/V166D 快照..."):
+        v166d_result = backfill_missing_log_snapshots(
+            start_date=str(start_date),
+            end_date=str(end_date),
+            limit=int(v166d_limit),
+            dry_run=bool(dry_run),
+            github=bool(github_backup),
+        )
+    st.session_state["v166d_log_snapshot_backfill_result"] = v166d_result
+    st.session_state["v166d_log_snapshot_coverage"] = None
+    if v166d_result.get("ok"):
+        st.success(
+            "V166D LOG 快照補強完成。"
+            + ("（Dry Run，未寫入）" if v166d_result.get("dry_run") else "")
+            + f" 可補強/已補強 {v166d_result.get('updated_count', 0)} 筆。"
+        )
+    else:
+        st.error(f"V166D LOG 快照補強失敗：{v166d_result.get('reason', '')}")
+    st.json(v166d_result)
+
+if CAN_EXPORT and v166d_cov.get("ok", True):
+    v166d_b3.download_button(
+        "⬇️ 下載 V166D 覆蓋率報告",
+        data=export_log_snapshot_coverage_excel_bytes(v166d_cov),
+        file_name=f"SPT_V166D_LOG快照覆蓋率_{start_date}_{end_date}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        key="v166d_download_log_snapshot_coverage",
+    )
+
+if not CAN_REPAIR:
+    st.info("你的帳號沒有 14 模組 can_manage 權限，因此不能執行 V166D LOG 快照補強。")
+
+if st.session_state.get("v166d_log_snapshot_backfill_result"):
+    with st.expander("V166D 最近一次 LOG 快照補強結果", expanded=False):
+        st.json(st.session_state.get("v166d_log_snapshot_backfill_result"))
 
 
 if b3.button("🧹 清除本頁檢查結果", use_container_width=True, key="v153_clear_result"):

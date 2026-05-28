@@ -876,6 +876,13 @@ def apply_theme() -> None:
         install_column_settings_patch()
     except Exception:
         pass
+    # V166E: prevent rapid duplicate add-clicks and restore scroll position after editor reruns.
+    # UI-only guard; must never break page rendering.
+    try:
+        from services.editor_stability_service import install_editor_stability_guards
+        install_editor_stability_guards()
+    except Exception:
+        pass
 
 
 def app_theme() -> None:
