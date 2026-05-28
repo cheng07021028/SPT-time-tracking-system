@@ -600,16 +600,6 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             cur.execute(idx_sql)
         except Exception:
             pass
-
-    # V172: backend-only SQLite indexes for high-frequency filters.
-    # This only creates indexes when compatible tables/columns exist. It never
-    # changes business rows, IDs, UI, Streamlit widgets, or write semantics.
-    try:
-        from services.sqlite_index_service import apply_sqlite_performance_indexes
-        apply_sqlite_performance_indexes(conn, run_optimize=False)
-    except Exception:
-        pass
-
     conn.commit()
 
 
