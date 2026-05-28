@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-28 19:35:37",
-  "exported_at": "2026-05-28 19:35:37",
-  "reason": "start_work_v137_identity_safe_upsert_02",
+  "updated_at": "2026-05-28 19:42:02",
+  "exported_at": "2026-05-28 19:42:02",
+  "reason": "delete_time_records_v96_0102_sync_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -4303,44 +4303,6 @@
         "recovery_closed_source": ""
       },
       {
-        "id": 319,
-        "record_key": "SSS|NA|6S|2026-05-28 19:32:51|48960586",
-        "status": "暫停",
-        "work_order": "NA",
-        "part_no": "",
-        "type_name": "",
-        "process_name": "6S",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-28 19:32:51",
-        "end_action": "暫停",
-        "end_timestamp": "2026-05-28 19:34:50",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "19:32:51",
-        "end_date": "2026-05-28",
-        "end_time": "19:34:50",
-        "work_hours": 0.03,
-        "assembly_location": "",
-        "group_key": "SSS|6S|2026-05-28",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-28 19:32:51",
-        "updated_at": "2026-05-28 19:34:50",
-        "department": "",
-        "title": "",
-        "department_emp": "",
-        "title_emp": "",
-        "recovery_status": "",
-        "recovery_note": "",
-        "is_deleted": "",
-        "deleted_at": "",
-        "work_hours_hms": "",
-        "recovery_closed_at": "",
-        "recovery_closed_source": ""
-      },
-      {
         "id": 320,
         "record_key": "SSS|21M0241-01|前置鈑金|2026-05-28 19:35:36|5887a1dd",
         "status": "作業中",
@@ -4382,6 +4344,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 115
+    "time_records": 114
   }
 }
