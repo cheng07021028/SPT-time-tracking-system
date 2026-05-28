@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 10:45:09",
-  "exported_at": "2026-05-28 10:45:09",
-  "reason": "v147_batched_write_log_authority",
+  "updated_at": "2026-05-28 10:45:56",
+  "exported_at": "2026-05-28 10:45:56",
+  "reason": "logout_v133_time_authority_flush_log_flush",
   "empty_authoritative": false,
   "tables": {
     "system_logs": [
@@ -10663,11 +10663,59 @@
         "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 9610,
+        "log_time": "2026-05-28 10:45:52",
+        "user_name": "SPT240",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "264",
+        "message": "吉爾 開始 26M0021-03 / 骨架組立",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9609,
+        "log_time": "2026-05-28 10:45:52",
+        "user_name": "SPT240",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9608,
+        "log_time": "2026-05-28 10:45:52",
+        "user_name": "SPT240",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "262",
+        "message": "V96 結束工時紀錄 #262，同步結束=1筆，狀態=暫停",
+        "detail": "262",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9607,
+        "log_time": "2026-05-28 10:45:52",
+        "user_name": "SPT240",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 888
+    "system_logs": 892
   }
 }
