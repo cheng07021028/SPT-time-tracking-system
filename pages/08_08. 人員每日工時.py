@@ -8,6 +8,10 @@ from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access
 from services.crud_table_service import load_employees
 from services.time_record_service import load_records
+try:
+    from services.time_record_service import load_daily_record_summary_sql
+except Exception:
+    load_daily_record_summary_sql = None
 import pandas as pd
 from services.table_ui_service import render_table
 from services.duration_service import hours_to_hms
@@ -121,6 +125,37 @@ show_only_no_record = bool(st.session_state.get("daily_hours_no_record_only", Fa
 
 d = selected.strftime("%Y-%m-%d")
 
+def _v174_work_hours_to_float(value) -> float:
+    try:
+        if pd.isna(value):
+            return 0.0
+    except Exception:
+        pass
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        try:
+            return float(value)
+        except Exception:
+            return 0.0
+    text = str(value).strip().replace("：", ":")
+    if not text or text.lower() in {"none", "nan", "nat", "null", "<na>"}:
+        return 0.0
+    try:
+        return float(text)
+    except Exception:
+        pass
+    if ":" in text:
+        try:
+            parts = [float(x) for x in text.split(":") if str(x).strip() != ""]
+            if len(parts) == 3:
+                return parts[0] + parts[1] / 60 + parts[2] / 3600
+            if len(parts) == 2:
+                return parts[0] + parts[1] / 60
+        except Exception:
+            return 0.0
+    return 0.0
+
 # V29: 使用權威檔人員與工時資料即時計算，避免 SQLite 快取延遲造成資料錯誤。
 emp = _employees_authority_df.copy()
 for _c in ["is_active", "is_in_factory", "is_today_attendance"]:
@@ -128,7 +163,15 @@ for _c in ["is_active", "is_in_factory", "is_today_attendance"]:
         emp[_c] = False
     emp[_c] = emp[_c].astype(str).str.lower().str.strip().isin(["1", "true", "yes", "y", "是", "啟用", "在廠", "出勤"]) | (emp[_c] == 1) | (emp[_c] == True)
 emp = emp[(emp["is_active"]) & (emp["is_in_factory"]) & (emp["is_today_attendance"])]
-records = load_records(start_date=d, end_date=d)
+# V174：08 每日工時只查必要欄位 employee_id/work_hours/end_timestamp/status，
+# 不再為一天彙總載入 time_records 全欄位。畫面與篩選功能保持不變。
+if callable(load_daily_record_summary_sql):
+    try:
+        records = load_daily_record_summary_sql(d)
+    except Exception:
+        records = load_records(start_date=d, end_date=d)
+else:
+    records = load_records(start_date=d, end_date=d)
 if records is None:
     records = pd.DataFrame()
 if not records.empty:
@@ -139,7 +182,7 @@ if not records.empty:
         rec = rec[rec["work_date"].astype(str) == d]
     if "work_hours" not in rec.columns:
         rec["work_hours"] = 0
-    rec["work_hours"] = pd.to_numeric(rec["work_hours"], errors="coerce").fillna(0)
+    rec["work_hours"] = rec["work_hours"].map(_v174_work_hours_to_float).fillna(0)
     rec["is_active_record"] = rec.get("end_timestamp", pd.Series([""] * len(rec))).fillna("").astype(str).str.strip().eq("") if "end_timestamp" in rec.columns else False
     grp = rec.groupby("employee_id", dropna=False).agg(
         total_hours=("work_hours", "sum"),

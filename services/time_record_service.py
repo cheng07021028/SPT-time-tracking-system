@@ -9910,3 +9910,47 @@ def get_v173_01_query_optimization_status() -> dict:
     }
 # =================== END V173 01 SQL PRECISE QUERY LAYER ===================
 
+
+# ===================== V174 LARGE TABLE BACKEND FILTER HELPERS =====================
+# 目的：提供 02 / 08 大表後端查詢入口；不改工時寫入、不改畫面、不改 theme/CSS。
+def load_history_records_sql_filtered(filters=None, *, start_date=None, end_date=None, limit=None, offset=0):
+    try:
+        from services.large_table_query_service import load_history_records_sql_filtered as _v174_load_history
+        return _v174_load_history(filters or {}, start_date=start_date, end_date=end_date, limit=limit, offset=offset)
+    except Exception:
+        # 回退舊版 load_records，確保功能不中斷。
+        try:
+            return load_records(str(start_date) if start_date is not None else None, str(end_date) if end_date is not None else None, None, None)
+        except Exception:
+            return pd.DataFrame()
+
+
+def count_history_records_sql_filtered(filters=None, *, start_date=None, end_date=None) -> int:
+    try:
+        from services.large_table_query_service import count_history_records_sql_filtered as _v174_count_history
+        return int(_v174_count_history(filters or {}, start_date=start_date, end_date=end_date) or 0)
+    except Exception:
+        return 0
+
+
+def load_daily_record_summary_sql(work_date):
+    try:
+        from services.large_table_query_service import load_daily_record_summary_sql as _v174_daily_summary
+        return _v174_daily_summary(work_date)
+    except Exception:
+        try:
+            return load_records(str(work_date), str(work_date), None, None)
+        except Exception:
+            return pd.DataFrame()
+
+
+def get_v174_large_table_optimization_status() -> dict:
+    return {
+        "version": "V174",
+        "enabled": True,
+        "visual_changed": False,
+        "css_changed": False,
+        "theme_changed": False,
+        "write_path_changed": False,
+    }
+# =================== END V174 LARGE TABLE BACKEND FILTER HELPERS ===================

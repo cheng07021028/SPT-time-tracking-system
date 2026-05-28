@@ -16,6 +16,11 @@ from services.time_record_service import (
     recalculate_time_records,
     import_time_records,
 )
+try:
+    from services.time_record_service import load_history_records_sql_filtered, count_history_records_sql_filtered
+except Exception:
+    load_history_records_sql_filtered = None
+    count_history_records_sql_filtered = None
 from services.master_data_service import load_employees, load_work_orders
 from services.table_ui_service import render_table, label_for, render_width_settings
 from services.duration_service import hours_to_hms
@@ -1214,7 +1219,25 @@ _seed_start, _seed_end = _date_range_from_preset(
     _history_filter_seed.get("start_date"),
     _history_filter_seed.get("end_date"),
 )
-base_df = load_records(str(_seed_start), str(_seed_end), None, None)
+# V174：02 大表先用 SQL 下推日期與已套用的篩選條件，再保留原本 pandas 異常/跨日判斷。
+# 不改畫面、不改表格渲染、不改儲存/刪除/重算流程。
+try:
+    _v174_limit = int(_history_filter_seed.get("detail_limit") or 1000)
+except Exception:
+    _v174_limit = 1000
+if callable(load_history_records_sql_filtered):
+    try:
+        base_df = load_history_records_sql_filtered(
+            _history_filter_seed,
+            start_date=str(_seed_start),
+            end_date=str(_seed_end),
+            limit=_v174_limit,
+            offset=0,
+        )
+    except Exception:
+        base_df = load_records(str(_seed_start), str(_seed_end), None, None)
+else:
+    base_df = load_records(str(_seed_start), str(_seed_end), None, None)
 df, history_filters = _render_history_filter_panel(base_df, employees, work_orders)
 
 start = history_filters.get("start_date", str(_seed_start))
