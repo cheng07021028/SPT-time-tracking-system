@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-28 09:25:00",
-  "exported_at": "2026-05-28 09:25:00",
+  "updated_at": "2026-05-28 09:25:29",
+  "exported_at": "2026-05-28 09:25:29",
   "reason": "start_work_v139_final_state_reconcile_02",
   "empty_authoritative": false,
   "tables": {
@@ -844,11 +844,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 09:24:44",
         "updated_at": "2026-05-28 09:24:44"
+      },
+      {
+        "id": 226,
+        "record_key": "SPT228|26N4001-04|骨架組立|2026-05-28 09:25:22|5dd09ae3",
+        "status": "作業中",
+        "work_order": "26N4001-04",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "骨架組立",
+        "employee_id": "SPT228",
+        "employee_name": "王添慶",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 09:25:22",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "09:25:22",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT228|骨架組立|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 09:25:22",
+        "updated_at": "2026-05-28 09:25:22"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 31
+    "time_records": 32
   }
 }
