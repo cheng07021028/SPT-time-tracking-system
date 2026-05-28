@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-28 15:29:29",
-  "exported_at": "2026-05-28 15:29:29",
-  "reason": "finish_work_v149_terminal_guard_reconcile_01",
+  "updated_at": "2026-05-28 15:33:01",
+  "exported_at": "2026-05-28 15:33:01",
+  "reason": "load_records_v139_final_state_reconcile_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -27,15 +27,17 @@
         "start_time": "20:25:05",
         "end_date": "2026-05-27",
         "end_time": "20:59:44",
-        "work_hours": 0.5775,
+        "work_hours": "00:34:39",
         "assembly_location": "竹東",
         "group_key": "SPT208|收機|2026-05-27",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-27 20:25:05",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 188,
@@ -56,15 +58,17 @@
         "start_time": "20:26:57",
         "end_date": "2026-05-27",
         "end_time": "21:00:41",
-        "work_hours": 0.562222,
+        "work_hours": "00:33:44",
         "assembly_location": "竹東",
         "group_key": "SPT239|收機|2026-05-27",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-27 20:26:57",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 189,
@@ -85,15 +89,17 @@
         "start_time": "20:27:51",
         "end_date": "2026-05-27",
         "end_time": "20:59:10",
-        "work_hours": 0.521944,
+        "work_hours": "00:31:19",
         "assembly_location": "竹東",
         "group_key": "SPT244|收機|2026-05-27",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-27 20:27:51",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 190,
@@ -114,15 +120,17 @@
         "start_time": "20:28:51",
         "end_date": "2026-05-27",
         "end_time": "20:57:37",
-        "work_hours": 0.479444,
+        "work_hours": "00:28:46",
         "assembly_location": "竹東",
         "group_key": "SPT241|收機|2026-05-27",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-27 20:28:51",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 191,
@@ -143,15 +151,17 @@
         "start_time": "08:29:48",
         "end_date": "2026-05-28",
         "end_time": "11:32:14",
-        "work_hours": 2.790556,
+        "work_hours": "02:47:26",
         "assembly_location": "竹東",
         "group_key": "B155|機台定位水平調整(含連結)|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:29:48",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造二課",
-        "title": "派遣部 _利誠"
+        "title": "派遣部 _利誠",
+        "department_emp": "製造二課",
+        "title_emp": "派遣部 _利誠"
       },
       {
         "id": 192,
@@ -175,12 +185,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B168|機台定位水平調整(含連結)|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:31:03",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造二課",
-        "title": "派遣部 _利誠"
+        "title": "派遣部 _利誠",
+        "department_emp": "製造二課",
+        "title_emp": "派遣部 _利誠"
       },
       {
         "id": 193,
@@ -201,15 +213,17 @@
         "start_time": "08:31:35",
         "end_date": "2026-05-28",
         "end_time": "11:00:04",
-        "work_hours": 2.224722,
+        "work_hours": "02:13:29",
         "assembly_location": "竹東",
         "group_key": "B002|機台定位水平調整(含連結)|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:31:35",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造二課",
-        "title": "派遣 _德興"
+        "title": "派遣 _德興",
+        "department_emp": "製造二課",
+        "title_emp": "派遣 _德興"
       },
       {
         "id": 194,
@@ -233,12 +247,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "",
         "group_key": "SPT015|機台定位水平調整(含連結)|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:33:24",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造二課",
-        "title": "組長"
+        "title": "組長",
+        "department_emp": "製造二課",
+        "title_emp": "組長"
       },
       {
         "id": 195,
@@ -259,15 +275,17 @@
         "start_time": "08:34:57",
         "end_date": "2026-05-28",
         "end_time": "11:03:31",
-        "work_hours": 2.226111,
+        "work_hours": "02:13:34",
         "assembly_location": "竹東",
         "group_key": "B260|機台定位水平調整(含連結)|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:34:57",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "派遣 _利誠"
+        "title": "派遣 _利誠",
+        "department_emp": "製造一課",
+        "title_emp": "派遣 _利誠"
       },
       {
         "id": 196,
@@ -291,12 +309,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B211|骨架組立|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:36:42",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "晟銘"
+        "title": "晟銘",
+        "department_emp": "製造一課",
+        "title_emp": "晟銘"
       },
       {
         "id": 197,
@@ -320,12 +340,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B235|配電|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:37:32",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "派遣部 _晟銘"
+        "title": "派遣部 _晟銘",
+        "department_emp": "製造一課",
+        "title_emp": "派遣部 _晟銘"
       },
       {
         "id": 198,
@@ -349,12 +371,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B251|配電|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:51:03",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造二課",
-        "title": "晟銘"
+        "title": "晟銘",
+        "department_emp": "製造二課",
+        "title_emp": "晟銘"
       },
       {
         "id": 199,
@@ -375,15 +399,17 @@
         "start_time": "08:52:19",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT151|水平|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:52:19",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "助理工程師"
+        "title": "助理工程師",
+        "department_emp": "製造一課",
+        "title_emp": "助理工程師"
       },
       {
         "id": 200,
@@ -407,12 +433,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B249|配電|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:52:41",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造二課",
-        "title": "晟銘"
+        "title": "晟銘",
+        "department_emp": "製造二課",
+        "title_emp": "晟銘"
       },
       {
         "id": 201,
@@ -436,12 +464,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B250|配電|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:53:25",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造二課",
-        "title": "晟銘"
+        "title": "晟銘",
+        "department_emp": "製造二課",
+        "title_emp": "晟銘"
       },
       {
         "id": 202,
@@ -462,15 +492,17 @@
         "start_time": "08:54:04",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT250|S.T.|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:54:04",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "高級工程師"
+        "title": "高級工程師",
+        "department_emp": "製造一課",
+        "title_emp": "高級工程師"
       },
       {
         "id": 203,
@@ -494,12 +526,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B252|配電|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:54:17",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造二課",
-        "title": "晟銘"
+        "title": "晟銘",
+        "department_emp": "製造二課",
+        "title_emp": "晟銘"
       },
       {
         "id": 204,
@@ -523,12 +557,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B247|其他|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:55:54",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造二課",
-        "title": "微動"
+        "title": "微動",
+        "department_emp": "製造二課",
+        "title_emp": "微動"
       },
       {
         "id": 205,
@@ -552,12 +588,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B228|配電|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 08:57:21",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "派遣部 _晟銘"
+        "title": "派遣部 _晟銘",
+        "department_emp": "製造一課",
+        "title_emp": "派遣部 _晟銘"
       },
       {
         "id": 206,
@@ -578,15 +616,17 @@
         "start_time": "09:04:37",
         "end_date": "2026-05-28",
         "end_time": "14:11:56",
-        "work_hours": 3.871944,
+        "work_hours": "03:52:19",
         "assembly_location": "竹東",
         "group_key": "SPT239|清潔|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:04:37",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 207,
@@ -607,15 +647,17 @@
         "start_time": "09:05:10",
         "end_date": "2026-05-28",
         "end_time": "11:07:10",
-        "work_hours": 1.783333,
+        "work_hours": "01:47:00",
         "assembly_location": "宏田",
         "group_key": "SPT105|Packing|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:05:10",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "助理工程師"
+        "title": "助理工程師",
+        "department_emp": "製造一課",
+        "title_emp": "助理工程師"
       },
       {
         "id": 208,
@@ -639,12 +681,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B226|骨架組立|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:06:06",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "派遣部 _晟銘"
+        "title": "派遣部 _晟銘",
+        "department_emp": "製造一課",
+        "title_emp": "派遣部 _晟銘"
       },
       {
         "id": 209,
@@ -668,12 +712,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT208|清潔|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:06:08",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 210,
@@ -697,12 +743,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B204|骨架組立|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:08:06",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "派遣部 _晟銘"
+        "title": "派遣部 _晟銘",
+        "department_emp": "製造一課",
+        "title_emp": "派遣部 _晟銘"
       },
       {
         "id": 213,
@@ -726,12 +774,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT243|骨架組立|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:10:23",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 215,
@@ -755,12 +805,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT196|收機|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:12:27",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "助理工程師"
+        "title": "助理工程師",
+        "department_emp": "製造一課",
+        "title_emp": "助理工程師"
       },
       {
         "id": 218,
@@ -781,15 +833,17 @@
         "start_time": "09:16:05",
         "end_date": "2026-05-28",
         "end_time": "14:10:31",
-        "work_hours": 3.657222,
+        "work_hours": "03:39:26",
         "assembly_location": "竹東",
         "group_key": "B135|骨架組立|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:16:05",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "派遣部 _德興"
+        "title": "派遣部 _德興",
+        "department_emp": "製造一課",
+        "title_emp": "派遣部 _德興"
       },
       {
         "id": 219,
@@ -813,12 +867,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B227|骨架組立|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:16:24",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "派遣部 _晟銘"
+        "title": "派遣部 _晟銘",
+        "department_emp": "製造一課",
+        "title_emp": "派遣部 _晟銘"
       },
       {
         "id": 223,
@@ -839,15 +895,17 @@
         "start_time": "09:21:39",
         "end_date": "2026-05-28",
         "end_time": "14:18:52",
-        "work_hours": 3.703611,
+        "work_hours": "03:42:13",
         "assembly_location": "竹東",
         "group_key": "SPT199|收機|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:21:39",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 224,
@@ -868,15 +926,17 @@
         "start_time": "09:24:44",
         "end_date": "2026-05-28",
         "end_time": "09:28:29",
-        "work_hours": 0.0625,
+        "work_hours": "00:03:45",
         "assembly_location": "竹東",
         "group_key": "B126|配電|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:24:44",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "派遣 _晟銘"
+        "title": "派遣 _晟銘",
+        "department_emp": "製造一課",
+        "title_emp": "派遣 _晟銘"
       },
       {
         "id": 227,
@@ -900,12 +960,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT091|收機|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:26:39",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "工程師"
+        "title": "工程師",
+        "department_emp": "製造一課",
+        "title_emp": "工程師"
       },
       {
         "id": 229,
@@ -929,12 +991,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT092|S.T.|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:29:09",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "工程師"
+        "title": "工程師",
+        "department_emp": "製造一課",
+        "title_emp": "工程師"
       },
       {
         "id": 233,
@@ -955,15 +1019,17 @@
         "start_time": "09:32:09",
         "end_date": "2026-05-28",
         "end_time": "13:22:14",
-        "work_hours": 2.584722,
+        "work_hours": "02:35:05",
         "assembly_location": "竹東",
         "group_key": "SPT034|S.T.|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:32:09",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "工程師"
+        "title": "工程師",
+        "department_emp": "製造一課",
+        "title_emp": "工程師"
       },
       {
         "id": 235,
@@ -987,12 +1053,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT148|骨架組立|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:33:15",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "工程師"
+        "title": "工程師",
+        "department_emp": "製造一課",
+        "title_emp": "工程師"
       },
       {
         "id": 240,
@@ -1016,12 +1084,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B237|模組|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:40:40",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "晟銘"
+        "title": "晟銘",
+        "department_emp": "製造一課",
+        "title_emp": "晟銘"
       },
       {
         "id": 243,
@@ -1042,15 +1112,17 @@
         "start_time": "09:50:20",
         "end_date": "2026-05-28",
         "end_time": "13:33:00",
-        "work_hours": 2.461111,
+        "work_hours": "02:27:40",
         "assembly_location": "竹東",
         "group_key": "SPT149|設變|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:50:20",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "助理工程師"
+        "title": "助理工程師",
+        "department_emp": "製造一課",
+        "title_emp": "助理工程師"
       },
       {
         "id": 247,
@@ -1071,15 +1143,17 @@
         "start_time": "09:53:28",
         "end_date": "2026-05-28",
         "end_time": "13:37:37",
-        "work_hours": 2.485833,
+        "work_hours": "02:29:09",
         "assembly_location": "竹東",
         "group_key": "SPT160|設變|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:53:28",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "助理工程師"
+        "title": "助理工程師",
+        "department_emp": "製造一課",
+        "title_emp": "助理工程師"
       },
       {
         "id": 250,
@@ -1103,12 +1177,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT230|模組|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 09:57:04",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "高級工程師"
+        "title": "高級工程師",
+        "department_emp": "製造一課",
+        "title_emp": "高級工程師"
       },
       {
         "id": 252,
@@ -1132,12 +1208,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "",
         "group_key": "SPT138|機台定位水平調整(含連結)|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 10:05:59",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造二課",
-        "title": "工程師"
+        "title": "工程師",
+        "department_emp": "製造二課",
+        "title_emp": "工程師"
       },
       {
         "id": 253,
@@ -1161,12 +1239,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT203|模組|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 10:10:32",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "工程師"
+        "title": "工程師",
+        "department_emp": "製造一課",
+        "title_emp": "工程師"
       },
       {
         "id": 254,
@@ -1190,12 +1270,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT145|模組|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 10:27:37",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "工程師"
+        "title": "工程師",
+        "department_emp": "製造一課",
+        "title_emp": "工程師"
       },
       {
         "id": 260,
@@ -1219,12 +1301,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT230|模組|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 10:30:56",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "高級工程師"
+        "title": "高級工程師",
+        "department_emp": "製造一課",
+        "title_emp": "高級工程師"
       },
       {
         "id": 262,
@@ -1245,15 +1329,17 @@
         "start_time": "10:34:47",
         "end_date": "2026-05-28",
         "end_time": "10:45:22",
-        "work_hours": 0.006111,
+        "work_hours": "00:00:22",
         "assembly_location": "竹東",
         "group_key": "SPT240|前置鈑金|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 10:34:47",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 265,
@@ -1277,17 +1363,19 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT077|其他|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 10:56:51",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "工程師"
+        "title": "工程師",
+        "department_emp": "製造一課",
+        "title_emp": "工程師"
       },
       {
         "id": 279,
         "record_key": "SPT121|24N4001-30|其他|2026-05-28 11:51:02|f70b2df8",
-        "status": "暫停",
+        "status": "作業中",
         "work_order": "24N4001-30",
         "part_no": "1SLP01S-FCA1-01",
         "type_name": "FCLP EFEM",
@@ -1296,22 +1384,24 @@
         "employee_name": "徐兆生",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 11:51:02",
-        "end_action": "暫停",
-        "end_timestamp": "2026-05-28 15:28:46",
-        "remark": "通電量測；同步作業平均分配：2筆，群組總工時=02:22:44，平均=01:11:24",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "通電量測",
         "start_date": "2026-05-28",
         "start_time": "11:51:02",
-        "end_date": "2026-05-28",
-        "end_time": "15:28:46",
-        "work_hours": 1.19,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT121|其他|2026-05-28",
-        "is_group_work": 1,
+        "is_group_work": true,
         "source": "streamlit",
         "created_at": "2026-05-28 11:51:02",
-        "updated_at": "2026-05-28 15:28:46",
-        "department": "",
-        "title": ""
+        "updated_at": "2026-05-28 15:29:48",
+        "department": "製造一課",
+        "title": "工程師",
+        "department_emp": "製造一課",
+        "title_emp": "工程師"
       },
       {
         "id": 280,
@@ -1335,12 +1425,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT231|收機|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 13:05:22",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 281,
@@ -1364,12 +1456,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT034|S.T.|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 13:31:37",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "工程師"
+        "title": "工程師",
+        "department_emp": "製造一課",
+        "title_emp": "工程師"
       },
       {
         "id": 282,
@@ -1393,12 +1487,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT105|Packing|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 11:55:23",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "助理工程師"
+        "title": "助理工程師",
+        "department_emp": "製造一課",
+        "title_emp": "助理工程師"
       },
       {
         "id": 283,
@@ -1422,12 +1518,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT220|S.T.|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 13:23:53",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "高級工程師"
+        "title": "高級工程師",
+        "department_emp": "製造一課",
+        "title_emp": "高級工程師"
       },
       {
         "id": 284,
@@ -1451,12 +1549,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT149|模組|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 13:33:54",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "助理工程師"
+        "title": "助理工程師",
+        "department_emp": "製造一課",
+        "title_emp": "助理工程師"
       },
       {
         "id": 285,
@@ -1480,12 +1580,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT160|模組|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 13:39:25",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "助理工程師"
+        "title": "助理工程師",
+        "department_emp": "製造一課",
+        "title_emp": "助理工程師"
       },
       {
         "id": 286,
@@ -1509,12 +1611,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT241|模組|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 13:47:04",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 288,
@@ -1535,15 +1639,17 @@
         "start_time": "13:51:27",
         "end_date": "2026-05-28",
         "end_time": "13:55:18",
-        "work_hours": 0.064167,
+        "work_hours": "00:03:51",
         "assembly_location": "竹東",
         "group_key": "SPT256|模組|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 13:51:27",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 289,
@@ -1567,12 +1673,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT256|模組|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 13:56:54",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 290,
@@ -1596,12 +1704,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT172|Packing|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 14:00:06",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "助理工程師"
+        "title": "助理工程師",
+        "department_emp": "製造一課",
+        "title_emp": "助理工程師"
       },
       {
         "id": 291,
@@ -1625,12 +1735,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT199|收機|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 14:21:17",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 292,
@@ -1654,12 +1766,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT158|收機|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 14:25:05",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "工程師"
+        "title": "工程師",
+        "department_emp": "製造一課",
+        "title_emp": "工程師"
       },
       {
         "id": 293,
@@ -1683,12 +1797,14 @@
         "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT239|前置鈑金|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 14:34:50",
-        "updated_at": "2026-05-28 14:51:36",
+        "updated_at": "2026-05-28 15:29:48",
         "department": "製造一課",
-        "title": "技術員"
+        "title": "技術員",
+        "department_emp": "製造一課",
+        "title_emp": "技術員"
       },
       {
         "id": 294,
@@ -1709,15 +1825,17 @@
         "start_time": "14:57:23",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT031|S.T.|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 14:57:23",
-        "updated_at": "2026-05-28 14:57:23",
-        "department": "",
-        "title": ""
+        "updated_at": "2026-05-28 15:29:48",
+        "department": "製造一課",
+        "title": "組長",
+        "department_emp": "製造一課",
+        "title_emp": "組長"
       },
       {
         "id": 295,
@@ -1738,20 +1856,22 @@
         "start_time": "15:24:09",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B135|收機|2026-05-28",
-        "is_group_work": 0,
+        "is_group_work": false,
         "source": "streamlit",
         "created_at": "2026-05-28 15:24:09",
-        "updated_at": "2026-05-28 15:24:09",
-        "department": "",
-        "title": ""
+        "updated_at": "2026-05-28 15:29:48",
+        "department": "製造一課",
+        "title": "晟銘",
+        "department_emp": "製造一課",
+        "title_emp": "派遣部 _德興"
       },
       {
         "id": 296,
         "record_key": "SPT121|24N4001-31|其他|2026-05-28 15:26:35|35076cd7",
-        "status": "暫停",
+        "status": "作業中",
         "work_order": "24N4001-31",
         "part_no": "1SLP01S-FCA1-01",
         "type_name": "FCLP EFEM",
@@ -1760,27 +1880,60 @@
         "employee_name": "徐兆生",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 15:26:35",
-        "end_action": "暫停",
-        "end_timestamp": "2026-05-28 15:28:46",
-        "remark": "通電量測；同步作業平均分配：2筆，群組總工時=02:22:44，平均=01:11:24",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "通電量測",
         "start_date": "2026-05-28",
         "start_time": "15:26:35",
-        "end_date": "2026-05-28",
-        "end_time": "15:28:46",
-        "work_hours": 1.19,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT121|其他|2026-05-28",
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-28 15:26:35",
-        "updated_at": "2026-05-28 15:28:46",
+        "updated_at": "2026-05-28 15:31:56",
         "department": "",
-        "title": ""
+        "title": "",
+        "department_emp": "",
+        "title_emp": ""
+      },
+      {
+        "id": 297,
+        "record_key": "SPT121|24N4001-32|其他|2026-05-28 15:31:56|e85922bb",
+        "status": "作業中",
+        "work_order": "24N4001-32",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "其他",
+        "employee_id": "SPT121",
+        "employee_name": "徐兆生",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 15:31:56",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "通電量測",
+        "start_date": "2026-05-28",
+        "start_time": "15:31:56",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT121|其他|2026-05-28",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-28 15:31:56",
+        "updated_at": "2026-05-28 15:31:56",
+        "department": "",
+        "title": "",
+        "department_emp": "",
+        "title_emp": ""
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 61
+    "time_records": 62
   }
 }
