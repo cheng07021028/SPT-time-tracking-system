@@ -32,6 +32,11 @@ from services.backup_restore_service import (
     restore_missing_time_records_from_backup,
     backup_manifest_rows,
 )
+from services.system_monitoring_service import (
+    collect_system_monitoring_snapshot,
+    export_monitoring_excel_bytes,
+    monitoring_summary_rows,
+)
 
 from services.page_hygiene_service import (
     collect_page_hygiene_status,
@@ -75,6 +80,122 @@ st.caption(
     "權限說明：進入本頁需 14 模組 can_view；下載 Excel 需 can_export；執行非破壞式修復需 can_manage。"
 )
 
+
+st.markdown("### V166 系統監控儀表板 / System Monitoring Dashboard")
+st.caption(
+    "此區為唯讀監控，不寫入、不刪除、不重算、不補送 GitHub。"
+    "用來快速確認線上人數估算、今日作業量、未結束作業、長時間作業、備份佇列、資料庫/寫入錯誤與資料健康摘要。"
+)
+
+if "v166_monitoring_snapshot" not in st.session_state:
+    try:
+        st.session_state["v166_monitoring_snapshot"] = collect_system_monitoring_snapshot()
+    except Exception as exc:
+        st.session_state["v166_monitoring_snapshot"] = {
+            "version": "V166_system_monitoring_dashboard",
+            "level": "ERROR",
+            "risk_score": 100,
+            "warnings": [str(exc)],
+            "metrics": {},
+            "summary_rows": [],
+            "read_only": True,
+            "production_write_path_changed": False,
+        }
+
+v166_c1, v166_c2, v166_c3, v166_c4 = st.columns([1, 1, 1, 1])
+v166_work_date = v166_c1.date_input("監控日期 / Monitor Date", value=today_date(), key="v166_monitor_date")
+v166_window = v166_c2.number_input("線上估算分鐘", min_value=5, max_value=240, value=30, step=5, key="v166_active_window")
+v166_include_integrity = v166_c3.checkbox("包含資料健康檢查 / Slower", value=False, key="v166_include_integrity")
+v166_c4.info("預設快速監控；勾選資料健康檢查會較慢，但可顯示 LOG 有但工時缺失等異常。")
+
+v166_b1, v166_b2 = st.columns([1, 3])
+if v166_b1.button("🔄 刷新系統監控", use_container_width=True, key="v166_refresh_monitoring"):
+    with st.spinner("正在讀取 01/02/06/11、SQLite、備份佇列與監控摘要；此動作唯讀不寫入..."):
+        st.session_state["v166_monitoring_snapshot"] = collect_system_monitoring_snapshot(
+            work_date=str(v166_work_date),
+            active_user_window_minutes=int(v166_window),
+            include_integrity_audit=bool(v166_include_integrity),
+            integrity_start_date=str(v166_work_date),
+            integrity_end_date=str(v166_work_date),
+        )
+    st.rerun()
+v166_b2.caption("V166 不改正式資料流程；production_write_path_changed 必須維持 False。")
+
+v166_snapshot = st.session_state.get("v166_monitoring_snapshot") or {}
+v166_metrics = v166_snapshot.get("metrics", {}) if isinstance(v166_snapshot.get("metrics"), dict) else {}
+v166_level = str(v166_snapshot.get("level") or "UNKNOWN")
+if v166_level == "OK":
+    st.success(f"系統監控狀態 OK｜檢查時間：{v166_snapshot.get('checked_at', '')}")
+elif v166_level == "WARN":
+    st.warning(f"系統監控有需注意項目｜風險分數：{v166_snapshot.get('risk_score', 0)}｜檢查時間：{v166_snapshot.get('checked_at', '')}")
+else:
+    st.error(f"系統監控發現高風險或檢查錯誤｜風險分數：{v166_snapshot.get('risk_score', 0)}｜檢查時間：{v166_snapshot.get('checked_at', '')}")
+
+for warning in v166_snapshot.get("warnings", [])[:5]:
+    st.caption(f"• {warning}")
+
+v166_m1, v166_m2, v166_m3, v166_m4, v166_m5, v166_m6 = st.columns(6)
+v166_m1.metric("線上估算", v166_metrics.get("active_user_estimate", 0))
+v166_m2.metric("今日開始 LOG", v166_metrics.get("today_start_logs", 0))
+v166_m3.metric("今日結束 LOG", v166_metrics.get("today_end_logs", 0))
+v166_m4.metric("未結束作業", v166_metrics.get("active_work_total", 0))
+v166_m5.metric("超過12H", v166_metrics.get("active_over_12h", 0))
+v166_m6.metric("DB/寫入錯誤", v166_metrics.get("today_db_write_error_logs", 0))
+
+v166_m7, v166_m8, v166_m9, v166_m10, v166_m11, v166_m12 = st.columns(6)
+v166_m7.metric("今日工時紀錄", v166_metrics.get("today_time_records", 0))
+v166_m8.metric("GitHub待上傳", v166_metrics.get("backup_authority_pending", 0))
+v166_m9.metric("事件待上傳", v166_metrics.get("backup_event_pending", 0))
+v166_m10.metric("LOG待同步", "是" if v166_metrics.get("backup_log_pending") else "否")
+v166_m11.metric("健康重大異常", v166_metrics.get("integrity_critical", "未檢查"))
+v166_m12.metric("LOG缺工時", v166_metrics.get("log_start_missing_count", "未檢查"))
+
+try:
+    st.dataframe(pd.DataFrame(monitoring_summary_rows(v166_snapshot)), use_container_width=True, hide_index=True, height=300)
+except Exception:
+    pass
+
+with st.expander("V166 監控詳細資料 / Monitoring Details", expanded=False):
+    tab_active, tab_long, tab_users, tab_process, tab_sources, tab_raw = st.tabs([
+        "未結束作業", "長時間作業", "線上估算", "今日工段", "來源統計", "原始摘要"
+    ])
+    with tab_active:
+        st.dataframe(pd.DataFrame(v166_snapshot.get("active_work_preview_rows", [])), use_container_width=True, hide_index=True, height=320)
+    with tab_long:
+        st.dataframe(pd.DataFrame(v166_snapshot.get("long_active_over_12h_rows", [])), use_container_width=True, hide_index=True, height=320)
+    with tab_users:
+        st.dataframe(pd.DataFrame(v166_snapshot.get("active_users_rows", [])), use_container_width=True, hide_index=True, height=320)
+    with tab_process:
+        st.dataframe(pd.DataFrame(v166_snapshot.get("process_rows", [])), use_container_width=True, hide_index=True, height=320)
+    with tab_sources:
+        st.dataframe(pd.DataFrame(v166_snapshot.get("source_rows", [])), use_container_width=True, hide_index=True, height=320)
+    with tab_raw:
+        st.json({
+            "version": v166_snapshot.get("version"),
+            "checked_at": v166_snapshot.get("checked_at"),
+            "level": v166_snapshot.get("level"),
+            "risk_score": v166_snapshot.get("risk_score"),
+            "read_only": v166_snapshot.get("read_only"),
+            "production_write_path_changed": v166_snapshot.get("production_write_path_changed"),
+            "sqlite_info": v166_snapshot.get("sqlite_info"),
+            "last_backup": v166_snapshot.get("last_backup"),
+            "backup_summary": {k: v for k, v in (v166_snapshot.get("backup_summary") or {}).items() if k != "raw"},
+            "integrity_summary": v166_snapshot.get("integrity_summary"),
+        })
+
+if CAN_EXPORT:
+    st.download_button(
+        "⬇️ 下載 V166 系統監控 Excel",
+        data=export_monitoring_excel_bytes(v166_snapshot),
+        file_name=f"SPT_V166_系統監控_{v166_snapshot.get('work_date', '')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        key="v166_download_monitoring_excel",
+    )
+else:
+    st.info("你的帳號沒有 14 模組匯出權限，因此不能下載 V166 系統監控 Excel。")
+
+st.divider()
 
 
 st.markdown("### V163 每日資料結帳與鎖定 / Daily Close & Lock")
