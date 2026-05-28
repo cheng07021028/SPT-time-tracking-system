@@ -1,0 +1,48 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "3e6864d130c44aa4907351ab9829d112",
+  "event_type": "PAUSE_WORK",
+  "event_time": "2026-05-28 15:29:30",
+  "record_id": "279",
+  "record_key": "SPT121|24N4001-30|其他|2026-05-28 11:51:02|f70b2df8",
+  "operator_account": "SPT121",
+  "reason": "finish_work_v152_event_journal",
+  "row": {
+    "id": "279",
+    "record_key": "SPT121|24N4001-30|其他|2026-05-28 11:51:02|f70b2df8",
+    "status": "暫停",
+    "work_order": "24N4001-30",
+    "part_no": "1SLP01S-FCA1-01",
+    "type_name": "FCLP EFEM",
+    "process_name": "其他",
+    "employee_id": "SPT121",
+    "employee_name": "徐兆生",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-28 11:51:02",
+    "end_action": "暫停",
+    "end_timestamp": "2026-05-28 15:28:46",
+    "remark": "通電量測；同步作業平均分配：2筆，群組總工時=02:22:44，平均=01:11:24",
+    "start_date": "2026-05-28",
+    "start_time": "11:51:02",
+    "end_date": "2026-05-28",
+    "end_time": "15:28:46",
+    "work_hours": "1.19",
+    "assembly_location": "竹東",
+    "group_key": "SPT121|其他|2026-05-28",
+    "is_group_work": "1",
+    "source": "streamlit",
+    "created_at": "2026-05-28 11:51:02",
+    "updated_at": "2026-05-28 15:28:46"
+  },
+  "extra": {
+    "end_action": "暫停",
+    "remark": "",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      279,
+      296
+    ]
+  },
+  "previous_checksum": "ec6a38cc387d0bacc37de50ca1679810034ebda376ee6551cd7dd9c58f8df09f",
+  "checksum": "f8037e2c827c654e2c13d434d246ab3592658f577ff1cdbc80e2207d077a489c"
+}
