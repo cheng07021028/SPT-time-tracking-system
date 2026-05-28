@@ -38,6 +38,14 @@ from services.page_hygiene_service import (
     page_hygiene_rows,
 )
 
+from services.daily_close_service import (
+    close_work_date,
+    daily_close_report,
+    export_daily_close_excel_bytes,
+    list_daily_close_status,
+    reopen_work_date,
+)
+
 MODULE_CODE = "14_data_health"
 
 st.set_page_config(page_title="14. 資料健康檢查中心", page_icon="🛡️", layout="wide")
@@ -65,6 +73,139 @@ st.warning(
 st.caption(
     "權限說明：進入本頁需 14 模組 can_view；下載 Excel 需 can_export；執行非破壞式修復需 can_manage。"
 )
+
+
+
+st.markdown("### V163 每日資料結帳與鎖定 / Daily Close & Lock")
+st.caption(
+    "此區用於每日結帳、鎖定已結帳日期、建立結帳備份與輸出結帳報告。"
+    "鎖定後該日期的開始、結束、儲存、刪除、重算與匯入會被保護；如需更正，請先重新開啟日期。"
+)
+
+v163_today = today_date()
+if "v163_daily_close_report" not in st.session_state:
+    st.session_state["v163_daily_close_report"] = None
+if "v163_daily_close_action" not in st.session_state:
+    st.session_state["v163_daily_close_action"] = None
+
+v163_c1, v163_c2, v163_c3, v163_c4 = st.columns([1, 1, 1, 1])
+v163_work_date = v163_c1.date_input("結帳日期 / Work Date", value=v163_today, key="v163_work_date")
+v163_create_backup = v163_c2.checkbox("結帳時建立完整備份", value=True, disabled=not CAN_REPAIR, key="v163_create_backup")
+v163_block_critical = v163_c3.checkbox("有重大異常時阻止結帳", value=True, disabled=not CAN_REPAIR, key="v163_block_critical")
+v163_require_no_active = v163_c4.checkbox("有未結束作業時阻止結帳", value=True, disabled=not CAN_REPAIR, key="v163_require_no_active")
+
+v163_note = st.text_input("結帳備註 / Note", value="", key="v163_close_note")
+
+v163_b1, v163_b2, v163_b3, v163_b4 = st.columns([1, 1, 1, 1])
+if v163_b1.button("🔍 檢查結帳狀態", use_container_width=True, key="v163_check_daily_close"):
+    with st.spinner("正在檢查當日工時、未結束作業與資料健康摘要..."):
+        st.session_state["v163_daily_close_report"] = daily_close_report(str(v163_work_date))
+    st.rerun()
+
+v163_confirm_close = v163_b2.checkbox("確認結帳", value=False, disabled=not CAN_REPAIR, key="v163_confirm_close")
+if v163_b3.button(
+    "✅ 執行每日結帳並鎖定",
+    use_container_width=True,
+    disabled=(not CAN_REPAIR) or (not v163_confirm_close),
+    key="v163_close_work_date",
+):
+    with st.spinner("正在執行每日結帳：檢查未結束作業、資料健康摘要與建立備份..."):
+        st.session_state["v163_daily_close_action"] = close_work_date(
+            str(v163_work_date),
+            note=v163_note,
+            require_no_active=bool(v163_require_no_active),
+            create_backup=bool(v163_create_backup),
+            block_on_critical_health=bool(v163_block_critical),
+        )
+        st.session_state["v163_daily_close_report"] = daily_close_report(str(v163_work_date))
+    st.rerun()
+
+v163_confirm_reopen = v163_b4.checkbox("確認重新開啟", value=False, disabled=not CAN_REPAIR, key="v163_confirm_reopen")
+if st.button(
+    "🔓 重新開啟已結帳日期以便更正",
+    use_container_width=True,
+    disabled=(not CAN_REPAIR) or (not v163_confirm_reopen),
+    key="v163_reopen_work_date",
+):
+    with st.spinner("正在重新開啟已結帳日期；此動作只解除鎖定，不修改工時資料..."):
+        st.session_state["v163_daily_close_action"] = reopen_work_date(str(v163_work_date), reason=v163_note or "管理員重新開啟日期更正")
+        st.session_state["v163_daily_close_report"] = daily_close_report(str(v163_work_date))
+    st.rerun()
+
+v163_action = st.session_state.get("v163_daily_close_action")
+if isinstance(v163_action, dict) and v163_action:
+    if v163_action.get("ok"):
+        st.success("V163 操作完成。")
+    else:
+        reason = v163_action.get("reason") or "unknown"
+        if reason == "active_records_exist":
+            st.error(f"仍有未結束作業 {v163_action.get('active_count', 0)} 筆，已阻止結帳。請先下班/暫停/完工，或取消『有未結束作業時阻止結帳』後再執行。")
+        elif reason == "critical_health_issues":
+            st.error(f"資料健康檢查仍有重大異常 {v163_action.get('critical_count', 0)} 筆，已阻止結帳。")
+        else:
+            st.warning(f"V163 操作未完成：{reason}")
+    with st.expander("V163 最近一次操作結果", expanded=False):
+        st.json(v163_action)
+
+v163_report = st.session_state.get("v163_daily_close_report")
+if not isinstance(v163_report, dict) or not v163_report:
+    try:
+        v163_report = daily_close_report(str(v163_work_date))
+    except Exception as exc:
+        v163_report = {"ok": False, "error": str(exc), "work_date": str(v163_work_date)}
+
+if isinstance(v163_report, dict):
+    dc1, dc2, dc3, dc4, dc5 = st.columns(5)
+    dc1.metric("工作日期", v163_report.get("work_date", str(v163_work_date)))
+    dc2.metric("結帳狀態", "已鎖定" if v163_report.get("closed") else "未結帳")
+    dc3.metric("當日工時筆數", v163_report.get("record_count", 0))
+    dc4.metric("未結束作業", v163_report.get("active_count", 0))
+    hs = v163_report.get("health_summary") if isinstance(v163_report.get("health_summary"), dict) else {}
+    dc5.metric("重大異常", hs.get("critical_count", 0) if isinstance(hs, dict) else 0)
+
+    if v163_report.get("closed"):
+        close_info = v163_report.get("close_info") if isinstance(v163_report.get("close_info"), dict) else {}
+        st.success(f"{v163_report.get('work_date')} 已結帳鎖定。結帳人：{close_info.get('closed_by','')}；時間：{close_info.get('closed_at','')}。")
+    else:
+        if int(v163_report.get("active_count") or 0) > 0:
+            st.warning("此日期仍有未結束作業，建議先處理完再結帳。")
+        else:
+            st.info("此日期尚未結帳；若確認資料正確，可執行每日結帳並鎖定。")
+
+    if v163_report.get("active_records"):
+        with st.expander("V163 未結束作業明細 / Active Records Blocking Close", expanded=True):
+            st.dataframe(pd.DataFrame(v163_report.get("active_records") or []), use_container_width=True, hide_index=True, height=260)
+
+    with st.expander("V163 當日狀態統計與健康摘要", expanded=False):
+        st.json({
+            "status_counts": v163_report.get("status_counts", {}),
+            "health_summary": v163_report.get("health_summary", {}),
+            "close_info": v163_report.get("close_info", {}),
+        })
+
+    if CAN_EXPORT:
+        try:
+            st.download_button(
+                "⬇️ 下載 V163 每日結帳報告 Excel",
+                data=export_daily_close_excel_bytes(str(v163_work_date)),
+                file_name=f"SPT_V163_每日結帳報告_{v163_work_date}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="v163_download_daily_close_excel",
+            )
+        except Exception as exc:
+            st.warning(f"產生 V163 Excel 報告失敗：{exc}")
+
+with st.expander("最近 14 日結帳狀態 / Recent Daily Close Status", expanded=False):
+    try:
+        st.dataframe(list_daily_close_status(end_date=str(v163_work_date), days=14), use_container_width=True, hide_index=True, height=320)
+    except Exception as exc:
+        st.error(f"讀取每日結帳狀態失敗：{exc}")
+
+if not CAN_REPAIR:
+    st.info("你的帳號沒有 14 模組 can_manage 權限，因此只能查看結帳狀態，不能執行結帳或重新開啟。")
+
+st.divider()
 
 
 st.markdown("### V159 頁面路由健康檢查 / Page Route Hygiene")
