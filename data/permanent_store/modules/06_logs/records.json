@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 02:13:47",
-  "exported_at": "2026-05-29 02:13:47",
+  "updated_at": "2026-05-29 02:14:26",
+  "exported_at": "2026-05-29 02:14:26",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -823,11 +823,35 @@
         "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 02:13:43\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"331\",\"target_ids\":[331],\"message\":\"張文品 開始 21M0241-01 / 前置鈑金\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"B002|21M0241-01|前置鈑金|2026-05-29 02:13:04|4d72211f\",\"identity_key\":\"record_key:B002|21M0241-01|前置鈑金|2026-05-29 02:13:04|4d72211f\",\"id\":\"331\",\"employee_id\":\"B002\",\"employee_name\":\"張文品\",\"work_order\":\"21M0241-01\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 02:13:04\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":331,\"record_key\":\"B002|21M0241-01|前置鈑金|2026-05-29 02:13:04|4d72211f\",\"status\":\"作業中\",\"work_order\":\"21M0241-01\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"employee_id\":\"B002\",\"employee_name\":\"張文品\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 02:13:04\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"02:13:04\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B002|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 02:13:04\",\"updated_at\":\"2026-05-29 02:13:04\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":331,\"record_key\":\"B002|21M0241-01|前置鈑金|2026-05-29 02:13:04|4d72211f\",\"status\":\"作業中\",\"work_order\":\"21M0241-01\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"employee_id\":\"B002\",\"employee_name\":\"張文品\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 02:13:04\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"02:13:04\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B002|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 02:13:04\",\"updated_at\":\"2026-05-29 02:13:04\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":331,\"record_key\":\"B002|21M0241-01|前置鈑金|2026-05-29 02:13:04|4d72211f\",\"status\":\"作業中\",\"work_order\":\"21M0241-01\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"employee_id\":\"B002\",\"employee_name\":\"張文品\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 02:13:04\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"02:13:04\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B002|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 02:13:04\",\"updated_at\":\"2026-05-29 02:13:04\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":331,\"record_key\":\"B002|21M0241-01|前置鈑金|2026-05-29 02:13:04|4d72211f\",\"status\":\"作業中\",\"work_order\":\"21M0241-01\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"employee_id\":\"B002\",\"employee_name\":\"張文品\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 02:13:04\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"02:13:04\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B002|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 02:13:04\",\"updated_at\":\"2026-05-29 02:13:04\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"fd427e2d846e93bcca103511e38ecdbfef0563b351618a6a2290c485782ea5f4\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 148,
+        "log_time": "2026-05-29 02:14:22",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V198",
+        "target_table": "time_records",
+        "target_id": "331",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：V198 02 歷史紀錄刪除已寫入 reboot-proof hard delete guard；deleted=1；ids=[331]",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 147,
+        "log_time": "2026-05-29 02:14:17",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V196",
+        "target_table": "time_records",
+        "target_id": "331",
+        "message": "02 歷史紀錄啟動編輯後整列刪除 / V198 02 reboot-proof delete：V196 reboot-proof hard delete；ids=[331]；sqlite_deleted=0；remaining=0",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 68
+    "system_logs": 70
   }
 }
