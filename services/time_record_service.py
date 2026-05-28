@@ -13333,3 +13333,115 @@ def audit_v197_active_signature_compatibility() -> dict:
     }
 
 # ================= END V197 ACTIVE WORK SIGNATURE COMPATIBILITY FIX =================
+
+
+# ============================================================
+# V198｜02 History delete must use the same reboot-proof hard-delete lane
+# ============================================================
+# Problem fixed:
+# - 01.工時紀錄 delete used the latest V196/V197 delete_time_records() wrapper,
+#   so deleted rows stayed hidden after Reboot App.
+# - 02.歷史紀錄 page intentionally calls delete_time_records_v178b_strict()
+#   for editor deletes.  Older strict delete implementations could bypass the
+#   V196 hard-delete guard, so rows deleted from 02 could come back after reboot.
+#
+# Design:
+# - Keep UI/theme/pages unchanged.
+# - Override delete_time_records_v178b_strict at the very end so 02 editor deletes
+#   always go through services.time_record_hard_delete_guard_service.
+# - Store durable identities: id + record_key + business key from the editor row.
+# - Rewrite 01/02 authority and delete SQLite cache through the same guard.
+# ============================================================
+
+def _v198_clear_time_record_caches() -> None:
+    for fn_name in (
+        "clear_query_cache",
+        "clear_today_records_fast_cache",
+        "_v173_clear_cache",
+        "_v171_clear_cache",
+    ):
+        try:
+            fn = globals().get(fn_name)
+            if callable(fn):
+                fn()
+        except Exception:
+            pass
+    try:
+        if "st" in globals() and hasattr(st, "cache_data"):
+            st.cache_data.clear()
+    except Exception:
+        pass
+
+
+def _v198_force_hard_delete(record_ids, *, reason: str, source_df=None, github: bool = True) -> dict:
+    ids = []
+    for x in record_ids or []:
+        try:
+            i = int(float(str(x).strip()))
+            if i > 0 and i not in ids:
+                ids.append(i)
+        except Exception:
+            pass
+    if not ids:
+        return {"ok": False, "deleted_count": 0, "reason": "no_ids", "ids": []}
+    try:
+        from services import time_record_hard_delete_guard_service as _v198_guard
+        result = _v198_guard.force_delete_time_records(
+            ids,
+            reason=f"{reason} / V198 02 reboot-proof delete",
+            source_df=source_df if isinstance(source_df, pd.DataFrame) else None,
+            github=github,
+        )
+        try:
+            _v198_guard.clear_cache()
+        except Exception:
+            pass
+        _v198_clear_time_record_caches()
+        return dict(result or {"ok": True, "deleted_count": len(ids), "ids": ids})
+    except Exception as exc:
+        try:
+            write_log("V198_DELETE_ERROR", f"V198 hard delete failed: {exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        # Fallback to current delete_time_records wrapper; it should still include V196 guard.
+        try:
+            n = int(delete_time_records(ids, reason=f"{reason} / V198 fallback") or 0)
+            _v198_clear_time_record_caches()
+            return {"ok": n > 0, "deleted_count": n, "ids": ids, "fallback": True}
+        except Exception:
+            return {"ok": False, "deleted_count": 0, "ids": ids, "error": str(exc)}
+
+
+def delete_time_records_v178b_strict(record_ids: list[int], reason: str = "02 歷史紀錄嚴格刪除", editor_df=None) -> dict:  # type: ignore[override]
+    """V198 compatibility entry used by pages/02_02. 歷史紀錄.py.
+
+    Always use the latest reboot-proof hard delete guard.  This preserves the
+    existing page call signature while making 02 deletes persist after Reboot App.
+    """
+    result = _v198_force_hard_delete(record_ids, reason=reason, source_df=editor_df, github=True)
+    try:
+        write_log(
+            "DELETE_TIME_RECORDS_V198",
+            f"{reason}：V198 02 歷史紀錄刪除已寫入 reboot-proof hard delete guard；deleted={result.get('deleted_count', 0)}；ids={result.get('ids', [])}",
+            "time_records",
+            target_id=",".join(map(str, result.get("ids", []) or [])),
+            level="WARN",
+        )
+    except Exception:
+        pass
+    return result
+
+
+def audit_v198_02_delete_route() -> dict:
+    """Small diagnostic helper for 14/terminal checks."""
+    out = {"version": "V198", "strict_delete_overridden": True}
+    try:
+        from services import time_record_hard_delete_guard_service as _guard
+        entries = _guard.load_deleted_entries()
+        out["hard_delete_guard_entries"] = len(entries or [])
+        out["guard_service_available"] = True
+    except Exception as exc:
+        out["guard_service_available"] = False
+        out["error"] = str(exc)
+    return out
+

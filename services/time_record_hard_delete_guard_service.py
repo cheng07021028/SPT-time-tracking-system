@@ -58,6 +58,14 @@ def _to_int(v: Any) -> int | None:
     except Exception:
         return None
 
+def _id_col(df: pd.DataFrame | None) -> str:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return ""
+    for c in ("id", "ID", "ID / ID", "ID / ID / ID", "紀錄編號", "record_id"):
+        if c in df.columns:
+            return c
+    return ""
+
 
 def _norm_ts(v: Any) -> str:
     s = _txt(v)
@@ -86,12 +94,22 @@ def _norm_ts(v: Any) -> str:
 
 
 def business_key(row: dict[str, Any]) -> str:
-    start = _txt(row.get("start_timestamp")) or _txt(row.get("開始時間")) or _txt(row.get("開始時間戳")) or _txt(row.get("start_date"))
+    start = (
+        _txt(row.get("start_timestamp"))
+        or _txt(row.get("開始時間戳 / Start Timestamp"))
+        or _txt(row.get("開始時間 / Start Timestamp"))
+        or _txt(row.get("開始時間戳"))
+        or _txt(row.get("開始時間"))
+    )
+    if not start:
+        sd = _txt(row.get("start_date")) or _txt(row.get("開始日期 / Start Date")) or _txt(row.get("開始日期"))
+        st = _txt(row.get("start_time")) or _txt(row.get("開始時刻 / Start Time")) or _txt(row.get("開始時刻"))
+        start = (sd + " " + st).strip() if (sd or st) else ""
     return "|".join([
-        _txt(row.get("employee_id") or row.get("工號") or row.get("工號 / Employee ID")),
-        _txt(row.get("employee_name") or row.get("姓名") or row.get("姓名 / Name")),
-        _txt(row.get("work_order") or row.get("製令") or row.get("製令 / Work Order")),
-        _txt(row.get("process_name") or row.get("工段名稱") or row.get("工段名稱 / Process") or row.get("process")),
+        _txt(row.get("employee_id") or row.get("工號") or row.get("工號 / Employee ID") or row.get("Employee ID")),
+        _txt(row.get("employee_name") or row.get("姓名") or row.get("姓名 / Name") or row.get("Name")),
+        _txt(row.get("work_order") or row.get("製令") or row.get("製令 / Work Order") or row.get("Work Order")),
+        _txt(row.get("process_name") or row.get("工段名稱") or row.get("工段名稱 / Process") or row.get("工段 / Process") or row.get("Process") or row.get("process")),
         _norm_ts(start),
     ])
 
@@ -101,7 +119,7 @@ def identities_for_row(row: dict[str, Any]) -> set[str]:
     rid = _to_int(row.get("id") or row.get("ID") or row.get("ID / ID"))
     if rid is not None:
         ids.add(f"id:{rid}")
-    rk = _txt(row.get("record_key") or row.get("Record Key") or row.get("record key"))
+    rk = _txt(row.get("record_key") or row.get("紀錄鍵 / Record Key") or row.get("Record Key") or row.get("record key"))
     if rk:
         ids.add(f"record_key:{rk}")
     bk = business_key(row)
@@ -393,8 +411,9 @@ def force_delete_time_records(record_ids: Iterable[Any], *, reason: str = "V196 
     if not ids:
         return {"ok": False, "deleted_count": 0, "reason": "no_ids"}
     src = source_df.copy() if isinstance(source_df, pd.DataFrame) else pd.DataFrame()
-    if src is not None and not src.empty and "id" in src.columns:
-        deleted_rows = src.loc[src["id"].map(_to_int).isin(set(ids))].copy()
+    id_col = _id_col(src)
+    if src is not None and not src.empty and id_col:
+        deleted_rows = src.loc[src[id_col].map(_to_int).isin(set(ids))].copy()
     else:
         deleted_rows = pd.DataFrame()
     add_deleted_rows(deleted_rows, ids, reason=reason, github=github)
@@ -441,3 +460,6 @@ def force_delete_time_records(record_ids: Iterable[Any], *, reason: str = "V196 
         pass
     clear_cache()
     return {"ok": True, "deleted_count": len(ids), "sqlite_deleted": sqlite_deleted, "remaining": written, "ids": ids}
+
+
+# V198 hard delete guard compatibility marker: supports 02 editor strict delete with bilingual columns.
