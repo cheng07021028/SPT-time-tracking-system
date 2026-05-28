@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 21:53:03",
+  "exported_at": "2026-05-28 21:57:38",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -2350,10 +2350,142 @@
         "message": "UPDATE security_users",
         "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
         "level": "INFO"
+      },
+      {
+        "id": 246,
+        "log_time": "2026-05-28 21:56:57",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 247,
+        "log_time": "2026-05-28 21:56:57",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 248,
+        "log_time": "2026-05-28 21:56:57",
+        "user_name": "admin",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 2 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 249,
+        "log_time": "2026-05-28 21:56:57",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 250,
+        "log_time": "2026-05-28 21:56:57",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 251,
+        "log_time": "2026-05-28 21:56:57",
+        "user_name": "admin",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_finish_active_visible_v141: 已由 01/02 權威檔回填 SQLite cache 2 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 252,
+        "log_time": "2026-05-28 21:57:03",
+        "user_name": "SPT077",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 253,
+        "log_time": "2026-05-28 21:57:03",
+        "user_name": "SPT077",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 254,
+        "log_time": "2026-05-28 21:57:03",
+        "user_name": "SPT077",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 255,
+        "log_time": "2026-05-28 21:57:03",
+        "user_name": "SPT077",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 3 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 256,
+        "log_time": "2026-05-28 21:57:23",
+        "user_name": "SPT077",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
+        "level": "INFO"
+      },
+      {
+        "id": 257,
+        "log_time": "2026-05-28 21:57:24",
+        "user_name": "SPT077",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "265",
+        "message": "V137 結束工時紀錄 #265；同步結束=1筆；狀態=下班；群組總工時=09:00:32；平均工時=09:00:36",
+        "detail": "265\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-28 21:57:24\",\"action_type\":\"END_WORK\",\"target_table\":\"time_records\",\"target_id\":\"265\",\"target_ids\":[265],\"message\":\"V137 結束工時紀錄 #265；同步結束=1筆；狀態=下班；群組總工時=09:00:32；平均工時=09:00:36\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT077|26N4001-01|其他|2026-05-28 10:56:51|a1c838fd\",\"identity_key\":\"record_key:SPT077|26N4001-01|其他|2026-05-28 10:56:51|a1c838fd\",\"id\":\"265\",\"employee_id\":\"SPT077\",\"employee_name\":\"謝宛庭\",\"work_order\":\"26N4001-01\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"其他\",\"status\":\"下班\",\"start_timestamp\":\"2026-05-28 10:56:51\",\"end_timestamp\":\"2026-05-28 21:57:23\",\"work_hours\":\"9.01\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":265,\"record_key\":\"SPT077|26N4001-01|其他|2026-05-28 10:56:51|a1c838fd\",\"status\":\"下班\",\"work_order\":\"26N4001-01\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"其他\",\"employee_id\":\"SPT077\",\"employee_name\":\"謝宛庭\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 10:56:51\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 21:57:23\",\"remark\":\"前置線材加工\",\"start_date\":\"2026-05-28\",\"start_time\":\"10:56:51\",\"end_date\":\"2026-05-28\",\"end_time\":\"21:57:23\",\"work_hours\":9.01,\"assembly_location\":\"竹東\",\"group_key\":\"SPT077|其他|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 10:56:51\",\"updated_at\":\"2026-05-28 21:57:23\",\"department\":\"\",\"title\":\"\",\"department_emp\":\"\",\"title_emp\":\"\",\"recovery_status\":\"\",\"recovery_note\":\"\",\"is_deleted\":\"\",\"deleted_at\":\"\",\"work_hours_hms\":\"\",\"recovery_closed_at\":\"\",\"recovery_closed_source\":\"\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":265,\"record_key\":\"SPT077|26N4001-01|其他|2026-05-28 10:56:51|a1c838fd\",\"status\":\"下班\",\"work_order\":\"26N4001-01\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"其他\",\"employee_id\":\"SPT077\",\"employee_name\":\"謝宛庭\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 10:56:51\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 21:57:23\",\"remark\":\"前置線材加工\",\"start_date\":\"2026-05-28\",\"start_time\":\"10:56:51\",\"end_date\":\"2026-05-28\",\"end_time\":\"21:57:23\",\"work_hours\":9.01,\"assembly_location\":\"竹東\",\"group_key\":\"SPT077|其他|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 10:56:51\",\"updated_at\":\"2026-05-28 21:57:23\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":265,\"record_key\":\"SPT077|26N4001-01|其他|2026-05-28 10:56:51|a1c838fd\",\"status\":\"下班\",\"work_order\":\"26N4001-01\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"其他\",\"employee_id\":\"SPT077\",\"employee_name\":\"謝宛庭\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 10:56:51\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 21:57:23\",\"remark\":\"前置線材加工\",\"start_date\":\"2026-05-28\",\"start_time\":\"10:56:51\",\"end_date\":\"2026-05-28\",\"end_time\":\"21:57:23\",\"work_hours\":9.01,\"assembly_location\":\"竹東\",\"group_key\":\"SPT077|其他|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 10:56:51\",\"updated_at\":\"2026-05-28 21:57:23\",\"department\":\"\",\"title\":\"\",\"department_emp\":\"\",\"title_emp\":\"\",\"recovery_status\":\"\",\"recovery_note\":\"\",\"is_deleted\":\"\",\"deleted_at\":\"\",\"work_hours_hms\":\"\",\"recovery_closed_at\":\"\",\"recovery_closed_source\":\"\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":265,\"record_key\":\"SPT077|26N4001-01|其他|2026-05-28 10:56:51|a1c838fd\",\"status\":\"下班\",\"work_order\":\"26N4001-01\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"其他\",\"employee_id\":\"SPT077\",\"employee_name\":\"謝宛庭\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 10:56:51\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 21:57:23\",\"remark\":\"前置線材加工\",\"start_date\":\"2026-05-28\",\"start_time\":\"10:56:51\",\"end_date\":\"2026-05-28\",\"end_time\":\"21:57:23\",\"work_hours\":9.01,\"assembly_location\":\"竹東\",\"group_key\":\"SPT077|其他|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 10:56:51\",\"updated_at\":\"2026-05-28 21:57:23\",\"department\":\"\",\"title\":\"\",\"department_emp\":\"\",\"title_emp\":\"\",\"recovery_status\":\"\",\"recovery_note\":\"\",\"is_deleted\":\"\",\"deleted_at\":\"\",\"work_hours_hms\":\"\",\"recovery_closed_at\":\"\",\"recovery_closed_source\":\"\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"547792eb0f76c2d29faf69307e2973fa0793d6b28972f3c9a97ba489158e0715\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 213
+    "system_logs": 225
   }
 }
