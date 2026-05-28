@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 11:30:06",
-  "exported_at": "2026-05-28 11:30:06",
+  "updated_at": "2026-05-28 11:30:20",
+  "exported_at": "2026-05-28 11:30:20",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 14300,
+        "source": "v103_merge",
+        "username": "B155",
+        "display_name": "趙健浩",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=B155; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-28 11:30:20",
+        "logout_time": "2026-05-28 11:30:20",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 11:30:20"
+      },
       {
         "id": 14005,
         "source": "v103_merge",
@@ -4718,7 +4734,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 294,
+    "login_logs": 295,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
