@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 09:30:42",
-  "exported_at": "2026-05-28 09:30:42",
+  "updated_at": "2026-05-28 09:30:48",
+  "exported_at": "2026-05-28 09:30:48",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -2803,11 +2803,23 @@
         "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 9594,
+        "log_time": "2026-05-28 09:30:48",
+        "user_name": "SPT031",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "230",
+        "message": "吳政昌 開始 24N4001-34 / S.T.",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 233
+    "system_logs": 234
   }
 }
