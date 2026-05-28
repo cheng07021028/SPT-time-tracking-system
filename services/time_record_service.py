@@ -9478,245 +9478,37 @@ def audit_time_record_integrity_v152() -> dict:
 
 # =================== END V152 APPEND-ONLY EVENT JOURNAL + TRANSACTION SAFETY LAYER =====================
 
-
-# ===================== V170 01 RERUN READ CACHE WITHOUT UI CHANGES =====================
-# 目的：Streamlit 點選下拉/輸入框會 rerun；01 頁會反覆呼叫 today_records、load_records、active 查詢。
-#      此處只做短 TTL 讀取快取，開始/結束/儲存/刪除/匯入後立即清除。
-# 注意：不改畫面 CSS、不改欄位順序、不改按鈕、不改資料主鍵、不改 V152/V151 耐久層。
-import time as _v170_time
-import os as _v170_os
-
+# =================== V171 PERFORMANCE PROFILER HOOKS ===================
 try:
-    _v170_prev_clear_today_records_fast_cache = clear_today_records_fast_cache
+    from services.performance_profiler_service import wrap_function, mark_installed
+    if mark_installed("time_record_service"):
+        def _v171_load_records_detail(args, kwargs):
+            return {
+                "start_date": str(args[0] if len(args) > 0 else kwargs.get("start_date", ""))[:60],
+                "end_date": str(args[1] if len(args) > 1 else kwargs.get("end_date", ""))[:60],
+                "employee_id": str(args[2] if len(args) > 2 else kwargs.get("employee_id", ""))[:80],
+                "work_order": str(args[3] if len(args) > 3 else kwargs.get("work_order", ""))[:100],
+            }
+        def _v171_start_detail(args, kwargs):
+            emp = args[0] if args else kwargs.get("employee", {})
+            wo = args[1] if len(args) > 1 else kwargs.get("work_order", {})
+            return {
+                "employee_id": str(emp.get("employee_id", emp.get("工號", "")) if isinstance(emp, dict) else "")[:80],
+                "work_order": str(wo.get("work_order", wo.get("製令", "")) if isinstance(wo, dict) else "")[:120],
+                "process_name": str(args[2] if len(args) > 2 else kwargs.get("process_name", ""))[:120],
+            }
+        if "load_records" in globals():
+            load_records = wrap_function(load_records, category="time_record", name="time_record_service.load_records", threshold_ms=500, detail_factory=_v171_load_records_detail)  # type: ignore[assignment]
+        if "today_records" in globals():
+            today_records = wrap_function(today_records, category="time_record", name="time_record_service.today_records", threshold_ms=500, detail_factory=lambda a,k: {"include_finished": str(a[0] if a else k.get("include_finished", "")), "unfinished_only": str(a[1] if len(a)>1 else k.get("unfinished_only", ""))})  # type: ignore[assignment]
+        if "start_work" in globals():
+            start_work = wrap_function(start_work, category="time_record_write", name="time_record_service.start_work", threshold_ms=800, detail_factory=_v171_start_detail)  # type: ignore[assignment]
+        if "finish_work" in globals():
+            finish_work = wrap_function(finish_work, category="time_record_write", name="time_record_service.finish_work", threshold_ms=800, detail_factory=lambda a,k: {"record_id": str(a[0] if a else k.get("record_id", ""))[:80], "end_action": str(a[1] if len(a)>1 else k.get("end_action", ""))[:80]})  # type: ignore[assignment]
+        for _name in ("sync_time_records_01_02_now", "flush_time_record_authority_upload_now", "repair_time_records_from_events_v152", "audit_time_record_integrity_v152"):
+            if _name in globals() and callable(globals()[_name]):
+                globals()[_name] = wrap_function(globals()[_name], category="time_record_repair", name="time_record_service." + _name, threshold_ms=1000)  # type: ignore[index]
 except Exception:
-    _v170_prev_clear_today_records_fast_cache = None
-try:
-    _v170_prev_load_records = load_records
-except Exception:
-    _v170_prev_load_records = None
-try:
-    _v170_prev_today_records = today_records
-except Exception:
-    _v170_prev_today_records = None
-try:
-    _v170_prev_get_active_records = get_active_records
-except Exception:
-    _v170_prev_get_active_records = None
-try:
-    _v170_prev_get_active_record = get_active_record
-except Exception:
-    _v170_prev_get_active_record = None
-try:
-    _v170_prev_get_active_group = get_active_group
-except Exception:
-    _v170_prev_get_active_group = None
-try:
-    _v170_prev_get_active_same_work = get_active_same_work
-except Exception:
-    _v170_prev_get_active_same_work = None
-try:
-    _v170_prev_get_conflicting_active_records = get_conflicting_active_records
-except Exception:
-    _v170_prev_get_conflicting_active_records = None
-try:
-    _v170_prev_start_work = start_work
-except Exception:
-    _v170_prev_start_work = None
-try:
-    _v170_prev_finish_work = finish_work
-except Exception:
-    _v170_prev_finish_work = None
-try:
-    _v170_prev_save_time_records = save_time_records
-except Exception:
-    _v170_prev_save_time_records = None
-try:
-    _v170_prev_delete_time_records = delete_time_records
-except Exception:
-    _v170_prev_delete_time_records = None
-try:
-    _v170_prev_recalculate_time_records = recalculate_time_records
-except Exception:
-    _v170_prev_recalculate_time_records = None
-try:
-    _v170_prev_import_time_records = import_time_records
-except Exception:
-    _v170_prev_import_time_records = None
+    pass
+# =================== END V171 PERFORMANCE PROFILER HOOKS ===================
 
-_V170_TR_READ_CACHE: dict[tuple, tuple[float, object]] = {}
-_V170_TR_CACHE_SECONDS = float(_v170_os.environ.get('SPT_V170_TIME_RECORD_CACHE_SECONDS', '8') or 8)
-_V170_TR_CACHE_MAX_ITEMS = 80
-
-
-def _v170_cache_key(name: str, *args, **kwargs) -> tuple:
-    clean_kwargs = tuple(sorted((str(k), str(v)) for k, v in (kwargs or {}).items()))
-    return (name, tuple(str(x) for x in args), clean_kwargs)
-
-
-def _v170_get_cached(key: tuple):
-    got = _V170_TR_READ_CACHE.get(key)
-    if not got:
-        return None
-    ts, val = got
-    if _v170_time.time() - ts > _V170_TR_CACHE_SECONDS:
-        _V170_TR_READ_CACHE.pop(key, None)
-        return None
-    if isinstance(val, pd.DataFrame):
-        return val.copy()
-    if isinstance(val, dict):
-        return dict(val)
-    return val
-
-
-def _v170_put_cached(key: tuple, val):
-    try:
-        if len(_V170_TR_READ_CACHE) >= _V170_TR_CACHE_MAX_ITEMS:
-            oldest = min(_V170_TR_READ_CACHE.items(), key=lambda kv: kv[1][0])[0]
-            _V170_TR_READ_CACHE.pop(oldest, None)
-        store = val.copy() if isinstance(val, pd.DataFrame) else (dict(val) if isinstance(val, dict) else val)
-        _V170_TR_READ_CACHE[key] = (_v170_time.time(), store)
-    except Exception:
-        pass
-
-
-def clear_today_records_fast_cache() -> None:  # type: ignore[override]
-    try:
-        _V170_TR_READ_CACHE.clear()
-    except Exception:
-        pass
-    if callable(_v170_prev_clear_today_records_fast_cache):
-        try:
-            _v170_prev_clear_today_records_fast_cache()
-        except Exception:
-            pass
-
-
-def clear_time_record_runtime_fast_cache() -> None:
-    clear_today_records_fast_cache()
-
-
-def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
-    key = _v170_cache_key('load_records', start_date, end_date, employee_id, work_order)
-    hit = _v170_get_cached(key)
-    if isinstance(hit, pd.DataFrame):
-        return hit
-    df = _v170_prev_load_records(start_date, end_date, employee_id, work_order) if callable(_v170_prev_load_records) else pd.DataFrame()
-    _v170_put_cached(key, df)
-    return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
-
-
-def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
-    key = _v170_cache_key('today_records', bool(include_finished), bool(unfinished_only), today_text())
-    hit = _v170_get_cached(key)
-    if isinstance(hit, pd.DataFrame):
-        return hit
-    df = _v170_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only) if callable(_v170_prev_today_records) else pd.DataFrame()
-    _v170_put_cached(key, df)
-    return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
-
-
-def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
-    key = _v170_cache_key('get_active_records', employee_id, process_name, start_date, employee_name)
-    hit = _v170_get_cached(key)
-    if isinstance(hit, pd.DataFrame):
-        return hit
-    df = _v170_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name) if callable(_v170_prev_get_active_records) else pd.DataFrame()
-    _v170_put_cached(key, df)
-    return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
-
-
-def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
-    key = _v170_cache_key('get_active_record', employee_id, employee_name)
-    hit = _v170_get_cached(key)
-    if isinstance(hit, dict) or hit is None and key in _V170_TR_READ_CACHE:
-        return hit
-    try:
-        row = _v170_prev_get_active_record(employee_id, employee_name=employee_name) if callable(_v170_prev_get_active_record) else None
-    except TypeError:
-        row = _v170_prev_get_active_record(employee_id) if callable(_v170_prev_get_active_record) else None
-    _v170_put_cached(key, row)
-    return dict(row) if isinstance(row, dict) else None
-
-
-def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
-    key = _v170_cache_key('get_active_group', record_id)
-    hit = _v170_get_cached(key)
-    if isinstance(hit, pd.DataFrame):
-        return hit
-    df = _v170_prev_get_active_group(record_id) if callable(_v170_prev_get_active_group) else pd.DataFrame()
-    _v170_put_cached(key, df)
-    return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
-
-
-def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
-    key = _v170_cache_key('get_active_same_work', employee_id, work_order, process_name, start_date, employee_name)
-    hit = _v170_get_cached(key)
-    if isinstance(hit, dict) or hit is None and key in _V170_TR_READ_CACHE:
-        return hit
-    row = _v170_prev_get_active_same_work(employee_id, work_order, process_name, start_date=start_date, employee_name=employee_name) if callable(_v170_prev_get_active_same_work) else None
-    _v170_put_cached(key, row)
-    return dict(row) if isinstance(row, dict) else None
-
-
-def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
-    key = _v170_cache_key('get_conflicting_active_records', employee_id, process_name, start_date, employee_name)
-    hit = _v170_get_cached(key)
-    if isinstance(hit, pd.DataFrame):
-        return hit
-    df = _v170_prev_get_conflicting_active_records(employee_id, process_name, start_date=start_date, employee_name=employee_name) if callable(_v170_prev_get_conflicting_active_records) else pd.DataFrame()
-    _v170_put_cached(key, df)
-    return df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
-
-
-def _v170_clear_after_write_result(result):
-    try:
-        clear_today_records_fast_cache()
-    except Exception:
-        pass
-    try:
-        clear_query_cache()
-    except Exception:
-        pass
-    return result
-
-
-def start_work(employee: dict, work_order: dict, process_name: str, remark: str = '', auto_pause_old: bool = True) -> int:  # type: ignore[override]
-    if not callable(_v170_prev_start_work):
-        raise RuntimeError('start_work implementation is unavailable')
-    return int(_v170_clear_after_write_result(_v170_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old)) or 0)
-
-
-def finish_work(record_id: int, end_action: str, remark: str = '', finish_parallel_group: bool = True) -> int:  # type: ignore[override]
-    if not callable(_v170_prev_finish_work):
-        return 0
-    return int(_v170_clear_after_write_result(_v170_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group)) or 0)
-
-
-def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
-    n = int(_v170_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) if callable(_v170_prev_save_time_records) else 0)
-    return int(_v170_clear_after_write_result(n) or 0)
-
-
-def delete_time_records(record_ids: list[int], reason: str = '管理員刪除工時紀錄') -> int:  # type: ignore[override]
-    n = int(_v170_prev_delete_time_records(record_ids, reason=reason) if callable(_v170_prev_delete_time_records) else 0)
-    return int(_v170_clear_after_write_result(n) or 0)
-
-
-def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
-    n = int(_v170_prev_recalculate_time_records(record_ids) if callable(_v170_prev_recalculate_time_records) else 0)
-    return int(_v170_clear_after_write_result(n) or 0)
-
-
-def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = 'history_import') -> dict:  # type: ignore[override]
-    res = _v170_prev_import_time_records(df, recalc=recalc, source=source) if callable(_v170_prev_import_time_records) else {'inserted': 0, 'updated': 0, 'skipped': 0}
-    _v170_clear_after_write_result(res)
-    return res if isinstance(res, dict) else {'result': res}
-
-
-def v170_time_record_cache_status() -> dict:
-    return {
-        'version': 'V170_01_RERUN_READ_CACHE_WITHOUT_UI_CHANGES',
-        'ttl_seconds': _V170_TR_CACHE_SECONDS,
-        'cache_items': len(_V170_TR_READ_CACHE),
-    }
-# =================== END V170 01 RERUN READ CACHE WITHOUT UI CHANGES ===================

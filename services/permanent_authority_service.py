@@ -1639,3 +1639,24 @@ def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:  # type: ign
     except Exception:
         pass
 # =================== END V156 AUTHORITY READ CACHE + SAFE INVALIDATION ===================
+
+# =================== V171 PERFORMANCE PROFILER HOOKS ===================
+try:
+    from services.performance_profiler_service import wrap_function, mark_installed
+    if mark_installed("permanent_authority_service"):
+        def _v171_authority_detail(args, kwargs):
+            return {"module_key": str(args[0] if args else kwargs.get("module_key", ""))[:120], "kind": str(args[1] if len(args)>1 else kwargs.get("kind", ""))[:80]}
+        for _name, _cat, _threshold in (
+            ("load_authority", "authority_json", 500),
+            ("load_tables", "authority_json", 500),
+            ("load_settings", "authority_json", 400),
+            ("save_authority", "authority_json_write", 1000),
+            ("save_settings", "authority_json_write", 800),
+            ("flush_authority_upload_queue_now", "github_queue", 1000),
+        ):
+            if _name in globals() and callable(globals()[_name]):
+                globals()[_name] = wrap_function(globals()[_name], category=_cat, name="permanent_authority_service." + _name, threshold_ms=_threshold, detail_factory=_v171_authority_detail)  # type: ignore[index]
+except Exception:
+    pass
+# =================== END V171 PERFORMANCE PROFILER HOOKS ===================
+

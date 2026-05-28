@@ -484,3 +484,20 @@ def backup_all_and_push_to_github() -> Dict[str, Any]:
 
 def push_existing_backups_to_github() -> Dict[str, Any]:
     return upload_existing_permanent_files()
+
+# =================== V171 PERFORMANCE PROFILER HOOKS ===================
+try:
+    from services.performance_profiler_service import wrap_function, mark_installed
+    if mark_installed("github_cloud_storage_service"):
+        for _name in (
+            "export_database_state", "upload_text_to_github", "upload_file_to_github",
+            "upload_existing_permanent_files", "download_text_from_github", "download_latest_permanent_files_from_github",
+            "restore_from_github_if_database_empty", "upload_audit_logs_to_github", "backup_all_to_files",
+            "backup_all_and_push_to_github", "push_existing_backups_to_github",
+        ):
+            if _name in globals() and callable(globals()[_name]):
+                globals()[_name] = wrap_function(globals()[_name], category="github", name="github_cloud_storage_service." + _name, threshold_ms=1000, detail_factory=lambda a,k,_n=_name: {"function": _n, "target": str(a[0] if a else k.get("path_in_repo", k.get("local_path", "")))[:220]})  # type: ignore[index]
+except Exception:
+    pass
+# =================== END V171 PERFORMANCE PROFILER HOOKS ===================
+

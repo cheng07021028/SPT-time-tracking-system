@@ -1566,74 +1566,34 @@ def execute_transaction(
     return ids
 # ===== END V24 LIGHTWEIGHT SYSTEM LOG AUDIT FOR ALL DB WRITES =====
 
-
-# ===================== V170 BACKEND-ONLY PERFORMANCE GUARD =====================
-# 目的：加速 01/登入/一般互動；只改資料後端等待策略，不動 CSS、theme、頁面排版與 data_editor 顯示。
-# 原則：即時交易仍寫 SQLite；高頻操作不等待 GitHub/大型 permanent export。
-#      只建立待備份標記，09/14 或排程再執行正式備份。
+# =================== V171 PERFORMANCE PROFILER HOOKS ===================
 try:
-    _v170_prev_auto_export_after_write_enabled = _auto_export_after_write_enabled
+    from services.performance_profiler_service import wrap_function, sql_summary, mark_installed
+    if mark_installed("db_service"):
+        def _v171_sql_detail(args, kwargs):
+            sql = args[0] if args else kwargs.get("sql", "")
+            detail = sql_summary(sql)
+            try:
+                params = args[1] if len(args) > 1 else kwargs.get("params", None)
+                if params is not None:
+                    detail["param_count"] = len(params) if hasattr(params, "__len__") else 1
+            except Exception:
+                pass
+            return detail
+        query_df = wrap_function(query_df, category="sqlite", name="db_service.query_df", threshold_ms=250, detail_factory=_v171_sql_detail)  # type: ignore[assignment]
+        query_one = wrap_function(query_one, category="sqlite", name="db_service.query_one", threshold_ms=250, detail_factory=_v171_sql_detail)  # type: ignore[assignment]
+        execute = wrap_function(execute, category="sqlite_write", name="db_service.execute", threshold_ms=350, detail_factory=_v171_sql_detail)  # type: ignore[assignment]
+        executemany = wrap_function(executemany, category="sqlite_write", name="db_service.executemany", threshold_ms=600, detail_factory=_v171_sql_detail)  # type: ignore[assignment]
+        if "execute_transaction" in globals():
+            def _v171_tx_detail(args, kwargs):
+                ops = args[0] if args else kwargs.get("operations", [])
+                try:
+                    n = len(ops or [])
+                except Exception:
+                    n = 0
+                return {"operation_count": n, "source_sql": str(kwargs.get("source_sql", ""))[:160]}
+            execute_transaction = wrap_function(execute_transaction, category="sqlite_write", name="db_service.execute_transaction", threshold_ms=800, detail_factory=_v171_tx_detail)  # type: ignore[assignment]
 except Exception:
-    _v170_prev_auto_export_after_write_enabled = None
-try:
-    _v170_prev_after_write = _after_write
-except Exception:
-    _v170_prev_after_write = None
-try:
-    _v170_prev_execute = execute
-except Exception:
-    _v170_prev_execute = None
-try:
-    _v170_prev_executemany = executemany
-except Exception:
-    _v170_prev_executemany = None
-try:
-    _v170_prev_execute_transaction = execute_transaction
-except Exception:
-    _v170_prev_execute_transaction = None
+    pass
+# =================== END V171 PERFORMANCE PROFILER HOOKS ===================
 
-
-def _auto_export_after_write_enabled() -> bool:  # type: ignore[override]
-    """V170: default synchronous write-through is OFF.
-
-    - 現場人員按開始/結束/勾選/儲存時，不等待 GitHub API 或大型 JSON export。
-    - 如需回到舊同步等待模式，可在環境變數設定 SPT_SYNC_EXPORT_ON_WRITE=1。
-    - 不影響 09/14 手動備份、排程備份、V152 event journal、V151 row shard。
-    """
-    val = str(os.environ.get('SPT_SYNC_EXPORT_ON_WRITE', '') or os.environ.get('SPT_AUTO_EXPORT_AFTER_WRITE', '')).strip().lower()
-    return val in {'1', 'true', 'yes', 'on', 'enable', 'enabled'}
-
-
-def _after_write(sql: str | None = None) -> None:  # type: ignore[override]
-    """Fast after-write path: clear read cache + mark pending backup only.
-
-    This intentionally avoids network/export work during operator transactions.
-    """
-    try:
-        clear_query_cache()
-    except Exception:
-        pass
-    try:
-        mark_data_changed('V170：資料已變更，已建立待備份標記；請由 09/14 或排程執行永久備份。', sql)
-    except Exception:
-        pass
-    if not _auto_export_after_write_enabled():
-        return
-    # Explicit opt-in only: preserve old write-through behavior for debugging/admin if env var enabled.
-    if callable(_v170_prev_after_write):
-        try:
-            _v170_prev_after_write(sql)
-        except Exception:
-            pass
-
-
-def v170_backend_performance_status() -> dict:
-    """Small diagnostics helper for tools/page checks."""
-    return {
-        'version': 'V170_BACKEND_ONLY_PERFORMANCE_GUARD',
-        'sync_export_on_write': bool(_auto_export_after_write_enabled()),
-        'pending_backup_status': pending_backup_status() if 'pending_backup_status' in globals() else {},
-        'query_cache_items': len(_QUERY_CACHE) if isinstance(globals().get('_QUERY_CACHE'), dict) else 0,
-        'db_path': str(DB_PATH),
-    }
-# =================== END V170 BACKEND-ONLY PERFORMANCE GUARD ===================

@@ -4292,3 +4292,22 @@ if callable(_v156_prev_get_process_options_by_model):
     def get_process_options_by_model(type_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
         return _v156_sys_cached(('options_by_model', str(type_name or ''), bool(include_common)), lambda: _v156_prev_get_process_options_by_model(type_name=type_name, include_common=include_common))
 # =================== END V156 SYSTEM SETTINGS READ CACHE ===================
+
+# =================== V171 PERFORMANCE PROFILER HOOKS ===================
+try:
+    from services.performance_profiler_service import wrap_function, mark_installed
+    if mark_installed("system_settings_service"):
+        for _name in (
+            "load_process_options_df", "get_process_options", "load_process_categories_df",
+            "load_process_category_choices", "get_process_options_by_category", "get_process_options_by_category_exact",
+            "load_rest_periods_df", "load_process_model_choices", "get_process_options_by_model",
+        ):
+            if _name in globals() and callable(globals()[_name]):
+                globals()[_name] = wrap_function(globals()[_name], category="system_settings", name="system_settings_service." + _name, threshold_ms=400)  # type: ignore[index]
+        for _name in ("save_process_options_df", "save_process_categories_df", "delete_process_options", "delete_process_categories", "save_rest_periods_df", "delete_rest_periods"):
+            if _name in globals() and callable(globals()[_name]):
+                globals()[_name] = wrap_function(globals()[_name], category="system_settings_write", name="system_settings_service." + _name, threshold_ms=800)  # type: ignore[index]
+except Exception:
+    pass
+# =================== END V171 PERFORMANCE PROFILER HOOKS ===================
+

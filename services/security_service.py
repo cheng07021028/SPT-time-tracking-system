@@ -4288,71 +4288,23 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 require_permission = require_module_access
 # =================== END V153B RUNTIME GUARD FOR MODULE 14 DATA HEALTH CENTER ===================
 
-
-# ===================== V170 PERMISSION CHECK CACHE WITHOUT UI CHANGES =====================
-# 目的：首頁與各頁 rerun 時會多次 check_permission；此處只快取權限判斷結果，不動登入畫面/樣式/表格。
-import time as _v170_sec_time
+# =================== V171 PERFORMANCE PROFILER HOOKS ===================
 try:
-    _v170_prev_check_permission = check_permission
+    from services.performance_profiler_service import wrap_function, mark_installed
+    if mark_installed("security_service"):
+        def _v171_security_detail(args, kwargs):
+            return {"module_code": str(args[0] if args else kwargs.get("module_code", ""))[:120], "action": str(args[1] if len(args) > 1 else kwargs.get("action", ""))[:80]}
+        if "ensure_security_schema" in globals():
+            ensure_security_schema = wrap_function(ensure_security_schema, category="security", name="security_service.ensure_security_schema", threshold_ms=500)  # type: ignore[assignment]
+        if "authenticate" in globals():
+            authenticate = wrap_function(authenticate, category="security", name="security_service.authenticate", threshold_ms=500, detail_factory=lambda a, k: {"username": str(a[0] if a else k.get("username", ""))[:120]})  # type: ignore[assignment]
+        if "require_login" in globals():
+            require_login = wrap_function(require_login, category="security", name="security_service.require_login", threshold_ms=500, detail_factory=_v171_security_detail)  # type: ignore[assignment]
+        if "check_permission" in globals():
+            check_permission = wrap_function(check_permission, category="security", name="security_service.check_permission", threshold_ms=150, detail_factory=_v171_security_detail)  # type: ignore[assignment]
+        if "require_module_access" in globals():
+            require_module_access = wrap_function(require_module_access, category="security", name="security_service.require_module_access", threshold_ms=500, detail_factory=_v171_security_detail)  # type: ignore[assignment]
 except Exception:
-    _v170_prev_check_permission = None
-try:
-    _v170_prev_clear_permission_cache = clear_permission_cache
-except Exception:
-    _v170_prev_clear_permission_cache = None
+    pass
+# =================== END V171 PERFORMANCE PROFILER HOOKS ===================
 
-_V170_PERMISSION_RESULT_CACHE: dict[tuple, tuple[float, bool]] = {}
-_V170_PERMISSION_CACHE_SECONDS = float(os.environ.get('SPT_V170_PERMISSION_CACHE_SECONDS', '20') or 20)
-
-
-def _v170_permission_file_mtime() -> float:
-    try:
-        return float(_V125_PERMISSION_FILE.stat().st_mtime) if _V125_PERMISSION_FILE.exists() else 0.0
-    except Exception:
-        return 0.0
-
-
-def clear_permission_cache(username: str | None = None) -> None:  # type: ignore[override]
-    try:
-        _V170_PERMISSION_RESULT_CACHE.clear()
-    except Exception:
-        pass
-    if callable(_v170_prev_clear_permission_cache):
-        try:
-            _v170_prev_clear_permission_cache(username)
-        except TypeError:
-            _v170_prev_clear_permission_cache()
-        except Exception:
-            pass
-
-
-def check_permission(module_code: str, action: str = 'can_view') -> bool:  # type: ignore[override]
-    if not st.session_state.get('auth_logged_in'):
-        return False
-    username = str(st.session_state.get('auth_username', '') or '').strip().lower()
-    roles = st.session_state.get('auth_roles', []) or []
-    if isinstance(roles, str):
-        roles = [roles]
-    role_text = ','.join(sorted({str(r).strip().lower() for r in roles if str(r).strip()}))
-    key = (username, role_text, str(module_code or ''), str(action or 'can_view'), _v170_permission_file_mtime())
-    now_s = _v170_sec_time.time()
-    got = _V170_PERMISSION_RESULT_CACHE.get(key)
-    if got and now_s - got[0] <= _V170_PERMISSION_CACHE_SECONDS:
-        return bool(got[1])
-    res = bool(_v170_prev_check_permission(module_code, action)) if callable(_v170_prev_check_permission) else False
-    try:
-        if len(_V170_PERMISSION_RESULT_CACHE) > 300:
-            _V170_PERMISSION_RESULT_CACHE.clear()
-        _V170_PERMISSION_RESULT_CACHE[key] = (now_s, res)
-    except Exception:
-        pass
-    return bool(res)
-
-
-def v170_security_cache_status() -> dict:
-    return {
-        'version': 'V170_PERMISSION_CHECK_CACHE_WITHOUT_UI_CHANGES',
-        'cache_items': len(_V170_PERMISSION_RESULT_CACHE),
-        'ttl_seconds': _V170_PERMISSION_CACHE_SECONDS,
-    }
-# =================== END V170 PERMISSION CHECK CACHE WITHOUT UI CHANGES ===================

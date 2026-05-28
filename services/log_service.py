@@ -925,31 +925,17 @@ def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit:
     return n
 # =================== END V156 LOG QUERY CACHE ===================
 
-# ===================== V166C TIME RECORD FULL SNAPSHOT LOGGING =====================
-# 目的：讓 06 LOG 不只是人類可讀文字，也保存 time_records 完整 JSON 快照。
-# 後續資料遺失時，修復優先序為 row shard / event journal / V166C LOG snapshot / LOG-only text。
-# 此 wrapper 只增強 detail 內容，不改原本 LOG 寫入、刪除 tombstone、V147 批次同步與 V156 cache 行為。
+# =================== V171 PERFORMANCE PROFILER HOOKS ===================
 try:
-    _v166c_prev_write_log = write_log
-except Exception:  # pragma: no cover
-    _v166c_prev_write_log = None
+    from services.performance_profiler_service import wrap_function, mark_installed
+    if mark_installed("log_service"):
+        if "write_log" in globals():
+            write_log = wrap_function(write_log, category="log", name="log_service.write_log", threshold_ms=300, detail_factory=lambda a,k: {"action_type": str(a[0] if a else k.get("action_type", ""))[:120], "target_table": str(a[2] if len(a)>2 else k.get("target_table", ""))[:120], "level": str(a[5] if len(a)>5 else k.get("level", ""))[:60]})  # type: ignore[assignment]
+        if "load_logs" in globals():
+            load_logs = wrap_function(load_logs, category="log", name="log_service.load_logs", threshold_ms=500, detail_factory=lambda a,k: {"limit": str(a[0] if a else k.get("limit", "")), "keyword": str(k.get("keyword", ""))[:120]})  # type: ignore[assignment]
+        if "delete_logs_by_date_range" in globals():
+            delete_logs_by_date_range = wrap_function(delete_logs_by_date_range, category="log_write", name="log_service.delete_logs_by_date_range", threshold_ms=800)  # type: ignore[assignment]
+except Exception:
+    pass
+# =================== END V171 PERFORMANCE PROFILER HOOKS ===================
 
-
-def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
-    new_detail = detail
-    try:
-        from services.log_snapshot_service import append_snapshot_to_detail
-        new_detail = append_snapshot_to_detail(
-            detail=detail,
-            action_type=action_type,
-            message=message,
-            target_table=target_table,
-            target_id=str(target_id or ""),
-        )
-    except Exception:
-        new_detail = detail
-    if callable(_v166c_prev_write_log):
-        return _v166c_prev_write_log(action_type, message, target_table, target_id, new_detail, level, user_name)
-    return None
-
-# =================== END V166C TIME RECORD FULL SNAPSHOT LOGGING ===================
