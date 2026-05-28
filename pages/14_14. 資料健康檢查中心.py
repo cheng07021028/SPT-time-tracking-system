@@ -38,6 +38,12 @@ from services.system_monitoring_service import (
     monitoring_summary_rows,
 )
 
+from services.log_only_pending_close_service import (
+    collect_log_only_pending_close_candidates,
+    close_log_only_pending_records,
+    export_pending_close_excel_bytes,
+)
+
 from services.page_hygiene_service import (
     collect_page_hygiene_status,
     cleanup_duplicate_mojibake_pages,
@@ -773,6 +779,157 @@ if result:
     if st.session_state.get("v164b_log_recovery_result"):
         with st.expander("V164B LOG 待補還原結果", expanded=False):
             st.json(st.session_state.get("v164b_log_recovery_result"))
+
+
+
+st.divider()
+st.markdown("### V166B LOG-only 待補紀錄人工結算 / Pending Recovery Close")
+st.caption(
+    "此區專門結算 V164B 從 LOG 救回的『待人工確認』資料。"
+    "不會把舊資料塞回 01 Active Work，也不會觸發一般開始/結束流程；只在你確認結束時間後，"
+    "更新 01/02 權威檔、計算扣休息後工時、寫入 event journal、row shard 與 LOG。"
+)
+
+v166b_c1, v166b_c2, v166b_c3 = st.columns([1, 1, 2])
+v166b_suggest_hours = v166b_c1.number_input(
+    "建議下一筆開始搜尋小時", min_value=1, max_value=48, value=18, step=1, key="v166b_suggest_hours"
+)
+v166b_c2.metric("目前模式", "Dry Run" if dry_run else "正式寫入")
+v166b_c3.info("建議先 Dry Run，確認結束時間與工時正確後，再取消 Dry Run 正式結算。")
+
+if "v166b_pending_close_snapshot" not in st.session_state:
+    st.session_state["v166b_pending_close_snapshot"] = None
+if "v166b_pending_close_result" not in st.session_state:
+    st.session_state["v166b_pending_close_result"] = None
+
+v166b_refresh_col, v166b_export_col = st.columns([1, 1])
+if v166b_refresh_col.button("🔄 重新讀取待補結算清單", use_container_width=True, key="v166b_refresh_pending_close"):
+    with st.spinner("正在讀取 V164B 待人工確認資料，並尋找同工號下一筆開始時間作為結束建議..."):
+        st.session_state["v166b_pending_close_snapshot"] = collect_log_only_pending_close_candidates(
+            start_date=str(start_date),
+            end_date=str(end_date),
+            suggestion_max_hours=int(v166b_suggest_hours),
+        )
+    st.rerun()
+
+if st.session_state.get("v166b_pending_close_snapshot") is None:
+    try:
+        st.session_state["v166b_pending_close_snapshot"] = collect_log_only_pending_close_candidates(
+            start_date=str(start_date),
+            end_date=str(end_date),
+            suggestion_max_hours=int(v166b_suggest_hours),
+        )
+    except Exception as exc:
+        st.session_state["v166b_pending_close_snapshot"] = {"ok": False, "reason": str(exc), "rows": [], "pending_count": 0}
+
+v166b_snapshot = st.session_state.get("v166b_pending_close_snapshot") or {}
+v166b_rows = v166b_snapshot.get("rows", []) if isinstance(v166b_snapshot, dict) else []
+v166b_pending_count = int(v166b_snapshot.get("pending_count", 0) or 0) if isinstance(v166b_snapshot, dict) else 0
+v166b_suggested_count = int(v166b_snapshot.get("suggested_count", 0) or 0) if isinstance(v166b_snapshot, dict) else 0
+
+v166b_m1, v166b_m2, v166b_m3 = st.columns(3)
+v166b_m1.metric("待補結算筆數", v166b_pending_count)
+v166b_m2.metric("有建議結束時間", v166b_suggested_count)
+v166b_m3.metric("檢查時間", v166b_snapshot.get("checked_at", "") if isinstance(v166b_snapshot, dict) else "")
+
+if v166b_pending_count <= 0:
+    st.success("目前日期範圍內沒有 V164B LOG-only 待人工確認未結算資料。")
+else:
+    st.warning(
+        "請確認每筆結束時間。若『建議結束時間』空白，請手動輸入；"
+        "若系統用同工號下一筆開始時間建議，仍需由管理員確認現場事實。"
+    )
+    v166b_df = pd.DataFrame(v166b_rows)
+    editable_cols = [
+        "結算 / Close", "identity_key", "record_key", "id", "工號 / Employee ID", "姓名 / Name",
+        "製令 / Work Order", "工段 / Process", "開始時間 / Start", "建議結束時間 / Suggested End",
+        "結束時間 / End Timestamp", "結束狀態 / Close Status", "補登備註 / Close Note", "建議來源 / Suggestion"
+    ]
+    for col in editable_cols:
+        if col not in v166b_df.columns:
+            v166b_df[col] = ""
+    v166b_df = v166b_df[editable_cols]
+    column_config = {}
+    try:
+        column_config = {
+            "結算 / Close": st.column_config.CheckboxColumn("結算", help="勾選後才會納入補登結算"),
+            "結束狀態 / Close Status": st.column_config.SelectboxColumn(
+                "結束狀態", options=["補登結束", "下班", "暫停", "完工"], required=True
+            ),
+            "補登備註 / Close Note": st.column_config.TextColumn("補登備註"),
+            "結束時間 / End Timestamp": st.column_config.TextColumn("結束時間 / End Timestamp", help="格式：YYYY-MM-DD HH:MM:SS"),
+        }
+    except Exception:
+        column_config = {}
+    v166b_edit_df = st.data_editor(
+        v166b_df,
+        use_container_width=True,
+        hide_index=True,
+        height=420,
+        key="v166b_pending_close_editor",
+        column_config=column_config,
+        disabled=[
+            "identity_key", "record_key", "id", "工號 / Employee ID", "姓名 / Name",
+            "製令 / Work Order", "工段 / Process", "開始時間 / Start", "建議結束時間 / Suggested End", "建議來源 / Suggestion"
+        ],
+    )
+
+    selected_df = v166b_edit_df[v166b_edit_df["結算 / Close"].astype(bool)].copy() if isinstance(v166b_edit_df, pd.DataFrame) and not v166b_edit_df.empty else pd.DataFrame()
+    st.caption(f"已勾選 {len(selected_df)} 筆。正式結算前請確認結束時間不可空白，且結束時間必須大於開始時間。")
+
+    v166b_confirm = st.checkbox(
+        "我確認要將勾選的 LOG-only 待補紀錄依畫面結束時間進行人工結算",
+        disabled=not CAN_REPAIR,
+        key="v166b_confirm_pending_close",
+    )
+    close_disabled = (not CAN_REPAIR) or (not v166b_confirm) or selected_df.empty
+    if st.button("✅ 執行 V166B 待補紀錄人工結算", use_container_width=True, disabled=close_disabled, key="v166b_close_pending_button"):
+        requests = []
+        for _, r in selected_df.iterrows():
+            requests.append({
+                "identity_key": str(r.get("identity_key", "") or ""),
+                "record_key": str(r.get("record_key", "") or ""),
+                "id": str(r.get("id", "") or ""),
+                "end_timestamp": str(r.get("結束時間 / End Timestamp", "") or ""),
+                "close_status": str(r.get("結束狀態 / Close Status", "") or "補登結束"),
+                "note": str(r.get("補登備註 / Close Note", "") or ""),
+            })
+        with st.spinner("正在進行 V166B LOG-only 待補人工結算..."):
+            v166b_result = close_log_only_pending_records(
+                requests,
+                github=bool(github_backup),
+                dry_run=bool(dry_run),
+            )
+        st.session_state["v166b_pending_close_result"] = v166b_result
+        if v166b_result.get("ok"):
+            st.success(
+                "V166B 待補人工結算完成。"
+                + ("（Dry Run，未寫入）" if v166b_result.get("dry_run") else "")
+                + f" 結算 {v166b_result.get('closed_count', 0)} 筆。"
+            )
+            if not v166b_result.get("dry_run"):
+                st.session_state["v166b_pending_close_snapshot"] = None
+        else:
+            st.error(f"V166B 待補人工結算失敗：{v166b_result.get('reason', '')}")
+        st.json(v166b_result)
+
+    if CAN_EXPORT:
+        v166b_export_col.download_button(
+            "⬇️ 下載待補結算清單 Excel",
+            data=export_pending_close_excel_bytes(v166b_snapshot),
+            file_name=f"SPT_V166B_LOG_only_待補結算_{start_date}_{end_date}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="v166b_download_pending_close_excel",
+        )
+
+if not CAN_REPAIR:
+    st.info("你的帳號沒有 14 模組 can_manage 權限，因此不能執行 V166B 待補人工結算。")
+
+if st.session_state.get("v166b_pending_close_result"):
+    with st.expander("V166B 最近一次待補人工結算結果", expanded=False):
+        st.json(st.session_state.get("v166b_pending_close_result"))
+
 
 if b3.button("🧹 清除本頁檢查結果", use_container_width=True, key="v153_clear_result"):
     st.session_state["v153_audit_result"] = None
