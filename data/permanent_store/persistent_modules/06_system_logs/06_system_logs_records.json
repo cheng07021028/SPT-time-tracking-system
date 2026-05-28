@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 16:14:02",
+  "exported_at": "2026-05-28 16:23:55",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -1855,10 +1855,87 @@
         "message": "回填工時 SQLite cache 失敗 id=217 record_key=LOGRECOVERY|SPT193|25M0785-02|其他|2026-05-28 09:13:03|217: database is locked",
         "detail": "",
         "level": "ERROR"
+      },
+      {
+        "id": 323,
+        "log_time": "2026-05-28 16:15:08",
+        "user_name": "SPT034",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 324,
+        "log_time": "2026-05-28 16:15:09",
+        "user_name": "SPT034",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 325,
+        "log_time": "2026-05-28 16:15:09",
+        "user_name": "SPT034",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_finish_active_visible_v141: 已由 01/02 權威檔回填 SQLite cache 2 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 326,
+        "log_time": "2026-05-28 16:15:40",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V137 已安全合併儲存 105 筆；多人同製令同製程不覆蓋。",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 347,
+        "log_time": "2026-05-28 16:23:15",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 348,
+        "log_time": "2026-05-28 16:23:15",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 349,
+        "log_time": "2026-05-28 16:23:15",
+        "user_name": "admin",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 2 筆",
+        "detail": "",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 168
+    "system_logs": 175
   }
 }
