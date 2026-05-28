@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-28 11:11:52",
-  "exported_at": "2026-05-28 11:11:52",
-  "reason": "finish_work_v108_fast_local_sync_01",
+  "updated_at": "2026-05-28 11:12:40",
+  "exported_at": "2026-05-28 11:12:40",
+  "reason": "start_work_v108_fast_local_upsert_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1195,11 +1195,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 10:56:51",
         "updated_at": "2026-05-28 10:56:51"
+      },
+      {
+        "id": 275,
+        "record_key": "SPT239|26N4001-07|前置鈑金|2026-05-28 11:12:40|eebd2487",
+        "status": "作業中",
+        "work_order": "26N4001-07",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "前置鈑金",
+        "employee_id": "SPT239",
+        "employee_name": "麥可",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 11:12:40",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "11:12:40",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT239|前置鈑金|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 11:12:40",
+        "updated_at": "2026-05-28 11:12:40"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 44
+    "time_records": 45
   }
 }
