@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-29 01:20:06",
-  "exported_at": "2026-05-29 01:20:06",
-  "reason": "finish_work_v194_local_first_02",
+  "updated_at": "2026-05-29 01:20:37",
+  "exported_at": "2026-05-29 01:20:37",
+  "reason": "start_work_v194_local_first_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -34,11 +34,38 @@
         "source": "streamlit",
         "created_at": "2026-05-29 01:10:53",
         "updated_at": "2026-05-29 01:19:29"
+      },
+      {
+        "id": 329,
+        "record_key": "B126|21M0241-04|前置鈑金|2026-05-29 01:20:35|031f4f5e",
+        "status": "作業中",
+        "work_order": "21M0241-04",
+        "part_no": "4TRSC020-004-02",
+        "type_name": "NTB 3 PORT",
+        "process_name": "前置鈑金",
+        "employee_id": "B126",
+        "employee_name": "戴鎰祥",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 01:20:35",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "01:20:35",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B126|前置鈑金|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 01:20:35",
+        "updated_at": "2026-05-29 01:20:35"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 1
+    "time_records": 2
   }
 }
