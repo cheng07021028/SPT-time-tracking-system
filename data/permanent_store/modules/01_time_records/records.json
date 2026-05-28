@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-28 09:54:54",
-  "exported_at": "2026-05-28 09:54:54",
+  "updated_at": "2026-05-28 09:58:09",
+  "exported_at": "2026-05-28 09:58:09",
   "reason": "start_work_v108_fast_local_upsert_01",
   "empty_authoritative": false,
   "tables": {
@@ -1087,11 +1087,65 @@
         "source": "streamlit",
         "created_at": "2026-05-28 09:54:53",
         "updated_at": "2026-05-28 09:54:53"
+      },
+      {
+        "id": 250,
+        "record_key": "SPT230|26N4001-02|模組|2026-05-28 09:57:04|10a15c40",
+        "status": "作業中",
+        "work_order": "26N4001-02",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "模組",
+        "employee_id": "SPT230",
+        "employee_name": "梁志宏",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 09:57:04",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "09:57:04",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT230|模組|2026-05-28",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-28 09:57:04",
+        "updated_at": "2026-05-28 09:58:09"
+      },
+      {
+        "id": 251,
+        "record_key": "SPT230|26N4001-03|模組|2026-05-28 09:58:09|d32455a5",
+        "status": "作業中",
+        "work_order": "26N4001-03",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "模組",
+        "employee_id": "SPT230",
+        "employee_name": "梁志宏",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 09:58:09",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "09:58:09",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT230|模組|2026-05-28",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-28 09:58:09",
+        "updated_at": "2026-05-28 09:58:09"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 40
+    "time_records": 42
   }
 }
