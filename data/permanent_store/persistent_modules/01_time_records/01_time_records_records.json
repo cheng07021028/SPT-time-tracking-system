@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 20:12:18",
+  "exported_at": "2026-05-28 20:17:51",
   "source": "db_service_write",
   "module_key": "01_time_records",
   "module_code": "01",
@@ -425,20 +425,20 @@
         "employee_name": "鄭智鍵",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 08:52:19",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "08:52:19",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": "00:00:00",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT151|水平|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:52:19",
-        "updated_at": "2026-05-28 16:15:37"
+        "updated_at": "2026-05-28 20:14:18"
       },
       {
         "id": 200,
@@ -2977,10 +2977,37 @@
         "source": "streamlit",
         "created_at": "2026-05-28 17:16:14",
         "updated_at": "2026-05-28 17:51:46"
+      },
+      {
+        "id": 320,
+        "record_key": "SSS|21M0241-01|前置鈑金|2026-05-28 19:35:36|5887a1dd",
+        "status": "作業中",
+        "work_order": "21M0241-01",
+        "part_no": "4TRSC020-004-02",
+        "type_name": "NTB 3 PORT",
+        "process_name": "前置鈑金",
+        "employee_id": "SSS",
+        "employee_name": "SSS",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 19:35:36",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": null,
+        "start_date": "2026-05-28",
+        "start_time": "19:35:36",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SSS|前置鈑金|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 19:35:36",
+        "updated_at": "2026-05-28 20:14:18"
       }
     ]
   },
   "table_counts": {
-    "time_records": 110
+    "time_records": 111
   }
 }
