@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-28 09:53:59",
-  "exported_at": "2026-05-28 09:53:59",
+  "updated_at": "2026-05-28 09:54:11",
+  "exported_at": "2026-05-28 09:54:11",
   "reason": "start_work_v108_fast_local_upsert_01",
   "empty_authoritative": false,
   "tables": {
@@ -1033,11 +1033,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 09:53:28",
         "updated_at": "2026-05-28 09:53:28"
+      },
+      {
+        "id": 248,
+        "record_key": "B248|26N4001-03|配電|2026-05-28 09:54:11|6cf6c06c",
+        "status": "作業中",
+        "work_order": "26N4001-03",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "配電",
+        "employee_id": "B248",
+        "employee_name": "佘銘訓",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 09:54:11",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "09:54:11",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B248|配電|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 09:54:11",
+        "updated_at": "2026-05-28 09:54:11"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 38
+    "time_records": 39
   }
 }
