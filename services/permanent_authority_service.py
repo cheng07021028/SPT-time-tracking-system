@@ -1198,3 +1198,285 @@ def get_authority_write_status() -> dict[str, dict[str, Any]]:
         return {}
 
 # =================== END V123 CONCURRENT AUTHORITY WRITE LOCK ===================
+
+# ===================== V147 50-USER PERFORMANCE SAFE GITHUB QUEUE =====================
+# 目的：
+# - Streamlit 50 人同時操作時，避免每個開始/結束/LOG 都等待 GitHub Contents API。
+# - 不改資料格式、不刪資料、不用局部資料覆蓋權威檔。
+# - 所有 save_authority 仍先完成本機 canonical 原子寫入；只有 GitHub 發布改成可合併的背景佇列。
+# - 刪除、tombstone、權限、系統設定等高風險操作仍同步 GitHub，避免 Reboot 後復活或遺失。
+import atexit as _v147_atexit
+import threading as _v147_threading
+
+_V147_UPLOAD_QUEUE_PATH = PROJECT_ROOT / "data" / "permanent_store" / "authority_upload_queue.json"
+_V147_UPLOAD_QUEUE_LOCK = _v147_threading.RLock()
+_V147_UPLOAD_WORKER_LOCK = _v147_threading.RLock()
+_V147_UPLOAD_WORKER_RUNNING = False
+_V147_UPLOAD_STATUS: dict[str, Any] = {
+    "running": False,
+    "pending": 0,
+    "last_flush_at": "",
+    "last_error": "",
+    "last_uploaded": [],
+}
+
+_V147_ASYNC_MODULES = {"01_time_records", "02_history", "06_logs", "06_system_logs"}
+_V147_ASYNC_REASON_TOKENS = (
+    "start_work", "finish_work", "end_work", "active_work", "v108", "v133",
+    "write_log", "system_log", "v122_write_log", "async", "heartbeat",
+)
+_V147_SYNC_REASON_TOKENS = (
+    "delete", "tombstone", "recalculate", "import", "manual", "admin", "permission",
+    "security", "settings", "idle", "password", "restore", "backup", "clear", "purge",
+    "v146", "v145", "v144", "v142", "v135",
+)
+
+
+def _v147_reason_text(reason: str | None) -> str:
+    return str(reason or "").lower()
+
+
+def _v147_should_async_github(module_key: str, kind: str, reason: str, *, force_upload: bool = False) -> bool:
+    module_key = str(module_key or "")
+    kind = "settings" if str(kind).lower().startswith("set") else "records"
+    r = _v147_reason_text(reason)
+    if module_key not in _V147_ASYNC_MODULES:
+        return False
+    if kind == "settings":
+        return False
+    if any(tok in r for tok in _V147_SYNC_REASON_TOKENS):
+        return False
+    if module_key in {"06_logs", "06_system_logs"}:
+        # LOG 寫入非常高頻，只要不是刪除/清除類，就排入背景上傳。
+        return True
+    return bool(any(tok in r for tok in _V147_ASYNC_REASON_TOKENS) or force_upload)
+
+
+def _v147_read_queue() -> dict[str, Any]:
+    try:
+        if _V147_UPLOAD_QUEUE_PATH.exists():
+            data = json.loads(_V147_UPLOAD_QUEUE_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                entries = data.get("entries") if isinstance(data.get("entries"), dict) else {}
+                return {"version": "V147", "updated_at": data.get("updated_at") or now_text(), "entries": entries}
+    except Exception:
+        pass
+    return {"version": "V147", "updated_at": now_text(), "entries": {}}
+
+
+def _v147_write_queue(data: dict[str, Any]) -> None:
+    try:
+        _V147_UPLOAD_QUEUE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "version": "V147",
+            "updated_at": now_text(),
+            "entries": data.get("entries") if isinstance(data.get("entries"), dict) else {},
+        }
+        tmp = _V147_UPLOAD_QUEUE_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        os.replace(tmp, _V147_UPLOAD_QUEUE_PATH)
+    except Exception as exc:
+        _V147_UPLOAD_STATUS["last_error"] = f"write_queue_failed: {exc}"
+
+
+def _v147_enqueue_authority_upload(module_key: str, kind: str = "records", reason: str = "v147_async_upload") -> dict[str, Any]:
+    module_key = str(module_key or "")
+    kind = "settings" if str(kind).lower().startswith("set") else "records"
+    try:
+        p = canonical_path(module_key, kind)
+        if not p.exists():
+            return {"ok": False, "queued": False, "reason": "canonical_file_missing", "module_key": module_key, "kind": kind}
+        rel = _remote_path(p)
+        with _V147_UPLOAD_QUEUE_LOCK:
+            data = _v147_read_queue()
+            entries = data.get("entries") if isinstance(data.get("entries"), dict) else {}
+            old = entries.get(rel) if isinstance(entries.get(rel), dict) else {}
+            entries[rel] = {
+                "module_key": module_key,
+                "kind": kind,
+                "path": str(p),
+                "remote_path": rel,
+                "reason": reason,
+                "queued_at": old.get("queued_at") or now_text(),
+                "updated_at": now_text(),
+                "attempts": int(old.get("attempts") or 0),
+                "last_error": old.get("last_error", ""),
+            }
+            # 防呆：佇列只保留最新 300 個檔案項目；實際通常只有幾個 canonical 檔。
+            if len(entries) > 300:
+                entries = dict(list(entries.items())[-300:])
+            data["entries"] = entries
+            _v147_write_queue(data)
+            _V147_UPLOAD_STATUS["pending"] = len(entries)
+        _v147_start_upload_worker(reason="enqueue")
+        return {"ok": True, "queued": True, "module_key": module_key, "kind": kind, "path": rel, "reason": reason}
+    except Exception as exc:
+        _V147_UPLOAD_STATUS["last_error"] = str(exc)[:500]
+        return {"ok": False, "queued": False, "error": str(exc)[:500], "module_key": module_key, "kind": kind}
+
+
+def _v147_flush_queue_once(max_seconds: float = 8.0) -> dict[str, Any]:
+    start = time.time()
+    uploaded: list[str] = []
+    errors: list[str] = []
+    with _V147_UPLOAD_QUEUE_LOCK:
+        data = _v147_read_queue()
+        entries = data.get("entries") if isinstance(data.get("entries"), dict) else {}
+    if not entries:
+        _V147_UPLOAD_STATUS.update({"pending": 0, "last_flush_at": now_text(), "last_uploaded": []})
+        return {"ok": True, "uploaded": [], "pending": 0, "errors": []}
+
+    for rel, entry in list(entries.items()):
+        if time.time() - start > max(float(max_seconds or 0), 0.5):
+            break
+        try:
+            p = Path(str(entry.get("path") or ""))
+            if not p.exists():
+                uploaded.append(rel)
+                with _V147_UPLOAD_QUEUE_LOCK:
+                    data2 = _v147_read_queue(); e2 = data2.get("entries", {})
+                    if isinstance(e2, dict):
+                        e2.pop(rel, None); data2["entries"] = e2; _v147_write_queue(data2)
+                continue
+            res = github_put_file(p, p.read_text(encoding="utf-8"), f"SPT authority async {entry.get('module_key')} {entry.get('kind')}: {entry.get('reason')}")
+            if res.get("ok") or res.get("skipped"):
+                uploaded.append(rel)
+                with _V147_UPLOAD_QUEUE_LOCK:
+                    data2 = _v147_read_queue(); e2 = data2.get("entries", {})
+                    if isinstance(e2, dict):
+                        e2.pop(rel, None); data2["entries"] = e2; _v147_write_queue(data2)
+            else:
+                msg = str(res.get("error") or res.get("reason") or "github_upload_failed")[:500]
+                errors.append(f"{rel}: {msg}")
+                with _V147_UPLOAD_QUEUE_LOCK:
+                    data2 = _v147_read_queue(); e2 = data2.get("entries", {})
+                    if isinstance(e2, dict) and isinstance(e2.get(rel), dict):
+                        e2[rel]["attempts"] = int(e2[rel].get("attempts") or 0) + 1
+                        e2[rel]["last_error"] = msg
+                        e2[rel]["last_attempt_at"] = now_text()
+                        data2["entries"] = e2; _v147_write_queue(data2)
+        except Exception as exc:
+            errors.append(f"{rel}: {exc}")
+    with _V147_UPLOAD_QUEUE_LOCK:
+        remain = _v147_read_queue().get("entries", {})
+        pending = len(remain) if isinstance(remain, dict) else 0
+    _V147_UPLOAD_STATUS.update({
+        "pending": pending,
+        "last_flush_at": now_text(),
+        "last_error": "; ".join(errors[-3:])[:500],
+        "last_uploaded": uploaded[-20:],
+    })
+    return {"ok": len(errors) == 0, "uploaded": uploaded, "pending": pending, "errors": errors}
+
+
+def _v147_upload_worker(reason: str = "worker") -> None:
+    global _V147_UPLOAD_WORKER_RUNNING
+    try:
+        # 合併短時間內的多個上傳要求，避免 50 人同時按鈕造成 50 次 GitHub PUT。
+        time.sleep(float(os.environ.get("SPT_AUTH_UPLOAD_DEBOUNCE_SEC", "1.2") or 1.2))
+        while True:
+            res = _v147_flush_queue_once(max_seconds=float(os.environ.get("SPT_AUTH_UPLOAD_WORKER_BUDGET_SEC", "8") or 8))
+            if int(res.get("pending") or 0) <= 0:
+                return
+            # 還有待上傳，多等一下再試，避免連續卡住 Streamlit 背景執行緒。
+            time.sleep(float(os.environ.get("SPT_AUTH_UPLOAD_RETRY_DELAY_SEC", "3") or 3))
+    finally:
+        with _V147_UPLOAD_WORKER_LOCK:
+            _V147_UPLOAD_WORKER_RUNNING = False
+            _V147_UPLOAD_STATUS["running"] = False
+
+
+def _v147_start_upload_worker(reason: str = "start") -> None:
+    global _V147_UPLOAD_WORKER_RUNNING
+    try:
+        with _V147_UPLOAD_WORKER_LOCK:
+            if _V147_UPLOAD_WORKER_RUNNING:
+                return
+            _V147_UPLOAD_WORKER_RUNNING = True
+            _V147_UPLOAD_STATUS["running"] = True
+        t = _v147_threading.Thread(target=_v147_upload_worker, kwargs={"reason": reason}, name="SPT-V147-AuthorityUploadQueue", daemon=True)
+        t.start()
+    except Exception as exc:
+        with _V147_UPLOAD_WORKER_LOCK:
+            _V147_UPLOAD_WORKER_RUNNING = False
+            _V147_UPLOAD_STATUS["running"] = False
+        _V147_UPLOAD_STATUS["last_error"] = str(exc)[:500]
+
+
+def flush_authority_upload_queue_now(reason: str = "manual_v147_flush", max_seconds: float = 12.0) -> dict[str, Any]:
+    """手動/登出/診斷用：同步補送背景 GitHub 佇列。"""
+    return _v147_flush_queue_once(max_seconds=max_seconds)
+
+
+def get_authority_upload_queue_status() -> dict[str, Any]:
+    try:
+        with _V147_UPLOAD_QUEUE_LOCK:
+            q = _v147_read_queue()
+            pending = len(q.get("entries", {})) if isinstance(q.get("entries"), dict) else 0
+        out = dict(_V147_UPLOAD_STATUS)
+        out["pending"] = pending
+        out["queue_path"] = str(_V147_UPLOAD_QUEUE_PATH)
+        return out
+    except Exception as exc:
+        return {"running": False, "pending": -1, "last_error": str(exc)[:500]}
+
+
+try:
+    _v147_prev_save_authority = save_authority
+except Exception:
+    _v147_prev_save_authority = None
+
+
+def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    module_key = str(module_key or "")
+    # 高頻路徑：本機 canonical 照常原子寫入，GitHub 只排入合併佇列。
+    if bool(github) and callable(_v147_prev_save_authority) and _v147_should_async_github(module_key, "records" if records is not None else "settings", reason):
+        res = _v147_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=False)
+        queued = []
+        if records is not None:
+            queued.append(_v147_enqueue_authority_upload(module_key, "records", reason))
+        if settings is not None:
+            queued.append(_v147_enqueue_authority_upload(module_key, "settings", reason))
+        try:
+            res.setdefault("github", [])
+            res["github"].extend(queued)
+            res["github_mode"] = "v147_queued_after_local_atomic_write"
+        except Exception:
+            pass
+        return res
+    if callable(_v147_prev_save_authority):
+        return _v147_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=github)
+    return {"ok": False, "error": "previous_save_authority_missing", "module_key": module_key}
+
+
+try:
+    _v147_prev_force_upload_authority_file = force_upload_authority_file
+except Exception:
+    _v147_prev_force_upload_authority_file = None
+
+
+def force_upload_authority_file(module_key: str, kind: str = "records", reason: str = "force_authority_upload_v147") -> dict[str, Any]:  # type: ignore[override]
+    module_key = str(module_key or "")
+    kind = "settings" if str(kind).lower().startswith("set") else "records"
+    if _v147_should_async_github(module_key, kind, reason, force_upload=True):
+        return _v147_enqueue_authority_upload(module_key, kind, reason)
+    if callable(_v147_prev_force_upload_authority_file):
+        return _v147_prev_force_upload_authority_file(module_key, kind, reason)
+    try:
+        p = canonical_path(module_key, kind)
+        if not p.exists():
+            return {"ok": False, "skipped": True, "reason": "canonical_file_missing", "path": str(p)}
+        return github_put_file(p, p.read_text(encoding="utf-8"), f"SPT authority {module_key} {kind}: {reason}")
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300], "module_key": module_key, "kind": kind}
+
+
+try:
+    _v147_start_upload_worker(reason="startup_flush_existing_queue")
+except Exception:
+    pass
+try:
+    _v147_atexit.register(lambda: _v147_flush_queue_once(max_seconds=6.0))
+except Exception:
+    pass
+# =================== END V147 50-USER PERFORMANCE SAFE GITHUB QUEUE ===================

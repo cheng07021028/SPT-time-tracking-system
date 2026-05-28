@@ -719,317 +719,121 @@ def get_system_log_authority_status() -> dict[str, Any]:
 
 # =================== END V122 06 LOG AUTHORITY WRITE-THROUGH + DELETE TOMBSTONE ===================
 
-# ===================== V146 06 LOG DELETE DURABLE TOMBSTONE + REBOOT NO-REVIVE FIX =====================
-# 修正目的：
-# 1) 06 LOG查詢刪除日期區間後，Reboot App 不得再因 GitHub 舊 records、SQLite cache、legacy 檔案復活。
-# 2) delete_state.json 過去只寫在本機路徑；Streamlit Cloud Reboot 後若本機檔不在或未同步，deleted_keys 會失效。
-# 3) V146 將 tombstone 同步寫入 06_logs/settings.json 權威檔，並套用「刪除日期區間 + deleted_at」防復活規則。
-# 4) 刪除後新產生的 LOG，例如 DELETE_LOG_RANGE 稽核紀錄，因 log_time 晚於 deleted_at，不會被誤刪。
+# ===================== V147 HIGH-FREQUENCY LOG BATCHING =====================
+# 目的：50 人同時操作時，LOG 仍即時寫入 SQLite，但不再每一筆 LOG 都同步/上傳整份 06_logs 權威檔。
+# 讀取 LOG 時仍會合併 SQLite + authority，因此畫面不會少資料；刪除日期區間仍走原 tombstone 權威流程。
+import threading as _v147_log_threading
+import time as _v147_log_time
 
-_V146_LOG_DELETE_VERSION = "V146_LOG_DELETE_RANGE_TOMBSTONE"
-
-
-def _v146_safe_list(value) -> list:
-    return value if isinstance(value, list) else []
-
-
-def _v146_parse_dt_text(value: Any) -> str:
-    text = _clean_text(value)
-    if not text:
-        return ""
-    try:
-        dt = pd.to_datetime(text, errors="coerce")
-        if not pd.isna(dt):
-            return dt.strftime("%Y-%m-%d %H:%M:%S")
-    except Exception:
-        pass
-    text = text.replace("/", "-").replace("T", " ")
-    if len(text) == 10:
-        return text + " 23:59:59"
-    return text[:19]
+_V147_LOG_BATCH_LOCK = _v147_log_threading.RLock()
+_V147_LOG_BATCH_STATE = {
+    "running": False,
+    "pending": False,
+    "last_sync_at": 0.0,
+    "last_error": "",
+    "write_count_since_sync": 0,
+}
 
 
-def _v146_date_in_range(log_date: str, start_date: str, end_date: str) -> bool:
-    d = _clean_text(log_date)[:10]
-    s = _clean_text(start_date)[:10]
-    e = _clean_text(end_date)[:10]
-    return bool(d and s and e and s <= d <= e)
-
-
-def _v146_read_settings_state() -> dict[str, Any]:
-    try:
-        from services.permanent_authority_service import load_settings as _pa_load_settings
-        data = _pa_load_settings(_V122_LOG_MODULE_KEY)
-        if isinstance(data, dict):
-            # settings 可能直接是 tombstone，也可能包在 log_delete_state 裡。
-            nested = data.get("log_delete_state") if isinstance(data.get("log_delete_state"), dict) else None
-            src = nested if isinstance(nested, dict) else data
-            if src.get("deleted_keys") is not None or src.get("deleted_ranges") is not None:
-                return dict(src)
-    except Exception:
-        pass
-    return {}
-
-
-def _v146_merge_delete_states(*states: dict[str, Any]) -> dict[str, Any]:
-    deleted_keys: set[str] = set()
-    ranges: list[dict[str, Any]] = []
-    seen_ranges: set[tuple[str, str, str]] = set()
-    latest = ""
-    for stt in states:
-        if not isinstance(stt, dict):
-            continue
-        latest = max(latest, _clean_text(stt.get("updated_at")))
-        for k in _v146_safe_list(stt.get("deleted_keys")):
-            sk = str(k or "").strip()
-            if sk:
-                deleted_keys.add(sk)
-        for r in _v146_safe_list(stt.get("deleted_ranges")) + _v146_safe_list(stt.get("delete_ranges")):
-            if not isinstance(r, dict):
-                continue
-            s = _date_text(r.get("start_date") or r.get("start")) or ""
-            e = _date_text(r.get("end_date") or r.get("end")) or ""
-            deleted_at = _v146_parse_dt_text(r.get("deleted_at") or r.get("updated_at") or latest or now_text())
-            if not s or not e:
-                continue
-            key = (s, e, deleted_at)
-            if key in seen_ranges:
-                continue
-            seen_ranges.add(key)
-            rr = dict(r)
-            rr["start_date"] = s
-            rr["end_date"] = e
-            rr["deleted_at"] = deleted_at
-            ranges.append(rr)
-    ranges.sort(key=lambda r: (_clean_text(r.get("start_date")), _clean_text(r.get("end_date")), _clean_text(r.get("deleted_at"))))
-    return {
-        "version": _V146_LOG_DELETE_VERSION,
-        "module_key": _V122_LOG_MODULE_KEY,
-        "deleted_keys": sorted(deleted_keys),
-        "deleted_ranges": ranges[-500:],
-        "updated_at": now_text(),
-    }
-
-
-def _v122_read_log_delete_state() -> dict[str, Any]:  # type: ignore[override]
-    """V146: read delete tombstone from both local delete_state.json and canonical settings.json."""
-    local_state: dict[str, Any] = {}
-    try:
-        if _V122_LOG_DELETE_STATE_PATH.exists() and _V122_LOG_DELETE_STATE_PATH.stat().st_size > 0:
-            data = _v122_json.loads(_V122_LOG_DELETE_STATE_PATH.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                local_state = data
-    except Exception:
-        local_state = {}
-    settings_state = _v146_read_settings_state()
-    merged = _v146_merge_delete_states(local_state, settings_state)
-    if not merged.get("updated_at"):
-        merged["updated_at"] = now_text()
-    return merged
-
-
-def _v122_write_log_delete_state(state: dict[str, Any]) -> None:  # type: ignore[override]
-    """V146: persist delete tombstone locally and to canonical settings.json/GitHub."""
-    try:
-        merged = _v146_merge_delete_states(_v122_read_log_delete_state(), state or {})
-    except Exception:
-        merged = dict(state or {})
-        merged.setdefault("version", _V146_LOG_DELETE_VERSION)
-        merged.setdefault("module_key", _V122_LOG_MODULE_KEY)
-        merged.setdefault("deleted_keys", [])
-        merged.setdefault("deleted_ranges", [])
-        merged["updated_at"] = now_text()
-
-    # Local compatibility path used by existing V122 code.
-    try:
-        _V122_LOG_DELETE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        tmp = _V122_LOG_DELETE_STATE_PATH.with_suffix(".json.tmp")
-        tmp.write_text(_v122_json.dumps(merged, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-        tmp.replace(_V122_LOG_DELETE_STATE_PATH)
-    except Exception:
-        pass
-
-    # Canonical durable path that survives Streamlit Cloud Reboot.
-    try:
-        from services.permanent_authority_service import save_settings as _pa_save_settings
-        payload = dict(merged)
-        payload["log_delete_state"] = dict(merged)
-        _pa_save_settings(_V122_LOG_MODULE_KEY, payload, reason="v146_06_log_delete_tombstone", github=True)
-    except Exception:
-        pass
-
-
-def _v146_is_log_row_deleted(row: dict[str, Any], state: dict[str, Any] | None = None) -> bool:
-    state = state or _v122_read_log_delete_state()
-    clean = _v122_log_clean_row(row, str((row or {}).get("source") or ""))
-    key = _v122_log_key(clean)
-    deleted_keys = {str(x) for x in _v146_safe_list(state.get("deleted_keys")) if str(x).strip()}
-    if key in deleted_keys:
-        return True
-
-    log_date = _v122_log_date(clean.get("log_time"))
-    log_ts = _v146_parse_dt_text(clean.get("log_time"))
-    for r in _v146_safe_list(state.get("deleted_ranges")) + _v146_safe_list(state.get("delete_ranges")):
-        if not isinstance(r, dict):
-            continue
-        s = _date_text(r.get("start_date") or r.get("start")) or ""
-        e = _date_text(r.get("end_date") or r.get("end")) or ""
-        deleted_at = _v146_parse_dt_text(r.get("deleted_at") or r.get("updated_at") or "")
-        if not _v146_date_in_range(log_date, s, e):
-            continue
-        # 關鍵：只擋刪除時點以前的舊 LOG。刪除後新產生的稽核 LOG 要保留。
-        if not deleted_at or not log_ts or log_ts <= deleted_at:
-            return True
-    return False
-
-
-def _v122_deleted_key_set() -> set[str]:  # type: ignore[override]
-    state = _v122_read_log_delete_state()
-    return {str(x) for x in _v146_safe_list(state.get("deleted_keys")) if str(x).strip()}
-
-
-def _v122_dedupe_log_rows(rows: list[dict[str, Any]], apply_tombstone: bool = True) -> list[dict[str, Any]]:  # type: ignore[override]
-    state = _v122_read_log_delete_state() if apply_tombstone else {"deleted_keys": [], "deleted_ranges": []}
-    seen: set[str] = set()
-    out: list[dict[str, Any]] = []
-    for r in rows or []:
-        clean = _v122_log_clean_row(r, str((r or {}).get("source") or ""))
-        key = _v122_log_key(clean)
-        if apply_tombstone and _v146_is_log_row_deleted(clean, state):
-            continue
-        if key in seen:
-            continue
-        seen.add(key)
-        clean["log_key"] = key
-        out.append(clean)
-    return out
-
-
-def _v146_force_upload_delete_state(reason: str = "v146_force_upload_log_delete_state") -> None:
-    try:
-        from services.permanent_authority_service import force_upload_authority_file
-        force_upload_authority_file(_V122_LOG_MODULE_KEY, "settings", reason=reason)
-    except Exception:
-        # save_settings(github=True) above already attempted upload; this is only best-effort.
-        pass
-
-
-def _v146_rewrite_sqlite_without_deleted(rows: list[dict[str, Any]]) -> None:
-    safe_rows = _v122_dedupe_log_rows(rows or [], apply_tombstone=True)
-    _v122_replace_sqlite_logs(safe_rows)
-
-
-def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit: bool = True, user_name: str | None = None) -> int:  # type: ignore[override]
-    """V146 durable delete.
-
-    Deletes are persisted as both:
-    - 06_logs/records.json with matching old rows removed
-    - 06_logs/settings.json + delete_state.json tombstone with deleted date ranges
-
-    This prevents Reboot App from restoring old LOG rows from SQLite/legacy/GitHub records.
-    """
-    s = _date_text(start_date)
-    e = _date_text(end_date)
-    if not s or not e:
-        return 0
-    if s > e:
-        return 0
-
-    deleted_at = now_text()
-    deleted_by = user_name or _current_log_user()
-    with _V122_LOG_LOCK:
-        rows_all = _v122_all_log_rows(include_sqlite=True, apply_tombstone=True)
-        target: list[dict[str, Any]] = []
-        for r in rows_all:
-            d = _v122_log_date(r.get("log_time"))
-            if d and s <= d <= e:
-                target.append(r)
-        deleted_count = len(target)
-        if deleted_count <= 0:
-            # Still persist range tombstone, because the user explicitly cleared a period;
-            # this blocks older remote/legacy files that may arrive after Reboot.
-            pass
-
-        old_state = _v122_read_log_delete_state()
-        deleted_keys = set(str(x) for x in _v146_safe_list(old_state.get("deleted_keys")) if str(x).strip())
-        for r in target:
-            deleted_keys.add(_v122_log_key(_v122_log_clean_row(r, str(r.get("source") or ""))))
-        ranges = _v146_safe_list(old_state.get("deleted_ranges"))
-        ranges.append({
-            "start_date": s,
-            "end_date": e,
-            "deleted_count": deleted_count,
-            "deleted_at": deleted_at,
-            "deleted_by": deleted_by,
-            "rule": "hide log rows in range with log_time <= deleted_at; keep new audit logs after deleted_at",
-        })
-        new_state = dict(old_state)
-        new_state["version"] = _V146_LOG_DELETE_VERSION
-        new_state["module_key"] = _V122_LOG_MODULE_KEY
-        new_state["deleted_keys"] = sorted(deleted_keys)
-        new_state["deleted_ranges"] = ranges[-500:]
-        new_state["last_deleted_count"] = deleted_count
-        new_state["updated_at"] = deleted_at
-        _v122_write_log_delete_state(new_state)
-
-        # Re-read merged durable state and filter both authority + SQLite rows through it.
-        durable_state = _v122_read_log_delete_state()
-        remaining = [r for r in rows_all if not _v146_is_log_row_deleted(r, durable_state)]
-        _v122_save_authority_log_rows(remaining, reason="v146_delete_system_logs_durable_tombstone", github=True)
-        _v146_rewrite_sqlite_without_deleted(remaining)
-        _v146_force_upload_delete_state("v146_delete_system_logs_durable_tombstone")
-
-    if keep_delete_audit:
-        write_log(
-            "DELETE_LOG_RANGE",
-            f"刪除 LOG 日期區間：{s} ~ {e}，刪除筆數：{deleted_count}",
-            target_table="system_logs",
-            target_id=f"{s}~{e}",
-            detail=f"deleted_count={deleted_count};authority=06_logs.records.json;settings=06_logs.settings.json;version=V146",
-            level="WARN",
-            user_name=deleted_by,
-        )
+def _v147_schedule_log_authority_batch(reason: str = "v147_log_batch") -> None:
+    def _worker() -> None:
         try:
-            _v146_force_upload_delete_state("v146_delete_audit_after_range_delete")
+            delay = float(__import__("os").environ.get("SPT_LOG_AUTH_BATCH_DELAY_SEC", "4.0") or 4.0)
         except Exception:
-            pass
-    return int(deleted_count)
+            delay = 4.0
+        try:
+            _v147_log_time.sleep(max(delay, 0.5))
+            while True:
+                with _V147_LOG_BATCH_LOCK:
+                    _V147_LOG_BATCH_STATE["pending"] = False
+                try:
+                    # 背景批次：保留 authority 既有 LOG + SQLite 最新 LOG。limit 足夠覆蓋目前現場量；不在按鈕執行緒內跑。
+                    rows = _v122_read_authority_log_rows() if "_v122_read_authority_log_rows" in globals() else []
+                    rows += _v122_sqlite_log_rows(limit=3000) if "_v122_sqlite_log_rows" in globals() else []
+                    _v122_save_authority_log_rows(rows, reason=reason, github=False)
+                    try:
+                        from services.permanent_authority_service import force_upload_authority_file
+                        force_upload_authority_file("06_logs", "records", reason=reason)
+                    except Exception:
+                        pass
+                    with _V147_LOG_BATCH_LOCK:
+                        _V147_LOG_BATCH_STATE["last_sync_at"] = _v147_log_time.time()
+                        _V147_LOG_BATCH_STATE["last_error"] = ""
+                        _V147_LOG_BATCH_STATE["write_count_since_sync"] = 0
+                except Exception as exc:
+                    with _V147_LOG_BATCH_LOCK:
+                        _V147_LOG_BATCH_STATE["last_error"] = str(exc)[:500]
+                with _V147_LOG_BATCH_LOCK:
+                    if not _V147_LOG_BATCH_STATE.get("pending"):
+                        _V147_LOG_BATCH_STATE["running"] = False
+                        return
+                _v147_log_time.sleep(1.0)
+        except Exception as exc:
+            with _V147_LOG_BATCH_LOCK:
+                _V147_LOG_BATCH_STATE["last_error"] = str(exc)[:500]
+                _V147_LOG_BATCH_STATE["running"] = False
+
+    with _V147_LOG_BATCH_LOCK:
+        _V147_LOG_BATCH_STATE["pending"] = True
+        _V147_LOG_BATCH_STATE["write_count_since_sync"] = int(_V147_LOG_BATCH_STATE.get("write_count_since_sync") or 0) + 1
+        if _V147_LOG_BATCH_STATE.get("running"):
+            return
+        _V147_LOG_BATCH_STATE["running"] = True
+    try:
+        _v147_log_threading.Thread(target=_worker, name="SPT-V147-SystemLogBatchSync", daemon=True).start()
+    except Exception as exc:
+        with _V147_LOG_BATCH_LOCK:
+            _V147_LOG_BATCH_STATE["running"] = False
+            _V147_LOG_BATCH_STATE["last_error"] = str(exc)[:500]
 
 
-def count_logs_by_date_range(start_date: Any, end_date: Any) -> int:  # type: ignore[override]
-    rows = _v122_all_log_rows(include_sqlite=True, apply_tombstone=True)
-    return len(_v122_apply_log_filters(rows, start_date, end_date))
+try:
+    _v147_original_sqlite_only_write_log = _v122_original_write_log if callable(_v122_original_write_log) else None  # type: ignore[name-defined]
+except Exception:
+    _v147_original_sqlite_only_write_log = None
 
 
-def get_system_log_authority_status() -> dict[str, Any]:  # type: ignore[override]
-    rows = _v122_read_authority_log_rows()
-    db_rows = _v122_sqlite_log_rows(limit=200000)
-    state = _v122_read_log_delete_state()
-    effective_rows = _v122_dedupe_log_rows(rows + db_rows, apply_tombstone=True)
-    return {
-        "module_key": _V122_LOG_MODULE_KEY,
-        "path": str(_V122_LOG_AUTH_DIR / "records.json"),
-        "exists": (_V122_LOG_AUTH_DIR / "records.json").exists(),
-        "count": len(_v122_dedupe_log_rows(rows, apply_tombstone=True)),
-        "effective_count": len(effective_rows),
-        "db_count": len(db_rows),
-        "delete_state_path": str(_V122_LOG_DELETE_STATE_PATH),
-        "delete_state_exists": _V122_LOG_DELETE_STATE_PATH.exists(),
-        "deleted_keys": len(state.get("deleted_keys") or []),
-        "deleted_ranges": len(state.get("deleted_ranges") or []),
-        "settings_tombstone": bool(_v146_read_settings_state()),
-        "upload_running": bool(_V122_LOG_UPLOAD_STATE.get("running")),
-        "last_upload_error": _V122_LOG_UPLOAD_STATE.get("last_error", ""),
-    }
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    """V147：LOG 先即時寫 SQLite，06_logs 權威檔改為背景批次同步。"""
+    if callable(_v147_original_sqlite_only_write_log):
+        _v147_original_sqlite_only_write_log(action_type, message, target_table, target_id, detail, level, user_name)
+    else:
+        execute(
+            """
+            INSERT INTO system_logs
+            (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (now_text(), user_name or _current_log_user(), action_type, target_table, str(target_id or ""), message, detail, level),
+        )
+    # 不阻塞使用者操作；06 LOG 查詢仍會從 SQLite 看到新資料。
+    try:
+        _v147_schedule_log_authority_batch("v147_batched_write_log_authority")
+    except Exception:
+        pass
 
 
-def repair_system_logs_after_reboot_now(reason: str = "v146_repair_logs_after_reboot") -> int:
-    """Manual/page-safe repair helper: remove deleted logs from SQLite and rewrite authority."""
-    with _V122_LOG_LOCK:
-        rows = _v122_all_log_rows(include_sqlite=True, apply_tombstone=True)
-        _v122_save_authority_log_rows(rows, reason=reason, github=True)
-        _v146_rewrite_sqlite_without_deleted(rows)
-        _v146_force_upload_delete_state(reason)
-        return len(rows)
+def flush_log_authority_batch_now(reason: str = "manual_v147_log_flush") -> dict[str, Any]:
+    """手動/登出前補送 LOG 權威檔；不刪資料。"""
+    try:
+        rows = _v122_read_authority_log_rows() if "_v122_read_authority_log_rows" in globals() else []
+        rows += _v122_sqlite_log_rows(limit=5000) if "_v122_sqlite_log_rows" in globals() else []
+        res = _v122_save_authority_log_rows(rows, reason=reason, github=False)
+        try:
+            from services.permanent_authority_service import flush_authority_upload_queue_now, force_upload_authority_file
+            force_upload_authority_file("06_logs", "records", reason=reason)
+            q = flush_authority_upload_queue_now(reason=reason, max_seconds=6.0)
+        except Exception as exc:
+            q = {"ok": False, "error": str(exc)[:300]}
+        return {"ok": True, "save": res, "upload": q, "rows": len(rows)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:500]}
 
-# =================== END V146 06 LOG DELETE DURABLE TOMBSTONE + REBOOT NO-REVIVE FIX ===================
+
+def get_log_batch_status() -> dict[str, Any]:
+    try:
+        with _V147_LOG_BATCH_LOCK:
+            return dict(_V147_LOG_BATCH_STATE)
+    except Exception:
+        return {"running": False, "pending": False, "last_error": "status_unavailable"}
+# =================== END V147 HIGH-FREQUENCY LOG BATCHING ===================
