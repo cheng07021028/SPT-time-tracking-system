@@ -15,21 +15,32 @@ from services.time_record_integrity_service import (
     export_audit_excel_bytes,
 )
 
+MODULE_CODE = "14_data_health"
+
 st.set_page_config(page_title="14. 資料健康檢查中心", page_icon="🛡️", layout="wide")
 apply_theme()
+
+# V153B: 14 is now an independent permission-managed module.
+# Do not borrow 12_module_persistence permissions and do not swallow permission errors.
+require_module_access(MODULE_CODE, "can_view")
+
 try:
-    require_module_access("12_module_persistence", "can_view")
+    CAN_EXPORT = bool(check_permission(MODULE_CODE, "can_export") or check_permission(MODULE_CODE, "can_manage"))
 except Exception:
-    # Keep the page guarded by 12 permissions when available.  If a deployment has
-    # not yet mapped module 14, require_module_access will already stop unauthorized
-    # users; this fallback only prevents older services from crashing imports.
-    pass
+    CAN_EXPORT = False
+try:
+    CAN_REPAIR = bool(check_permission(MODULE_CODE, "can_manage"))
+except Exception:
+    CAN_REPAIR = False
 
 render_header("14｜資料健康檢查中心", "工時紀錄稽核、資料遺失檢查、01/02 權威檔非破壞式修復")
 
 st.warning(
     "本頁只用於資料健康檢查與非破壞式修復。檢查不寫入；修復只合併缺漏資料到 01/02 權威檔，"
     "不刪除、不重新編號、不用畫面局部資料覆蓋完整歷史。"
+)
+st.caption(
+    "權限說明：進入本頁需 14 模組 can_view；下載 Excel 需 can_export；執行非破壞式修復需 can_manage。"
 )
 
 if "v153_audit_result" not in st.session_state:
@@ -38,8 +49,13 @@ if "v153_audit_result" not in st.session_state:
 c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
 start_date = c1.date_input("檢查開始日期 / Start", value=today_date() - timedelta(days=7), key="v153_start_date")
 end_date = c2.date_input("檢查結束日期 / End", value=today_date(), key="v153_end_date")
-github_backup = c3.checkbox("修復後同步 GitHub", value=True, help="正式修復建議勾選；若 GitHub 很慢，可先取消，之後再手動備份。")
-dry_run = c4.checkbox("只模擬修復 / Dry Run", value=True)
+github_backup = c3.checkbox(
+    "修復後同步 GitHub",
+    value=True,
+    help="正式修復建議勾選；若 GitHub 很慢，可先取消，之後再手動備份。",
+    disabled=not CAN_REPAIR,
+)
+dry_run = c4.checkbox("只模擬修復 / Dry Run", value=True, disabled=not CAN_REPAIR)
 
 b1, b2, b3 = st.columns([1, 1, 1])
 if b1.button("🔍 執行資料健康檢查", use_container_width=True, key="v153_run_audit"):
@@ -85,20 +101,19 @@ if result:
         file_name=f"SPT_V153_資料健康檢查_{start_date}_{end_date}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
+        disabled=not CAN_EXPORT,
+        help=None if CAN_EXPORT else "你的帳號沒有 14 模組匯出權限。",
     )
 
     st.divider()
     st.markdown("### 非破壞式修復 / Non-destructive Repair")
-    st.caption("修復會把 02_history、01_time_records、SQLite、row shard、event row 中仍可完整還原的工時資料合併後，寫回 01/02 canonical。只剩 LOG 的資料不會自動補，避免產生不完整紀錄。")
+    st.caption(
+        "修復會把 02_history、01_time_records、SQLite、row shard、event row 中仍可完整還原的工時資料合併後，"
+        "寫回 01/02 canonical。只剩 LOG 的資料不會自動補，避免產生不完整紀錄。"
+    )
 
-    can_repair = False
-    try:
-        can_repair = bool(check_permission("12_module_persistence", "can_manage") or check_permission("12_module_persistence", "can_edit"))
-    except Exception:
-        can_repair = True
-
-    if not can_repair:
-        st.info("你的帳號沒有資料修復權限。")
+    if not CAN_REPAIR:
+        st.info("你的帳號沒有 14 模組管理權限，因此只能檢查，不能執行修復。")
     else:
         confirm = st.checkbox("我確認執行非破壞式合併修復", key="v153_confirm_repair")
         if b2.button("🛠️ 執行非破壞式修復", use_container_width=True, disabled=not confirm, key="v153_repair_button"):
@@ -121,4 +136,4 @@ if b3.button("🧹 清除本頁檢查結果", use_container_width=True, key="v15
     st.session_state.pop("v153_repair_result", None)
     st.rerun()
 
-st.caption("V153：資料健康檢查中心。建議每次部署修正包後先執行檢查，再決定是否修復。")
+st.caption("V153B：資料健康檢查中心已納入 10. 權限管理。建議每次部署修正包後先執行檢查，再決定是否修復。")

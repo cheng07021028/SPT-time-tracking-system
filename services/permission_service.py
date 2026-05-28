@@ -5824,3 +5824,156 @@ def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[overr
 check_permission = has_permission
 # ======================= END V125 ACCOUNT MASTER PERMISSION RECONCILIATION =======================
 
+
+# ===================== V153B REGISTER MODULE 14 DATA HEALTH PERMISSIONS =====================
+# 目的：將「14. 資料健康檢查中心」正式加入 10. 權限管理。
+# 原則：不覆蓋既有 01~13 權限設定；只補上 14 模組列。
+# 安全預設：只有 admin 角色預設全開；其他角色預設全關，必須由 10 權限管理明確勾選。
+
+_V153B_MODULE_14 = {"module_code": "14", "module_name_zh": "資料健康檢查中心", "module_name_en": "Data Health Center"}
+
+def _v153b_register_module_14_in_memory() -> None:
+    try:
+        global MODULES
+        if not any(str(m.get("module_code", "")).zfill(2) == "14" for m in MODULES):
+            MODULES.append(dict(_V153B_MODULE_14))
+        else:
+            for m in MODULES:
+                if str(m.get("module_code", "")).zfill(2) == "14":
+                    m["module_code"] = "14"
+                    m["module_name_zh"] = _V153B_MODULE_14["module_name_zh"]
+                    m["module_name_en"] = _V153B_MODULE_14["module_name_en"]
+    except Exception:
+        pass
+
+_v153b_register_module_14_in_memory()
+
+try:
+    _v153b_prev_role_preset_for_module = _role_preset_for_module
+except Exception:
+    _v153b_prev_role_preset_for_module = None
+
+def _role_preset_for_module(role: str, module_code: str) -> dict:  # type: ignore[override]
+    module_no = str(module_code or "").zfill(2)
+    if module_no == "14":
+        base = {k: 0 for k, _, _ in ACTIONS}
+        if str(role or "").strip().lower() == "admin":
+            return {k: 1 for k in base}
+        return base
+    if callable(_v153b_prev_role_preset_for_module):
+        return dict(_v153b_prev_role_preset_for_module(role, module_code))
+    return dict(ROLE_PRESET.get(str(role or "operator").strip().lower(), ROLE_PRESET.get("operator", {})))
+
+try:
+    _v153b_prev_v96_role_preset = _v96_role_preset  # type: ignore[name-defined]
+except Exception:
+    _v153b_prev_v96_role_preset = None
+
+def _v96_role_preset(role: str, module_code: str) -> dict:  # type: ignore[override]
+    module_no = str(module_code or "").zfill(2)
+    if module_no == "14":
+        base = {k: 0 for k, _, _ in ACTIONS}
+        if str(role or "").strip().lower() == "admin":
+            return {k: 1 for k in base}
+        return base
+    if callable(_v153b_prev_v96_role_preset):
+        return dict(_v153b_prev_v96_role_preset(role, module_code))
+    return _role_preset_for_module(role, module_no)
+
+try:
+    _v153b_prev_v125_role_preset = _v125_role_preset  # type: ignore[name-defined]
+except Exception:
+    _v153b_prev_v125_role_preset = None
+
+def _v125_role_preset(role: str, module_code: str) -> dict:  # type: ignore[override]
+    module_no = str(module_code or "").zfill(2)
+    if module_no == "14":
+        base = {k: 0 for k, _, _ in ACTIONS}
+        if str(role or "").strip().lower() == "admin":
+            return {k: 1 for k in base}
+        return base
+    if callable(_v153b_prev_v125_role_preset):
+        return dict(_v153b_prev_v125_role_preset(role, module_code))
+    return _role_preset_for_module(role, module_no)
+
+
+def ensure_module_14_permission_rows(reason: str = "v153b_register_module_14", *, write: bool = True) -> dict:
+    """Ensure 14｜資料健康檢查中心 appears in 10 權限管理 authority matrix.
+
+    This function is additive only. Existing rows and existing 01~13 permissions
+    are preserved. If a user already has a 14 row, it is not overwritten.
+    """
+    _v153b_register_module_14_in_memory()
+    result = {"ok": True, "added": 0, "users": 0, "written": False, "reason": reason}
+    try:
+        payload = _v125_permission_payload() if "_v125_permission_payload" in globals() else {}
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        users = [dict(u) for u in tables.get("auth_users", []) if isinstance(u, dict) and str(u.get("username") or "").strip()]
+        existing = [dict(r) for r in tables.get("auth_account_permissions", []) if isinstance(r, dict)]
+        by_key = {}
+        for r in existing:
+            uname = str(r.get("username") or "").strip()
+            module_no = str(r.get("module_code") or "").zfill(2)
+            if uname and module_no:
+                by_key[(uname.lower(), module_no)] = r
+        now = now_text()
+        for u in users:
+            uname = str(u.get("username") or "").strip()
+            if not uname:
+                continue
+            result["users"] += 1
+            key = (uname.lower(), "14")
+            if key in by_key:
+                # Only normalize names; do not change permissions.
+                by_key[key]["module_name_zh"] = _V153B_MODULE_14["module_name_zh"]
+                by_key[key]["module_name_en"] = _V153B_MODULE_14["module_name_en"]
+                continue
+            role = str(u.get("role_code") or u.get("role") or "operator").strip().lower() or "operator"
+            preset = _v125_role_preset(role, "14")
+            row = {
+                "username": uname,
+                "module_code": "14",
+                "module_name_zh": _V153B_MODULE_14["module_name_zh"],
+                "module_name_en": _V153B_MODULE_14["module_name_en"],
+                "updated_at": now,
+            }
+            for col, _, _ in ACTIONS:
+                row[col] = int(preset.get(col, 0) or 0)
+            by_key[key] = row
+            result["added"] += 1
+        if result["added"] and write:
+            tables["auth_account_permissions"] = [by_key[k] for k in sorted(by_key.keys(), key=lambda k: (k[0], int(k[1]) if str(k[1]).isdigit() else 999))]
+            payload["tables"] = tables
+            if "_v125_write_permission_payload" in globals():
+                wr = _v125_write_permission_payload(payload, reason)
+                result["write_result"] = wr
+                result["written"] = True
+            else:
+                result["written"] = False
+        try:
+            clear_permission_runtime_cache()
+        except Exception:
+            pass
+    except Exception as exc:
+        result["ok"] = False
+        result["error"] = str(exc)[:500]
+    return result
+
+try:
+    _v153b_prev_get_account_permissions = get_account_permissions
+except Exception:
+    _v153b_prev_get_account_permissions = None
+
+def get_account_permissions() -> List[dict]:  # type: ignore[override]
+    # Make 14 visible in 10 權限管理 without changing any existing 01~13 rows.
+    ensure_module_14_permission_rows(reason="v153b_get_account_permissions_register", write=True)
+    if callable(_v153b_prev_get_account_permissions):
+        return _v153b_prev_get_account_permissions()
+    return []
+
+# Register once on import, best effort. No existing permissions are changed.
+try:
+    ensure_module_14_permission_rows(reason="v153b_import_register", write=True)
+except Exception:
+    pass
+# =================== END V153B REGISTER MODULE 14 DATA HEALTH PERMISSIONS ===================

@@ -4104,3 +4104,186 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 
 require_permission = require_module_access
 # =================== END V142 HARD GUARD FOR 10 PERMISSION MANAGEMENT ===================
+
+# ===================== V153B RUNTIME GUARD FOR MODULE 14 DATA HEALTH CENTER =====================
+# 目的：讓 14｜資料健康檢查中心正式受 10｜權限管理控制。
+# 安全預設：缺少 14 權限列時，除 admin 外一律拒絕；不得 fallback 成 manager/viewer/auditor 預設可進。
+
+_V153B_DATA_HEALTH_MODULE_NO = "14"
+_V153B_DATA_HEALTH_MODULE_CODE = "14_data_health"
+
+def _v153b_register_module_14_runtime() -> None:
+    try:
+        global MODULES, MODULE_CODE_TO_NO, MODULE_NO_TO_CODE
+        exists = False
+        for m in MODULES:
+            if str(m.get("module_no", "")).zfill(2) == "14" or str(m.get("module_code", "")) in {"14", "14_data_health", "14_health_center"}:
+                m["module_code"] = "14_data_health"
+                m["module_no"] = "14"
+                m["module_name"] = "資料健康檢查中心"
+                m["module_name_en"] = "Data Health Center"
+                exists = True
+        if not exists:
+            MODULES.append({"module_code": "14_data_health", "module_no": "14", "module_name": "資料健康檢查中心", "module_name_en": "Data Health Center"})
+        MODULE_CODE_TO_NO = {m["module_code"]: m["module_no"] for m in MODULES}
+        MODULE_NO_TO_CODE = {m["module_no"]: m["module_code"] for m in MODULES}
+        if "_V125_MODULE_ALIASES" in globals():
+            _V125_MODULE_ALIASES.update({
+                "14": "14",
+                "14_data_health": "14",
+                "14_health_center": "14",
+                "14_integrity": "14",
+                "data_health": "14",
+                "time_record_health": "14",
+            })
+    except Exception:
+        pass
+
+_v153b_register_module_14_runtime()
+
+try:
+    _v153b_prev_v125_role_default = _v125_role_default  # type: ignore[name-defined]
+except Exception:
+    _v153b_prev_v125_role_default = None
+
+def _v125_role_default(role: str, module_no: str) -> dict[str, bool]:  # type: ignore[override]
+    module_no2 = _v125_module_no(module_no) if "_v125_module_no" in globals() else str(module_no or "").zfill(2)
+    if module_no2 == "14":
+        base = {c: False for c in PERMISSION_COLUMNS}
+        if str(role or "").strip().lower() == "admin":
+            return {c: True for c in PERMISSION_COLUMNS}
+        return base
+    if callable(_v153b_prev_v125_role_default):
+        return _v153b_prev_v125_role_default(role, module_no)
+    return {c: False for c in PERMISSION_COLUMNS}
+
+try:
+    _v153b_prev_check_permission = check_permission
+except Exception:
+    _v153b_prev_check_permission = None
+
+def _v153b_truthy(v, default: bool = False) -> bool:
+    try:
+        return _v125_truthy(v, default)  # type: ignore[name-defined]
+    except Exception:
+        if v is None:
+            return default
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, (int, float)):
+            return float(v) != 0
+        s = str(v).strip().lower()
+        if s in {"1", "true", "yes", "y", "on", "是", "啟用", "active", "checked", "勾選"}:
+            return True
+        if s in {"0", "false", "no", "n", "off", "否", "停用", "inactive", "unchecked", ""}:
+            return False
+        return default
+
+
+def _v153b_module_no(code: str) -> str:
+    try:
+        return _v125_module_no(code)  # type: ignore[name-defined]
+    except Exception:
+        s = str(code or "").strip()
+        if s in {"14", "14_data_health", "14_health_center", "14_integrity", "data_health", "time_record_health"}:
+            return "14"
+        if len(s) >= 2 and s[:2].isdigit():
+            return s[:2]
+        return s.zfill(2)
+
+
+def _v153b_action(action: str) -> str:
+    try:
+        return _v125_action(action)  # type: ignore[name-defined]
+    except Exception:
+        s = str(action or "can_view").strip()
+        return s if s in PERMISSION_COLUMNS else "can_view"
+
+
+def _v153b_current_role_from_authority(username: str) -> tuple[str, bool]:
+    try:
+        tables = _v125_load_permission_tables()  # type: ignore[name-defined]
+    except Exception:
+        tables = {}
+    uname = str(username or "").strip().lower()
+    for table in ("auth_users", "security_users"):
+        for row in tables.get(table, []) or []:
+            if not isinstance(row, dict):
+                continue
+            u = str(row.get("username") or row.get("帳號") or row.get("帳號 / Username") or "").strip().lower()
+            if u != uname:
+                continue
+            role = str(row.get("role_code") or row.get("role") or row.get("角色") or "operator").strip().lower() or "operator"
+            active = _v153b_truthy(row.get("is_active", row.get("啟用", row.get("啟用 / Active", True))), True)
+            return role, bool(active)
+    if uname == "admin":
+        return "admin", True
+    return "operator", True
+
+
+def _v153b_check_data_health_permission(action: str = "can_view") -> bool:
+    if not st.session_state.get("auth_logged_in"):
+        return False
+    username = str(st.session_state.get("auth_username", "") or "").strip()
+    if not username:
+        return False
+    role, active = _v153b_current_role_from_authority(username)
+    if not active:
+        return False
+    if username.lower() == "admin" or role == "admin":
+        return True
+    act = _v153b_action(action)
+    try:
+        tables = _v125_load_permission_tables()  # type: ignore[name-defined]
+    except Exception:
+        tables = {}
+    # Module 14 must be explicit. Missing row means deny, not role fallback.
+    for row in tables.get("auth_account_permissions", []) or []:
+        if not isinstance(row, dict):
+            continue
+        u = str(row.get("username") or "").strip().lower()
+        if u != username.lower():
+            continue
+        m = _v153b_module_no(str(row.get("module_code") or ""))
+        if m != "14":
+            continue
+        if _v153b_truthy(row.get("can_manage", False), False):
+            return True
+        return _v153b_truthy(row.get(act, False), False)
+    return False
+
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    _v153b_register_module_14_runtime()
+    if _v153b_module_no(module_code) == "14":
+        return _v153b_check_data_health_permission(action)
+    if callable(_v153b_prev_check_permission):
+        return bool(_v153b_prev_check_permission(module_code, action))
+    return False
+
+try:
+    _v153b_prev_require_module_access = require_module_access
+except Exception:
+    _v153b_prev_require_module_access = None
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    _v153b_register_module_14_runtime()
+    if _v153b_module_no(module_code) == "14":
+        require_login(module_code)
+        if not _v153b_check_data_health_permission(action):
+            try:
+                log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"14_data_health:{action}", "14_data_health")
+            except Exception:
+                pass
+            st.error("權限不足：你的帳號未被授權使用 14. 資料健康檢查中心。請到 10. 權限管理設定此模組權限。")
+            st.stop()
+        return
+    if callable(_v153b_prev_require_module_access):
+        return _v153b_prev_require_module_access(module_code, action)
+    require_login(module_code)
+    if not check_permission(module_code, action):
+        st.error("權限不足：你的帳號未被授權使用此模組或功能。")
+        st.stop()
+
+require_permission = require_module_access
+# =================== END V153B RUNTIME GUARD FOR MODULE 14 DATA HEALTH CENTER ===================
