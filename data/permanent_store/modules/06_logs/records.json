@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 22:38:56",
-  "exported_at": "2026-05-28 22:38:56",
+  "updated_at": "2026-05-28 22:41:06",
+  "exported_at": "2026-05-28 22:41:06",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -31,11 +31,35 @@
         "detail": "deleted_count=27;authority=06_logs.records.json;tombstone=delete_state.json",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 140,
+        "log_time": "2026-05-28 22:41:02",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：V96 已刪除 SQLite 0 筆、01/02 權威檔 118 筆，並建立 tombstone。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 139,
+        "log_time": "2026-05-28 22:40:59",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "DELETE time_records",
+        "detail": "DELETE FROM time_records WHERE id IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2
+    "system_logs": 4
   }
 }
