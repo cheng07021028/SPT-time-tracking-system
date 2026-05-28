@@ -4287,3 +4287,745 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 
 require_permission = require_module_access
 # =================== END V153B RUNTIME GUARD FOR MODULE 14 DATA HEALTH CENTER ===================
+
+
+# ===================== V167 LOGIN PERFORMANCE FINAL OVERRIDE =====================
+# 目的：登入頁與首頁不得因權限 schema 重建、永久檔掃描、GitHub 同步、逐筆 execute
+# 而卡住。此段放在檔案最後，覆蓋前面多版修補函式；只改啟動/登入/權限讀取路徑，
+# 不改 01/02 工時交易資料、不改 10 權限管理儲存邏輯。
+
+_V167_LOGIN_SCHEMA_READY = False
+_V167_AUTH_RESTORE_READY = False
+_V167_PERMISSION_CACHE_TTL_SECONDS = 300
+
+
+def _v167_db_path() -> Path:
+    try:
+        return _security_db_path()
+    except Exception:
+        return PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
+
+
+def _v167_connect() -> sqlite3.Connection:
+    db_path = _v167_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path, check_same_thread=False, timeout=8)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=8000")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA temp_store=MEMORY")
+    except Exception:
+        pass
+    return conn
+
+
+def _v167_table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    try:
+        return {str(r[1]) for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    except Exception:
+        return set()
+
+
+def _v167_add_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
+    existing = _v167_table_columns(conn, table)
+    if not existing:
+        return
+    for col, ddl in columns.items():
+        if col in existing:
+            continue
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+            existing.add(col)
+        except Exception:
+            pass
+
+
+def _v167_module_no(module_code: str) -> str:
+    s = str(module_code or "").strip()
+    if s in {"14_data_health", "14_health_center", "data_health", "time_record_health"}:
+        return "14"
+    if s in {"10_permissions", "permission", "permissions"}:
+        return "10"
+    if s in MODULE_CODE_TO_NO:
+        return str(MODULE_CODE_TO_NO.get(s)).zfill(2)
+    if len(s) >= 2 and s[:2].isdigit():
+        return s[:2]
+    return s.zfill(2)
+
+
+def _v167_module_code_from_no(no: str) -> str:
+    n = str(no or "").zfill(2)
+    return MODULE_NO_TO_CODE.get(n, n)
+
+
+def _v167_role_perm(role_code: str, module_code: str) -> dict[str, int]:
+    try:
+        return {c: int(bool(_role_perm_template(role_code, module_code).get(c, False))) for c in PERMISSION_COLUMNS}
+    except Exception:
+        if str(role_code).strip().lower() == "admin":
+            return {c: 1 for c in PERMISSION_COLUMNS}
+        return {c: 0 for c in PERMISSION_COLUMNS}
+
+
+def _v167_ensure_login_schema(force: bool = False) -> None:
+    """Create/upgrade auth + security tables in one direct transaction.
+
+    舊版 ensure_security_schema 會對每個 role/module/user 分別呼叫 db_service.execute，
+    造成大量 SQLite 連線、LOG audit 與備份標記。登入頁只需要帳號/權限表，
+    所以這裡直接用 SQLite 單一交易完成，不走 db_service，不觸發 GitHub / LOG。
+    """
+    global _V167_LOGIN_SCHEMA_READY, _SECURITY_SCHEMA_READY
+    if _V167_LOGIN_SCHEMA_READY and not force:
+        return
+    now = _now()
+    with _v167_connect() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS auth_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            password_hint TEXT,
+            employee_id TEXT,
+            display_name TEXT,
+            email TEXT,
+            role_code TEXT DEFAULT 'operator',
+            is_active INTEGER DEFAULT 1,
+            force_password_change INTEGER DEFAULT 0,
+            last_login_at TEXT,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS auth_account_permissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            module_code TEXT NOT NULL,
+            module_name_zh TEXT,
+            module_name_en TEXT,
+            can_view INTEGER DEFAULT 0,
+            can_create INTEGER DEFAULT 0,
+            can_edit INTEGER DEFAULT 0,
+            can_delete INTEGER DEFAULT 0,
+            can_import INTEGER DEFAULT 0,
+            can_export INTEGER DEFAULT 0,
+            can_backup INTEGER DEFAULT 0,
+            can_restore INTEGER DEFAULT 0,
+            can_manage INTEGER DEFAULT 0,
+            updated_at TEXT,
+            UNIQUE(username, module_code)
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS auth_login_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            display_name TEXT,
+            event_time TEXT,
+            event_type TEXT,
+            result TEXT,
+            module_code TEXT,
+            module_name TEXT,
+            message TEXT,
+            ip_address TEXT,
+            user_agent TEXT
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS auth_security_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT,
+            note TEXT,
+            updated_at TEXT
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS security_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            employee_id TEXT,
+            display_name TEXT,
+            email TEXT,
+            role_code TEXT DEFAULT 'operator',
+            is_active INTEGER DEFAULT 1,
+            force_password_change INTEGER DEFAULT 0,
+            last_login_at TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS security_roles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role_code TEXT UNIQUE NOT NULL,
+            role_name TEXT NOT NULL,
+            role_name_en TEXT,
+            description TEXT,
+            is_system_role INTEGER DEFAULT 1,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS security_user_roles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            role_code TEXT NOT NULL,
+            created_at TEXT,
+            UNIQUE(username, role_code)
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS security_module_permissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role_code TEXT NOT NULL,
+            module_code TEXT NOT NULL,
+            module_no TEXT,
+            module_name TEXT,
+            module_name_en TEXT,
+            can_view INTEGER DEFAULT 0,
+            can_create INTEGER DEFAULT 0,
+            can_edit INTEGER DEFAULT 0,
+            can_delete INTEGER DEFAULT 0,
+            can_import INTEGER DEFAULT 0,
+            can_export INTEGER DEFAULT 0,
+            can_backup INTEGER DEFAULT 0,
+            can_restore INTEGER DEFAULT 0,
+            can_manage INTEGER DEFAULT 0,
+            updated_at TEXT,
+            UNIQUE(role_code, module_code)
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS security_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT,
+            note TEXT,
+            updated_at TEXT
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS security_login_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            display_name TEXT,
+            event_type TEXT,
+            result TEXT,
+            message TEXT,
+            module_code TEXT,
+            login_time TEXT,
+            logout_time TEXT,
+            idle_seconds INTEGER,
+            user_agent TEXT,
+            created_at TEXT
+        )
+        """)
+        _v167_add_columns(conn, "security_users", {
+            "role_code": "TEXT DEFAULT 'operator'",
+            "employee_id": "TEXT", "display_name": "TEXT", "email": "TEXT",
+            "is_active": "INTEGER DEFAULT 1", "force_password_change": "INTEGER DEFAULT 0",
+            "last_login_at": "TEXT", "created_at": "TEXT", "updated_at": "TEXT",
+        })
+        _v167_add_columns(conn, "auth_users", {
+            "password_hint": "TEXT", "employee_id": "TEXT", "display_name": "TEXT", "email": "TEXT",
+            "role_code": "TEXT DEFAULT 'operator'", "is_active": "INTEGER DEFAULT 1",
+            "force_password_change": "INTEGER DEFAULT 0", "last_login_at": "TEXT", "note": "TEXT",
+            "created_at": "TEXT", "updated_at": "TEXT",
+        })
+        _v167_add_columns(conn, "auth_account_permissions", {c: "INTEGER DEFAULT 0" for c in PERMISSION_COLUMNS})
+        _v167_add_columns(conn, "security_module_permissions", {c: "INTEGER DEFAULT 0" for c in PERMISSION_COLUMNS})
+        _v167_add_columns(conn, "security_login_logs", {
+            "display_name": "TEXT", "event_type": "TEXT", "result": "TEXT", "message": "TEXT",
+            "module_code": "TEXT", "login_time": "TEXT", "logout_time": "TEXT",
+            "idle_seconds": "INTEGER", "user_agent": "TEXT", "created_at": "TEXT",
+        })
+
+        for role_code, role_name, role_en in ROLES:
+            cur.execute("""
+                INSERT OR IGNORE INTO security_roles
+                (role_code, role_name, role_name_en, description, is_system_role, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 1, ?, ?)
+            """, (role_code, role_name, role_en, role_en, now, now))
+
+        # 14 必須註冊，否則 10 權限管理與 14 資料健康中心權限會不同步。
+        try:
+            _v153b_register_module_14_runtime()
+        except Exception:
+            pass
+
+        for m in MODULES:
+            module_code = str(m.get("module_code", ""))
+            for role_code, _, _ in ROLES:
+                p = _v167_role_perm(role_code, module_code)
+                cur.execute("""
+                    INSERT OR IGNORE INTO security_module_permissions
+                    (role_code,module_code,module_no,module_name,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, (
+                    role_code, module_code, str(m.get("module_no", "")), str(m.get("module_name", "")), str(m.get("module_name_en", "")),
+                    *(int(p.get(c, 0)) for c in PERMISSION_COLUMNS), now,
+                ))
+
+        for username, password, display_name, role_code in DEFAULT_USERS:
+            pw_hash = hash_password(password)
+            cur.execute("""
+                INSERT OR IGNORE INTO auth_users
+                (username,password_hash,password_hint,display_name,role_code,is_active,force_password_change,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,1,1,'system default account',?,?)
+            """, (username, pw_hash, password, display_name, role_code, now, now))
+            cur.execute("""
+                INSERT OR IGNORE INTO security_users
+                (username,password_hash,display_name,role_code,is_active,force_password_change,created_at,updated_at)
+                VALUES (?,?,?,?,1,1,?,?)
+            """, (username, pw_hash, display_name, role_code, now, now))
+            cur.execute("INSERT OR IGNORE INTO security_user_roles(username, role_code, created_at) VALUES (?,?,?)", (username, role_code, now))
+
+        # 若帳號級權限表仍空，補入預設帳號權限。既有權限不覆蓋。
+        try:
+            acc_count = int(cur.execute("SELECT COUNT(*) FROM auth_account_permissions").fetchone()[0] or 0)
+        except Exception:
+            acc_count = 0
+        if acc_count == 0:
+            for username, _, _, role_code in DEFAULT_USERS:
+                for m in MODULES:
+                    p = _v167_role_perm(role_code, str(m.get("module_code", "")))
+                    module_no = str(m.get("module_no", "")).zfill(2)
+                    cur.execute("""
+                        INSERT OR IGNORE INTO auth_account_permissions
+                        (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """, (
+                        username, module_no, str(m.get("module_name", "")), str(m.get("module_name_en", "")),
+                        *(int(p.get(c, 0)) for c in PERMISSION_COLUMNS), now,
+                    ))
+
+        cur.execute("""
+            INSERT OR IGNORE INTO auth_security_settings(setting_key, setting_value, note, updated_at)
+            VALUES ('idle_timeout_minutes', ?, '閒置自動登出分鐘數 / Idle logout minutes', ?)
+        """, (str(DEFAULT_IDLE_MINUTES), now))
+        cur.execute("""
+            INSERT OR IGNORE INTO security_settings(setting_key, setting_value, note, updated_at)
+            VALUES ('idle_timeout_minutes', ?, '閒置自動登出分鐘數 / Idle logout minutes', ?)
+        """, (str(DEFAULT_IDLE_MINUTES), now))
+        for idx_sql in [
+            "CREATE INDEX IF NOT EXISTS idx_v167_auth_users_username ON auth_users(username)",
+            "CREATE INDEX IF NOT EXISTS idx_v167_auth_perm_user_module ON auth_account_permissions(username, module_code)",
+            "CREATE INDEX IF NOT EXISTS idx_v167_security_users_username ON security_users(username)",
+            "CREATE INDEX IF NOT EXISTS idx_v167_security_perm_role_module ON security_module_permissions(role_code, module_code)",
+            "CREATE INDEX IF NOT EXISTS idx_v167_security_login_time ON security_login_logs(login_time, created_at)",
+        ]:
+            try:
+                cur.execute(idx_sql)
+            except Exception:
+                pass
+        conn.commit()
+    _V167_LOGIN_SCHEMA_READY = True
+    _SECURITY_SCHEMA_READY = True
+
+
+def ensure_security_schema(force: bool = False) -> None:  # type: ignore[override]
+    _v167_ensure_login_schema(force=force)
+
+
+def _v167_read_json(path: Path) -> dict[str, Any]:
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _v167_restore_auth_from_fixed_files_if_needed(username: str = "") -> None:
+    global _V167_AUTH_RESTORE_READY
+    uname = str(username or "").strip()
+    if _V167_AUTH_RESTORE_READY and not uname:
+        return
+    _v167_ensure_login_schema()
+    should_restore = False
+    with _v167_connect() as conn:
+        try:
+            total = int(conn.execute("SELECT COUNT(*) FROM auth_users").fetchone()[0] or 0)
+        except Exception:
+            total = 0
+        if total <= 6:
+            should_restore = True
+        if uname:
+            try:
+                row = conn.execute("SELECT username FROM auth_users WHERE lower(username)=lower(?)", (uname,)).fetchone()
+                if row is None:
+                    should_restore = True
+            except Exception:
+                should_restore = True
+    if not should_restore:
+        _V167_AUTH_RESTORE_READY = True
+        return
+    try:
+        tables = _best_local_auth_tables()
+    except Exception:
+        tables = {"auth_users": [], "auth_account_permissions": []}
+    users = [u for u in tables.get("auth_users", []) if isinstance(u, dict)]
+    perms = [r for r in tables.get("auth_account_permissions", []) if isinstance(r, dict)]
+    if not users:
+        _V167_AUTH_RESTORE_READY = True
+        return
+    now = _now()
+    with _v167_connect() as conn:
+        cur = conn.cursor()
+        for u in users:
+            name = str(u.get("username", "") or "").strip()
+            if not name:
+                continue
+            cur.execute("""
+                INSERT INTO auth_users
+                (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(username) DO UPDATE SET
+                    password_hash=excluded.password_hash,
+                    password_hint=excluded.password_hint,
+                    employee_id=excluded.employee_id,
+                    display_name=excluded.display_name,
+                    email=excluded.email,
+                    role_code=excluded.role_code,
+                    is_active=excluded.is_active,
+                    force_password_change=excluded.force_password_change,
+                    last_login_at=excluded.last_login_at,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (
+                name, str(u.get("password_hash", "") or ""), str(u.get("password_hint", "") or ""),
+                str(u.get("employee_id", "") or ""), str(u.get("display_name", "") or name),
+                str(u.get("email", "") or ""), str(u.get("role_code", "operator") or "operator"),
+                int(u.get("is_active", 1) or 0), int(u.get("force_password_change", 0) or 0),
+                str(u.get("last_login_at", "") or ""), str(u.get("note", "") or ""),
+                str(u.get("created_at", "") or now), str(u.get("updated_at", "") or now),
+            ))
+        for r in perms:
+            name = str(r.get("username", "") or "").strip()
+            module = str(r.get("module_code", "") or "").strip()
+            if not name or not module:
+                continue
+            cur.execute("""
+                INSERT INTO auth_account_permissions
+                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(username,module_code) DO UPDATE SET
+                    module_name_zh=excluded.module_name_zh,
+                    module_name_en=excluded.module_name_en,
+                    can_view=excluded.can_view,
+                    can_create=excluded.can_create,
+                    can_edit=excluded.can_edit,
+                    can_delete=excluded.can_delete,
+                    can_import=excluded.can_import,
+                    can_export=excluded.can_export,
+                    can_backup=excluded.can_backup,
+                    can_restore=excluded.can_restore,
+                    can_manage=excluded.can_manage,
+                    updated_at=excluded.updated_at
+            """, (
+                name, module, str(r.get("module_name_zh", "") or ""), str(r.get("module_name_en", "") or ""),
+                int(r.get("can_view", 0) or 0), int(r.get("can_create", 0) or 0),
+                int(r.get("can_edit", 0) or 0), int(r.get("can_delete", 0) or 0),
+                int(r.get("can_import", 0) or 0), int(r.get("can_export", 0) or 0),
+                int(r.get("can_backup", 0) or 0), int(r.get("can_restore", 0) or 0),
+                int(r.get("can_manage", 0) or 0), str(r.get("updated_at", "") or now),
+            ))
+        conn.commit()
+    _V167_AUTH_RESTORE_READY = True
+
+
+def _v167_login_row(username: str) -> dict[str, Any] | None:
+    uname = str(username or "").strip()
+    if not uname:
+        return None
+    with _v167_connect() as conn:
+        row = conn.execute("SELECT * FROM auth_users WHERE lower(username)=lower(?)", (uname,)).fetchone()
+        if row:
+            return dict(row)
+        row = conn.execute("SELECT * FROM security_users WHERE lower(username)=lower(?)", (uname,)).fetchone()
+        return dict(row) if row else None
+
+
+def log_security_event(username: str | None, event_type: str, result: str, message: str = "", module_code: str = "", idle_seconds: int | None = None) -> None:  # type: ignore[override]
+    try:
+        _v167_ensure_login_schema()
+        now = _now()
+        with _v167_connect() as conn:
+            conn.execute("""
+                INSERT INTO security_login_logs
+                (username, display_name, event_type, result, message, module_code, login_time, logout_time, idle_seconds, user_agent, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                username or "",
+                st.session_state.get("auth_display_name", ""),
+                event_type, result, message, module_code,
+                now if event_type == "LOGIN" else None,
+                now if event_type in {"LOGOUT", "AUTO_LOGOUT", "POST_RECORD_LOGOUT"} else None,
+                idle_seconds, "streamlit", now,
+            ))
+            try:
+                conn.execute("""
+                    INSERT INTO auth_login_logs
+                    (username, display_name, event_time, event_type, result, module_code, message, user_agent)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (username or "", st.session_state.get("auth_display_name", ""), now, event_type, result, module_code, message, "streamlit"))
+            except Exception:
+                pass
+            conn.commit()
+    except Exception:
+        pass
+
+
+def _v167_account_role(username: str, fallback: dict[str, Any] | None = None) -> str:
+    try:
+        row = _v167_login_row(username) or fallback or {}
+        role = str(row.get("role_code", "") or "").strip()
+        if role:
+            return role
+    except Exception:
+        pass
+    try:
+        with _v167_connect() as conn:
+            r = conn.execute("SELECT role_code FROM security_user_roles WHERE lower(username)=lower(?) ORDER BY id LIMIT 1", (str(username or ""),)).fetchone()
+            if r:
+                return str(r[0] or "").strip()
+    except Exception:
+        pass
+    return "admin" if str(username or "").strip().lower() == "admin" else "operator"
+
+
+def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
+    username = (username or "").strip()
+    _v167_ensure_login_schema()
+    _v167_restore_auth_from_fixed_files_if_needed(username)
+    row = _v167_login_row(username)
+    if not row:
+        log_security_event(username, "LOGIN", "FAIL", "帳號不存在")
+        return False, "帳號或密碼錯誤。"
+    try:
+        if int(row.get("is_active", 1) or 0) == 0:
+            log_security_event(username, "LOGIN", "FAIL", "帳號停用")
+            return False, "帳號已停用。"
+    except Exception:
+        pass
+    if not verify_password(password, row.get("password_hash")):
+        log_security_event(username, "LOGIN", "FAIL", "密碼錯誤")
+        return False, "帳號或密碼錯誤。"
+    role = _v167_account_role(username, row)
+    st.session_state["auth_logged_in"] = True
+    st.session_state["auth_username"] = username
+    st.session_state["auth_display_name"] = row.get("display_name") or username
+    st.session_state["auth_employee_id"] = row.get("employee_id") or ""
+    st.session_state["auth_roles"] = [role]
+    st.session_state["auth_login_ts"] = time.time()
+    st.session_state["auth_last_activity_ts"] = time.time()
+    try:
+        with _v167_connect() as conn:
+            now = _now()
+            conn.execute("UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)", (now, now, username))
+            conn.execute("UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)", (now, now, username))
+            conn.commit()
+    except Exception:
+        pass
+    clear_permission_cache(username)
+    log_security_event(username, "LOGIN", "SUCCESS", f"role={role}")
+    return True, "登入成功。"
+
+
+def _v167_read_idle_from_payload(payload: dict[str, Any]) -> int | None:
+    try:
+        for k in ("idle_timeout_minutes", "setting_value"):
+            raw = payload.get(k)
+            if raw not in (None, ""):
+                return max(1, int(float(raw)))
+        settings = payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
+        raw = settings.get("idle_timeout_minutes")
+        if raw not in (None, ""):
+            return max(1, int(float(raw)))
+        sec = payload.get("security_settings") if isinstance(payload.get("security_settings"), dict) else {}
+        raw = sec.get("idle_timeout_minutes")
+        if raw not in (None, ""):
+            return max(1, int(float(raw)))
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        for table_name in ("auth_security_settings", "security_settings"):
+            rows = tables.get(table_name, []) if isinstance(tables, dict) else []
+            if isinstance(rows, list):
+                for row in rows:
+                    if isinstance(row, dict) and str(row.get("setting_key") or "") == "idle_timeout_minutes":
+                        raw = row.get("setting_value")
+                        if raw not in (None, ""):
+                            return max(1, int(float(raw)))
+    except Exception:
+        return None
+    return None
+
+
+def get_idle_timeout_minutes() -> int:  # type: ignore[override]
+    try:
+        cache = st.session_state.get("_spt_idle_timeout_cache")
+        now_ts = time.time()
+        if cache and now_ts - float(cache.get("ts", 0) or 0) < _V167_PERMISSION_CACHE_TTL_SECONDS:
+            return max(1, int(cache.get("minutes", DEFAULT_IDLE_MINUTES)))
+    except Exception:
+        now_ts = time.time()
+    paths = []
+    try:
+        paths.extend(_v98_idle_timeout_paths())  # type: ignore[name-defined]
+    except Exception:
+        pass
+    paths.extend([
+        PROJECT_ROOT / "data" / "permanent_store" / "config" / "idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_idle_timeout_settings.json",
+        PROJECT_ROOT / "data" / "permanent_store" / "config" / "security_settings.json",
+        PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_security_settings.json",
+        PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "settings.json",
+        PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+    ])
+    minutes = None
+    seen = set()
+    for path in paths:
+        try:
+            p = Path(path)
+            if str(p) in seen:
+                continue
+            seen.add(str(p))
+            minutes = _v167_read_idle_from_payload(_v167_read_json(p))
+            if minutes is not None:
+                break
+        except Exception:
+            continue
+    if minutes is None:
+        try:
+            _v167_ensure_login_schema()
+            with _v167_connect() as conn:
+                for table in ("auth_security_settings", "security_settings"):
+                    try:
+                        row = conn.execute(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'").fetchone()
+                        if row and row[0] not in (None, ""):
+                            minutes = max(1, int(float(row[0])))
+                            break
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    minutes = max(1, int(minutes or DEFAULT_IDLE_MINUTES))
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": now_ts}
+    except Exception:
+        pass
+    return minutes
+
+
+def _v167_is_admin(username: str | None = None, roles: list[str] | None = None) -> bool:
+    uname = str(username or st.session_state.get("auth_username", "") or "").strip().lower()
+    clean_roles = [str(r).strip().lower() for r in (roles or st.session_state.get("auth_roles", []) or [])]
+    if uname == "admin" or "admin" in clean_roles:
+        return True
+    try:
+        return _v167_account_role(uname).lower() == "admin"
+    except Exception:
+        return False
+
+
+def _v167_load_permission_cache(username: str, roles: list[str] | None = None, force: bool = False) -> dict[str, dict[str, bool]]:
+    cache_key = f"_spt_perm_cache_v167_{username}"
+    now_ts = time.time()
+    cached = st.session_state.get(cache_key)
+    if cached and not force and now_ts - float(cached.get("ts", 0) or 0) < _V167_PERMISSION_CACHE_TTL_SECONDS:
+        return dict(cached.get("data", {}) or {})
+    roles = roles or st.session_state.get("auth_roles", []) or []
+    data: dict[str, dict[str, bool]] = {}
+    if _v167_is_admin(username, roles):
+        for m in MODULES:
+            data[str(m.get("module_code", ""))] = {c: True for c in PERMISSION_COLUMNS}
+        st.session_state[cache_key] = {"ts": now_ts, "data": data}
+        return data
+    try:
+        _v167_ensure_login_schema()
+        with _v167_connect() as conn:
+            rows = conn.execute("""
+                SELECT * FROM auth_account_permissions
+                WHERE lower(username)=lower(?)
+            """, (username,)).fetchall()
+            for rr in rows:
+                r = dict(rr)
+                no = _v167_module_no(str(r.get("module_code") or ""))
+                code = _v167_module_code_from_no(no)
+                row = {c: bool(int(r.get(c, 0) or 0)) for c in PERMISSION_COLUMNS}
+                if row.get("can_manage"):
+                    row = {c: True for c in PERMISSION_COLUMNS}
+                data[code] = row
+            if not data and roles:
+                placeholders = ",".join(["?"] * len(roles))
+                role_rows = conn.execute(f"""
+                    SELECT module_code,
+                           MAX(can_view) AS can_view, MAX(can_create) AS can_create, MAX(can_edit) AS can_edit,
+                           MAX(can_delete) AS can_delete, MAX(can_import) AS can_import, MAX(can_export) AS can_export,
+                           MAX(can_backup) AS can_backup, MAX(can_restore) AS can_restore, MAX(can_manage) AS can_manage
+                    FROM security_module_permissions
+                    WHERE role_code IN ({placeholders})
+                    GROUP BY module_code
+                """, tuple(roles)).fetchall()
+                for rr in role_rows:
+                    r = dict(rr)
+                    code = str(r.get("module_code") or "")
+                    row = {c: bool(int(r.get(c, 0) or 0)) for c in PERMISSION_COLUMNS}
+                    if row.get("can_manage"):
+                        row = {c: True for c in PERMISSION_COLUMNS}
+                    data[code] = row
+    except Exception:
+        data = {}
+    st.session_state[cache_key] = {"ts": now_ts, "data": data}
+    return data
+
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    if not st.session_state.get("auth_logged_in"):
+        return False
+    action = action if action in PERMISSION_COLUMNS else "can_view"
+    username = str(st.session_state.get("auth_username", "") or "")
+    roles = st.session_state.get("auth_roles", []) or []
+    module_no = _v167_module_no(module_code)
+    if module_no == "10":
+        return _v167_is_admin(username, roles)
+    if _v167_is_admin(username, roles):
+        return True
+    data = _v167_load_permission_cache(username, roles)
+    code = _v167_module_code_from_no(module_no)
+    row = data.get(code) or data.get(module_no) or {}
+    if module_no == "14" and not row:
+        return False
+    if row.get("can_manage"):
+        return True
+    return bool(row.get(action, False))
+
+
+def require_login(module_code: str = "") -> None:  # type: ignore[override]
+    _v167_ensure_login_schema()
+    if not st.session_state.get("auth_logged_in"):
+        render_login_form()
+        st.stop()
+    _check_idle_timeout()
+    render_user_bar(module_code)
+
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    require_login(module_code)
+    if not check_permission(module_code, action):
+        log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
+        if _v167_module_no(module_code) == "10":
+            st.error("權限不足：10. 權限管理只允許系統管理員（admin 角色）進入。")
+        else:
+            st.error("權限不足：你的帳號未被授權使用此模組或功能。")
+        st.stop()
+
+
+require_permission = require_module_access
+# =================== END V167 LOGIN PERFORMANCE FINAL OVERRIDE ===================

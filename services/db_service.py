@@ -1565,3 +1565,39 @@ def execute_transaction(
         pass
     return ids
 # ===== END V24 LIGHTWEIGHT SYSTEM LOG AUDIT FOR ALL DB WRITES =====
+
+
+# ===================== V167 NO-BLOCKING WRITE SYNC FINAL OVERRIDE =====================
+# 目的：50 人同時記錄時，任何一般寫入不得同步等待 GitHub / 大型 JSON 匯出。
+# 寫入後只清除快取與建立待備份標記；09 備份中心或明確環境變數才執行同步。
+try:
+    _v167_prev_after_write = _after_write
+except Exception:
+    _v167_prev_after_write = None
+
+
+def _auto_export_after_write_enabled() -> bool:  # type: ignore[override]
+    """Default OFF for runtime writes.
+
+    設為 SPT_SYNC_AFTER_WRITE=1 或 SPT_AUTO_EXPORT_AFTER_WRITE=1 才允許舊版同步路徑。
+    預設關閉可避免開始/結束工時卡在 GitHub API 或大型 JSON 匯出。
+    """
+    val = str(os.environ.get("SPT_SYNC_AFTER_WRITE", os.environ.get("SPT_AUTO_EXPORT_AFTER_WRITE", "0"))).strip().lower()
+    return val in {"1", "true", "yes", "on", "enable", "enabled"}
+
+
+def _after_write(sql: str | None = None) -> None:  # type: ignore[override]
+    clear_query_cache()
+    try:
+        mark_data_changed("資料已變更，已加入待備份佇列；正式備份請由 09/14 或排程執行。", sql)
+    except Exception:
+        pass
+    if not _auto_export_after_write_enabled():
+        return
+    # 明確打開同步時才沿用舊同步流程；仍保留舊函式相容。
+    try:
+        if callable(_v167_prev_after_write):
+            _v167_prev_after_write(sql)
+    except Exception:
+        pass
+# =================== END V167 NO-BLOCKING WRITE SYNC FINAL OVERRIDE ===================
