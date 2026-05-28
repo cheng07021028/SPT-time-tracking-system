@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "13_system_settings",
   "kind": "records",
-  "updated_at": "2026-05-27 19:41:13",
-  "exported_at": "2026-05-27 19:41:13",
-  "reason": "export_13_system_settings_page_apply_v85",
+  "updated_at": "2026-05-28 09:27:44",
+  "exported_at": "2026-05-28 09:27:44",
+  "reason": "save_process_options_v85",
   "empty_authoritative": false,
   "tables": {
     "process_categories": [
@@ -894,6 +894,16 @@
         "updated_at": "2026-05-27 19:37:08"
       },
       {
+        "id": 120,
+        "category_name": "6S",
+        "process_name": "6S",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-27 19:41:11",
+        "updated_at": "2026-05-27 19:41:11"
+      },
+      {
         "id": 104,
         "category_name": "Sorter/EFEM",
         "process_name": "骨架組立",
@@ -901,7 +911,7 @@
         "sort_order": 3,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 105,
@@ -911,7 +921,7 @@
         "sort_order": 4,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 106,
@@ -921,7 +931,7 @@
         "sort_order": 5,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 107,
@@ -931,7 +941,7 @@
         "sort_order": 6,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 108,
@@ -941,7 +951,7 @@
         "sort_order": 7,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 109,
@@ -951,7 +961,7 @@
         "sort_order": 8,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 110,
@@ -961,7 +971,7 @@
         "sort_order": 9,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 111,
@@ -971,7 +981,7 @@
         "sort_order": 10,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 112,
@@ -981,7 +991,7 @@
         "sort_order": 11,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 113,
@@ -991,7 +1001,7 @@
         "sort_order": 12,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 114,
@@ -1001,7 +1011,7 @@
         "sort_order": 13,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 115,
@@ -1011,7 +1021,7 @@
         "sort_order": 14,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 116,
@@ -1021,7 +1031,7 @@
         "sort_order": 15,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 117,
@@ -1031,17 +1041,17 @@
         "sort_order": 16,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
-        "id": 120,
-        "category_name": "6S",
-        "process_name": "6S",
+        "id": 121,
+        "category_name": "Sorter/EFEM",
+        "process_name": "模組",
         "is_active": 1,
-        "sort_order": 3,
+        "sort_order": 15,
         "note": "",
-        "created_at": "2026-05-27 19:41:11",
-        "updated_at": "2026-05-27 19:41:11"
+        "created_at": "2026-05-28 09:27:44",
+        "updated_at": "2026-05-28 09:27:44"
       }
     ],
     "process_options": [
@@ -1866,6 +1876,16 @@
         "updated_at": "2026-05-27 19:37:08"
       },
       {
+        "id": 120,
+        "category_name": "6S",
+        "process_name": "6S",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-27 19:41:11",
+        "updated_at": "2026-05-27 19:41:11"
+      },
+      {
         "id": 104,
         "category_name": "Sorter/EFEM",
         "process_name": "骨架組立",
@@ -1873,7 +1893,7 @@
         "sort_order": 3,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 105,
@@ -1883,7 +1903,7 @@
         "sort_order": 4,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 106,
@@ -1893,7 +1913,7 @@
         "sort_order": 5,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 107,
@@ -1903,7 +1923,7 @@
         "sort_order": 6,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 108,
@@ -1913,7 +1933,7 @@
         "sort_order": 7,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 109,
@@ -1923,7 +1943,7 @@
         "sort_order": 8,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 110,
@@ -1933,7 +1953,7 @@
         "sort_order": 9,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 111,
@@ -1943,7 +1963,7 @@
         "sort_order": 10,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 112,
@@ -1953,7 +1973,7 @@
         "sort_order": 11,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 113,
@@ -1963,7 +1983,7 @@
         "sort_order": 12,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 114,
@@ -1973,7 +1993,7 @@
         "sort_order": 13,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 115,
@@ -1983,7 +2003,7 @@
         "sort_order": 14,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 116,
@@ -1993,7 +2013,7 @@
         "sort_order": 15,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
         "id": 117,
@@ -2003,17 +2023,17 @@
         "sort_order": 16,
         "note": "",
         "created_at": "2026-05-27 19:01:49",
-        "updated_at": "2026-05-27 19:38:55"
+        "updated_at": "2026-05-28 09:27:44"
       },
       {
-        "id": 120,
-        "category_name": "6S",
-        "process_name": "6S",
+        "id": 121,
+        "category_name": "Sorter/EFEM",
+        "process_name": "模組",
         "is_active": 1,
-        "sort_order": 3,
+        "sort_order": 15,
         "note": "",
-        "created_at": "2026-05-27 19:41:11",
-        "updated_at": "2026-05-27 19:41:11"
+        "created_at": "2026-05-28 09:27:44",
+        "updated_at": "2026-05-28 09:27:44"
       }
     ],
     "rest_periods": [
@@ -2070,8 +2090,8 @@
   "settings": {},
   "table_counts": {
     "process_categories": 7,
-    "process_category_options": 97,
-    "process_options": 97,
+    "process_category_options": 98,
+    "process_options": 98,
     "rest_periods": 5,
     "app_settings": 1
   }
