@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 00:41:14",
+  "exported_at": "2026-05-29 00:47:16",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 98,
+  "business_row_count": 99,
   "table_counts": {
     "auth_account_permissions": 118,
     "auth_login_logs": 0,
@@ -20,10 +20,11 @@
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "table_ui_settings": 0,
     "time_record_delete_tombstones": 0,
-    "time_record_transaction_guard": 3,
-    "time_records": 98,
+    "time_record_events": 0,
+    "time_record_outbox": 0,
+    "time_record_transaction_guard": 4,
+    "time_records": 99,
     "work_orders": 0
   },
   "tables": {
@@ -2794,8 +2795,9 @@
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
-    "table_ui_settings": [],
     "time_record_delete_tombstones": [],
+    "time_record_events": [],
+    "time_record_outbox": [],
     "time_record_transaction_guard": [
       {
         "op_key": "b04f38627233e8c24869d424500d06faab7c6826",
@@ -2832,6 +2834,18 @@
         "result_count": 0,
         "hit_count": 0,
         "payload": "{\"record_id\": 324, \"end_action\": \"暫停\"}"
+      },
+      {
+        "op_key": "fd88c3f7379a7e838687c3356bad8c6f730ec8c4",
+        "op_type": "START_WORK",
+        "first_at": "2026-05-29 00:47:16",
+        "last_at": "2026-05-29 00:47:16",
+        "ttl_seconds": 10,
+        "status": "CLAIMED",
+        "result_id": null,
+        "result_count": 0,
+        "hit_count": 0,
+        "payload": "{\"employee\": {\"id\": 48, \"employee_id\": \"B002\", \"employee_name\": \"張文品\", \"department\": \"製造二課\", \"title\": \"派遣 _德興\", \"is_active\": true, \"is_in_factory\": true, \"is_today_attendance\": true, \"note\": \"\", \"created_at\": \"\", \"updated_at\": \"\"}, \"work_order\": {\"id\": \"180\", \"work_order\": \"21M0241-01\", \"part_no\": \"4TRSC020-004-02\", \"type_name\": \"NTB 3 PORT\", \"assembly_location\": \"竹東\", \"customer\": \"TSMC 12P8->TSMC 18\", \"note\": \"\", \"is_active\": true, \"created_at\": \"2026-05-26 23:24:58\", \"updated_at\": \"2026-05-26 23:24:58\"}, \"process_name\": \"前置鈑金\"}"
       }
     ],
     "time_records": [
@@ -5480,6 +5494,33 @@
         "source": "streamlit",
         "created_at": "2026-05-29 00:14:26",
         "updated_at": "2026-05-29 00:41:14"
+      },
+      {
+        "id": 325,
+        "record_key": "B002|21M0241-01|前置鈑金|2026-05-29 00:47:16|4cb3bbc8",
+        "status": "作業中",
+        "work_order": "21M0241-01",
+        "part_no": "4TRSC020-004-02",
+        "type_name": "NTB 3 PORT",
+        "process_name": "前置鈑金",
+        "employee_id": "B002",
+        "employee_name": "張文品",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 00:47:16",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "00:47:16",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B002|前置鈑金|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 00:47:16",
+        "updated_at": "2026-05-29 00:47:16"
       }
     ],
     "work_orders": []
