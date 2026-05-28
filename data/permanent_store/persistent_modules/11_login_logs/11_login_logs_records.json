@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 09:03:46",
+  "exported_at": "2026-05-28 09:08:25",
   "source": "db_service_write",
   "module_key": "11_login_logs",
   "module_code": "11",
@@ -533,11 +533,26 @@
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-27 22:20:37"
+      },
+      {
+        "id": 1618,
+        "username": "SPT243",
+        "display_name": "溫翠茹",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=SPT243; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-28 09:08:25",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 09:08:25"
       }
     ]
   },
   "table_counts": {
     "auth_login_logs": 0,
-    "login_logs": 35
+    "login_logs": 36
   }
 }
