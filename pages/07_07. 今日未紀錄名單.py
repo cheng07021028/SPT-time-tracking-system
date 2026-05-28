@@ -9,7 +9,7 @@ import streamlit as st
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access, check_permission
 from services.crud_table_service import load_employees, save_employees
-from services.time_record_service import load_records
+from services.time_record_service import load_records, today_records
 from services.table_ui_service import render_table
 
 st.set_page_config(page_title="07. 今日未紀錄名單", page_icon="⟁️", layout="wide")
@@ -176,58 +176,171 @@ def _date_text_series(df: pd.DataFrame) -> pd.Series:
     return pd.Series([""] * len(df), index=df.index, dtype=str)
 
 
+def _v148_clean_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    s = str(value).strip()
+    return "" if s.lower() in {"none", "nan", "nat", "null", "<na>"} else s
+
+
+def _v148_first_existing_series(df: pd.DataFrame, candidates: list[str]) -> pd.Series:
+    if df is None or df.empty:
+        return pd.Series(dtype=str)
+    for c in candidates:
+        if c in df.columns:
+            return df[c].map(_v148_clean_text)
+    return pd.Series([""] * len(df), index=df.index, dtype=str)
+
+
+def _v148_record_key_employee_series(df: pd.DataFrame) -> pd.Series:
+    rk = _v148_first_existing_series(df, ["record_key", "紀錄鍵 / Record Key", "Record Key"])
+    return rk.map(lambda x: str(x).split("|", 1)[0].strip() if "|" in str(x) else "")
+
+
+def _v148_record_employee_id_series(df: pd.DataFrame) -> pd.Series:
+    emp = _v148_first_existing_series(df, [
+        "employee_id", "工號 / Employee ID", "工號", "Employee ID", "員工編號", "人員工號"
+    ])
+    missing = emp.eq("")
+    if missing.any():
+        rk_emp = _v148_record_key_employee_series(df)
+        emp = emp.mask(missing, rk_emp)
+    return emp.map(lambda x: str(x).strip())
+
+
+def _v148_record_employee_name_series(df: pd.DataFrame) -> pd.Series:
+    return _v148_first_existing_series(df, [
+        "employee_name", "姓名 / Name", "姓名", "Name", "員工姓名", "人員姓名"
+    ]).map(lambda x: str(x).strip())
+
+
+def _v148_record_date_series(df: pd.DataFrame) -> pd.Series:
+    if df is None or df.empty:
+        return pd.Series(dtype=str)
+    for c in [
+        "start_date", "工作日期 / Work Date", "work_date", "開始日期 / Start Date", "開始日期",
+        "start_timestamp", "開始時間戳 / Start Timestamp", "開始時間 / Start Timestamp", "開始時間",
+    ]:
+        if c in df.columns:
+            try:
+                s = pd.to_datetime(df[c], errors="coerce").dt.strftime("%Y-%m-%d")
+                if s.notna().any():
+                    return s.fillna("").astype(str)
+            except Exception:
+                pass
+            return df[c].map(lambda v: _v148_clean_text(v).replace("/", "-")[:10])
+    return pd.Series([""] * len(df), index=df.index, dtype=str)
+
+
+def _v148_combine_record_sources(target_date: str) -> pd.DataFrame:
+    """Read-only 07 source: 02 history canonical + 01 today display source.
+
+    07 must not decide missing people from only one source. A person has recorded
+    time if either 02 history or 01 current/today records contains a row for the
+    employee on the selected date. This function does not write, delete, or recalc.
+    """
+    frames: list[pd.DataFrame] = []
+    try:
+        hist = load_records(start_date=target_date, end_date=target_date)
+        if isinstance(hist, pd.DataFrame) and not hist.empty:
+            frames.append(hist)
+    except Exception:
+        pass
+    try:
+        today_df = today_records(include_finished=True, unfinished_only=False)
+        if isinstance(today_df, pd.DataFrame) and not today_df.empty:
+            frames.append(today_df)
+    except Exception:
+        pass
+    if not frames:
+        return pd.DataFrame()
+    out = pd.concat(frames, ignore_index=True, sort=False)
+    # Dedupe without losing valid rows. record_key first, then id.
+    for key_col in ["record_key", "紀錄鍵 / Record Key"]:
+        if key_col in out.columns:
+            key = out[key_col].map(_v148_clean_text)
+            with_key = out.loc[key.ne("")].drop_duplicates(subset=[key_col], keep="last")
+            without_key = out.loc[key.eq("")]
+            out = pd.concat([with_key, without_key], ignore_index=True, sort=False)
+            break
+    for id_col in ["id", "ID / ID"]:
+        if id_col in out.columns:
+            try:
+                out["_v148_id"] = pd.to_numeric(out[id_col], errors="coerce")
+                has_id = out["_v148_id"].notna()
+                out = pd.concat([
+                    out.loc[has_id].drop_duplicates(subset=["_v148_id"], keep="last"),
+                    out.loc[~has_id],
+                ], ignore_index=True, sort=False).drop(columns=["_v148_id"], errors="ignore")
+            except Exception:
+                out = out.drop(columns=["_v148_id"], errors="ignore")
+            break
+    return out.reset_index(drop=True)
+
+
 def _build_missing_today_df(employee_df: pd.DataFrame, target_date: str) -> pd.DataFrame:
-    # V65：今日未紀錄名單改用 04 人員權威檔 + 02/01 工時權威檔即時計算。
-    # 不再查 SQLite employees 快取，避免 Reboot / GitHub 永久檔已更新但 SQLite 快取未同步，造成缺勤人數誤顯示 0。
+    """Build today's missing list with robust 01/02 record detection.
+
+    V148 root fix:
+    Previous logic only trusted load_records() and only the internal employee_id
+    column. If 01 had a current row, or 02 returned bilingual columns / record_key
+    based rows, the employee could still appear as missing. This version counts a
+    person as recorded when either 01 or 02 has any row for the same employee and
+    date, using employee_id, bilingual Employee ID, or record_key prefix.
+    """
     emp = ensure_cols(employee_df)
+    base_cols = ["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]
     if emp.empty:
-        return pd.DataFrame(columns=[
-            "employee_id", "employee_name", "department", "title",
-            "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count",
-        ])
+        return pd.DataFrame(columns=base_cols)
     for c in BOOL_INTERNAL_COLS:
         emp[c] = emp[c].map(_to_bool_value).fillna(False).astype(bool)
     emp = emp[(emp["is_active"]) & (emp["is_in_factory"]) & (emp["is_today_attendance"])].copy()
-    emp["employee_id"] = emp["employee_id"].fillna("").astype(str).str.strip()
+    emp["employee_id"] = emp["employee_id"].map(_v148_clean_text)
+    emp["employee_name"] = emp["employee_name"].map(_v148_clean_text)
     emp = emp[emp["employee_id"] != ""].copy()
     if emp.empty:
         out = emp.copy()
         out["last_start_time"] = ""
         out["today_record_count"] = 0
-        return out[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]]
+        return out[base_cols]
 
-    try:
-        rec = load_records(start_date=target_date, end_date=target_date)
-    except Exception:
-        rec = pd.DataFrame()
-    if rec is None or not isinstance(rec, pd.DataFrame) or rec.empty or "employee_id" not in rec.columns:
+    rec = _v148_combine_record_sources(target_date)
+    if rec is None or not isinstance(rec, pd.DataFrame) or rec.empty:
         emp["last_start_time"] = ""
         emp["today_record_count"] = 0
-        return emp[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
+        return emp[base_cols].sort_values("employee_id")
 
     rec = rec.copy()
-    rec["employee_id"] = rec["employee_id"].fillna("").astype(str).str.strip()
-    rec["__record_date"] = _date_text_series(rec)
-    rec = rec[(rec["employee_id"] != "") & (rec["__record_date"] == str(target_date))].copy()
+    rec["__emp_id"] = _v148_record_employee_id_series(rec)
+    rec["__emp_name"] = _v148_record_employee_name_series(rec)
+    rec["__record_date"] = _v148_record_date_series(rec)
+    rec["__start_time"] = _v148_first_existing_series(rec, [
+        "start_timestamp", "開始時間戳 / Start Timestamp", "開始時間 / Start Timestamp", "開始時間", "start_time", "開始時刻 / Start Time"
+    ])
+    rec = rec[(rec["__record_date"] == str(target_date)) & ((rec["__emp_id"] != "") | (rec["__emp_name"] != ""))].copy()
     if rec.empty:
         emp["last_start_time"] = ""
         emp["today_record_count"] = 0
-        return emp[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
+        return emp[base_cols].sort_values("employee_id")
 
-    if "start_timestamp" not in rec.columns:
-        if "start_time" in rec.columns:
-            rec["start_timestamp"] = rec["start_time"]
-        else:
-            rec["start_timestamp"] = ""
-    grp = rec.groupby("employee_id", dropna=False).agg(
-        last_start_time=("start_timestamp", "max"),
-        today_record_count=("employee_id", "size"),
+    rec["__emp_key"] = rec["__emp_id"].astype(str).str.strip().str.casefold()
+    emp["__emp_key"] = emp["employee_id"].astype(str).str.strip().str.casefold()
+
+    grp = rec[rec["__emp_key"] != ""].groupby("__emp_key", dropna=False).agg(
+        last_start_time=("__start_time", "max"),
+        today_record_count=("__emp_key", "size"),
     ).reset_index()
-    out = emp.merge(grp, on="employee_id", how="left")
+
+    out = emp.merge(grp, on="__emp_key", how="left")
     out["today_record_count"] = pd.to_numeric(out["today_record_count"], errors="coerce").fillna(0).astype(int)
     out["last_start_time"] = out["last_start_time"].fillna("").astype(str)
     out = out[out["today_record_count"] == 0].copy()
-    return out[["employee_id", "employee_name", "department", "title", "is_in_factory", "is_today_attendance", "last_start_time", "today_record_count"]].sort_values("employee_id")
+    return out[base_cols].sort_values("employee_id")
 
 
 if STATE_KEY not in st.session_state:

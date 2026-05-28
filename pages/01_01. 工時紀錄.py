@@ -49,6 +49,7 @@ from services.time_record_service import (
     get_active_group,
     get_active_record,
     get_conflicting_active_records,
+    load_records,
     get_active_same_work,
     refresh_active_records_for_employee,
     save_time_records,
@@ -58,6 +59,7 @@ from services.time_record_service import (
 from services.db_service import query_one
 from services.table_ui_service import render_table, render_width_settings
 from services.system_settings_service import get_process_options_by_category_exact, get_default_process_category, load_process_category_choices, get_live_page_reset_time
+from services.timezone_service import today_text
 
 st.set_page_config(page_title="01. 工時紀錄", page_icon="⏱", layout="wide")
 apply_theme()
@@ -513,6 +515,148 @@ def _v143_ui_identity_debug_text(row: dict | None) -> str:
     return "；".join(fields)
 # ===== END V143 ACTIVE WORK UI STRICT IDENTITY GUARD =====
 
+
+# ===== V148 TODAY FINISHED RECORDS READ-ONLY PANEL =====
+def _v148_blank(value) -> bool:
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    if value is None:
+        return True
+    return str(value).strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _v148_text(value) -> str:
+    return "" if _v148_blank(value) else str(value).strip()
+
+
+def _v148_date_text_from_row(row: dict) -> str:
+    for c in ["start_date", "工作日期 / Work Date", "work_date", "開始日期 / Start Date", "開始日期"]:
+        v = row.get(c)
+        if not _v148_blank(v):
+            try:
+                dt = pd.to_datetime(v, errors="coerce")
+                if not pd.isna(dt):
+                    return dt.strftime("%Y-%m-%d")
+            except Exception:
+                pass
+            s = str(v).strip().replace("/", "-")
+            if len(s) >= 10:
+                return s[:10]
+    for c in ["start_timestamp", "開始時間戳 / Start Timestamp", "開始時間 / Start Timestamp", "開始時間"]:
+        v = row.get(c)
+        if not _v148_blank(v):
+            try:
+                dt = pd.to_datetime(v, errors="coerce")
+                if not pd.isna(dt):
+                    return dt.strftime("%Y-%m-%d")
+            except Exception:
+                pass
+            s = str(v).strip().replace("/", "-")
+            if len(s) >= 10:
+                return s[:10]
+    return ""
+
+
+def _v148_is_finished_row(row: dict) -> bool:
+    status = _v148_text(row.get("status") or row.get("狀態 / Status") or row.get("狀態"))
+    end_ts = _v148_text(row.get("end_timestamp") or row.get("結束時間戳 / End Timestamp") or row.get("結束時間 / End Timestamp") or row.get("結束時間"))
+    end_date = _v148_text(row.get("end_date") or row.get("結束日期 / End Date") or row.get("結束日期"))
+    end_time = _v148_text(row.get("end_time") or row.get("結束時刻 / End Time") or row.get("結束時刻"))
+    ended_status = status in {"下班", "暫停", "完工", "已結束", "結束", "Off Duty", "Pause", "Complete", "Finished"}
+    if status == "作業中" and not end_ts and not end_date and not end_time:
+        return False
+    return bool(ended_status or end_ts or (end_date and end_time))
+
+
+def _v148_sort_finished_records(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    sort_col = None
+    for c in ["end_timestamp", "結束時間戳 / End Timestamp", "start_timestamp", "開始時間戳 / Start Timestamp", "id", "ID / ID"]:
+        if c in out.columns:
+            sort_col = c
+            break
+    if sort_col:
+        try:
+            if sort_col in {"id", "ID / ID"}:
+                out["_v148_sort"] = pd.to_numeric(out[sort_col], errors="coerce")
+            else:
+                out["_v148_sort"] = pd.to_datetime(out[sort_col], errors="coerce")
+            out = out.sort_values("_v148_sort", ascending=False, kind="stable").drop(columns=["_v148_sort"], errors="ignore")
+        except Exception:
+            pass
+    return out.reset_index(drop=True)
+
+
+def _v148_dedupe_records(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    for key_col in ["record_key", "紀錄鍵 / Record Key"]:
+        if key_col in out.columns:
+            key = out[key_col].fillna("").astype(str).str.strip()
+            with_key = out.loc[key.ne("")].drop_duplicates(subset=[key_col], keep="last")
+            without_key = out.loc[key.eq("")]
+            out = pd.concat([with_key, without_key], ignore_index=True)
+            break
+    for id_col in ["id", "ID / ID"]:
+        if id_col in out.columns:
+            try:
+                out["_v148_id_key"] = pd.to_numeric(out[id_col], errors="coerce")
+                has_id = out["_v148_id_key"].notna()
+                out = pd.concat([
+                    out.loc[has_id].drop_duplicates(subset=["_v148_id_key"], keep="last"),
+                    out.loc[~has_id],
+                ], ignore_index=True).drop(columns=["_v148_id_key"], errors="ignore")
+            except Exception:
+                out = out.drop(columns=["_v148_id_key"], errors="ignore")
+            break
+    return out.reset_index(drop=True)
+
+
+def _v148_load_today_finished_records_for_employee(employee_id: str, employee_name: str = "") -> pd.DataFrame:
+    """Read-only list for operators to verify today's completed records.
+
+    It never writes authority files, never recalculates, and never deletes. It only
+    combines 02 history plus the current 01 display source so a just-finished row
+    remains visible even when GitHub upload is running in the background.
+    """
+    target_date = today_text()
+    frames: list[pd.DataFrame] = []
+    try:
+        df_hist = load_records(start_date=target_date, end_date=target_date)
+        if isinstance(df_hist, pd.DataFrame) and not df_hist.empty:
+            frames.append(df_hist)
+    except Exception:
+        pass
+    try:
+        df_today = today_records(include_finished=True, unfinished_only=False)
+        if isinstance(df_today, pd.DataFrame) and not df_today.empty:
+            frames.append(df_today)
+    except Exception:
+        pass
+    if not frames:
+        return pd.DataFrame()
+    merged = _v148_dedupe_records(pd.concat(frames, ignore_index=True, sort=False))
+    keep: list[dict] = []
+    for _, row in merged.iterrows():
+        row_dict = row.to_dict()
+        if _v148_date_text_from_row(row_dict) != str(target_date):
+            continue
+        if not _v148_is_finished_row(row_dict):
+            continue
+        if not _v143_ui_row_matches_selected(row_dict, employee_id, employee_name):
+            continue
+        keep.append(row_dict)
+    if not keep:
+        return pd.DataFrame()
+    return _v148_sort_finished_records(pd.DataFrame(keep))
+# ===== END V148 TODAY FINISHED RECORDS READ-ONLY PANEL =====
+
 # V13: 01 opens from latest memory files/SQLite without doing heavy master restore inline.
 employees = load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
 work_orders = load_work_orders_for_time_record_fast(active_only=True)
@@ -688,6 +832,14 @@ with right:
                 n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=True)
                 trigger_post_record_continue_prompt(f"已同步下班 {n} 筆並平均計算工時。", title="工時已結束")
                 st.rerun()
+
+    st.markdown("#### 今日已結束紀錄 / Today Finished Records")
+    finished_today_df = _v148_load_today_finished_records_for_employee(emp_id2, _emp2_name)
+    if finished_today_df.empty:
+        st.info("此人員今天尚無已結束紀錄。")
+    else:
+        st.caption("只顯示目前選擇人員今日已下班、暫停或完工的紀錄；此區為唯讀查閱，不會寫入、覆蓋或刪除資料。")
+        render_table(finished_today_df, "today_finished_records_for_selected_employee_v148", editable=False, height=260)
 
 st.divider()
 st.subheader("今日工時紀錄 / Today Records")
