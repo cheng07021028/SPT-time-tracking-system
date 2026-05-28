@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-28 09:39:08",
-  "exported_at": "2026-05-28 09:39:08",
-  "reason": "start_work_v139_final_state_reconcile_02",
+  "updated_at": "2026-05-28 09:41:06",
+  "exported_at": "2026-05-28 09:41:06",
+  "reason": "get_active_record_v143_all_identity_columns_strict_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1141,11 +1141,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 09:39:02",
         "updated_at": "2026-05-28 09:39:02"
+      },
+      {
+        "id": 240,
+        "record_key": "B237|26N4001-06|模組|2026-05-28 09:40:40|72b46e68",
+        "status": "作業中",
+        "work_order": "26N4001-06",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "模組",
+        "employee_id": "B237",
+        "employee_name": "彭紹恩",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 09:40:40",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "09:40:40",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B237|模組|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 09:40:40",
+        "updated_at": "2026-05-28 09:40:40"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 42
+    "time_records": 43
   }
 }
