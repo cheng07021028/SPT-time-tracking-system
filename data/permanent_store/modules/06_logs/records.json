@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 01:12:58",
-  "exported_at": "2026-05-29 01:12:58",
+  "updated_at": "2026-05-29 01:13:47",
+  "exported_at": "2026-05-29 01:13:47",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -403,11 +403,35 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 170,
+        "log_time": "2026-05-29 01:13:43",
+        "user_name": "SSS",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "329",
+        "message": "結束工時紀錄 #329，同步結束=1筆，狀態=下班，群組總工時=00:00:49，平均工時=00:00:36",
+        "detail": "329\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 01:13:43\",\"action_type\":\"END_WORK\",\"target_table\":\"time_records\",\"target_id\":\"329\",\"target_ids\":[329],\"message\":\"結束工時紀錄 #329，同步結束=1筆，狀態=下班，群組總工時=00:00:49，平均工時=00:00:36\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SSS|21M0241-04|前置鈑金|2026-05-29 01:12:54|f6c70b50\",\"identity_key\":\"record_key:SSS|21M0241-04|前置鈑金|2026-05-29 01:12:54|f6c70b50\",\"id\":\"329\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"work_order\":\"21M0241-04\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 01:12:54\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":329,\"record_key\":\"SSS|21M0241-04|前置鈑金|2026-05-29 01:12:54|f6c70b50\",\"status\":\"作業中\",\"work_order\":\"21M0241-04\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 01:12:54\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"01:12:54\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SSS|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 01:12:54\",\"updated_at\":\"2026-05-29 01:12:54\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":329,\"record_key\":\"SSS|21M0241-04|前置鈑金|2026-05-29 01:12:54|f6c70b50\",\"status\":\"下班\",\"work_order\":\"21M0241-04\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 01:12:54\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-29 01:13:43\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"01:12:54\",\"end_date\":\"2026-05-29\",\"end_time\":\"01:13:43\",\"work_hours\":0.01,\"assembly_location\":\"竹東\",\"group_key\":\"SSS|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 01:12:54\",\"updated_at\":\"2026-05-29 01:13:43\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":329,\"record_key\":\"SSS|21M0241-04|前置鈑金|2026-05-29 01:12:54|f6c70b50\",\"status\":\"作業中\",\"work_order\":\"21M0241-04\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 01:12:54\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"01:12:54\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SSS|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 01:12:54\",\"updated_at\":\"2026-05-29 01:12:54\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":329,\"record_key\":\"SSS|21M0241-04|前置鈑金|2026-05-29 01:12:54|f6c70b50\",\"status\":\"作業中\",\"work_order\":\"21M0241-04\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 01:12:54\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"01:12:54\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SSS|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 01:12:54\",\"updated_at\":\"2026-05-29 01:12:54\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"66746a4af20bee5a827f019a7ab24f29be50f8b7f186cf0864fd5b14a8b4f6eb\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 169,
+        "log_time": "2026-05-29 01:13:43",
+        "user_name": "SSS",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 33
+    "system_logs": 35
   }
 }
