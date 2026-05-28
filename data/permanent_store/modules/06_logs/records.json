@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 20:58:20",
-  "exported_at": "2026-05-28 20:58:20",
+  "updated_at": "2026-05-28 20:58:34",
+  "exported_at": "2026-05-28 20:58:34",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -28015,11 +28015,107 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 652,
+        "log_time": "2026-05-28 20:58:33",
+        "user_name": "SPT240",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_finish_active_visible_v141: 已由 01/02 權威檔回填 SQLite cache 3 筆",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 651,
+        "log_time": "2026-05-28 20:58:33",
+        "user_name": "SPT240",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 648,
+        "log_time": "2026-05-28 20:58:32",
+        "user_name": "SPT240",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 3 筆",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 647,
+        "log_time": "2026-05-28 20:58:32",
+        "user_name": "SPT240",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 644,
+        "log_time": "2026-05-28 20:58:30",
+        "user_name": "SPT241",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "316",
+        "message": "V137 結束工時紀錄 #316；同步結束=1筆；狀態=下班；群組總工時=01:40:44；平均工時=01:40:48",
+        "detail": "316\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-28 20:58:30\",\"action_type\":\"END_WORK\",\"target_table\":\"time_records\",\"target_id\":\"316\",\"target_ids\":[316],\"message\":\"V137 結束工時紀錄 #316；同步結束=1筆；狀態=下班；群組總工時=01:40:44；平均工時=01:40:48\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT241|26M0021-03|骨架組立|2026-05-28 19:02:46|a14ec194\",\"identity_key\":\"record_key:SPT241|26M0021-03|骨架組立|2026-05-28 19:02:46|a14ec194\",\"id\":\"316\",\"employee_id\":\"SPT241\",\"employee_name\":\"達文\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"骨架組立\",\"status\":\"下班\",\"start_timestamp\":\"2026-05-28 19:02:46\",\"end_timestamp\":\"2026-05-28 20:58:30\",\"work_hours\":\"1.68\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":316,\"record_key\":\"SPT241|26M0021-03|骨架組立|2026-05-28 19:02:46|a14ec194\",\"status\":\"下班\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT241\",\"employee_name\":\"達文\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 19:02:46\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 20:58:30\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"19:02:46\",\"end_date\":\"2026-05-28\",\"end_time\":\"20:58:30\",\"work_hours\":1.68,\"assembly_location\":\"竹東\",\"group_key\":\"SPT241|骨架組立|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 19:02:46\",\"updated_at\":\"2026-05-28 20:58:30\",\"department\":\"\",\"title\":\"\",\"department_emp\":\"\",\"title_emp\":\"\",\"recovery_status\":\"\",\"recovery_note\":\"\",\"is_deleted\":\"\",\"deleted_at\":\"\",\"work_hours_hms\":\"\",\"recovery_closed_at\":\"\",\"recovery_closed_source\":\"\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":316,\"record_key\":\"SPT241|26M0021-03|骨架組立|2026-05-28 19:02:46|a14ec194\",\"status\":\"下班\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT241\",\"employee_name\":\"達文\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 19:02:46\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 20:58:30\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"19:02:46\",\"end_date\":\"2026-05-28\",\"end_time\":\"20:58:30\",\"work_hours\":1.68,\"assembly_location\":\"竹東\",\"group_key\":\"SPT241|骨架組立|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 19:02:46\",\"updated_at\":\"2026-05-28 20:58:30\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":316,\"record_key\":\"SPT241|26M0021-03|骨架組立|2026-05-28 19:02:46|a14ec194\",\"status\":\"下班\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT241\",\"employee_name\":\"達文\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 19:02:46\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 20:58:30\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"19:02:46\",\"end_date\":\"2026-05-28\",\"end_time\":\"20:58:30\",\"work_hours\":1.68,\"assembly_location\":\"竹東\",\"group_key\":\"SPT241|骨架組立|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 19:02:46\",\"updated_at\":\"2026-05-28 20:58:30\",\"department\":\"\",\"title\":\"\",\"department_emp\":\"\",\"title_emp\":\"\",\"recovery_status\":\"\",\"recovery_note\":\"\",\"is_deleted\":\"\",\"deleted_at\":\"\",\"work_hours_hms\":\"\",\"recovery_closed_at\":\"\",\"recovery_closed_source\":\"\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":316,\"record_key\":\"SPT241|26M0021-03|骨架組立|2026-05-28 19:02:46|a14ec194\",\"status\":\"下班\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT241\",\"employee_name\":\"達文\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 19:02:46\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 20:58:30\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"19:02:46\",\"end_date\":\"2026-05-28\",\"end_time\":\"20:58:30\",\"work_hours\":1.68,\"assembly_location\":\"竹東\",\"group_key\":\"SPT241|骨架組立|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 19:02:46\",\"updated_at\":\"2026-05-28 20:58:30\",\"department\":\"\",\"title\":\"\",\"department_emp\":\"\",\"title_emp\":\"\",\"recovery_status\":\"\",\"recovery_note\":\"\",\"is_deleted\":\"\",\"deleted_at\":\"\",\"work_hours_hms\":\"\",\"recovery_closed_at\":\"\",\"recovery_closed_source\":\"\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"83f25fd7e59466f14c44fe8b13b8d8ddf5e0b3bff16aff7705d84b6b13c26952\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 643,
+        "log_time": "2026-05-28 20:58:30",
+        "user_name": "SPT241",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 642,
+        "log_time": "2026-05-28 20:58:29",
+        "user_name": "SPT241",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 3 筆",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 641,
+        "log_time": "2026-05-28 20:58:29",
+        "user_name": "SPT241",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2334
+    "system_logs": 2342
   }
 }
