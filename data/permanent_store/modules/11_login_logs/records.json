@@ -2,12 +2,60 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 22:01:14",
-  "exported_at": "2026-05-28 22:01:14",
+  "updated_at": "2026-05-28 22:01:36",
+  "exported_at": "2026-05-28 22:01:36",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 25310,
+        "source": "v103_merge",
+        "username": "SPT242",
+        "display_name": "保羅",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=SPT242; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-28 22:01:35",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 22:01:35"
+      },
+      {
+        "id": 24640,
+        "source": "v103_merge",
+        "username": "SPT242",
+        "display_name": "保羅",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=SPT242; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-28 22:01:25",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 22:01:25"
+      },
+      {
+        "id": 23971,
+        "source": "v103_merge",
+        "username": "SPT242",
+        "display_name": "保羅",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=SPT242; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-28 22:01:23",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-28 22:01:23"
+      },
       {
         "id": 23303,
         "source": "v103_merge",
@@ -10686,7 +10734,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 667,
+    "login_logs": 670,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
