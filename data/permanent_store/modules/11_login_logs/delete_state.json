@@ -1,7 +1,7 @@
 {
   "authority_schema": "SPT-LoginLogsDeleteState-V135",
   "module_key": "11_login_logs",
-  "updated_at": "2026-05-28 22:15:19",
+  "updated_at": "2026-05-28 23:39:57",
   "delete_ranges": [
     {
       "start_date": "2026-04-23",
@@ -65,6 +65,13 @@
       "end_date": "2026-05-28",
       "deleted_at": "2026-05-28 22:15:19",
       "deleted_count": 677,
+      "mode": "date_range_before_deleted_at_v135"
+    },
+    {
+      "start_date": "2026-04-28",
+      "end_date": "2026-05-28",
+      "deleted_at": "2026-05-28 23:39:57",
+      "deleted_count": 19,
       "mode": "date_range_before_deleted_at_v135"
     }
   ],
@@ -1896,6 +1903,8 @@
     "SPT250|LOGIN|SUCCESS|2026-05-28 08:53:23|LOGIN|role=operator;source=authority; employee_id=SPT250",
     "SPT250|LOGIN|SUCCESS|2026-05-28 10:19:32|LOGIN|role=operator;source=authority; employee_id=SPT250",
     "SPT250|LOGIN|SUCCESS|2026-05-28 15:18:25|LOGIN|role=operator;source=authority; employee_id=SPT250",
+    "SPT250|LOGIN|SUCCESS|2026-05-28 22:32:24|LOGIN|role=operator;source=authority; employee_id=SPT250",
+    "SPT250|LOGIN|SUCCESS|2026-05-28 22:38:19|LOGIN|role=operator;source=authority; employee_id=SPT250",
     "SPT250|LOGOUT|SUCCESS|2026-05-27 18:43:18||使用者手動登出; employee_id=SPT250; roles=operator",
     "SPT250|LOGOUT|SUCCESS|2026-05-28 08:56:20||使用者手動登出; employee_id=SPT250; roles=operator",
     "SPT250|PERMISSION_DENIED|FAIL|2026-05-27 15:16:12|10_permissions|10_permissions:can_manage; employee_id=SPT250; roles=operator",
@@ -1982,6 +1991,8 @@
     "admin|AUTO_LOGOUT|SUCCESS|2026-05-28 18:51:53||閒置自動登出; roles=admin",
     "admin|AUTO_LOGOUT|SUCCESS|2026-05-28 22:00:55||閒置超過 3 分鐘，自動登出; roles=admin",
     "admin|AUTO_LOGOUT|SUCCESS|2026-05-28 22:00:59||閒置自動登出; roles=admin",
+    "admin|AUTO_LOGOUT|SUCCESS|2026-05-28 22:59:18||閒置超過 3 分鐘，自動登出; roles=admin",
+    "admin|AUTO_LOGOUT|SUCCESS|2026-05-28 22:59:20||閒置自動登出; roles=admin",
     "admin|LOGIN|FAIL|2026-05-15 10:47:49||密碼錯誤",
     "admin|LOGIN|SUCCESS|2026-05-15 03:46:55||roles=admin",
     "admin|LOGIN|SUCCESS|2026-05-15 03:51:27||roles=admin",
@@ -2143,6 +2154,21 @@
     "admin|LOGIN|SUCCESS|2026-05-28 22:07:09|LOGIN|role=admin;source=authority",
     "admin|LOGIN|SUCCESS|2026-05-28 22:11:09||role=admin;source=authority",
     "admin|LOGIN|SUCCESS|2026-05-28 22:11:10|LOGIN|role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 22:26:03|LOGIN|role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 22:31:08|LOGIN|role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 22:31:08||role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 22:38:14|LOGIN|role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 22:48:37|LOGIN|role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 22:53:09|LOGIN|role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 22:53:09||role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 23:00:46|LOGIN|role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 23:11:28|LOGIN|role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 23:16:18|LOGIN|role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 23:16:18||role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 23:33:21|LOGIN|role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 23:33:21||role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 23:39:01|LOGIN|role=admin;source=authority",
+    "admin|LOGIN|SUCCESS|2026-05-28 23:39:01||role=admin;source=authority",
     "admin|LOGOUT|SUCCESS|2026-05-15 07:33:36||使用者手動登出",
     "admin|LOGOUT|SUCCESS|2026-05-15 10:48:59||使用者手動登出",
     "admin|LOGOUT|SUCCESS|2026-05-15 10:50:29||使用者手動登出",
@@ -2215,217 +2241,140 @@
     "spt243|LOGIN|FAIL|2026-05-27 09:38:37|LOGIN|密碼錯誤; employee_id=SPT243; roles=operator",
     "sss|LOGIN|FAIL|2026-05-28 14:41:25|LOGIN|密碼錯誤; employee_id=SSS; roles=operator"
   ],
-  "last_deleted_count": 677,
+  "last_deleted_count": 19,
   "last_deleted_rows_preview": [
     {
       "username": "admin",
       "event_type": "LOGIN",
       "result": "SUCCESS",
-      "login_time": "2026-05-28 22:11:10",
-      "key": "admin|LOGIN|SUCCESS|2026-05-28 22:11:10|LOGIN|role=admin;source=authority"
+      "login_time": "2026-05-28 23:39:01",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 23:39:01|LOGIN|role=admin;source=authority"
     },
     {
       "username": "admin",
       "event_type": "LOGIN",
       "result": "SUCCESS",
-      "login_time": "2026-05-28 22:11:09",
-      "key": "admin|LOGIN|SUCCESS|2026-05-28 22:11:09||role=admin;source=authority"
+      "login_time": "2026-05-28 23:39:01",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 23:39:01||role=admin;source=authority"
     },
     {
       "username": "admin",
       "event_type": "LOGIN",
       "result": "SUCCESS",
-      "login_time": "2026-05-28 22:07:09",
-      "key": "admin|LOGIN|SUCCESS|2026-05-28 22:07:09|LOGIN|role=admin;source=authority"
-    },
-    {
-      "username": "SPT243",
-      "event_type": "LOGIN",
-      "result": "SUCCESS",
-      "login_time": "2026-05-28 22:03:31",
-      "key": "SPT243|LOGIN|SUCCESS|2026-05-28 22:03:31|LOGIN|role=operator;source=authority; employee_id=SPT243"
-    },
-    {
-      "username": "SPT242",
-      "event_type": "LOGIN",
-      "result": "SUCCESS",
-      "login_time": "2026-05-28 22:02:18",
-      "key": "SPT242|LOGIN|SUCCESS|2026-05-28 22:02:18|LOGIN|role=operator;source=authority; employee_id=SPT242"
-    },
-    {
-      "username": "SPT242",
-      "event_type": "LOGIN",
-      "result": "FAIL",
-      "login_time": "2026-05-28 22:01:58",
-      "key": "SPT242|LOGIN|FAIL|2026-05-28 22:01:58|LOGIN|密碼錯誤; employee_id=SPT242; roles=operator"
-    },
-    {
-      "username": "SPT242",
-      "event_type": "LOGIN",
-      "result": "FAIL",
-      "login_time": "2026-05-28 22:01:48",
-      "key": "SPT242|LOGIN|FAIL|2026-05-28 22:01:48|LOGIN|密碼錯誤; employee_id=SPT242; roles=operator"
-    },
-    {
-      "username": "SPT242",
-      "event_type": "LOGIN",
-      "result": "FAIL",
-      "login_time": "2026-05-28 22:01:35",
-      "key": "SPT242|LOGIN|FAIL|2026-05-28 22:01:35|LOGIN|密碼錯誤; employee_id=SPT242; roles=operator"
-    },
-    {
-      "username": "SPT242",
-      "event_type": "LOGIN",
-      "result": "FAIL",
-      "login_time": "2026-05-28 22:01:25",
-      "key": "SPT242|LOGIN|FAIL|2026-05-28 22:01:25|LOGIN|密碼錯誤; employee_id=SPT242; roles=operator"
-    },
-    {
-      "username": "SPT242",
-      "event_type": "LOGIN",
-      "result": "FAIL",
-      "login_time": "2026-05-28 22:01:23",
-      "key": "SPT242|LOGIN|FAIL|2026-05-28 22:01:23|LOGIN|密碼錯誤; employee_id=SPT242; roles=operator"
+      "login_time": "2026-05-28 23:33:21",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 23:33:21|LOGIN|role=admin;source=authority"
     },
     {
       "username": "admin",
       "event_type": "LOGIN",
       "result": "SUCCESS",
-      "login_time": "2026-05-28 22:01:13",
-      "key": "admin|LOGIN|SUCCESS|2026-05-28 22:01:13|LOGIN|role=admin;source=authority"
+      "login_time": "2026-05-28 23:33:21",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 23:33:21||role=admin;source=authority"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-28 23:16:18",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 23:16:18|LOGIN|role=admin;source=authority"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-28 23:16:18",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 23:16:18||role=admin;source=authority"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-28 23:11:28",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 23:11:28|LOGIN|role=admin;source=authority"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-28 23:00:46",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 23:00:46|LOGIN|role=admin;source=authority"
     },
     {
       "username": "admin",
       "event_type": "AUTO_LOGOUT",
       "result": "SUCCESS",
-      "login_time": "2026-05-28 22:00:59",
-      "key": "admin|AUTO_LOGOUT|SUCCESS|2026-05-28 22:00:59||閒置自動登出; roles=admin"
+      "login_time": "2026-05-28 22:59:20",
+      "key": "admin|AUTO_LOGOUT|SUCCESS|2026-05-28 22:59:20||閒置自動登出; roles=admin"
     },
     {
       "username": "admin",
       "event_type": "AUTO_LOGOUT",
       "result": "SUCCESS",
-      "login_time": "2026-05-28 22:00:55",
-      "key": "admin|AUTO_LOGOUT|SUCCESS|2026-05-28 22:00:55||閒置超過 3 分鐘，自動登出; roles=admin"
-    },
-    {
-      "username": "SPT077",
-      "event_type": "LOGOUT",
-      "result": "SUCCESS",
-      "login_time": "2026-05-28 22:00:28",
-      "key": "SPT077|LOGOUT|SUCCESS|2026-05-28 22:00:28||使用者手動登出; employee_id=SPT077; roles=operator"
-    },
-    {
-      "username": "SPT077",
-      "event_type": "LOGOUT",
-      "result": "SUCCESS",
-      "login_time": "2026-05-28 22:00:22",
-      "key": "SPT077|LOGOUT|SUCCESS|2026-05-28 22:00:22||使用者手動登出; employee_id=SPT077; roles=operator"
-    },
-    {
-      "username": "SPT077",
-      "event_type": "LOGIN",
-      "result": "SUCCESS",
-      "login_time": "2026-05-28 21:56:55",
-      "key": "SPT077|LOGIN|SUCCESS|2026-05-28 21:56:55|LOGIN|role=operator;source=authority; employee_id=SPT077"
-    },
-    {
-      "username": "SPT243",
-      "event_type": "POST_RECORD_LOGOUT",
-      "result": "SUCCESS",
-      "login_time": "2026-05-28 21:56:26",
-      "key": "SPT243|POST_RECORD_LOGOUT|SUCCESS|2026-05-28 21:56:26||完成工時後選擇不繼續記錄，自動登出; employee_id=SPT243; roles=operator"
+      "login_time": "2026-05-28 22:59:18",
+      "key": "admin|AUTO_LOGOUT|SUCCESS|2026-05-28 22:59:18||閒置超過 3 分鐘，自動登出; roles=admin"
     },
     {
       "username": "admin",
       "event_type": "LOGIN",
       "result": "SUCCESS",
-      "login_time": "2026-05-28 21:54:36",
-      "key": "admin|LOGIN|SUCCESS|2026-05-28 21:54:36|LOGIN|role=admin;source=authority"
-    },
-    {
-      "username": "SPT243",
-      "event_type": "LOGIN",
-      "result": "SUCCESS",
-      "login_time": "2026-05-28 21:54:26",
-      "key": "SPT243|LOGIN|SUCCESS|2026-05-28 21:54:26|LOGIN|role=operator;source=authority; employee_id=SPT243"
-    },
-    {
-      "username": "SPT145",
-      "event_type": "AUTO_LOGOUT",
-      "result": "SUCCESS",
-      "login_time": "2026-05-28 21:51:43",
-      "key": "SPT145|AUTO_LOGOUT|SUCCESS|2026-05-28 21:51:43||閒置自動登出; employee_id=SPT145; roles=operator"
-    },
-    {
-      "username": "SPT145",
-      "event_type": "AUTO_LOGOUT",
-      "result": "SUCCESS",
-      "login_time": "2026-05-28 21:51:40",
-      "key": "SPT145|AUTO_LOGOUT|SUCCESS|2026-05-28 21:51:40||閒置超過 3 分鐘，自動登出; employee_id=SPT145; roles=operator"
+      "login_time": "2026-05-28 22:53:09",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 22:53:09|LOGIN|role=admin;source=authority"
     },
     {
       "username": "admin",
       "event_type": "LOGIN",
       "result": "SUCCESS",
-      "login_time": "2026-05-28 21:47:11",
-      "key": "admin|LOGIN|SUCCESS|2026-05-28 21:47:11|LOGIN|role=admin;source=authority"
+      "login_time": "2026-05-28 22:53:09",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 22:53:09||role=admin;source=authority"
     },
     {
-      "username": "SPT145",
+      "username": "admin",
       "event_type": "LOGIN",
       "result": "SUCCESS",
-      "login_time": "2026-05-28 21:46:40",
-      "key": "SPT145|LOGIN|SUCCESS|2026-05-28 21:46:40|LOGIN|role=operator;source=authority; employee_id=SPT145"
+      "login_time": "2026-05-28 22:48:37",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 22:48:37|LOGIN|role=admin;source=authority"
     },
     {
-      "username": "spt145",
-      "event_type": "LOGIN",
-      "result": "FAIL",
-      "login_time": "2026-05-28 21:46:37",
-      "key": "spt145|LOGIN|FAIL|2026-05-28 21:46:37|LOGIN|密碼錯誤; employee_id=SPT145; roles=operator"
-    },
-    {
-      "username": "B211",
-      "event_type": "POST_RECORD_LOGOUT",
-      "result": "SUCCESS",
-      "login_time": "2026-05-28 21:01:52",
-      "key": "B211|POST_RECORD_LOGOUT|SUCCESS|2026-05-28 21:01:52||完成工時後選擇不繼續記錄，自動登出; employee_id=B211; roles=operator"
-    },
-    {
-      "username": "SPT240",
-      "event_type": "LOGOUT",
-      "result": "SUCCESS",
-      "login_time": "2026-05-28 21:00:25",
-      "key": "SPT240|LOGOUT|SUCCESS|2026-05-28 21:00:25||使用者手動登出; employee_id=SPT240; roles=operator"
-    },
-    {
-      "username": "B211",
+      "username": "SPT250",
       "event_type": "LOGIN",
       "result": "SUCCESS",
-      "login_time": "2026-05-28 21:00:21",
-      "key": "B211|LOGIN|SUCCESS|2026-05-28 21:00:21|LOGIN|role=operator;source=authority; employee_id=B211"
+      "login_time": "2026-05-28 22:38:19",
+      "key": "SPT250|LOGIN|SUCCESS|2026-05-28 22:38:19|LOGIN|role=operator;source=authority; employee_id=SPT250"
     },
     {
-      "username": "SPT256",
-      "event_type": "LOGOUT",
-      "result": "SUCCESS",
-      "login_time": "2026-05-28 20:59:48",
-      "key": "SPT256|LOGOUT|SUCCESS|2026-05-28 20:59:48||使用者手動登出; employee_id=SPT256; roles=operator"
-    },
-    {
-      "username": "SPT256",
+      "username": "admin",
       "event_type": "LOGIN",
       "result": "SUCCESS",
-      "login_time": "2026-05-28 20:59:09",
-      "key": "SPT256|LOGIN|SUCCESS|2026-05-28 20:59:09|LOGIN|role=operator;source=authority; employee_id=SPT256"
+      "login_time": "2026-05-28 22:38:14",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 22:38:14|LOGIN|role=admin;source=authority"
     },
     {
-      "username": "SPT245",
-      "event_type": "LOGOUT",
+      "username": "SPT250",
+      "event_type": "LOGIN",
       "result": "SUCCESS",
-      "login_time": "2026-05-28 20:58:55",
-      "key": "SPT245|LOGOUT|SUCCESS|2026-05-28 20:58:55||使用者手動登出; employee_id=SPT245; roles=operator"
+      "login_time": "2026-05-28 22:32:24",
+      "key": "SPT250|LOGIN|SUCCESS|2026-05-28 22:32:24|LOGIN|role=operator;source=authority; employee_id=SPT250"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-28 22:31:08",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 22:31:08|LOGIN|role=admin;source=authority"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-28 22:31:08",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 22:31:08||role=admin;source=authority"
+    },
+    {
+      "username": "admin",
+      "event_type": "LOGIN",
+      "result": "SUCCESS",
+      "login_time": "2026-05-28 22:26:03",
+      "key": "admin|LOGIN|SUCCESS|2026-05-28 22:26:03|LOGIN|role=admin;source=authority"
     }
   ]
 }
