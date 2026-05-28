@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 13:38:49",
+  "exported_at": "2026-05-28 13:42:24",
   "source": "db_service_write",
   "module_key": "01_time_records",
   "module_code": "01",
@@ -184,7 +184,7 @@
         "start_timestamp": "2026-05-28 08:31:35",
         "end_action": "暫停",
         "end_timestamp": "2026-05-28 11:00:04",
-        "remark": "",
+        "remark": null,
         "start_date": "2026-05-28",
         "start_time": "08:31:35",
         "end_date": "2026-05-28",
@@ -1357,10 +1357,37 @@
         "source": "streamlit",
         "created_at": "2026-05-28 13:33:54",
         "updated_at": "2026-05-28 13:33:54"
+      },
+      {
+        "id": 285,
+        "record_key": "SPT160|25M0785-02|模組|2026-05-28 13:39:25|8819ebd7",
+        "status": "作業中",
+        "work_order": "25M0785-02",
+        "part_no": "PSRSC131-N01-04",
+        "type_name": "PSRSC131-N01",
+        "process_name": "模組",
+        "employee_id": "SPT160",
+        "employee_name": "邱信維",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 13:39:25",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "13:39:25",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT160|模組|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 13:39:25",
+        "updated_at": "2026-05-28 13:39:25"
       }
     ]
   },
   "table_counts": {
-    "time_records": 50
+    "time_records": 51
   }
 }
