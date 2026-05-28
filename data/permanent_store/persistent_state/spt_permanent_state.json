@@ -1,18 +1,15 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 09:46:55",
+  "exported_at": "2026-05-28 09:47:19",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 35,
   "table_counts": {
-    "app_settings": 0,
     "auth_account_permissions": 143,
     "auth_login_logs": 0,
     "auth_security_settings": 2,
     "auth_users": 12,
     "employees": 0,
-    "process_categories": 0,
-    "process_category_options": 0,
     "process_options": 44,
     "rest_periods": 10,
     "system_logs": 820,
@@ -23,7 +20,6 @@
     "work_orders": 0
   },
   "tables": {
-    "app_settings": [],
     "auth_account_permissions": [
       {
         "id": 1,
@@ -2667,8 +2663,6 @@
       }
     ],
     "employees": [],
-    "process_categories": [],
-    "process_category_options": [],
     "process_options": [
       {
         "id": 603,
