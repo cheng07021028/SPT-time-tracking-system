@@ -9058,3 +9058,422 @@ def audit_time_record_integrity_v151() -> dict:
         return {"error": str(exc)[:500]}
 
 # =================== END V151 TIME RECORD DURABLE ROW SHARD + NON-DESTRUCTIVE MERGE ===================
+
+# ===================== V152 APPEND-ONLY EVENT JOURNAL + TRANSACTION SAFETY LAYER =====================
+# 目的：把工時紀錄提升成「交易型紀錄」：每次開始、暫停、完工、下班、手動修改、刪除、重算，
+# 都另外寫入不可覆蓋的 append-only event journal。records.json / row shard / SQLite 都可以用來顯示，
+# 但 event journal 是防止多人同時寫入時資料被整包覆蓋的重建依據。
+
+try:
+    from services.time_record_event_journal_service import (
+        append_time_record_event as _v152_append_event,
+        rebuild_latest_rows_from_events as _v152_rebuild_rows_from_events,
+        audit_time_record_event_journal as _v152_audit_event_journal,
+        flush_time_record_event_journal_now as _v152_flush_event_journal_now,
+        ensure_time_record_event_schema as _v152_ensure_event_schema,
+    )
+except Exception:  # pragma: no cover
+    _v152_append_event = None  # type: ignore
+    _v152_rebuild_rows_from_events = None  # type: ignore
+    _v152_audit_event_journal = None  # type: ignore
+    _v152_flush_event_journal_now = None  # type: ignore
+    _v152_ensure_event_schema = None  # type: ignore
+
+try:
+    _v152_prev_start_work = start_work
+except Exception:
+    _v152_prev_start_work = None
+try:
+    _v152_prev_finish_work = finish_work
+except Exception:
+    _v152_prev_finish_work = None
+try:
+    _v152_prev_save_time_records = save_time_records
+except Exception:
+    _v152_prev_save_time_records = None
+try:
+    _v152_prev_delete_time_records = delete_time_records
+except Exception:
+    _v152_prev_delete_time_records = None
+try:
+    _v152_prev_recalculate_time_records = recalculate_time_records
+except Exception:
+    _v152_prev_recalculate_time_records = None
+try:
+    _v152_prev_import_time_records = import_time_records
+except Exception:
+    _v152_prev_import_time_records = None
+try:
+    _v152_prev_load_records = load_records
+except Exception:
+    _v152_prev_load_records = None
+try:
+    _v152_prev_today_records = today_records
+except Exception:
+    _v152_prev_today_records = None
+try:
+    _v152_prev_flush_time_record_authority_upload_now = flush_time_record_authority_upload_now
+except Exception:
+    _v152_prev_flush_time_record_authority_upload_now = None
+
+# V151 包了一層同步 row shard 且可能同步 GitHub。V152 高頻開始/結束優先使用 V151 前一層核心，
+# 再自行寫入 event journal + 本機 row shard，避免每次現場操作等待 GitHub。
+_v152_core_start_work = globals().get("_v151_prev_start_work") or _v152_prev_start_work
+_v152_core_finish_work = globals().get("_v151_prev_finish_work") or _v152_prev_finish_work
+
+
+def _v152_event_type_for_end_action(end_action: str) -> str:
+    action = str(end_action or "").strip()
+    if action == "暫停":
+        return "PAUSE_WORK"
+    if action == "下班":
+        return "OFF_DUTY"
+    if action == "完工":
+        return "FINISH_WORK"
+    return "END_WORK"
+
+
+def _v152_query_rows(ids) -> pd.DataFrame:
+    try:
+        if "_v151_query_rows_by_ids" in globals():
+            return _v151_query_rows_by_ids(ids)
+    except Exception:
+        pass
+    try:
+        clean = []
+        for x in ids or []:
+            try:
+                i = int(float(str(x).strip()))
+                if i > 0 and i not in clean:
+                    clean.append(i)
+            except Exception:
+                continue
+        if not clean:
+            return pd.DataFrame()
+        ph = ",".join(["?"] * len(clean))
+        return query_df(f"SELECT * FROM time_records WHERE id IN ({ph}) ORDER BY id", clean)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v152_rows_to_records(rows) -> list[dict]:
+    if rows is None:
+        return []
+    if isinstance(rows, pd.DataFrame):
+        if rows.empty:
+            return []
+        try:
+            clean = rows.copy().where(pd.notna(rows), "")
+            return [dict(r) for _, r in clean.iterrows()]
+        except Exception:
+            return []
+    if isinstance(rows, dict):
+        return [dict(rows)]
+    if isinstance(rows, list):
+        return [dict(r) for r in rows if isinstance(r, dict)]
+    return []
+
+
+def _v152_write_durable_layers(rows, reason: str, *, event_type: str = "TIME_RECORD_CHANGE", github: bool = False, extra: dict | None = None) -> int:
+    """Write event journal + V151 row shards + non-destructive snapshots.
+
+    High-frequency calls use github=False to avoid blocking 50 operators.  The event
+    journal schedules its own background upload.  Admin/explicit sync can still pass
+    github=True through sync_time_records_01_02_now / flush helpers.
+    """
+    records = _v152_rows_to_records(rows)
+    if not records:
+        return 0
+    try:
+        if callable(_v152_append_event):
+            _v152_append_event(event_type, records, reason=reason, payload_extra=extra or {}, schedule_upload=True)
+    except Exception as exc:
+        try:
+            write_log("V152_EVENT_APPEND_ERROR", f"工時事件紀錄寫入失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        if "_v151_write_row_shards" in globals():
+            _v151_write_row_shards(records, reason, github=bool(github))
+    except Exception as exc:
+        try:
+            write_log("V152_ROW_SHARD_WRITE_ERROR", f"V152 row shard 寫入失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        if "_v151_save_canonical_non_destructive" in globals():
+            _v151_save_canonical_non_destructive(records, reason, github=bool(github))
+    except Exception as exc:
+        try:
+            write_log("V152_NON_DESTRUCTIVE_SNAPSHOT_ERROR", f"V152 非破壞式快照同步失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return len(records)
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V152 fast transaction path: SQL business write + append-only event journal."""
+    if callable(_v152_ensure_event_schema):
+        try:
+            _v152_ensure_event_schema()
+        except Exception:
+            pass
+    if not callable(_v152_core_start_work):
+        raise RuntimeError("start_work core implementation is unavailable")
+    rid = int(_v152_core_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        rows_df = _v152_query_rows([rid])
+        _v152_write_durable_layers(
+            rows_df,
+            "start_work_v152_event_journal",
+            event_type="START_WORK",
+            github=False,
+            extra={"employee": employee or {}, "work_order": work_order or {}, "process_name": process_name},
+        )
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V152 finish path keeps full group event proof, not only first row."""
+    if callable(_v152_ensure_event_schema):
+        try:
+            _v152_ensure_event_schema()
+        except Exception:
+            pass
+    before_ids: list[int] = []
+    try:
+        rid0 = int(float(str(record_id).strip()))
+        group = get_active_group(rid0) if finish_parallel_group else pd.DataFrame()
+        if isinstance(group, pd.DataFrame) and not group.empty and "id" in group.columns:
+            for x in group["id"].tolist():
+                try:
+                    i = int(float(str(x).strip()))
+                    if i not in before_ids:
+                        before_ids.append(i)
+                except Exception:
+                    pass
+        if rid0 not in before_ids:
+            before_ids.append(rid0)
+    except Exception:
+        try:
+            before_ids = [int(float(str(record_id).strip()))]
+        except Exception:
+            before_ids = []
+    if not callable(_v152_core_finish_work):
+        raise RuntimeError("finish_work core implementation is unavailable")
+    n = int(_v152_core_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n or before_ids:
+        rows_df = _v152_query_rows(before_ids)
+        _v152_write_durable_layers(
+            rows_df,
+            "finish_work_v152_event_journal",
+            event_type=_v152_event_type_for_end_action(end_action),
+            github=False,
+            extra={"end_action": end_action, "remark": remark, "finish_parallel_group": bool(finish_parallel_group), "affected_ids": before_ids},
+        )
+    return n
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    if not callable(_v152_prev_save_time_records):
+        return 0
+    n = int(_v152_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    if n:
+        # Save operation is admin-level; event proof is append-only, snapshot remains non-destructive.
+        try:
+            rows = df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+            _v152_write_durable_layers(rows, "save_time_records_v152_manual_edit", event_type="MANUAL_EDIT", github=False, extra={"recalc_edited_timestamps": bool(recalc_edited_timestamps)})
+        except Exception:
+            pass
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    # Append delete proof before deleting.  Existing tombstone/soft-delete logic remains in previous wrapper.
+    ids = []
+    for x in record_ids or []:
+        try:
+            i = int(float(str(x).strip()))
+            if i > 0 and i not in ids:
+                ids.append(i)
+        except Exception:
+            pass
+    before_df = _v152_query_rows(ids)
+    if isinstance(before_df, pd.DataFrame) and not before_df.empty:
+        _v152_write_durable_layers(before_df, "delete_time_records_v152_before_delete", event_type="DELETE_MARK", github=False, extra={"reason": reason, "record_ids": ids})
+    if not callable(_v152_prev_delete_time_records):
+        return 0
+    n = int(_v152_prev_delete_time_records(record_ids, reason=reason) or 0)
+    return n
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    if not callable(_v152_prev_recalculate_time_records):
+        return 0
+    n = int(_v152_prev_recalculate_time_records(record_ids) or 0)
+    if n:
+        rows_df = _v152_query_rows(record_ids or []) if record_ids else load_records()
+        _v152_write_durable_layers(rows_df, "recalculate_time_records_v152_event", event_type="RECALCULATE", github=False, extra={"record_ids": record_ids or []})
+    return n
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    if not callable(_v152_prev_import_time_records):
+        return {"inserted": 0, "updated": 0, "skipped": 0}
+    result = _v152_prev_import_time_records(df, recalc=recalc, source=source)
+    try:
+        changed = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
+    except Exception:
+        changed = 0
+    if changed:
+        _v152_write_durable_layers(df if isinstance(df, pd.DataFrame) else pd.DataFrame(), "import_time_records_v152_event", event_type="IMPORT_TIME_RECORDS", github=False, extra={"source": source, "result": result})
+    return result
+
+
+def _v152_event_rows_df() -> pd.DataFrame:
+    try:
+        if callable(_v152_rebuild_rows_from_events):
+            rows = _v152_rebuild_rows_from_events()
+            return pd.DataFrame(rows) if rows else pd.DataFrame()
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    base = pd.DataFrame()
+    try:
+        if callable(_v152_prev_load_records):
+            base = _v152_prev_load_records(start_date, end_date, employee_id, work_order)
+    except Exception:
+        base = pd.DataFrame()
+    ev_df = _v152_event_rows_df()
+    try:
+        if "_v151_merge_rows" in globals():
+            rows = _v151_merge_rows(base, ev_df)
+            return _v151_filter_records_df(pd.DataFrame(rows), start_date, end_date, employee_id, work_order)
+    except Exception:
+        pass
+    return base if isinstance(base, pd.DataFrame) else pd.DataFrame()
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    base = pd.DataFrame()
+    try:
+        if callable(_v152_prev_today_records):
+            base = _v152_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+    except Exception:
+        base = pd.DataFrame()
+    ev_df = _v152_event_rows_df()
+    try:
+        if "_v151_merge_rows" in globals():
+            rows = _v151_merge_rows(base, ev_df)
+            df = pd.DataFrame(rows) if rows else pd.DataFrame()
+            if df.empty:
+                return df
+            # Reapply active/today display rule from V151 so event repair cannot re-show terminal rows as active.
+            try:
+                cycle_start = _business_cycle_start_date() if "_business_cycle_start_date" in globals() else today_text()
+            except Exception:
+                cycle_start = today_text()
+            def _is_active_row_v152(r: dict) -> bool:
+                try:
+                    terminal = _v151_is_terminal(r) if "_v151_is_terminal" in globals() else str(r.get("status") or "").strip() in {"暫停", "下班", "完工", "已結束"}
+                except Exception:
+                    terminal = False
+                end_ts = str(r.get("end_timestamp") or "").strip().lower()
+                status = str(r.get("status") or "").strip()
+                return (not terminal) and end_ts in {"", "none", "nan", "nat"} and status in {"", "作業中"}
+            active_mask = df.apply(lambda r: _is_active_row_v152(dict(r)), axis=1)
+            if unfinished_only:
+                df = df.loc[active_mask].copy()
+            else:
+                if "start_date" in df.columns:
+                    current = df["start_date"].astype(str) >= str(cycle_start)
+                elif "start_timestamp" in df.columns:
+                    current = df["start_timestamp"].astype(str).str[:10] >= str(cycle_start)
+                else:
+                    current = pd.Series([True] * len(df), index=df.index)
+                df = df.loc[current | active_mask].copy()
+            return _v151_filter_records_df(df)
+    except Exception:
+        pass
+    return base if isinstance(base, pd.DataFrame) else pd.DataFrame()
+
+
+def repair_time_records_from_events_v152(reason: str = "manual_repair_from_v152_events", *, github: bool = True) -> dict:
+    """Non-destructive repair: merge append-only events back into 01/02 snapshots.
+
+    This function is safe for diagnostics/admin tools.  It never uses a smaller
+    dataframe to erase history; it only adds/updates rows by record_key/business key.
+    """
+    ev_df = _v152_event_rows_df()
+    ev_count = int(len(ev_df)) if isinstance(ev_df, pd.DataFrame) else 0
+    synced = 0
+    if ev_count:
+        try:
+            synced = int(_v151_save_canonical_non_destructive(ev_df, reason, github=bool(github)) or 0) if "_v151_save_canonical_non_destructive" in globals() else 0
+        except Exception as exc:
+            try:
+                write_log("V152_EVENT_REPAIR_ERROR", f"從事件紀錄修復 01/02 失敗：{exc}", "time_records", level="ERROR")
+            except Exception:
+                pass
+    try:
+        if callable(_v152_flush_event_journal_now):
+            _v152_flush_event_journal_now("repair_time_records_from_events_v152_flush", limit=300)
+    except Exception:
+        pass
+    return {"event_rebuilt_rows": ev_count, "synced_snapshot_rows": synced}
+
+
+def sync_time_records_01_02_now(reason: str = "v152_manual_safe_sync", *, github: bool = True) -> int:  # type: ignore[override]
+    # First consolidate V151 layers, then merge event journal rows; never use partial table to erase history.
+    base_n = 0
+    try:
+        if "_v151_save_canonical_non_destructive" in globals():
+            base_n = int(_v151_save_canonical_non_destructive(None, reason + "_v151", github=bool(github)) or 0)
+    except Exception:
+        base_n = 0
+    repair = repair_time_records_from_events_v152(reason + "_events", github=bool(github))
+    return max(base_n, int(repair.get("synced_snapshot_rows") or 0))
+
+
+def flush_time_record_authority_upload_now(reason: str = "v152_flush_time_authority_and_events") -> bool:  # type: ignore[override]
+    ok = False
+    try:
+        if callable(_v152_prev_flush_time_record_authority_upload_now):
+            ok = bool(_v152_prev_flush_time_record_authority_upload_now(reason))
+    except Exception:
+        ok = False
+    try:
+        if callable(_v152_flush_event_journal_now):
+            res = _v152_flush_event_journal_now(reason + "_event_journal", limit=500)
+            ok = bool(ok or res.get("ok") or res.get("uploaded", 0) >= 0)
+    except Exception:
+        pass
+    return bool(ok)
+
+
+def audit_time_record_integrity_v152() -> dict:
+    out: dict = {}
+    try:
+        if "audit_time_record_integrity_v151" in globals():
+            out["v151"] = audit_time_record_integrity_v151()
+    except Exception as exc:
+        out["v151_error"] = str(exc)[:300]
+    try:
+        out["event_journal"] = _v152_audit_event_journal() if callable(_v152_audit_event_journal) else {"error": "event_journal_unavailable"}
+    except Exception as exc:
+        out["event_journal_error"] = str(exc)[:300]
+    try:
+        df = load_records()
+        out["visible_history_rows"] = int(len(df)) if isinstance(df, pd.DataFrame) else 0
+    except Exception as exc:
+        out["visible_history_error"] = str(exc)[:300]
+    return out
+
+# =================== END V152 APPEND-ONLY EVENT JOURNAL + TRANSACTION SAFETY LAYER =====================
