@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 18:09:34",
-  "exported_at": "2026-05-28 18:09:34",
+  "updated_at": "2026-05-28 18:10:19",
+  "exported_at": "2026-05-28 18:10:19",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -22627,11 +22627,35 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 476,
+        "log_time": "2026-05-28 18:10:14",
+        "user_name": "SPT087",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "298",
+        "message": "V137 結束工時紀錄 #298；同步結束=1筆；狀態=下班；群組總工時=02:10:45；平均工時=02:10:48",
+        "detail": "298\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-28 18:10:14\",\"action_type\":\"END_WORK\",\"target_table\":\"time_records\",\"target_id\":\"298\",\"target_ids\":[298],\"message\":\"V137 結束工時紀錄 #298；同步結束=1筆；狀態=下班；群組總工時=02:10:45；平均工時=02:10:48\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-28 15:49:15|003c07af\",\"identity_key\":\"record_key:SPT087|25M0541-02|骨架組立|2026-05-28 15:49:15|003c07af\",\"id\":\"298\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"status\":\"下班\",\"start_timestamp\":\"2026-05-28 15:49:15\",\"end_timestamp\":\"2026-05-28 18:10:11\",\"work_hours\":\"2.18\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":298,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-28 15:49:15|003c07af\",\"status\":\"下班\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 15:49:15\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 18:10:11\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"15:49:15\",\"end_date\":\"2026-05-28\",\"end_time\":\"18:10:11\",\"work_hours\":2.18,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 15:49:15\",\"updated_at\":\"2026-05-28 18:10:11\",\"department\":\"\",\"title\":\"\",\"department_emp\":\"\",\"title_emp\":\"\",\"recovery_status\":\"\",\"recovery_note\":\"\",\"is_deleted\":\"\",\"deleted_at\":\"\",\"work_hours_hms\":\"\",\"recovery_closed_at\":\"\",\"recovery_closed_source\":\"\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":298,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-28 15:49:15|003c07af\",\"status\":\"下班\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 15:49:15\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 18:10:11\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"15:49:15\",\"end_date\":\"2026-05-28\",\"end_time\":\"18:10:11\",\"work_hours\":2.18,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 15:49:15\",\"updated_at\":\"2026-05-28 18:10:11\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":298,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-28 15:49:15|003c07af\",\"status\":\"下班\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 15:49:15\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 18:10:11\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"15:49:15\",\"end_date\":\"2026-05-28\",\"end_time\":\"18:10:11\",\"work_hours\":2.18,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 15:49:15\",\"updated_at\":\"2026-05-28 18:10:11\",\"department\":\"\",\"title\":\"\",\"department_emp\":\"\",\"title_emp\":\"\",\"recovery_status\":\"\",\"recovery_note\":\"\",\"is_deleted\":\"\",\"deleted_at\":\"\",\"work_hours_hms\":\"\",\"recovery_closed_at\":\"\",\"recovery_closed_source\":\"\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":298,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-28 15:49:15|003c07af\",\"status\":\"下班\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 15:49:15\",\"end_action\":\"下班\",\"end_timestamp\":\"2026-05-28 18:10:11\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"15:49:15\",\"end_date\":\"2026-05-28\",\"end_time\":\"18:10:11\",\"work_hours\":2.18,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 15:49:15\",\"updated_at\":\"2026-05-28 18:10:11\",\"department\":\"\",\"title\":\"\",\"department_emp\":\"\",\"title_emp\":\"\",\"recovery_status\":\"\",\"recovery_note\":\"\",\"is_deleted\":\"\",\"deleted_at\":\"\",\"work_hours_hms\":\"\",\"recovery_closed_at\":\"\",\"recovery_closed_source\":\"\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"cc747f7caf43fbce50cc795d2dcadcb478d3e5c21658c1c7f673547f7ebf2a9d\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 475,
+        "log_time": "2026-05-28 18:10:11",
+        "user_name": "SPT087",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1885
+    "system_logs": 1887
   }
 }
