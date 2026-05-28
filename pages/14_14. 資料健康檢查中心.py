@@ -9,6 +9,11 @@ import streamlit as st
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access, check_permission
 from services.timezone_service import today_date
+from services.backup_queue_status_service import (
+    collect_backup_queue_status,
+    flush_backup_queues_now,
+    status_rows_for_table,
+)
 from services.time_record_integrity_service import (
     audit_time_record_integrity,
     repair_0102_authority_non_destructive,
@@ -42,6 +47,62 @@ st.warning(
 st.caption(
     "權限說明：進入本頁需 14 模組 can_view；下載 Excel 需 can_export；執行非破壞式修復需 can_manage。"
 )
+
+
+st.markdown("### 備份佇列狀態 / Backup Queue Status")
+st.caption(
+    "此區只顯示與補送備份佇列，不修改工時內容、不刪除、不重算、不覆蓋 01/02 歷史。"
+)
+if "v155_backup_status" not in st.session_state:
+    try:
+        st.session_state["v155_backup_status"] = collect_backup_queue_status()
+    except Exception as exc:
+        st.session_state["v155_backup_status"] = {"level": "ERROR", "summary": {}, "errors": [{"source": "status", "error": str(exc)}]}
+
+bs1, bs2, bs3 = st.columns([1, 1, 2])
+if bs1.button("🔄 重新讀取備份狀態", use_container_width=True, key="v155_refresh_backup_status"):
+    st.session_state["v155_backup_status"] = collect_backup_queue_status()
+    st.rerun()
+
+flush_disabled = not CAN_REPAIR
+if bs2.button("☁️ 手動補送備份佇列", use_container_width=True, disabled=flush_disabled, key="v155_flush_backup_queue"):
+    with st.spinner("正在補送 GitHub 權威檔 / LOG / 工時事件佇列，這不會修改工時資料..."):
+        st.session_state["v155_flush_result"] = flush_backup_queues_now(reason="manual_v155_from_health_center", max_seconds=14)
+        st.session_state["v155_backup_status"] = st.session_state["v155_flush_result"].get("after") or collect_backup_queue_status()
+    st.rerun()
+if flush_disabled:
+    bs3.info("你的帳號沒有 14 模組 can_manage 權限，只能查看狀態，不能手動補送備份。")
+
+backup_status = st.session_state.get("v155_backup_status") or {}
+summary = backup_status.get("summary", {}) if isinstance(backup_status.get("summary"), dict) else {}
+level = str(backup_status.get("level") or "UNKNOWN")
+if level == "OK":
+    st.success(f"備份佇列狀態正常。檢查時間：{backup_status.get('checked_at', '')}")
+elif level == "WARN":
+    st.warning(f"仍有待補送或需注意的備份項目。檢查時間：{backup_status.get('checked_at', '')}")
+else:
+    st.error(f"備份狀態有錯誤，請展開詳細資訊。檢查時間：{backup_status.get('checked_at', '')}")
+
+bk1, bk2, bk3, bk4, bk5 = st.columns(5)
+bk1.metric("權威檔待上傳", summary.get("authority_pending", 0))
+bk2.metric("工時事件待上傳", summary.get("event_pending", 0))
+bk3.metric("LOG 待同步", "是" if summary.get("log_pending") else "否")
+bk4.metric("LOG 未同步數", summary.get("log_write_count_since_sync", 0))
+bk5.metric("錯誤數", summary.get("error_count", 0))
+
+try:
+    st.dataframe(pd.DataFrame(status_rows_for_table(backup_status)), use_container_width=True, hide_index=True, height=230)
+except Exception:
+    pass
+
+with st.expander("備份佇列詳細資料 / Backup Queue Details", expanded=False):
+    st.json(backup_status)
+
+if "v155_flush_result" in st.session_state:
+    with st.expander("最近一次手動補送結果 / Last Manual Flush Result", expanded=False):
+        st.json(st.session_state["v155_flush_result"])
+
+st.divider()
 
 if "v153_audit_result" not in st.session_state:
     st.session_state["v153_audit_result"] = None
@@ -136,4 +197,4 @@ if b3.button("🧹 清除本頁檢查結果", use_container_width=True, key="v15
     st.session_state.pop("v153_repair_result", None)
     st.rerun()
 
-st.caption("V153B：資料健康檢查中心已納入 10. 權限管理。建議每次部署修正包後先執行檢查，再決定是否修復。")
+st.caption("V155：資料健康檢查中心已加入備份佇列狀態。建議每次部署修正包後先檢查備份狀態，再執行資料健康檢查。")
