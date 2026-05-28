@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 16:47:31",
-  "exported_at": "2026-05-28 16:47:31",
-  "reason": "logout_v133_time_authority_flush_log_flush",
+  "updated_at": "2026-05-28 16:57:31",
+  "exported_at": "2026-05-28 16:57:31",
+  "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
     "system_logs": [
@@ -20395,11 +20395,35 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 385,
+        "log_time": "2026-05-28 16:57:27",
+        "user_name": "SPT150",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "310",
+        "message": "V137 結束工時紀錄 #310；同步結束=1筆；狀態=暫停；群組總工時=00:22:41；平均工時=00:22:48",
+        "detail": "310",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 384,
+        "log_time": "2026-05-28 16:57:25",
+        "user_name": "SPT150",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1699
+    "system_logs": 1701
   }
 }
