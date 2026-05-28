@@ -1,0 +1,47 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "a760888fc4464882934d0a48d6f43717",
+  "event_type": "PAUSE_WORK",
+  "event_time": "2026-05-28 22:37:02",
+  "record_id": "202",
+  "record_key": "SPT250|25MN0014-06|S.T.|2026-05-28 08:54:04|9d84b16f",
+  "operator_account": "SPT250",
+  "reason": "finish_work_v152_event_journal",
+  "row": {
+    "id": "202",
+    "record_key": "SPT250|25MN0014-06|S.T.|2026-05-28 08:54:04|9d84b16f",
+    "status": "暫停",
+    "work_order": "25MN0014-06",
+    "part_no": "9MRSC2A2-BWN01-03",
+    "type_name": "BWS3200\nRSC2A2-BWN01-03",
+    "process_name": "S.T.",
+    "employee_id": "SPT250",
+    "employee_name": "鄭至賢",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-28 08:54:04",
+    "end_action": "暫停",
+    "end_timestamp": "2026-05-28 22:34:34",
+    "remark": "S.T.停機異常排除",
+    "start_date": "2026-05-28",
+    "start_time": "08:54:04",
+    "end_date": "2026-05-28",
+    "end_time": "22:34:34",
+    "work_hours": "11.43",
+    "assembly_location": "竹東",
+    "group_key": "SPT250|S.T.|2026-05-28",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-28 08:54:04",
+    "updated_at": "2026-05-28 22:34:34"
+  },
+  "extra": {
+    "end_action": "暫停",
+    "remark": "S.T.停機異常排除",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      202
+    ]
+  },
+  "previous_checksum": "",
+  "checksum": "93e3b9815b78a50ff421761716f588c3141db1dd1d0ab2c6802adcf79f4cf838"
+}
