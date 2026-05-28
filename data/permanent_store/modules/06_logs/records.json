@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 01:09:21",
-  "exported_at": "2026-05-29 01:09:21",
+  "updated_at": "2026-05-29 01:10:42",
+  "exported_at": "2026-05-29 01:10:42",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -319,11 +319,47 @@
         "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 146,
+        "log_time": "2026-05-29 01:10:38",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V178B",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：已刪除/封鎖 2 筆；02刪除=0，01刪除=2，SQLite刪除=0，tombstone=0。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 145,
+        "log_time": "2026-05-29 01:10:38",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V178",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：已建立刪除 tombstone，01/02 顯示同步；刪除 2 筆，同步保留 0 筆。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 144,
+        "log_time": "2026-05-29 01:10:38",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "326,327",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：V177 已刪除 2 筆，01 Today Records / 02 Editable History / SQLite 快取同步完成。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 26
+    "system_logs": 29
   }
 }
