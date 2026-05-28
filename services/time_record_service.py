@@ -7888,3 +7888,3661 @@ def inspect_active_work_identity_conflicts(employee_id: str | None = None, emplo
     return pd.DataFrame(rows)
 
 # =================== END V143 ACTIVE WORK SELECTED-EMPLOYEE IDENTITY HARD GUARD ===================
+
+# ===================== V147 TIME RECORD FLUSH + PERFORMANCE SAFE QUEUE HOOK =====================
+# 目的：保留 V108 開始/結束作業秒級回應；登出或手動刷新時，才主動補送 GitHub 佇列。
+try:
+    _v147_prev_flush_time_record_authority_upload_now = flush_time_record_authority_upload_now  # type: ignore[name-defined]
+except Exception:
+    _v147_prev_flush_time_record_authority_upload_now = None
+
+
+def flush_time_record_authority_upload_now(reason: str = "v147_flush_time_authority") -> bool:  # type: ignore[override]
+    ok = False
+    try:
+        if callable(_v147_prev_flush_time_record_authority_upload_now):
+            ok = bool(_v147_prev_flush_time_record_authority_upload_now(reason))
+    except Exception:
+        ok = False
+    try:
+        from services.permanent_authority_service import flush_authority_upload_queue_now
+        res = flush_authority_upload_queue_now(reason=reason, max_seconds=8.0)
+        ok = bool(ok or res.get("ok") or int(res.get("pending") or 0) == 0)
+    except Exception:
+        pass
+    try:
+        from services.log_service import flush_log_authority_batch_now
+        flush_log_authority_batch_now(reason=f"{reason}_log_flush")
+    except Exception:
+        pass
+    return bool(ok)
+
+
+def get_time_record_performance_status() -> dict:
+    """診斷用，不觸發資料寫入。"""
+    out = {}
+    try:
+        from services.permanent_authority_service import get_authority_upload_queue_status
+        out["authority_upload_queue"] = get_authority_upload_queue_status()
+    except Exception as exc:
+        out["authority_upload_queue"] = {"error": str(exc)[:300]}
+    try:
+        from services.log_service import get_log_batch_status
+        out["log_batch"] = get_log_batch_status()
+    except Exception as exc:
+        out["log_batch"] = {"error": str(exc)[:300]}
+    return out
+# =================== END V147 TIME RECORD FLUSH + PERFORMANCE SAFE QUEUE HOOK ===================
+
+# ===================== V149 ACTIVE WORK TERMINAL STATE CROSS-SOURCE GUARD =====================
+# 修正目的：
+# 1) 01「目前作業中 / Active Work」不得顯示已在 02 歷史紀錄標記為暫停/下班/完工的同一筆資料。
+# 2) 同一筆資料可能在 SQLite、01_time_records、02_history 中有不同版本；Active Work 必須以最終狀態為準。
+# 3) 為避免 SQLite id 重用誤殺新資料，ID 只在業務主鍵或 record_key 可佐證時才作為終止狀態判斷依據。
+# 4) 僅加強讀取/顯示與 Active Work 判斷，不刪除歷史、不重新編號、不用畫面局部資料覆蓋完整權威檔。
+
+_V149_TERMINAL_STATUS = {"下班", "暫停", "完工", "已結束", "結束", "停止", "已停止", "closed", "finished", "complete", "completed", "pause", "paused", "off duty"}
+_V149_ACTIVE_STATUS = {"作業中", "working", "active", "in progress"}
+
+_V149_ID_COLS = ["id", "ID", "ID / ID", "紀錄編號", "record_id"]
+_V149_RECORD_KEY_COLS = ["record_key", "紀錄鍵 / Record Key", "紀錄鍵", "Record Key"]
+_V149_EMP_ID_COLS = ["employee_id", "工號 / Employee ID", "工號", "Employee ID", "員工編號", "人員工號"]
+_V149_EMP_NAME_COLS = ["employee_name", "姓名 / Name", "姓名", "Name", "員工姓名", "人員姓名"]
+_V149_WORK_ORDER_COLS = ["work_order", "製令 / Work Order", "製令", "Work Order", "製令單號"]
+_V149_PROCESS_COLS = ["process_name", "工段名稱 / Process", "工段 / Process", "工段", "製程", "Process"]
+_V149_START_TS_COLS = ["start_timestamp", "開始時間戳 / Start Timestamp", "開始時間戳", "Start Timestamp", "開始時間"]
+_V149_START_DATE_COLS = ["start_date", "開始日期 / Start Date", "開始日期", "Start Date", "work_date", "日期"]
+_V149_START_TIME_COLS = ["start_time", "開始時間 / Start Time", "開始時間", "Start Time"]
+_V149_STATUS_COLS = ["status", "狀態 / Status", "狀態", "Status"]
+_V149_END_ACTION_COLS = ["end_action", "結束動作 / End Action", "結束動作", "End Action"]
+_V149_END_TS_COLS = ["end_timestamp", "結束時間戳 / End Timestamp", "結束時間 / End Timestamp", "結束時間戳", "結束時間", "End Timestamp"]
+
+
+def _v149_blank(value) -> bool:
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    if value is None:
+        return True
+    return str(value).strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _v149_norm(value) -> str:
+    if _v149_blank(value):
+        return ""
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
+    return str(value).strip()
+
+
+def _v149_key(value) -> str:
+    return _v149_norm(value).replace("｜", "|").strip().lower()
+
+
+def _v149_first(row: dict, cols: list[str]) -> str:
+    for c in cols:
+        if c in row and not _v149_blank(row.get(c)):
+            return _v149_norm(row.get(c))
+    return ""
+
+
+def _v149_values(row: dict, cols: list[str]) -> list[str]:
+    out: list[str] = []
+    for c in cols:
+        if c in row and not _v149_blank(row.get(c)):
+            v = _v149_norm(row.get(c))
+            if v and v not in out:
+                out.append(v)
+    return out
+
+
+def _v149_int(value):
+    if _v149_blank(value):
+        return None
+    try:
+        return int(float(str(value).strip()))
+    except Exception:
+        return None
+
+
+def _v149_row_id(row: dict):
+    for c in _V149_ID_COLS:
+        if c in row:
+            rid = _v149_int(row.get(c))
+            if rid is not None and rid > 0:
+                return rid
+    return None
+
+
+def _v149_record_key(row: dict) -> str:
+    for c in _V149_RECORD_KEY_COLS:
+        if c in row and not _v149_blank(row.get(c)):
+            return _v149_norm(row.get(c))
+    return ""
+
+
+def _v149_record_key_employee(row: dict) -> str:
+    rk = _v149_record_key(row)
+    if not rk or "|" not in rk:
+        return ""
+    return rk.split("|", 1)[0].strip()
+
+
+def _v149_start_timestamp(row: dict) -> str:
+    ts = _v149_first(row, _V149_START_TS_COLS)
+    if ts:
+        try:
+            dt = pd.to_datetime(ts, errors="coerce")
+            if not pd.isna(dt):
+                return dt.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+        return ts[:19]
+    d = _v149_first(row, _V149_START_DATE_COLS)
+    t = _v149_first(row, _V149_START_TIME_COLS)
+    if d:
+        d = d.replace("/", "-")[:10]
+        t = (t or "00:00:00").replace("：", ":")[:8]
+        if len(t) == 5:
+            t += ":00"
+        return f"{d} {t}"
+    return ""
+
+
+def _v149_business_key(row: dict) -> str:
+    emp = _v149_first(row, _V149_EMP_ID_COLS) or _v149_record_key_employee(row)
+    wo = _v149_first(row, _V149_WORK_ORDER_COLS)
+    proc = _v149_first(row, _V149_PROCESS_COLS)
+    start_ts = _v149_start_timestamp(row)
+    if emp and wo and proc and start_ts:
+        return "biz:" + "|".join([_v149_key(emp), _v149_key(wo), _v149_key(proc), _v149_key(start_ts)])
+    return ""
+
+
+def _v149_loose_identity(row: dict) -> tuple[str, str, str, str]:
+    emp = _v149_key(_v149_first(row, _V149_EMP_ID_COLS) or _v149_record_key_employee(row))
+    wo = _v149_key(_v149_first(row, _V149_WORK_ORDER_COLS))
+    proc = _v149_key(_v149_first(row, _V149_PROCESS_COLS))
+    start_ts = _v149_key(_v149_start_timestamp(row))
+    return emp, wo, proc, start_ts
+
+
+def _v149_is_terminal_row(row: dict) -> bool:
+    statuses = {_v149_key(x) for x in _v149_values(row, _V149_STATUS_COLS)}
+    end_actions = {_v149_key(x) for x in _v149_values(row, _V149_END_ACTION_COLS)}
+    end_values = [_v149_norm(x) for x in _v149_values(row, _V149_END_TS_COLS) if _v149_norm(x)]
+    terminal_keys = {_v149_key(x) for x in _V149_TERMINAL_STATUS}
+    if statuses and any(s in terminal_keys for s in statuses):
+        return True
+    if end_actions and any(a in terminal_keys for a in end_actions):
+        return True
+    if end_values:
+        return True
+    return False
+
+
+def _v149_is_active_row(row: dict) -> bool:
+    if _v149_is_terminal_row(row):
+        return False
+    statuses = {_v149_key(x) for x in _v149_values(row, _V149_STATUS_COLS)}
+    active_keys = {_v149_key(x) for x in _V149_ACTIVE_STATUS}
+    if statuses:
+        return any(s in active_keys for s in statuses) and not any(s not in active_keys for s in statuses)
+    return True
+
+
+def _v149_raw_time_sources() -> list[pd.DataFrame]:
+    frames: list[pd.DataFrame] = []
+    for module_key in ("01_time_records", "02_history"):
+        try:
+            if "_v139_table_df" in globals():
+                df = _v139_table_df(module_key)
+            else:
+                from services.permanent_authority_service import df_from_table as _pa_df
+                df = _pa_df(module_key, "time_records")
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                frames.append(df.copy())
+        except Exception:
+            pass
+    try:
+        if "_v139_sqlite_all_df" in globals():
+            df = _v139_sqlite_all_df()
+        else:
+            df = query_df("SELECT * FROM time_records ORDER BY id")
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            frames.append(df.copy())
+    except Exception:
+        pass
+    return frames
+
+
+def _v149_clean_df(df: pd.DataFrame | None) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame):
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        out = out.loc[:, ~pd.Index(out.columns).duplicated()].copy()
+        out = out.where(pd.notna(out), "")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v149_filter_deleted(df: pd.DataFrame) -> pd.DataFrame:
+    out = _v149_clean_df(df)
+    for name in ("_v139_filter_deleted", "_v98_filter_deleted", "_v97_filter_deleted_df", "_v94_filter_deleted_df", "_v96_filter_tombstone"):
+        try:
+            fn = globals().get(name)
+            if callable(fn):
+                tmp = fn(out)
+                if isinstance(tmp, pd.DataFrame):
+                    out = _v149_clean_df(tmp)
+        except Exception:
+            pass
+    return out
+
+
+def _v149_terminal_index() -> dict:
+    """Build final-state markers from all live sources without mutating data."""
+    rks: set[str] = set()
+    biz: set[str] = set()
+    by_id: dict[int, list[dict]] = {}
+    rows: list[dict] = []
+    for df in _v149_raw_time_sources():
+        df = _v149_filter_deleted(df)
+        if df.empty:
+            continue
+        for _, rr in df.iterrows():
+            row = dict(rr.to_dict())
+            if not _v149_is_terminal_row(row):
+                continue
+            rows.append(row)
+            rk = _v149_record_key(row)
+            if rk:
+                rks.add(_v149_key(rk))
+            b = _v149_business_key(row)
+            if b:
+                biz.add(b)
+            rid = _v149_row_id(row)
+            if rid is not None:
+                by_id.setdefault(int(rid), []).append(row)
+    return {"record_keys": rks, "business_keys": biz, "by_id": by_id, "rows": rows}
+
+
+def _v149_same_logical_record_by_id(active_row: dict, terminal_row: dict) -> bool:
+    """Use id only when additional fields support that both rows are the same record.
+
+    This avoids the old SQLite id-reuse problem: a new active row must not be hidden
+    merely because an old terminal row reused the same numeric id.
+    """
+    ark = _v149_record_key(active_row)
+    trk = _v149_record_key(terminal_row)
+    if ark and trk:
+        return _v149_key(ark) == _v149_key(trk)
+    abiz = _v149_business_key(active_row)
+    tbiz = _v149_business_key(terminal_row)
+    if abiz and tbiz:
+        return abiz == tbiz
+
+    a_emp, a_wo, a_proc, a_start = _v149_loose_identity(active_row)
+    t_emp, t_wo, t_proc, t_start = _v149_loose_identity(terminal_row)
+    required_pairs = [(a_emp, t_emp), (a_wo, t_wo), (a_proc, t_proc)]
+    if not all(a and b and a == b for a, b in required_pairs):
+        return False
+    # 開始時間若雙方都有，必須一致；若任一方缺開始時間，至少同工號+製令+工段才視為同筆 id 的舊/新版本。
+    if a_start and t_start:
+        return a_start == t_start
+    return True
+
+
+def _v149_has_terminal_twin(row: dict, terminal_index: dict | None = None) -> bool:
+    if terminal_index is None:
+        terminal_index = _v149_terminal_index()
+    rk = _v149_record_key(row)
+    if rk and _v149_key(rk) in terminal_index.get("record_keys", set()):
+        return True
+    b = _v149_business_key(row)
+    if b and b in terminal_index.get("business_keys", set()):
+        return True
+    rid = _v149_row_id(row)
+    if rid is not None:
+        for trow in terminal_index.get("by_id", {}).get(int(rid), []):
+            if _v149_same_logical_record_by_id(row, trow):
+                return True
+    return False
+
+
+def _v149_source_for_active(reason: str = "v149_active_source") -> pd.DataFrame:
+    try:
+        if "_v139_reconciled_df" in globals():
+            df = _v139_reconciled_df(include_sqlite=True)
+        elif "_v143_reconciled_active_source" in globals():
+            df = _v143_reconciled_active_source(reason)
+        else:
+            df = query_df("SELECT * FROM time_records ORDER BY id")
+    except Exception:
+        df = pd.DataFrame()
+    try:
+        if "_v143_add_canonical_columns" in globals():
+            df = _v143_add_canonical_columns(df)
+    except Exception:
+        pass
+    return _v149_filter_deleted(df)
+
+
+def _v149_identity_matches(row: dict, employee_id: str | None, employee_name: str | None = None) -> bool:
+    try:
+        if "_v143_identity_matches_selected" in globals():
+            return bool(_v143_identity_matches_selected(row, employee_id, employee_name))
+    except Exception:
+        pass
+    selected_id = _v149_key(employee_id)
+    selected_name = _v149_key(employee_name)
+    id_values = _v149_values(row, _V149_EMP_ID_COLS)
+    rk_emp = _v149_record_key_employee(row)
+    if rk_emp:
+        id_values.append(rk_emp)
+    ids = {_v149_key(x) for x in id_values if _v149_key(x)}
+    names = {_v149_key(x) for x in _v149_values(row, _V149_EMP_NAME_COLS) if _v149_key(x)}
+    if selected_id and (not ids or any(x != selected_id for x in ids)):
+        return False
+    if selected_name and names and any(x != selected_name for x in names):
+        return False
+    return True
+
+
+def _v149_filter_active_df(
+    employee_id: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+    reason: str = "v149_filter_active",
+) -> pd.DataFrame:
+    df = _v149_source_for_active(reason)
+    if df.empty:
+        return pd.DataFrame()
+    terminal_index = _v149_terminal_index()
+    rows: list[dict] = []
+    emp_id = _v149_norm(employee_id)
+    emp_name = _v149_norm(employee_name)
+    proc_key = _v149_key(process_name)
+    sdate = _v149_norm(start_date)
+    for _, rr in df.iterrows():
+        row = dict(rr.to_dict())
+        if not _v149_is_active_row(row):
+            continue
+        if _v149_has_terminal_twin(row, terminal_index):
+            # 核心修正：任何來源已標記同筆資料為暫停/下班/完工，Active Work 不可再顯示作業中舊版。
+            continue
+        if emp_id and not _v149_identity_matches(row, emp_id, emp_name):
+            continue
+        if proc_key:
+            proc_values = {_v149_key(v) for v in _v149_values(row, _V149_PROCESS_COLS) if _v149_key(v)}
+            if proc_key not in proc_values:
+                continue
+        if sdate:
+            # start_date 比 timestamp 寬鬆；避免 timestamp 造成日期欄缺失時無法結束舊筆。
+            date_values = {_v149_norm(v)[:10] for v in _v149_values(row, _V149_START_DATE_COLS) if _v149_norm(v)}
+            ts = _v149_start_timestamp(row)
+            if ts:
+                date_values.add(ts[:10])
+            if sdate[:10] not in date_values:
+                continue
+        rows.append(row)
+    out = pd.DataFrame(rows) if rows else pd.DataFrame(columns=df.columns)
+    try:
+        if "_v143_add_canonical_columns" in globals():
+            out = _v143_add_canonical_columns(out)
+    except Exception:
+        pass
+    if not out.empty and "id" in out.columns:
+        try:
+            out["_v149_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values("_v149_sort_id", ascending=True, kind="stable").drop(columns=["_v149_sort_id"], errors="ignore")
+        except Exception:
+            pass
+    return out.reset_index(drop=True)
+
+
+def _v149_remove_stale_active_duplicates(df: pd.DataFrame) -> pd.DataFrame:
+    """Display guard for Today/History: remove old active rows when a terminal twin exists."""
+    out = _v149_filter_deleted(df)
+    if out.empty:
+        return out
+    terminal_index = _v149_terminal_index()
+    keep_rows: list[dict] = []
+    for _, rr in out.iterrows():
+        row = dict(rr.to_dict())
+        if _v149_is_active_row(row) and _v149_has_terminal_twin(row, terminal_index):
+            continue
+        keep_rows.append(row)
+    clean = pd.DataFrame(keep_rows) if keep_rows else pd.DataFrame(columns=out.columns)
+    return clean.reset_index(drop=True)
+
+
+# Save previous public functions before overriding.
+try:
+    _v149_prev_today_records = today_records
+except Exception:
+    _v149_prev_today_records = None
+try:
+    _v149_prev_load_records = load_records
+except Exception:
+    _v149_prev_load_records = None
+try:
+    _v149_prev_finish_work = finish_work
+except Exception:
+    _v149_prev_finish_work = None
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    return _v149_filter_active_df(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date, reason="get_active_records_v149_terminal_guard")
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = _v149_filter_active_df(employee_id=employee_id, employee_name=employee_name, reason="get_active_record_v149_terminal_guard")
+    if df.empty:
+        return None
+    try:
+        if "id" in df.columns:
+            df["_v149_sort_id"] = pd.to_numeric(df["id"], errors="coerce")
+            df = df.sort_values("_v149_sort_id", ascending=False, kind="stable").drop(columns=["_v149_sort_id"], errors="ignore")
+        row = df.iloc[0].where(pd.notna(df.iloc[0]), None).to_dict()
+        if not _v149_identity_matches(row, employee_id, employee_name):
+            return None
+        if _v149_has_terminal_twin(row):
+            return None
+        return row
+    except Exception:
+        return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    rid = _v149_int(record_id)
+    if rid is None:
+        return pd.DataFrame()
+    df = _v149_source_for_active("get_active_group_v149_terminal_guard")
+    if df.empty or "id" not in df.columns:
+        return pd.DataFrame()
+    try:
+        base = df[df["id"].map(_v149_int) == int(rid)].copy()
+    except Exception:
+        base = pd.DataFrame()
+    if base.empty:
+        return pd.DataFrame()
+    terminal_index = _v149_terminal_index()
+    # If any same logical record is already terminal, there is no active group to finish.
+    for _, rr in base.iterrows():
+        brow = dict(rr.to_dict())
+        if _v149_is_terminal_row(brow) or _v149_has_terminal_twin(brow, terminal_index):
+            return pd.DataFrame()
+    base_row = dict(base.iloc[0].to_dict())
+    emp_id = _v149_first(base_row, _V149_EMP_ID_COLS) or _v149_record_key_employee(base_row)
+    emp_name = _v149_first(base_row, _V149_EMP_NAME_COLS)
+    proc = _v149_first(base_row, _V149_PROCESS_COLS)
+    sdate = _v149_first(base_row, _V149_START_DATE_COLS) or _v149_start_timestamp(base_row)[:10]
+    if not emp_id or not _v149_identity_matches(base_row, emp_id, emp_name):
+        return pd.DataFrame()
+    return _v149_filter_active_df(employee_id=emp_id, employee_name=emp_name or None, process_name=proc or None, start_date=sdate or None, reason="get_active_group_v149_terminal_guard_group")
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = _v149_filter_active_df(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date or today_text(), reason="get_active_same_work_v149_terminal_guard")
+    if df.empty:
+        return None
+    target = _v149_key(work_order)
+    keep: list[dict] = []
+    for _, rr in df.iterrows():
+        row = dict(rr.to_dict())
+        vals = {_v149_key(v) for v in _v149_values(row, _V149_WORK_ORDER_COLS) if _v149_key(v)}
+        if target in vals:
+            keep.append(row)
+    if not keep:
+        return None
+    try:
+        row = pd.DataFrame(keep).iloc[-1]
+        return row.where(pd.notna(row), None).to_dict()
+    except Exception:
+        return keep[-1]
+
+
+def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    start_date = start_date or today_text()
+    active = _v149_filter_active_df(employee_id=employee_id, employee_name=employee_name, reason="get_conflicting_active_records_v149_terminal_guard")
+    if active.empty:
+        return pd.DataFrame()
+    rows: list[dict] = []
+    proc_key = _v149_key(process_name)
+    date_key = _v149_norm(start_date)[:10]
+    for _, rr in active.iterrows():
+        row = dict(rr.to_dict())
+        proc_values = {_v149_key(v) for v in _v149_values(row, _V149_PROCESS_COLS) if _v149_key(v)}
+        dates = {_v149_norm(v)[:10] for v in _v149_values(row, _V149_START_DATE_COLS) if _v149_norm(v)}
+        ts = _v149_start_timestamp(row)
+        if ts:
+            dates.add(ts[:10])
+        if proc_key not in proc_values or date_key not in dates:
+            rows.append(row)
+    return pd.DataFrame(rows).reset_index(drop=True) if rows else pd.DataFrame()
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    if callable(_v149_prev_today_records):
+        df = _v149_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+    else:
+        df = pd.DataFrame()
+    out = _v149_remove_stale_active_duplicates(df)
+    if unfinished_only and not out.empty:
+        rows = [dict(r.to_dict()) for _, r in out.iterrows() if _v149_is_active_row(dict(r.to_dict())) and not _v149_has_terminal_twin(dict(r.to_dict()))]
+        out = pd.DataFrame(rows) if rows else pd.DataFrame(columns=out.columns)
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) else pd.DataFrame()
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    if callable(_v149_prev_load_records):
+        df = _v149_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+    else:
+        df = pd.DataFrame()
+    return _v149_remove_stale_active_duplicates(df)
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v149_prev_finish_work):
+        raise RuntimeError("finish_work core implementation is unavailable")
+    n = int(_v149_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n:
+        # 結束動作完成後，清除快取並本機調和一次；不強制等待 GitHub，避免 50 人操作變慢。
+        try:
+            if "clear_today_records_fast_cache" in globals():
+                clear_today_records_fast_cache()
+        except Exception:
+            pass
+        try:
+            if "clear_query_cache" in globals():
+                clear_query_cache()
+        except Exception:
+            pass
+        try:
+            if "_v139_reconciled_df" in globals() and "_v139_save_reconciled" in globals():
+                _v139_save_reconciled(_v139_reconciled_df(include_sqlite=True), "finish_work_v149_terminal_guard_reconcile", github=False, sync_sqlite=True)
+        except Exception as exc:
+            try:
+                write_log("V149_FINISH_RECONCILE_WARN", f"V149 結束後本機調和失敗：{exc}", "time_records", record_id, level="WARN")
+            except Exception:
+                pass
+    return n
+
+
+def inspect_active_work_terminal_conflicts(employee_id: str | None = None, employee_name: str | None = None) -> pd.DataFrame:
+    """Read-only diagnostic: active rows that are hidden because another source says terminal."""
+    df = _v149_source_for_active("inspect_active_work_terminal_conflicts_v149")
+    if df.empty:
+        return pd.DataFrame()
+    terminal_index = _v149_terminal_index()
+    rows: list[dict] = []
+    for _, rr in df.iterrows():
+        row = dict(rr.to_dict())
+        if not _v149_is_active_row(row):
+            continue
+        if employee_id and not _v149_identity_matches(row, employee_id, employee_name):
+            continue
+        if _v149_has_terminal_twin(row, terminal_index):
+            rows.append({
+                "id": _v149_row_id(row),
+                "employee_id": _v149_first(row, _V149_EMP_ID_COLS) or _v149_record_key_employee(row),
+                "employee_name": _v149_first(row, _V149_EMP_NAME_COLS),
+                "work_order": _v149_first(row, _V149_WORK_ORDER_COLS),
+                "process_name": _v149_first(row, _V149_PROCESS_COLS),
+                "start_timestamp": _v149_start_timestamp(row),
+                "status_values": " | ".join(_v149_values(row, _V149_STATUS_COLS)),
+                "record_key": _v149_record_key(row),
+                "reason": "同一筆資料在其他來源已是暫停/下班/完工，Active Work 已隱藏舊作業中版本",
+            })
+    return pd.DataFrame(rows)
+
+# =================== END V149 ACTIVE WORK TERMINAL STATE CROSS-SOURCE GUARD ===================
+
+# ===================== V151 TIME RECORD DURABLE ROW SHARD + NON-DESTRUCTIVE MERGE =====================
+# 修正目的：
+# 1) LOG 有 START_WORK / INSERT，但 02 歷史紀錄缺該筆資料，代表 SQLite 已寫入但 01/02 canonical 未確實保留。
+# 2) 50 人同時操作時，舊版以整包 records.json 讀取→合併→覆蓋寫回，容易發生 last-writer-wins，
+#    造成 A 使用者剛新增的資料被 B 使用者用舊版 authority 覆蓋掉。
+# 3) V151 新增「單筆 row shard」耐久層：每次開始/結束，除了原本 SQLite 與 canonical 外，
+#    會把該筆工時以 record_key/business key 存成單筆 JSON。顯示與匯出時會把 records.json、SQLite、row shards
+#    做非破壞式合併，避免任何一個來源漏資料造成歷史消失。
+# 4) 刪除仍尊重 tombstone；已刪除資料不會因 row shard 被救回。
+
+try:
+    _v151_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v151_prev_start_work = None
+try:
+    _v151_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v151_prev_finish_work = None
+try:
+    _v151_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v151_prev_load_records = None
+try:
+    _v151_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v151_prev_today_records = None
+try:
+    _v151_prev_sync_time_records_01_02_now = sync_time_records_01_02_now
+except Exception:  # pragma: no cover
+    _v151_prev_sync_time_records_01_02_now = None
+
+import hashlib as _v151_hashlib
+import json as _v151_json
+import os as _v151_os
+from pathlib import Path as _v151_Path
+import threading as _v151_threading
+
+_V151_ROW_SHARD_LOCK = _v151_threading.RLock()
+_V151_PROJECT_ROOT = _v151_Path(__file__).resolve().parents[1]
+_V151_SHARD_MODULES = ("01_time_records", "02_history")
+_V151_TERMINAL_STATUSES = {"下班", "暫停", "完工", "已結束", "結束", "停止", "已停止", "closed", "finished", "complete", "completed", "pause", "paused", "off duty"}
+
+
+def _v151_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v151_json_default(value):
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if isinstance(value, (datetime, date)):
+        return value.strftime("%Y-%m-%d %H:%M:%S") if isinstance(value, datetime) else value.strftime("%Y-%m-%d")
+    try:
+        if hasattr(value, "item"):
+            return value.item()
+    except Exception:
+        pass
+    return str(value)
+
+
+def _v151_row_dict(row) -> dict:
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return dict(row)
+    try:
+        return dict(row)
+    except Exception:
+        return {}
+
+
+def _v151_first(row: dict, cols: list[str]) -> str:
+    for c in cols:
+        if c in row:
+            v = _v151_text(row.get(c))
+            if v:
+                return v
+    return ""
+
+
+def _v151_record_key(row: dict) -> str:
+    return _v151_first(row, ["record_key", "紀錄鍵 / Record Key", "紀錄鍵", "Record Key"])
+
+
+def _v151_employee_id(row: dict) -> str:
+    rk = _v151_record_key(row)
+    from_rk = rk.split("|", 1)[0].strip() if "|" in rk else ""
+    return _v151_first(row, ["employee_id", "工號 / Employee ID", "工號", "Employee ID", "員工編號"]) or from_rk
+
+
+def _v151_employee_name(row: dict) -> str:
+    return _v151_first(row, ["employee_name", "姓名 / Name", "姓名", "Name", "員工姓名"])
+
+
+def _v151_work_order(row: dict) -> str:
+    return _v151_first(row, ["work_order", "製令 / Work Order", "製令", "Work Order", "製令單號"])
+
+
+def _v151_process(row: dict) -> str:
+    return _v151_first(row, ["process_name", "工段名稱 / Process", "工段 / Process", "工段", "製程", "Process"])
+
+
+def _v151_start_ts(row: dict) -> str:
+    ts = _v151_first(row, ["start_timestamp", "開始時間戳 / Start Timestamp", "開始時間戳", "Start Timestamp", "開始時間"])
+    if ts:
+        return ts
+    d = _v151_first(row, ["start_date", "開始日期 / Start Date", "開始日期", "Start Date", "work_date", "日期"])
+    t = _v151_first(row, ["start_time", "開始時間 / Start Time", "開始時間", "Start Time"])
+    return (d + " " + t).strip()
+
+
+def _v151_row_id(row: dict) -> str:
+    return _v151_first(row, ["id", "ID", "ID / ID", "紀錄編號", "record_id"])
+
+
+def _v151_identity_key(row: dict) -> str:
+    rk = _v151_record_key(row)
+    if rk:
+        return "rk:" + rk
+    emp = _v151_employee_id(row)
+    name = _v151_employee_name(row)
+    wo = _v151_work_order(row)
+    proc = _v151_process(row)
+    st = _v151_start_ts(row)
+    if emp and wo and proc and st:
+        return "biz:" + "|".join([emp, name, wo, proc, st])
+    rid = _v151_row_id(row)
+    if rid:
+        # ID 只做最後 fallback，避免 SQLite id 重用誤覆蓋不同人的資料。
+        return "id:" + rid
+    raw = _v151_json.dumps(row, ensure_ascii=False, sort_keys=True, default=_v151_json_default)
+    return "hash:" + _v151_hashlib.sha256(raw.encode("utf-8")).hexdigest()[:20]
+
+
+def _v151_shard_name(row: dict) -> str:
+    key = _v151_identity_key(row)
+    digest = _v151_hashlib.sha256(key.encode("utf-8")).hexdigest()[:24]
+    rid = _v151_row_id(row) or "noid"
+    sdate = (_v151_start_ts(row)[:10] or today_text()).replace("/", "-")
+    safe_rid = "".join(ch if ch.isalnum() else "_" for ch in str(rid))[:40]
+    return f"{sdate}/tr_{safe_rid}_{digest}.json"
+
+
+def _v151_shard_path(module_key: str, row: dict) -> _v151_Path:
+    return _V151_PROJECT_ROOT / "data" / "permanent_store" / "modules" / str(module_key) / "time_record_rows" / _v151_shard_name(row)
+
+
+def _v151_status_key(value) -> str:
+    return _v151_text(value).lower().replace(" ", "")
+
+
+def _v151_is_terminal(row: dict) -> bool:
+    try:
+        if "_v149_is_terminal" in globals() and callable(globals().get("_v149_is_terminal")):
+            return bool(globals()["_v149_is_terminal"](row))
+    except Exception:
+        pass
+    vals = []
+    for c in ["status", "狀態 / Status", "狀態", "Status", "end_action", "結束動作 / End Action", "結束動作"]:
+        if c in row:
+            vals.append(row.get(c))
+    if _v151_first(row, ["end_timestamp", "結束時間戳 / End Timestamp", "結束時間", "End Timestamp"]):
+        return True
+    terminal = {_v151_status_key(x) for x in _V151_TERMINAL_STATUSES}
+    return any(_v151_status_key(x) in terminal for x in vals)
+
+
+def _v151_updated_score(row: dict) -> tuple[int, str, str]:
+    terminal = 1 if _v151_is_terminal(row) else 0
+    ts = _v151_first(row, ["updated_at", "更新時間 / Updated At", "updated_time", "end_timestamp", "結束時間戳 / End Timestamp", "start_timestamp", "created_at"])
+    rid = _v151_row_id(row)
+    return (terminal, ts, rid)
+
+
+def _v151_merge_rows(*row_groups) -> list[dict]:
+    """Non-destructive merge; terminal/latest rows win but columns are unioned."""
+    merged: dict[str, dict] = {}
+    scores: dict[str, tuple[int, str, str]] = {}
+    for group in row_groups:
+        if group is None:
+            continue
+        if isinstance(group, pd.DataFrame):
+            iterable = [dict(r) for _, r in group.where(pd.notna(group), "").iterrows()]
+        else:
+            iterable = group if isinstance(group, list) else []
+        for raw in iterable:
+            row = _v151_row_dict(raw)
+            if not row:
+                continue
+            key = _v151_identity_key(row)
+            score = _v151_updated_score(row)
+            if key not in merged:
+                merged[key] = dict(row)
+                scores[key] = score
+                continue
+            old = merged[key]
+            old_score = scores.get(key, (0, "", ""))
+            # keep all nonblank fields; if current row is newer/terminal it can replace conflicting fields.
+            newer = score >= old_score
+            combined = dict(old)
+            for c, v in row.items():
+                sv = _v151_text(v)
+                if newer:
+                    if sv or not _v151_text(combined.get(c)):
+                        combined[c] = v
+                else:
+                    if c not in combined or not _v151_text(combined.get(c)):
+                        combined[c] = v
+            if newer:
+                merged[key] = combined
+                scores[key] = score
+            else:
+                merged[key] = combined
+    rows = list(merged.values())
+    try:
+        rows.sort(key=lambda r: int(float(_v151_row_id(r) or 0)))
+    except Exception:
+        rows.sort(key=lambda r: _v151_start_ts(r))
+    # Apply delete tombstone last so deliberately deleted rows do not revive.
+    try:
+        if rows and "_v94_filter_deleted_df" in globals() and callable(globals().get("_v94_filter_deleted_df")):
+            df = pd.DataFrame(rows)
+            df = globals()["_v94_filter_deleted_df"](df)
+            rows = [dict(r) for _, r in df.where(pd.notna(df), "").iterrows()]
+    except Exception:
+        pass
+    return rows
+
+
+def _v151_sqlite_all_rows() -> list[dict]:
+    try:
+        df = query_df("SELECT * FROM time_records ORDER BY id")
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return [dict(r) for _, r in df.where(pd.notna(df), "").iterrows()]
+    except Exception:
+        pass
+    return []
+
+
+def _v151_query_rows_by_ids(ids) -> pd.DataFrame:
+    clean: list[int] = []
+    for x in ids or []:
+        try:
+            i = int(float(str(x).strip()))
+            if i > 0 and i not in clean:
+                clean.append(i)
+        except Exception:
+            continue
+    if not clean:
+        return pd.DataFrame()
+    try:
+        ph = ",".join(["?"] * len(clean))
+        return query_df(f"SELECT * FROM time_records WHERE id IN ({ph}) ORDER BY id", clean)
+    except Exception:
+        rows = []
+        for i in clean:
+            try:
+                r = query_one("SELECT * FROM time_records WHERE id=?", (i,)) or {}
+                if r:
+                    rows.append(r)
+            except Exception:
+                pass
+        return pd.DataFrame(rows)
+
+
+def _v151_load_authority_rows(module_key: str) -> list[dict]:
+    try:
+        from services.permanent_authority_service import load_tables as _pa_load_tables
+        rows = (_pa_load_tables(module_key, "records") or {}).get("time_records", [])
+        return [dict(r) for r in rows if isinstance(r, dict)]
+    except Exception:
+        return []
+
+
+def _v151_load_shard_rows() -> list[dict]:
+    rows: list[dict] = []
+    seen_files: set[str] = set()
+    for module_key in _V151_SHARD_MODULES:
+        root = _V151_PROJECT_ROOT / "data" / "permanent_store" / "modules" / module_key / "time_record_rows"
+        if not root.exists():
+            continue
+        for p in sorted(root.glob("**/*.json")):
+            sp = str(p.resolve())
+            if sp in seen_files:
+                continue
+            seen_files.add(sp)
+            try:
+                data = _v151_json.loads(p.read_text(encoding="utf-8"))
+                row = data.get("row") if isinstance(data, dict) else None
+                if isinstance(row, dict):
+                    rows.append(dict(row))
+            except Exception:
+                continue
+    return rows
+
+
+def _v151_atomic_write_json(path: _v151_Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(_v151_json.dumps(payload, ensure_ascii=False, indent=2, default=_v151_json_default), encoding="utf-8")
+    # Validate before replace.
+    _v151_json.loads(tmp.read_text(encoding="utf-8"))
+    _v151_os.replace(tmp, path)
+
+
+def _v151_github_upload_file(path: _v151_Path, reason: str) -> dict:
+    try:
+        # Row shards are small and path-unique. Uploading them prevents Reboot from losing rows while avoiding full records.json races.
+        if str(_v151_os.environ.get("SPT_TIME_RECORD_ROW_SHARD_GITHUB", "1")).strip().lower() in {"0", "false", "no", "off"}:
+            return {"ok": True, "skipped": True, "reason": "disabled_by_env"}
+        from services.permanent_authority_service import github_put_file as _pa_github_put_file
+        return _pa_github_put_file(path, path.read_text(encoding="utf-8"), f"SPT V151 time record row shard: {reason}")
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300]}
+
+
+def _v151_write_row_shards(rows, reason: str = "v151_row_shard", *, github: bool = True) -> int:
+    if isinstance(rows, pd.DataFrame):
+        iterable = [dict(r) for _, r in rows.where(pd.notna(rows), "").iterrows()]
+    elif isinstance(rows, list):
+        iterable = [dict(r) for r in rows if isinstance(r, dict)]
+    elif isinstance(rows, dict):
+        iterable = [dict(rows)]
+    else:
+        iterable = []
+    if not iterable:
+        return 0
+    wrote = 0
+    with _V151_ROW_SHARD_LOCK:
+        for row in iterable:
+            if not row:
+                continue
+            payload = {
+                "schema": "SPT-TimeRecordRowShard-V151",
+                "reason": reason,
+                "saved_at": _now() if "_now" in globals() else now_text(),
+                "identity_key": _v151_identity_key(row),
+                "row": row,
+            }
+            # local mirror to both modules for current runtime; GitHub upload only needs 02_history shard.
+            for module_key in _V151_SHARD_MODULES:
+                p = _v151_shard_path(module_key, row)
+                try:
+                    _v151_atomic_write_json(p, payload)
+                    wrote += 1
+                except Exception as exc:
+                    try:
+                        write_log("V151_ROW_SHARD_WRITE_ERROR", f"寫入 row shard 失敗 {p}: {exc}", "time_records", _v151_row_id(row), level="ERROR")
+                    except Exception:
+                        pass
+            if github:
+                try:
+                    p2 = _v151_shard_path("02_history", row)
+                    res = _v151_github_upload_file(p2, reason)
+                    if not res.get("ok"):
+                        write_log("V151_ROW_SHARD_GITHUB_ERROR", f"row shard 上傳 GitHub 失敗：{res}", "time_records", _v151_row_id(row), level="ERROR")
+                except Exception:
+                    pass
+    return wrote
+
+
+def _v151_save_canonical_non_destructive(extra_rows=None, reason: str = "v151_non_destructive_merge", *, github: bool = False) -> int:
+    try:
+        existing01 = _v151_load_authority_rows("01_time_records")
+        existing02 = _v151_load_authority_rows("02_history")
+        shards = _v151_load_shard_rows()
+        sqlite_rows = _v151_sqlite_all_rows()
+        if isinstance(extra_rows, pd.DataFrame):
+            extra = [dict(r) for _, r in extra_rows.where(pd.notna(extra_rows), "").iterrows()]
+        elif isinstance(extra_rows, list):
+            extra = [dict(r) for r in extra_rows if isinstance(r, dict)]
+        elif isinstance(extra_rows, dict):
+            extra = [dict(extra_rows)]
+        else:
+            extra = []
+        merged = _v151_merge_rows(existing01, existing02, shards, sqlite_rows, extra)
+        from services.permanent_authority_service import save_authority as _pa_save_authority
+        # Full records.json is a snapshot only; V151 row_shards are the durable row-level source. Keep full snapshot local-first to avoid full-file races on GitHub.
+        _pa_save_authority("01_time_records", records={"time_records": merged}, reason=f"{reason}_01", github=False)
+        _pa_save_authority("02_history", records={"time_records": merged}, reason=f"{reason}_02", github=bool(github))
+        return int(len(merged))
+    except Exception as exc:
+        try:
+            write_log("V151_CANONICAL_MERGE_ERROR", f"非破壞式合併 01/02 工時權威檔失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        return 0
+
+
+def _v151_filter_records_df(df: pd.DataFrame, start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    if start_date:
+        if "start_date" in out.columns:
+            out = out[out["start_date"].astype(str) >= str(start_date)]
+        elif "start_timestamp" in out.columns:
+            out = out[out["start_timestamp"].astype(str).str[:10] >= str(start_date)]
+    if end_date:
+        if "start_date" in out.columns:
+            out = out[out["start_date"].astype(str) <= str(end_date)]
+        elif "start_timestamp" in out.columns:
+            out = out[out["start_timestamp"].astype(str).str[:10] <= str(end_date)]
+    if employee_id and "employee_id" in out.columns:
+        out = out[out["employee_id"].astype(str) == str(employee_id)]
+    if work_order and "work_order" in out.columns:
+        out = out[out["work_order"].astype(str) == str(work_order)]
+    try:
+        if "id" in out.columns:
+            out["_v151_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values("_v151_sort_id", ascending=False, kind="stable").drop(columns=["_v151_sort_id"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v151_all_records_df() -> pd.DataFrame:
+    rows = _v151_merge_rows(
+        _v151_load_authority_rows("01_time_records"),
+        _v151_load_authority_rows("02_history"),
+        _v151_load_shard_rows(),
+        _v151_sqlite_all_rows(),
+    )
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    base_df = pd.DataFrame()
+    try:
+        if callable(_v151_prev_load_records):
+            base_df = _v151_prev_load_records(start_date, end_date, employee_id, work_order)
+    except Exception:
+        base_df = pd.DataFrame()
+    all_rows = _v151_merge_rows(
+        base_df if isinstance(base_df, pd.DataFrame) else pd.DataFrame(),
+        _v151_load_authority_rows("01_time_records"),
+        _v151_load_authority_rows("02_history"),
+        _v151_load_shard_rows(),
+        _v151_sqlite_all_rows(),
+    )
+    return _v151_filter_records_df(pd.DataFrame(all_rows), start_date, end_date, employee_id, work_order)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    base_df = pd.DataFrame()
+    try:
+        if callable(_v151_prev_today_records):
+            base_df = _v151_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+    except Exception:
+        base_df = pd.DataFrame()
+    rows = _v151_merge_rows(base_df, _v151_load_shard_rows(), _v151_sqlite_all_rows())
+    df = pd.DataFrame(rows) if rows else pd.DataFrame()
+    if df.empty:
+        return df
+    try:
+        cycle_start = _business_cycle_start_date() if "_business_cycle_start_date" in globals() else today_text()
+    except Exception:
+        cycle_start = today_text()
+    def _is_active_row(r: dict) -> bool:
+        return (not _v151_is_terminal(r)) and (_v151_text(r.get("end_timestamp")) == "") and (_v151_text(r.get("status")) in {"", "作業中"})
+    active_mask = df.apply(lambda r: _is_active_row(dict(r)), axis=1)
+    if unfinished_only:
+        df = df.loc[active_mask].copy()
+    else:
+        if "start_date" in df.columns:
+            current = df["start_date"].astype(str) >= str(cycle_start)
+        elif "start_timestamp" in df.columns:
+            current = df["start_timestamp"].astype(str).str[:10] >= str(cycle_start)
+        else:
+            current = pd.Series([True] * len(df), index=df.index)
+        df = df.loc[current | active_mask].copy()
+    return _v151_filter_records_df(df)
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v151_prev_start_work):
+        raise RuntimeError("start_work core implementation is unavailable")
+    rid = int(_v151_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        rows_df = _v151_query_rows_by_ids([rid])
+        if isinstance(rows_df, pd.DataFrame) and not rows_df.empty:
+            _v151_write_row_shards(rows_df, "start_work_v151_durable_row", github=True)
+            _v151_save_canonical_non_destructive(rows_df, "start_work_v151_non_destructive_snapshot", github=False)
+        try:
+            clear_query_cache()
+        except Exception:
+            pass
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v151_prev_finish_work):
+        raise RuntimeError("finish_work core implementation is unavailable")
+    before_ids: list[int] = []
+    try:
+        group = get_active_group(int(float(str(record_id).strip()))) if finish_parallel_group else pd.DataFrame()
+        if isinstance(group, pd.DataFrame) and not group.empty and "id" in group.columns:
+            before_ids = [int(float(str(x))) for x in group["id"].tolist() if _v151_text(x)]
+    except Exception:
+        before_ids = []
+    if not before_ids:
+        try:
+            before_ids = [int(float(str(record_id).strip()))]
+        except Exception:
+            before_ids = []
+    n = int(_v151_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    ids = before_ids or [record_id]
+    rows_df = _v151_query_rows_by_ids(ids)
+    if isinstance(rows_df, pd.DataFrame) and not rows_df.empty:
+        _v151_write_row_shards(rows_df, "finish_work_v151_durable_row", github=True)
+        _v151_save_canonical_non_destructive(rows_df, "finish_work_v151_non_destructive_snapshot", github=False)
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return n
+
+
+def sync_time_records_01_02_now(reason: str = "v151_manual_non_destructive_sync", *, github: bool = True) -> int:  # type: ignore[override]
+    # Manual sync consolidates records + row_shards + SQLite into a safe snapshot. It never uses a smaller partial table to erase history.
+    n = _v151_save_canonical_non_destructive(None, reason, github=bool(github))
+    return int(n or 0)
+
+
+def audit_time_record_integrity_v151() -> dict:
+    """Diagnostic helper for 09/12/manual checks; no writes."""
+    try:
+        authority = _v151_merge_rows(_v151_load_authority_rows("01_time_records"), _v151_load_authority_rows("02_history"))
+        shards = _v151_load_shard_rows()
+        sqlite_rows = _v151_sqlite_all_rows()
+        merged = _v151_merge_rows(authority, shards, sqlite_rows)
+        return {
+            "authority_rows": len(authority),
+            "row_shards": len(shards),
+            "sqlite_rows": len(sqlite_rows),
+            "merged_rows": len(merged),
+            "missing_from_authority_recoverable": max(0, len(merged) - len(authority)),
+        }
+    except Exception as exc:
+        return {"error": str(exc)[:500]}
+
+# =================== END V151 TIME RECORD DURABLE ROW SHARD + NON-DESTRUCTIVE MERGE ===================
+
+# ===================== V152 APPEND-ONLY EVENT JOURNAL + TRANSACTION SAFETY LAYER =====================
+# 目的：把工時紀錄提升成「交易型紀錄」：每次開始、暫停、完工、下班、手動修改、刪除、重算，
+# 都另外寫入不可覆蓋的 append-only event journal。records.json / row shard / SQLite 都可以用來顯示，
+# 但 event journal 是防止多人同時寫入時資料被整包覆蓋的重建依據。
+
+try:
+    from services.time_record_event_journal_service import (
+        append_time_record_event as _v152_append_event,
+        rebuild_latest_rows_from_events as _v152_rebuild_rows_from_events,
+        audit_time_record_event_journal as _v152_audit_event_journal,
+        flush_time_record_event_journal_now as _v152_flush_event_journal_now,
+        ensure_time_record_event_schema as _v152_ensure_event_schema,
+    )
+except Exception:  # pragma: no cover
+    _v152_append_event = None  # type: ignore
+    _v152_rebuild_rows_from_events = None  # type: ignore
+    _v152_audit_event_journal = None  # type: ignore
+    _v152_flush_event_journal_now = None  # type: ignore
+    _v152_ensure_event_schema = None  # type: ignore
+
+try:
+    _v152_prev_start_work = start_work
+except Exception:
+    _v152_prev_start_work = None
+try:
+    _v152_prev_finish_work = finish_work
+except Exception:
+    _v152_prev_finish_work = None
+try:
+    _v152_prev_save_time_records = save_time_records
+except Exception:
+    _v152_prev_save_time_records = None
+try:
+    _v152_prev_delete_time_records = delete_time_records
+except Exception:
+    _v152_prev_delete_time_records = None
+try:
+    _v152_prev_recalculate_time_records = recalculate_time_records
+except Exception:
+    _v152_prev_recalculate_time_records = None
+try:
+    _v152_prev_import_time_records = import_time_records
+except Exception:
+    _v152_prev_import_time_records = None
+try:
+    _v152_prev_load_records = load_records
+except Exception:
+    _v152_prev_load_records = None
+try:
+    _v152_prev_today_records = today_records
+except Exception:
+    _v152_prev_today_records = None
+try:
+    _v152_prev_flush_time_record_authority_upload_now = flush_time_record_authority_upload_now
+except Exception:
+    _v152_prev_flush_time_record_authority_upload_now = None
+
+# V151 包了一層同步 row shard 且可能同步 GitHub。V152 高頻開始/結束優先使用 V151 前一層核心，
+# 再自行寫入 event journal + 本機 row shard，避免每次現場操作等待 GitHub。
+_v152_core_start_work = globals().get("_v151_prev_start_work") or _v152_prev_start_work
+_v152_core_finish_work = globals().get("_v151_prev_finish_work") or _v152_prev_finish_work
+
+
+def _v152_event_type_for_end_action(end_action: str) -> str:
+    action = str(end_action or "").strip()
+    if action == "暫停":
+        return "PAUSE_WORK"
+    if action == "下班":
+        return "OFF_DUTY"
+    if action == "完工":
+        return "FINISH_WORK"
+    return "END_WORK"
+
+
+def _v152_query_rows(ids) -> pd.DataFrame:
+    try:
+        if "_v151_query_rows_by_ids" in globals():
+            return _v151_query_rows_by_ids(ids)
+    except Exception:
+        pass
+    try:
+        clean = []
+        for x in ids or []:
+            try:
+                i = int(float(str(x).strip()))
+                if i > 0 and i not in clean:
+                    clean.append(i)
+            except Exception:
+                continue
+        if not clean:
+            return pd.DataFrame()
+        ph = ",".join(["?"] * len(clean))
+        return query_df(f"SELECT * FROM time_records WHERE id IN ({ph}) ORDER BY id", clean)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v152_rows_to_records(rows) -> list[dict]:
+    if rows is None:
+        return []
+    if isinstance(rows, pd.DataFrame):
+        if rows.empty:
+            return []
+        try:
+            clean = rows.copy().where(pd.notna(rows), "")
+            return [dict(r) for _, r in clean.iterrows()]
+        except Exception:
+            return []
+    if isinstance(rows, dict):
+        return [dict(rows)]
+    if isinstance(rows, list):
+        return [dict(r) for r in rows if isinstance(r, dict)]
+    return []
+
+
+def _v152_write_durable_layers(rows, reason: str, *, event_type: str = "TIME_RECORD_CHANGE", github: bool = False, extra: dict | None = None) -> int:
+    """Write event journal + V151 row shards + non-destructive snapshots.
+
+    High-frequency calls use github=False to avoid blocking 50 operators.  The event
+    journal schedules its own background upload.  Admin/explicit sync can still pass
+    github=True through sync_time_records_01_02_now / flush helpers.
+    """
+    records = _v152_rows_to_records(rows)
+    if not records:
+        return 0
+    try:
+        if callable(_v152_append_event):
+            _v152_append_event(event_type, records, reason=reason, payload_extra=extra or {}, schedule_upload=True)
+    except Exception as exc:
+        try:
+            write_log("V152_EVENT_APPEND_ERROR", f"工時事件紀錄寫入失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        if "_v151_write_row_shards" in globals():
+            _v151_write_row_shards(records, reason, github=bool(github))
+    except Exception as exc:
+        try:
+            write_log("V152_ROW_SHARD_WRITE_ERROR", f"V152 row shard 寫入失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        if "_v151_save_canonical_non_destructive" in globals():
+            _v151_save_canonical_non_destructive(records, reason, github=bool(github))
+    except Exception as exc:
+        try:
+            write_log("V152_NON_DESTRUCTIVE_SNAPSHOT_ERROR", f"V152 非破壞式快照同步失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return len(records)
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V152 fast transaction path: SQL business write + append-only event journal."""
+    if callable(_v152_ensure_event_schema):
+        try:
+            _v152_ensure_event_schema()
+        except Exception:
+            pass
+    if not callable(_v152_core_start_work):
+        raise RuntimeError("start_work core implementation is unavailable")
+    rid = int(_v152_core_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        rows_df = _v152_query_rows([rid])
+        _v152_write_durable_layers(
+            rows_df,
+            "start_work_v152_event_journal",
+            event_type="START_WORK",
+            github=False,
+            extra={"employee": employee or {}, "work_order": work_order or {}, "process_name": process_name},
+        )
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V152 finish path keeps full group event proof, not only first row."""
+    if callable(_v152_ensure_event_schema):
+        try:
+            _v152_ensure_event_schema()
+        except Exception:
+            pass
+    before_ids: list[int] = []
+    try:
+        rid0 = int(float(str(record_id).strip()))
+        group = get_active_group(rid0) if finish_parallel_group else pd.DataFrame()
+        if isinstance(group, pd.DataFrame) and not group.empty and "id" in group.columns:
+            for x in group["id"].tolist():
+                try:
+                    i = int(float(str(x).strip()))
+                    if i not in before_ids:
+                        before_ids.append(i)
+                except Exception:
+                    pass
+        if rid0 not in before_ids:
+            before_ids.append(rid0)
+    except Exception:
+        try:
+            before_ids = [int(float(str(record_id).strip()))]
+        except Exception:
+            before_ids = []
+    if not callable(_v152_core_finish_work):
+        raise RuntimeError("finish_work core implementation is unavailable")
+    n = int(_v152_core_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n or before_ids:
+        rows_df = _v152_query_rows(before_ids)
+        _v152_write_durable_layers(
+            rows_df,
+            "finish_work_v152_event_journal",
+            event_type=_v152_event_type_for_end_action(end_action),
+            github=False,
+            extra={"end_action": end_action, "remark": remark, "finish_parallel_group": bool(finish_parallel_group), "affected_ids": before_ids},
+        )
+    return n
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    if not callable(_v152_prev_save_time_records):
+        return 0
+    n = int(_v152_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    if n:
+        # Save operation is admin-level; event proof is append-only, snapshot remains non-destructive.
+        try:
+            rows = df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+            _v152_write_durable_layers(rows, "save_time_records_v152_manual_edit", event_type="MANUAL_EDIT", github=False, extra={"recalc_edited_timestamps": bool(recalc_edited_timestamps)})
+        except Exception:
+            pass
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    # Append delete proof before deleting.  Existing tombstone/soft-delete logic remains in previous wrapper.
+    ids = []
+    for x in record_ids or []:
+        try:
+            i = int(float(str(x).strip()))
+            if i > 0 and i not in ids:
+                ids.append(i)
+        except Exception:
+            pass
+    before_df = _v152_query_rows(ids)
+    if isinstance(before_df, pd.DataFrame) and not before_df.empty:
+        _v152_write_durable_layers(before_df, "delete_time_records_v152_before_delete", event_type="DELETE_MARK", github=False, extra={"reason": reason, "record_ids": ids})
+    if not callable(_v152_prev_delete_time_records):
+        return 0
+    n = int(_v152_prev_delete_time_records(record_ids, reason=reason) or 0)
+    return n
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    if not callable(_v152_prev_recalculate_time_records):
+        return 0
+    n = int(_v152_prev_recalculate_time_records(record_ids) or 0)
+    if n:
+        rows_df = _v152_query_rows(record_ids or []) if record_ids else load_records()
+        _v152_write_durable_layers(rows_df, "recalculate_time_records_v152_event", event_type="RECALCULATE", github=False, extra={"record_ids": record_ids or []})
+    return n
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    if not callable(_v152_prev_import_time_records):
+        return {"inserted": 0, "updated": 0, "skipped": 0}
+    result = _v152_prev_import_time_records(df, recalc=recalc, source=source)
+    try:
+        changed = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
+    except Exception:
+        changed = 0
+    if changed:
+        _v152_write_durable_layers(df if isinstance(df, pd.DataFrame) else pd.DataFrame(), "import_time_records_v152_event", event_type="IMPORT_TIME_RECORDS", github=False, extra={"source": source, "result": result})
+    return result
+
+
+def _v152_event_rows_df() -> pd.DataFrame:
+    try:
+        if callable(_v152_rebuild_rows_from_events):
+            rows = _v152_rebuild_rows_from_events()
+            return pd.DataFrame(rows) if rows else pd.DataFrame()
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    base = pd.DataFrame()
+    try:
+        if callable(_v152_prev_load_records):
+            base = _v152_prev_load_records(start_date, end_date, employee_id, work_order)
+    except Exception:
+        base = pd.DataFrame()
+    ev_df = _v152_event_rows_df()
+    try:
+        if "_v151_merge_rows" in globals():
+            rows = _v151_merge_rows(base, ev_df)
+            return _v151_filter_records_df(pd.DataFrame(rows), start_date, end_date, employee_id, work_order)
+    except Exception:
+        pass
+    return base if isinstance(base, pd.DataFrame) else pd.DataFrame()
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    base = pd.DataFrame()
+    try:
+        if callable(_v152_prev_today_records):
+            base = _v152_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+    except Exception:
+        base = pd.DataFrame()
+    ev_df = _v152_event_rows_df()
+    try:
+        if "_v151_merge_rows" in globals():
+            rows = _v151_merge_rows(base, ev_df)
+            df = pd.DataFrame(rows) if rows else pd.DataFrame()
+            if df.empty:
+                return df
+            # Reapply active/today display rule from V151 so event repair cannot re-show terminal rows as active.
+            try:
+                cycle_start = _business_cycle_start_date() if "_business_cycle_start_date" in globals() else today_text()
+            except Exception:
+                cycle_start = today_text()
+            def _is_active_row_v152(r: dict) -> bool:
+                try:
+                    terminal = _v151_is_terminal(r) if "_v151_is_terminal" in globals() else str(r.get("status") or "").strip() in {"暫停", "下班", "完工", "已結束"}
+                except Exception:
+                    terminal = False
+                end_ts = str(r.get("end_timestamp") or "").strip().lower()
+                status = str(r.get("status") or "").strip()
+                return (not terminal) and end_ts in {"", "none", "nan", "nat"} and status in {"", "作業中"}
+            active_mask = df.apply(lambda r: _is_active_row_v152(dict(r)), axis=1)
+            if unfinished_only:
+                df = df.loc[active_mask].copy()
+            else:
+                if "start_date" in df.columns:
+                    current = df["start_date"].astype(str) >= str(cycle_start)
+                elif "start_timestamp" in df.columns:
+                    current = df["start_timestamp"].astype(str).str[:10] >= str(cycle_start)
+                else:
+                    current = pd.Series([True] * len(df), index=df.index)
+                df = df.loc[current | active_mask].copy()
+            return _v151_filter_records_df(df)
+    except Exception:
+        pass
+    return base if isinstance(base, pd.DataFrame) else pd.DataFrame()
+
+
+def repair_time_records_from_events_v152(reason: str = "manual_repair_from_v152_events", *, github: bool = True) -> dict:
+    """Non-destructive repair: merge append-only events back into 01/02 snapshots.
+
+    This function is safe for diagnostics/admin tools.  It never uses a smaller
+    dataframe to erase history; it only adds/updates rows by record_key/business key.
+    """
+    ev_df = _v152_event_rows_df()
+    ev_count = int(len(ev_df)) if isinstance(ev_df, pd.DataFrame) else 0
+    synced = 0
+    if ev_count:
+        try:
+            synced = int(_v151_save_canonical_non_destructive(ev_df, reason, github=bool(github)) or 0) if "_v151_save_canonical_non_destructive" in globals() else 0
+        except Exception as exc:
+            try:
+                write_log("V152_EVENT_REPAIR_ERROR", f"從事件紀錄修復 01/02 失敗：{exc}", "time_records", level="ERROR")
+            except Exception:
+                pass
+    try:
+        if callable(_v152_flush_event_journal_now):
+            _v152_flush_event_journal_now("repair_time_records_from_events_v152_flush", limit=300)
+    except Exception:
+        pass
+    return {"event_rebuilt_rows": ev_count, "synced_snapshot_rows": synced}
+
+
+def sync_time_records_01_02_now(reason: str = "v152_manual_safe_sync", *, github: bool = True) -> int:  # type: ignore[override]
+    # First consolidate V151 layers, then merge event journal rows; never use partial table to erase history.
+    base_n = 0
+    try:
+        if "_v151_save_canonical_non_destructive" in globals():
+            base_n = int(_v151_save_canonical_non_destructive(None, reason + "_v151", github=bool(github)) or 0)
+    except Exception:
+        base_n = 0
+    repair = repair_time_records_from_events_v152(reason + "_events", github=bool(github))
+    return max(base_n, int(repair.get("synced_snapshot_rows") or 0))
+
+
+def flush_time_record_authority_upload_now(reason: str = "v152_flush_time_authority_and_events") -> bool:  # type: ignore[override]
+    ok = False
+    try:
+        if callable(_v152_prev_flush_time_record_authority_upload_now):
+            ok = bool(_v152_prev_flush_time_record_authority_upload_now(reason))
+    except Exception:
+        ok = False
+    try:
+        if callable(_v152_flush_event_journal_now):
+            res = _v152_flush_event_journal_now(reason + "_event_journal", limit=500)
+            ok = bool(ok or res.get("ok") or res.get("uploaded", 0) >= 0)
+    except Exception:
+        pass
+    return bool(ok)
+
+
+def audit_time_record_integrity_v152() -> dict:
+    out: dict = {}
+    try:
+        if "audit_time_record_integrity_v151" in globals():
+            out["v151"] = audit_time_record_integrity_v151()
+    except Exception as exc:
+        out["v151_error"] = str(exc)[:300]
+    try:
+        out["event_journal"] = _v152_audit_event_journal() if callable(_v152_audit_event_journal) else {"error": "event_journal_unavailable"}
+    except Exception as exc:
+        out["event_journal_error"] = str(exc)[:300]
+    try:
+        df = load_records()
+        out["visible_history_rows"] = int(len(df)) if isinstance(df, pd.DataFrame) else 0
+    except Exception as exc:
+        out["visible_history_error"] = str(exc)[:300]
+    return out
+
+# =================== END V152 APPEND-ONLY EVENT JOURNAL + TRANSACTION SAFETY LAYER =====================
+
+# ===================== V175 01 FAST DISPLAY + TODAY/HISTORY CONSISTENCY =====================
+# 目的：
+# 1) 01 工時紀錄在「結束目前作業」到「今日已結束紀錄 / Today Finished Records」之間，
+#    不再因每次 rerun 都掃 SQLite + 01/02 authority + event journal + 自動回補而等待很久。
+# 2) 「今日工時紀錄 / Today Records」必須與「02 歷史紀錄 / Editable History」一致；
+#    02 已刪除的紀錄不可再被 SQLite 舊快取或 event journal 救回到 01 今日工時紀錄。
+# 3) 不改畫面、不改 CSS、不改 theme、不改表格渲染、不改欄位顯示；只改後端查詢來源與顯示讀取路徑。
+# 4) 開始/結束作業仍保留原本交易流程、event journal、row shard、LOG 與 01/02 權威檔寫入。
+
+import time as _v175_time
+
+try:
+    _v175_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v175_prev_today_records = None
+try:
+    _v175_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v175_prev_load_records = None
+try:
+    _v175_prev_refresh_active_records_for_employee = refresh_active_records_for_employee
+except Exception:  # pragma: no cover
+    _v175_prev_refresh_active_records_for_employee = None
+try:
+    _v175_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v175_prev_get_active_record = None
+try:
+    _v175_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v175_prev_start_work = None
+try:
+    _v175_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v175_prev_finish_work = None
+
+_V175_REFRESH_ACTIVE_TTL: dict[str, tuple[float, int]] = {}
+_V175_REFRESH_ACTIVE_TTL_SEC = 20.0
+
+
+def _v175_blank(value) -> bool:
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    if value is None:
+        return True
+    return str(value).strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _v175_text(value) -> str:
+    if _v175_blank(value):
+        return ""
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
+    return str(value).strip()
+
+
+def _v175_int(value):
+    if _v175_blank(value):
+        return None
+    try:
+        return int(float(str(value).strip()))
+    except Exception:
+        return None
+
+
+def _v175_clean_df(df: pd.DataFrame | None) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame):
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        out = out.loc[:, ~pd.Index(out.columns).duplicated()].copy()
+        out = out.where(pd.notna(out), "")
+    except Exception:
+        pass
+    # 移除純 UI 勾選欄，避免保存/比對時被當成資料欄。
+    ui_cols = {"刪除", "刪除 / Delete", "重算", "重算 / Recalc", "選取", "Select", "selected", "__selected__", "_selected", "_row_selected", "Delete", "Recalc"}
+    drop = [c for c in out.columns if str(c).strip() in ui_cols]
+    if drop:
+        out = out.drop(columns=drop, errors="ignore")
+    return out.reset_index(drop=True)
+
+
+def _v175_filter_deleted(df: pd.DataFrame | None) -> pd.DataFrame:
+    out = _v175_clean_df(df)
+    if out.empty:
+        return out
+    # 沿用既有 tombstone / delete-state 過濾器。這是防止 02 刪除後被 SQLite 舊資料救回的核心。
+    for name in ("_v137_filter_deleted", "_v134_filter_deleted", "_v151_filter_deleted_df", "_v97_filter_deleted_df", "_v98_filter_deleted", "_v94_filter_deleted_df", "_v96_filter_tombstone"):
+        try:
+            fn = globals().get(name)
+            if callable(fn):
+                tmp = fn(out)
+                if isinstance(tmp, pd.DataFrame):
+                    out = _v175_clean_df(tmp)
+        except Exception:
+            pass
+    return out.reset_index(drop=True)
+
+
+def _v175_authority_df(module_key: str) -> pd.DataFrame:
+    """Read local 01/02 authority only; never merge SQLite/event journal for display.
+
+    SQLite / event journal are durable recovery layers, but Today Records must mirror
+    02 Editable History.  If a row was deleted from 02, it must not reappear in 01
+    merely because an old SQLite cache row still exists.
+    """
+    # Prefer existing local helper because it already knows current authority layout.
+    try:
+        fn = globals().get("_v137_authority_df") or globals().get("_v134_authority_df") or globals().get("_v98_authority_df")
+        if callable(fn):
+            df = fn(module_key)
+            if isinstance(df, pd.DataFrame):
+                return _v175_filter_deleted(df)
+    except Exception:
+        pass
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df_from_table  # type: ignore
+        return _v175_filter_deleted(_pa_df_from_table(module_key, "time_records"))
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v175_history_source_df() -> pd.DataFrame:
+    """02_history is the display authority. 01 is used only as a fallback when 02 is empty."""
+    hist = _v175_authority_df("02_history")
+    if isinstance(hist, pd.DataFrame) and not hist.empty:
+        return hist.reset_index(drop=True)
+    live = _v175_authority_df("01_time_records")
+    return live.reset_index(drop=True) if isinstance(live, pd.DataFrame) else pd.DataFrame()
+
+
+def _v175_row_date(row: dict) -> str:
+    for c in ("start_date", "開始日期 / Start Date", "開始日期", "date", "日期"):
+        if c in row and not _v175_blank(row.get(c)):
+            return _v175_text(row.get(c))[:10]
+    for c in ("start_timestamp", "開始時間戳 / Start Timestamp", "開始時間 / Start Timestamp", "開始時間"):
+        if c in row and not _v175_blank(row.get(c)):
+            return _v175_text(row.get(c))[:10]
+    return ""
+
+
+def _v175_is_terminal(row: dict) -> bool:
+    try:
+        fn = globals().get("_v151_is_terminal")
+        if callable(fn):
+            return bool(fn(row))
+    except Exception:
+        pass
+    status = _v175_text(row.get("status") or row.get("狀態 / Status") or row.get("狀態"))
+    end_ts = _v175_text(row.get("end_timestamp") or row.get("結束時間戳 / End Timestamp") or row.get("結束時間 / End Timestamp") or row.get("結束時間"))
+    end_date = _v175_text(row.get("end_date") or row.get("結束日期 / End Date") or row.get("結束日期"))
+    end_time = _v175_text(row.get("end_time") or row.get("結束時刻 / End Time") or row.get("結束時刻"))
+    return bool(status in {"下班", "暫停", "完工", "已結束", "結束", "Off Duty", "Pause", "Complete", "Finished"} or end_ts or (end_date and end_time))
+
+
+def _v175_is_active(row: dict) -> bool:
+    status = _v175_text(row.get("status") or row.get("狀態 / Status") or row.get("狀態"))
+    end_ts = _v175_text(row.get("end_timestamp") or row.get("結束時間戳 / End Timestamp") or row.get("結束時間 / End Timestamp") or row.get("結束時間"))
+    if status and status != "作業中":
+        return False
+    return not _v175_is_terminal(row) and _v175_blank(end_ts)
+
+
+def _v175_business_cycle_start() -> str:
+    try:
+        fn = globals().get("_business_cycle_start_date")
+        if callable(fn):
+            return str(fn())[:10]
+    except Exception:
+        pass
+    try:
+        return str(today_text())[:10]
+    except Exception:
+        return datetime.now().strftime("%Y-%m-%d")
+
+
+def _v175_apply_common_filters(df: pd.DataFrame, start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:
+    out = _v175_filter_deleted(df)
+    if out.empty:
+        return out
+    if start_date:
+        dates = out.apply(lambda r: _v175_row_date(dict(r)), axis=1)
+        out = out.loc[dates.astype(str) >= str(start_date)[:10]].copy()
+    if end_date:
+        dates = out.apply(lambda r: _v175_row_date(dict(r)), axis=1)
+        out = out.loc[dates.astype(str) <= str(end_date)[:10]].copy()
+    if employee_id:
+        emp_cols = [c for c in ("employee_id", "工號", "工號 / Employee ID", "Employee ID") if c in out.columns]
+        if emp_cols:
+            mask = pd.Series([False] * len(out), index=out.index)
+            for c in emp_cols:
+                mask = mask | out[c].astype(str).str.strip().eq(str(employee_id).strip())
+            out = out.loc[mask].copy()
+    if work_order:
+        wo_cols = [c for c in ("work_order", "製令", "製令 / Work Order", "Work Order") if c in out.columns]
+        if wo_cols:
+            mask = pd.Series([False] * len(out), index=out.index)
+            for c in wo_cols:
+                mask = mask | out[c].astype(str).str.strip().eq(str(work_order).strip())
+            out = out.loc[mask].copy()
+    return out.reset_index(drop=True)
+
+
+def _v175_sort_records(df: pd.DataFrame) -> pd.DataFrame:
+    out = _v175_clean_df(df)
+    if out.empty:
+        return out
+    sort_cols = []
+    if "id" in out.columns:
+        try:
+            out["_v175_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+            sort_cols.append("_v175_sort_id")
+        except Exception:
+            pass
+    if "start_timestamp" in out.columns:
+        try:
+            out["_v175_sort_ts"] = pd.to_datetime(out["start_timestamp"], errors="coerce")
+            sort_cols.insert(0, "_v175_sort_ts")
+        except Exception:
+            pass
+    if sort_cols:
+        try:
+            out = out.sort_values(sort_cols, ascending=[False] * len(sort_cols), kind="stable")
+        except Exception:
+            pass
+    return out.drop(columns=["_v175_sort_id", "_v175_sort_ts"], errors="ignore").reset_index(drop=True)
+
+
+def _v175_record_perf(name: str, started: float) -> None:
+    try:
+        elapsed_ms = int((_v175_time.perf_counter() - started) * 1000)
+        # 若 V171 profiler 已套用，就記錄到 profiler；否則不額外寫 LOG，避免為了量測拖慢現場操作。
+        try:
+            from services.performance_profiler_service import record_perf_event  # type: ignore
+            record_perf_event(name=name, elapsed_ms=elapsed_ms, category="time_record_display", detail="V175")
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V175: 02 history display source = 02_history authority, not SQLite cache.
+
+    This makes 02 Editable History and 01 Today Records consistent and prevents
+    deleted history rows from coming back through old runtime caches.
+    """
+    t0 = _v175_time.perf_counter()
+    try:
+        df = _v175_history_source_df()
+        df = _v175_apply_common_filters(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+        return _v175_sort_records(df)
+    finally:
+        _v175_record_perf("time_record_service.load_records.v175_authority_only", t0)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """V175: Today Records mirrors 02_history and never resurrects deleted rows.
+
+    It deliberately does not call display self-repair, event rebuild, or SQLite merge.
+    Recovery is still available in 14 Health Center, but normal 01 display must not
+    use recovery layers to override 02 user deletions.
+    """
+    t0 = _v175_time.perf_counter()
+    try:
+        df = _v175_history_source_df()
+        if df.empty:
+            return pd.DataFrame()
+        rows = []
+        cycle_start = _v175_business_cycle_start()
+        for _, rr in df.iterrows():
+            r = dict(rr)
+            active = _v175_is_active(r)
+            if unfinished_only or not include_finished:
+                if active:
+                    rows.append(r)
+                continue
+            row_date = _v175_row_date(r)
+            if active or (row_date and row_date >= str(cycle_start)):
+                rows.append(r)
+        if not rows:
+            return pd.DataFrame(columns=list(df.columns))
+        return _v175_sort_records(pd.DataFrame(rows))
+    finally:
+        _v175_record_perf("time_record_service.today_records.v175_authority_only", t0)
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    """V175: fast active lookup; supports employee_name used by 01 page without TypeError fallback."""
+    try:
+        sql = """
+            SELECT * FROM time_records
+            WHERE employee_id=?
+              AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='' OR LOWER(TRIM(COALESCE(end_timestamp,''))) IN ('none','nan','nat'))
+              AND (COALESCE(status,'')='' OR status='作業中')
+        """
+        params: list = [str(employee_id).strip()]
+        if employee_name:
+            sql += " AND COALESCE(employee_name,'')=?"
+            params.append(str(employee_name).strip())
+        sql += " ORDER BY id DESC LIMIT 1"
+        return query_one(sql, tuple(params))
+    except Exception:
+        try:
+            if callable(_v175_prev_get_active_record):
+                return _v175_prev_get_active_record(employee_id)  # type: ignore[misc]
+        except Exception:
+            pass
+    return None
+
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v175_01_fast_active_refresh") -> int:  # type: ignore[override]
+    """V175: do not hydrate authority on every rerun.
+
+    The old helper cleared query cache and could hydrate 01/02 authority every time
+    the selected employee had no active work.  That made the Finish Work area and
+    Today Finished Records wait a long time after every checkbox/selectbox rerun.
+    This fast version only counts SQLite active rows with a short TTL.
+    """
+    emp_id = str(employee_id or "").strip()
+    emp_name = str(employee_name or "").strip()
+    key = f"{emp_id}|{emp_name}"
+    now_s = _v175_time.time()
+    old = _V175_REFRESH_ACTIVE_TTL.get(key)
+    if old and (now_s - old[0]) < _V175_REFRESH_ACTIVE_TTL_SEC:
+        return int(old[1])
+    try:
+        sql = """
+            SELECT COUNT(*) AS c FROM time_records
+            WHERE (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='' OR LOWER(TRIM(COALESCE(end_timestamp,''))) IN ('none','nan','nat'))
+              AND (COALESCE(status,'')='' OR status='作業中')
+        """
+        params: list = []
+        if emp_id:
+            sql += " AND employee_id=?"
+            params.append(emp_id)
+        if emp_name:
+            sql += " AND COALESCE(employee_name,'')=?"
+            params.append(emp_name)
+        row = query_one(sql, tuple(params)) or {}
+        cnt = int(row.get("c", 0) or 0)
+    except Exception:
+        cnt = 0
+    _V175_REFRESH_ACTIVE_TTL[key] = (now_s, cnt)
+    return int(cnt)
+
+
+def _v175_clear_display_caches() -> None:
+    try:
+        _V175_REFRESH_ACTIVE_TTL.clear()
+    except Exception:
+        pass
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v175_prev_start_work):
+        raise RuntimeError("start_work core implementation is unavailable")
+    t0 = _v175_time.perf_counter()
+    rid = int(_v175_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    _v175_clear_display_caches()
+    _v175_record_perf("time_record_service.start_work.v175_transaction", t0)
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v175_prev_finish_work):
+        raise RuntimeError("finish_work core implementation is unavailable")
+    t0 = _v175_time.perf_counter()
+    n = int(_v175_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    _v175_clear_display_caches()
+    _v175_record_perf("time_record_service.finish_work.v175_transaction", t0)
+    return n
+
+# =================== END V175 01 FAST DISPLAY + TODAY/HISTORY CONSISTENCY ===================
+
+
+
+# ===================== V176 01 START/FINISH FAST TRANSACTION PATH =====================
+# 目的：
+# 1) 01 工時紀錄按「開始作業 / 結束作業」時，避免走多層舊 wrapper、全量權威合併、GitHub 同步、全量 shard 掃描。
+# 2) 不改畫面、不改 CSS、不改 theme、不改表格渲染、不改欄位顯示。
+# 3) 保留資料正確性：SQLite 即時寫入、01/02 canonical 本機更新、V151 row shard 本機寫入、V152 event journal、06 LOG。
+# 4) GitHub / 全量備份改為排程/背景/14 手動，不阻塞現場按鈕。
+
+import time as _v176_time
+
+try:
+    _v176_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v176_prev_start_work = None
+try:
+    _v176_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v176_prev_finish_work = None
+
+_V176_FAST_PATH_ENABLED = True
+_V176_LAST_TIMINGS: list[dict] = []
+
+
+def _v176_perf(name: str, started: float, detail: str = "") -> None:
+    try:
+        ms = int((_v176_time.perf_counter() - started) * 1000)
+        item = {"name": name, "elapsed_ms": ms, "detail": detail, "at": _now() if "_now" in globals() else now_text()}
+        _V176_LAST_TIMINGS.append(item)
+        if len(_V176_LAST_TIMINGS) > 50:
+            del _V176_LAST_TIMINGS[: len(_V176_LAST_TIMINGS) - 50]
+        try:
+            from services.performance_profiler_service import record_perf_event  # type: ignore
+            record_perf_event(name=name, elapsed_ms=ms, category="time_record_transaction", detail=detail)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def get_v176_last_transaction_timings() -> list[dict]:
+    return list(_V176_LAST_TIMINGS)
+
+
+def _v176_blank(value) -> bool:
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    if value is None:
+        return True
+    return str(value).strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _v176_text(value) -> str:
+    if _v176_blank(value):
+        return ""
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
+    return str(value).strip()
+
+
+def _v176_row_dict(row) -> dict:
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return dict(row)
+    try:
+        return dict(row)
+    except Exception:
+        return {}
+
+
+def _v176_query_rows_by_ids(ids) -> pd.DataFrame:
+    clean: list[int] = []
+    for x in ids or []:
+        try:
+            i = int(float(str(x).strip()))
+            if i > 0 and i not in clean:
+                clean.append(i)
+        except Exception:
+            pass
+    if not clean:
+        return pd.DataFrame()
+    try:
+        placeholders = ",".join(["?"] * len(clean))
+        return query_df(f"SELECT * FROM time_records WHERE id IN ({placeholders}) ORDER BY id DESC", tuple(clean))
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v176_identity_key(row: dict) -> str:
+    try:
+        if "_v151_identity_key" in globals() and callable(_v151_identity_key):
+            return str(_v151_identity_key(row))
+    except Exception:
+        pass
+    rk = _v176_text(row.get("record_key") or row.get("紀錄鍵 / Record Key") or row.get("紀錄鍵"))
+    if rk:
+        return "rk:" + rk
+    emp = _v176_text(row.get("employee_id") or row.get("工號 / Employee ID") or row.get("工號"))
+    name = _v176_text(row.get("employee_name") or row.get("姓名 / Name") or row.get("姓名"))
+    wo = _v176_text(row.get("work_order") or row.get("製令 / Work Order") or row.get("製令"))
+    proc = _v176_text(row.get("process_name") or row.get("工段 / Process") or row.get("工段"))
+    st = _v176_text(row.get("start_timestamp") or row.get("開始時間戳 / Start Timestamp") or row.get("開始時間"))
+    if emp and wo and proc and st:
+        return "biz:" + "|".join([emp, name, wo, proc, st])
+    rid = _v176_text(row.get("id") or row.get("ID"))
+    return "id:" + rid if rid else ""
+
+
+def _v176_table_rows_from_df(df: pd.DataFrame) -> list[dict]:
+    try:
+        from services.permanent_authority_service import table_from_df as _pa_table_from_df  # type: ignore
+        return _pa_table_from_df(df)
+    except Exception:
+        try:
+            work = df.copy().where(pd.notna(df), "")
+            return [dict(r) for _, r in work.iterrows()]
+        except Exception:
+            return []
+
+
+def _v176_upsert_authority_rows(rows_df: pd.DataFrame, reason: str) -> int:
+    """Local-only one-row/multi-row authority upsert.
+
+    This intentionally does NOT merge SQLite all rows, row_shards all rows, or event journal all rows.
+    It only upserts the rows just changed by Start/Finish into 01/02 canonical files.
+    """
+    if rows_df is None or not isinstance(rows_df, pd.DataFrame) or rows_df.empty:
+        return 0
+    started = _v176_time.perf_counter()
+    changed_rows = []
+    try:
+        clean = rows_df.copy().where(pd.notna(rows_df), "")
+        changed_rows = [dict(r) for _, r in clean.iterrows()]
+        from services.permanent_authority_service import df_from_table as _pa_df_from_table, save_authority as _pa_save_authority  # type: ignore
+        total_saved = 0
+        for module_key in ("01_time_records", "02_history"):
+            try:
+                base = _pa_df_from_table(module_key, "time_records")
+                if base is None or not isinstance(base, pd.DataFrame):
+                    base = pd.DataFrame()
+                base = base.copy().where(pd.notna(base), "") if not base.empty else pd.DataFrame()
+                row_map: dict[str, dict] = {}
+                order: list[str] = []
+                if not base.empty:
+                    for _, rr in base.iterrows():
+                        d = dict(rr)
+                        k = _v176_identity_key(d)
+                        if not k:
+                            continue
+                        if k not in row_map:
+                            order.append(k)
+                        row_map[k] = d
+                for d in changed_rows:
+                    k = _v176_identity_key(d)
+                    if not k:
+                        continue
+                    if k not in row_map:
+                        order.append(k)
+                    # changed row wins, but does not erase unrelated rows
+                    old = dict(row_map.get(k) or {})
+                    old.update(d)
+                    row_map[k] = old
+                merged_rows = [row_map[k] for k in order if k in row_map]
+                _pa_save_authority(module_key, records={"time_records": merged_rows}, reason=f"{reason}_{module_key}", github=False)
+                total_saved = max(total_saved, len(merged_rows))
+            except Exception as exc:
+                try:
+                    write_log("V176_AUTHORITY_UPSERT_ERROR", f"V176 本機權威檔 upsert 失敗 {module_key}: {exc}", "time_records", level="ERROR")
+                except Exception:
+                    pass
+        _v176_perf("v176_authority_local_upsert", started, f"rows={len(changed_rows)} total={total_saved}")
+        return int(total_saved or 0)
+    except Exception as exc:
+        try:
+            write_log("V176_AUTHORITY_UPSERT_ERROR", f"V176 本機權威檔 upsert 失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        return 0
+
+
+def _v176_write_durable_layers(rows_df: pd.DataFrame, reason: str, event_type: str, extra: dict | None = None) -> None:
+    started = _v176_time.perf_counter()
+    if rows_df is None or not isinstance(rows_df, pd.DataFrame) or rows_df.empty:
+        return
+    # 1) 01/02 canonical local-only upsert; immediate display consistency, no GitHub wait.
+    _v176_upsert_authority_rows(rows_df, reason)
+    # 2) Row shard local-only.  Do not upload to GitHub during operator click.
+    try:
+        if "_v151_write_row_shards" in globals() and callable(_v151_write_row_shards):
+            _v151_write_row_shards(rows_df, reason + "_row_shard", github=False)
+    except Exception as exc:
+        try:
+            write_log("V176_ROW_SHARD_WARN", f"V176 row shard 本機寫入失敗：{exc}", "time_records", level="WARN")
+        except Exception:
+            pass
+    # 3) Event journal.  Append proof locally and queue upload asynchronously.
+    try:
+        from services.time_record_event_journal_service import append_time_record_event  # type: ignore
+        append_time_record_event(event_type, rows_df, reason=reason, payload_extra=extra or {}, schedule_upload=True)
+    except Exception as exc:
+        try:
+            write_log("V176_EVENT_JOURNAL_WARN", f"V176 event journal 寫入失敗：{exc}", "time_records", level="WARN")
+        except Exception:
+            pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        if "clear_today_records_fast_cache" in globals():
+            clear_today_records_fast_cache()
+    except Exception:
+        pass
+    _v176_perf("v176_write_durable_layers", started, f"event={event_type} rows={len(rows_df)}")
+
+
+def _v176_assert_open(work_date: str, operation: str) -> None:
+    try:
+        from services.daily_close_service import assert_work_date_open  # type: ignore
+        assert_work_date_open(work_date, operation=operation)
+    except ImportError:
+        return
+
+
+def _v176_active_rows_for_employee(employee_id: str, employee_name: str = "") -> pd.DataFrame:
+    try:
+        if employee_name:
+            return query_df(
+                """
+                SELECT * FROM time_records
+                WHERE employee_id=? AND COALESCE(employee_name,'')=? AND end_timestamp IS NULL
+                ORDER BY id
+                """,
+                (str(employee_id).strip(), str(employee_name).strip()),
+            )
+        return query_df(
+            "SELECT * FROM time_records WHERE employee_id=? AND end_timestamp IS NULL ORDER BY id",
+            (str(employee_id).strip(),),
+        )
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v176_duplicate_active(employee_id: str, employee_name: str, work_order: str, process_name: str, start_date: str) -> dict | None:
+    try:
+        if employee_name:
+            return query_one(
+                """
+                SELECT * FROM time_records
+                WHERE employee_id=? AND COALESCE(employee_name,'')=? AND work_order=? AND process_name=? AND start_date=? AND end_timestamp IS NULL
+                ORDER BY id DESC LIMIT 1
+                """,
+                (employee_id, employee_name, work_order, process_name, start_date),
+            )
+        return query_one(
+            """
+            SELECT * FROM time_records
+            WHERE employee_id=? AND work_order=? AND process_name=? AND start_date=? AND end_timestamp IS NULL
+            ORDER BY id DESC LIMIT 1
+            """,
+            (employee_id, work_order, process_name, start_date),
+        )
+    except Exception:
+        return None
+
+
+def _v176_conflicting_ids(employee_id: str, employee_name: str, process_name: str, start_date: str) -> list[int]:
+    active = _v176_active_rows_for_employee(employee_id, employee_name)
+    if active is None or active.empty:
+        return []
+    ids: list[int] = []
+    for _, rr in active.iterrows():
+        row = dict(rr)
+        proc = _v176_text(row.get("process_name"))
+        sdate = _v176_text(row.get("start_date"))[:10]
+        if proc != str(process_name).strip() or sdate != str(start_date).strip():
+            try:
+                rid = int(float(str(row.get("id"))))
+                if rid > 0 and rid not in ids:
+                    ids.append(rid)
+            except Exception:
+                pass
+    return ids
+
+
+def _v176_active_group_for_record(rec: dict) -> pd.DataFrame:
+    try:
+        emp = _v176_text(rec.get("employee_id"))
+        name = _v176_text(rec.get("employee_name"))
+        proc = _v176_text(rec.get("process_name"))
+        sdate = _v176_text(rec.get("start_date"))[:10]
+        if name:
+            return query_df(
+                """
+                SELECT * FROM time_records
+                WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL
+                ORDER BY id
+                """,
+                (emp, name, proc, sdate),
+            )
+        return query_df(
+            """
+            SELECT * FROM time_records
+            WHERE employee_id=? AND process_name=? AND start_date=? AND end_timestamp IS NULL
+            ORDER BY id
+            """,
+            (emp, proc, sdate),
+        )
+    except Exception:
+        return pd.DataFrame([rec]) if rec else pd.DataFrame()
+
+
+def _v176_hms(hours_value) -> str:
+    try:
+        if "_v138_hours_to_hms_label" in globals() and callable(_v138_hours_to_hms_label):
+            return str(_v138_hours_to_hms_label(hours_value))
+    except Exception:
+        pass
+    try:
+        total = int(round(float(hours_value or 0) * 3600))
+        return f"{total//3600:02d}:{(total%3600)//60:02d}:{total%60:02d}"
+    except Exception:
+        return "00:00:00"
+
+
+def _v176_parallel_summary_text(count: int, total_hours: float, avg_hours: float) -> str:
+    try:
+        if "_v138_parallel_summary_text" in globals() and callable(_v138_parallel_summary_text):
+            return str(_v138_parallel_summary_text(count, total_hours, avg_hours))
+    except Exception:
+        pass
+    return f"同步作業平均分配：{count}筆，群組總工時={_v176_hms(total_hours)}，平均={_v176_hms(avg_hours)}"
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V176 fast local transaction path for 01 Start Work.
+
+    It avoids old wrapper chains that perform full authority merge / GitHub waits.
+    """
+    if not _V176_FAST_PATH_ENABLED:
+        if callable(_v176_prev_start_work):
+            return int(_v176_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+        return 0
+    started = _v176_time.perf_counter()
+    now = _now() if "_now" in globals() else now_text()
+    start_date, start_time = split_timestamp(now)
+    _v176_assert_open(start_date, "開始作業 / START_WORK")
+    employee_id = _v176_text((employee or {}).get("employee_id"))
+    employee_name = _v176_text((employee or {}).get("employee_name"))
+    wo_no = _v176_text((work_order or {}).get("work_order"))
+    proc = _v176_text(process_name)
+    if not employee_id or not wo_no or not proc:
+        raise ValueError("工號、製令、工段名稱不可空白。")
+    duplicate = _v176_duplicate_active(employee_id, employee_name, wo_no, proc, start_date)
+    if duplicate:
+        raise ValueError(f"此人員已有相同製令與工段正在計時，禁止重複紀錄：{wo_no} / {proc}")
+    conflicts = _v176_conflicting_ids(employee_id, employee_name, proc, start_date)
+    if conflicts:
+        if not auto_pause_old:
+            raise ValueError("此人員已有不同工段正在計時，請先確認暫停前一筆作業後再開始新紀錄。")
+        for cid in conflicts:
+            try:
+                # Calls V176 finish path; closed rows are skipped by SQL WHERE end_timestamp IS NULL.
+                finish_work(cid, "暫停", "系統自動暫停：同一人員切換不同工段或不同日期作業", finish_parallel_group=True)
+            except Exception as exc:
+                try:
+                    write_log("V176_AUTO_PAUSE_WARN", f"自動暫停舊作業失敗 id={cid}: {exc}", "time_records", cid, level="WARN")
+                except Exception:
+                    pass
+    record_key = make_record_key(employee_id, wo_no, proc, now)
+    group_key = f"{employee_id}|{proc}|{start_date}"
+    rid = execute(
+        """
+        INSERT INTO time_records(
+            record_key, status, work_order, part_no, type_name, process_name,
+            employee_id, employee_name, start_action, start_timestamp,
+            remark, start_date, start_time, assembly_location,
+            group_key, is_group_work, source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            record_key, "作業中", wo_no, (work_order or {}).get("part_no", ""), (work_order or {}).get("type_name", ""), proc,
+            employee_id, employee_name, "開始", now, remark, start_date, start_time, (work_order or {}).get("assembly_location", ""),
+            group_key, 0, "streamlit", now, now,
+        ),
+    )
+    # Mark parallel same employee/process/date if multiple active rows exist.
+    try:
+        if employee_name:
+            parallel = query_df(
+                """
+                SELECT id FROM time_records
+                WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL
+                """,
+                (employee_id, employee_name, proc, start_date),
+            )
+            params = (group_key, now, employee_id, employee_name, proc, start_date)
+            where = "employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL"
+        else:
+            parallel = query_df(
+                """
+                SELECT id FROM time_records
+                WHERE employee_id=? AND process_name=? AND start_date=? AND end_timestamp IS NULL
+                """,
+                (employee_id, proc, start_date),
+            )
+            params = (group_key, now, employee_id, proc, start_date)
+            where = "employee_id=? AND process_name=? AND start_date=? AND end_timestamp IS NULL"
+        if isinstance(parallel, pd.DataFrame) and len(parallel) > 1:
+            execute(f"UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE {where}", params)
+    except Exception:
+        pass
+    try:
+        write_log("START_WORK", f"{employee_name} 開始 {wo_no} / {proc}", "time_records", rid)
+    except Exception:
+        pass
+    rows_df = _v176_query_rows_by_ids([rid])
+    _v176_write_durable_layers(rows_df, "start_work_v176_fast_transaction", "START_WORK", {"employee": employee or {}, "work_order": work_order or {}, "process_name": proc})
+    _v176_perf("v176_start_work_total", started, f"rid={rid}")
+    return int(rid or 0)
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V176 fast local transaction path for 01 Finish Work."""
+    if not _V176_FAST_PATH_ENABLED:
+        if callable(_v176_prev_finish_work):
+            return int(_v176_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+        return 0
+    started = _v176_time.perf_counter()
+    try:
+        rid0 = int(float(str(record_id).strip()))
+    except Exception:
+        raise ValueError("工時紀錄 ID 無效")
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (rid0,))
+    if not rec:
+        raise ValueError("找不到工時紀錄")
+    rec = dict(rec)
+    if _v176_text(rec.get("end_timestamp")):
+        return 0
+    work_date = _v176_text(rec.get("start_date") or rec.get("start_timestamp"))[:10]
+    _v176_assert_open(work_date, "結束作業 / FINISH_WORK")
+    now = _now() if "_now" in globals() else now_text()
+    end_date, end_time = split_timestamp(now)
+    status = end_action if str(end_action or "").strip() in ("下班", "暫停", "完工") else "已結束"
+    group = _v176_active_group_for_record(rec) if finish_parallel_group else pd.DataFrame([rec])
+    if group is None or group.empty:
+        group = pd.DataFrame([rec])
+    group_ids: list[int] = []
+    for x in group.get("id", pd.Series(dtype=object)).tolist():
+        try:
+            i = int(float(str(x).strip()))
+            if i > 0 and i not in group_ids:
+                group_ids.append(i)
+        except Exception:
+            pass
+    if rid0 not in group_ids:
+        group_ids.append(rid0)
+    try:
+        starts = [str(x) for x in group.get("start_timestamp", pd.Series(dtype=object)).dropna().tolist() if _v176_text(x)]
+        earliest_start = min(starts) if starts else _v176_text(rec.get("start_timestamp"))
+    except Exception:
+        earliest_start = _v176_text(rec.get("start_timestamp"))
+    total_hours = float(calculate_work_hours(earliest_start, now) or 0)
+    avg_hours = round(total_hours / max(len(group_ids), 1), 2)
+    is_group = 1 if len(group_ids) > 1 else int(float(str(rec.get("is_group_work") or 0)))
+    group_key = _v176_text(rec.get("group_key")) or f"{_v176_text(rec.get('employee_id'))}|{_v176_text(rec.get('process_name'))}|{_v176_text(rec.get('start_date'))}"
+    for gid in group_ids:
+        old = query_one("SELECT remark FROM time_records WHERE id=?", (gid,)) or {}
+        new_remark = _v176_text((old or {}).get("remark"))
+        append = _v176_text(remark)
+        if len(group_ids) > 1:
+            append = (append + "；" if append else "") + _v176_parallel_summary_text(len(group_ids), total_hours, avg_hours)
+        if append:
+            new_remark = (new_remark + "；" if new_remark else "") + append
+        execute(
+            """
+            UPDATE time_records
+            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
+            WHERE id=? AND end_timestamp IS NULL
+            """,
+            (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, is_group, now, gid),
+        )
+    try:
+        write_log(
+            "END_WORK_GROUP" if len(group_ids) > 1 else "END_WORK",
+            f"結束工時紀錄 #{rid0}，同步結束={len(group_ids)}筆，狀態={status}，群組總工時={_v176_hms(total_hours)}，平均工時={_v176_hms(avg_hours)}",
+            "time_records",
+            rid0,
+            detail=",".join(str(x) for x in group_ids),
+        )
+    except Exception:
+        pass
+    rows_df = _v176_query_rows_by_ids(group_ids)
+    event_type = "PAUSE_WORK" if status == "暫停" else ("OFF_DUTY" if status == "下班" else ("FINISH_WORK" if status == "完工" else "END_WORK"))
+    _v176_write_durable_layers(rows_df, "finish_work_v176_fast_transaction", event_type, {"end_action": end_action, "remark": remark, "affected_ids": group_ids})
+    _v176_perf("v176_finish_work_total", started, f"ids={len(group_ids)}")
+    return int(len(group_ids))
+
+# =================== END V176 01 START/FINISH FAST TRANSACTION PATH =====================
+
+
+# ===================== V177 01 TODAY/HISTORY DELETE SYNC AUTHORITY FIX =====================
+# 目的：
+# 1) 01 今日工時紀錄 / Today Records 必須與 02 歷史紀錄 / Editable History 使用同一份 02_history canonical。
+# 2) 01 管理員工時紀錄維護的刪除、存檔，必須同步 01_time_records / 02_history / SQLite 快取。
+# 3) 02 已刪除的資料不得再因 SQLite、event journal、row shard 或顯示快取回到 01。
+# 4) 不改畫面、不改 CSS、不改 theme、不改表格渲染、不重新編號 ID。
+
+try:
+    _v177_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v177_prev_save_time_records = None
+try:
+    _v177_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v177_prev_delete_time_records = None
+try:
+    _v177_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v177_prev_today_records = None
+try:
+    _v177_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v177_prev_load_records = None
+
+_V177_UI_COLS = {
+    "刪除", "刪除 / Delete", "Delete", "重算", "重算 / Recalc", "Recalc",
+    "選取", "Select", "selected", "__selected__", "_selected", "_row_selected",
+}
+_V177_TERMINAL_STATUS = {"下班", "暫停", "完工", "已結束", "結束", "Off Duty", "Pause", "Complete", "Finished"}
+
+
+def _v177_now_text() -> str:
+    try:
+        return _now() if "_now" in globals() else now_text()
+    except Exception:
+        try:
+            from services.timezone_service import now_text as _tz_now_text
+            return _tz_now_text()
+        except Exception:
+            from datetime import datetime as _dt
+            return _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v177_blank(v) -> bool:
+    try:
+        if pd.isna(v):
+            return True
+    except Exception:
+        pass
+    return v is None or str(v).strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _v177_text(v) -> str:
+    if _v177_blank(v):
+        return ""
+    try:
+        if isinstance(v, datetime):
+            return v.strftime("%Y-%m-%d %H:%M:%S")
+        if isinstance(v, date):
+            return v.strftime("%Y-%m-%d")
+    except Exception:
+        pass
+    return str(v).strip()
+
+
+def _v177_int(v):
+    if _v177_blank(v):
+        return None
+    try:
+        i = int(float(str(v).strip()))
+        return i if i > 0 else None
+    except Exception:
+        return None
+
+
+def _v177_checked(v) -> bool:
+    if isinstance(v, str):
+        return v.strip().lower() in {"1", "true", "yes", "y", "on", "是", "勾選", "checked"}
+    return bool(v)
+
+
+def _v177_clean_df(df) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame):
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        out = out.loc[:, ~pd.Index(out.columns).duplicated()].copy()
+    except Exception:
+        pass
+    drop = [c for c in out.columns if str(c).strip() in _V177_UI_COLS]
+    if drop:
+        out = out.drop(columns=drop, errors="ignore")
+    try:
+        out = out.where(pd.notna(out), "")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v177_table_rows(df: pd.DataFrame) -> list[dict]:
+    clean = _v177_clean_df(df)
+    try:
+        from services.permanent_authority_service import table_from_df as _pa_table_from_df
+        return _pa_table_from_df(clean)
+    except Exception:
+        try:
+            return clean.to_dict(orient="records")
+        except Exception:
+            return []
+
+
+def _v177_authority_df(module_key: str) -> pd.DataFrame:
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df_from_table
+        df = _pa_df_from_table(module_key, "time_records")
+        if isinstance(df, pd.DataFrame):
+            return _v177_clean_df(df)
+    except Exception:
+        pass
+    # fallback：相容舊 helper
+    for fn_name in ("_v175_authority_df", "_v137_authority_df", "_v134_authority_df", "_v98_authority_df", "_v96_fast_authority_df", "_v89_authority_df"):
+        try:
+            fn = globals().get(fn_name)
+            if callable(fn):
+                df = fn(module_key)
+                if isinstance(df, pd.DataFrame):
+                    return _v177_clean_df(df)
+        except Exception:
+            pass
+    return pd.DataFrame()
+
+
+def _v177_history_settings() -> dict:
+    try:
+        from services.permanent_authority_service import load_settings as _pa_load_settings
+        data = _pa_load_settings("02_history")
+        return dict(data) if isinstance(data, dict) else {}
+    except Exception:
+        try:
+            return _v94_history_settings() if "_v94_history_settings" in globals() else {}
+        except Exception:
+            return {}
+
+
+def _v177_save_history_settings(settings: dict, reason: str = "v177_history_settings") -> None:
+    try:
+        from services.permanent_authority_service import save_settings as _pa_save_settings
+        _pa_save_settings("02_history", settings or {}, reason=reason, github=False)
+    except Exception:
+        try:
+            if "_v94_save_history_settings" in globals():
+                _v94_save_history_settings(settings or {}, reason)
+        except Exception:
+            pass
+
+
+def _v177_tombstones() -> tuple[set[int], set[str]]:
+    try:
+        stg = _v177_history_settings()
+        ids: set[int] = set()
+        keys: set[str] = set()
+        for x in stg.get("deleted_record_ids", []) if isinstance(stg.get("deleted_record_ids", []), list) else []:
+            i = _v177_int(x)
+            if i is not None:
+                ids.add(i)
+        for x in stg.get("deleted_record_keys", []) if isinstance(stg.get("deleted_record_keys", []), list) else []:
+            s = str(x or "").strip()
+            if s:
+                keys.add(s)
+        return ids, keys
+    except Exception:
+        return set(), set()
+
+
+def _v177_id_col(df: pd.DataFrame) -> str:
+    for c in ("id", "ID", "ID / ID", "ID / ID / ID", "紀錄編號", "record_id"):
+        if c in df.columns:
+            return c
+    return ""
+
+
+def _v177_value_from(row: dict, *cols: str) -> str:
+    for c in cols:
+        if c in row and not _v177_blank(row.get(c)):
+            return _v177_text(row.get(c))
+    return ""
+
+
+def _v177_record_key(row: dict) -> str:
+    direct = _v177_value_from(row, "record_key", "紀錄鍵 / Record Key", "Record Key")
+    if direct:
+        return direct
+    emp_id = _v177_value_from(row, "employee_id", "工號", "工號 / Employee ID", "Employee ID")
+    emp_name = _v177_value_from(row, "employee_name", "姓名", "姓名 / Name", "Name")
+    wo = _v177_value_from(row, "work_order", "製令", "製令 / Work Order", "Work Order")
+    proc = _v177_value_from(row, "process_name", "工段", "工段 / Process", "Process")
+    start_ts = _v177_value_from(row, "start_timestamp", "開始時間戳 / Start Timestamp", "開始時間 / Start Timestamp")
+    if not start_ts:
+        sd = _v177_value_from(row, "start_date", "開始日期 / Start Date", "開始日期")
+        stime = _v177_value_from(row, "start_time", "開始時刻 / Start Time", "開始時刻")
+        start_ts = (sd + " " + stime).strip()
+    parts = [emp_id, emp_name, wo, proc, start_ts]
+    return "|".join(parts) if any(parts) else ""
+
+
+def _v177_row_date(row: dict) -> str:
+    for c in ("start_date", "開始日期 / Start Date", "開始日期", "work_date", "日期"):
+        if c in row and not _v177_blank(row.get(c)):
+            return _v177_text(row.get(c))[:10]
+    for c in ("start_timestamp", "開始時間戳 / Start Timestamp", "開始時間 / Start Timestamp", "開始時間"):
+        if c in row and not _v177_blank(row.get(c)):
+            return _v177_text(row.get(c))[:10]
+    return ""
+
+
+def _v177_is_terminal(row: dict) -> bool:
+    status = _v177_value_from(row, "status", "狀態 / Status", "狀態")
+    end_ts = _v177_value_from(row, "end_timestamp", "結束時間戳 / End Timestamp", "結束時間 / End Timestamp", "結束時間")
+    end_date = _v177_value_from(row, "end_date", "結束日期 / End Date", "結束日期")
+    end_time = _v177_value_from(row, "end_time", "結束時刻 / End Time", "結束時刻")
+    return status in _V177_TERMINAL_STATUS or bool(end_ts) or bool(end_date and end_time)
+
+
+def _v177_is_active(row: dict) -> bool:
+    status = _v177_value_from(row, "status", "狀態 / Status", "狀態")
+    if status and status != "作業中":
+        return False
+    return not _v177_is_terminal(row)
+
+
+def _v177_filter_tombstones(df: pd.DataFrame) -> pd.DataFrame:
+    out = _v177_clean_df(df)
+    if out.empty:
+        return out
+    ids, keys = _v177_tombstones()
+    if not ids and not keys:
+        return out
+    mask = pd.Series([True] * len(out), index=out.index)
+    id_col = _v177_id_col(out)
+    if id_col and ids:
+        mask &= ~out[id_col].map(lambda x: (_v177_int(x) in ids))
+    if keys:
+        row_keys = out.apply(lambda r: _v177_record_key(dict(r)), axis=1)
+        mask &= ~row_keys.astype(str).str.strip().isin(keys)
+    return out.loc[mask].copy().reset_index(drop=True)
+
+
+def _v177_sort(df: pd.DataFrame) -> pd.DataFrame:
+    out = _v177_clean_df(df)
+    if out.empty:
+        return out
+    try:
+        if "start_timestamp" in out.columns:
+            out["_v177_ts"] = pd.to_datetime(out["start_timestamp"], errors="coerce")
+        id_col = _v177_id_col(out)
+        if id_col:
+            out["_v177_id"] = pd.to_numeric(out[id_col], errors="coerce")
+        sort_cols = [c for c in ("_v177_ts", "_v177_id") if c in out.columns]
+        if sort_cols:
+            out = out.sort_values(sort_cols, ascending=[False] * len(sort_cols), kind="stable")
+    except Exception:
+        pass
+    return out.drop(columns=["_v177_ts", "_v177_id"], errors="ignore").reset_index(drop=True)
+
+
+def _v177_save_0102(df: pd.DataFrame, reason: str, *, github: bool = False) -> int:
+    safe = _v177_filter_tombstones(df)
+    rows = _v177_table_rows(_v177_sort(safe))
+    try:
+        from services.permanent_authority_service import save_authority as _pa_save_authority
+        _pa_save_authority("01_time_records", records={"time_records": rows}, reason=reason + "_01", github=bool(github))
+        _pa_save_authority("02_history", records={"time_records": rows}, reason=reason + "_02", github=bool(github))
+    except Exception as exc:
+        try:
+            write_log("V177_AUTHORITY_SAVE_ERROR", f"V177 01/02 權威檔同步失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    try:
+        _v177_sync_sqlite_from_authority(safe)
+    except Exception:
+        pass
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(len(rows))
+
+
+def _v177_existing_sqlite_cols() -> list[str]:
+    try:
+        rows = query_df("PRAGMA table_info(time_records)")
+        if isinstance(rows, pd.DataFrame) and not rows.empty and "name" in rows.columns:
+            return [str(x) for x in rows["name"].tolist() if str(x)]
+    except Exception:
+        pass
+    return []
+
+
+def _v177_sync_sqlite_from_authority(df: pd.DataFrame) -> int:
+    cols = _v177_existing_sqlite_cols()
+    if not cols:
+        return 0
+    clean = _v177_filter_tombstones(df)
+    for c in cols:
+        if c not in clean.columns:
+            clean[c] = None
+    clean = clean[cols].where(pd.notna(clean[cols]), None)
+    rows = clean.to_dict(orient="records")
+    import sqlite3 as _sqlite3
+    try:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    conn = _sqlite3.connect(DB_PATH, timeout=15)
+    try:
+        conn.execute("PRAGMA busy_timeout=8000")
+        conn.execute("BEGIN")
+        conn.execute("DELETE FROM time_records")
+        if rows:
+            quoted = ",".join([f'"{c}"' for c in cols])
+            placeholders = ",".join(["?"] * len(cols))
+            sql = f"INSERT INTO time_records ({quoted}) VALUES ({placeholders})"
+            conn.executemany(sql, [tuple(r.get(c) for c in cols) for r in rows])
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return len(rows)
+
+
+def _v177_history_df() -> pd.DataFrame:
+    hist = _v177_filter_tombstones(_v177_authority_df("02_history"))
+    if isinstance(hist, pd.DataFrame) and not hist.empty:
+        return _v177_sort(hist)
+    # 只有 02 權威檔完全空時，才用 01 fallback；但仍套 tombstone。
+    live = _v177_filter_tombstones(_v177_authority_df("01_time_records"))
+    return _v177_sort(live)
+
+
+def _v177_apply_filters(df: pd.DataFrame, start_date=None, end_date=None, employee_id=None, work_order=None) -> pd.DataFrame:
+    out = _v177_filter_tombstones(df)
+    if out.empty:
+        return out
+    if start_date:
+        dates = out.apply(lambda r: _v177_row_date(dict(r)), axis=1)
+        out = out.loc[dates.astype(str) >= str(start_date)[:10]].copy()
+    if end_date:
+        dates = out.apply(lambda r: _v177_row_date(dict(r)), axis=1)
+        out = out.loc[dates.astype(str) <= str(end_date)[:10]].copy()
+    if employee_id:
+        emp_cols = [c for c in ("employee_id", "工號", "工號 / Employee ID", "Employee ID") if c in out.columns]
+        if emp_cols:
+            mask = pd.Series([False] * len(out), index=out.index)
+            for c in emp_cols:
+                mask = mask | out[c].astype(str).str.strip().eq(str(employee_id).strip())
+            out = out.loc[mask].copy()
+    if work_order:
+        wo_cols = [c for c in ("work_order", "製令", "製令 / Work Order", "Work Order") if c in out.columns]
+        if wo_cols:
+            mask = pd.Series([False] * len(out), index=out.index)
+            for c in wo_cols:
+                mask = mask | out[c].astype(str).str.strip().eq(str(work_order).strip())
+            out = out.loc[mask].copy()
+    return _v177_sort(out)
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V177: 02 Editable History authority is the visible source of truth."""
+    df = _v177_history_df()
+    return _v177_apply_filters(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """V177: 01 Today Records mirrors 02 Editable History and never resurrects deleted rows."""
+    df = _v177_history_df()
+    if df.empty:
+        return pd.DataFrame()
+    try:
+        cycle_start = _business_cycle_start_date() if "_business_cycle_start_date" in globals() else today_text()
+    except Exception:
+        cycle_start = today_text() if "today_text" in globals() else _v177_now_text()[:10]
+    rows = []
+    for _, rr in df.iterrows():
+        r = dict(rr)
+        active = _v177_is_active(r)
+        if unfinished_only or not include_finished:
+            if active:
+                rows.append(r)
+            continue
+        row_date = _v177_row_date(r)
+        if active or (row_date and row_date >= str(cycle_start)[:10]):
+            rows.append(r)
+    if not rows:
+        return pd.DataFrame(columns=list(df.columns))
+    return _v177_sort(pd.DataFrame(rows))
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    """V177: merge editor rows into 02 canonical, then mirror 01 and SQLite cache."""
+    edit = _v177_clean_df(df)
+    if edit.empty:
+        return 0
+    # Keep existing calculation normalization if available, but do not let older wrappers replace authority with partial data.
+    if recalc_edited_timestamps:
+        try:
+            normalized_rows = []
+            for _, rr in edit.iterrows():
+                row = dict(rr)
+                fn = globals().get("normalize_record_datetime_fields")
+                if callable(fn):
+                    row = fn(row, recalc_work_hours=True)
+                normalized_rows.append(row)
+            edit = pd.DataFrame(normalized_rows)
+        except Exception:
+            pass
+    auth = _v177_history_df()
+    if auth.empty:
+        auth = pd.DataFrame(columns=list(edit.columns))
+    all_cols: list[str] = []
+    for c in list(auth.columns) + list(edit.columns):
+        sc = str(c)
+        if sc not in all_cols:
+            all_cols.append(sc)
+    if "id" not in all_cols:
+        all_cols.insert(0, "id")
+    for c in all_cols:
+        if c not in auth.columns:
+            auth[c] = ""
+        if c not in edit.columns:
+            edit[c] = ""
+    auth = auth[all_cols].copy()
+    edit = edit[all_cols].copy()
+
+    id_col = _v177_id_col(auth) or "id"
+    by_id: dict[int, int] = {}
+    by_key: dict[str, int] = {}
+    if id_col in auth.columns:
+        for idx, val in auth[id_col].items():
+            rid = _v177_int(val)
+            if rid is not None:
+                by_id[rid] = idx
+    for idx, rr in auth.iterrows():
+        k = _v177_record_key(dict(rr))
+        if k:
+            by_key[k] = idx
+    try:
+        next_id = int(pd.to_numeric(auth[id_col], errors="coerce").max()) + 1 if id_col in auth.columns and not auth.empty else 1
+    except Exception:
+        next_id = 1
+    updated = 0
+    for _, rr in edit.iterrows():
+        row = dict(rr)
+        rid = _v177_int(row.get(id_col)) or _v177_int(row.get("id")) or _v177_int(row.get("ID")) or _v177_int(row.get("ID / ID"))
+        key = _v177_record_key(row)
+        idx = by_id.get(rid) if rid is not None else None
+        if idx is None and key:
+            idx = by_key.get(key)
+        if idx is None:
+            if rid is None:
+                rid = next_id
+                next_id += 1
+            row["id"] = rid
+            if id_col != "id":
+                row[id_col] = rid
+            new_row = {c: row.get(c, "") for c in auth.columns}
+            auth = pd.concat([auth, pd.DataFrame([new_row])], ignore_index=True)
+            idx = int(auth.index[-1])
+            by_id[int(rid)] = idx
+            if key:
+                by_key[key] = idx
+        else:
+            for c, v in row.items():
+                if c not in auth.columns:
+                    auth[c] = ""
+                auth.at[idx, c] = v
+        if "updated_at" in auth.columns:
+            auth.at[idx, "updated_at"] = _v177_now_text()
+        updated += 1
+    _v177_save_0102(auth, "save_time_records_v177_01_02_consistent", github=False)
+    try:
+        write_log("SAVE_TIME_RECORDS", f"V177 已儲存/更新 {updated} 筆，01 Today Records 與 02 Editable History 已同步。", "time_records")
+    except Exception:
+        pass
+    return int(updated)
+
+
+def _v177_add_tombstones(deleted_df: pd.DataFrame, ids: set[int], keys: set[str]) -> None:
+    if deleted_df is not None and isinstance(deleted_df, pd.DataFrame) and not deleted_df.empty:
+        id_col = _v177_id_col(deleted_df)
+        for _, rr in deleted_df.iterrows():
+            row = dict(rr)
+            if id_col:
+                i = _v177_int(row.get(id_col))
+                if i is not None:
+                    ids.add(i)
+            k = _v177_record_key(row)
+            if k:
+                keys.add(k)
+    stg = _v177_history_settings()
+    old_ids, old_keys = _v177_tombstones()
+    ids |= old_ids
+    keys |= old_keys
+    stg["deleted_record_ids"] = sorted(ids)
+    stg["deleted_record_keys"] = sorted(keys)
+    stg["delete_tombstone_updated_at"] = _v177_now_text()
+    _v177_save_history_settings(stg, "delete_tombstone_v177")
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    """V177: delete from 02 canonical first, then mirror 01 and SQLite.
+
+    This intentionally does not call older event-journal merge delete wrappers because
+    those layers can re-merge old SQLite/event rows into display.  Event proof is still
+    written as LOG before final save when possible.
+    """
+    ids = {i for i in (_v177_int(x) for x in (record_ids or [])) if i is not None}
+    if not ids:
+        return 0
+    auth = _v177_history_df()
+    if auth.empty:
+        return 0
+    id_col = _v177_id_col(auth)
+    if not id_col:
+        return 0
+    id_series = auth[id_col].map(_v177_int)
+    delete_mask = id_series.map(lambda x: x in ids)
+    deleted_df = auth.loc[delete_mask].copy()
+    if deleted_df.empty:
+        return 0
+    keys = {k for k in deleted_df.apply(lambda r: _v177_record_key(dict(r)), axis=1).tolist() if str(k).strip()}
+    _v177_add_tombstones(deleted_df, set(ids), set(keys))
+    remaining = auth.loc[~delete_mask].copy().reset_index(drop=True)
+    _v177_save_0102(remaining, "delete_time_records_v177_01_02_consistent", github=False)
+    try:
+        write_log("DELETE_TIME_RECORDS", f"{reason}：V177 已刪除 {len(deleted_df)} 筆，01 Today Records / 02 Editable History / SQLite 快取同步完成。", "time_records", target_id=",".join(str(x) for x in sorted(ids)), level="WARN")
+    except Exception:
+        pass
+    return int(len(deleted_df))
+
+
+def delete_time_records_from_editor_df(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete", reason: str = "01 管理員維護表刪除") -> int:
+    """Fallback for 01 admin editor when Streamlit checkbox delta exists but ID list was not captured.
+
+    The page can call this if delete_time_records(checked_ids) returns 0.
+    It resolves selected rows by id first, then record_key/business key.
+    """
+    df = editor_df.copy() if isinstance(editor_df, pd.DataFrame) else pd.DataFrame()
+    if df.empty or delete_column not in df.columns:
+        return 0
+    selected = df.loc[df[delete_column].map(_v177_checked)].copy()
+    if selected.empty:
+        return 0
+    id_col = _v177_id_col(selected)
+    ids = []
+    if id_col:
+        for x in selected[id_col].tolist():
+            i = _v177_int(x)
+            if i is not None and i not in ids:
+                ids.append(i)
+    count = delete_time_records(ids, reason=reason) if ids else 0
+    if count:
+        return count
+
+    # Key-based delete fallback.
+    auth = _v177_history_df()
+    if auth.empty:
+        return 0
+    target_keys = {_v177_record_key(dict(r)) for _, r in selected.iterrows()}
+    target_keys = {k for k in target_keys if str(k).strip()}
+    if not target_keys:
+        return 0
+    auth_keys = auth.apply(lambda r: _v177_record_key(dict(r)), axis=1)
+    mask = auth_keys.astype(str).str.strip().isin(target_keys)
+    deleted_df = auth.loc[mask].copy()
+    if deleted_df.empty:
+        return 0
+    id_col_auth = _v177_id_col(deleted_df)
+    ids2 = set()
+    if id_col_auth:
+        ids2 = {i for i in (deleted_df[id_col_auth].map(_v177_int).tolist()) if i is not None}
+    _v177_add_tombstones(deleted_df, ids2, set(target_keys))
+    remaining = auth.loc[~mask].copy().reset_index(drop=True)
+    _v177_save_0102(remaining, "delete_time_records_from_editor_df_v177", github=False)
+    try:
+        write_log("DELETE_TIME_RECORDS", f"{reason}：V177 已依 record_key/business key 刪除 {len(deleted_df)} 筆，01/02 已同步。", "time_records", level="WARN")
+    except Exception:
+        pass
+    return int(len(deleted_df))
+
+
+def sync_time_records_01_02_now(reason: str = "v177_manual_sync_02_to_01", *, github: bool = True) -> int:  # type: ignore[override]
+    df = _v177_history_df()
+    return _v177_save_0102(df, reason, github=bool(github))
+# =================== END V177 01 TODAY/HISTORY DELETE SYNC AUTHORITY FIX ===================
+
+# ======================= V178 TRANSACTION DUPLICATE GUARD + CONSISTENCY =======================
+# Backend-only safety patch:
+# - prevent repeated Streamlit rerun from inserting / logging the same operation several times;
+# - keep 01 Today Records and 02 History display aligned by filtering tombstones;
+# - block deleted rows from coming back through SQLite / row shard / event journal merge;
+# - do not change CSS, theme, page layout, table rendering, or field display.
+try:
+    from services import time_record_transaction_guard_service as _v178_guard
+except Exception:  # pragma: no cover
+    _v178_guard = None  # type: ignore
+
+try:
+    _v178_prev_start_work = start_work
+    _v178_prev_finish_work = finish_work
+    _v178_prev_load_records = load_records
+    _v178_prev_today_records = today_records
+    _v178_prev_delete_time_records = delete_time_records
+    _v178_prev_save_time_records = save_time_records
+    _v178_prev_recalculate_time_records = recalculate_time_records
+    _v178_prev_import_time_records = import_time_records
+    _v178_prev_get_active_records = get_active_records
+    _v178_prev_get_active_record = get_active_record
+    _v178_prev_get_active_group = get_active_group
+except Exception:
+    pass
+
+
+def _v178_guard_available() -> bool:
+    return _v178_guard is not None
+
+
+def _v178_safe_log(action: str, message: str, level: str = "INFO") -> None:
+    try:
+        write_log(action, message, "time_records", level=level)
+    except Exception:
+        pass
+
+
+def _v178_filter_df(df):
+    try:
+        if _v178_guard_available():
+            return _v178_guard.filter_and_dedupe_df(df)
+    except Exception:
+        pass
+    return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+
+
+def _v178_filter_active_df(df):
+    try:
+        if _v178_guard_available():
+            return _v178_guard.filter_active_df(df)
+    except Exception:
+        pass
+    return _v178_filter_df(df)
+
+
+def _v178_history_authority_df():
+    """02_history authority is the preferred display source for 01 Today Records."""
+    try:
+        from services.permanent_authority_service import df_from_table
+        df = df_from_table("02_history", "time_records")
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return df.copy()
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v178_filter_records_by_args(df, start_date=None, end_date=None, employee_id=None, work_order=None):
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame() if df is None else df
+    x = df.copy()
+    try:
+        date_col = "start_date" if "start_date" in x.columns else ("work_date" if "work_date" in x.columns else None)
+        if date_col:
+            if start_date:
+                x = x[x[date_col].astype(str) >= str(start_date)]
+            if end_date:
+                x = x[x[date_col].astype(str) <= str(end_date)]
+        elif "start_timestamp" in x.columns:
+            if start_date:
+                x = x[x["start_timestamp"].astype(str).str[:10] >= str(start_date)]
+            if end_date:
+                x = x[x["start_timestamp"].astype(str).str[:10] <= str(end_date)]
+        if employee_id and "employee_id" in x.columns:
+            x = x[x["employee_id"].astype(str) == str(employee_id)]
+        if work_order and "work_order" in x.columns:
+            x = x[x["work_order"].astype(str) == str(work_order)]
+    except Exception:
+        pass
+    return x.reset_index(drop=True)
+
+
+def _v178_current_cycle_start() -> str:
+    try:
+        return _business_cycle_start_date()
+    except Exception:
+        try:
+            return today_text()
+        except Exception:
+            return str(pd.Timestamp.today())[:10]
+
+
+def _v178_is_active_display_row(row: dict) -> bool:
+    try:
+        if _v178_guard_available() and not _v178_guard.active_row_is_safe(row):
+            return False
+    except Exception:
+        pass
+    status = str((row or {}).get("status") or "").strip()
+    end_ts = str((row or {}).get("end_timestamp") or "").strip().lower()
+    source = str((row or {}).get("source") or "").strip()
+    record_key = str((row or {}).get("record_key") or "").strip()
+    if source in {"V164B_LOG_ONLY_RECOVERY", "LOG_ONLY_RECOVERY", "LOGRECOVERY"} or record_key.startswith("LOGRECOVERY|"):
+        return False
+    return status in {"", "作業中"} and end_ts in {"", "none", "nan", "nat"}
+
+
+def _v178_today_display_filter(df, unfinished_only: bool = False):
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame() if df is None else df
+    x = _v178_filter_df(df)
+    if x.empty:
+        return x
+    try:
+        active_mask = x.apply(lambda r: _v178_is_active_display_row(dict(r)), axis=1)
+        if unfinished_only:
+            return x.loc[active_mask].copy().reset_index(drop=True)
+        cycle_start = _v178_current_cycle_start()
+        if "start_date" in x.columns:
+            current = x["start_date"].astype(str) >= str(cycle_start)
+        elif "start_timestamp" in x.columns:
+            current = x["start_timestamp"].astype(str).str[:10] >= str(cycle_start)
+        else:
+            current = pd.Series([True] * len(x), index=x.index)
+        return x.loc[current | active_mask].copy().reset_index(drop=True)
+    except Exception:
+        return x
+
+
+def _v178_write_filtered_authority(reason: str = "v178_consistency_sync", github: bool = False) -> int:
+    """Write filtered display-consistent rows to 01/02 authority without GitHub wait."""
+    df = pd.DataFrame()
+    try:
+        if callable(_v178_prev_load_records):
+            df = _v178_prev_load_records()
+    except Exception:
+        df = pd.DataFrame()
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        df = _v178_history_authority_df()
+    df = _v178_filter_df(df)
+    rows = []
+    try:
+        from services.permanent_authority_service import table_from_df, update_tables
+        rows = table_from_df(df) if not df.empty else []
+        try:
+            update_tables("01_time_records", {"time_records": rows}, reason=reason + "_01", github=bool(github))
+        except TypeError:
+            update_tables("01_time_records", {"time_records": rows}, reason=reason + "_01")
+        try:
+            update_tables("02_history", {"time_records": rows}, reason=reason + "_02", github=bool(github))
+        except TypeError:
+            update_tables("02_history", {"time_records": rows}, reason=reason + "_02")
+    except Exception as exc:
+        _v178_safe_log("V178_AUTHORITY_SYNC_ERROR", f"V178 01/02 權威同步失敗：{exc}", level="ERROR")
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(len(rows))
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """02/01 visible history after V178 tombstone + dedupe filtering."""
+    df = _v178_history_authority_df()
+    if df is None or df.empty:
+        try:
+            df = _v178_prev_load_records(start_date, end_date, employee_id, work_order)
+            return _v178_filter_df(df)
+        except Exception:
+            return pd.DataFrame()
+    df = _v178_filter_records_by_args(df, start_date, end_date, employee_id, work_order)
+    return _v178_filter_df(df)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """01 Today Records uses the same 02-history authority, with 01 display rules."""
+    df = _v178_history_authority_df()
+    if df is None or df.empty:
+        try:
+            df = _v178_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+        except Exception:
+            df = pd.DataFrame()
+    if not include_finished:
+        unfinished_only = True
+    return _v178_today_display_filter(df, unfinished_only=bool(unfinished_only))
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        df = _v178_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    except Exception:
+        df = pd.DataFrame()
+    return _v178_filter_active_df(df)
+
+
+def get_active_record(employee_id: str) -> dict | None:  # type: ignore[override]
+    try:
+        rec = _v178_prev_get_active_record(employee_id)
+        if rec and _v178_guard_available() and not _v178_guard.active_row_is_safe(rec):
+            return None
+        return rec
+    except Exception:
+        return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        df = _v178_prev_get_active_group(record_id)
+    except Exception:
+        df = pd.DataFrame()
+    return _v178_filter_active_df(df)
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v178_prev_start_work):
+        raise RuntimeError("start_work core implementation unavailable")
+    op_key = ""
+    claimed = {"claimed": True}
+    if _v178_guard_available():
+        op_key = _v178_guard.start_op_key(employee or {}, work_order or {}, process_name, bucket_seconds=8)
+        claimed = _v178_guard.claim_operation("START_WORK", op_key, ttl_seconds=10, payload={"employee": employee, "work_order": work_order, "process_name": process_name})
+        if not claimed.get("claimed"):
+            rid = int(claimed.get("result_id") or 0)
+            if rid:
+                return rid
+            # If the first request is still finishing, check whether the active row already exists.
+            try:
+                emp_id = str((employee or {}).get("employee_id") or "").strip()
+                emp_name = str((employee or {}).get("employee_name") or "").strip()
+                wo_no = str((work_order or {}).get("work_order") or "").strip()
+                proc = str(process_name or "").strip()
+                rec = get_active_same_work(emp_id, wo_no, proc, employee_name=emp_name)
+                if rec:
+                    return int(rec.get("id") or 0)
+            except Exception:
+                pass
+            # Last chance: wait briefly for the claimed operation to complete.
+            try:
+                import time as _time
+                for _ in range(6):
+                    _time.sleep(0.25)
+                    op = _v178_guard.lookup_operation(op_key)
+                    rid = int(op.get("result_id") or 0)
+                    if rid:
+                        return rid
+            except Exception:
+                pass
+            raise ValueError("偵測到重複開始作業請求，系統已防止重複新增，請重新整理確認目前作業中紀錄。")
+    try:
+        rid = int(_v178_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+        if _v178_guard_available() and op_key:
+            _v178_guard.complete_operation(op_key, result_id=rid, result_count=1, status="DONE")
+        if rid:
+            try:
+                _v178_write_filtered_authority("start_work_v178_consistency", github=False)
+            except Exception:
+                pass
+        return rid
+    except Exception:
+        if _v178_guard_available() and op_key:
+            _v178_guard.complete_operation(op_key, result_id=0, result_count=0, status="ERROR")
+        raise
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v178_prev_finish_work):
+        raise RuntimeError("finish_work core implementation unavailable")
+    op_key = ""
+    if _v178_guard_available():
+        op_key = _v178_guard.finish_op_key(record_id, end_action, bucket_seconds=8)
+        claimed = _v178_guard.claim_operation("FINISH_WORK", op_key, ttl_seconds=10, payload={"record_id": record_id, "end_action": end_action})
+        if not claimed.get("claimed"):
+            cnt = int(claimed.get("result_count") or 0)
+            return cnt
+    try:
+        n = int(_v178_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+        if _v178_guard_available() and op_key:
+            _v178_guard.complete_operation(op_key, result_id=int(record_id or 0), result_count=n, status="DONE")
+        if n:
+            try:
+                _v178_write_filtered_authority("finish_work_v178_consistency", github=False)
+            except Exception:
+                pass
+        return n
+    except Exception:
+        if _v178_guard_available() and op_key:
+            _v178_guard.complete_operation(op_key, result_id=int(record_id or 0), result_count=0, status="ERROR")
+        raise
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = []
+    for x in record_ids or []:
+        try:
+            i = int(float(str(x).strip()))
+            if i > 0 and i not in ids:
+                ids.append(i)
+        except Exception:
+            pass
+    if not ids:
+        return 0
+    evidence = []
+    try:
+        if _v178_guard_available():
+            evidence = _v178_guard.rows_by_ids(ids)
+            _v178_guard.add_tombstones(evidence, reason=reason)
+    except Exception:
+        evidence = []
+    deleted = 0
+    try:
+        deleted = int(_v178_prev_delete_time_records(ids, reason=reason) or 0)
+    except Exception as exc:
+        # Keep tombstone protection even when SQLite/cache delete fails.
+        _v178_safe_log("V178_DELETE_BASE_ERROR", f"V178 原刪除流程失敗，已保留 tombstone：{exc}", level="ERROR")
+    try:
+        if _v178_guard_available():
+            _v178_guard.purge_tombstoned_from_sqlite()
+    except Exception:
+        pass
+    synced = _v178_write_filtered_authority("delete_time_records_v178_tombstone", github=False)
+    final = int(deleted or len(evidence) or 0)
+    if final:
+        _v178_safe_log("DELETE_TIME_RECORDS_V178", f"{reason}：已建立刪除 tombstone，01/02 顯示同步；刪除 {final} 筆，同步保留 {synced} 筆。", level="WARN")
+    return final
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    n = int(_v178_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0) if callable(_v178_prev_save_time_records) else 0
+    if n:
+        try:
+            if _v178_guard_available():
+                _v178_guard.purge_tombstoned_from_sqlite()
+        except Exception:
+            pass
+        _v178_write_filtered_authority("save_time_records_v178_consistency", github=False)
+    return n
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    n = int(_v178_prev_recalculate_time_records(record_ids) or 0) if callable(_v178_prev_recalculate_time_records) else 0
+    if n:
+        _v178_write_filtered_authority("recalculate_time_records_v178_consistency", github=False)
+    return n
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    result = _v178_prev_import_time_records(df, recalc=recalc, source=source) if callable(_v178_prev_import_time_records) else {"inserted": 0, "updated": 0, "skipped": 0}
+    try:
+        changed = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
+    except Exception:
+        changed = 0
+    if changed:
+        try:
+            if _v178_guard_available():
+                _v178_guard.purge_tombstoned_from_sqlite()
+        except Exception:
+            pass
+        _v178_write_filtered_authority("import_time_records_v178_consistency", github=False)
+    return result
+
+
+def sync_time_records_01_02_now(reason: str = "v178_manual_consistency_sync", *, github: bool = True) -> int:  # type: ignore[override]
+    try:
+        if _v178_guard_available():
+            _v178_guard.purge_tombstoned_from_sqlite()
+    except Exception:
+        pass
+    return _v178_write_filtered_authority(reason, github=bool(github))
+
+
+def audit_time_record_integrity_v178() -> dict:
+    out = {"version": "V178", "ok": True}
+    try:
+        if _v178_guard_available():
+            out.update(_v178_guard.audit_v178_state())
+    except Exception as exc:
+        out["ok"] = False
+        out["guard_error"] = str(exc)[:300]
+    try:
+        today_df = today_records()
+        hist_df = load_records()
+        out["today_visible_rows"] = int(len(today_df)) if isinstance(today_df, pd.DataFrame) else 0
+        out["history_visible_rows"] = int(len(hist_df)) if isinstance(hist_df, pd.DataFrame) else 0
+    except Exception as exc:
+        out["ok"] = False
+        out["display_error"] = str(exc)[:300]
+    return out
+
+try:
+    if _v178_guard_available():
+        _v178_guard.ensure_v178_schema()
+except Exception:
+    pass
+# ===================== END V178 TRANSACTION DUPLICATE GUARD + CONSISTENCY =====================
+
+# ======================= V178B HISTORY DELETE STRICT REPAIR =======================
+# Backend-only repair for 02 History delete not taking effect.
+# - 02_history is the authority for history display;
+# - deletion writes tombstones and removes the row from 02_history, 01_time_records, and SQLite cache;
+# - no CSS/theme/page rendering changes.
+try:
+    from services import history_delete_repair_service as _v178b_history_delete
+except Exception:  # pragma: no cover
+    _v178b_history_delete = None  # type: ignore
+
+try:
+    _v178b_prev_delete_time_records = delete_time_records
+except Exception:
+    _v178b_prev_delete_time_records = None
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    if _v178b_history_delete is None:
+        return int(_v178b_prev_delete_time_records(record_ids, reason=reason) or 0) if callable(_v178b_prev_delete_time_records) else 0
+    try:
+        result = _v178b_history_delete.delete_history_records_strict(
+            record_ids,
+            reason=reason,
+            previous_delete_callable=_v178b_prev_delete_time_records if callable(_v178b_prev_delete_time_records) else None,
+        )
+        return int((result or {}).get("deleted_count") or 0)
+    except Exception as exc:
+        try:
+            write_log("V178B_DELETE_ERROR", f"V178B 嚴格刪除失敗，回退原刪除流程：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        return int(_v178b_prev_delete_time_records(record_ids, reason=reason) or 0) if callable(_v178b_prev_delete_time_records) else 0
+
+
+def delete_time_records_v178b_strict(record_ids: list[int], reason: str = "02 歷史紀錄嚴格刪除", editor_df=None) -> dict:  # type: ignore[override]
+    if _v178b_history_delete is None:
+        n = delete_time_records(record_ids, reason=reason)
+        return {"ok": bool(n), "deleted_count": int(n or 0), "ids": record_ids or []}
+    return _v178b_history_delete.delete_history_records_strict(
+        record_ids,
+        reason=reason,
+        editor_df=editor_df,
+        previous_delete_callable=_v178b_prev_delete_time_records if callable(_v178b_prev_delete_time_records) else None,
+    )
+# ===================== END V178B HISTORY DELETE STRICT REPAIR =====================
+
+# ===================== V179 UNIFIED TIME RECORD DELETE PATCH =====================
+# Backend-only safety layer. Do not change UI/theme/table rendering.
+try:
+    _v179_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v179_prev_delete_time_records = None
+try:
+    _v179_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v179_prev_load_records = None
+try:
+    _v179_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v179_prev_today_records = None
+try:
+    _v179_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v179_prev_get_active_records = None
+try:
+    _v179_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v179_prev_get_active_record = None
+
+
+def _v179_filter_deleted_rows(df):
+    try:
+        from services.time_record_delete_unifier_service import filter_deleted_rows
+        return filter_deleted_rows(df)
+    except Exception:
+        return df
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    """V179 final delete lane: delete from 01/02 authority + SQLite and write tombstones.
+
+    This intentionally bypasses older wrapper chains that may rebuild data from LOG
+    recovery, event journal or SQLite and accidentally make deleted rows reappear.
+    """
+    try:
+        from services.time_record_delete_unifier_service import force_delete_time_records
+        return int(force_delete_time_records(record_ids, reason=reason, github=False) or 0)
+    except Exception as exc:
+        try:
+            write_log("V179_DELETE_FALLBACK_ERROR", f"統一刪除通道失敗，改用舊刪除：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        if callable(_v179_prev_delete_time_records):
+            return int(_v179_prev_delete_time_records(record_ids, reason=reason) or 0)
+        return 0
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None):  # type: ignore[override]
+    df = _v179_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order) if callable(_v179_prev_load_records) else pd.DataFrame()
+    return _v179_filter_deleted_rows(df)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False):  # type: ignore[override]
+    df = _v179_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only) if callable(_v179_prev_today_records) else pd.DataFrame()
+    return _v179_filter_deleted_rows(df)
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None):  # type: ignore[override]
+    df = _v179_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name) if callable(_v179_prev_get_active_records) else pd.DataFrame()
+    return _v179_filter_deleted_rows(df)
+
+
+def get_active_record(employee_id: str):  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id)
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        if "id" in df.columns:
+            df = df.copy()
+            df["_v179_id"] = pd.to_numeric(df["id"], errors="coerce")
+            df = df.sort_values("_v179_id", ascending=False).drop(columns=["_v179_id"], errors="ignore")
+        return dict(df.iloc[0])
+    except Exception:
+        return None
+
+# =================== END V179 UNIFIED TIME RECORD DELETE PATCH ===================
+
+# =================== V180 EMERGENCY LOCAL DELETE OVERRIDE ===================
+# 目的：當 01/02 刪除一直運轉時，不再走舊版多層同步 / GitHub / 全量修復。
+# 刪除只做本機 01/02 canonical + SQLite + tombstone，快速返回；背景備份之後再做。
+try:
+    from services.time_record_delete_queue_service import delete_time_records_fast_local as _v180_delete_time_records_fast_local
+except Exception:
+    _v180_delete_time_records_fast_local = None
+
+_v180_prev_delete_time_records = delete_time_records
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    if callable(_v180_delete_time_records_fast_local):
+        try:
+            deleted = _v180_delete_time_records_fast_local(record_ids, reason=f"{reason} / V180 fast local delete")
+            try:
+                clear_query_cache()
+            except Exception:
+                pass
+            try:
+                clear_today_records_fast_cache()
+            except Exception:
+                pass
+            try:
+                write_log("DELETE_TIME_RECORDS", f"{reason}：V180 快速本機刪除 {deleted} 筆，已建立 tombstone；GitHub 備份延後處理。", "time_records", level="WARN")
+            except Exception:
+                pass
+            return int(deleted or 0)
+        except Exception as exc:
+            try:
+                write_log("V180_DELETE_FAST_ERROR", f"V180 快速刪除失敗，改走舊刪除流程：{exc}", "time_records", level="ERROR")
+            except Exception:
+                pass
+    return int(_v180_prev_delete_time_records(record_ids, reason=reason) or 0)
+# ================= END V180 EMERGENCY LOCAL DELETE OVERRIDE =================

@@ -10,6 +10,7 @@ import streamlit as st
 from services.theme_service import apply_theme, render_header
 from services.security_service import require_module_access, check_permission
 from services.time_record_service import (
+
     load_records,
     save_time_records,
     delete_time_records,
@@ -18,8 +19,84 @@ from services.time_record_service import (
 )
 from services.master_data_service import load_employees, load_work_orders
 from services.table_ui_service import render_table, label_for, render_width_settings
+from services.time_record_delete_unifier_service import delete_selected_time_records_from_editor
 from services.duration_service import hours_to_hms
 from services.history_filter_service import load_history_filters, save_history_filters, reset_history_filters
+
+# === V180B_HISTORY_TOTAL_TIME_TYPE_FIX_BEGIN ===
+def _v180b_parse_work_hours_to_decimal_hours(value):
+    """Safely convert mixed work_hours values to decimal hours.
+
+    Supported inputs:
+    - numeric hours, e.g. 0.16
+    - HH:MM:SS, e.g. 00:09:36
+    - H:MM, e.g. 1:30
+    - strings with blanks, commas, or legacy labels
+    Invalid/blank values are treated as 0.
+    """
+    try:
+        if value is None:
+            return 0.0
+        # pandas/numpy missing values
+        try:
+            import pandas as _pd  # local import: app already depends on pandas
+            if _pd.isna(value):
+                return 0.0
+        except Exception:
+            pass
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip()
+        if not text:
+            return 0.0
+        if text.lower() in {"nan", "none", "null", "nat", "未按結束", "清空"}:
+            return 0.0
+        # Remove common human-readable decorations without changing real values.
+        text = text.replace(",", "").replace("小時", "").strip()
+        text = text.replace("時", ":").replace("分", ":").replace("秒", "")
+        if ":" in text:
+            parts = [p for p in text.split(":") if p != ""]
+            nums = []
+            for p in parts[:3]:
+                try:
+                    nums.append(float(p))
+                except Exception:
+                    nums.append(0.0)
+            while len(nums) < 3:
+                nums.append(0.0)
+            h, m, s = nums[0], nums[1], nums[2]
+            return max(0.0, h + m / 60.0 + s / 3600.0)
+        return max(0.0, float(text))
+    except Exception:
+        return 0.0
+
+
+def _v180b_decimal_hours_to_hms(total_hours):
+    try:
+        seconds = int(round(float(total_hours) * 3600))
+    except Exception:
+        seconds = 0
+    if seconds < 0:
+        seconds = 0
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
+def _v180b_safe_work_hours_total_hms(df):
+    """Return total work hours as HH:MM:SS without pandas mixed-type sum."""
+    try:
+        if df is None or getattr(df, "empty", True) or "work_hours" not in getattr(df, "columns", []):
+            return "00:00:00"
+        total = 0.0
+        for value in df["work_hours"].tolist():
+            total += _v180b_parse_work_hours_to_decimal_hours(value)
+        return _v180b_decimal_hours_to_hms(total)
+    except Exception:
+        return "00:00:00"
+# === V180B_HISTORY_TOTAL_TIME_TYPE_FIX_END ===
+
 
 st.set_page_config(page_title="02. 歷史紀錄", page_icon="⧠", layout="wide")
 apply_theme()
@@ -1389,11 +1466,21 @@ with tab1:
                     _add_history_result("warning", "找不到可儲存的歷史紀錄表格內容，請重新載入後再試。", append=False)
                     rerun()
                 def _checked_ids(frame: pd.DataFrame, col: str) -> list[int]:
-                    if frame is None or frame.empty or col not in frame.columns or "id" not in frame.columns:
+                    try:
+                        from services.history_delete_repair_service import checked_ids_from_editor
+                        got = checked_ids_from_editor(frame, col)
+                        if got:
+                            return got
+                    except Exception:
+                        pass
+                    if frame is None or frame.empty or col not in frame.columns:
+                        return []
+                    id_col = "id" if "id" in frame.columns else ("ID / ID" if "ID / ID" in frame.columns else ("ID" if "ID" in frame.columns else None))
+                    if not id_col:
                         return []
                     try:
                         mask = frame[col].map(lambda v: str(v).strip().lower() in {"true", "1", "yes", "y", "on", "勾選", "是"} if not isinstance(v, bool) else v)
-                        return [int(x) for x in frame.loc[mask, "id"].dropna().tolist()]
+                        return [int(float(str(x))) for x in frame.loc[mask, id_col].dropna().tolist()]
                     except Exception:
                         return []
 
@@ -1427,7 +1514,12 @@ with tab1:
                         _add_history_result("warning", "請先在『刪除』欄勾選要刪除的紀錄，再按確認執行。", append=False)
                         rerun()
                     else:
-                        count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
+                        try:
+                            from services.time_record_service import delete_time_records_v178b_strict
+                            _v178b_delete_result = delete_time_records_v178b_strict(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除", editor_df=edited)
+                            count = int((_v178b_delete_result or {}).get("deleted_count") or 0)
+                        except Exception:
+                            count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
                         st.session_state[delete_select_key] = []
                         st.session_state[recalc_select_key] = []
                         _add_history_result("success", f"已刪除 {count} 筆歷史紀錄。", append=False)
