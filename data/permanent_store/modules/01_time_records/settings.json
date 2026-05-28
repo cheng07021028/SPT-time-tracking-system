@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "settings",
-  "updated_at": "2026-05-29 01:50:56",
-  "exported_at": "2026-05-29 01:50:56",
+  "updated_at": "2026-05-29 02:11:28",
+  "exported_at": "2026-05-29 02:11:28",
   "reason": "V196 hard delete guard",
   "empty_authoritative": false,
   "tables": {},
@@ -72,6 +72,61 @@
     "v196_hard_deleted_time_records": [
       {
         "row": {
+          "id": 330,
+          "跨日提醒 / Cross Day Alert": "",
+          "刪除 / Delete": true,
+          "重算 / Recalc": false,
+          "employee_id": "B002",
+          "status": "作業中",
+          "employee_name": "張文品",
+          "work_order": "21M0241-01",
+          "department": "製造二課",
+          "title": "派遣 _德興",
+          "part_no": "4TRSC020-004-02",
+          "type_name": "NTB 3 PORT",
+          "process_name": "前置鈑金",
+          "start_action": "開始",
+          "start_timestamp": "2026-05-29 01:53:03",
+          "end_action": "",
+          "end_timestamp": "",
+          "remark": "",
+          "start_date": "2026-05-29",
+          "start_time": "01:53:03",
+          "end_date": "",
+          "end_time": "",
+          "work_hours": "00:00:00",
+          "assembly_location": "竹東",
+          "group_key": "B002|前置鈑金|2026-05-29",
+          "跨日日期 / Cross Day Date": "",
+          "is_group_work": false,
+          "source": "streamlit",
+          "created_at": "2026-05-29 01:53:03",
+          "updated_at": "2026-05-29 01:53:03",
+          "record_key": "B002|21M0241-01|前置鈑金|2026-05-29 01:53:03|3d2d1d6f"
+        },
+        "id": 330,
+        "record_key": "B002|21M0241-01|前置鈑金|2026-05-29 01:53:03|3d2d1d6f",
+        "business_key": "B002|張文品|21M0241-01|前置鈑金|2026-05-29 01:53:03",
+        "deleted_at": "2026-05-29 02:11:27",
+        "source": "V196",
+        "reason": "02 歷史紀錄啟動編輯後整列刪除 / V198 02 reboot-proof delete",
+        "identities": [
+          "biz:B002|張文品|21M0241-01|前置鈑金|2026-05-29 01:53:03",
+          "id:330",
+          "record_key:B002|21M0241-01|前置鈑金|2026-05-29 01:53:03|3d2d1d6f"
+        ]
+      },
+      {
+        "id": 330,
+        "identities": [
+          "id:330"
+        ],
+        "deleted_at": "2026-05-29 02:11:27",
+        "source": "V196",
+        "reason": "02 歷史紀錄啟動編輯後整列刪除 / V198 02 reboot-proof delete"
+      },
+      {
+        "row": {
           "id": 329,
           "record_key": "B164|22M0100-28|配電|2026-05-29 01:36:52|ce0645bc",
           "status": "作業中",
@@ -118,9 +173,29 @@
         "deleted_at": "2026-05-29 01:50:55",
         "source": "V196",
         "reason": "01 工時紀錄管理員維護區刪除 / V196 reboot-proof hard delete"
+      },
+      {
+        "id": 326,
+        "identities": [
+          "id:326"
+        ],
+        "deleted_at": "2026-05-29 01:10:38",
+        "source": "V196_BOOTSTRAP_FROM_DELETE_LOG",
+        "reason": "02 歷史紀錄啟動編輯後整列刪除：V177 已刪除 2 筆，01 Today Records / 02 Editable History / SQLite 快取同步完成。",
+        "log_id": 144
+      },
+      {
+        "id": 327,
+        "identities": [
+          "id:327"
+        ],
+        "deleted_at": "2026-05-29 01:10:38",
+        "source": "V196_BOOTSTRAP_FROM_DELETE_LOG",
+        "reason": "02 歷史紀錄啟動編輯後整列刪除：V177 已刪除 2 筆，01 Today Records / 02 Editable History / SQLite 快取同步完成。",
+        "log_id": 144
       }
     ],
-    "v196_hard_delete_updated_at": "2026-05-29 01:50:56"
+    "v196_hard_delete_updated_at": "2026-05-29 02:11:28"
   },
   "table_counts": {}
 }
