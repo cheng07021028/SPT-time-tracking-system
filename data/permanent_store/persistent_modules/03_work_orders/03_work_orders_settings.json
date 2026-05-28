@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-27 22:06:13",
+  "exported_at": "2026-05-28 08:33:25",
   "source": "db_service_write",
   "module_key": "03_work_orders",
   "module_code": "03",
@@ -8,19 +8,10 @@
   "module_name_en": "Work Orders",
   "tables": {
     "table_column_settings": [],
-    "table_sort_settings": [],
-    "table_ui_settings": [
-      {
-        "table_key": "01.time_records.main",
-        "widths_json": "{\"id\": 60, \"record_key\": 100, \"status\": 100, \"work_order\": 120, \"part_no\": 170, \"type_name\": 230, \"process_name\": 140, \"employee_id\": 120, \"employee_name\": 130, \"start_action\": 140, \"start_timestamp\": 190, \"end_action\": 140, \"end_timestamp\": 100, \"remark\": 250, \"start_date\": 140, \"start_time\": 140, \"end_date\": 140, \"end_time\": 160, \"work_hours\": 140, \"assembly_location\": 140, \"group_key\": 60, \"is_group_work\": 140, \"source\": 60, \"created_at\": 60, \"updated_at\": 180}",
-        "order_json": "[\"id\", \"employee_id\", \"employee_name\", \"status\", \"work_order\", \"part_no\", \"is_group_work\", \"type_name\", \"process_name\", \"start_action\", \"start_timestamp\", \"end_action\", \"end_timestamp\", \"remark\", \"start_date\", \"start_time\", \"end_date\", \"end_time\", \"work_hours\", \"assembly_location\", \"group_key\", \"source\", \"created_at\", \"record_key\", \"updated_at\"]",
-        "updated_at": "2026-05-27 14:06:12"
-      }
-    ]
+    "table_sort_settings": []
   },
   "table_counts": {
     "table_column_settings": 0,
-    "table_sort_settings": 0,
-    "table_ui_settings": 1
+    "table_sort_settings": 0
   }
 }
