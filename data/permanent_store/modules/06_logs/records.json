@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 19:54:38",
-  "exported_at": "2026-05-28 19:54:38",
+  "updated_at": "2026-05-28 19:54:50",
+  "exported_at": "2026-05-28 19:54:50",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -25987,11 +25987,47 @@
         "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 577,
+        "log_time": "2026-05-28 19:54:46",
+        "user_name": "SPT239",
+        "action_type": "V134_REPAIR_TIME_RECORD_CANONICAL",
+        "target_table": "time_records",
+        "target_id": "314",
+        "message": "V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 1 筆，同步後 110 筆。",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-28 19:54:46\",\"action_type\":\"V134_REPAIR_TIME_RECORD_CANONICAL\",\"target_table\":\"time_records\",\"target_id\":\"314\",\"target_ids\":[314],\"message\":\"V134 已將 SQLite 中 missing time_records 補回 01/02 canonical；修復 1 筆，同步後 110 筆。\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c\",\"identity_key\":\"record_key:SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c\",\"id\":\"314\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"work_order\":\"24N4001-24\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"包機\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-28 19:53:57\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":314,\"record_key\":\"SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c\",\"status\":\"作業中\",\"work_order\":\"24N4001-24\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 19:53:57\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"19:53:57\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|包機|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 19:53:57\",\"updated_at\":\"2026-05-28 19:53:57\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":314,\"record_key\":\"SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c\",\"status\":\"作業中\",\"work_order\":\"24N4001-24\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 19:53:57\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"19:53:57\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|包機|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 19:53:57\",\"updated_at\":\"2026-05-28 19:53:57\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":314,\"record_key\":\"SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c\",\"status\":\"作業中\",\"work_order\":\"24N4001-24\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 19:53:57\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"19:53:57\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|包機|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 19:53:57\",\"updated_at\":\"2026-05-28 19:53:57\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":314,\"record_key\":\"SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c\",\"status\":\"作業中\",\"work_order\":\"24N4001-24\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 19:53:57\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"19:53:57\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|包機|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 19:53:57\",\"updated_at\":\"2026-05-28 19:53:57\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"cf61600b12de5ef0ab913d22079ea847a63804f35695dca5edb48d3b587b8067\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 576,
+        "log_time": "2026-05-28 19:54:46",
+        "user_name": "SPT239",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "314",
+        "message": "麥可 開始 24N4001-24 / 包機",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-28 19:54:46\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"314\",\"target_ids\":[314],\"message\":\"麥可 開始 24N4001-24 / 包機\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c\",\"identity_key\":\"record_key:SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c\",\"id\":\"314\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"work_order\":\"24N4001-24\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"包機\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-28 19:53:57\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":314,\"record_key\":\"SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c\",\"status\":\"作業中\",\"work_order\":\"24N4001-24\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 19:53:57\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"19:53:57\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|包機|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 19:53:57\",\"updated_at\":\"2026-05-28 19:53:57\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":314,\"record_key\":\"SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c\",\"status\":\"作業中\",\"work_order\":\"24N4001-24\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 19:53:57\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"19:53:57\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|包機|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 19:53:57\",\"updated_at\":\"2026-05-28 19:53:57\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":314,\"record_key\":\"SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c\",\"status\":\"作業中\",\"work_order\":\"24N4001-24\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 19:53:57\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"19:53:57\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|包機|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 19:53:57\",\"updated_at\":\"2026-05-28 19:53:57\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":314,\"record_key\":\"SPT239|24N4001-24|包機|2026-05-28 19:53:57|9a95fc4c\",\"status\":\"作業中\",\"work_order\":\"24N4001-24\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 19:53:57\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"19:53:57\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|包機|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 19:53:57\",\"updated_at\":\"2026-05-28 19:53:57\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"09499a7ef96109fcbdfe8a05dd0404ae338b8069f7cf0eafe9133d2ff2b0916f\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 575,
+        "log_time": "2026-05-28 19:54:46",
+        "user_name": "SPT239",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2165
+    "system_logs": 2168
   }
 }
