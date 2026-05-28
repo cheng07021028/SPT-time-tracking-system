@@ -1565,3 +1565,75 @@ def execute_transaction(
         pass
     return ids
 # ===== END V24 LIGHTWEIGHT SYSTEM LOG AUDIT FOR ALL DB WRITES =====
+
+
+# ===================== V170 BACKEND-ONLY PERFORMANCE GUARD =====================
+# 目的：加速 01/登入/一般互動；只改資料後端等待策略，不動 CSS、theme、頁面排版與 data_editor 顯示。
+# 原則：即時交易仍寫 SQLite；高頻操作不等待 GitHub/大型 permanent export。
+#      只建立待備份標記，09/14 或排程再執行正式備份。
+try:
+    _v170_prev_auto_export_after_write_enabled = _auto_export_after_write_enabled
+except Exception:
+    _v170_prev_auto_export_after_write_enabled = None
+try:
+    _v170_prev_after_write = _after_write
+except Exception:
+    _v170_prev_after_write = None
+try:
+    _v170_prev_execute = execute
+except Exception:
+    _v170_prev_execute = None
+try:
+    _v170_prev_executemany = executemany
+except Exception:
+    _v170_prev_executemany = None
+try:
+    _v170_prev_execute_transaction = execute_transaction
+except Exception:
+    _v170_prev_execute_transaction = None
+
+
+def _auto_export_after_write_enabled() -> bool:  # type: ignore[override]
+    """V170: default synchronous write-through is OFF.
+
+    - 現場人員按開始/結束/勾選/儲存時，不等待 GitHub API 或大型 JSON export。
+    - 如需回到舊同步等待模式，可在環境變數設定 SPT_SYNC_EXPORT_ON_WRITE=1。
+    - 不影響 09/14 手動備份、排程備份、V152 event journal、V151 row shard。
+    """
+    val = str(os.environ.get('SPT_SYNC_EXPORT_ON_WRITE', '') or os.environ.get('SPT_AUTO_EXPORT_AFTER_WRITE', '')).strip().lower()
+    return val in {'1', 'true', 'yes', 'on', 'enable', 'enabled'}
+
+
+def _after_write(sql: str | None = None) -> None:  # type: ignore[override]
+    """Fast after-write path: clear read cache + mark pending backup only.
+
+    This intentionally avoids network/export work during operator transactions.
+    """
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        mark_data_changed('V170：資料已變更，已建立待備份標記；請由 09/14 或排程執行永久備份。', sql)
+    except Exception:
+        pass
+    if not _auto_export_after_write_enabled():
+        return
+    # Explicit opt-in only: preserve old write-through behavior for debugging/admin if env var enabled.
+    if callable(_v170_prev_after_write):
+        try:
+            _v170_prev_after_write(sql)
+        except Exception:
+            pass
+
+
+def v170_backend_performance_status() -> dict:
+    """Small diagnostics helper for tools/page checks."""
+    return {
+        'version': 'V170_BACKEND_ONLY_PERFORMANCE_GUARD',
+        'sync_export_on_write': bool(_auto_export_after_write_enabled()),
+        'pending_backup_status': pending_backup_status() if 'pending_backup_status' in globals() else {},
+        'query_cache_items': len(_QUERY_CACHE) if isinstance(globals().get('_QUERY_CACHE'), dict) else 0,
+        'db_path': str(DB_PATH),
+    }
+# =================== END V170 BACKEND-ONLY PERFORMANCE GUARD ===================

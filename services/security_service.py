@@ -4287,3 +4287,72 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 
 require_permission = require_module_access
 # =================== END V153B RUNTIME GUARD FOR MODULE 14 DATA HEALTH CENTER ===================
+
+
+# ===================== V170 PERMISSION CHECK CACHE WITHOUT UI CHANGES =====================
+# 目的：首頁與各頁 rerun 時會多次 check_permission；此處只快取權限判斷結果，不動登入畫面/樣式/表格。
+import time as _v170_sec_time
+try:
+    _v170_prev_check_permission = check_permission
+except Exception:
+    _v170_prev_check_permission = None
+try:
+    _v170_prev_clear_permission_cache = clear_permission_cache
+except Exception:
+    _v170_prev_clear_permission_cache = None
+
+_V170_PERMISSION_RESULT_CACHE: dict[tuple, tuple[float, bool]] = {}
+_V170_PERMISSION_CACHE_SECONDS = float(os.environ.get('SPT_V170_PERMISSION_CACHE_SECONDS', '20') or 20)
+
+
+def _v170_permission_file_mtime() -> float:
+    try:
+        return float(_V125_PERMISSION_FILE.stat().st_mtime) if _V125_PERMISSION_FILE.exists() else 0.0
+    except Exception:
+        return 0.0
+
+
+def clear_permission_cache(username: str | None = None) -> None:  # type: ignore[override]
+    try:
+        _V170_PERMISSION_RESULT_CACHE.clear()
+    except Exception:
+        pass
+    if callable(_v170_prev_clear_permission_cache):
+        try:
+            _v170_prev_clear_permission_cache(username)
+        except TypeError:
+            _v170_prev_clear_permission_cache()
+        except Exception:
+            pass
+
+
+def check_permission(module_code: str, action: str = 'can_view') -> bool:  # type: ignore[override]
+    if not st.session_state.get('auth_logged_in'):
+        return False
+    username = str(st.session_state.get('auth_username', '') or '').strip().lower()
+    roles = st.session_state.get('auth_roles', []) or []
+    if isinstance(roles, str):
+        roles = [roles]
+    role_text = ','.join(sorted({str(r).strip().lower() for r in roles if str(r).strip()}))
+    key = (username, role_text, str(module_code or ''), str(action or 'can_view'), _v170_permission_file_mtime())
+    now_s = _v170_sec_time.time()
+    got = _V170_PERMISSION_RESULT_CACHE.get(key)
+    if got and now_s - got[0] <= _V170_PERMISSION_CACHE_SECONDS:
+        return bool(got[1])
+    res = bool(_v170_prev_check_permission(module_code, action)) if callable(_v170_prev_check_permission) else False
+    try:
+        if len(_V170_PERMISSION_RESULT_CACHE) > 300:
+            _V170_PERMISSION_RESULT_CACHE.clear()
+        _V170_PERMISSION_RESULT_CACHE[key] = (now_s, res)
+    except Exception:
+        pass
+    return bool(res)
+
+
+def v170_security_cache_status() -> dict:
+    return {
+        'version': 'V170_PERMISSION_CHECK_CACHE_WITHOUT_UI_CHANGES',
+        'cache_items': len(_V170_PERMISSION_RESULT_CACHE),
+        'ttl_seconds': _V170_PERMISSION_CACHE_SECONDS,
+    }
+# =================== END V170 PERMISSION CHECK CACHE WITHOUT UI CHANGES ===================
