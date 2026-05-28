@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 09:27:34",
-  "exported_at": "2026-05-28 09:27:34",
+  "updated_at": "2026-05-28 09:28:37",
+  "exported_at": "2026-05-28 09:28:37",
   "reason": "v122_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -2239,11 +2239,191 @@
         "detail": "",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 9482,
+        "log_time": "2026-05-28 09:27:46",
+        "user_name": "admin",
+        "action_type": "SAVE_PROCESS_OPTIONS",
+        "target_table": "13_system_settings",
+        "target_id": "",
+        "message": "儲存工段設定 15 筆，影響類別：Sorter/EFEM",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9481,
+        "log_time": "2026-05-28 09:27:46",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "app_settings",
+        "target_id": "",
+        "message": "INSERT app_settings",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; INSERT OR REPLACE INTO app_settings(setting_key, setting_value, note, updated_at) VALUES (?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9480,
+        "log_time": "2026-05-28 09:27:46",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "rest_periods",
+        "target_id": "",
+        "message": "INSERT rest_periods",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; INSERT INTO rest_periods(id, name, start_time, end_time, is_active, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9479,
+        "log_time": "2026-05-28 09:27:46",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "process_options",
+        "target_id": "",
+        "message": "INSERT process_options",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; \n                INSERT INTO process_options(process_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, ?, ?, ?, ?, ?)\n                ON CONFLICT(process_name) DO UPDATE SET\n                    is_active=excluded.is_active,\n                    sort_order=excluded.sort_order,\n                    note=excluded.note,\n                    updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9478,
+        "log_time": "2026-05-28 09:27:46",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; \n                INSERT INTO process_category_options(id, category_name, process_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n                ON CONFLICT(category_name, process_name) DO UPDATE SET\n                    is_active=excluded.is_active,\n                    sort_order=excluded.sort_order,\n                    note=excluded.note,\n                    updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9477,
+        "log_time": "2026-05-28 09:27:46",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; \n                INSERT INTO process_categories(id, category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, ?, ?, ?, ?, ?, ?)\n                ON CONFLICT(category_name) DO UPDATE SET\n                    is_active=excluded.is_active,\n                    sort_order=excluded.sort_order,\n                    note=excluded.note,\n                    updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9476,
+        "log_time": "2026-05-28 09:27:46",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "app_settings",
+        "target_id": "",
+        "message": "DELETE app_settings",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM app_settings",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9475,
+        "log_time": "2026-05-28 09:27:46",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "rest_periods",
+        "target_id": "",
+        "message": "DELETE rest_periods",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM rest_periods",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9474,
+        "log_time": "2026-05-28 09:27:46",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "process_options",
+        "target_id": "",
+        "message": "DELETE process_options",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM process_options",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9473,
+        "log_time": "2026-05-28 09:27:46",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "DELETE process_category_options",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM process_category_options",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9472,
+        "log_time": "2026-05-28 09:27:46",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "DELETE process_categories",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM process_categories",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9500,
+        "log_time": "2026-05-28 09:28:30",
+        "user_name": "B126",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "224",
+        "message": "V137 結束工時紀錄 #224；同步結束=1筆；狀態=暫停；群組總工時=00:03:45；平均工時=00:03:36",
+        "detail": "224",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9499,
+        "log_time": "2026-05-28 09:28:29",
+        "user_name": "B126",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9502,
+        "log_time": "2026-05-28 09:28:36",
+        "user_name": "B126",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 1 筆",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9501,
+        "log_time": "2026-05-28 09:28:36",
+        "user_name": "B126",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 186
+    "system_logs": 201
   }
 }
