@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 00:58:45",
+  "exported_at": "2026-05-29 01:04:32",
   "source": "db_service_write",
   "module_key": "01_time_records",
   "module_code": "01",
@@ -2680,10 +2680,37 @@
         "source": "streamlit",
         "created_at": "2026-05-29 00:47:16",
         "updated_at": "2026-05-29 00:47:16"
+      },
+      {
+        "id": 326,
+        "record_key": "B002|21M0241-04|前置鈑金|2026-05-29 01:04:32|8a7a02a9",
+        "status": "作業中",
+        "work_order": "21M0241-04",
+        "part_no": "4TRSC020-004-02",
+        "type_name": "NTB 3 PORT",
+        "process_name": "前置鈑金",
+        "employee_id": "B002",
+        "employee_name": "張文品",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 01:04:32",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "01:04:32",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B002|前置鈑金|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 01:04:32",
+        "updated_at": "2026-05-29 01:04:32"
       }
     ]
   },
   "table_counts": {
-    "time_records": 99
+    "time_records": 100
   }
 }
