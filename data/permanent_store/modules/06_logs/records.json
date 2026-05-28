@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 20:13:37",
-  "exported_at": "2026-05-28 20:13:37",
+  "updated_at": "2026-05-28 20:13:50",
+  "exported_at": "2026-05-28 20:13:50",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -26899,11 +26899,23 @@
         "detail": "",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 222,
+        "log_time": "2026-05-28 20:13:45",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01 工時紀錄管理員維護區刪除：V96 已刪除 SQLite 0 筆、01/02 權威檔 1 筆，並建立 tombstone。",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2241
+    "system_logs": 2242
   }
 }
