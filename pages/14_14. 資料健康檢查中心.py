@@ -24,6 +24,13 @@ from services.regression_test_service import (
     export_v157_regression_excel_bytes,
     compact_result_rows,
 )
+from services.backup_restore_service import (
+    create_full_backup_snapshot,
+    list_backup_snapshots,
+    inspect_backup_zip_bytes,
+    restore_missing_time_records_from_backup,
+    backup_manifest_rows,
+)
 
 MODULE_CODE = "14_data_health"
 
@@ -53,6 +60,131 @@ st.caption(
     "權限說明：進入本頁需 14 模組 can_view；下載 Excel 需 can_export；執行非破壞式修復需 can_manage。"
 )
 
+
+st.markdown("### V158 一鍵備份 / 還原中心")
+st.caption(
+    "此區用於建立完整資料備份 ZIP，以及從備份 ZIP 非破壞式補回缺失的工時紀錄。"
+    "還原只補缺漏，不刪除、不覆蓋、不重新編號，並尊重 02_history tombstone。"
+)
+
+v158_c1, v158_c2, v158_c3 = st.columns([1, 1, 2])
+if "v158_backup_result" not in st.session_state:
+    st.session_state["v158_backup_result"] = None
+if "v158_inspect_result" not in st.session_state:
+    st.session_state["v158_inspect_result"] = None
+if "v158_restore_result" not in st.session_state:
+    st.session_state["v158_restore_result"] = None
+
+create_backup_disabled = not CAN_REPAIR
+if v158_c1.button("📦 建立完整備份 ZIP", use_container_width=True, disabled=create_backup_disabled, key="v158_create_backup"):
+    with st.spinner("正在建立完整資料備份 ZIP；此動作只讀取資料，不修改正式紀錄..."):
+        st.session_state["v158_backup_result"] = create_full_backup_snapshot(reason="manual_v158_from_health_center", save_to_disk=True)
+    st.rerun()
+
+if v158_c2.button("🔄 重新讀取最近備份", use_container_width=True, key="v158_refresh_backup_list"):
+    st.session_state.pop("v158_backup_list", None)
+    st.rerun()
+
+if create_backup_disabled:
+    v158_c3.info("你的帳號沒有 14 模組 can_manage 權限，不能建立備份或執行還原。")
+else:
+    v158_c3.info("建議每次大版本更新前，先建立完整備份 ZIP 並下載保存。")
+
+v158_backup_result = st.session_state.get("v158_backup_result")
+if isinstance(v158_backup_result, dict) and v158_backup_result.get("ok"):
+    b1, b2, b3, b4 = st.columns(4)
+    b1.metric("備份檔案數", v158_backup_result.get("file_count", 0))
+    b2.metric("備份大小", f"{int(v158_backup_result.get('size', 0) or 0) / 1024:.1f} KB")
+    b3.metric("建立時間", v158_backup_result.get("created_at", ""))
+    b4.metric("SHA256", str(v158_backup_result.get("sha256", ""))[:10] + "...")
+    st.success("完整備份 ZIP 已建立。請下載保存；本機也會留存在 data/permanent_store/_backups/v158。")
+    st.download_button(
+        "⬇️ 下載完整備份 ZIP",
+        data=v158_backup_result.get("zip_bytes", b""),
+        file_name=v158_backup_result.get("file_name", "SPT_V158_full_backup.zip"),
+        mime="application/zip",
+        use_container_width=True,
+        disabled=not CAN_EXPORT,
+        help=None if CAN_EXPORT else "你的帳號沒有 14 模組匯出權限。",
+        key="v158_download_backup_zip",
+    )
+
+with st.expander("最近本機備份 / Recent Local Backups", expanded=False):
+    try:
+        backup_list = list_backup_snapshots(limit=10)
+        if backup_list:
+            st.dataframe(pd.DataFrame(backup_list), use_container_width=True, hide_index=True, height=260)
+        else:
+            st.info("尚未建立 V158 本機備份。")
+    except Exception as exc:
+        st.error(f"讀取最近備份失敗：{exc}")
+
+st.markdown("#### 檢查備份 ZIP / Inspect Backup ZIP")
+backup_file = st.file_uploader(
+    "上傳 V158 備份 ZIP，僅用於檢查或非破壞式補回缺失工時資料",
+    type=["zip"],
+    key="v158_backup_uploader",
+)
+if backup_file is not None:
+    uploaded_bytes = backup_file.getvalue()
+    if st.button("🔎 檢查上傳的備份 ZIP", use_container_width=True, key="v158_inspect_uploaded_backup"):
+        st.session_state["v158_inspect_result"] = inspect_backup_zip_bytes(uploaded_bytes)
+        st.session_state["v158_restore_result"] = None
+        st.rerun()
+
+inspect_result = st.session_state.get("v158_inspect_result")
+if isinstance(inspect_result, dict) and inspect_result:
+    if inspect_result.get("ok"):
+        st.success("備份 ZIP 可讀取。")
+        st.dataframe(pd.DataFrame(backup_manifest_rows(inspect_result)), use_container_width=True, hide_index=True, height=260)
+    else:
+        st.error(f"備份 ZIP 無法讀取：{inspect_result.get('reason')}")
+
+if backup_file is not None and isinstance(inspect_result, dict) and inspect_result.get("ok"):
+    st.markdown("#### 非破壞式補回缺失工時資料 / Non-destructive Missing Row Restore")
+    st.caption(
+        "此功能只會從備份 ZIP 找出目前 01/02 缺少的 time_records 並補回。"
+        "現有資料不覆蓋；已刪除 tombstone 資料不復活；預設先 Dry Run。"
+    )
+    r1, r2, r3 = st.columns([1, 1, 2])
+    restore_dry_run = r1.checkbox("只模擬 / Dry Run", value=True, key="v158_restore_dry_run")
+    restore_github = r2.checkbox("套用後同步 GitHub", value=True, disabled=restore_dry_run or not CAN_REPAIR, key="v158_restore_github")
+    if not CAN_REPAIR:
+        r3.info("你的帳號沒有 14 模組 can_manage 權限，不能執行補回。")
+    else:
+        r3.warning("實際補回前請先確認 Dry Run 結果；補回為新增缺漏列，不會刪除或覆蓋現有列。")
+    if st.button("🛠️ 從備份非破壞式補回缺失工時資料", use_container_width=True, disabled=not CAN_REPAIR, key="v158_restore_missing"):
+        with st.spinner("正在比對備份與目前 01/02 資料；只補缺漏，不覆蓋現有資料..."):
+            st.session_state["v158_restore_result"] = restore_missing_time_records_from_backup(
+                uploaded_bytes,
+                dry_run=bool(restore_dry_run),
+                github=bool(restore_github),
+                reason="manual_v158_restore_from_health_center",
+            )
+        st.rerun()
+
+restore_result = st.session_state.get("v158_restore_result")
+if isinstance(restore_result, dict) and restore_result:
+    if restore_result.get("ok"):
+        rr1, rr2, rr3, rr4, rr5 = st.columns(5)
+        rr1.metric("備份工時列", restore_result.get("backup_total_rows", 0))
+        rr2.metric("目前工時列", restore_result.get("current_total_rows", 0))
+        rr3.metric("可補回缺漏", restore_result.get("missing_rows", 0))
+        rr4.metric("略過已存在", restore_result.get("skipped_existing", 0))
+        rr5.metric("略過已刪除", restore_result.get("skipped_deleted_tombstone", 0))
+        if restore_result.get("dry_run"):
+            st.info("Dry Run 完成，尚未寫入。確認缺漏筆數合理後，可取消 Dry Run 再執行。")
+        else:
+            st.success(
+                f"補回完成：01/02 權威檔目前 {restore_result.get('saved_authority_rows', 0)} 筆；"
+                f"SQLite cache 補入 {restore_result.get('sqlite_inserted', 0)} 筆。"
+            )
+        with st.expander("補回結果詳細資料 / Restore Detail", expanded=False):
+            st.json(restore_result)
+    else:
+        st.error(f"補回失敗：{restore_result.get('reason')}")
+
+st.divider()
 
 st.markdown("### 備份佇列狀態 / Backup Queue Status")
 st.caption(
@@ -275,4 +407,4 @@ if b3.button("🧹 清除本頁檢查結果", use_container_width=True, key="v15
     st.session_state.pop("v153_repair_result", None)
     st.rerun()
 
-st.caption("V155：資料健康檢查中心已加入備份佇列狀態。建議每次部署修正包後先檢查備份狀態，再執行資料健康檢查。")
+st.caption("V158：資料健康檢查中心已加入一鍵備份 / 還原中心。建議每次大版本更新前先建立完整備份，再執行 V157 測試與資料健康檢查。")
