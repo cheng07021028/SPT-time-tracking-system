@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 13:19:27",
+  "exported_at": "2026-05-28 13:22:37",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -9203,10 +9203,54 @@
         "message": "01_finish_active_visible_v141: 已由 01/02 權威檔回填 SQLite cache 1 筆",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 9855,
+        "log_time": "2026-05-28 13:22:14",
+        "user_name": "SPT034",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
+        "level": "INFO"
+      },
+      {
+        "id": 9856,
+        "log_time": "2026-05-28 13:22:16",
+        "user_name": "SPT034",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "233",
+        "message": "V137 結束工時紀錄 #233；同步結束=1筆；狀態=暫停；群組總工時=01:20:05；平均工時=01:19:48",
+        "detail": "233",
+        "level": "INFO"
+      },
+      {
+        "id": 9857,
+        "log_time": "2026-05-28 13:22:21",
+        "user_name": "SPT034",
+        "action_type": "V89_SQLITE_CACHE_SYNC_ERROR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 快取由權威檔覆蓋失敗：UNIQUE constraint failed: time_records.id",
+        "detail": "",
+        "level": "ERROR"
+      },
+      {
+        "id": 9858,
+        "log_time": "2026-05-28 13:22:25",
+        "user_name": "SPT034",
+        "action_type": "V89_SQLITE_CACHE_SYNC_ERROR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 快取由權威檔覆蓋失敗：UNIQUE constraint failed: time_records.id",
+        "detail": "",
+        "level": "ERROR"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 836
+    "system_logs": 840
   }
 }
