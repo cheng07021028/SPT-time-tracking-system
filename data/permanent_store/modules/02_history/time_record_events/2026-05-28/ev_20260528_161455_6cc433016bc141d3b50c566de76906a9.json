@@ -1,0 +1,46 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "6cc433016bc141d3b50c566de76906a9",
+  "event_type": "DELETE_MARK",
+  "event_time": "2026-05-28 16:14:55",
+  "record_id": "273",
+  "record_key": "LOGRECOVERY|SSS|NA|6S|2026-05-28 11:08:44|273",
+  "operator_account": "admin",
+  "reason": "delete_time_records_v152_before_delete",
+  "row": {
+    "id": "273",
+    "record_key": "LOGRECOVERY|SSS|NA|6S|2026-05-28 11:08:44|273",
+    "status": "作業中",
+    "work_order": "NA",
+    "part_no": "",
+    "type_name": "",
+    "process_name": "6S",
+    "employee_id": "SSS",
+    "employee_name": "SSS",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-28 11:08:44",
+    "end_action": "",
+    "end_timestamp": "",
+    "remark": "V164B_LOG_ONLY_RECOVERY：由 LOG START_WORK 補回。LOG 不含完整 INSERT 參數，請人工確認 P/N、機型、組立地點、結束時間與工時後再轉正式紀錄。",
+    "start_date": "2026-05-28",
+    "start_time": "11:08:44",
+    "end_date": "",
+    "end_time": "",
+    "work_hours": "00:00:00",
+    "assembly_location": "",
+    "group_key": "SSS|6S|2026-05-28",
+    "is_group_work": "0",
+    "source": "V164B_LOG_ONLY_RECOVERY",
+    "created_at": "2026-05-28 11:08:44",
+    "updated_at": "2026-05-28 16:04:53"
+  },
+  "extra": {
+    "reason": "02 歷史紀錄啟動編輯後整列刪除",
+    "record_ids": [
+      271,
+      273
+    ]
+  },
+  "previous_checksum": "5bbba7318814d2443e230af5350bc773db78af0a6ef5cd7013fd5fbd3e62beff",
+  "checksum": "09eaa730cf6b334c8bd4aa00b1cf8d926f2d08e3952cb0343e70ccfbdba96322"
+}
