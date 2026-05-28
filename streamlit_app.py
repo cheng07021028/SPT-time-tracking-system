@@ -1,6 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+# === V160 Taiwan timezone bootstrap ===
+# Streamlit Cloud system logs may display UTC, but all application records, LOG rows,
+# exports, date filters, and daily reset calculations must use Taiwan time.
+try:
+    from services.timezone_bootstrap_service import apply_app_timezone
+    apply_app_timezone()
+except Exception:
+    pass
+# === /V160 Taiwan timezone bootstrap ===
+
 # === V-PERSIST-ROOT: single permanent store bootstrap ===
 try:
     from services.permanent_store_service import ensure_permanent_store
