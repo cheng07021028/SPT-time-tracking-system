@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 00:41:52",
-  "exported_at": "2026-05-29 00:41:52",
+  "updated_at": "2026-05-29 00:42:30",
+  "exported_at": "2026-05-29 00:42:30",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -163,11 +163,47 @@
         "detail": "324\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 00:41:48\",\"action_type\":\"END_WORK\",\"target_table\":\"time_records\",\"target_id\":\"324\",\"target_ids\":[324],\"message\":\"結束工時紀錄 #324，同步結束=1筆，狀態=暫停，群組總工時=00:26:48，平均工時=00:27:00\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SSS|NA|6S|2026-05-29 00:14:26|b5c196cd\",\"identity_key\":\"record_key:SSS|NA|6S|2026-05-29 00:14:26|b5c196cd\",\"id\":\"324\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 00:14:26\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":324,\"record_key\":\"SSS|NA|6S|2026-05-29 00:14:26|b5c196cd\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 00:14:26\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"00:14:26\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 00:14:26\",\"updated_at\":\"2026-05-29 00:14:26\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":324,\"record_key\":\"SSS|NA|6S|2026-05-29 00:14:26|b5c196cd\",\"status\":\"暫停\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 00:14:26\",\"end_action\":\"暫停\",\"end_timestamp\":\"2026-05-29 00:41:14\",\"remark\":\"系統自動暫停：同一人員切換不同工段或不同日期作業\",\"start_date\":\"2026-05-29\",\"start_time\":\"00:14:26\",\"end_date\":\"2026-05-29\",\"end_time\":\"00:41:14\",\"work_hours\":0.45,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 00:14:26\",\"updated_at\":\"2026-05-29 00:41:14\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":324,\"record_key\":\"SSS|NA|6S|2026-05-29 00:14:26|b5c196cd\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 00:14:26\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"00:14:26\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 00:14:26\",\"updated_at\":\"2026-05-29 00:14:26\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":324,\"record_key\":\"SSS|NA|6S|2026-05-29 00:14:26|b5c196cd\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 00:14:26\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"00:14:26\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 00:14:26\",\"updated_at\":\"2026-05-29 00:14:26\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"ed013565c4b422627069f8d6a58b8f52e9d10e67d8135c0f85d4f99d76b16c07\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 147,
+        "log_time": "2026-05-29 00:42:26",
+        "user_name": "SSS",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "326",
+        "message": "SSS 開始 21M0241-02 / 前置鈑金",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 00:42:26\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"326\",\"target_ids\":[326],\"message\":\"SSS 開始 21M0241-02 / 前置鈑金\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":0,\"authority_02_history\":0,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SSS|21M0241-02|前置鈑金|2026-05-29 00:42:26|620c9f09\",\"identity_key\":\"record_key:SSS|21M0241-02|前置鈑金|2026-05-29 00:42:26|620c9f09\",\"id\":\"326\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"work_order\":\"21M0241-02\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 00:42:26\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":326,\"record_key\":\"SSS|21M0241-02|前置鈑金|2026-05-29 00:42:26|620c9f09\",\"status\":\"作業中\",\"work_order\":\"21M0241-02\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 00:42:26\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"00:42:26\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SSS|前置鈑金|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 00:42:26\",\"updated_at\":\"2026-05-29 00:42:26\",\"_snapshot_source\":\"sqlite.time_records\"}],\"sqlite_time_records\":[{\"id\":326,\"record_key\":\"SSS|21M0241-02|前置鈑金|2026-05-29 00:42:26|620c9f09\",\"status\":\"作業中\",\"work_order\":\"21M0241-02\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 00:42:26\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"00:42:26\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SSS|前置鈑金|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 00:42:26\",\"updated_at\":\"2026-05-29 00:42:26\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[],\"authority_02_history\":[]},\"snapshot_hash\":\"1866d0b6162bab6f5344a0f84c50261b84b3ee9de1a19aa0982975e34c1b1dfd\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 146,
+        "log_time": "2026-05-29 00:42:26",
+        "user_name": "SSS",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 145,
+        "log_time": "2026-05-29 00:42:26",
+        "user_name": "SSS",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 13
+    "system_logs": 16
   }
 }
