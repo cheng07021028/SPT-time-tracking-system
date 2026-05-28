@@ -1,0 +1,47 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "2c06a62c2ecc4070b4c7be4167a01d1d",
+  "event_type": "FINISH_WORK",
+  "event_time": "2026-05-28 17:08:46",
+  "record_id": "290",
+  "record_key": "SPT172|25M0115-17|Packing|2026-05-28 14:00:06|2a25315c",
+  "operator_account": "SPT172",
+  "reason": "finish_work_v152_event_journal",
+  "row": {
+    "id": "290",
+    "record_key": "SPT172|25M0115-17|Packing|2026-05-28 14:00:06|2a25315c",
+    "status": "完工",
+    "work_order": "25M0115-17",
+    "part_no": "4TRSC150-003-01",
+    "type_name": "12\" UFO EFEM",
+    "process_name": "Packing",
+    "employee_id": "SPT172",
+    "employee_name": "胡瑄芸",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-28 14:00:06",
+    "end_action": "完工",
+    "end_timestamp": "2026-05-28 17:08:36",
+    "remark": "",
+    "start_date": "2026-05-28",
+    "start_time": "14:00:06",
+    "end_date": "2026-05-28",
+    "end_time": "17:08:36",
+    "work_hours": "2.89",
+    "assembly_location": "竹東",
+    "group_key": "SPT172|Packing|2026-05-28",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-28 14:00:06",
+    "updated_at": "2026-05-28 17:08:36"
+  },
+  "extra": {
+    "end_action": "完工",
+    "remark": "",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      290
+    ]
+  },
+  "previous_checksum": "09d3df959519812002c914370a6118e13f73a71d61c7ed18b0c3a45257f5b95f",
+  "checksum": "145973b306c4c9574d60beed0925f2207c3b5e4675ee56f48fcd598ea1a0c777"
+}
