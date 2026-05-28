@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-28 08:55:58",
-  "exported_at": "2026-05-28 08:55:58",
-  "reason": "start_work_v139_final_state_reconcile_02",
+  "updated_at": "2026-05-28 08:57:42",
+  "exported_at": "2026-05-28 08:57:42",
+  "reason": "get_active_record_v143_all_identity_columns_strict_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -493,11 +493,38 @@
         "source": "streamlit",
         "created_at": "2026-05-28 08:55:54",
         "updated_at": "2026-05-28 08:55:54"
+      },
+      {
+        "id": 205,
+        "record_key": "B228|26N4001-03|配電|2026-05-28 08:57:21|801d8340",
+        "status": "作業中",
+        "work_order": "26N4001-03",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "配電",
+        "employee_id": "B228",
+        "employee_name": "溫翠茹",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 08:57:21",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "前置加工",
+        "start_date": "2026-05-28",
+        "start_time": "08:57:21",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B228|配電|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 08:57:21",
+        "updated_at": "2026-05-28 08:57:21"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 18
+    "time_records": 19
   }
 }
