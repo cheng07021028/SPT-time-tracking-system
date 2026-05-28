@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-28 19:00:46",
-  "exported_at": "2026-05-28 19:00:46",
+  "updated_at": "2026-05-28 19:01:22",
+  "exported_at": "2026-05-28 19:01:22",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -24775,11 +24775,47 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 560,
+        "log_time": "2026-05-28 19:01:11",
+        "user_name": "SPT244",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "315",
+        "message": "費南 開始 24N4001-24 / 包機",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 559,
+        "log_time": "2026-05-28 19:01:08",
+        "user_name": "SPT244",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 558,
+        "log_time": "2026-05-28 19:00:57",
+        "user_name": "SPT241",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "286",
+        "message": "V137 結束工時紀錄 #286；同步結束=1筆；狀態=暫停；群組總工時=04:28:46；平均工時=04:28:48",
+        "detail": "286\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-28 19:00:57\",\"action_type\":\"END_WORK\",\"target_table\":\"time_records\",\"target_id\":\"286\",\"target_ids\":[286],\"message\":\"V137 結束工時紀錄 #286；同步結束=1筆；狀態=暫停；群組總工時=04:28:46；平均工時=04:28:48\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT241|25M0785-02|模組|2026-05-28 13:47:04|7c2fb94a\",\"identity_key\":\"record_key:SPT241|25M0785-02|模組|2026-05-28 13:47:04|7c2fb94a\",\"id\":\"286\",\"employee_id\":\"SPT241\",\"employee_name\":\"達文\",\"work_order\":\"25M0785-02\",\"part_no\":\"PSRSC131-N01-04\",\"type_name\":\"PSRSC131-N01\",\"process_name\":\"模組\",\"status\":\"暫停\",\"start_timestamp\":\"2026-05-28 13:47:04\",\"end_timestamp\":\"2026-05-28 19:00:50\",\"work_hours\":\"4.48\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":286,\"record_key\":\"SPT241|25M0785-02|模組|2026-05-28 13:47:04|7c2fb94a\",\"status\":\"暫停\",\"work_order\":\"25M0785-02\",\"part_no\":\"PSRSC131-N01-04\",\"type_name\":\"PSRSC131-N01\",\"process_name\":\"模組\",\"employee_id\":\"SPT241\",\"employee_name\":\"達文\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 13:47:04\",\"end_action\":\"暫停\",\"end_timestamp\":\"2026-05-28 19:00:50\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"13:47:04\",\"end_date\":\"2026-05-28\",\"end_time\":\"19:00:50\",\"work_hours\":4.48,\"assembly_location\":\"竹東\",\"group_key\":\"SPT241|模組|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 13:47:04\",\"updated_at\":\"2026-05-28 19:00:50\",\"department\":\"\",\"title\":\"\",\"department_emp\":\"\",\"title_emp\":\"\",\"recovery_status\":\"\",\"recovery_note\":\"\",\"is_deleted\":\"\",\"deleted_at\":\"\",\"work_hours_hms\":\"\",\"recovery_closed_at\":\"\",\"recovery_closed_source\":\"\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":286,\"record_key\":\"SPT241|25M0785-02|模組|2026-05-28 13:47:04|7c2fb94a\",\"status\":\"作業中\",\"work_order\":\"25M0785-02\",\"part_no\":\"PSRSC131-N01-04\",\"type_name\":\"PSRSC131-N01\",\"process_name\":\"模組\",\"employee_id\":\"SPT241\",\"employee_name\":\"達文\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 13:47:04\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"13:47:04\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":\"00:00:00\",\"assembly_location\":\"竹東\",\"group_key\":\"SPT241|模組|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 13:47:04\",\"updated_at\":\"2026-05-28 16:15:37\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":286,\"record_key\":\"SPT241|25M0785-02|模組|2026-05-28 13:47:04|7c2fb94a\",\"status\":\"暫停\",\"work_order\":\"25M0785-02\",\"part_no\":\"PSRSC131-N01-04\",\"type_name\":\"PSRSC131-N01\",\"process_name\":\"模組\",\"employee_id\":\"SPT241\",\"employee_name\":\"達文\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 13:47:04\",\"end_action\":\"暫停\",\"end_timestamp\":\"2026-05-28 19:00:50\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"13:47:04\",\"end_date\":\"2026-05-28\",\"end_time\":\"19:00:50\",\"work_hours\":4.48,\"assembly_location\":\"竹東\",\"group_key\":\"SPT241|模組|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 13:47:04\",\"updated_at\":\"2026-05-28 19:00:50\",\"department\":\"\",\"title\":\"\",\"department_emp\":\"\",\"title_emp\":\"\",\"recovery_status\":\"\",\"recovery_note\":\"\",\"is_deleted\":\"\",\"deleted_at\":\"\",\"work_hours_hms\":\"\",\"recovery_closed_at\":\"\",\"recovery_closed_source\":\"\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":286,\"record_key\":\"SPT241|25M0785-02|模組|2026-05-28 13:47:04|7c2fb94a\",\"status\":\"暫停\",\"work_order\":\"25M0785-02\",\"part_no\":\"PSRSC131-N01-04\",\"type_name\":\"PSRSC131-N01\",\"process_name\":\"模組\",\"employee_id\":\"SPT241\",\"employee_name\":\"達文\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-28 13:47:04\",\"end_action\":\"暫停\",\"end_timestamp\":\"2026-05-28 19:00:50\",\"remark\":\"\",\"start_date\":\"2026-05-28\",\"start_time\":\"13:47:04\",\"end_date\":\"2026-05-28\",\"end_time\":\"19:00:50\",\"work_hours\":4.48,\"assembly_location\":\"竹東\",\"group_key\":\"SPT241|模組|2026-05-28\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-28 13:47:04\",\"updated_at\":\"2026-05-28 19:00:50\",\"department\":\"\",\"title\":\"\",\"department_emp\":\"\",\"title_emp\":\"\",\"recovery_status\":\"\",\"recovery_note\":\"\",\"is_deleted\":\"\",\"deleted_at\":\"\",\"work_hours_hms\":\"\",\"recovery_closed_at\":\"\",\"recovery_closed_source\":\"\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"965fa499f43104c31524a6358afd2269cd34d7e4ce5ab180c7d9369e5dbd9394\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 2064
+    "system_logs": 2067
   }
 }
