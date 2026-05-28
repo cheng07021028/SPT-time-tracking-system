@@ -1,17 +1,20 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 14:48:42",
+  "exported_at": "2026-05-28 14:53:48",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 54,
+  "business_row_count": 58,
   "table_counts": {
+    "app_settings": 1,
     "auth_account_permissions": 118,
     "auth_login_logs": 0,
     "auth_security_settings": 2,
     "auth_users": 9,
     "employees": 0,
     "login_logs": 422,
-    "process_options": 17,
+    "process_categories": 7,
+    "process_category_options": 101,
+    "process_options": 44,
     "rest_periods": 5,
     "security_login_logs": 0,
     "security_module_permissions": 84,
@@ -19,14 +22,25 @@
     "security_settings": 2,
     "security_user_roles": 9,
     "security_users": 9,
-    "system_logs": 213,
+    "system_logs": 228,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
-    "time_records": 54,
+    "table_ui_settings": 0,
+    "time_record_events": 0,
+    "time_record_outbox": 0,
+    "time_records": 58,
     "work_orders": 0
   },
   "tables": {
+    "app_settings": [
+      {
+        "setting_key": "default_process_category",
+        "setting_value": "Sorter/EFEM",
+        "note": "01 工時紀錄預設類別",
+        "updated_at": "2026-05-22 23:48:30"
+      }
+    ],
     "auth_account_permissions": [
       {
         "id": 1,
@@ -8529,164 +8543,1484 @@
         "created_at": "2026-05-27 22:20:37"
       }
     ],
-    "process_options": [
+    "process_categories": [
       {
         "id": 1,
-        "process_name": "前置鈑金",
-        "is_active": 1,
+        "category_name": "全部 / 通用",
+        "is_active": 0,
         "sort_order": 1,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "note": "所有類別共用工段",
+        "created_at": "2026-05-20 14:24:53",
+        "updated_at": "2026-05-27 19:40:22"
       },
       {
         "id": 2,
-        "process_name": "LP改造",
+        "category_name": "Sorter/EFEM",
         "is_active": 1,
         "sort_order": 2,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "note": "",
+        "created_at": "2026-05-20 14:25:52",
+        "updated_at": "2026-05-27 19:40:22"
       },
       {
         "id": 3,
-        "process_name": "骨架組立",
+        "category_name": "NTB",
         "is_active": 1,
         "sort_order": 3,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "note": "",
+        "created_at": "2026-05-20 14:43:35",
+        "updated_at": "2026-05-27 19:40:22"
       },
       {
         "id": 4,
-        "process_name": "配電",
+        "category_name": "FCLP",
         "is_active": 1,
         "sort_order": 4,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "note": "",
+        "created_at": "2026-05-22 09:54:34",
+        "updated_at": "2026-05-27 19:40:22"
       },
       {
         "id": 5,
-        "process_name": "模組",
+        "category_name": "GPTC",
         "is_active": 1,
         "sort_order": 5,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "note": "",
+        "created_at": "2026-05-22 09:54:34",
+        "updated_at": "2026-05-27 19:40:22"
       },
       {
         "id": 6,
-        "process_name": "水平",
+        "category_name": "BWBS",
         "is_active": 1,
         "sort_order": 6,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "note": "",
+        "created_at": "2026-05-22 09:54:34",
+        "updated_at": "2026-05-27 19:40:22"
       },
       {
         "id": 7,
-        "process_name": "S.T.",
+        "category_name": "6S",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-27 19:40:22",
+        "updated_at": "2026-05-27 19:40:22"
+      }
+    ],
+    "process_category_options": [
+      {
+        "id": 1,
+        "category_name": "全部 / 通用",
+        "process_name": "前置鈑金",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
+      },
+      {
+        "id": 2,
+        "category_name": "全部 / 通用",
+        "process_name": "LP改造",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
+      },
+      {
+        "id": 3,
+        "category_name": "全部 / 通用",
+        "process_name": "骨架組立",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
+      },
+      {
+        "id": 4,
+        "category_name": "全部 / 通用",
+        "process_name": "配電",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
+      },
+      {
+        "id": 5,
+        "category_name": "全部 / 通用",
+        "process_name": "模組",
         "is_active": 1,
         "sort_order": 7,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
+      },
+      {
+        "id": 6,
+        "category_name": "全部 / 通用",
+        "process_name": "水平",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
+      },
+      {
+        "id": 7,
+        "category_name": "全部 / 通用",
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
       },
       {
         "id": 8,
+        "category_name": "全部 / 通用",
         "process_name": "清潔",
         "is_active": 1,
-        "sort_order": 8,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
       },
       {
         "id": 9,
+        "category_name": "全部 / 通用",
         "process_name": "收機",
         "is_active": 1,
-        "sort_order": 9,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
       },
       {
         "id": 10,
+        "category_name": "全部 / 通用",
         "process_name": "包機",
         "is_active": 1,
-        "sort_order": 10,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
       },
       {
         "id": 11,
+        "category_name": "全部 / 通用",
         "process_name": "Packing",
         "is_active": 1,
-        "sort_order": 11,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "sort_order": 13,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
       },
       {
         "id": 12,
+        "category_name": "全部 / 通用",
         "process_name": "異常",
         "is_active": 1,
-        "sort_order": 12,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
       },
       {
         "id": 13,
+        "category_name": "全部 / 通用",
         "process_name": "設變",
         "is_active": 1,
-        "sort_order": 13,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
       },
       {
         "id": 14,
+        "category_name": "全部 / 通用",
         "process_name": "重工",
         "is_active": 1,
-        "sort_order": 14,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
       },
       {
         "id": 15,
+        "category_name": "全部 / 通用",
         "process_name": "教育訓練",
         "is_active": 1,
-        "sort_order": 15,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
       },
       {
         "id": 16,
+        "category_name": "全部 / 通用",
         "process_name": "IPQC",
         "is_active": 1,
-        "sort_order": 16,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
       },
       {
         "id": 17,
+        "category_name": "全部 / 通用",
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 19,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-22 09:54:55"
+      },
+      {
+        "id": 19,
+        "category_name": "NTB",
+        "process_name": "前置鈑金",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 20,
+        "category_name": "NTB",
+        "process_name": "模組",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 21,
+        "category_name": "NTB",
+        "process_name": "骨架組立",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 22,
+        "category_name": "NTB",
+        "process_name": "配電",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 23,
+        "category_name": "NTB",
+        "process_name": "水平",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 24,
+        "category_name": "NTB",
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 25,
+        "category_name": "NTB",
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 26,
+        "category_name": "NTB",
+        "process_name": "清潔",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 27,
+        "category_name": "NTB",
+        "process_name": "收機",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 28,
+        "category_name": "NTB",
+        "process_name": "包機",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 30,
+        "category_name": "NTB",
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 31,
+        "category_name": "NTB",
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 32,
+        "category_name": "NTB",
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-22 09:55:40",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 34,
+        "category_name": "FCLP",
+        "process_name": "前置鈑金",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 35,
+        "category_name": "FCLP",
+        "process_name": "模組",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 36,
+        "category_name": "FCLP",
+        "process_name": "骨架組立",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 37,
+        "category_name": "FCLP",
+        "process_name": "配電",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 38,
+        "category_name": "FCLP",
+        "process_name": "水平",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 39,
+        "category_name": "FCLP",
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 40,
+        "category_name": "FCLP",
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 41,
+        "category_name": "FCLP",
+        "process_name": "清潔",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 42,
+        "category_name": "FCLP",
+        "process_name": "收機",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 43,
+        "category_name": "FCLP",
+        "process_name": "包機",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 45,
+        "category_name": "FCLP",
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 46,
+        "category_name": "FCLP",
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 47,
+        "category_name": "FCLP",
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 48,
+        "category_name": "FCLP",
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-22 12:01:07",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 50,
+        "category_name": "GPTC",
+        "process_name": "機台定位水平調整(含連結)",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 51,
+        "category_name": "GPTC",
+        "process_name": "ETH 模組組裝",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 52,
+        "category_name": "GPTC",
+        "process_name": "CVTR 模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 53,
+        "category_name": "GPTC",
+        "process_name": "LDCV 模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 54,
+        "category_name": "GPTC",
+        "process_name": "UDCV 模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 55,
+        "category_name": "GPTC",
+        "process_name": "LTLT模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 56,
+        "category_name": "GPTC",
+        "process_name": "UTLT模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 57,
+        "category_name": "GPTC",
+        "process_name": "LBTR模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 58,
+        "category_name": "GPTC",
+        "process_name": "UBTR模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 59,
+        "category_name": "GPTC",
+        "process_name": "機構調整(滑軌模組)",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 60,
+        "category_name": "GPTC",
+        "process_name": "unit 安裝調整 (Robot  /LP / FFU)",
+        "is_active": 1,
+        "sort_order": 13,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 61,
+        "category_name": "GPTC",
+        "process_name": "GPTC Robot Teaching機構調整",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 62,
+        "category_name": "GPTC",
+        "process_name": "主機 / 次系統管路製作",
+        "is_active": 0,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 63,
+        "category_name": "GPTC",
+        "process_name": "管路檢測",
+        "is_active": 0,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 64,
+        "category_name": "GPTC",
+        "process_name": "管路流量調整",
+        "is_active": 0,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 65,
+        "category_name": "GPTC",
+        "process_name": "上盤日",
+        "is_active": 0,
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 66,
+        "category_name": "GPTC",
+        "process_name": "主機 /次系統管路製作",
+        "is_active": 0,
+        "sort_order": 19,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 67,
+        "category_name": "GPTC",
+        "process_name": "POWER ON",
+        "is_active": 0,
+        "sort_order": 20,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 68,
+        "category_name": "GPTC",
+        "process_name": "IO Test",
+        "is_active": 0,
+        "sort_order": 21,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 69,
+        "category_name": "BWBS",
+        "process_name": "Robot Z軸組立",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 70,
+        "category_name": "BWBS",
+        "process_name": "左右塔組立",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 71,
+        "category_name": "BWBS",
+        "process_name": "水平調整",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 72,
+        "category_name": "BWBS",
+        "process_name": "模組組立",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 73,
+        "category_name": "BWBS",
+        "process_name": "OPEN 配線",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 74,
+        "category_name": "BWBS",
+        "process_name": "左右塔配線",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 75,
+        "category_name": "BWBS",
+        "process_name": "左右塔外框結合",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 76,
+        "category_name": "BWBS",
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 77,
+        "category_name": "BWBS",
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 78,
+        "category_name": "BWBS",
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 13,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 79,
+        "category_name": "BWBS",
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 80,
+        "category_name": "BWBS",
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 81,
+        "category_name": "BWBS",
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 82,
+        "category_name": "BWBS",
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 101,
+        "category_name": "BWBS",
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-27 15:14:35",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 103,
+        "category_name": "NTB",
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-27 18:57:45",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 104,
+        "category_name": "Sorter/EFEM",
+        "process_name": "前置鈑金",
+        "is_active": 1,
+        "sort_order": 1,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 105,
+        "category_name": "Sorter/EFEM",
+        "process_name": "LP改造",
+        "is_active": 1,
+        "sort_order": 2,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 106,
+        "category_name": "Sorter/EFEM",
+        "process_name": "骨架組立",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 107,
+        "category_name": "Sorter/EFEM",
+        "process_name": "配電",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 108,
+        "category_name": "Sorter/EFEM",
+        "process_name": "模組",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 109,
+        "category_name": "Sorter/EFEM",
+        "process_name": "水平",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 110,
+        "category_name": "Sorter/EFEM",
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 111,
+        "category_name": "Sorter/EFEM",
+        "process_name": "清潔",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 112,
+        "category_name": "Sorter/EFEM",
+        "process_name": "收機",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 113,
+        "category_name": "Sorter/EFEM",
+        "process_name": "包機",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 114,
+        "category_name": "Sorter/EFEM",
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 13,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 115,
+        "category_name": "Sorter/EFEM",
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 116,
+        "category_name": "Sorter/EFEM",
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 117,
+        "category_name": "Sorter/EFEM",
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-27 19:01:49",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 119,
+        "category_name": "FCLP",
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-27 19:37:08",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 120,
+        "category_name": "6S",
+        "process_name": "6S",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-27 19:41:11",
+        "updated_at": "2026-05-27 19:41:11"
+      },
+      {
+        "id": 121,
+        "category_name": "Sorter/EFEM",
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-28 09:27:44",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 122,
+        "category_name": "Sorter/EFEM",
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-28 09:46:57",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 123,
+        "category_name": "Sorter/EFEM",
         "process_name": "其他",
         "is_active": 1,
         "sort_order": 17,
-        "note": "系統預設工段，可於 13 系統設定修改",
-        "created_at": "2026-05-28 14:47:12",
-        "updated_at": "2026-05-28 14:47:12"
+        "note": "",
+        "created_at": "2026-05-28 09:46:57",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 124,
+        "category_name": "NTB",
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-28 09:48:44",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 125,
+        "category_name": "NTB",
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-28 09:48:44",
+        "updated_at": "2026-05-28 09:48:44"
+      },
+      {
+        "id": 126,
+        "category_name": "FCLP",
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-28 09:50:39",
+        "updated_at": "2026-05-28 09:50:39"
+      }
+    ],
+    "process_options": [
+      {
+        "id": 18,
+        "process_name": "前置鈑金",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 19,
+        "process_name": "LP改造",
+        "is_active": 1,
+        "sort_order": 2,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:46:57"
+      },
+      {
+        "id": 20,
+        "process_name": "骨架組立",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 21,
+        "process_name": "配電",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 22,
+        "process_name": "模組",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 23,
+        "process_name": "水平",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 24,
+        "process_name": "S.T.",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 25,
+        "process_name": "清潔",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 26,
+        "process_name": "收機",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 27,
+        "process_name": "包機",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:50:39"
+      },
+      {
+        "id": 28,
+        "process_name": "Packing",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 29,
+        "process_name": "異常",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 30,
+        "process_name": "設變",
+        "is_active": 1,
+        "sort_order": 13,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 31,
+        "process_name": "重工",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 32,
+        "process_name": "教育訓練",
+        "is_active": 1,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 33,
+        "process_name": "IPQC",
+        "is_active": 1,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 34,
+        "process_name": "其他",
+        "is_active": 1,
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-22 09:54:55",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 35,
+        "process_name": "機台定位水平調整(含連結)",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 36,
+        "process_name": "ETH 模組組裝",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 37,
+        "process_name": "CVTR 模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 38,
+        "process_name": "LDCV 模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 39,
+        "process_name": "UDCV 模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 40,
+        "process_name": "LTLT模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 41,
+        "process_name": "UTLT模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 42,
+        "process_name": "LBTR模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 10,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 43,
+        "process_name": "UBTR模組組裝與安裝",
+        "is_active": 1,
+        "sort_order": 11,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 44,
+        "process_name": "機構調整(滑軌模組)",
+        "is_active": 1,
+        "sort_order": 12,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 45,
+        "process_name": "unit 安裝調整 (Robot  /LP / FFU)",
+        "is_active": 1,
+        "sort_order": 13,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 46,
+        "process_name": "GPTC Robot Teaching機構調整",
+        "is_active": 1,
+        "sort_order": 14,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 47,
+        "process_name": "主機 / 次系統管路製作",
+        "is_active": 0,
+        "sort_order": 15,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 48,
+        "process_name": "管路檢測",
+        "is_active": 0,
+        "sort_order": 16,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 49,
+        "process_name": "管路流量調整",
+        "is_active": 0,
+        "sort_order": 17,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 50,
+        "process_name": "上盤日",
+        "is_active": 0,
+        "sort_order": 18,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 51,
+        "process_name": "主機 /次系統管路製作",
+        "is_active": 0,
+        "sort_order": 19,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 52,
+        "process_name": "POWER ON",
+        "is_active": 0,
+        "sort_order": 20,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 53,
+        "process_name": "IO Test",
+        "is_active": 0,
+        "sort_order": 21,
+        "note": "",
+        "created_at": "2026-05-22 12:02:45",
+        "updated_at": "2026-05-26 15:05:37"
+      },
+      {
+        "id": 54,
+        "process_name": "6S",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-27 19:41:11",
+        "updated_at": "2026-05-27 19:41:11"
+      },
+      {
+        "id": 104,
+        "process_name": "Robot Z軸組立",
+        "is_active": 1,
+        "sort_order": 3,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 105,
+        "process_name": "左右塔組立",
+        "is_active": 1,
+        "sort_order": 4,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 106,
+        "process_name": "水平調整",
+        "is_active": 1,
+        "sort_order": 5,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 107,
+        "process_name": "模組組立",
+        "is_active": 1,
+        "sort_order": 6,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 108,
+        "process_name": "OPEN 配線",
+        "is_active": 1,
+        "sort_order": 7,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 109,
+        "process_name": "左右塔配線",
+        "is_active": 1,
+        "sort_order": 8,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
+      },
+      {
+        "id": 110,
+        "process_name": "左右塔外框結合",
+        "is_active": 1,
+        "sort_order": 9,
+        "note": "",
+        "created_at": "2026-05-22 12:03:29",
+        "updated_at": "2026-05-28 09:57:07"
       }
     ],
     "rest_periods": [
       {
-        "id": 1,
+        "id": 11,
         "name": "上午休息",
         "start_time": "10:30",
         "end_time": "10:45",
@@ -8694,7 +10028,7 @@
         "sort_order": 1
       },
       {
-        "id": 2,
+        "id": 12,
         "name": "午休",
         "start_time": "12:00",
         "end_time": "13:00",
@@ -8702,7 +10036,7 @@
         "sort_order": 2
       },
       {
-        "id": 3,
+        "id": 13,
         "name": "下午休息",
         "start_time": "15:00",
         "end_time": "15:15",
@@ -8710,7 +10044,7 @@
         "sort_order": 3
       },
       {
-        "id": 4,
+        "id": 14,
         "name": "晚餐休息",
         "start_time": "18:00",
         "end_time": "18:30",
@@ -8718,7 +10052,7 @@
         "sort_order": 4
       },
       {
-        "id": 5,
+        "id": 15,
         "name": "晚上休息",
         "start_time": "20:00",
         "end_time": "20:15",
@@ -12835,6 +14169,171 @@
         "message": "UPDATE security_users",
         "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
         "level": "INFO"
+      },
+      {
+        "id": 214,
+        "log_time": "2026-05-28 14:49:13",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 215,
+        "log_time": "2026-05-28 14:49:13",
+        "user_name": "admin",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 1 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 216,
+        "log_time": "2026-05-28 14:49:18",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 217,
+        "log_time": "2026-05-28 14:49:18",
+        "user_name": "admin",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_finish_active_visible_v141: 已由 01/02 權威檔回填 SQLite cache 1 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 218,
+        "log_time": "2026-05-28 14:50:51",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "DELETE process_categories",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM process_categories",
+        "level": "INFO"
+      },
+      {
+        "id": 219,
+        "log_time": "2026-05-28 14:50:51",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "DELETE process_category_options",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM process_category_options",
+        "level": "INFO"
+      },
+      {
+        "id": 220,
+        "log_time": "2026-05-28 14:50:51",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "process_options",
+        "target_id": "",
+        "message": "DELETE process_options",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM process_options",
+        "level": "INFO"
+      },
+      {
+        "id": 221,
+        "log_time": "2026-05-28 14:50:51",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "rest_periods",
+        "target_id": "",
+        "message": "DELETE rest_periods",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM rest_periods",
+        "level": "INFO"
+      },
+      {
+        "id": 222,
+        "log_time": "2026-05-28 14:50:51",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "app_settings",
+        "target_id": "",
+        "message": "DELETE app_settings",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; DELETE FROM app_settings",
+        "level": "INFO"
+      },
+      {
+        "id": 223,
+        "log_time": "2026-05-28 14:50:51",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "process_categories",
+        "target_id": "",
+        "message": "INSERT process_categories",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; \n                INSERT INTO process_categories(id, category_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, ?, ?, ?, ?, ?, ?)\n                ON CONFLICT(category_name) DO UPDATE SET\n                    is_active=excluded.is_active,\n                    sort_order=excluded.sort_order,\n                    note=excluded.note,\n                    updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 224,
+        "log_time": "2026-05-28 14:50:51",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "process_category_options",
+        "target_id": "",
+        "message": "INSERT process_category_options",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; \n                INSERT INTO process_category_options(id, category_name, process_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n                ON CONFLICT(category_name, process_name) DO UPDATE SET\n                    is_active=excluded.is_active,\n                    sort_order=excluded.sort_order,\n                    note=excluded.note,\n                    updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 225,
+        "log_time": "2026-05-28 14:50:51",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "process_options",
+        "target_id": "",
+        "message": "INSERT process_options",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; \n                INSERT INTO process_options(process_name, is_active, sort_order, note, created_at, updated_at)\n                VALUES (?, ?, ?, ?, ?, ?)\n                ON CONFLICT(process_name) DO UPDATE SET\n                    is_active=excluded.is_active,\n                    sort_order=excluded.sort_order,\n                    note=excluded.note,\n                    updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 226,
+        "log_time": "2026-05-28 14:50:51",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "rest_periods",
+        "target_id": "",
+        "message": "INSERT rest_periods",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; INSERT INTO rest_periods(id, name, start_time, end_time, is_active, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 227,
+        "log_time": "2026-05-28 14:50:51",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "app_settings",
+        "target_id": "",
+        "message": "INSERT app_settings",
+        "detail": "transaction=V88_SYNC_13_SYSTEM_SETTINGS_CACHE; INSERT OR REPLACE INTO app_settings(setting_key, setting_value, note, updated_at) VALUES (?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 228,
+        "log_time": "2026-05-28 14:51:39",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V137 已安全合併儲存 58 筆；多人同製令同製程不覆蓋。",
+        "detail": "",
+        "level": "INFO"
       }
     ],
     "system_settings": [
@@ -12877,6 +14376,9 @@
     ],
     "table_column_settings": [],
     "table_sort_settings": [],
+    "table_ui_settings": [],
+    "time_record_events": [],
+    "time_record_outbox": [],
     "time_records": [
       {
         "id": 187,
@@ -12897,13 +14399,13 @@
         "start_time": "20:25:05",
         "end_date": "2026-05-27",
         "end_time": "20:59:44",
-        "work_hours": 0.58,
+        "work_hours": 0.5775,
         "assembly_location": "竹東",
         "group_key": "SPT208|收機|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 20:25:05",
-        "updated_at": "2026-05-27 20:59:44"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 188,
@@ -12919,18 +14421,18 @@
         "start_timestamp": "2026-05-27 20:26:57",
         "end_action": "下班",
         "end_timestamp": "2026-05-27 21:00:41",
-        "remark": null,
+        "remark": "",
         "start_date": "2026-05-27",
         "start_time": "20:26:57",
         "end_date": "2026-05-27",
         "end_time": "21:00:41",
-        "work_hours": 0.56,
+        "work_hours": 0.562222,
         "assembly_location": "竹東",
         "group_key": "SPT239|收機|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 20:26:57",
-        "updated_at": "2026-05-27 21:00:41"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 189,
@@ -12951,13 +14453,13 @@
         "start_time": "20:27:51",
         "end_date": "2026-05-27",
         "end_time": "20:59:10",
-        "work_hours": 0.52,
+        "work_hours": 0.521944,
         "assembly_location": "竹東",
         "group_key": "SPT244|收機|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 20:27:51",
-        "updated_at": "2026-05-27 20:59:10"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 190,
@@ -12978,13 +14480,13 @@
         "start_time": "20:28:51",
         "end_date": "2026-05-27",
         "end_time": "20:57:37",
-        "work_hours": 0.48,
+        "work_hours": 0.479444,
         "assembly_location": "竹東",
         "group_key": "SPT241|收機|2026-05-27",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-27 20:28:51",
-        "updated_at": "2026-05-27 20:57:37"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 191,
@@ -13005,13 +14507,13 @@
         "start_time": "08:29:48",
         "end_date": "2026-05-28",
         "end_time": "11:32:14",
-        "work_hours": 2.54,
+        "work_hours": 2.790556,
         "assembly_location": "竹東",
         "group_key": "B155|機台定位水平調整(含連結)|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:29:48",
-        "updated_at": "2026-05-28 11:32:14"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 192,
@@ -13032,13 +14534,13 @@
         "start_time": "08:31:03",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B168|機台定位水平調整(含連結)|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:31:03",
-        "updated_at": "2026-05-28 08:31:03"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 193,
@@ -13059,13 +14561,13 @@
         "start_time": "08:31:35",
         "end_date": "2026-05-28",
         "end_time": "11:00:04",
-        "work_hours": 1.97,
+        "work_hours": 2.224722,
         "assembly_location": "竹東",
         "group_key": "B002|機台定位水平調整(含連結)|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:31:35",
-        "updated_at": "2026-05-28 11:00:04"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 194,
@@ -13086,13 +14588,13 @@
         "start_time": "08:33:24",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "",
         "group_key": "SPT015|機台定位水平調整(含連結)|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:33:24",
-        "updated_at": "2026-05-28 08:33:24"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 195,
@@ -13113,13 +14615,13 @@
         "start_time": "08:34:57",
         "end_date": "2026-05-28",
         "end_time": "11:03:31",
-        "work_hours": 1.98,
+        "work_hours": 2.226111,
         "assembly_location": "竹東",
         "group_key": "B260|機台定位水平調整(含連結)|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:34:57",
-        "updated_at": "2026-05-28 11:03:31"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 196,
@@ -13140,13 +14642,13 @@
         "start_time": "08:36:42",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B211|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:36:42",
-        "updated_at": "2026-05-28 08:36:42"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 197,
@@ -13167,13 +14669,13 @@
         "start_time": "08:37:32",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B235|配電|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:37:32",
-        "updated_at": "2026-05-28 08:37:32"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 198,
@@ -13194,13 +14696,13 @@
         "start_time": "08:51:03",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B251|配電|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:51:03",
-        "updated_at": "2026-05-28 08:51:03"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 199,
@@ -13221,13 +14723,13 @@
         "start_time": "08:52:19",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT151|水平|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:52:19",
-        "updated_at": "2026-05-28 08:52:19"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 200,
@@ -13248,13 +14750,13 @@
         "start_time": "08:52:41",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B249|配電|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:52:41",
-        "updated_at": "2026-05-28 08:52:41"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 201,
@@ -13275,13 +14777,13 @@
         "start_time": "08:53:25",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B250|配電|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:53:25",
-        "updated_at": "2026-05-28 08:53:25"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 202,
@@ -13302,13 +14804,13 @@
         "start_time": "08:54:04",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT250|S.T.|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:54:04",
-        "updated_at": "2026-05-28 08:54:04"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 203,
@@ -13329,13 +14831,13 @@
         "start_time": "08:54:17",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B252|配電|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:54:17",
-        "updated_at": "2026-05-28 08:54:17"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 204,
@@ -13356,13 +14858,13 @@
         "start_time": "08:55:54",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B247|其他|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:55:54",
-        "updated_at": "2026-05-28 08:55:54"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 205,
@@ -13383,18 +14885,18 @@
         "start_time": "08:57:21",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B228|配電|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 08:57:21",
-        "updated_at": "2026-05-28 08:57:21"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 206,
         "record_key": "SPT239|22M0162-91|清潔|2026-05-28 09:04:37|cc5818b1",
-        "status": "作業中",
+        "status": "完工",
         "work_order": "22M0162-91",
         "part_no": "4TRSC020-004-02->4TRSC020-004-06",
         "type_name": "NTB 3 LP +快拆+EMO",
@@ -13403,20 +14905,20 @@
         "employee_name": "麥可",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 09:04:37",
-        "end_action": "",
-        "end_timestamp": "",
-        "remark": "",
+        "end_action": "完工",
+        "end_timestamp": "2026-05-28 14:11:56",
+        "remark": "FINISHED",
         "start_date": "2026-05-28",
         "start_time": "09:04:37",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-28",
+        "end_time": "14:11:56",
+        "work_hours": 3.871944,
         "assembly_location": "竹東",
         "group_key": "SPT239|清潔|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:04:37",
-        "updated_at": "2026-05-28 09:04:37"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 207,
@@ -13437,13 +14939,13 @@
         "start_time": "09:05:10",
         "end_date": "2026-05-28",
         "end_time": "11:07:10",
-        "work_hours": 1.53,
+        "work_hours": 1.783333,
         "assembly_location": "宏田",
         "group_key": "SPT105|Packing|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:05:10",
-        "updated_at": "2026-05-28 11:07:10"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 208,
@@ -13464,13 +14966,13 @@
         "start_time": "09:06:06",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B226|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:06:06",
-        "updated_at": "2026-05-28 09:06:06"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 209,
@@ -13491,13 +14993,13 @@
         "start_time": "09:06:08",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT208|清潔|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:06:08",
-        "updated_at": "2026-05-28 09:06:08"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 210,
@@ -13518,13 +15020,13 @@
         "start_time": "09:08:06",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B204|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:08:06",
-        "updated_at": "2026-05-28 09:08:06"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 213,
@@ -13545,13 +15047,13 @@
         "start_time": "09:10:23",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT243|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:10:23",
-        "updated_at": "2026-05-28 09:10:23"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 215,
@@ -13572,13 +15074,13 @@
         "start_time": "09:12:27",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT196|收機|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:12:27",
-        "updated_at": "2026-05-28 09:12:27"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 218,
@@ -13594,18 +15096,18 @@
         "start_timestamp": "2026-05-28 09:16:05",
         "end_action": "暫停",
         "end_timestamp": "2026-05-28 14:10:31",
-        "remark": null,
+        "remark": "",
         "start_date": "2026-05-28",
         "start_time": "09:16:05",
         "end_date": "2026-05-28",
         "end_time": "14:10:31",
-        "work_hours": 3.66,
+        "work_hours": 3.657222,
         "assembly_location": "竹東",
         "group_key": "B135|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:16:05",
-        "updated_at": "2026-05-28 14:10:31"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 219,
@@ -13626,13 +15128,13 @@
         "start_time": "09:16:24",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B227|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:16:24",
-        "updated_at": "2026-05-28 09:16:24"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 223,
@@ -13648,18 +15150,18 @@
         "start_timestamp": "2026-05-28 09:21:39",
         "end_action": "暫停",
         "end_timestamp": "2026-05-28 14:18:52",
-        "remark": null,
+        "remark": "",
         "start_date": "2026-05-28",
         "start_time": "09:21:39",
         "end_date": "2026-05-28",
         "end_time": "14:18:52",
-        "work_hours": 3.7,
+        "work_hours": 3.703611,
         "assembly_location": "竹東",
         "group_key": "SPT199|收機|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:21:39",
-        "updated_at": "2026-05-28 14:18:52"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 224,
@@ -13680,13 +15182,13 @@
         "start_time": "09:24:44",
         "end_date": "2026-05-28",
         "end_time": "09:28:29",
-        "work_hours": 0.06,
+        "work_hours": 0.0625,
         "assembly_location": "竹東",
         "group_key": "B126|配電|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:24:44",
-        "updated_at": "2026-05-28 09:28:29"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 227,
@@ -13707,13 +15209,13 @@
         "start_time": "09:26:39",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT091|收機|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:26:39",
-        "updated_at": "2026-05-28 09:26:39"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 229,
@@ -13734,13 +15236,13 @@
         "start_time": "09:29:09",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT092|S.T.|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:29:09",
-        "updated_at": "2026-05-28 09:29:09"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 233,
@@ -13761,13 +15263,13 @@
         "start_time": "09:32:09",
         "end_date": "2026-05-28",
         "end_time": "13:22:14",
-        "work_hours": 1.33,
+        "work_hours": 2.584722,
         "assembly_location": "竹東",
         "group_key": "SPT034|S.T.|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:32:09",
-        "updated_at": "2026-05-28 13:22:14"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 235,
@@ -13788,13 +15290,13 @@
         "start_time": "09:33:15",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT148|骨架組立|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:33:15",
-        "updated_at": "2026-05-28 09:33:15"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 240,
@@ -13815,13 +15317,13 @@
         "start_time": "09:40:40",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "B237|模組|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:40:40",
-        "updated_at": "2026-05-28 09:40:40"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 243,
@@ -13842,13 +15344,13 @@
         "start_time": "09:50:20",
         "end_date": "2026-05-28",
         "end_time": "13:33:00",
-        "work_hours": 1.21,
+        "work_hours": 2.461111,
         "assembly_location": "竹東",
         "group_key": "SPT149|設變|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:50:20",
-        "updated_at": "2026-05-28 13:33:00"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 247,
@@ -13869,13 +15371,13 @@
         "start_time": "09:53:28",
         "end_date": "2026-05-28",
         "end_time": "13:37:37",
-        "work_hours": 2.49,
+        "work_hours": 2.485833,
         "assembly_location": "竹東",
         "group_key": "SPT160|設變|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:53:28",
-        "updated_at": "2026-05-28 13:37:37"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 250,
@@ -13896,13 +15398,13 @@
         "start_time": "09:57:04",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT230|模組|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 09:57:04",
-        "updated_at": "2026-05-28 09:57:04"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 252,
@@ -13923,13 +15425,13 @@
         "start_time": "10:05:59",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "",
         "group_key": "SPT138|機台定位水平調整(含連結)|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:05:59",
-        "updated_at": "2026-05-28 10:05:59"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 253,
@@ -13950,13 +15452,13 @@
         "start_time": "10:10:32",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT203|模組|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:10:32",
-        "updated_at": "2026-05-28 10:10:32"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 254,
@@ -13977,13 +15479,13 @@
         "start_time": "10:27:37",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT145|模組|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:27:37",
-        "updated_at": "2026-05-28 10:27:37"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 260,
@@ -14004,13 +15506,13 @@
         "start_time": "10:30:56",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT230|模組|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:30:56",
-        "updated_at": "2026-05-28 10:30:56"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 262,
@@ -14031,13 +15533,13 @@
         "start_time": "10:34:47",
         "end_date": "2026-05-28",
         "end_time": "10:45:22",
-        "work_hours": 0.0,
+        "work_hours": 0.006111,
         "assembly_location": "竹東",
         "group_key": "SPT240|前置鈑金|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:34:47",
-        "updated_at": "2026-05-28 10:45:22"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 265,
@@ -14058,13 +15560,13 @@
         "start_time": "10:56:51",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT077|其他|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 10:56:51",
-        "updated_at": "2026-05-28 10:56:51"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 279,
@@ -14085,13 +15587,13 @@
         "start_time": "11:51:02",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT121|其他|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 11:51:02",
-        "updated_at": "2026-05-28 11:51:02"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 280,
@@ -14112,13 +15614,13 @@
         "start_time": "13:05:22",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT231|收機|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:05:22",
-        "updated_at": "2026-05-28 13:05:22"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 281,
@@ -14139,13 +15641,13 @@
         "start_time": "13:31:37",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT034|S.T.|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:31:37",
-        "updated_at": "2026-05-28 13:31:37"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 282,
@@ -14166,13 +15668,13 @@
         "start_time": "11:55:23",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT105|Packing|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 11:55:23",
-        "updated_at": "2026-05-28 11:55:23"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 283,
@@ -14193,13 +15695,13 @@
         "start_time": "13:23:53",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT220|S.T.|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:23:53",
-        "updated_at": "2026-05-28 13:23:53"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 284,
@@ -14220,13 +15722,13 @@
         "start_time": "13:33:54",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT149|模組|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:33:54",
-        "updated_at": "2026-05-28 13:33:54"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 285,
@@ -14247,13 +15749,13 @@
         "start_time": "13:39:25",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT160|模組|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:39:25",
-        "updated_at": "2026-05-28 13:39:25"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 286,
@@ -14274,13 +15776,13 @@
         "start_time": "13:47:04",
         "end_date": "",
         "end_time": "",
-        "work_hours": 0.0,
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT241|模組|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:47:04",
-        "updated_at": "2026-05-28 13:47:04"
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 288,
@@ -14296,18 +15798,45 @@
         "start_timestamp": "2026-05-28 13:51:27",
         "end_action": "暫停",
         "end_timestamp": "2026-05-28 13:55:18",
-        "remark": null,
+        "remark": "",
         "start_date": "2026-05-28",
         "start_time": "13:51:27",
         "end_date": "2026-05-28",
         "end_time": "13:55:18",
-        "work_hours": 0.06,
+        "work_hours": 0.064167,
         "assembly_location": "竹東",
         "group_key": "SPT256|模組|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 13:51:27",
-        "updated_at": "2026-05-28 13:55:18"
+        "updated_at": "2026-05-28 14:51:36"
+      },
+      {
+        "id": 289,
+        "record_key": "SPT256|25M0785-02|模組|2026-05-28 13:56:54|d9a6b07a",
+        "status": "作業中",
+        "work_order": "25M0785-02",
+        "part_no": "PSRSC131-N01-04",
+        "type_name": "PSRSC131-N01",
+        "process_name": "模組",
+        "employee_id": "SPT256",
+        "employee_name": "阿杰",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 13:56:54",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "13:56:54",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
+        "assembly_location": "竹東",
+        "group_key": "SPT256|模組|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 13:56:54",
+        "updated_at": "2026-05-28 14:51:36"
       },
       {
         "id": 290,
@@ -14321,20 +15850,101 @@
         "employee_name": "胡瑄芸",
         "start_action": "開始",
         "start_timestamp": "2026-05-28 14:00:06",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": null,
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
         "start_date": "2026-05-28",
         "start_time": "14:00:06",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
         "assembly_location": "竹東",
         "group_key": "SPT172|Packing|2026-05-28",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-28 14:00:06",
-        "updated_at": "2026-05-28 14:00:06"
+        "updated_at": "2026-05-28 14:51:36"
+      },
+      {
+        "id": 291,
+        "record_key": "SPT199|26M0021-01|收機|2026-05-28 14:21:17|9da50173",
+        "status": "作業中",
+        "work_order": "26M0021-01",
+        "part_no": "1GRSC150-003-04",
+        "type_name": "4 Port Frame Long-type EFEM",
+        "process_name": "收機",
+        "employee_id": "SPT199",
+        "employee_name": "龍斯愷",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 14:21:17",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "14:21:17",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
+        "assembly_location": "竹東",
+        "group_key": "SPT199|收機|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 14:21:17",
+        "updated_at": "2026-05-28 14:51:36"
+      },
+      {
+        "id": 292,
+        "record_key": "SPT158|26M0021-01|收機|2026-05-28 14:25:05|43605a5e",
+        "status": "作業中",
+        "work_order": "26M0021-01",
+        "part_no": "1GRSC150-003-04",
+        "type_name": "4 Port Frame Long-type EFEM",
+        "process_name": "收機",
+        "employee_id": "SPT158",
+        "employee_name": "劉定澤",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 14:25:05",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "14:25:05",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
+        "assembly_location": "竹東",
+        "group_key": "SPT158|收機|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 14:25:05",
+        "updated_at": "2026-05-28 14:51:36"
+      },
+      {
+        "id": 293,
+        "record_key": "SPT239|26N4001-07|前置鈑金|2026-05-28 14:34:50|f633725a",
+        "status": "作業中",
+        "work_order": "26N4001-07",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "前置鈑金",
+        "employee_id": "SPT239",
+        "employee_name": "麥可",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-28 14:34:50",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-28",
+        "start_time": "14:34:50",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": "00:00:00",
+        "assembly_location": "竹東",
+        "group_key": "SPT239|前置鈑金|2026-05-28",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-28 14:34:50",
+        "updated_at": "2026-05-28 14:51:36"
       }
     ],
     "work_orders": []
