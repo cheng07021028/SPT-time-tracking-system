@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-28 18:11:47",
+  "exported_at": "2026-05-28 18:15:18",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -4044,10 +4044,109 @@
         "message": "01_finish_active_visible_v141: 已由 01/02 權威檔回填 SQLite cache 2 筆",
         "detail": "",
         "level": "INFO"
+      },
+      {
+        "id": 525,
+        "log_time": "2026-05-28 18:14:03",
+        "user_name": "B135",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 526,
+        "log_time": "2026-05-28 18:14:03",
+        "user_name": "B135",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 527,
+        "log_time": "2026-05-28 18:14:03",
+        "user_name": "B135",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 2 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 528,
+        "log_time": "2026-05-28 18:14:07",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 529,
+        "log_time": "2026-05-28 18:14:07",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 530,
+        "log_time": "2026-05-28 18:14:07",
+        "user_name": "admin",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_start_active_visible_v133: 已由 01/02 權威檔回填 SQLite cache 2 筆",
+        "detail": "",
+        "level": "INFO"
+      },
+      {
+        "id": 531,
+        "log_time": "2026-05-28 18:14:24",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 532,
+        "log_time": "2026-05-28 18:14:24",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 533,
+        "log_time": "2026-05-28 18:14:24",
+        "user_name": "admin",
+        "action_type": "V104_TIME_AUTHORITY_TO_SQLITE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01_finish_active_visible_v141: 已由 01/02 權威檔回填 SQLite cache 2 筆",
+        "detail": "",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 367
+    "system_logs": 376
   }
 }
