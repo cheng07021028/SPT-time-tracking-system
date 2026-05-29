@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-29 13:17:00",
-  "exported_at": "2026-05-29 13:17:00",
-  "reason": "start_work_v194_local_first_02",
+  "updated_at": "2026-05-29 13:17:02",
+  "exported_at": "2026-05-29 13:17:02",
+  "reason": "start_work_v195_consistency_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -34,6 +34,33 @@
         "source": "streamlit",
         "created_at": "2026-05-29 13:16:57",
         "updated_at": "2026-05-29 13:16:57"
+      },
+      {
+        "id": 406,
+        "record_key": "SPT231|26M0095-10|包機|2026-05-29 13:16:50|47aa4019",
+        "status": "作業中",
+        "work_order": "26M0095-10",
+        "part_no": "4TRSC131-005-05",
+        "type_name": "2LP Asymtek EFEM (wafer)",
+        "process_name": "包機",
+        "employee_id": "SPT231",
+        "employee_name": "陳建勳",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 13:16:50",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "13:16:50",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT231|包機|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 13:16:50",
+        "updated_at": "2026-05-29 13:16:50"
       },
       {
         "id": 405,
@@ -1929,6 +1956,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 71
+    "time_records": 72
   }
 }
