@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 22:42:59",
-  "exported_at": "2026-05-29 22:42:59",
+  "updated_at": "2026-05-29 23:01:57",
+  "exported_at": "2026-05-29 23:01:57",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -223,11 +223,83 @@
         "detail": "v231_load_records\n__spt_log_uid=7ec618ddf7f641ee8b13343ea391af1c",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 7,
+        "log_time": "2026-05-29 23:01:57",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6,
+        "log_time": "2026-05-29 23:01:56",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-29 23:01:54",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v232_delete_fast_lanes_base",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 3,
+        "log_time": "2026-05-29 23:01:54",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_delete_fast_cache_remove_base",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-29 23:01:53",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V223",
+        "target_table": "time_records",
+        "target_id": "443",
+        "message": "01 工時紀錄管理員維護區刪除：V223 以 ID 精準刪除並同步 01/02 權威檔；deleted=1；remaining=0",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-29 23:01:53",
+        "user_name": "admin",
+        "action_type": "V222_DELETE_CACHE_SYNC",
+        "target_table": "time_records",
+        "target_id": "443",
+        "message": "V222 已同步移除前台快取刪除資料：Today 1 筆、Active 1 筆。",
+        "detail": "v223_delete_cache|01 工時紀錄管理員維護區刪除\n__spt_log_uid=f45d5aa74b8f471497a6eae290195402",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 18
+    "system_logs": 24
   }
 }
