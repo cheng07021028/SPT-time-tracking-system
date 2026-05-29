@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 17:59:59",
-  "exported_at": "2026-05-29 17:59:59",
+  "updated_at": "2026-05-29 18:00:40",
+  "exported_at": "2026-05-29 18:00:40",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 43,
+        "source": "v103_merge",
+        "username": "B126",
+        "display_name": "戴鎰祥",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=B126; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-29 18:00:39",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 18:00:39"
+      },
+      {
+        "id": 1,
+        "source": "v103_merge",
+        "username": "B126",
+        "display_name": "",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=B126; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-29 18:00:39",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 18:00:39"
+      },
       {
         "id": 126159,
         "source": "v103_merge",
@@ -12350,7 +12382,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 771,
+    "login_logs": 773,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
