@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 09:30:24",
-  "exported_at": "2026-05-29 09:30:24",
+  "updated_at": "2026-05-29 09:32:02",
+  "exported_at": "2026-05-29 09:32:02",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -1711,11 +1711,131 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 866,
+        "log_time": "2026-05-29 09:31:22",
+        "user_name": "SPT150",
+        "action_type": "UPDATE",
+        "target_table": "security_users",
+        "target_id": "",
+        "message": "UPDATE security_users",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 865,
+        "log_time": "2026-05-29 09:31:22",
+        "user_name": "SPT150",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 864,
+        "log_time": "2026-05-29 09:31:22",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 857,
+        "log_time": "2026-05-29 09:31:21",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 850,
+        "log_time": "2026-05-29 09:31:21",
+        "user_name": "appuser",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 849,
+        "log_time": "2026-05-29 09:31:21",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 870,
+        "log_time": "2026-05-29 09:31:58",
+        "user_name": "SPT138",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "364",
+        "message": "蘇雍盛 開始 V3141245 / GPTC Robot Teaching機構調整",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 09:31:58\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"364\",\"target_ids\":[364],\"message\":\"蘇雍盛 開始 V3141245 / GPTC Robot Teaching機構調整\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"identity_key\":\"record_key:SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"id\":\"364\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":364,\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"status\":\"作業中\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"量測機台的震動值\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:48\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT138|GPTC Robot Teaching機構調整|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:48\",\"updated_at\":\"2026-05-29 09:31:48\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":364,\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"status\":\"作業中\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"量測機台的震動值\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:48\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT138|GPTC Robot Teaching機構調整|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:48\",\"updated_at\":\"2026-05-29 09:31:48\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":364,\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"status\":\"作業中\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"量測機台的震動值\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:48\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT138|GPTC Robot Teaching機構調整|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:48\",\"updated_at\":\"2026-05-29 09:31:48\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":364,\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"status\":\"作業中\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"量測機台的震動值\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:48\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT138|GPTC Robot Teaching機構調整|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:48\",\"updated_at\":\"2026-05-29 09:31:48\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"7afaacf4607358efd96d459aec7ebc126a51019f875d19af3e910fb04fee5361\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 869,
+        "log_time": "2026-05-29 09:31:58",
+        "user_name": "SPT091",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "363",
+        "message": "魏瑄毅 開始 26M0021-03 / 骨架組立",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 09:31:58\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"363\",\"target_ids\":[363],\"message\":\"魏瑄毅 開始 26M0021-03 / 骨架組立\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT091|26M0021-03|骨架組立|2026-05-29 09:31:47|bb05feba\",\"identity_key\":\"record_key:SPT091|26M0021-03|骨架組立|2026-05-29 09:31:47|bb05feba\",\"id\":\"363\",\"employee_id\":\"SPT091\",\"employee_name\":\"魏瑄毅\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"骨架組立\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:31:47\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":363,\"record_key\":\"SPT091|26M0021-03|骨架組立|2026-05-29 09:31:47|bb05feba\",\"status\":\"作業中\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT091\",\"employee_name\":\"魏瑄毅\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:47\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:47\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT091|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:47\",\"updated_at\":\"2026-05-29 09:31:47\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":363,\"record_key\":\"SPT091|26M0021-03|骨架組立|2026-05-29 09:31:47|bb05feba\",\"status\":\"作業中\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT091\",\"employee_name\":\"魏瑄毅\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:47\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:47\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT091|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:47\",\"updated_at\":\"2026-05-29 09:31:47\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":363,\"record_key\":\"SPT091|26M0021-03|骨架組立|2026-05-29 09:31:47|bb05feba\",\"status\":\"作業中\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT091\",\"employee_name\":\"魏瑄毅\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:47\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:47\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT091|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:47\",\"updated_at\":\"2026-05-29 09:31:47\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":363,\"record_key\":\"SPT091|26M0021-03|骨架組立|2026-05-29 09:31:47|bb05feba\",\"status\":\"作業中\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT091\",\"employee_name\":\"魏瑄毅\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:47\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:47\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT091|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:47\",\"updated_at\":\"2026-05-29 09:31:47\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"c1564b2858188a1b6772b3ab2ab1eb84fcd34d3eeef1a438c18950e66bb738be\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 868,
+        "log_time": "2026-05-29 09:31:54",
+        "user_name": "SPT138",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 867,
+        "log_time": "2026-05-29 09:31:54",
+        "user_name": "SPT091",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 142
+    "system_logs": 152
   }
 }
