@@ -15683,3 +15683,744 @@ def audit_v207_active_finish_work_backend_fix() -> dict:
 
 # ================= END V207 ACTIVE SQLITE STALE AUTHORITY GUARD =================
 
+
+# ================= V208 01/02 DISPLAY AUTHORITY FALLBACK｜2026-05-29 =================
+# Root cause fixed:
+# V205 made load_records() / today_records() SQLite-only for speed.  On Streamlit cold start
+# or after deploy, SQLite can be empty or missing the time_records table while the real
+# authority files still contain data under data/permanent_store/modules/01_time_records
+# and 02_history.  Result: 01/02 temporarily show "No data" until another guard hydrates
+# SQLite.  V208 keeps SQLite fast path first, but when a display query returns empty it
+# reads the local authority JSON and optionally hydrates SQLite cache.  No UI/CSS/theme
+# / table-rendering / button code is changed.
+try:
+    _v208_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v208_prev_load_records = None
+try:
+    _v208_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v208_prev_today_records = None
+
+
+def _v208_date_text(value) -> str:
+    s = _v206_text(value) if "_v206_text" in globals() else ("" if value is None else str(value).strip())
+    if not s:
+        return ""
+    s = s.replace("/", "-")
+    return s[:10]
+
+
+def _v208_filter_df(
+    df: pd.DataFrame,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    employee_id: str | None = None,
+    work_order: str | None = None,
+) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        if "start_date" not in out.columns:
+            out["start_date"] = ""
+        if "start_timestamp" in out.columns:
+            blank_sd = out["start_date"].map(lambda x: _v208_date_text(x) == "")
+            out.loc[blank_sd, "start_date"] = out.loc[blank_sd, "start_timestamp"].map(_v208_date_text)
+        out["_v208_start_date"] = out["start_date"].map(_v208_date_text)
+        sd = _v208_date_text(start_date)
+        ed = _v208_date_text(end_date)
+        if sd:
+            out = out.loc[out["_v208_start_date"] >= sd].copy()
+        if ed:
+            out = out.loc[out["_v208_start_date"] <= ed].copy()
+        emp = _v206_text(employee_id) if "_v206_text" in globals() else str(employee_id or "").strip()
+        if emp and "employee_id" in out.columns:
+            out = out.loc[out["employee_id"].map(lambda x: _v206_text(x) if "_v206_text" in globals() else str(x).strip()) == emp].copy()
+        wo = _v206_text(work_order) if "_v206_text" in globals() else str(work_order or "").strip()
+        if wo and "work_order" in out.columns:
+            out = out.loc[out["work_order"].map(lambda x: _v206_text(x) if "_v206_text" in globals() else str(x).strip()) == wo].copy()
+        out = out.drop(columns=["_v208_start_date"], errors="ignore")
+    except Exception:
+        out = out.drop(columns=["_v208_start_date"], errors="ignore") if isinstance(out, pd.DataFrame) else pd.DataFrame()
+    try:
+        if "id" in out.columns:
+            out["_v208_id_sort"] = pd.to_numeric(out["id"], errors="coerce").fillna(0)
+            out = out.sort_values("_v208_id_sort", ascending=False, kind="stable").drop(columns=["_v208_id_sort"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v208_authority_records_df(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    employee_id: str | None = None,
+    work_order: str | None = None,
+) -> pd.DataFrame:
+    """Read 01/02 local authority JSON only.  No GitHub, no page/UI side effect."""
+    frames: list[pd.DataFrame] = []
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df_from_table
+        # 02_history and 01_time_records should normally be identical.  Merge by key so a
+        # single stale/empty source cannot blank the display.
+        for module_key, rank in (("02_history", 2), ("01_time_records", 1)):
+            try:
+                df = _pa_df_from_table(module_key, "time_records")
+                if isinstance(df, pd.DataFrame) and not df.empty:
+                    if "_v206_normalize_time_records_df" in globals():
+                        df = _v206_normalize_time_records_df(df)
+                    else:
+                        df = df.copy()
+                    df["_v208_source_rank"] = rank
+                    frames.append(df)
+            except Exception:
+                continue
+    except Exception:
+        return pd.DataFrame()
+    if not frames:
+        return pd.DataFrame()
+    out = pd.concat(frames, ignore_index=True, sort=False)
+    if out.empty:
+        return pd.DataFrame()
+    try:
+        out["_v208_updated_sort"] = pd.to_datetime(out.get("updated_at", ""), errors="coerce")
+        rk = out.get("record_key", pd.Series([""] * len(out))).map(lambda x: _v206_text(x) if "_v206_text" in globals() else str(x or "").strip())
+        rid = out.get("id", pd.Series([""] * len(out))).astype(str).map(lambda x: _v206_text(x) if "_v206_text" in globals() else str(x or "").strip())
+        out["_v208_dedupe_key"] = rk.where(rk.ne(""), "id:" + rid)
+        out = out.sort_values(["_v208_updated_sort", "_v208_source_rank"], ascending=[True, True], kind="stable")
+        out = out.drop_duplicates("_v208_dedupe_key", keep="last")
+    except Exception:
+        pass
+    try:
+        out = _v205_filter_visible_rows(out) if "_v205_filter_visible_rows" in globals() else out
+    except Exception:
+        pass
+    out = out.drop(columns=[c for c in out.columns if str(c).startswith("_v208_")], errors="ignore")
+    if "_v206_normalize_time_records_df" in globals():
+        out = _v206_normalize_time_records_df(out)
+    return _v208_filter_df(out, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+
+
+def _v208_ensure_time_records_table() -> None:
+    """Ensure SQLite cache table exists even when db_service guard skipped it."""
+    try:
+        from services.db_service import ensure_database as _ensure_database
+        _ensure_database()
+    except Exception:
+        pass
+    try:
+        with _v205_conn() as conn:
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS time_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                record_key TEXT UNIQUE,
+                status TEXT,
+                work_order TEXT,
+                part_no TEXT,
+                type_name TEXT,
+                process_name TEXT,
+                employee_id TEXT,
+                employee_name TEXT,
+                start_action TEXT,
+                start_timestamp TEXT,
+                end_action TEXT,
+                end_timestamp TEXT,
+                remark TEXT,
+                start_date TEXT,
+                start_time TEXT,
+                end_date TEXT,
+                end_time TEXT,
+                work_hours REAL DEFAULT 0,
+                assembly_location TEXT,
+                group_key TEXT,
+                is_group_work INTEGER DEFAULT 0,
+                source TEXT DEFAULT 'streamlit',
+                created_at TEXT,
+                updated_at TEXT
+            )
+            """)
+            existing_cols = [str(r[1]) for r in conn.execute("PRAGMA table_info(time_records)").fetchall()]
+            desired = {
+                "record_key": "TEXT", "status": "TEXT", "work_order": "TEXT", "part_no": "TEXT", "type_name": "TEXT",
+                "process_name": "TEXT", "employee_id": "TEXT", "employee_name": "TEXT", "start_action": "TEXT",
+                "start_timestamp": "TEXT", "end_action": "TEXT", "end_timestamp": "TEXT", "remark": "TEXT",
+                "start_date": "TEXT", "start_time": "TEXT", "end_date": "TEXT", "end_time": "TEXT",
+                "work_hours": "REAL DEFAULT 0", "assembly_location": "TEXT", "group_key": "TEXT",
+                "is_group_work": "INTEGER DEFAULT 0", "source": "TEXT DEFAULT 'streamlit'", "created_at": "TEXT", "updated_at": "TEXT",
+            }
+            for col, decl in desired.items():
+                if col not in existing_cols:
+                    try:
+                        conn.execute(f"ALTER TABLE time_records ADD COLUMN {col} {decl}")
+                    except Exception:
+                        pass
+            try:
+                conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_time_records_record_key_v208 ON time_records(record_key)")
+            except Exception:
+                pass
+            conn.commit()
+    except Exception:
+        pass
+
+
+def _v208_sqlite_count_all() -> int:
+    try:
+        _v208_ensure_time_records_table()
+        with _v205_conn() as conn:
+            return int(conn.execute("SELECT COUNT(*) FROM time_records").fetchone()[0])
+    except Exception:
+        return 0
+
+
+def _v208_upsert_records_to_sqlite(df: pd.DataFrame, reason: str = "v208_display_authority_hydrate") -> int:
+    """Best-effort cache hydrate from authority.  Does not write authority/GitHub."""
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return 0
+    _v208_ensure_time_records_table()
+    try:
+        rows_df = _v206_normalize_time_records_df(df) if "_v206_normalize_time_records_df" in globals() else df.copy()
+        with _v205_conn() as conn:
+            db_cols = [str(r[1]) for r in conn.execute("PRAGMA table_info(time_records)").fetchall()]
+            usable = [c for c in _V206_SQLITE_COLS if c in db_cols] if "_V206_SQLITE_COLS" in globals() else [c for c in rows_df.columns if c in db_cols]
+            count = 0
+            for _, rr in rows_df.iterrows():
+                row = {c: rr.get(c, "") for c in usable}
+                if "id" in row:
+                    try:
+                        if _v206_is_blank(row.get("id")) if "_v206_is_blank" in globals() else str(row.get("id") or "").strip() == "":
+                            row.pop("id", None)
+                        else:
+                            row["id"] = int(float(row.get("id")))
+                    except Exception:
+                        row.pop("id", None)
+                if "work_hours" in row:
+                    try:
+                        row["work_hours"] = float(row.get("work_hours") or 0)
+                    except Exception:
+                        row["work_hours"] = 0.0
+                if "is_group_work" in row:
+                    try:
+                        row["is_group_work"] = int(float(row.get("is_group_work") or 0))
+                    except Exception:
+                        row["is_group_work"] = 0
+                keys = list(row.keys())
+                if not keys:
+                    continue
+                placeholders = ",".join(["?"] * len(keys))
+                col_sql = ",".join(keys)
+                vals = tuple(row.get(c) for c in keys)
+                rk = row.get("record_key")
+                rk_text = _v206_text(rk) if "_v206_text" in globals() else str(rk or "").strip()
+                if rk_text and "record_key" in keys:
+                    update_cols = [c for c in keys if c not in {"id", "record_key"}]
+                    update_sql = ",".join([f"{c}=excluded.{c}" for c in update_cols]) or "record_key=excluded.record_key"
+                    conn.execute(
+                        f"INSERT INTO time_records({col_sql}) VALUES({placeholders}) "
+                        f"ON CONFLICT(record_key) DO UPDATE SET {update_sql}",
+                        vals,
+                    )
+                else:
+                    conn.execute(f"INSERT OR REPLACE INTO time_records({col_sql}) VALUES({placeholders})", vals)
+                count += 1
+            conn.commit()
+        try:
+            _v205_clear_caches()
+        except Exception:
+            pass
+        if count:
+            try:
+                _v205_direct_log("V208_DISPLAY_AUTHORITY_HYDRATE", f"SQLite time_records 顯示快取空白，已由 01/02 權威檔回填 {count} 筆。", detail=reason, level="INFO")
+            except Exception:
+                pass
+        return int(count)
+    except Exception as exc:
+        try:
+            _v205_direct_log("V208_DISPLAY_AUTHORITY_HYDRATE_WARN", f"01/02 權威檔回填 SQLite 顯示快取失敗：{exc}", detail=reason, level="WARN")
+        except Exception:
+            pass
+        return 0
+
+
+def _v208_empty_frame(df) -> bool:
+    return not isinstance(df, pd.DataFrame) or df.empty
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V208: 02 History keeps V205 SQLite fast path, fallback to 01/02 authority if empty."""
+    sqlite_df = pd.DataFrame()
+    if callable(_v208_prev_load_records):
+        try:
+            sqlite_df = _v208_prev_load_records(start_date, end_date, employee_id, work_order)
+        except Exception:
+            sqlite_df = pd.DataFrame()
+    if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty:
+        return sqlite_df.reset_index(drop=True)
+    auth_df = _v208_authority_records_df(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        # Hydrate full authority only when SQLite is empty/missing so later reruns stay fast.
+        if _v208_sqlite_count_all() <= 0:
+            all_auth = _v208_authority_records_df()
+            _v208_upsert_records_to_sqlite(all_auth, reason="load_records_v208_empty_sqlite_display_repair")
+        return auth_df.reset_index(drop=True)
+    return pd.DataFrame()
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """V208: 01 Today Records keeps V205 SQLite fast path, fallback to authority if empty."""
+    sqlite_df = pd.DataFrame()
+    if callable(_v208_prev_today_records):
+        try:
+            sqlite_df = _v208_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+        except Exception:
+            sqlite_df = pd.DataFrame()
+    if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty:
+        return sqlite_df.reset_index(drop=True)
+    target = _v205_today() if "_v205_today" in globals() else today_text()
+    auth_df = _v208_authority_records_df(start_date=target, end_date=target)
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        try:
+            if unfinished_only or not include_finished:
+                auth_df = auth_df.loc[_v206_is_active_df(auth_df)].copy() if "_v206_is_active_df" in globals() else auth_df
+        except Exception:
+            pass
+        if isinstance(auth_df, pd.DataFrame) and not auth_df.empty and _v208_sqlite_count_all() <= 0:
+            all_auth = _v208_authority_records_df()
+            _v208_upsert_records_to_sqlite(all_auth, reason="today_records_v208_empty_sqlite_display_repair")
+        return auth_df.reset_index(drop=True)
+    return pd.DataFrame()
+
+
+def audit_v208_display_authority_fallback() -> dict:
+    try:
+        auth_all = _v208_authority_records_df()
+        auth_today = _v208_authority_records_df(start_date=(_v205_today() if "_v205_today" in globals() else today_text()), end_date=(_v205_today() if "_v205_today" in globals() else today_text()))
+        sqlite_count = _v208_sqlite_count_all()
+    except Exception as exc:
+        return {"version": "V208", "ok": False, "error": str(exc)}
+    return {
+        "version": "V208",
+        "scope": "services/time_record_service.py backend display fallback only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "v205_sqlite_fast_path_preserved": True,
+        "load_records_authority_fallback_when_sqlite_empty": True,
+        "today_records_authority_fallback_when_sqlite_empty": True,
+        "sqlite_time_records_count": int(sqlite_count),
+        "authority_all_rows": int(len(auth_all)) if isinstance(auth_all, pd.DataFrame) else 0,
+        "authority_today_rows": int(len(auth_today)) if isinstance(auth_today, pd.DataFrame) else 0,
+        "github_foreground_sync": False,
+    }
+
+# ================= END V208 01/02 DISPLAY AUTHORITY FALLBACK =================
+
+# ================= V209 01/02 DISPLAY RECONCILE AUTHORITY + SQLITE｜2026-05-29 =================
+# V208 fixed fully empty SQLite.  V209 additionally fixes partial/stale SQLite restore:
+# some old guards can hydrate data/permanent_store/database from legacy persistent_modules
+# with fewer rows than the canonical data/permanent_store/modules authority files.  In that
+# state 01/02 may show incomplete or inconsistent data.  This still keeps SQLite first, then
+# uses local authority only to reconcile missing display rows.  No UI/CSS/theme/table/buttons.
+try:
+    _v209_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v209_prev_load_records = None
+try:
+    _v209_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v209_prev_today_records = None
+
+
+def _v209_key_series(df: pd.DataFrame) -> pd.Series:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.Series(dtype=str)
+    rk = df.get("record_key", pd.Series([""] * len(df))).map(lambda x: _v206_text(x) if "_v206_text" in globals() else str(x or "").strip())
+    rid = df.get("id", pd.Series([""] * len(df))).astype(str).map(lambda x: _v206_text(x) if "_v206_text" in globals() else str(x or "").strip())
+    return rk.where(rk.ne(""), "id:" + rid)
+
+
+def _v209_merge_display_frames(sqlite_df: pd.DataFrame, auth_df: pd.DataFrame) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        a = auth_df.copy()
+        a["_v209_source_rank"] = 2
+        frames.append(a)
+    if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty:
+        s = sqlite_df.copy()
+        s["_v209_source_rank"] = 3  # keep just-started SQLite rows when not yet in authority
+        frames.append(s)
+    if not frames:
+        return pd.DataFrame()
+    out = pd.concat(frames, ignore_index=True, sort=False)
+    if "_v206_normalize_time_records_df" in globals():
+        out = _v206_normalize_time_records_df(out)
+    try:
+        out = _v205_filter_visible_rows(out) if "_v205_filter_visible_rows" in globals() else out
+    except Exception:
+        pass
+    if out.empty:
+        return pd.DataFrame()
+    try:
+        out["_v209_key"] = _v209_key_series(out)
+        out["_v209_updated_sort"] = pd.to_datetime(out.get("updated_at", ""), errors="coerce")
+        out["_v209_id_sort"] = pd.to_numeric(out.get("id", 0), errors="coerce").fillna(0)
+        out = out.loc[out["_v209_key"].astype(str).str.len() > 0].copy()
+        out = out.sort_values(["_v209_updated_sort", "_v209_source_rank", "_v209_id_sort"], ascending=[True, True, True], kind="stable")
+        out = out.drop_duplicates("_v209_key", keep="last")
+        out = out.sort_values("_v209_id_sort", ascending=False, kind="stable")
+    except Exception:
+        pass
+    out = out.drop(columns=[c for c in out.columns if str(c).startswith("_v209_")], errors="ignore")
+    return out.reset_index(drop=True)
+
+
+def _v209_authority_total_count() -> int:
+    try:
+        df = _v208_authority_records_df()
+        return int(len(df)) if isinstance(df, pd.DataFrame) else 0
+    except Exception:
+        return 0
+
+
+def _v209_should_reconcile(sqlite_df: pd.DataFrame, auth_df: pd.DataFrame, *, scope: str = "display") -> bool:
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        if not isinstance(sqlite_df, pd.DataFrame) or sqlite_df.empty:
+            return True
+        try:
+            # If filtered authority has rows missing from the filtered SQLite result, reconcile.
+            sk = set(str(x) for x in _v209_key_series(sqlite_df).tolist() if str(x))
+            ak = set(str(x) for x in _v209_key_series(auth_df).tolist() if str(x))
+            if ak and not ak.issubset(sk):
+                return True
+        except Exception:
+            pass
+        try:
+            sqlite_total = _v208_sqlite_count_all()
+            auth_total = _v209_authority_total_count()
+            if auth_total > 0 and sqlite_total < auth_total:
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def _v209_hydrate_if_authority_newer(reason: str = "v209_display_reconcile") -> None:
+    try:
+        auth_total_df = _v208_authority_records_df()
+        if isinstance(auth_total_df, pd.DataFrame) and not auth_total_df.empty:
+            if _v208_sqlite_count_all() < len(auth_total_df):
+                _v208_upsert_records_to_sqlite(auth_total_df, reason=reason)
+    except Exception:
+        pass
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V209: 02 History display = SQLite fast path reconciled with local authority when missing."""
+    sqlite_df = pd.DataFrame()
+    raw_loader = globals().get("_v208_prev_load_records") or _v209_prev_load_records
+    if callable(raw_loader):
+        try:
+            sqlite_df = raw_loader(start_date, end_date, employee_id, work_order)
+        except Exception:
+            sqlite_df = pd.DataFrame()
+    auth_df = _v208_authority_records_df(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+    if _v209_should_reconcile(sqlite_df, auth_df, scope="load_records"):
+        _v209_hydrate_if_authority_newer("load_records_v209_authority_reconcile")
+        return _v209_merge_display_frames(sqlite_df, auth_df)
+    if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty:
+        return sqlite_df.reset_index(drop=True)
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        return auth_df.reset_index(drop=True)
+    return pd.DataFrame()
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """V209: 01 Today display = SQLite fast path reconciled with local authority when missing."""
+    sqlite_df = pd.DataFrame()
+    raw_loader = globals().get("_v208_prev_today_records") or _v209_prev_today_records
+    if callable(raw_loader):
+        try:
+            sqlite_df = raw_loader(include_finished=include_finished, unfinished_only=unfinished_only)
+        except Exception:
+            sqlite_df = pd.DataFrame()
+    target = _v205_today() if "_v205_today" in globals() else today_text()
+    auth_df = _v208_authority_records_df(start_date=target, end_date=target)
+    try:
+        if unfinished_only or not include_finished:
+            auth_df = auth_df.loc[_v206_is_active_df(auth_df)].copy() if "_v206_is_active_df" in globals() and isinstance(auth_df, pd.DataFrame) and not auth_df.empty else auth_df
+    except Exception:
+        pass
+    if _v209_should_reconcile(sqlite_df, auth_df, scope="today_records"):
+        _v209_hydrate_if_authority_newer("today_records_v209_authority_reconcile")
+        return _v209_merge_display_frames(sqlite_df, auth_df)
+    if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty:
+        return sqlite_df.reset_index(drop=True)
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        return auth_df.reset_index(drop=True)
+    return pd.DataFrame()
+
+
+def audit_v209_display_reconcile() -> dict:
+    try:
+        raw_load = globals().get("_v208_prev_load_records")
+        sqlite_all = raw_load(None, None, None, None) if callable(raw_load) else pd.DataFrame()
+    except Exception:
+        sqlite_all = pd.DataFrame()
+    try:
+        auth_all = _v208_authority_records_df()
+        target = _v205_today() if "_v205_today" in globals() else today_text()
+        sqlite_today = (globals().get("_v208_prev_today_records") or (lambda **_: pd.DataFrame()))(include_finished=True, unfinished_only=False)
+        auth_today = _v208_authority_records_df(start_date=target, end_date=target)
+    except Exception as exc:
+        return {"version": "V209", "ok": False, "error": str(exc)}
+    return {
+        "version": "V209",
+        "scope": "services/time_record_service.py backend display reconciliation only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "v205_sqlite_fast_path_preserved": True,
+        "sqlite_all_rows_fast_path": int(len(sqlite_all)) if isinstance(sqlite_all, pd.DataFrame) else 0,
+        "authority_all_rows": int(len(auth_all)) if isinstance(auth_all, pd.DataFrame) else 0,
+        "sqlite_today_rows_fast_path": int(len(sqlite_today)) if isinstance(sqlite_today, pd.DataFrame) else 0,
+        "authority_today_rows": int(len(auth_today)) if isinstance(auth_today, pd.DataFrame) else 0,
+        "reconcile_when_authority_has_missing_keys": True,
+        "github_foreground_sync": False,
+    }
+
+# ================= END V209 01/02 DISPLAY RECONCILE AUTHORITY + SQLITE =================
+
+# ================= V210 CANONICAL DISPLAY + SAFE SQLITE DELTA｜2026-05-29 =================
+# V209 showed that legacy SQLite can contain old rows from data/permanent_store/persistent_modules
+# that are not in the canonical authority files.  V210 makes 01/02 display canonical-authority
+# first, plus only safe SQLite delta rows (newer id than authority or very recent local writes).
+# This prevents stale legacy rows from reappearing while still preserving just-started local rows.
+try:
+    _v210_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v210_prev_get_active_records = None
+
+
+def _v210_now_dt():
+    try:
+        return taiwan_now().replace(tzinfo=None)  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return datetime.now()
+        except Exception:
+            return None
+
+
+def _v210_row_dt(row: dict, *cols: str):
+    for col in cols:
+        try:
+            val = row.get(col)
+            if val is None or str(val).strip() == "":
+                continue
+            dt = pd.to_datetime(val, errors="coerce")
+            if pd.notna(dt):
+                try:
+                    return dt.to_pydatetime().replace(tzinfo=None)
+                except Exception:
+                    return dt.to_pydatetime()
+        except Exception:
+            continue
+    return None
+
+
+def _v210_is_safe_sqlite_delta(row: dict, max_auth_id: float) -> bool:
+    """Keep SQLite-only rows only when they look like new unsynced local writes."""
+    try:
+        rid = pd.to_numeric(pd.Series([row.get("id")]), errors="coerce").iloc[0]
+        if pd.notna(rid) and float(rid) > float(max_auth_id or 0):
+            return True
+    except Exception:
+        pass
+    now_dt = _v210_now_dt()
+    row_dt = _v210_row_dt(row, "updated_at", "created_at", "start_timestamp")
+    if now_dt is not None and row_dt is not None:
+        try:
+            age_sec = abs((now_dt - row_dt).total_seconds())
+            # Background local/GitHub publish should finish quickly; keep recent local-only rows
+            # so a just-started record is not hidden before authority catches up.
+            if age_sec <= 1800:
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def _v210_merge_canonical_display(sqlite_df: pd.DataFrame, auth_df: pd.DataFrame) -> pd.DataFrame:
+    if auth_df is None or not isinstance(auth_df, pd.DataFrame) or auth_df.empty:
+        return sqlite_df.reset_index(drop=True) if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty else pd.DataFrame()
+    auth = auth_df.copy()
+    sqlite = sqlite_df.copy() if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty else pd.DataFrame()
+    if "_v206_normalize_time_records_df" in globals():
+        auth = _v206_normalize_time_records_df(auth)
+        if not sqlite.empty:
+            sqlite = _v206_normalize_time_records_df(sqlite)
+    try:
+        auth_keys = set(str(x) for x in _v209_key_series(auth).tolist() if str(x))
+    except Exception:
+        auth_keys = set()
+    try:
+        max_auth_id = float(pd.to_numeric(auth.get("id", pd.Series([0])), errors="coerce").max() or 0)
+    except Exception:
+        max_auth_id = 0.0
+    sqlite_keep_rows = []
+    if not sqlite.empty:
+        try:
+            sqlite_keys = _v209_key_series(sqlite).tolist()
+        except Exception:
+            sqlite_keys = [""] * len(sqlite)
+        for idx, (_, rr) in enumerate(sqlite.iterrows()):
+            row = dict(rr)
+            key = str(sqlite_keys[idx]) if idx < len(sqlite_keys) else ""
+            if key in auth_keys:
+                sqlite_keep_rows.append(row)
+            elif _v210_is_safe_sqlite_delta(row, max_auth_id=max_auth_id):
+                sqlite_keep_rows.append(row)
+    safe_sqlite = pd.DataFrame(sqlite_keep_rows) if sqlite_keep_rows else pd.DataFrame()
+    return _v209_merge_display_frames(safe_sqlite, auth)
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    raw_loader = globals().get("_v208_prev_load_records") or globals().get("_v209_prev_load_records")
+    sqlite_df = pd.DataFrame()
+    if callable(raw_loader):
+        try:
+            sqlite_df = raw_loader(start_date, end_date, employee_id, work_order)
+        except Exception:
+            sqlite_df = pd.DataFrame()
+    auth_df = _v208_authority_records_df(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        _v209_hydrate_if_authority_newer("load_records_v210_canonical_display")
+        return _v210_merge_canonical_display(sqlite_df, auth_df)
+    return sqlite_df.reset_index(drop=True) if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty else pd.DataFrame()
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    raw_loader = globals().get("_v208_prev_today_records") or globals().get("_v209_prev_today_records")
+    sqlite_df = pd.DataFrame()
+    if callable(raw_loader):
+        try:
+            sqlite_df = raw_loader(include_finished=include_finished, unfinished_only=unfinished_only)
+        except Exception:
+            sqlite_df = pd.DataFrame()
+    target = _v205_today() if "_v205_today" in globals() else today_text()
+    auth_df = _v208_authority_records_df(start_date=target, end_date=target)
+    try:
+        if unfinished_only or not include_finished:
+            auth_df = auth_df.loc[_v206_is_active_df(auth_df)].copy() if "_v206_is_active_df" in globals() and isinstance(auth_df, pd.DataFrame) and not auth_df.empty else auth_df
+    except Exception:
+        pass
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        _v209_hydrate_if_authority_newer("today_records_v210_canonical_display")
+        return _v210_merge_canonical_display(sqlite_df, auth_df)
+    return sqlite_df.reset_index(drop=True) if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty else pd.DataFrame()
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V210: Active rows also reconcile canonical authority with safe SQLite delta."""
+    sqlite_df = _v206_sqlite_active_df(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    auth_df = _v206_active_authority_df(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        try:
+            _v206_upsert_active_rows_to_sqlite(auth_df, reason="get_active_records_v210_canonical_active")
+        except Exception:
+            pass
+        merged = _v210_merge_canonical_display(sqlite_df, auth_df)
+    else:
+        merged = sqlite_df.reset_index(drop=True) if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty else pd.DataFrame()
+    if merged.empty:
+        return pd.DataFrame()
+    try:
+        merged = merged.loc[_v206_is_active_df(merged)].copy() if "_v206_is_active_df" in globals() else merged
+    except Exception:
+        pass
+    return merged.reset_index(drop=True)
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        tmp = df.copy()
+        if "id" in tmp.columns:
+            tmp["_v210_id_sort"] = pd.to_numeric(tmp["id"], errors="coerce").fillna(0)
+            tmp = tmp.sort_values("_v210_id_sort", ascending=False, kind="stable").drop(columns=["_v210_id_sort"], errors="ignore")
+        return dict(tmp.iloc[0].to_dict())
+    except Exception:
+        return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    rec = None
+    try:
+        rec = _v205_query_one("SELECT * FROM time_records WHERE id=?", (int(record_id),)) if "_v205_query_one" in globals() else None
+    except Exception:
+        rec = None
+    if not rec:
+        try:
+            auth_all = _v206_active_authority_df()
+            if isinstance(auth_all, pd.DataFrame) and not auth_all.empty and "id" in auth_all.columns:
+                ids = pd.to_numeric(auth_all["id"], errors="coerce")
+                hit = auth_all.loc[ids == int(record_id)].copy()
+                if not hit.empty:
+                    rec = dict(hit.iloc[0].to_dict())
+        except Exception:
+            rec = None
+    if not rec:
+        return pd.DataFrame()
+    return get_active_records(
+        employee_id=_v206_text(rec.get("employee_id")) if "_v206_text" in globals() else str(rec.get("employee_id") or ""),
+        employee_name=_v206_text(rec.get("employee_name")) if "_v206_text" in globals() else str(rec.get("employee_name") or ""),
+        process_name=_v206_text(rec.get("process_name")) if "_v206_text" in globals() else str(rec.get("process_name") or ""),
+        start_date=_v206_text(rec.get("start_date")) if "_v206_text" in globals() else str(rec.get("start_date") or ""),
+    )
+
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v210_active_reconcile") -> int:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    return int(len(df)) if isinstance(df, pd.DataFrame) and not df.empty else 0
+
+
+def audit_v210_canonical_display_delta() -> dict:
+    try:
+        target = _v205_today() if "_v205_today" in globals() else today_text()
+        raw_load = globals().get("_v208_prev_load_records")
+        raw_today = globals().get("_v208_prev_today_records")
+        sqlite_all = raw_load(None, None, None, None) if callable(raw_load) else pd.DataFrame()
+        sqlite_today = raw_today(include_finished=True, unfinished_only=False) if callable(raw_today) else pd.DataFrame()
+        auth_all = _v208_authority_records_df()
+        auth_today = _v208_authority_records_df(start_date=target, end_date=target)
+        final_all = load_records()
+        final_today = today_records(include_finished=True, unfinished_only=False)
+    except Exception as exc:
+        return {"version": "V210", "ok": False, "error": str(exc)}
+    return {
+        "version": "V210",
+        "scope": "services/time_record_service.py backend canonical display only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "v205_sqlite_fast_path_preserved": True,
+        "canonical_authority_first_for_01_02_display": True,
+        "safe_sqlite_delta_kept_for_new_unsynced_rows": True,
+        "sqlite_all_rows_fast_path": int(len(sqlite_all)) if isinstance(sqlite_all, pd.DataFrame) else 0,
+        "authority_all_rows": int(len(auth_all)) if isinstance(auth_all, pd.DataFrame) else 0,
+        "final_all_rows": int(len(final_all)) if isinstance(final_all, pd.DataFrame) else 0,
+        "sqlite_today_rows_fast_path": int(len(sqlite_today)) if isinstance(sqlite_today, pd.DataFrame) else 0,
+        "authority_today_rows": int(len(auth_today)) if isinstance(auth_today, pd.DataFrame) else 0,
+        "final_today_rows": int(len(final_today)) if isinstance(final_today, pd.DataFrame) else 0,
+        "github_foreground_sync": False,
+    }
+
+# ================= END V210 CANONICAL DISPLAY + SAFE SQLITE DELTA =================
