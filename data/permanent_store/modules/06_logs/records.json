@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 08:55:59",
-  "exported_at": "2026-05-29 08:55:59",
+  "updated_at": "2026-05-29 09:19:20",
+  "exported_at": "2026-05-29 09:19:20",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -1111,11 +1111,35 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 461,
+        "log_time": "2026-05-29 09:19:15",
+        "user_name": "SPT208",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "347",
+        "message": "邱珍娜 開始 25M0541-02 / 前置鈑金",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 09:19:15\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"347\",\"target_ids\":[347],\"message\":\"邱珍娜 開始 25M0541-02 / 前置鈑金\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT208|25M0541-02|前置鈑金|2026-05-29 09:19:13|fb1b3635\",\"identity_key\":\"record_key:SPT208|25M0541-02|前置鈑金|2026-05-29 09:19:13|fb1b3635\",\"id\":\"347\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"前置鈑金\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:19:13\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":347,\"record_key\":\"SPT208|25M0541-02|前置鈑金|2026-05-29 09:19:13|fb1b3635\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:19:13\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:19:13\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT208|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:19:13\",\"updated_at\":\"2026-05-29 09:19:13\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":347,\"record_key\":\"SPT208|25M0541-02|前置鈑金|2026-05-29 09:19:13|fb1b3635\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:19:13\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:19:13\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT208|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:19:13\",\"updated_at\":\"2026-05-29 09:19:13\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":347,\"record_key\":\"SPT208|25M0541-02|前置鈑金|2026-05-29 09:19:13|fb1b3635\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:19:13\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:19:13\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT208|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:19:13\",\"updated_at\":\"2026-05-29 09:19:13\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":347,\"record_key\":\"SPT208|25M0541-02|前置鈑金|2026-05-29 09:19:13|fb1b3635\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:19:13\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:19:13\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT208|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:19:13\",\"updated_at\":\"2026-05-29 09:19:13\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"9bf9ad229871da525ca5a41f261574df00bc18d8384e0b0f56bcc4211f9c9d04\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 460,
+        "log_time": "2026-05-29 09:19:15",
+        "user_name": "SPT208",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 92
+    "system_logs": 94
   }
 }
