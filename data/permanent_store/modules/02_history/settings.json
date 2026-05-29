@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "settings",
-  "updated_at": "2026-05-29 19:17:22",
-  "exported_at": "2026-05-29 19:17:22",
+  "updated_at": "2026-05-29 19:33:42",
+  "exported_at": "2026-05-29 19:33:42",
   "reason": "V196 hard delete guard",
   "empty_authoritative": false,
   "tables": {},
@@ -569,6 +569,55 @@
     },
     "column_settings": {},
     "v196_hard_deleted_time_records": [
+      {
+        "row": {
+          "id": 434,
+          "record_key": "B002|21M0241-01|前置鈑金|2026-05-29 19:31:52|ca67207f",
+          "status": "作業中",
+          "work_order": "21M0241-01",
+          "part_no": "4TRSC020-004-02",
+          "type_name": "NTB 3 PORT",
+          "process_name": "前置鈑金",
+          "employee_id": "B002",
+          "employee_name": "張文品",
+          "start_action": "開始",
+          "start_timestamp": "2026-05-29 19:31:52",
+          "end_action": "下班",
+          "end_timestamp": "2026-05-29 19:32:38",
+          "remark": "",
+          "start_date": "2026-05-29",
+          "start_time": "19:31:52",
+          "end_date": "2026-05-29",
+          "end_time": "19:32:38",
+          "work_hours": 0.0,
+          "assembly_location": "竹東",
+          "group_key": "B002|前置鈑金|2026-05-29",
+          "is_group_work": 0,
+          "source": "streamlit_v205_fast",
+          "created_at": "2026-05-29 19:31:52",
+          "updated_at": "2026-05-29 19:31:52"
+        },
+        "id": 434,
+        "record_key": "B002|21M0241-01|前置鈑金|2026-05-29 19:31:52|ca67207f",
+        "business_key": "B002|張文品|21M0241-01|前置鈑金|2026-05-29 19:31:52",
+        "deleted_at": "2026-05-29 19:33:42",
+        "source": "V196",
+        "reason": "01 工時紀錄管理員維護區刪除",
+        "identities": [
+          "biz:B002|張文品|21M0241-01|前置鈑金|2026-05-29 19:31:52",
+          "id:434",
+          "record_key:B002|21M0241-01|前置鈑金|2026-05-29 19:31:52|ca67207f"
+        ]
+      },
+      {
+        "id": 434,
+        "identities": [
+          "id:434"
+        ],
+        "deleted_at": "2026-05-29 19:33:42",
+        "source": "V196",
+        "reason": "01 工時紀錄管理員維護區刪除"
+      },
       {
         "row": {
           "id": 325,
@@ -12217,7 +12266,7 @@
         "log_id": 144
       }
     ],
-    "v196_hard_delete_updated_at": "2026-05-29 19:17:22"
+    "v196_hard_delete_updated_at": "2026-05-29 19:33:42"
   },
   "table_counts": {}
 }
