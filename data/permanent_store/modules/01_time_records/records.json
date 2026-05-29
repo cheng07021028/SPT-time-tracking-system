@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-29 13:31:47",
-  "exported_at": "2026-05-29 13:31:47",
-  "reason": "start_work_v195_consistency_01",
+  "updated_at": "2026-05-29 13:32:07",
+  "exported_at": "2026-05-29 13:32:07",
+  "reason": "finish_work_v194_local_first_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1145,7 +1145,7 @@
       {
         "id": 372,
         "record_key": "SPT160|25M0785-02|水平|2026-05-29 09:44:48|75b18968",
-        "status": "作業中",
+        "status": "完工",
         "work_order": "25M0785-02",
         "part_no": "PSRSC131-N01-04",
         "type_name": "PSRSC131-N01",
@@ -1154,20 +1154,20 @@
         "employee_name": "邱信維",
         "start_action": "開始",
         "start_timestamp": "2026-05-29 09:44:48",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "完工",
+        "end_timestamp": "2026-05-29 13:31:56",
         "remark": "",
         "start_date": "2026-05-29",
         "start_time": "09:44:48",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-29",
+        "end_time": "13:31:56",
+        "work_hours": 2.54,
         "assembly_location": "竹東",
         "group_key": "SPT160|水平|2026-05-29",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-29 09:44:48",
-        "updated_at": "2026-05-29 09:44:48"
+        "updated_at": "2026-05-29 13:31:56"
       },
       {
         "id": 371,
