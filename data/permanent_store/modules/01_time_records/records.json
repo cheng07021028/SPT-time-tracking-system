@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-29 09:30:23",
-  "exported_at": "2026-05-29 09:30:23",
-  "reason": "start_work_v194_local_first_01",
+  "updated_at": "2026-05-29 09:30:25",
+  "exported_at": "2026-05-29 09:30:25",
+  "reason": "start_work_v195_consistency_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -88,6 +88,33 @@
         "source": "streamlit",
         "created_at": "2026-05-29 09:29:19",
         "updated_at": "2026-05-29 09:29:19"
+      },
+      {
+        "id": 359,
+        "record_key": "SPT077|26N4001-02|前置鈑金|2026-05-29 09:29:16|ca105f8b",
+        "status": "作業中",
+        "work_order": "26N4001-02",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "前置鈑金",
+        "employee_id": "SPT077",
+        "employee_name": "謝宛庭",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 09:29:16",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "前置線材加工",
+        "start_date": "2026-05-29",
+        "start_time": "09:29:16",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT077|前置鈑金|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 09:29:16",
+        "updated_at": "2026-05-29 09:29:16"
       },
       {
         "id": 358,
@@ -741,6 +768,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 27
+    "time_records": 28
   }
 }
