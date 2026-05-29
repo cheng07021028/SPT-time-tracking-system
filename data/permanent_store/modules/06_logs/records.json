@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 17:44:36",
-  "exported_at": "2026-05-29 17:44:36",
+  "updated_at": "2026-05-29 17:49:08",
+  "exported_at": "2026-05-29 17:49:08",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -13255,11 +13255,35 @@
         "detail": "get_active_records_v210_canonical_active\n__spt_log_uid=649d9afce2d648e3afd83f8370bd06c3",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 1749,
+        "log_time": "2026-05-29 17:49:06",
+        "user_name": "SPT193",
+        "action_type": "V208_DISPLAY_AUTHORITY_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite time_records 顯示快取空白，已由 01/02 權威檔回填 87 筆。",
+        "detail": "load_records_v210_canonical_display",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1748,
+        "log_time": "2026-05-29 17:49:05",
+        "user_name": "SPT193",
+        "action_type": "V206_ACTIVE_AUTHORITY_FALLBACK",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 查無目前作業，已由權威檔回填 active 1 筆。",
+        "detail": "get_active_records_v210_canonical_active",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1104
+    "system_logs": 1106
   }
 }
