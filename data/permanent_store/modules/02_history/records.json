@@ -2,12 +2,39 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-29 13:20:22",
-  "exported_at": "2026-05-29 13:20:22",
-  "reason": "start_work_v195_consistency_02",
+  "updated_at": "2026-05-29 13:22:09",
+  "exported_at": "2026-05-29 13:22:09",
+  "reason": "start_work_v194_local_first_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
+      {
+        "id": 410,
+        "record_key": "B002|25MN0014-10|其他|2026-05-29 13:21:56|9978cc04",
+        "status": "作業中",
+        "work_order": "25MN0014-10",
+        "part_no": "BWS3200\nRSC2A2-BWN01-03",
+        "type_name": "9MRSC2A2-BWN01-03",
+        "process_name": "其他",
+        "employee_id": "B002",
+        "employee_name": "張文品",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 13:21:56",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "線材前制",
+        "start_date": "2026-05-29",
+        "start_time": "13:21:56",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B002|其他|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 13:21:56",
+        "updated_at": "2026-05-29 13:21:56"
+      },
       {
         "id": 408,
         "record_key": "SPT174|26M0095-10|包機|2026-05-29 13:20:07|1d553a71",
@@ -1983,6 +2010,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 73
+    "time_records": 74
   }
 }
