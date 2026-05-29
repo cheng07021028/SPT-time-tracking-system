@@ -16954,3 +16954,332 @@ def audit_v213_finish_work_active_identity_fallback() -> dict:
     }
 
 # ================= END V213 FINISH WORK EMPLOYEE-ID AUTHORITY FALLBACK =================
+
+
+# ================= V214 FINISH WORK SAME DISPLAY SOURCE FIX｜2026-05-29 =================
+# 目的：把 Finish Work 的 active 查詢改回「與 Today Records / load_records 同一顯示資料源」判斷。
+# 背景：V205 之後 active 查詢走多層 SQLite/authority wrapper；現場出現 Today Records 看得到，
+#      但 Finish Work 顯示「此人員目前沒有未結束作業」。V214 不再依賴前一層 get_active_records，
+#      而是直接從目前已修好的顯示資料源(today_records/load_records)篩選未結束紀錄。
+# 限制：不改 UI/CSS/theme/table/buttons；不改 V205 秒級交易；不移除 V212 逐筆權威檔保存鏈。
+
+
+def _v214_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if text.lower() in {"none", "nan", "nat", "null", "<na>"}:
+        return ""
+    return text
+
+
+def _v214_key(value) -> str:
+    return _v214_text(value).casefold()
+
+
+def _v214_blank_like(value) -> bool:
+    return _v214_key(value) in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _v214_record_key_employee(row: dict) -> str:
+    rk = _v214_text((row or {}).get("record_key") or (row or {}).get("紀錄鍵 / Record Key") or (row or {}).get("Record Key"))
+    return rk.split("|", 1)[0].strip() if "|" in rk else ""
+
+
+def _v214_status_is_active(value) -> bool:
+    status = _v214_text(value)
+    if not status:
+        return True
+    # 相容前面版本可能寫入的狀態文字；排除下班/暫停/完工/結束。
+    return status in {"作業中", "工作中", "進行中", "未結束", "ACTIVE", "Active", "active"}
+
+
+def _v214_active_mask(df: pd.DataFrame) -> pd.Series:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.Series(dtype=bool)
+    end_ts = df.get("end_timestamp", pd.Series([""] * len(df), index=df.index)).map(_v214_text)
+    end_action = df.get("end_action", pd.Series([""] * len(df), index=df.index)).map(_v214_text)
+    status = df.get("status", pd.Series([""] * len(df), index=df.index)).map(_v214_text)
+    # 以 end_timestamp 為主要判斷；若有 end_action 但 end_timestamp 空白，仍視為已結束，避免誤結束。
+    end_blank = end_ts.map(_v214_blank_like)
+    action_blank = end_action.map(_v214_blank_like)
+    status_active = status.map(_v214_status_is_active)
+    return end_blank & action_blank & status_active
+
+
+def _v214_filter_employee_exact(df: pd.DataFrame, employee_id: str | None = None) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    emp = _v214_key(employee_id)
+    if not emp:
+        return df.copy().reset_index(drop=True)
+    rows = []
+    for _, rr in df.iterrows():
+        row = rr.to_dict()
+        got_id = _v214_key(row.get("employee_id") or row.get("工號 / Employee ID") or row.get("工號") or row.get("Employee ID"))
+        rk_emp = _v214_key(_v214_record_key_employee(row))
+        # 有正式 employee_id 時必須完全一致；只有舊資料缺 employee_id 時才允許 record_key prefix。
+        if got_id:
+            if got_id == emp:
+                rows.append(row)
+        elif rk_emp and rk_emp == emp:
+            rows.append(row)
+    return pd.DataFrame(rows).reset_index(drop=True) if rows else pd.DataFrame()
+
+
+def _v214_filter_params(
+    df: pd.DataFrame,
+    *,
+    employee_id: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+    work_order: str | None = None,
+) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        out = out.loc[_v214_active_mask(out)].copy()
+    except Exception:
+        pass
+    if out.empty:
+        return pd.DataFrame()
+    out = _v214_filter_employee_exact(out, employee_id)
+    if out.empty:
+        return pd.DataFrame()
+    try:
+        if process_name and "process_name" in out.columns:
+            proc = _v214_key(process_name)
+            out = out.loc[out["process_name"].map(_v214_key) == proc].copy()
+        if work_order and "work_order" in out.columns:
+            wo = _v214_key(work_order)
+            out = out.loc[out["work_order"].map(_v214_key) == wo].copy()
+        if start_date:
+            sd = _v214_text(start_date).replace("/", "-")[:10]
+            if "start_date" in out.columns:
+                out = out.loc[out["start_date"].map(_v214_text).str.replace("/", "-", regex=False).str[:10] == sd].copy()
+            elif "start_timestamp" in out.columns:
+                out = out.loc[out["start_timestamp"].map(_v214_text).str.replace("/", "-", regex=False).str[:10] == sd].copy()
+    except Exception:
+        pass
+    # employee_name 僅作輔助，不再硬擋；前面 UI/主檔姓名不同時，employee_id 一致即允許結束本人作業。
+    return out.reset_index(drop=True) if not out.empty else pd.DataFrame()
+
+
+def _v214_source_frames_for_active(employee_id: str | None = None) -> list[pd.DataFrame]:
+    frames: list[pd.DataFrame] = []
+    # 1) 直接使用 01 頁 Today Records 同源資料：使用者能在今日表格看到的 active，Finish Work 必須也看得到。
+    try:
+        df_today_active = today_records(include_finished=False, unfinished_only=True)
+        if isinstance(df_today_active, pd.DataFrame) and not df_today_active.empty:
+            frames.append(df_today_active)
+    except Exception:
+        pass
+    # 2) 再用 load_records 補跨日/今日函式日期判斷差異；仍是同一 canonical display source。
+    try:
+        df_all = load_records(employee_id=employee_id) if employee_id else load_records()
+        if isinstance(df_all, pd.DataFrame) and not df_all.empty:
+            frames.append(df_all)
+    except Exception:
+        pass
+    # 3) 最後才讀底層 SQLite active，保留 V205 秒級新寫入；不靠前一層 wrapper，避免遞迴/舊過濾條件。
+    try:
+        if "_v205_query_df" in globals() and callable(_v205_query_df) and "_v205_is_active_sql" in globals():
+            sql = "SELECT * FROM time_records WHERE " + _v205_is_active_sql()
+            params: list = []
+            emp = _v214_text(employee_id)
+            if emp:
+                sql += " AND employee_id=?"
+                params.append(emp)
+            sql += " ORDER BY id DESC"
+            df_sql = _v205_query_df(sql, tuple(params))
+            if isinstance(df_sql, pd.DataFrame) and not df_sql.empty:
+                frames.append(df_sql)
+    except Exception:
+        pass
+    # 4) 權威檔 active。呼叫時不傳 employee_name，避免姓名不一致擋掉；後續只以 employee_id 嚴格過濾。
+    try:
+        if "_v206_active_authority_df" in globals() and callable(_v206_active_authority_df):
+            df_auth = _v206_active_authority_df(employee_id=_v214_text(employee_id) or None, employee_name=None)
+            if isinstance(df_auth, pd.DataFrame) and not df_auth.empty:
+                frames.append(df_auth)
+    except Exception:
+        pass
+    return frames
+
+
+def _v214_concat_dedupe_sort(frames: list[pd.DataFrame]) -> pd.DataFrame:
+    usable = [x.copy() for x in frames if isinstance(x, pd.DataFrame) and not x.empty]
+    if not usable:
+        return pd.DataFrame()
+    try:
+        merged = pd.concat(usable, ignore_index=True, sort=False)
+    except Exception:
+        return usable[0].reset_index(drop=True)
+    if merged.empty:
+        return pd.DataFrame()
+    try:
+        if "_v206_normalize_time_records_df" in globals() and callable(_v206_normalize_time_records_df):
+            merged = _v206_normalize_time_records_df(merged)
+    except Exception:
+        pass
+    try:
+        # 同一筆優先用較新/較完整的來源；key 以 record_key 優先，沒有則 id。
+        rk = merged.get("record_key", pd.Series([""] * len(merged))).map(_v214_text)
+        rid = merged.get("id", pd.Series([""] * len(merged))).map(_v214_text)
+        merged["_v214_dedupe_key"] = rk.where(rk != "", "id:" + rid)
+        merged["_v214_id_sort"] = pd.to_numeric(merged.get("id", 0), errors="coerce").fillna(0)
+        merged["_v214_updated_sort"] = pd.to_datetime(merged.get("updated_at", ""), errors="coerce")
+        merged = merged.sort_values(["_v214_id_sort", "_v214_updated_sort"], ascending=[True, True], kind="stable")
+        merged = merged.drop_duplicates("_v214_dedupe_key", keep="last")
+        merged = merged.sort_values(["_v214_id_sort", "_v214_updated_sort"], ascending=[False, False], kind="stable")
+        merged = merged.drop(columns=[c for c in merged.columns if str(c).startswith("_v214_")], errors="ignore")
+    except Exception:
+        pass
+    return merged.reset_index(drop=True)
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V214: Finish Work active lookup must use the same canonical display source as Today Records.
+
+    employee_name is intentionally not a hard filter.  employee_id remains exact, so this cannot show another person.
+    """
+    frames = _v214_source_frames_for_active(employee_id=employee_id)
+    merged = _v214_concat_dedupe_sort(frames)
+    out = _v214_filter_params(
+        merged,
+        employee_id=employee_id,
+        process_name=process_name,
+        start_date=start_date,
+        employee_name=employee_name,
+    )
+    if isinstance(out, pd.DataFrame) and not out.empty:
+        try:
+            if "_v206_upsert_active_rows_to_sqlite" in globals() and callable(_v206_upsert_active_rows_to_sqlite):
+                _v206_upsert_active_rows_to_sqlite(out, reason="v214_finish_same_display_source")
+        except Exception:
+            pass
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        return dict(df.iloc[0].to_dict())
+    except Exception:
+        return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    rid = int(record_id)
+    seed = None
+    try:
+        all_active = get_active_records()
+        if isinstance(all_active, pd.DataFrame) and not all_active.empty and "id" in all_active.columns:
+            ids = pd.to_numeric(all_active["id"], errors="coerce")
+            hit = all_active.loc[ids == rid].copy()
+            if not hit.empty:
+                seed = dict(hit.iloc[0].to_dict())
+    except Exception:
+        seed = None
+    if seed is None:
+        try:
+            all_rows = load_records()
+            if isinstance(all_rows, pd.DataFrame) and not all_rows.empty and "id" in all_rows.columns:
+                ids = pd.to_numeric(all_rows["id"], errors="coerce")
+                hit = all_rows.loc[ids == rid].copy()
+                if not hit.empty:
+                    seed = dict(hit.iloc[0].to_dict())
+        except Exception:
+            seed = None
+    if not seed:
+        return pd.DataFrame()
+    return get_active_records(
+        employee_id=_v214_text(seed.get("employee_id")),
+        process_name=_v214_text(seed.get("process_name")),
+        start_date=_v214_text(seed.get("start_date")),
+        employee_name=None,
+    )
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    df = _v214_filter_params(df, employee_id=employee_id, process_name=process_name, start_date=start_date, work_order=work_order)
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        return dict(df.iloc[0].to_dict())
+    except Exception:
+        return None
+
+
+def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or getattr(df, "empty", True):
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        proc = _v214_key(process_name)
+        sd = _v214_text(start_date or (_v205_today() if "_v205_today" in globals() else today_text())).replace("/", "-")[:10]
+        if "process_name" in out.columns:
+            proc_series = out["process_name"].map(_v214_key)
+        else:
+            proc_series = pd.Series([""] * len(out), index=out.index)
+        if "start_date" in out.columns:
+            date_series = out["start_date"].map(_v214_text).str.replace("/", "-", regex=False).str[:10]
+        elif "start_timestamp" in out.columns:
+            date_series = out["start_timestamp"].map(_v214_text).str.replace("/", "-", regex=False).str[:10]
+        else:
+            date_series = pd.Series([""] * len(out), index=out.index)
+        # 與 V205 舊邏輯一致：同人員 active 中，工段不同或日期不同才是衝突。
+        out = out.loc[(proc_series != proc) | (date_series != sd)].copy()
+    except Exception:
+        pass
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()
+
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v214_finish_same_display_source") -> int:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    try:
+        n = int(len(df)) if isinstance(df, pd.DataFrame) and not df.empty else 0
+        if n:
+            try:
+                _v205_direct_log(
+                    "V214_FINISH_ACTIVE_SOURCE_OK",
+                    f"Finish Work 使用 Today Records/load_records 同源資料找到 {n} 筆未結束作業。",
+                    target_id=str(employee_id or ""),
+                    detail=str(reason or ""),
+                    level="INFO",
+                )
+            except Exception:
+                pass
+        return n
+    except Exception:
+        return 0
+
+
+def audit_v214_finish_same_display_source_fix() -> dict:
+    return {
+        "version": "V214",
+        "scope": "services/time_record_service.py backend active-query override only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "v205_sqlite_fast_transaction_preserved": True,
+        "v212_row_durable_save_preserved": True,
+        "finish_work_active_source": "same canonical display source as Today Records and load_records",
+        "employee_safety": "employee_id exact match required; employee_name no longer blocks same employee",
+        "reason": "Today Records can show the just-started row while the previous active wrapper chain returns none.",
+    }
+
+# ================= END V214 FINISH WORK SAME DISPLAY SOURCE FIX =================
