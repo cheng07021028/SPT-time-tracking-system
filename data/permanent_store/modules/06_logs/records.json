@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 09:32:02",
-  "exported_at": "2026-05-29 09:32:02",
+  "updated_at": "2026-05-29 09:32:28",
+  "exported_at": "2026-05-29 09:32:28",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -1831,11 +1831,47 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 873,
+        "log_time": "2026-05-29 09:32:24",
+        "user_name": "SPT077",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "365",
+        "message": "謝宛庭 開始 26N4001-01 / 前置鈑金",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 09:32:24\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"365\",\"target_ids\":[365],\"message\":\"謝宛庭 開始 26N4001-01 / 前置鈑金\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT077|26N4001-01|前置鈑金|2026-05-29 09:32:21|4cdfe523\",\"identity_key\":\"record_key:SPT077|26N4001-01|前置鈑金|2026-05-29 09:32:21|4cdfe523\",\"id\":\"365\",\"employee_id\":\"SPT077\",\"employee_name\":\"謝宛庭\",\"work_order\":\"26N4001-01\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"前置鈑金\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:32:21\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":365,\"record_key\":\"SPT077|26N4001-01|前置鈑金|2026-05-29 09:32:21|4cdfe523\",\"status\":\"作業中\",\"work_order\":\"26N4001-01\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT077\",\"employee_name\":\"謝宛庭\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:32:21\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"前置線材加工\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:32:21\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT077|前置鈑金|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:32:21\",\"updated_at\":\"2026-05-29 09:32:21\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":365,\"record_key\":\"SPT077|26N4001-01|前置鈑金|2026-05-29 09:32:21|4cdfe523\",\"status\":\"作業中\",\"work_order\":\"26N4001-01\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT077\",\"employee_name\":\"謝宛庭\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:32:21\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"前置線材加工\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:32:21\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT077|前置鈑金|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:32:21\",\"updated_at\":\"2026-05-29 09:32:21\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":365,\"record_key\":\"SPT077|26N4001-01|前置鈑金|2026-05-29 09:32:21|4cdfe523\",\"status\":\"作業中\",\"work_order\":\"26N4001-01\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT077\",\"employee_name\":\"謝宛庭\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:32:21\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"前置線材加工\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:32:21\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT077|前置鈑金|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:32:21\",\"updated_at\":\"2026-05-29 09:32:21\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":365,\"record_key\":\"SPT077|26N4001-01|前置鈑金|2026-05-29 09:32:21|4cdfe523\",\"status\":\"作業中\",\"work_order\":\"26N4001-01\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT077\",\"employee_name\":\"謝宛庭\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:32:21\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"前置線材加工\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:32:21\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT077|前置鈑金|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:32:21\",\"updated_at\":\"2026-05-29 09:32:21\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"e61c7d1e216a0827b57aabfed2f3bc246cf31c4124e2c80579571dd678a89b8a\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 872,
+        "log_time": "2026-05-29 09:32:24",
+        "user_name": "SPT077",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 871,
+        "log_time": "2026-05-29 09:32:23",
+        "user_name": "SPT077",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 152
+    "system_logs": 155
   }
 }
