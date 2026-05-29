@@ -1,0 +1,47 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "72dcdf758ecf4c3ab64da633bf5c31a6",
+  "event_type": "OFF_DUTY",
+  "event_time": "2026-05-29 17:37:28",
+  "record_id": "383",
+  "record_key": "SPT203|25M0785-02|其他|2026-05-29 10:11:11|ea70128d",
+  "operator_account": "SPT203",
+  "reason": "finish_work_v212_restore_per_row_save",
+  "row": {
+    "id": "383",
+    "record_key": "SPT203|25M0785-02|其他|2026-05-29 10:11:11|ea70128d",
+    "status": "下班",
+    "work_order": "25M0785-02",
+    "part_no": "PSRSC131-N01-04",
+    "type_name": "PSRSC131-N01",
+    "process_name": "其他",
+    "employee_id": "SPT203",
+    "employee_name": "徐梓翔",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-29 10:11:11",
+    "end_action": "下班",
+    "end_timestamp": "2026-05-29 17:37:28",
+    "remark": "通電前量測＆封外封板金",
+    "start_date": "2026-05-29",
+    "start_time": "10:11:11",
+    "end_date": "2026-05-29",
+    "end_time": "17:37:28",
+    "work_hours": "5.94",
+    "assembly_location": "竹東",
+    "group_key": "SPT203|其他|2026-05-29",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-29 10:11:11",
+    "updated_at": "2026-05-29 17:37:28"
+  },
+  "extra": {
+    "end_action": "下班",
+    "remark": "",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      383
+    ]
+  },
+  "previous_checksum": "",
+  "checksum": "e582db3e65faed486a144f69424a6d6b9c5f4fdbbc718d1666173a1f6c09c37a"
+}
