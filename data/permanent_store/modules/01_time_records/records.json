@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-29 13:53:48",
-  "exported_at": "2026-05-29 13:53:48",
-  "reason": "start_work_v194_local_first_01",
+  "updated_at": "2026-05-29 13:54:33",
+  "exported_at": "2026-05-29 13:54:33",
+  "reason": "finish_work_v194_local_first_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -65,7 +65,7 @@
       {
         "id": 425,
         "record_key": "SSS|NA|6S|2026-05-29 13:47:04|54c21e36",
-        "status": "作業中",
+        "status": "完工",
         "work_order": "NA",
         "part_no": "",
         "type_name": "",
@@ -74,20 +74,20 @@
         "employee_name": "SSS",
         "start_action": "開始",
         "start_timestamp": "2026-05-29 13:47:04",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "完工",
+        "end_timestamp": "2026-05-29 13:54:23",
         "remark": "",
         "start_date": "2026-05-29",
         "start_time": "13:47:04",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-29",
+        "end_time": "13:54:23",
+        "work_hours": 0.12,
         "assembly_location": "",
         "group_key": "SSS|6S|2026-05-29",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-29 13:47:04",
-        "updated_at": "2026-05-29 13:47:04"
+        "updated_at": "2026-05-29 13:54:23"
       },
       {
         "id": 423,
