@@ -1,0 +1,47 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "8dff9d0f811c44a28b049df219465147",
+  "event_type": "OFF_DUTY",
+  "event_time": "2026-05-29 17:53:41",
+  "record_id": "426",
+  "record_key": "B168|25MN0014-10|其他|2026-05-29 13:47:58|f145f581",
+  "operator_account": "B168",
+  "reason": "finish_work_v212_restore_per_row_save",
+  "row": {
+    "id": "426",
+    "record_key": "B168|25MN0014-10|其他|2026-05-29 13:47:58|f145f581",
+    "status": "下班",
+    "work_order": "25MN0014-10",
+    "part_no": "BWS3200\nRSC2A2-BWN01-03",
+    "type_name": "9MRSC2A2-BWN01-03",
+    "process_name": "其他",
+    "employee_id": "B168",
+    "employee_name": "洪敏強",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-29 13:47:58",
+    "end_action": "下班",
+    "end_timestamp": "2026-05-29 17:53:41",
+    "remark": "線材前置",
+    "start_date": "2026-05-29",
+    "start_time": "13:47:58",
+    "end_date": "2026-05-29",
+    "end_time": "17:53:41",
+    "work_hours": "3.85",
+    "assembly_location": "竹東",
+    "group_key": "B168|其他|2026-05-29",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-29 13:47:58",
+    "updated_at": "2026-05-29 17:53:41"
+  },
+  "extra": {
+    "end_action": "下班",
+    "remark": "",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      426
+    ]
+  },
+  "previous_checksum": "5135a5de0dd481cf56bccd6f6a6688c5608e47bdffc835bdeee82e4f7275874b",
+  "checksum": "75c2ff3a59094d8f34b5679f463e96d1a9267c30994360cb9121fa655f32c08c"
+}
