@@ -1,0 +1,47 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "0547fac7d604440180beaf0bb9d4390f",
+  "event_type": "OFF_DUTY",
+  "event_time": "2026-05-29 17:52:23",
+  "record_id": "414",
+  "record_key": "B155|25MN0014-10|其他|2026-05-29 13:27:46|0ba7edf1",
+  "operator_account": "B155",
+  "reason": "finish_work_v212_restore_per_row_save",
+  "row": {
+    "id": "414",
+    "record_key": "B155|25MN0014-10|其他|2026-05-29 13:27:46|0ba7edf1",
+    "status": "下班",
+    "work_order": "25MN0014-10",
+    "part_no": "BWS3200\nRSC2A2-BWN01-03",
+    "type_name": "9MRSC2A2-BWN01-03",
+    "process_name": "其他",
+    "employee_id": "B155",
+    "employee_name": "趙健浩",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-29 13:27:46",
+    "end_action": "下班",
+    "end_timestamp": "2026-05-29 17:52:23",
+    "remark": "線材加工",
+    "start_date": "2026-05-29",
+    "start_time": "13:27:46",
+    "end_date": "2026-05-29",
+    "end_time": "17:52:23",
+    "work_hours": "4.16",
+    "assembly_location": "竹東",
+    "group_key": "B155|其他|2026-05-29",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-29 13:27:46",
+    "updated_at": "2026-05-29 17:52:23"
+  },
+  "extra": {
+    "end_action": "下班",
+    "remark": "",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      414
+    ]
+  },
+  "previous_checksum": "",
+  "checksum": "c16c97cef6d1eeca2d808cfaf7005b81cc07df2130f58f08209d8e13e77efcf0"
+}
