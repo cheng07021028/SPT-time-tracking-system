@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 13:32:19",
-  "exported_at": "2026-05-29 13:32:19",
+  "updated_at": "2026-05-29 13:35:14",
+  "exported_at": "2026-05-29 13:35:14",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -7111,11 +7111,215 @@
         "detail": "372\n__spt_log_uid=fcfd8b39beed42b78caa94fdda93de44\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:32:02\",\"action_type\":\"END_WORK\",\"target_table\":\"time_records\",\"target_id\":\"372\",\"target_ids\":[372],\"message\":\"V96 結束工時紀錄 #372，同步結束=1筆，狀態=完工\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT160|25M0785-02|水平|2026-05-29 09:44:48|75b18968\",\"identity_key\":\"record_key:SPT160|25M0785-02|水平|2026-05-29 09:44:48|75b18968\",\"id\":\"372\",\"employee_id\":\"SPT160\",\"employee_name\":\"邱信維\",\"work_order\":\"25M0785-02\",\"part_no\":\"PSRSC131-N01-04\",\"type_name\":\"PSRSC131-N01\",\"process_name\":\"水平\",\"status\":\"完工\",\"start_timestamp\":\"2026-05-29 09:44:48\",\"end_timestamp\":\"2026-05-29 13:31:56\",\"work_hours\":\"2.54\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":372,\"record_key\":\"SPT160|25M0785-02|水平|2026-05-29 09:44:48|75b18968\",\"status\":\"完工\",\"work_order\":\"25M0785-02\",\"part_no\":\"PSRSC131-N01-04\",\"type_name\":\"PSRSC131-N01\",\"process_name\":\"水平\",\"employee_id\":\"SPT160\",\"employee_name\":\"邱信維\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:44:48\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 13:31:56\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:44:48\",\"end_date\":\"2026-05-29\",\"end_time\":\"13:31:56\",\"work_hours\":2.54,\"assembly_location\":\"竹東\",\"group_key\":\"SPT160|水平|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:44:48\",\"updated_at\":\"2026-05-29 13:31:56\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":372,\"record_key\":\"SPT160|25M0785-02|水平|2026-05-29 09:44:48|75b18968\",\"status\":\"完工\",\"work_order\":\"25M0785-02\",\"part_no\":\"PSRSC131-N01-04\",\"type_name\":\"PSRSC131-N01\",\"process_name\":\"水平\",\"employee_id\":\"SPT160\",\"employee_name\":\"邱信維\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:44:48\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 13:31:56\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:44:48\",\"end_date\":\"2026-05-29\",\"end_time\":\"13:31:56\",\"work_hours\":2.54,\"assembly_location\":\"竹東\",\"group_key\":\"SPT160|水平|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:44:48\",\"updated_at\":\"2026-05-29 13:31:56\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":372,\"record_key\":\"SPT160|25M0785-02|水平|2026-05-29 09:44:48|75b18968\",\"status\":\"完工\",\"work_order\":\"25M0785-02\",\"part_no\":\"PSRSC131-N01-04\",\"type_name\":\"PSRSC131-N01\",\"process_name\":\"水平\",\"employee_id\":\"SPT160\",\"employee_name\":\"邱信維\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:44:48\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 13:31:56\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:44:48\",\"end_date\":\"2026-05-29\",\"end_time\":\"13:31:56\",\"work_hours\":2.54,\"assembly_location\":\"竹東\",\"group_key\":\"SPT160|水平|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:44:48\",\"updated_at\":\"2026-05-29 13:31:56\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":372,\"record_key\":\"SPT160|25M0785-02|水平|2026-05-29 09:44:48|75b18968\",\"status\":\"完工\",\"work_order\":\"25M0785-02\",\"part_no\":\"PSRSC131-N01-04\",\"type_name\":\"PSRSC131-N01\",\"process_name\":\"水平\",\"employee_id\":\"SPT160\",\"employee_name\":\"邱信維\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:44:48\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 13:31:56\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:44:48\",\"end_date\":\"2026-05-29\",\"end_time\":\"13:31:56\",\"work_hours\":2.54,\"assembly_location\":\"竹東\",\"group_key\":\"SPT160|水平|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:44:48\",\"updated_at\":\"2026-05-29 13:31:56\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"761a910fb1a82aadc1ae9acf3d651ba0034e5b1aa12e76f09f7e0167a5391443\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1783,
+        "log_time": "2026-05-29 13:32:30",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1782,
+        "log_time": "2026-05-29 13:32:26",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1779,
+        "log_time": "2026-05-29 13:32:25",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1778,
+        "log_time": "2026-05-29 13:32:25",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1777,
+        "log_time": "2026-05-29 13:32:25",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1800,
+        "log_time": "2026-05-29 13:34:19",
+        "user_name": "B168",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "417",
+        "message": "洪敏強 開始 25MN0014-10 / 其他",
+        "detail": "__spt_log_uid=7121c450ada744868d987bb1ba3c5052",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1799,
+        "log_time": "2026-05-29 13:34:17",
+        "user_name": "B168",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1798,
+        "log_time": "2026-05-29 13:34:17",
+        "user_name": "SPT160",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "416",
+        "message": "邱信維 開始 26M0051-09 / 模組",
+        "detail": "__spt_log_uid=ae4c11e2fd4045fc8f30ffebd8046c13",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1797,
+        "log_time": "2026-05-29 13:34:12",
+        "user_name": "SPT160",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1802,
+        "log_time": "2026-05-29 13:34:28",
+        "user_name": "SPT199",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "420",
+        "message": "龍斯愷 開始 25M0694-01 / 收機",
+        "detail": "__spt_log_uid=89fba2681822451c84f67b32006236bf\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:34:28\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"420\",\"target_ids\":[420],\"message\":\"龍斯愷 開始 25M0694-01 / 收機\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\",\"identity_key\":\"record_key:SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\",\"id\":\"420\",\"employee_id\":\"SPT199\",\"employee_name\":\"龍斯愷\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 13:34:19\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":420,\"record_key\":\"SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"SPT199\",\"employee_name\":\"龍斯愷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:34:19\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:34:19\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT199|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:34:19\",\"updated_at\":\"2026-05-29 13:34:19\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":420,\"record_key\":\"SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"SPT199\",\"employee_name\":\"龍斯愷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:34:19\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:34:19\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT199|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:34:19\",\"updated_at\":\"2026-05-29 13:34:19\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":420,\"record_key\":\"SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"SPT199\",\"employee_name\":\"龍斯愷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:34:19\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:34:19\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT199|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:34:19\",\"updated_at\":\"2026-05-29 13:34:19\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":420,\"record_key\":\"SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"SPT199\",\"employee_name\":\"龍斯愷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:34:19\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:34:19\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT199|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:34:19\",\"updated_at\":\"2026-05-29 13:34:19\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"8a66e7ae361c7f46248614314d38792729ff2902424a8e8a3dd389d7be3792c9\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1801,
+        "log_time": "2026-05-29 13:34:27",
+        "user_name": "SPT199",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1803,
+        "log_time": "2026-05-29 13:34:36",
+        "user_name": "SPT199",
+        "action_type": "V200_ROW_START_WORK",
+        "target_table": "time_records",
+        "target_id": "420",
+        "message": "開始作業逐筆紀錄｜ID=420｜SPT199 龍斯愷 25M0694-01 / 收機",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"420\", \"record_key\": \"SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\", \"employee_id\": \"SPT199\", \"employee_name\": \"龍斯愷\", \"work_order\": \"25M0694-01\", \"process_name\": \"收機\", \"start_timestamp\": \"2026-05-29 13:34:19\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 420, \"record_key\": \"SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\", \"status\": \"作業中\", \"work_order\": \"25M0694-01\", \"part_no\": \"4TRSC122-SB2-13\", \"type_name\": \"SORTER RSC121 SB (RR757)\", \"process_name\": \"收機\", \"employee_id\": \"SPT199\", \"employee_name\": \"龍斯愷\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 13:34:19\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-29\", \"start_time\": \"13:34:19\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": 0.0, \"assembly_location\": \"竹東\", \"group_key\": \"SPT199|收機|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 13:34:19\", \"updated_at\": \"2026-05-29 13:34:19\"}}\n__spt_log_uid=1f40d74c411b42b887de18c62419f8e0\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:34:36\",\"action_type\":\"V200_ROW_START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"420\",\"target_ids\":[420],\"message\":\"開始作業逐筆紀錄｜ID=420｜SPT199 龍斯愷 25M0694-01 / 收機\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\",\"identity_key\":\"record_key:SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\",\"id\":\"420\",\"employee_id\":\"SPT199\",\"employee_name\":\"龍斯愷\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 13:34:19\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":420,\"record_key\":\"SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"SPT199\",\"employee_name\":\"龍斯愷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:34:19\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:34:19\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT199|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:34:19\",\"updated_at\":\"2026-05-29 13:34:19\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":420,\"record_key\":\"SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"SPT199\",\"employee_name\":\"龍斯愷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:34:19\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:34:19\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT199|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:34:19\",\"updated_at\":\"2026-05-29 13:34:19\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":420,\"record_key\":\"SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"SPT199\",\"employee_name\":\"龍斯愷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:34:19\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:34:19\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT199|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:34:19\",\"updated_at\":\"2026-05-29 13:34:19\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":420,\"record_key\":\"SPT199|25M0694-01|收機|2026-05-29 13:34:19|d5550e35\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"SPT199\",\"employee_name\":\"龍斯愷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:34:19\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:34:19\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT199|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:34:19\",\"updated_at\":\"2026-05-29 13:34:19\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"cea8a8736cb4c80a368389696d619f51d8e1c06a93174c5fa99870697a339346\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1826,
+        "log_time": "2026-05-29 13:35:05",
+        "user_name": "SPT231",
+        "action_type": "END_WORK_GROUP",
+        "target_table": "time_records",
+        "target_id": "407",
+        "message": "V96 結束工時紀錄 #407，同步結束=2筆，狀態=完工",
+        "detail": "406,407\n__spt_log_uid=98e4f5b891a4456ca01ca5989e381d11\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:35:05\",\"action_type\":\"END_WORK_GROUP\",\"target_table\":\"time_records\",\"target_id\":\"407\",\"target_ids\":[407],\"message\":\"V96 結束工時紀錄 #407，同步結束=2筆，狀態=完工\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"identity_key\":\"record_key:SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"id\":\"407\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"status\":\"完工\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_timestamp\":\"2026-05-29 13:35:02\",\"work_hours\":\"0.15\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":407,\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"status\":\"完工\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 13:35:02\",\"remark\":\"同步作業平均分配：2筆，群組總工時=00:18:12，平均=00:09:00\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:16:57\",\"end_date\":\"2026-05-29\",\"end_time\":\"13:35:02\",\"work_hours\":0.15,\"assembly_location\":\"竹東\",\"group_key\":\"SPT231|包機|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:16:57\",\"updated_at\":\"2026-05-29 13:35:02\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":407,\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"status\":\"完工\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 13:35:02\",\"remark\":\"同步作業平均分配：2筆，群組總工時=00:18:12，平均=00:09:00\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:16:57\",\"end_date\":\"2026-05-29\",\"end_time\":\"13:35:02\",\"work_hours\":0.15,\"assembly_location\":\"竹東\",\"group_key\":\"SPT231|包機|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:16:57\",\"updated_at\":\"2026-05-29 13:35:02\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":407,\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"status\":\"完工\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 13:35:02\",\"remark\":\"同步作業平均分配：2筆，群組總工時=00:18:12，平均=00:09:00\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:16:57\",\"end_date\":\"2026-05-29\",\"end_time\":\"13:35:02\",\"work_hours\":0.15,\"assembly_location\":\"竹東\",\"group_key\":\"SPT231|包機|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:16:57\",\"updated_at\":\"2026-05-29 13:35:02\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":407,\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"status\":\"完工\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 13:35:02\",\"remark\":\"同步作業平均分配：2筆，群組總工時=00:18:12，平均=00:09:00\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:16:57\",\"end_date\":\"2026-05-29\",\"end_time\":\"13:35:02\",\"work_hours\":0.15,\"assembly_location\":\"竹東\",\"group_key\":\"SPT231|包機|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:16:57\",\"updated_at\":\"2026-05-29 13:35:02\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"60438f9bd7ee64e2d7871d3a9d5cd17250a147fc500614710af6c18b2bd67e22\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1825,
+        "log_time": "2026-05-29 13:35:05",
+        "user_name": "SPT231",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1823,
+        "log_time": "2026-05-29 13:35:02",
+        "user_name": "SPT231",
+        "action_type": "V201_SQLITE_ROW_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "407",
+        "message": "v201_finish_retry_before_core: 已由 01/02 權威資料回填 SQLite 單筆 cache，id=407",
+        "detail": "__spt_log_uid=68f82ae38cd4409b8d24832b9627d45e",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1822,
+        "log_time": "2026-05-29 13:35:02",
+        "user_name": "SPT231",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1827,
+        "log_time": "2026-05-29 13:35:10",
+        "user_name": "SPT231",
+        "action_type": "V200_ROW_FINISH_WORK",
+        "target_table": "time_records",
+        "target_id": "407",
+        "message": "結束作業逐筆紀錄｜動作=完工｜ID=407｜SPT231 陳建勳 26M0095-10 / 包機",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"407\", \"record_key\": \"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\", \"employee_id\": \"SPT231\", \"employee_name\": \"陳建勳\", \"work_order\": \"26M0095-10\", \"process_name\": \"包機\", \"start_timestamp\": \"2026-05-29 13:16:57\", \"end_timestamp\": \"2026-05-29 13:35:02\", \"status\": \"完工\", \"row_snapshot\": {\"id\": 407, \"record_key\": \"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\", \"status\": \"完工\", \"work_order\": \"26M0095-10\", \"part_no\": \"4TRSC131-005-05\", \"type_name\": \"2LP Asymtek EFEM (wafer)\", \"process_name\": \"包機\", \"employee_id\": \"SPT231\", \"employee_name\": \"陳建勳\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 13:16:57\", \"end_action\": \"完工\", \"end_timestamp\": \"2026-05-29 13:35:02\", \"remark\": \"同步作業平均分配：2筆，群組總工時=00:18:12，平均=00:09:00\", \"start_date\": \"2026-05-29\", \"start_time\": \"13:16:57\", \"end_date\": \"2026-05-29\", \"end_time\": \"13:35:02\", \"work_hours\": 0.15, \"assembly_location\": \"竹東\", \"group_key\": \"SPT231|包機|2026-05-29\", \"is_group_work\": 1, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 13:16:57\", \"updated_at\": \"2026-05-29 13:35:02\"}}\n__spt_log_uid=aed4320841cb429488d3f295143f44eb\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:35:10\",\"action_type\":\"V200_ROW_FINISH_WORK\",\"target_table\":\"time_records\",\"target_id\":\"407\",\"target_ids\":[407],\"message\":\"結束作業逐筆紀錄｜動作=完工｜ID=407｜SPT231 陳建勳 26M0095-10 / 包機\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":0,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"identity_key\":\"record_key:SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"id\":\"407\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"status\":\"完工\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_timestamp\":\"2026-05-29 13:35:02\",\"work_hours\":\"0.15\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":407,\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"status\":\"完工\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 13:35:02\",\"remark\":\"同步作業平均分配：2筆，群組總工時=00:18:12，平均=00:09:00\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:16:57\",\"end_date\":\"2026-05-29\",\"end_time\":\"13:35:02\",\"work_hours\":0.15,\"assembly_location\":\"竹東\",\"group_key\":\"SPT231|包機|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:16:57\",\"updated_at\":\"2026-05-29 13:35:02\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[],\"authority_01_time_records\":[{\"id\":407,\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"status\":\"完工\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 13:35:02\",\"remark\":\"同步作業平均分配：2筆，群組總工時=00:18:12，平均=00:09:00\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:16:57\",\"end_date\":\"2026-05-29\",\"end_time\":\"13:35:02\",\"work_hours\":0.15,\"assembly_location\":\"竹東\",\"group_key\":\"SPT231|包機|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:16:57\",\"updated_at\":\"2026-05-29 13:35:02\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":407,\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"status\":\"完工\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 13:35:02\",\"remark\":\"同步作業平均分配：2筆，群組總工時=00:18:12，平均=00:09:00\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:16:57\",\"end_date\":\"2026-05-29\",\"end_time\":\"13:35:02\",\"work_hours\":0.15,\"assembly_location\":\"竹東\",\"group_key\":\"SPT231|包機|2026-05-29\",\"is_group_work\":1,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:16:57\",\"updated_at\":\"2026-05-29 13:35:02\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"41c47a3ec74c0abadbe36497479e8eaee4c66f5ec70a78d1b281837c12a7f7fa\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 592
+    "system_logs": 609
   }
 }
