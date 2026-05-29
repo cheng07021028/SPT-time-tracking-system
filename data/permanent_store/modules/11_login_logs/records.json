@@ -2,14 +2,14 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 18:00:49",
-  "exported_at": "2026-05-29 18:00:49",
+  "updated_at": "2026-05-29 18:00:51",
+  "exported_at": "2026-05-29 18:00:51",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
       {
-        "id": 8,
+        "id": 3156,
         "source": "v103_merge",
         "username": "SPT243",
         "display_name": "",
@@ -25,39 +25,7 @@
         "created_at": "2026-05-29 18:00:45"
       },
       {
-        "id": 2372,
-        "source": "v103_merge",
-        "username": "admin",
-        "display_name": "系統管理員",
-        "event_type": "LOGIN",
-        "result": "SUCCESS",
-        "message": "role=admin;source=authority",
-        "module_code": "LOGIN",
-        "login_time": "2026-05-29 18:00:44",
-        "logout_time": "",
-        "idle_minutes": NaN,
-        "ip_address": "",
-        "user_agent": "streamlit",
-        "created_at": "2026-05-29 18:00:44"
-      },
-      {
-        "id": 2371,
-        "source": "v103_merge",
-        "username": "SPT121",
-        "display_name": "徐兆生",
-        "event_type": "LOGIN",
-        "result": "SUCCESS",
-        "message": "role=operator;source=authority; employee_id=SPT121",
-        "module_code": "LOGIN",
-        "login_time": "2026-05-29 18:00:44",
-        "logout_time": "",
-        "idle_minutes": NaN,
-        "ip_address": "",
-        "user_agent": "streamlit",
-        "created_at": "2026-05-29 18:00:44"
-      },
-      {
-        "id": 2370,
+        "id": 3159,
         "source": "v103_merge",
         "username": "B164",
         "display_name": "陳宛廷",
@@ -73,7 +41,39 @@
         "created_at": "2026-05-29 18:00:44"
       },
       {
-        "id": 2369,
+        "id": 3158,
+        "source": "v103_merge",
+        "username": "SPT121",
+        "display_name": "徐兆生",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=SPT121",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-29 18:00:44",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 18:00:44"
+      },
+      {
+        "id": 3157,
+        "source": "v103_merge",
+        "username": "admin",
+        "display_name": "系統管理員",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=admin;source=authority",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-29 18:00:44",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 18:00:44"
+      },
+      {
+        "id": 818,
         "source": "v103_merge",
         "username": "SPT243",
         "display_name": "羅丹",
@@ -89,14 +89,14 @@
         "created_at": "2026-05-29 18:00:43"
       },
       {
-        "id": 817,
+        "id": 820,
         "source": "v103_merge",
         "username": "SPT243",
-        "display_name": "羅丹",
+        "display_name": "",
         "event_type": "LOGIN",
         "result": "FAIL",
         "message": "密碼錯誤; employee_id=SPT243; roles=operator",
-        "module_code": "LOGIN",
+        "module_code": "",
         "login_time": "2026-05-29 18:00:42",
         "logout_time": "",
         "idle_minutes": NaN,
@@ -105,14 +105,14 @@
         "created_at": "2026-05-29 18:00:42"
       },
       {
-        "id": 2,
+        "id": 819,
         "source": "v103_merge",
         "username": "SPT243",
-        "display_name": "",
+        "display_name": "羅丹",
         "event_type": "LOGIN",
         "result": "FAIL",
         "message": "密碼錯誤; employee_id=SPT243; roles=operator",
-        "module_code": "",
+        "module_code": "LOGIN",
         "login_time": "2026-05-29 18:00:42",
         "logout_time": "",
         "idle_minutes": NaN,
@@ -12487,6 +12487,22 @@
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 23:47:57"
+      },
+      {
+        "id": 3155,
+        "source": "v103_merge",
+        "username": "SPT243",
+        "display_name": "羅丹",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=SPT243; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-29 18:00:46",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 18:00:46"
       }
     ],
     "auth_login_logs": [],
@@ -12494,7 +12510,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 780,
+    "login_logs": 781,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
