@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 10:33:06",
-  "exported_at": "2026-05-29 10:33:06",
+  "updated_at": "2026-05-29 10:33:08",
+  "exported_at": "2026-05-29 10:33:08",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -3967,11 +3967,23 @@
         "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 712,
+        "log_time": "2026-05-29 10:33:06",
+        "user_name": "SPT239",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "390",
+        "message": "麥可 開始 26M0095-07 / 清潔",
+        "detail": "__spt_log_uid=8dd437a7955349bc9fd900b557d16bfc\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 10:33:06\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"390\",\"target_ids\":[390],\"message\":\"麥可 開始 26M0095-07 / 清潔\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT239|26M0095-07|清潔|2026-05-29 10:32:27|25554bc6\",\"identity_key\":\"record_key:SPT239|26M0095-07|清潔|2026-05-29 10:32:27|25554bc6\",\"id\":\"390\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"work_order\":\"26M0095-07\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)(宏田)\",\"process_name\":\"清潔\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 10:32:27\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":390,\"record_key\":\"SPT239|26M0095-07|清潔|2026-05-29 10:32:27|25554bc6\",\"status\":\"作業中\",\"work_order\":\"26M0095-07\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)(宏田)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:32:27\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:32:27\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"宏田\",\"group_key\":\"SPT239|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:32:27\",\"updated_at\":\"2026-05-29 10:32:27\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":390,\"record_key\":\"SPT239|26M0095-07|清潔|2026-05-29 10:32:27|25554bc6\",\"status\":\"作業中\",\"work_order\":\"26M0095-07\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)(宏田)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:32:27\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:32:27\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"宏田\",\"group_key\":\"SPT239|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:32:27\",\"updated_at\":\"2026-05-29 10:32:27\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":390,\"record_key\":\"SPT239|26M0095-07|清潔|2026-05-29 10:32:27|25554bc6\",\"status\":\"作業中\",\"work_order\":\"26M0095-07\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)(宏田)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:32:27\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:32:27\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"宏田\",\"group_key\":\"SPT239|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:32:27\",\"updated_at\":\"2026-05-29 10:32:27\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":390,\"record_key\":\"SPT239|26M0095-07|清潔|2026-05-29 10:32:27|25554bc6\",\"status\":\"作業中\",\"work_order\":\"26M0095-07\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)(宏田)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:32:27\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:32:27\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"宏田\",\"group_key\":\"SPT239|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:32:27\",\"updated_at\":\"2026-05-29 10:32:27\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"874bcd8e9a6b4aa480a6dc358b869abcb0a216feab2c61c93526633ebf434f33\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 330
+    "system_logs": 331
   }
 }
