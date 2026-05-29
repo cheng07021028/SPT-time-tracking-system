@@ -18571,3 +18571,693 @@ def audit_v222_delete_cache_and_history_display() -> dict:
     }
 
 # ================= END V222 DELETE CACHE SYNC + 02 HISTORY DIRECT AUTHORITY FALLBACK =================
+
+# ================= V223 01/02 SAME-LANE AUTHORITY REPAIR + REBOOT-PROOF DELETE GUARD =================
+# 目的：修正 V220~V222 後出現的兩個現象：
+# 1) 01 Today Records 刪除後快取/舊權威又把資料帶回來。
+# 2) 02 歷史紀錄因 V199/guard/filter 錯誤把 01/02 權威重寫成空白而顯示 No data。
+# 原則：不改 UI/CSS/theme/table/buttons；不回退 SQLite-only；保留目前讀寫正確鏈，
+#      但最後顯示與刪除改走「01/02 同源、ID/record_key 精準 tombstone」的安全後端。
+try:
+    _v223_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v223_prev_load_records = None
+try:
+    _v223_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v223_prev_today_records = None
+try:
+    _v223_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v223_prev_get_active_records = None
+try:
+    _v223_prev_get_active_group = get_active_group
+except Exception:  # pragma: no cover
+    _v223_prev_get_active_group = None
+try:
+    _v223_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v223_prev_start_work = None
+try:
+    _v223_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v223_prev_finish_work = None
+try:
+    _v223_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v223_prev_save_time_records = None
+
+import json as _v223_json
+import os as _v223_os
+from pathlib import Path as _v223_Path
+from datetime import datetime as _v223_datetime
+
+_V223_PROJECT_ROOT = _v223_Path(__file__).resolve().parents[1]
+_V223_AUTH_ROOT = _V223_PROJECT_ROOT / "data" / "permanent_store" / "modules"
+_V223_CACHE_ROOT = _V223_PROJECT_ROOT / "data" / "persistent_state" / "frontend_cache"
+_V223_VERSION = "V223"
+
+
+def _v223_now() -> str:
+    try:
+        return now_text()  # type: ignore[name-defined]
+    except Exception:
+        return _v223_datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v223_text(v) -> str:
+    if v is None:
+        return ""
+    try:
+        if pd.isna(v):  # type: ignore[name-defined]
+            return ""
+    except Exception:
+        pass
+    s = str(v).strip()
+    return "" if s.lower() in ("none", "nan", "nat", "null", "<na>") else s
+
+
+def _v223_int(v) -> int | None:
+    s = _v223_text(v)
+    if not s:
+        return None
+    try:
+        i = int(float(s))
+        return i if i > 0 else None
+    except Exception:
+        return None
+
+
+def _v223_date(v) -> str:
+    s = _v223_text(v).replace("/", "-")
+    if len(s) >= 10:
+        m = __import__("re").search(r"(\d{4})-(\d{1,2})-(\d{1,2})", s[:20])
+        if m:
+            try:
+                return f"{int(m.group(1)):04d}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+            except Exception:
+                return s[:10]
+    return ""
+
+
+def _v223_json_default(v):
+    try:
+        if pd.isna(v):  # type: ignore[name-defined]
+            return ""
+    except Exception:
+        pass
+    try:
+        if hasattr(v, "item"):
+            return v.item()
+    except Exception:
+        pass
+    return str(v)
+
+
+def _v223_auth_path(module_key: str) -> _v223_Path:
+    return _V223_AUTH_ROOT / module_key / "records.json"
+
+
+def _v223_read_json(path: _v223_Path, default):
+    try:
+        if path.exists():
+            return _v223_json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return default
+    return default
+
+
+def _v223_write_json(path: _v223_Path, payload) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(_v223_json.dumps(payload, ensure_ascii=False, indent=2, default=_v223_json_default), encoding="utf-8")
+    # verify before replace
+    _v223_json.loads(tmp.read_text(encoding="utf-8"))
+    _v223_os.replace(tmp, path)
+
+
+def _v223_read_module_rows(module_key: str) -> list[dict]:
+    data = _v223_read_json(_v223_auth_path(module_key), {})
+    if not isinstance(data, dict):
+        return []
+    rows = data.get("tables", {}).get("time_records", [])
+    return [dict(r) for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+def _v223_make_payload(module_key: str, rows: list[dict], reason: str) -> dict:
+    old = _v223_read_json(_v223_auth_path(module_key), {})
+    settings = old.get("settings", {}) if isinstance(old, dict) and isinstance(old.get("settings"), dict) else {}
+    now = _v223_now()
+    return {
+        "authority_schema": "SPT-PermanentAuthority-V29",
+        "module_key": module_key,
+        "kind": "records",
+        "updated_at": now,
+        "exported_at": now,
+        "reason": reason,
+        "empty_authoritative": False,
+        "tables": {"time_records": rows},
+        "settings": settings,
+        "table_counts": {"time_records": len(rows)},
+    }
+
+
+def _v223_write_modules(rows: list[dict], reason: str, *, github: bool = False) -> None:
+    clean_rows = [dict(r) for r in rows if isinstance(r, dict)]
+    # 先直接寫本機，避免 permanent_authority_service 任何舊 filter/guard 再把資料洗掉。
+    for module_key in ("01_time_records", "02_history"):
+        _v223_write_json(_v223_auth_path(module_key), _v223_make_payload(module_key, clean_rows, reason))
+    if github:
+        try:
+            from services.permanent_authority_service import save_authority  # type: ignore
+            for module_key in ("01_time_records", "02_history"):
+                save_authority(module_key, records={"time_records": clean_rows}, reason=reason, github=True)
+        except Exception as exc:
+            try:
+                if "_v205_direct_log" in globals() and callable(_v205_direct_log):  # type: ignore[name-defined]
+                    _v205_direct_log("V223_GITHUB_SAVE_WARN", f"V223 寫入 GitHub 權威檔失敗：{exc}", detail=reason, level="WARN")  # type: ignore[name-defined]
+            except Exception:
+                pass
+
+
+def _v223_row_key(row: dict) -> str:
+    rid = _v223_int(row.get("id") or row.get("ID") or row.get("ID / ID"))
+    if rid is not None:
+        return f"id:{rid}"
+    rk = _v223_text(row.get("record_key") or row.get("紀錄鍵 / Record Key") or row.get("Record Key"))
+    if rk:
+        return "record_key:" + rk
+    return "biz:" + "|".join([
+        _v223_text(row.get("employee_id") or row.get("工號 / Employee ID") or row.get("工號")),
+        _v223_text(row.get("employee_name") or row.get("姓名 / Name") or row.get("姓名")),
+        _v223_text(row.get("work_order") or row.get("製令 / Work Order") or row.get("製令")),
+        _v223_text(row.get("process_name") or row.get("工段名稱 / Process") or row.get("工段 / Process") or row.get("工段")),
+        _v223_text(row.get("start_timestamp") or row.get("開始時間戳 / Start Timestamp") or row.get("開始時間")),
+    ])
+
+
+def _v223_sort_rows(rows: list[dict]) -> list[dict]:
+    def _sort_key(r):
+        rid = _v223_int(r.get("id")) or 0
+        upd = _v223_text(r.get("updated_at") or r.get("end_timestamp") or r.get("start_timestamp"))
+        return (rid, upd)
+    try:
+        return sorted(rows, key=_sort_key, reverse=True)
+    except Exception:
+        return rows
+
+
+def _v223_dedupe_rows(rows: list[dict]) -> list[dict]:
+    by: dict[str, dict] = {}
+    order: list[str] = []
+    for raw in rows or []:
+        if not isinstance(raw, dict):
+            continue
+        row = dict(raw)
+        k = _v223_row_key(row)
+        if not k or k == "biz:||||":
+            continue
+        if k not in by:
+            order.append(k)
+            by[k] = row
+        else:
+            old = dict(by[k])
+            old.update({kk: vv for kk, vv in row.items() if _v223_text(vv) != "" or kk not in old})
+            # 若後來 row 有更新時間/結束欄位，優先保留後來值。
+            by[k] = old
+    return _v223_sort_rows([by[k] for k in order if k in by])
+
+
+def _v223_deleted_exact_sets() -> tuple[set[int], set[str]]:
+    deleted_ids: set[int] = set()
+    deleted_keys: set[str] = set()
+    paths = [
+        _V223_AUTH_ROOT / "time_record_delete_guard" / "records.json",
+        _V223_AUTH_ROOT / "time_record_delete_tombstones" / "records.json",
+    ]
+    for path in paths:
+        data = _v223_read_json(path, {})
+        stack = []
+        if isinstance(data, dict):
+            if isinstance(data.get("tables"), dict):
+                for v in data.get("tables", {}).values():
+                    if isinstance(v, list):
+                        stack.extend(v)
+            for k in ("tombstones", "records", "deleted_time_records"):
+                if isinstance(data.get(k), list):
+                    stack.extend(data.get(k) or [])
+        for e in stack:
+            if not isinstance(e, dict):
+                continue
+            rid = _v223_int(e.get("id"))
+            if rid is not None:
+                deleted_ids.add(rid)
+            rk = _v223_text(e.get("record_key"))
+            if rk:
+                deleted_keys.add(rk)
+            row = e.get("row") if isinstance(e.get("row"), dict) else {}
+            rid2 = _v223_int(row.get("id") or row.get("ID") or row.get("ID / ID")) if row else None
+            if rid2 is not None:
+                deleted_ids.add(rid2)
+            rk2 = _v223_text(row.get("record_key")) if row else ""
+            if rk2:
+                deleted_keys.add(rk2)
+            ids = e.get("identities")
+            if isinstance(ids, list):
+                for x in ids:
+                    s = _v223_text(x)
+                    if s.startswith("id:"):
+                        rid3 = _v223_int(s.split(":", 1)[1])
+                        if rid3 is not None:
+                            deleted_ids.add(rid3)
+                    elif s.startswith("record_key:"):
+                        key = _v223_text(s.split(":", 1)[1])
+                        if key:
+                            deleted_keys.add(key)
+    return deleted_ids, deleted_keys
+
+
+def _v223_filter_deleted_exact(rows: list[dict]) -> list[dict]:
+    deleted_ids, deleted_keys = _v223_deleted_exact_sets()
+    if not deleted_ids and not deleted_keys:
+        return [dict(r) for r in rows if isinstance(r, dict)]
+    out = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        rid = _v223_int(row.get("id") or row.get("ID") or row.get("ID / ID"))
+        rk = _v223_text(row.get("record_key") or row.get("紀錄鍵 / Record Key") or row.get("Record Key"))
+        if rid is not None and rid in deleted_ids:
+            continue
+        if rk and rk in deleted_keys:
+            continue
+        out.append(dict(row))
+    return out
+
+
+def _v223_event_rows(max_files: int = 5000) -> list[dict]:
+    root = _V223_AUTH_ROOT / "02_history" / "time_record_events"
+    if not root.exists():
+        return []
+    files = sorted(root.glob("**/*.json"), key=lambda p: str(p))[-int(max_files):]
+    rows = []
+    for p in files:
+        try:
+            data = _v223_json.loads(p.read_text(encoding="utf-8"))
+            row = data.get("row") if isinstance(data, dict) else None
+            if isinstance(row, dict):
+                rr = dict(row)
+                rr.setdefault("updated_at", data.get("event_time") or _v223_now())
+                rows.append(rr)
+        except Exception:
+            continue
+    return rows
+
+
+def _v223_sqlite_rows() -> list[dict]:
+    try:
+        if "_v205_query_df" in globals() and callable(_v205_query_df):  # type: ignore[name-defined]
+            df = _v205_query_df("SELECT * FROM time_records ORDER BY id DESC", ())  # type: ignore[name-defined]
+        else:
+            df = query_df("SELECT * FROM time_records ORDER BY id DESC")  # type: ignore[name-defined]
+        if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+            return [dict(r) for _, r in df.copy().where(pd.notna(df), "").iterrows()]  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return []
+
+
+def _v223_cache_rows() -> list[dict]:
+    rows = []
+    for path in (_V223_CACHE_ROOT / "01_today_records_cache.json", _V223_CACHE_ROOT / "01_active_records_index.json"):
+        data = _v223_read_json(path, [])
+        if isinstance(data, list):
+            rows.extend([dict(r) for r in data if isinstance(r, dict)])
+    return rows
+
+
+def _v223_authority_rows_for_display(*, allow_recovery: bool = True) -> list[dict]:
+    # 先合併 01/02 權威。這是 02 歷史紀錄主來源。
+    rows = []
+    rows.extend(_v223_read_module_rows("02_history"))
+    rows.extend(_v223_read_module_rows("01_time_records"))
+    rows = _v223_dedupe_rows(_v223_filter_deleted_exact(rows))
+    if rows:
+        return rows
+    if not allow_recovery:
+        return []
+    # 若曾被錯誤刪除流程重寫成空白，從快取/SQLite/Event journal 復原可見資料，再套精準 tombstone。
+    recovered = []
+    recovered.extend(_v223_cache_rows())
+    recovered.extend(_v223_sqlite_rows())
+    recovered.extend(_v223_event_rows())
+    recovered = _v223_dedupe_rows(_v223_filter_deleted_exact(recovered))
+    if recovered:
+        try:
+            _v223_write_modules(recovered, "v223_recover_0102_from_cache_sqlite_events", github=False)
+        except Exception:
+            pass
+    return recovered
+
+
+def _v223_to_df(rows: list[dict]) -> pd.DataFrame:  # type: ignore[name-defined]
+    if not rows:
+        return pd.DataFrame()  # type: ignore[name-defined]
+    df = pd.DataFrame(rows)  # type: ignore[name-defined]
+    try:
+        if "_v206_normalize_time_records_df" in globals() and callable(_v206_normalize_time_records_df):  # type: ignore[name-defined]
+            df = _v206_normalize_time_records_df(df)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) and not df.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v223_filter_df(df: pd.DataFrame, start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None, *, active_only: bool = False) -> pd.DataFrame:  # type: ignore[name-defined]
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return pd.DataFrame()  # type: ignore[name-defined]
+    out = df.copy()
+    if "start_date" not in out.columns:
+        out["start_date"] = ""
+    if "start_timestamp" in out.columns:
+        mask = out["start_date"].map(lambda x: _v223_date(x) == "")
+        try:
+            out.loc[mask, "start_date"] = out.loc[mask, "start_timestamp"].map(_v223_date)
+        except Exception:
+            pass
+    out["_v223_sd"] = out["start_date"].map(_v223_date)
+    sd = _v223_date(start_date)
+    ed = _v223_date(end_date)
+    if sd:
+        out = out.loc[out["_v223_sd"] >= sd].copy()
+    if ed:
+        out = out.loc[out["_v223_sd"] <= ed].copy()
+    emp = _v223_text(employee_id)
+    if emp and "employee_id" in out.columns:
+        out = out.loc[out["employee_id"].map(_v223_text) == emp].copy()
+    wo = _v223_text(work_order)
+    if wo and "work_order" in out.columns:
+        out = out.loc[out["work_order"].map(_v223_text) == wo].copy()
+    if active_only:
+        end_ts = out.get("end_timestamp", pd.Series([""] * len(out))).map(_v223_text)  # type: ignore[name-defined]
+        status = out.get("status", pd.Series([""] * len(out))).map(_v223_text)  # type: ignore[name-defined]
+        out = out.loc[(end_ts == "") & (status.isin(["", "作業中"]))].copy()
+    try:
+        if "id" in out.columns:
+            out["_v223_id"] = pd.to_numeric(out["id"], errors="coerce").fillna(0)  # type: ignore[name-defined]
+            out = out.sort_values("_v223_id", ascending=False, kind="stable")
+    except Exception:
+        pass
+    out = out.drop(columns=["_v223_sd", "_v223_id"], errors="ignore")
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v223_rows_by_ids(ids) -> list[dict]:
+    wanted = {_v223_int(x) for x in (ids or [])}
+    wanted = {x for x in wanted if x is not None}
+    if not wanted:
+        return []
+    rows = []
+    for r in _v223_authority_rows_for_display(allow_recovery=True) + _v223_sqlite_rows() + _v223_cache_rows():
+        rid = _v223_int(r.get("id")) if isinstance(r, dict) else None
+        if rid in wanted:
+            rows.append(dict(r))
+    return _v223_dedupe_rows(rows)
+
+
+def _v223_upsert_rows(rows: list[dict] | pd.DataFrame, reason: str, *, github: bool = False, update_cache: bool = True) -> int:  # type: ignore[name-defined]
+    if isinstance(rows, pd.DataFrame):  # type: ignore[name-defined]
+        if rows.empty:
+            return 0
+        changed = [dict(r) for _, r in rows.copy().where(pd.notna(rows), "").iterrows()]  # type: ignore[name-defined]
+    else:
+        changed = [dict(r) for r in (rows or []) if isinstance(r, dict)]
+    if not changed:
+        return 0
+    base = _v223_authority_rows_for_display(allow_recovery=True)
+    merged = _v223_dedupe_rows(_v223_filter_deleted_exact(base + changed))
+    _v223_write_modules(merged, reason, github=github)
+    if update_cache:
+        for row in changed:
+            try:
+                if "_v220_upsert_cache_row" in globals() and callable(_v220_upsert_cache_row):  # type: ignore[name-defined]
+                    _v220_upsert_cache_row(row, reason=f"{reason}_front_cache")  # type: ignore[name-defined]
+            except Exception:
+                pass
+    try:
+        if "_v205_clear_caches" in globals() and callable(_v205_clear_caches):  # type: ignore[name-defined]
+            _v205_clear_caches()  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return len(changed)
+
+
+def _v223_delete_ids_direct(ids: list[int], reason: str, *, github: bool = True) -> int:
+    clean = sorted({i for i in (_v223_int(x) for x in (ids or [])) if i is not None})
+    if not clean:
+        return 0
+    evidence = _v223_rows_by_ids(clean)
+    # 先建立 tombstone；後續即使舊 records.json 被拉回，也會被精準 ID/record_key 過濾。
+    try:
+        from services.time_record_hard_delete_guard_service import add_deleted_rows, clear_cache  # type: ignore
+        add_deleted_rows(evidence if evidence else [{"id": i} for i in clean], clean, reason=reason, github=github)
+        clear_cache()
+    except Exception as exc:
+        # fallback：直接寫 guard records，至少保留 ID tombstone。
+        try:
+            guard_path = _V223_AUTH_ROOT / "time_record_delete_guard" / "records.json"
+            old = _v223_read_json(guard_path, {})
+            rows = []
+            if isinstance(old, dict):
+                rows = old.get("tables", {}).get("deleted_time_records", []) or []
+            if not isinstance(rows, list):
+                rows = []
+            for i in clean:
+                rows.append({"id": i, "identities": [f"id:{i}"], "deleted_at": _v223_now(), "source": "V223", "reason": reason})
+            payload = _v223_make_payload("time_record_delete_guard", [], "v223_delete_guard_fallback")
+            payload["tables"] = {"deleted_time_records": rows}
+            payload["table_counts"] = {"deleted_time_records": len(rows)}
+            _v223_write_json(guard_path, payload)
+        except Exception:
+            pass
+    before_rows = _v223_authority_rows_for_display(allow_recovery=True)
+    idset = set(clean)
+    remaining = []
+    for r in before_rows:
+        rid = _v223_int(r.get("id"))
+        if rid in idset:
+            continue
+        remaining.append(dict(r))
+    remaining = _v223_dedupe_rows(_v223_filter_deleted_exact(remaining))
+    _v223_write_modules(remaining, f"v223_reboot_proof_delete|{reason}", github=github)
+    # SQLite/cache 同步清除。
+    try:
+        if "_v222_sync_front_cache_after_delete" in globals() and callable(_v222_sync_front_cache_after_delete):  # type: ignore[name-defined]
+            _v222_sync_front_cache_after_delete(clean, reason=f"v223_delete_cache|{reason}")  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        ph = ",".join(["?"] * len(clean))
+        if "_v205_conn" in globals() and callable(_v205_conn):  # type: ignore[name-defined]
+            with _v205_conn() as conn:  # type: ignore[name-defined]
+                conn.execute(f"DELETE FROM time_records WHERE id IN ({ph})", tuple(clean))
+                conn.commit()
+    except Exception:
+        pass
+    try:
+        if "_v205_direct_log" in globals() and callable(_v205_direct_log):  # type: ignore[name-defined]
+            _v205_direct_log("DELETE_TIME_RECORDS_V223", f"{reason}：V223 以 ID 精準刪除並同步 01/02 權威檔；deleted={len(clean)}；remaining={len(remaining)}", target_id=",".join(map(str, clean)), level="WARN")  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return len(clean)
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V223: 02 history display uses raw 01/02 authority + recovery, not unsafe V199 broad filter."""
+    rows = _v223_authority_rows_for_display(allow_recovery=True)
+    df = _v223_to_df(rows)
+    return _v223_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    # 先沿用 V220/V222 前台快取速度，再套 V223 精準刪除；空白時回到 V223 同源資料。
+    df = pd.DataFrame()  # type: ignore[name-defined]
+    try:
+        if callable(_v223_prev_today_records):
+            df = _v223_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+    except Exception:
+        df = pd.DataFrame()  # type: ignore[name-defined]
+    if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+        rows = _v223_filter_deleted_exact([dict(r) for _, r in df.copy().where(pd.notna(df), "").iterrows()])  # type: ignore[name-defined]
+        out = _v223_to_df(rows)
+    else:
+        try:
+            today = today_date()  # type: ignore[name-defined]
+        except Exception:
+            today = _v223_now()[:10]
+        out = load_records(str(today), str(today), None, None)
+    if unfinished_only or not include_finished:
+        out = _v223_filter_df(out, active_only=True)
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = today_records(include_finished=False, unfinished_only=True)
+    out = _v223_filter_df(df, employee_id=employee_id, active_only=True)
+    if process_name and isinstance(out, pd.DataFrame) and not out.empty:  # type: ignore[name-defined]
+        out = out.loc[out.get("process_name", pd.Series([""] * len(out))).map(_v223_text) == _v223_text(process_name)].copy()  # type: ignore[name-defined]
+    if start_date and isinstance(out, pd.DataFrame) and not out.empty:  # type: ignore[name-defined]
+        out = _v223_filter_df(out, start_date=start_date, end_date=start_date, active_only=True)
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return None
+    return dict(df.iloc[0].to_dict())
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    seed_rows = _v223_rows_by_ids([record_id])
+    if not seed_rows:
+        try:
+            if callable(_v223_prev_get_active_group):
+                return _v223_prev_get_active_group(record_id)
+        except Exception:
+            pass
+        return pd.DataFrame()  # type: ignore[name-defined]
+    seed = seed_rows[0]
+    return get_active_records(employee_id=_v223_text(seed.get("employee_id")), process_name=_v223_text(seed.get("process_name")), start_date=_v223_date(seed.get("start_date") or seed.get("start_timestamp")))
+
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v223_refresh_active") -> int:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    return int(len(df)) if isinstance(df, pd.DataFrame) and not df.empty else 0  # type: ignore[name-defined]
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v223_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    rid = int(_v223_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        rows = _v223_rows_by_ids([rid])
+        if not rows:
+            rows = _v223_sqlite_rows()
+            rows = [r for r in rows if _v223_int(r.get("id")) == rid]
+        if rows:
+            _v223_upsert_rows(rows, "v223_start_work_force_0102_same_lane", github=False, update_cache=True)
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v223_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    before_group = get_active_group(record_id) if finish_parallel_group else pd.DataFrame()  # type: ignore[name-defined]
+    ids = []
+    if isinstance(before_group, pd.DataFrame) and not before_group.empty and "id" in before_group.columns:  # type: ignore[name-defined]
+        ids = [x for x in before_group["id"].tolist()]
+    ids.append(record_id)
+    n = int(_v223_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)
+    rows = _v223_rows_by_ids(ids)
+    # 若權威尚未更新，從 SQLite 抓結束後 row。
+    sql_rows = _v223_sqlite_rows()
+    idset = {_v223_int(x) for x in ids}
+    sql_rows = [r for r in sql_rows if _v223_int(r.get("id")) in idset]
+    if sql_rows:
+        rows = _v223_dedupe_rows(rows + sql_rows)
+    if rows:
+        _v223_upsert_rows(rows, "v223_finish_work_force_0102_same_lane", github=False, update_cache=True)
+    return n
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    n = 0
+    try:
+        if callable(_v223_prev_save_time_records):
+            n = int(_v223_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    except Exception:
+        n = 0
+    try:
+        if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+            _v223_upsert_rows(df.drop(columns=["刪除 / Delete", "重算 / Recalc", "刪除", "重算"], errors="ignore"), "v223_save_time_records_force_0102_same_lane", github=False, update_cache=True)
+            n = max(n, int(len(df)))
+    except Exception:
+        pass
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = sorted({i for i in (_v223_int(x) for x in (record_ids or [])) if i is not None})
+    if not ids:
+        return 0
+    return _v223_delete_ids_direct(ids, reason, github=True)
+
+
+def _v223_extract_checked_ids(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete") -> list[int]:  # type: ignore[name-defined]
+    if editor_df is None or not isinstance(editor_df, pd.DataFrame) or editor_df.empty:  # type: ignore[name-defined]
+        return []
+    candidates = [delete_column, "刪除 / Delete", "刪除", "Delete", "_delete"]
+    del_col = next((c for c in candidates if c in editor_df.columns), "")
+    if not del_col or "id" not in editor_df.columns:
+        return []
+    ids = []
+    for _, rr in editor_df.iterrows():
+        try:
+            checked = bool(rr.get(del_col))
+        except Exception:
+            checked = False
+        if checked:
+            rid = _v223_int(rr.get("id"))
+            if rid is not None:
+                ids.append(rid)
+    return sorted(set(ids))
+
+
+def delete_time_records_from_editor_df(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete", reason: str = "01 管理員維護表刪除") -> int:  # type: ignore[override]
+    ids = _v223_extract_checked_ids(editor_df, delete_column=delete_column)
+    if not ids:
+        return 0
+    return delete_time_records(ids, reason=reason)
+
+
+def delete_time_records_from_02_history_editor(editor_df: pd.DataFrame, record_ids: list[int] | None = None, delete_column: str = "刪除 / Delete", reason: str = "02 歷史紀錄刪除") -> dict:  # type: ignore[override]
+    ids = sorted({i for i in (_v223_int(x) for x in (record_ids or [])) if i is not None}) or _v223_extract_checked_ids(editor_df, delete_column=delete_column)
+    if not ids:
+        return {"ok": False, "deleted_count": 0, "ids": [], "message": "沒有勾選可刪除的紀錄"}
+    n = delete_time_records(ids, reason=reason)
+    return {"ok": True, "deleted_count": int(n), "ids": ids, "version": "V223"}
+
+
+def delete_time_records_v178b_strict(record_ids: list[int], reason: str = "02 歷史紀錄嚴格刪除", editor_df=None) -> dict:  # type: ignore[override]
+    ids = sorted({i for i in (_v223_int(x) for x in (record_ids or [])) if i is not None})
+    if not ids and isinstance(editor_df, pd.DataFrame):  # type: ignore[name-defined]
+        ids = _v223_extract_checked_ids(editor_df)
+    if not ids:
+        return {"ok": False, "deleted_count": 0, "ids": [], "message": "沒有勾選可刪除的紀錄"}
+    n = delete_time_records(ids, reason=reason)
+    return {"ok": True, "deleted_count": int(n), "ids": ids, "version": "V223"}
+
+
+def audit_v223_0102_sync_and_delete() -> dict:
+    rows = _v223_authority_rows_for_display(allow_recovery=True)
+    df = _v223_to_df(rows)
+    try:
+        today_df = today_records(include_finished=True, unfinished_only=False)
+    except Exception:
+        today_df = pd.DataFrame()  # type: ignore[name-defined]
+    return {
+        "version": "V223",
+        "scope": "01/02 same-lane authority repair + reboot-proof delete; backend only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "authority_rows_visible": int(len(df)) if isinstance(df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+        "today_rows_visible": int(len(today_df)) if isinstance(today_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+        "deleted_exact_ids": len(_v223_deleted_exact_sets()[0]),
+        "raw_01_rows": len(_v223_read_module_rows("01_time_records")),
+        "raw_02_rows": len(_v223_read_module_rows("02_history")),
+    }
+
+# ================= END V223 01/02 SAME-LANE AUTHORITY REPAIR + REBOOT-PROOF DELETE GUARD =================
