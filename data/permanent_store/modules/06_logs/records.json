@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 09:43:41",
-  "exported_at": "2026-05-29 09:43:41",
+  "updated_at": "2026-05-29 09:49:15",
+  "exported_at": "2026-05-29 09:49:15",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -1975,11 +1975,59 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1173,
+        "log_time": "2026-05-29 09:45:35",
+        "user_name": "SPT105",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "373",
+        "message": "劉秀鳳 開始 22M0162-91 / Packing",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 09:45:35\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"373\",\"target_ids\":[373],\"message\":\"劉秀鳳 開始 22M0162-91 / Packing\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT105|22M0162-91|Packing|2026-05-29 09:45:29|4082d7ba\",\"identity_key\":\"record_key:SPT105|22M0162-91|Packing|2026-05-29 09:45:29|4082d7ba\",\"id\":\"373\",\"employee_id\":\"SPT105\",\"employee_name\":\"劉秀鳳\",\"work_order\":\"22M0162-91\",\"part_no\":\"4TRSC020-004-02->4TRSC020-004-06\",\"type_name\":\"NTB 3 LP +快拆+EMO\",\"process_name\":\"Packing\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:45:29\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":373,\"record_key\":\"SPT105|22M0162-91|Packing|2026-05-29 09:45:29|4082d7ba\",\"status\":\"作業中\",\"work_order\":\"22M0162-91\",\"part_no\":\"4TRSC020-004-02->4TRSC020-004-06\",\"type_name\":\"NTB 3 LP +快拆+EMO\",\"process_name\":\"Packing\",\"employee_id\":\"SPT105\",\"employee_name\":\"劉秀鳳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:45:29\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:45:29\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT105|Packing|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:45:29\",\"updated_at\":\"2026-05-29 09:45:29\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":373,\"record_key\":\"SPT105|22M0162-91|Packing|2026-05-29 09:45:29|4082d7ba\",\"status\":\"作業中\",\"work_order\":\"22M0162-91\",\"part_no\":\"4TRSC020-004-02->4TRSC020-004-06\",\"type_name\":\"NTB 3 LP +快拆+EMO\",\"process_name\":\"Packing\",\"employee_id\":\"SPT105\",\"employee_name\":\"劉秀鳳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:45:29\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:45:29\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT105|Packing|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:45:29\",\"updated_at\":\"2026-05-29 09:45:29\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":373,\"record_key\":\"SPT105|22M0162-91|Packing|2026-05-29 09:45:29|4082d7ba\",\"status\":\"作業中\",\"work_order\":\"22M0162-91\",\"part_no\":\"4TRSC020-004-02->4TRSC020-004-06\",\"type_name\":\"NTB 3 LP +快拆+EMO\",\"process_name\":\"Packing\",\"employee_id\":\"SPT105\",\"employee_name\":\"劉秀鳳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:45:29\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:45:29\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT105|Packing|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:45:29\",\"updated_at\":\"2026-05-29 09:45:29\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":373,\"record_key\":\"SPT105|22M0162-91|Packing|2026-05-29 09:45:29|4082d7ba\",\"status\":\"作業中\",\"work_order\":\"22M0162-91\",\"part_no\":\"4TRSC020-004-02->4TRSC020-004-06\",\"type_name\":\"NTB 3 LP +快拆+EMO\",\"process_name\":\"Packing\",\"employee_id\":\"SPT105\",\"employee_name\":\"劉秀鳳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:45:29\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:45:29\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT105|Packing|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:45:29\",\"updated_at\":\"2026-05-29 09:45:29\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"12f41a1d3c5aff89d78fb342fdd45df7b414ba132b7b08f196b7511e8d82dba4\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1172,
+        "log_time": "2026-05-29 09:45:33",
+        "user_name": "SPT105",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1193,
+        "log_time": "2026-05-29 09:49:11",
+        "user_name": "B135",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "374",
+        "message": "鍾明志 開始 25M0541-02 / 骨架組立",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 09:49:11\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"374\",\"target_ids\":[374],\"message\":\"鍾明志 開始 25M0541-02 / 骨架組立\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"B135|25M0541-02|骨架組立|2026-05-29 09:48:37|67286f1e\",\"identity_key\":\"record_key:B135|25M0541-02|骨架組立|2026-05-29 09:48:37|67286f1e\",\"id\":\"374\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:48:37\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":374,\"record_key\":\"B135|25M0541-02|骨架組立|2026-05-29 09:48:37|67286f1e\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:48:37\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:48:37\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B135|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:48:37\",\"updated_at\":\"2026-05-29 09:48:37\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":374,\"record_key\":\"B135|25M0541-02|骨架組立|2026-05-29 09:48:37|67286f1e\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:48:37\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:48:37\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B135|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:48:37\",\"updated_at\":\"2026-05-29 09:48:37\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":374,\"record_key\":\"B135|25M0541-02|骨架組立|2026-05-29 09:48:37|67286f1e\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:48:37\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:48:37\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B135|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:48:37\",\"updated_at\":\"2026-05-29 09:48:37\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":374,\"record_key\":\"B135|25M0541-02|骨架組立|2026-05-29 09:48:37|67286f1e\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:48:37\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:48:37\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B135|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:48:37\",\"updated_at\":\"2026-05-29 09:48:37\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"d0f4af52a6e91f827ff4f8a8a677a0b8b9852a18cddb4e6cd8831c7899e806da\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1192,
+        "log_time": "2026-05-29 09:49:10",
+        "user_name": "B135",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 164
+    "system_logs": 168
   }
 }
