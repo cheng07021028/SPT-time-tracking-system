@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 18:13:19",
-  "exported_at": "2026-05-29 18:13:19",
+  "updated_at": "2026-05-29 18:13:29",
+  "exported_at": "2026-05-29 18:13:29",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -13747,11 +13747,47 @@
         "detail": "load_records_v210_canonical_display\n__spt_log_uid=1cfeffb4489241d49cecee5ea3ce44d9",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 1749,
+        "log_time": "2026-05-29 18:13:25",
+        "user_name": "SPT089",
+        "action_type": "V206_ACTIVE_AUTHORITY_FALLBACK",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 查無目前作業，已由權威檔回填 active 1 筆。",
+        "detail": "v214_finish_same_display_source",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1748,
+        "log_time": "2026-05-29 18:13:25",
+        "user_name": "SPT089",
+        "action_type": "V208_DISPLAY_AUTHORITY_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite time_records 顯示快取空白，已由 01/02 權威檔回填 88 筆。",
+        "detail": "today_records_v210_canonical_display",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1747,
+        "log_time": "2026-05-29 18:13:23",
+        "user_name": "SPT089",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：database disk image is malformed",
+        "detail": "v214_finish_same_display_source\n__spt_log_uid=d513ed0a19c7497fbf55fd9fdff5b817",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1145
+    "system_logs": 1148
   }
 }
