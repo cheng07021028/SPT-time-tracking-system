@@ -2,12 +2,39 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-29 09:21:35",
-  "exported_at": "2026-05-29 09:21:35",
-  "reason": "start_work_v195_consistency_01",
+  "updated_at": "2026-05-29 09:22:32",
+  "exported_at": "2026-05-29 09:22:32",
+  "reason": "start_work_v194_local_first_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
+      {
+        "id": 350,
+        "record_key": "SPT239|25M00541-02|前置鈑金|2026-05-29 09:21:21|cd345684",
+        "status": "作業中",
+        "work_order": "25M00541-02",
+        "part_no": "",
+        "type_name": "",
+        "process_name": "前置鈑金",
+        "employee_id": "SPT239",
+        "employee_name": "麥可",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 09:21:21",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "09:21:21",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "",
+        "group_key": "SPT239|前置鈑金|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 09:21:21",
+        "updated_at": "2026-05-29 09:21:21"
+      },
       {
         "id": 349,
         "record_key": "SPT228|26N4001-02|骨架組立|2026-05-29 09:21:04|447dc155",
@@ -471,6 +498,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 17
+    "time_records": 18
   }
 }
