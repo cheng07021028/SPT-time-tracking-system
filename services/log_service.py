@@ -1291,3 +1291,272 @@ def get_system_log_authority_status() -> dict[str, Any]:  # type: ignore[overrid
     return base
 
 # =================== END V200 COMPLETE ROW-LEVEL LOG RELIABILITY ===================
+
+# ===================== V210 LOG SCHEMA GUARD + REBOOT-SAFE DISPLAY =====================
+# Purpose:
+# - Streamlit Cloud Reboot may recreate a fresh SQLite file. If system_logs table
+#   has not been initialized yet, 06 LOG查詢 can show no records or write_log can
+#   silently fail.
+# - V210 guarantees the LOG table exists before write/query/delete/status, while
+#   still preserving V200 JSONL shard + authority fallback.
+# - No UI/CSS/theme/table-rendering changes.
+try:
+    import sqlite3 as _v210_sqlite3
+    from pathlib import Path as _v210_Path
+    try:
+        from services.db_service import DB_PATH as _V210_DB_PATH
+    except Exception:
+        _V210_DB_PATH = _v210_Path(__file__).resolve().parents[1] / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
+except Exception:  # pragma: no cover
+    _v210_sqlite3 = None  # type: ignore
+    _V210_DB_PATH = None  # type: ignore
+
+
+def _v210_ensure_system_logs_schema() -> bool:
+    """Create system_logs table/indexes without triggering heavy DB restore.
+
+    This is intentionally tiny and local. It does not delete, restore, upload,
+    or modify business data.
+    """
+    if _v210_sqlite3 is None or _V210_DB_PATH is None:
+        return False
+    try:
+        db_path = _v210_Path(_V210_DB_PATH)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = _v210_sqlite3.connect(str(db_path), timeout=30, check_same_thread=False)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS system_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    log_time TEXT,
+                    user_name TEXT,
+                    action_type TEXT,
+                    target_table TEXT,
+                    target_id TEXT,
+                    message TEXT,
+                    detail TEXT,
+                    level TEXT DEFAULT 'INFO'
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_system_logs_log_time ON system_logs(log_time)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_system_logs_action ON system_logs(action_type)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_system_logs_user ON system_logs(user_name)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs(level)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_system_logs_target ON system_logs(target_table, target_id)")
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+    except Exception:
+        return False
+
+
+try:
+    _v210_prev_write_log = write_log
+except Exception:
+    _v210_prev_write_log = None
+try:
+    _v210_prev_load_logs = load_logs
+except Exception:
+    _v210_prev_load_logs = None
+try:
+    _v210_prev_load_logs_page = load_logs_page
+except Exception:
+    _v210_prev_load_logs_page = None
+try:
+    _v210_prev_count_logs_by_date_range = count_logs_by_date_range
+except Exception:
+    _v210_prev_count_logs_by_date_range = None
+try:
+    _v210_prev_delete_logs_by_date_range = delete_logs_by_date_range
+except Exception:
+    _v210_prev_delete_logs_by_date_range = None
+try:
+    _v210_prev_get_system_log_authority_status = get_system_log_authority_status
+except Exception:
+    _v210_prev_get_system_log_authority_status = None
+
+
+# Run once at import. If it fails, individual functions still retry.
+try:
+    _v210_ensure_system_logs_schema()
+except Exception:
+    pass
+
+
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    _v210_ensure_system_logs_schema()
+    if callable(_v210_prev_write_log):
+        try:
+            return _v210_prev_write_log(action_type, message, target_table, target_id, detail, level, user_name)
+        except Exception:
+            # Last-resort SQLite insert, then still append shard when available.
+            pass
+    try:
+        execute(
+            """
+            INSERT INTO system_logs
+            (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (now_text(), user_name or _current_log_user(), action_type, target_table, str(target_id or ""), message, detail, level),
+        )
+    except Exception:
+        try:
+            db_path = _v210_Path(_V210_DB_PATH)
+            conn = _v210_sqlite3.connect(str(db_path), timeout=30, check_same_thread=False)
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO system_logs
+                    (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (now_text(), user_name or _current_log_user(), action_type, target_table, str(target_id or ""), message, detail, level),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception:
+            pass
+    # If V200 shard helper exists, keep a second durable local append-only copy.
+    try:
+        if '_v200_append_shard' in globals():
+            uid = _v200_new_uid() if '_v200_new_uid' in globals() else ""
+            _v200_append_shard({
+                "log_time": _v200_now_text_precise() if '_v200_now_text_precise' in globals() else now_text(),
+                "user_name": user_name or _current_log_user(),
+                "action_type": action_type,
+                "target_table": target_table,
+                "target_id": str(target_id or ""),
+                "message": message,
+                "detail": _v200_detail_with_uid(detail, uid) if uid and '_v200_detail_with_uid' in globals() else detail,
+                "level": level,
+                "source": "v210_schema_guard_shard",
+                "log_uid": uid,
+            })
+    except Exception:
+        pass
+    try:
+        clear_log_query_cache()  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def load_logs(limit: int = 500, start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None):  # type: ignore[override]
+    _v210_ensure_system_logs_schema()
+    if callable(_v210_prev_load_logs):
+        try:
+            df = _v210_prev_load_logs(limit=limit, start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword)
+            if isinstance(df, pd.DataFrame):
+                return df
+        except Exception:
+            pass
+    try:
+        res = load_logs_page(start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword, page=1, page_size=limit)
+        return res.get("df", pd.DataFrame()) if isinstance(res, dict) else pd.DataFrame()
+    except Exception:
+        return pd.DataFrame(columns=["id", "log_time", "user_name", "action_type", "target_table", "target_id", "message", "detail", "level", "source"])
+
+
+def load_logs_page(start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None, page: int = 1, page_size: int = 500) -> dict[str, Any]:  # type: ignore[override]
+    _v210_ensure_system_logs_schema()
+    if callable(_v210_prev_load_logs_page):
+        try:
+            res = _v210_prev_load_logs_page(start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword, page=page, page_size=page_size)
+            if isinstance(res, dict) and res.get("ok"):
+                return res
+        except Exception:
+            pass
+    # Robust fallback: collect from SQLite + V200 shards + authority when helpers are present.
+    try:
+        if '_v200_all_log_rows' in globals():
+            rows = _v200_all_log_rows(start_date, end_date, include_sqlite=True, include_authority=True, include_shards=True)
+        elif '_v122_all_log_rows' in globals():
+            rows = _v122_all_log_rows(include_sqlite=True, apply_tombstone=True)
+        else:
+            rows = []
+    except Exception:
+        rows = []
+    try:
+        if '_v122_apply_log_filters' in globals():
+            rows = _v122_apply_log_filters(rows, start_date, end_date, action_type, level, keyword)
+    except Exception:
+        pass
+    size = max(1, min(_safe_int(page_size, 500), 5000)) if '_safe_int' in globals() else max(1, min(int(page_size or 500), 5000))
+    p = max(1, _safe_int(page, 1)) if '_safe_int' in globals() else max(1, int(page or 1))
+    start_i = (p - 1) * size
+    end_i = start_i + size
+    df = pd.DataFrame(rows[start_i:end_i])
+    for c in ["id", "log_time", "user_name", "action_type", "target_table", "target_id", "message", "detail", "level", "source"]:
+        if c not in df.columns:
+            df[c] = ""
+    return {
+        "ok": True,
+        "df": df[["id", "log_time", "user_name", "action_type", "target_table", "target_id", "message", "detail", "level", "source"]],
+        "rows": df.to_dict("records"),
+        "total_rows": len(rows),
+        "page": p,
+        "page_size": size,
+        "total_pages": max(1, (len(rows) + size - 1) // size),
+        "elapsed_seconds": 0,
+        "source": "v210_schema_guard_sqlite_authority_shard",
+        "v210_schema_guard": True,
+    }
+
+
+def count_logs_by_date_range(start_date: Any, end_date: Any) -> int:  # type: ignore[override]
+    _v210_ensure_system_logs_schema()
+    try:
+        return int(load_logs_page(start_date=start_date, end_date=end_date, page=1, page_size=1).get("total_rows", 0) or 0)
+    except Exception:
+        if callable(_v210_prev_count_logs_by_date_range):
+            try:
+                return int(_v210_prev_count_logs_by_date_range(start_date, end_date) or 0)
+            except Exception:
+                pass
+        return 0
+
+
+def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit: bool = True, user_name: str | None = None) -> int:  # type: ignore[override]
+    _v210_ensure_system_logs_schema()
+    if callable(_v210_prev_delete_logs_by_date_range):
+        try:
+            return int(_v210_prev_delete_logs_by_date_range(start_date, end_date, keep_delete_audit=keep_delete_audit, user_name=user_name) or 0)
+        except TypeError:
+            try:
+                return int(_v210_prev_delete_logs_by_date_range(start_date, end_date) or 0)
+            except Exception:
+                pass
+        except Exception:
+            pass
+    return 0
+
+
+def get_system_log_authority_status() -> dict[str, Any]:  # type: ignore[override]
+    _v210_ensure_system_logs_schema()
+    base: dict[str, Any] = {}
+    if callable(_v210_prev_get_system_log_authority_status):
+        try:
+            base = dict(_v210_prev_get_system_log_authority_status() or {})
+        except Exception as exc:
+            base = {"error": str(exc)[:300]}
+    try:
+        db_count = len(_v122_sqlite_log_rows(limit=300000)) if '_v122_sqlite_log_rows' in globals() else 0
+    except Exception:
+        db_count = 0
+    try:
+        shard_count = len(_v200_read_shard_rows()) if '_v200_read_shard_rows' in globals() else 0
+    except Exception:
+        shard_count = 0
+    base.update({
+        "v210_schema_guard": True,
+        "system_logs_schema_ready": True,
+        "db_count": db_count,
+        "shard_count": shard_count,
+    })
+    return base
+
+# =================== END V210 LOG SCHEMA GUARD + REBOOT-SAFE DISPLAY ===================

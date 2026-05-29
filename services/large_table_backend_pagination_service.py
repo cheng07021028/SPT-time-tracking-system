@@ -416,3 +416,54 @@ def query_logs_backend_page(
     return {"ok": False, "df": pd.DataFrame(), "rows": [], "total_rows": 0, "reason": "query_logs_backend_page unavailable"}
 
 # =================== END V200 LOG BACKEND PAGINATION USES COMPLETE LOG SOURCE ===================
+
+# ===================== V210 06 LOG QUERY FALLBACK =====================
+# Keep 06 LOG查詢 from showing empty just because SQLite was recreated after Reboot.
+# Always ask log_service for complete SQLite + authority + JSONL shard source first.
+try:
+    _v210_prev_query_logs_backend_page = query_logs_backend_page
+except Exception:  # pragma: no cover
+    _v210_prev_query_logs_backend_page = None
+
+
+def query_logs_backend_page(
+    *,
+    start_date: Any | None = None,
+    end_date: Any | None = None,
+    action_type: str | None = None,
+    level: str | None = None,
+    keyword: str | None = None,
+    page: int = 1,
+    page_size: int = 500,
+) -> dict[str, Any]:  # type: ignore[override]
+    try:
+        from services import log_service as _v210_log_service
+        if hasattr(_v210_log_service, "load_logs_page"):
+            res = _v210_log_service.load_logs_page(
+                start_date=start_date,
+                end_date=end_date,
+                action_type=action_type,
+                level=level,
+                keyword=keyword,
+                page=page,
+                page_size=page_size,
+            )
+            if isinstance(res, dict) and res.get("ok"):
+                res["complete_log_source"] = True
+                res["v210_log_schema_guard"] = True
+                return res
+    except Exception:
+        pass
+    if callable(_v210_prev_query_logs_backend_page):
+        return _v210_prev_query_logs_backend_page(
+            start_date=start_date,
+            end_date=end_date,
+            action_type=action_type,
+            level=level,
+            keyword=keyword,
+            page=page,
+            page_size=page_size,
+        )
+    return {"ok": False, "df": pd.DataFrame(), "rows": [], "total_rows": 0, "reason": "query_logs_backend_page unavailable"}
+
+# =================== END V210 06 LOG QUERY FALLBACK ===================
