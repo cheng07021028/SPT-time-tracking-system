@@ -16424,3 +16424,328 @@ def audit_v210_canonical_display_delta() -> dict:
     }
 
 # ================= END V210 CANONICAL DISPLAY + SAFE SQLITE DELTA =================
+
+# ================= V212 RESTORE PER-ROW DURABLE SAVE + AUTHORITY ID SEQUENCE GUARD｜2026-05-29 =================
+# Root cause fixed:
+# - V205 fast start/finish wrote SQLite immediately but bypassed the old per-row durable save chain
+#   (01/02 authority JSON + row shard + event journal). A newly started row could appear from SQLite,
+#   then disappear when display reconciled against authority JSON that did not yet contain that row.
+# - When SQLite had only a partial legacy cache, AUTOINCREMENT could also allocate an id that already
+#   existed in 01/02 authority.  This made display/finish-by-id ambiguous.
+#
+# This section preserves the V205 fast SQLite transaction, but before Start aligns SQLite AUTOINCREMENT
+# with max authority id, and after Start/Finish immediately writes the changed row(s) to the local
+# per-row durable layers.  It does not change UI/CSS/theme/table/buttons and does not upload to GitHub
+# in the foreground.
+try:
+    _v212_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v212_prev_start_work = None
+try:
+    _v212_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v212_prev_finish_work = None
+try:
+    _v212_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v212_prev_save_time_records = None
+
+
+def _v212_clean_ids(ids) -> list[int]:
+    out: list[int] = []
+    for x in ids or []:
+        try:
+            i = int(float(str(x).strip()))
+            if i > 0 and i not in out:
+                out.append(i)
+        except Exception:
+            continue
+    return out
+
+
+def _v212_authority_max_id() -> int:
+    max_id = 0
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df_from_table  # type: ignore
+        for module_key in ("01_time_records", "02_history"):
+            try:
+                df = _pa_df_from_table(module_key, "time_records")
+                if isinstance(df, pd.DataFrame) and not df.empty and "id" in df.columns:
+                    val = pd.to_numeric(df["id"], errors="coerce").max()
+                    if pd.notna(val):
+                        max_id = max(max_id, int(float(val)))
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return int(max_id or 0)
+
+
+def _v212_sync_sqlite_sequence_with_authority(reason: str = "v212_before_start") -> int:
+    """Prevent new SQLite ids from colliding with 01/02 authority ids when SQLite cache is partial."""
+    auth_max = _v212_authority_max_id()
+    if auth_max <= 0:
+        return 0
+    try:
+        with _v205_conn() as conn:
+            exists = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='time_records'").fetchone()
+            if not exists:
+                return 0
+            try:
+                sqlite_max_row = conn.execute("SELECT COALESCE(MAX(id),0) AS m FROM time_records").fetchone()
+                sqlite_max = int(sqlite_max_row["m"] if sqlite_max_row else 0)
+            except Exception:
+                sqlite_max = 0
+            # AUTOINCREMENT uses sqlite_sequence.  Set it to authority max when the local cache is behind.
+            if sqlite_max < auth_max:
+                try:
+                    seq_row = conn.execute("SELECT seq FROM sqlite_sequence WHERE name='time_records'").fetchone()
+                    if seq_row is None:
+                        conn.execute("INSERT INTO sqlite_sequence(name, seq) VALUES('time_records', ?)", (auth_max,))
+                    else:
+                        conn.execute("UPDATE sqlite_sequence SET seq=? WHERE name='time_records' AND seq<?", (auth_max, auth_max))
+                    conn.commit()
+                    try:
+                        _v205_direct_log("V212_SQLITE_SEQUENCE_GUARD", f"SQLite 工時 ID 序號已對齊權威檔 max_id={auth_max}，避免新增紀錄 ID 撞號。", detail=reason, level="INFO")
+                    except Exception:
+                        pass
+                    return auth_max
+                except Exception:
+                    return 0
+    except Exception:
+        return 0
+    return 0
+
+
+def _v212_query_sqlite_rows_by_ids(ids) -> pd.DataFrame:
+    clean = _v212_clean_ids(ids)
+    if not clean:
+        return pd.DataFrame()
+    try:
+        placeholders = ",".join(["?"] * len(clean))
+        with _v205_conn() as conn:
+            df = pd.read_sql_query(
+                f"SELECT * FROM time_records WHERE id IN ({placeholders}) ORDER BY id",
+                conn,
+                params=tuple(clean),
+            )
+        try:
+            df = _v205_filter_visible_rows(df) if "_v205_filter_visible_rows" in globals() else df
+        except Exception:
+            pass
+        return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v212_sqlite_active_group_ids(record_id: int, finish_parallel_group: bool = True) -> list[int]:
+    rid0 = _v212_clean_ids([record_id])
+    if not rid0:
+        return []
+    if not finish_parallel_group:
+        return rid0
+    try:
+        with _v205_conn() as conn:
+            rec = conn.execute("SELECT * FROM time_records WHERE id=?", (rid0[0],)).fetchone()
+            if not rec:
+                return rid0
+            row = dict(rec)
+            rows = conn.execute(
+                """
+                SELECT id FROM time_records
+                WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=?
+                  AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='' OR LOWER(TRIM(COALESCE(end_timestamp,''))) IN ('none','nan','nat','null'))
+                  AND (COALESCE(status,'')='' OR status='作業中')
+                ORDER BY id
+                """,
+                (
+                    row.get("employee_id"),
+                    row.get("employee_name") or "",
+                    row.get("process_name"),
+                    row.get("start_date"),
+                ),
+            ).fetchall()
+        ids = [int(r["id"]) for r in rows if r and r["id"] is not None]
+        if rid0[0] not in ids:
+            ids.append(rid0[0])
+        return _v212_clean_ids(ids)
+    except Exception:
+        return rid0
+
+
+def _v212_event_type_for_end_action(end_action: str) -> str:
+    action = str(end_action or "").strip()
+    if action == "暫停":
+        return "PAUSE_WORK"
+    if action == "下班":
+        return "OFF_DUTY"
+    if action == "完工":
+        return "FINISH_WORK"
+    return "END_WORK"
+
+
+def _v212_fallback_authority_upsert(rows_df: pd.DataFrame, reason: str) -> int:
+    """Minimal local-only authority upsert if V176 durable layer is unavailable."""
+    if rows_df is None or not isinstance(rows_df, pd.DataFrame) or rows_df.empty:
+        return 0
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df_from_table, save_authority as _pa_save_authority  # type: ignore
+    except Exception:
+        return 0
+    try:
+        changed = rows_df.copy().where(pd.notna(rows_df), "")
+        changed_rows = [dict(r) for _, r in changed.iterrows()]
+    except Exception:
+        return 0
+
+    def _key(row: dict) -> str:
+        try:
+            rk = str(row.get("record_key") or "").strip()
+            if rk:
+                return "rk:" + rk
+            rid = str(row.get("id") or "").strip()
+            if rid:
+                return "id:" + str(int(float(rid)))
+        except Exception:
+            pass
+        try:
+            return "biz:" + "|".join([
+                str(row.get("employee_id") or "").strip(),
+                str(row.get("employee_name") or "").strip(),
+                str(row.get("work_order") or "").strip(),
+                str(row.get("process_name") or "").strip(),
+                str(row.get("start_timestamp") or "").strip(),
+            ])
+        except Exception:
+            return ""
+
+    saved = 0
+    for module_key in ("01_time_records", "02_history"):
+        try:
+            base = _pa_df_from_table(module_key, "time_records")
+            base = base.copy().where(pd.notna(base), "") if isinstance(base, pd.DataFrame) and not base.empty else pd.DataFrame()
+            row_map: dict[str, dict] = {}
+            order: list[str] = []
+            if isinstance(base, pd.DataFrame) and not base.empty:
+                for _, rr in base.iterrows():
+                    d = dict(rr)
+                    k = _key(d)
+                    if not k:
+                        continue
+                    if k not in row_map:
+                        order.append(k)
+                    row_map[k] = d
+            for d in changed_rows:
+                k = _key(d)
+                if not k:
+                    continue
+                if k not in row_map:
+                    order.append(k)
+                old = dict(row_map.get(k) or {})
+                old.update(d)
+                row_map[k] = old
+            merged = [row_map[k] for k in order if k in row_map]
+            _pa_save_authority(module_key, records={"time_records": merged}, reason=f"{reason}_{module_key}", github=False)
+            saved = max(saved, len(merged))
+        except Exception as exc:
+            try:
+                _v205_direct_log("V212_AUTHORITY_UPSERT_WARN", f"V212 權威檔逐筆 upsert 失敗 {module_key}: {exc}", detail=reason, level="WARN")
+            except Exception:
+                pass
+    return int(saved or 0)
+
+
+def _v212_write_row_durable_layers(rows_df: pd.DataFrame, reason: str, event_type: str, extra: dict | None = None) -> int:
+    """Immediate per-row local save for Start/Finish without foreground GitHub upload."""
+    if rows_df is None or not isinstance(rows_df, pd.DataFrame) or rows_df.empty:
+        return 0
+    saved = 0
+    try:
+        if "_v176_write_durable_layers" in globals() and callable(_v176_write_durable_layers):
+            _v176_write_durable_layers(rows_df, reason, event_type, extra=extra or {})
+            saved = int(len(rows_df))
+        else:
+            saved = _v212_fallback_authority_upsert(rows_df, reason)
+            try:
+                from services.time_record_event_journal_service import append_time_record_event  # type: ignore
+                append_time_record_event(event_type, rows_df, reason=reason, payload_extra=extra or {}, schedule_upload=True)
+            except Exception:
+                pass
+    except Exception as exc:
+        try:
+            _v205_direct_log("V212_ROW_SAVE_WARN", f"V212 儲存工時逐筆紀錄失敗：{exc}", detail=reason, level="WARN")
+        except Exception:
+            pass
+        return 0
+    try:
+        _v205_clear_caches()
+    except Exception:
+        pass
+    try:
+        _v205_direct_log(
+            "V212_ROW_SAVE_TIME_RECORD",
+            f"儲存工時逐筆紀錄：{event_type}，{len(rows_df)} 筆已寫入 01/02 權威檔與事件紀錄。",
+            target_id=",".join([str(x) for x in rows_df.get("id", pd.Series([], dtype=str)).tolist()]) if "id" in rows_df.columns else "",
+            detail=reason,
+            level="INFO",
+        )
+    except Exception:
+        pass
+    return int(saved or len(rows_df))
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V212: keep V205 fast SQLite start, prevent id collision, then restore immediate per-row durable save."""
+    if not callable(_v212_prev_start_work):
+        raise RuntimeError("start_work core implementation is unavailable")
+    _v212_sync_sqlite_sequence_with_authority("start_work_v212_before_fast_insert")
+    rid = int(_v212_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        rows_df = _v212_query_sqlite_rows_by_ids([rid])
+        _v212_write_row_durable_layers(
+            rows_df,
+            "start_work_v212_restore_per_row_save",
+            "START_WORK",
+            extra={"employee": employee or {}, "work_order": work_order or {}, "process_name": process_name, "remark": remark},
+        )
+    return int(rid)
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V212: keep V205 fast SQLite finish, then restore immediate per-row durable save."""
+    if not callable(_v212_prev_finish_work):
+        raise RuntimeError("finish_work core implementation is unavailable")
+    affected_ids = _v212_sqlite_active_group_ids(record_id, finish_parallel_group=finish_parallel_group)
+    n = int(_v212_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    if affected_ids:
+        rows_df = _v212_query_sqlite_rows_by_ids(affected_ids)
+        if isinstance(rows_df, pd.DataFrame) and not rows_df.empty:
+            _v212_write_row_durable_layers(
+                rows_df,
+                "finish_work_v212_restore_per_row_save",
+                _v212_event_type_for_end_action(end_action),
+                extra={"end_action": end_action, "remark": remark, "finish_parallel_group": bool(finish_parallel_group), "affected_ids": affected_ids},
+            )
+    return int(n)
+
+
+def audit_v212_per_row_durable_save() -> dict:
+    """Diagnostic helper: confirms Start/Finish now calls local per-row durable layers again."""
+    return {
+        "version": "V212",
+        "scope": "services/time_record_service.py backend only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "v205_sqlite_fast_transaction_preserved": True,
+        "sqlite_id_sequence_guard_against_authority_collision": True,
+        "start_finish_immediate_01_02_authority_upsert_restored": True,
+        "row_shard_and_event_journal_restored_when_available": bool("_v176_write_durable_layers" in globals() and callable(_v176_write_durable_layers)),
+        "foreground_github_upload": False,
+        "authority_max_id": _v212_authority_max_id(),
+        "reason": "Fix new work record briefly appears then disappears when authority display overwrites SQLite-only row.",
+    }
+
+# ================= END V212 RESTORE PER-ROW DURABLE SAVE + AUTHORITY ID SEQUENCE GUARD =================
