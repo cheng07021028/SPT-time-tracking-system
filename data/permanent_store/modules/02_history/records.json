@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-29 14:29:45",
-  "exported_at": "2026-05-29 14:29:45",
-  "reason": "finish_work_v204_frontend_isolated_background",
+  "updated_at": "2026-05-29 14:31:36",
+  "exported_at": "2026-05-29 14:31:36",
+  "reason": "V199 hard delete rewrite 01/02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -2559,40 +2559,11 @@
         "updated_at": "2026-05-29 14:06:18",
         "department": "",
         "title": ""
-      },
-      {
-        "id": 422,
-        "record_key": "SSS|NA|6S|2026-05-29 14:27:21|8b0cbfe1",
-        "status": "暫停",
-        "work_order": "NA",
-        "part_no": "",
-        "type_name": "",
-        "process_name": "6S",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-29 14:27:21",
-        "end_action": "暫停",
-        "end_timestamp": "2026-05-29 14:29:35",
-        "remark": "",
-        "start_date": "2026-05-29",
-        "start_time": "14:27:21",
-        "end_date": "2026-05-29",
-        "end_time": "14:29:35",
-        "work_hours": 0.04,
-        "assembly_location": "",
-        "group_key": "SSS|6S|2026-05-29",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-29 14:27:21",
-        "updated_at": "2026-05-29 14:29:35",
-        "department": "",
-        "title": ""
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 89
+    "time_records": 88
   }
 }
