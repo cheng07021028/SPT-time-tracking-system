@@ -2,41 +2,12 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-29 14:31:40",
-  "exported_at": "2026-05-29 14:31:40",
-  "reason": "delete_time_records_v204_frontend_isolated_background",
+  "updated_at": "2026-05-29 14:32:52",
+  "exported_at": "2026-05-29 14:32:52",
+  "reason": "V199 hard delete rewrite 01/02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
-      {
-        "id": 425,
-        "record_key": "SSS|NA|6S|2026-05-29 13:47:04|54c21e36",
-        "status": "完工",
-        "work_order": "NA",
-        "part_no": "",
-        "type_name": "",
-        "process_name": "6S",
-        "employee_id": "SSS",
-        "employee_name": "SSS",
-        "start_action": "開始",
-        "start_timestamp": "2026-05-29 13:47:04",
-        "end_action": "完工",
-        "end_timestamp": "2026-05-29 13:54:23",
-        "remark": "",
-        "start_date": "2026-05-28",
-        "start_time": "13:47:04",
-        "end_date": "2026-05-29",
-        "end_time": "13:54:23",
-        "work_hours": "21:52:19",
-        "assembly_location": "",
-        "group_key": "SSS|6S|2026-05-29",
-        "is_group_work": 0,
-        "source": "streamlit",
-        "created_at": "2026-05-29 13:47:04",
-        "updated_at": "2026-05-29 14:02:17",
-        "department": "SSS",
-        "title": "SSS"
-      },
       {
         "id": 332,
         "record_key": "B228|26N4001-07|配電|2026-05-29 08:35:05|d734c53c",
@@ -2564,6 +2535,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 88
+    "time_records": 87
   }
 }
