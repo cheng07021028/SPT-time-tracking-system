@@ -20753,3 +20753,658 @@ def audit_v230_frontend_operation_isolation_phase2() -> dict:
     }
 
 # ================= END V230 FRONTEND OPERATION ISOLATION PHASE 2 =================
+
+
+# ================= V231 01 PAGE ENTRY + ADMIN MAINTENANCE SPEEDUP｜2026-05-29 =================
+# 目的：以 V225/V230 正確基準為前提，只縮短 01 頁面進入、開始作業後 rerun、管理員維護 Save/Delete 的前台等待。
+# 原則：不改 UI/CSS/theme/table/buttons；不回退 SQLite-only；不改 01/02 權威同步正確規則。
+# 做法：
+# 1) 讀取先走 V230 memory cache，不每次先做完整檔案簽章。
+# 2) clear_today_records_fast_cache 改為節流型軟清除，避免管理員維護區每次 rerun 都強制重建。
+# 3) 管理員 Save 僅送出實際變更列，避免整張今日表逐筆寫回。
+# 4) start/finish/delete/save 後先更新前台快取，下一次 rerun 不重掃權威檔。
+try:
+    _v231_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v231_prev_load_records = None
+try:
+    _v231_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v231_prev_today_records = None
+try:
+    _v231_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v231_prev_get_active_records = None
+try:
+    _v231_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v231_prev_get_active_record = None
+try:
+    _v231_prev_get_active_group = get_active_group
+except Exception:  # pragma: no cover
+    _v231_prev_get_active_group = None
+try:
+    _v231_prev_refresh_active_records_for_employee = refresh_active_records_for_employee
+except Exception:  # pragma: no cover
+    _v231_prev_refresh_active_records_for_employee = None
+try:
+    _v231_prev_clear_today_records_fast_cache = clear_today_records_fast_cache
+except Exception:  # pragma: no cover
+    _v231_prev_clear_today_records_fast_cache = None
+try:
+    _v231_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v231_prev_start_work = None
+try:
+    _v231_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v231_prev_finish_work = None
+try:
+    _v231_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v231_prev_delete_time_records = None
+try:
+    _v231_prev_delete_time_records_from_editor_df = delete_time_records_from_editor_df
+except Exception:  # pragma: no cover
+    _v231_prev_delete_time_records_from_editor_df = None
+try:
+    _v231_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v231_prev_save_time_records = None
+
+import time as _v231_time
+import math as _v231_math
+
+_V231_VERSION = "V231_PAGE_ENTRY_ADMIN_MAINTENANCE_SPEEDUP"
+_V231_MEMORY_FAST_TTL_SECONDS = 60.0
+_V231_SOFT_CLEAR_THROTTLE_SECONDS = 25.0
+_V231_SKIP_NEXT_CLEAR_UNTIL = 0.0
+_V231_LAST_HARD_CLEAR_EPOCH = 0.0
+
+
+def _v231_text(v) -> str:
+    try:
+        return _v230_text(v)  # type: ignore[name-defined]
+    except Exception:
+        if v is None:
+            return ""
+        try:
+            if pd.isna(v):  # type: ignore[name-defined]
+                return ""
+        except Exception:
+            pass
+        s = str(v).strip()
+        return "" if s.lower() in ("none", "nan", "nat", "null", "<na>") else s
+
+
+def _v231_int(v) -> int | None:
+    try:
+        return _v230_int(v)  # type: ignore[name-defined]
+    except Exception:
+        s = _v231_text(v)
+        if not s:
+            return None
+        try:
+            i = int(float(s))
+            return i if i > 0 else None
+        except Exception:
+            return None
+
+
+def _v231_date(v) -> str:
+    try:
+        return _v230_date(v)  # type: ignore[name-defined]
+    except Exception:
+        s = _v231_text(v).replace("/", "-")
+        if " " in s:
+            s = s.split(" ", 1)[0]
+        if "T" in s:
+            s = s.split("T", 1)[0]
+        return s[:10] if len(s) >= 10 else ""
+
+
+def _v231_today() -> str:
+    try:
+        return _v230_today()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return today_date()  # type: ignore[name-defined]
+        except Exception:
+            return ""
+
+
+def _v231_norm(v) -> str:
+    """Stable comparison for admin editor rows. Avoid false changes from 1 vs 1.0, NaN, Timestamp etc."""
+    if v is None:
+        return ""
+    try:
+        if pd.isna(v):  # type: ignore[name-defined]
+            return ""
+    except Exception:
+        pass
+    try:
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            fv = float(v)
+            if _v231_math.isfinite(fv):
+                if abs(fv - round(fv)) < 0.0000001:
+                    return str(int(round(fv)))
+                return ("%.8f" % fv).rstrip("0").rstrip(".")
+    except Exception:
+        pass
+    s = str(v).strip()
+    if s.lower() in ("none", "nan", "nat", "null", "<na>"):
+        return ""
+    # Normalize Excel/Streamlit float-looking IDs and numeric strings.
+    try:
+        if s.replace(".", "", 1).isdigit():
+            fv = float(s)
+            if abs(fv - round(fv)) < 0.0000001:
+                return str(int(round(fv)))
+    except Exception:
+        pass
+    return s
+
+
+def _v231_memory_rows_valid() -> list[dict] | None:
+    try:
+        mem = _V230_MEMORY_CACHE.get("rows")  # type: ignore[name-defined]
+        epoch = float(_V230_MEMORY_CACHE.get("epoch") or 0)  # type: ignore[name-defined]
+        cache_date = _V230_MEMORY_CACHE.get("date")  # type: ignore[name-defined]
+        if isinstance(mem, list) and mem and cache_date == _v231_today() and (_v231_time.time() - epoch) < _V231_MEMORY_FAST_TTL_SECONDS:
+            return [dict(r) for r in mem if isinstance(r, dict)]
+    except Exception:
+        pass
+    return None
+
+
+def _v231_get_display_rows(reason: str = "v231_get") -> list[dict]:
+    rows = _v231_memory_rows_valid()
+    if rows is not None:
+        return rows
+    try:
+        return [dict(r) for r in _v230_get_display_rows(reason, allow_stale=True) if isinstance(r, dict)]  # type: ignore[name-defined]
+    except Exception:
+        try:
+            if callable(_v231_prev_load_records):
+                df = _v231_prev_load_records()
+                if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+                    return [dict(r) for _, r in df.copy().where(pd.notna(df), "").iterrows()]  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return []
+
+
+def _v231_rows_to_df(rows: list[dict]):
+    try:
+        return _v230_rows_to_df(rows)  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return pd.DataFrame(rows).reset_index(drop=True) if rows else pd.DataFrame()  # type: ignore[name-defined]
+        except Exception:
+            return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v231_filter_df(df, start_date=None, end_date=None, employee_id=None, work_order=None, process_name=None, employee_name=None, *, active_only=False):
+    try:
+        return _v230_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order, process_name=process_name, employee_name=employee_name, active_only=active_only)  # type: ignore[name-defined]
+    except Exception:
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v231_is_active_row(row: dict) -> bool:
+    try:
+        return bool(_v230_is_active_row(row))  # type: ignore[name-defined]
+    except Exception:
+        end_ts = _v231_text(row.get("end_timestamp") if isinstance(row, dict) else "")
+        if end_ts:
+            return False
+        status = _v231_text(row.get("status") if isinstance(row, dict) else "")
+        return status not in {"下班", "暫停", "完工", "已結束", "結束", "完成"}
+
+
+def _v231_write_rows(rows: list[dict], reason: str = "v231_write") -> None:
+    try:
+        _v230_write_display_rows(rows, reason=reason)  # type: ignore[name-defined]
+    except Exception:
+        try:
+            if isinstance(rows, list):
+                _V230_MEMORY_CACHE.update({"rows": rows, "signature": "v231_memory_only", "epoch": _v231_time.time(), "date": _v231_today()})  # type: ignore[name-defined]
+        except Exception:
+            pass
+
+
+def _v231_upsert_rows(rows: list[dict], reason: str = "v231_upsert") -> None:
+    incoming = [dict(r) for r in (rows or []) if isinstance(r, dict)]
+    if not incoming:
+        return
+    try:
+        _v230_upsert_cache_rows(incoming, reason=reason)  # type: ignore[name-defined]
+    except Exception:
+        base = _v231_get_display_rows(reason + "_base")
+        try:
+            merged = _v230_dedupe_rows(base + incoming)  # type: ignore[name-defined]
+        except Exception:
+            by = {}
+            for r in base + incoming:
+                rid = _v231_int(r.get("id") if isinstance(r, dict) else None)
+                if rid is not None:
+                    by[rid] = dict(r)
+            merged = list(by.values())
+        _v231_write_rows(merged, reason=reason)
+
+
+def _v231_remove_ids(ids: list[int | str], reason: str = "v231_remove") -> None:
+    try:
+        _v230_remove_cache_ids(ids, reason=reason)  # type: ignore[name-defined]
+        return
+    except Exception:
+        pass
+    wanted = {i for i in (_v231_int(x) for x in (ids or [])) if i is not None}
+    if not wanted:
+        return
+    kept = []
+    for r in _v231_get_display_rows(reason + "_base"):
+        rid = _v231_int(r.get("id") if isinstance(r, dict) else None)
+        if rid in wanted:
+            continue
+        kept.append(dict(r))
+    _v231_write_rows(kept, reason=reason)
+
+
+def _v231_find_rows_by_ids(ids: list[int | str]) -> list[dict]:
+    wanted = {i for i in (_v231_int(x) for x in (ids or [])) if i is not None}
+    if not wanted:
+        return []
+    out = []
+    for r in _v231_get_display_rows("v231_find_ids"):
+        rid = _v231_int(r.get("id") if isinstance(r, dict) else None)
+        if rid in wanted:
+            out.append(dict(r))
+    if out:
+        return out
+    try:
+        return [dict(r) for r in _v230_find_rows_by_ids_authority_first(list(wanted)) if isinstance(r, dict)]  # type: ignore[name-defined]
+    except Exception:
+        return []
+
+
+def _v231_synthetic_start_row(rid: int, employee: dict, work_order: dict, process_name: str, remark: str = "") -> dict:
+    now = ""
+    try:
+        now = _v230_now()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            now = now_text()  # type: ignore[name-defined]
+        except Exception:
+            now = ""
+    start_date = _v231_date(now) or _v231_today()
+    start_time = ""
+    try:
+        if " " in now:
+            start_time = now.split(" ", 1)[1][:8]
+    except Exception:
+        pass
+    emp_id = _v231_text(employee.get("employee_id") or employee.get("工號") or employee.get("id")) if isinstance(employee, dict) else ""
+    emp_name = _v231_text(employee.get("employee_name") or employee.get("姓名") or employee.get("name")) if isinstance(employee, dict) else ""
+    wo = _v231_text(work_order.get("work_order") or work_order.get("製令") or work_order.get("製令單號")) if isinstance(work_order, dict) else ""
+    return {
+        "id": int(rid),
+        "record_key": f"{emp_id}|{wo}|{_v231_text(process_name)}|{now}|v231",
+        "status": "作業中",
+        "work_order": wo,
+        "part_no": _v231_text(work_order.get("part_no") or work_order.get("P/N") or work_order.get("料號")) if isinstance(work_order, dict) else "",
+        "type_name": _v231_text(work_order.get("type_name") or work_order.get("機型") or work_order.get("type")) if isinstance(work_order, dict) else "",
+        "process_name": _v231_text(process_name),
+        "employee_id": emp_id,
+        "employee_name": emp_name,
+        "start_action": "開始",
+        "start_timestamp": now,
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": _v231_text(remark),
+        "start_date": start_date,
+        "start_time": start_time,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0,
+        "assembly_location": _v231_text(work_order.get("assembly_location") or work_order.get("組立地點")) if isinstance(work_order, dict) else "",
+        "group_key": f"{emp_id}|{_v231_text(process_name)}|{start_date}",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": now,
+        "updated_at": now,
+        "department": _v231_text(employee.get("department") or employee.get("單位")) if isinstance(employee, dict) else "",
+        "title": _v231_text(employee.get("title") or employee.get("職稱")) if isinstance(employee, dict) else "",
+    }
+
+
+def _v231_changed_rows(df) -> list[dict]:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return []
+    control_cols = {"刪除 / Delete", "重算 / Recalc", "刪除", "重算", "Delete", "_delete"}
+    meaningful_cols = {
+        "status", "work_order", "part_no", "type_name", "process_name", "employee_id", "employee_name",
+        "start_action", "start_timestamp", "end_action", "end_timestamp", "remark", "start_date", "start_time",
+        "end_date", "end_time", "work_hours", "assembly_location", "group_key", "is_group_work", "source",
+        "department", "title",
+    }
+    clean = df.drop(columns=[c for c in control_cols if c in df.columns], errors="ignore").copy()
+    current_by_id: dict[int, dict] = {}
+    for r in _v231_get_display_rows("v231_changed_rows_current"):
+        rid = _v231_int(r.get("id") if isinstance(r, dict) else None)
+        if rid is not None:
+            current_by_id[rid] = dict(r)
+    changed = []
+    for _, row in clean.copy().where(pd.notna(clean), "").iterrows():  # type: ignore[name-defined]
+        rec = dict(row)
+        rid = _v231_int(rec.get("id") or rec.get("ID") or rec.get("ID / ID"))
+        if rid is None:
+            # 無 ID 的列不判斷差異，交由既有保存鏈處理。
+            changed.append(rec)
+            continue
+        old = current_by_id.get(rid)
+        if not old:
+            changed.append(rec)
+            continue
+        is_changed = False
+        for col in meaningful_cols:
+            if col not in rec:
+                continue
+            if _v231_norm(rec.get(col)) != _v231_norm(old.get(col)):
+                is_changed = True
+                break
+        if is_changed:
+            changed.append(rec)
+    return changed
+
+
+def _v231_mark_skip_clear(seconds: float = 35.0) -> None:
+    global _V231_SKIP_NEXT_CLEAR_UNTIL
+    try:
+        _V231_SKIP_NEXT_CLEAR_UNTIL = max(float(_V231_SKIP_NEXT_CLEAR_UNTIL or 0), _v231_time.time() + float(seconds))
+    except Exception:
+        _V231_SKIP_NEXT_CLEAR_UNTIL = _v231_time.time() + float(seconds)
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    rows = _v231_get_display_rows("v231_load_records")
+    df = _v231_rows_to_df(rows)
+    return _v231_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    today = _v231_today()
+    df = load_records(today, today, None, None)
+    if unfinished_only or not include_finished:
+        df = _v231_filter_df(df, active_only=True)
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) and not df.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = today_records(include_finished=False, unfinished_only=True)
+    out = _v231_filter_df(df, employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name, active_only=True)
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return None
+    return dict(df.iloc[0].to_dict())
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    rows = _v231_find_rows_by_ids([record_id])
+    if not rows:
+        try:
+            if callable(_v231_prev_get_active_group):
+                return _v231_prev_get_active_group(record_id)
+        except Exception:
+            pass
+        return pd.DataFrame()  # type: ignore[name-defined]
+    seed = rows[0]
+    return get_active_records(
+        employee_id=_v231_text(seed.get("employee_id")),
+        process_name=_v231_text(seed.get("process_name")),
+        start_date=_v231_date(seed.get("start_date") or seed.get("start_timestamp")),
+    )
+
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v231_refresh_active") -> int:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    return int(len(df)) if isinstance(df, pd.DataFrame) and not df.empty else 0  # type: ignore[name-defined]
+
+
+def clear_today_records_fast_cache() -> None:  # type: ignore[override]
+    """V231: throttled soft clear. The admin maintenance page calls this on every rerun; do not force full rebuild each time."""
+    global _V231_LAST_HARD_CLEAR_EPOCH
+    now = _v231_time.time()
+    try:
+        if now < float(_V231_SKIP_NEXT_CLEAR_UNTIL or 0):
+            # A write/delete already updated V230/V231 cache. Do not invalidate it again during the immediate rerun.
+            try:
+                _V86_TODAY_CACHE.clear()  # type: ignore[name-defined]
+            except Exception:
+                pass
+            return
+    except Exception:
+        pass
+    try:
+        _V86_TODAY_CACHE.clear()  # type: ignore[name-defined]
+    except Exception:
+        pass
+    # Throttle actual invalidation. This preserves manual refresh behavior but avoids admin editor rerun storms.
+    if now - float(_V231_LAST_HARD_CLEAR_EPOCH or 0) < _V231_SOFT_CLEAR_THROTTLE_SECONDS:
+        return
+    _V231_LAST_HARD_CLEAR_EPOCH = now
+    try:
+        _V230_MEMORY_CACHE.update({"rows": None, "signature": "", "epoch": 0.0, "date": ""})  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        _V230_META_CACHE.unlink(missing_ok=True)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        _v230_enqueue_background_task("v231_soft_clear", {"reason": "clear_today_records_fast_cache", "throttle_seconds": _V231_SOFT_CLEAR_THROTTLE_SECONDS})  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v231_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    rid = int(_v231_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        rows = []
+        # First try memory/cache only; avoid extra authority scan on the immediate Start rerun path.
+        for r in _v231_get_display_rows("v231_start_fast_find"):
+            if _v231_int(r.get("id") if isinstance(r, dict) else None) == rid:
+                rows.append(dict(r))
+                break
+        if not rows:
+            rows = [_v231_synthetic_start_row(rid, employee if isinstance(employee, dict) else {}, work_order if isinstance(work_order, dict) else {}, process_name, remark)]
+        _v231_upsert_rows(rows, reason="v231_start_fast_cache_upsert")
+        _v231_mark_skip_clear(30.0)
+        try:
+            _v230_enqueue_background_task("v231_post_start_authority_refresh", {"id": rid, "process_name": process_name})  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v231_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    affected_ids: list[int] = []
+    try:
+        group_df = get_active_group(record_id) if finish_parallel_group else pd.DataFrame()  # type: ignore[name-defined]
+        if isinstance(group_df, pd.DataFrame) and not group_df.empty and "id" in group_df.columns:  # type: ignore[name-defined]
+            affected_ids.extend([i for i in (_v231_int(x) for x in group_df["id"].tolist()) if i is not None])
+    except Exception:
+        pass
+    rid0 = _v231_int(record_id)
+    if rid0 is not None:
+        affected_ids.append(rid0)
+    affected_ids = sorted(set(affected_ids))
+    n = int(_v231_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)
+    try:
+        rows = _v231_find_rows_by_ids(affected_ids)
+        if rows:
+            _v231_upsert_rows(rows, reason="v231_finish_fast_cache_upsert")
+        else:
+            _v231_remove_ids(affected_ids, reason="v231_finish_remove_active_fallback")
+        _v231_mark_skip_clear(30.0)
+    except Exception:
+        pass
+    return int(n)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = sorted({i for i in (_v231_int(x) for x in (record_ids or [])) if i is not None})
+    if not ids:
+        return 0
+    if not callable(_v231_prev_delete_time_records):
+        raise RuntimeError("delete_time_records base function is unavailable")
+    n = int(_v231_prev_delete_time_records(ids, reason=reason) or 0)
+    try:
+        _v231_remove_ids(ids, reason="v231_delete_fast_cache_remove")
+        _v231_mark_skip_clear(40.0)
+    except Exception:
+        pass
+    return int(n)
+
+
+def _v231_extract_checked_ids(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete") -> list[int]:  # type: ignore[name-defined]
+    try:
+        return list(_v230_extract_checked_ids(editor_df, delete_column=delete_column))  # type: ignore[name-defined]
+    except Exception:
+        if editor_df is None or not isinstance(editor_df, pd.DataFrame) or editor_df.empty:  # type: ignore[name-defined]
+            return []
+        if delete_column not in editor_df.columns or "id" not in editor_df.columns:
+            return []
+        ids = []
+        for _, rr in editor_df.iterrows():
+            try:
+                if bool(rr.get(delete_column)):
+                    rid = _v231_int(rr.get("id"))
+                    if rid is not None:
+                        ids.append(rid)
+            except Exception:
+                pass
+        return sorted(set(ids))
+
+
+def delete_time_records_from_editor_df(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete", reason: str = "01 管理員維護表刪除") -> int:  # type: ignore[override]
+    ids = _v231_extract_checked_ids(editor_df, delete_column=delete_column)
+    if not ids:
+        return 0
+    return delete_time_records(ids, reason=reason)
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return 0
+    changed = _v231_changed_rows(df)
+    if not changed:
+        # No-op save should be instant and should not rebuild authority/cache.
+        try:
+            _v230_enqueue_background_task("v231_save_no_change", {"rows": int(len(df))})  # type: ignore[name-defined]
+        except Exception:
+            pass
+        _v231_mark_skip_clear(25.0)
+        return 0
+    changed_df = pd.DataFrame(changed)  # type: ignore[name-defined]
+    n = 0
+    if callable(_v231_prev_save_time_records):
+        n = int(_v231_prev_save_time_records(changed_df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    try:
+        _v231_upsert_rows(changed, reason="v231_save_changed_rows_cache")
+        _v231_mark_skip_clear(40.0)
+        _v230_enqueue_background_task("v231_post_save_changed_only", {"changed_rows": int(len(changed)), "input_rows": int(len(df)), "result": int(n)})  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return int(n if n else len(changed))
+
+
+def audit_v231_page_entry_admin_speedup() -> dict:
+    rows = _v231_get_display_rows("v231_audit")
+    active = [r for r in rows if isinstance(r, dict) and _v231_is_active_row(r)]
+    return {
+        "version": _V231_VERSION,
+        "base_preserved": "V225 correctness + V230 speed cache",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "sqlite_only_rollback": False,
+        "memory_fast_ttl_seconds": _V231_MEMORY_FAST_TTL_SECONDS,
+        "soft_clear_throttle_seconds": _V231_SOFT_CLEAR_THROTTLE_SECONDS,
+        "rows": int(len(rows)),
+        "active_rows": int(len(active)),
+        "rule": "01 page/admin reruns use memory-first cache; admin save writes changed rows only; clear hook is throttled.",
+    }
+
+# ================= END V231 01 PAGE ENTRY + ADMIN MAINTENANCE SPEEDUP =================
+
+# ================= V231A DEFER EVENT UPLOAD QUEUE｜2026-05-29 =================
+# V231 補強：開始作業慢的主因是 event journal 每次同步寫 SQLite outbox/upload queue。
+# 這裡保留 event JSON + event SQLite 本體，但把 upload queue 改成 V230/V231 前台背景 marker，避免操作等待。
+try:
+    _v231_prev_v176_write_durable_layers = _v176_write_durable_layers
+except Exception:  # pragma: no cover
+    _v231_prev_v176_write_durable_layers = None
+
+
+def _v176_write_durable_layers(rows_df: pd.DataFrame, reason: str, event_type: str, extra: dict | None = None) -> None:  # type: ignore[override]
+    started = 0.0
+    try:
+        started = _v231_time.perf_counter()
+    except Exception:
+        pass
+    if rows_df is None or not isinstance(rows_df, pd.DataFrame) or rows_df.empty:  # type: ignore[name-defined]
+        return
+    # 1) 01/02 authority local write-through remains immediate and correct.
+    try:
+        if "_v176_upsert_authority_rows" in globals() and callable(_v176_upsert_authority_rows):  # type: ignore[name-defined]
+            _v176_upsert_authority_rows(rows_df, reason)  # type: ignore[name-defined]
+    except Exception as exc:
+        try:
+            write_log("V231_AUTHORITY_UPSERT_WARN", f"V231 authority upsert failed: {exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    # 2) Row shard stays local-only and immediate.
+    try:
+        if "_v151_write_row_shards" in globals() and callable(_v151_write_row_shards):  # type: ignore[name-defined]
+            _v151_write_row_shards(rows_df, reason + "_row_shard_v231", github=False)  # type: ignore[name-defined]
+    except Exception as exc:
+        try:
+            write_log("V231_ROW_SHARD_WARN", f"V231 row shard local write failed: {exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    # 3) Event proof remains local, but upload scheduling is deferred so Start/Finish does not wait on outbox SQLite.
+    try:
+        from services.time_record_event_journal_service import append_time_record_event  # type: ignore
+        append_time_record_event(event_type, rows_df, reason=reason, payload_extra=extra or {}, schedule_upload=False)
+        try:
+            _v230_enqueue_background_task("v231_deferred_event_upload", {"event_type": event_type, "rows": int(len(rows_df)), "reason": reason})  # type: ignore[name-defined]
+        except Exception:
+            pass
+    except Exception as exc:
+        try:
+            write_log("V231_EVENT_JOURNAL_WARN", f"V231 event journal local append failed: {exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    # No full query-cache clear here; V230/V231 cache is updated by caller wrappers.
+    try:
+        _v231_mark_skip_clear(30.0)
+    except Exception:
+        pass
+    try:
+        if "_v176_perf" in globals() and callable(_v176_perf):  # type: ignore[name-defined]
+            _v176_perf("v231_write_durable_layers_deferred_upload", started, f"event={event_type} rows={len(rows_df)}")  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+# ================= END V231A DEFER EVENT UPLOAD QUEUE =================
