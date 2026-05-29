@@ -2,12 +2,39 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-29 09:32:09",
-  "exported_at": "2026-05-29 09:32:09",
-  "reason": "start_work_v195_consistency_01",
+  "updated_at": "2026-05-29 09:32:25",
+  "exported_at": "2026-05-29 09:32:25",
+  "reason": "start_work_v194_local_first_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
+      {
+        "id": 365,
+        "record_key": "SPT077|26N4001-01|前置鈑金|2026-05-29 09:32:21|4cdfe523",
+        "status": "作業中",
+        "work_order": "26N4001-01",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "前置鈑金",
+        "employee_id": "SPT077",
+        "employee_name": "謝宛庭",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 09:32:21",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "前置線材加工",
+        "start_date": "2026-05-29",
+        "start_time": "09:32:21",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT077|前置鈑金|2026-05-29",
+        "is_group_work": 1,
+        "source": "streamlit",
+        "created_at": "2026-05-29 09:32:21",
+        "updated_at": "2026-05-29 09:32:21"
+      },
       {
         "id": 364,
         "record_key": "SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da",
@@ -165,10 +192,10 @@
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT077|前置鈑金|2026-05-29",
-        "is_group_work": 0,
+        "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-29 09:29:16",
-        "updated_at": "2026-05-29 09:29:16"
+        "updated_at": "2026-05-29 09:32:21"
       },
       {
         "id": 358,
@@ -822,6 +849,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 30
+    "time_records": 31
   }
 }
