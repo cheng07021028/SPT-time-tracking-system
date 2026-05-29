@@ -2,12 +2,39 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-29 10:40:26",
-  "exported_at": "2026-05-29 10:40:26",
-  "reason": "start_work_v195_consistency_01",
+  "updated_at": "2026-05-29 10:57:37",
+  "exported_at": "2026-05-29 10:57:37",
+  "reason": "start_work_v194_local_first_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
+      {
+        "id": 393,
+        "record_key": "B135|25M0694-02|收機|2026-05-29 10:57:33|555850be",
+        "status": "作業中",
+        "work_order": "25M0694-02",
+        "part_no": "4TRSC122-SB2-13",
+        "type_name": "SORTER RSC121 SB (RR757)",
+        "process_name": "收機",
+        "employee_id": "B135",
+        "employee_name": "鍾明志",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 10:57:33",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "10:57:33",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B135|收機|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 10:57:33",
+        "updated_at": "2026-05-29 10:57:33"
+      },
       {
         "id": 391,
         "record_key": "SPT244|26M0095-07|清潔|2026-05-29 10:39:44|b4605221",
@@ -1524,6 +1551,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 56
+    "time_records": 57
   }
 }
