@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 18:02:11",
-  "exported_at": "2026-05-29 18:02:11",
+  "updated_at": "2026-05-29 18:02:25",
+  "exported_at": "2026-05-29 18:02:25",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 15795,
+        "source": "v103_merge",
+        "username": "B164",
+        "display_name": "陳宛廷",
+        "event_type": "POST_RECORD_LOGOUT",
+        "result": "SUCCESS",
+        "message": "完成工時後選擇不繼續記錄，自動登出; employee_id=B164; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-29 18:02:14",
+        "logout_time": "2026-05-29 18:02:14",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 18:02:14"
+      },
+      {
+        "id": 21,
+        "source": "v103_merge",
+        "username": "B164",
+        "display_name": "陳宛廷",
+        "event_type": "POST_RECORD_LOGOUT",
+        "result": "SUCCESS",
+        "message": "完成工時後選擇不繼續記錄，自動登出; employee_id=B164; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-29 18:02:13",
+        "logout_time": "2026-05-29 18:02:13",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 18:02:13"
+      },
       {
         "id": 14994,
         "source": "v103_merge",
@@ -12814,7 +12846,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 800,
+    "login_logs": 802,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
