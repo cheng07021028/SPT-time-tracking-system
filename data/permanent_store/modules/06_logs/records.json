@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 22:37:14",
-  "exported_at": "2026-05-29 22:37:14",
+  "updated_at": "2026-05-29 22:40:49",
+  "exported_at": "2026-05-29 22:40:49",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -19,11 +19,35 @@
         "detail": "/mount/src/spt-time-tracking-system/data/database/spt_time_tracking.db",
         "level": "INFO",
         "source": "authority"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-29 22:40:45",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-29 22:40:45",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records\n__spt_log_uid=58ee2f063195439b955d0c5c44c3c95c",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1
+    "system_logs": 3
   }
 }
