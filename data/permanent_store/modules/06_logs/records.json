@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 08:48:20",
-  "exported_at": "2026-05-29 08:48:20",
+  "updated_at": "2026-05-29 08:50:41",
+  "exported_at": "2026-05-29 08:50:41",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -1003,11 +1003,35 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 309,
+        "log_time": "2026-05-29 08:50:37",
+        "user_name": "SPT151",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "340",
+        "message": "鄭智鍵 開始 24N4001-31 / 水平",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 08:50:37\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"340\",\"target_ids\":[340],\"message\":\"鄭智鍵 開始 24N4001-31 / 水平\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT151|24N4001-31|水平|2026-05-29 08:50:32|255c5bf9\",\"identity_key\":\"record_key:SPT151|24N4001-31|水平|2026-05-29 08:50:32|255c5bf9\",\"id\":\"340\",\"employee_id\":\"SPT151\",\"employee_name\":\"鄭智鍵\",\"work_order\":\"24N4001-31\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"水平\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 08:50:32\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":340,\"record_key\":\"SPT151|24N4001-31|水平|2026-05-29 08:50:32|255c5bf9\",\"status\":\"作業中\",\"work_order\":\"24N4001-31\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"水平\",\"employee_id\":\"SPT151\",\"employee_name\":\"鄭智鍵\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:50:32\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:50:32\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT151|水平|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:50:32\",\"updated_at\":\"2026-05-29 08:50:32\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":340,\"record_key\":\"SPT151|24N4001-31|水平|2026-05-29 08:50:32|255c5bf9\",\"status\":\"作業中\",\"work_order\":\"24N4001-31\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"水平\",\"employee_id\":\"SPT151\",\"employee_name\":\"鄭智鍵\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:50:32\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:50:32\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT151|水平|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:50:32\",\"updated_at\":\"2026-05-29 08:50:32\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":340,\"record_key\":\"SPT151|24N4001-31|水平|2026-05-29 08:50:32|255c5bf9\",\"status\":\"作業中\",\"work_order\":\"24N4001-31\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"水平\",\"employee_id\":\"SPT151\",\"employee_name\":\"鄭智鍵\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:50:32\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:50:32\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT151|水平|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:50:32\",\"updated_at\":\"2026-05-29 08:50:32\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":340,\"record_key\":\"SPT151|24N4001-31|水平|2026-05-29 08:50:32|255c5bf9\",\"status\":\"作業中\",\"work_order\":\"24N4001-31\",\"part_no\":\"1SLP01S-FCA1-01\",\"type_name\":\"FCLP EFEM\",\"process_name\":\"水平\",\"employee_id\":\"SPT151\",\"employee_name\":\"鄭智鍵\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:50:32\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:50:32\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT151|水平|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:50:32\",\"updated_at\":\"2026-05-29 08:50:32\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"4e905700fd5218209772caae9551c79956b3f4d2048ce767cae04d675017922c\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 308,
+        "log_time": "2026-05-29 08:50:35",
+        "user_name": "SPT151",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 83
+    "system_logs": 85
   }
 }
