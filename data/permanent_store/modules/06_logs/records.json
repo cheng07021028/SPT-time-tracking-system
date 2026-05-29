@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 17:43:15",
-  "exported_at": "2026-05-29 17:43:15",
+  "updated_at": "2026-05-29 17:43:26",
+  "exported_at": "2026-05-29 17:43:26",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -13123,11 +13123,59 @@
         "detail": "load_records_v210_canonical_display\n__spt_log_uid=b121d002153b43aaa99a829f2028627f",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 5,
+        "log_time": "2026-05-29 17:43:25",
+        "user_name": "admin",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "432",
+        "message": "SSS 開始 21M0241-01 / 前置鈑金",
+        "detail": "V205_FAST_START",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-29 17:43:22",
+        "user_name": "admin",
+        "action_type": "V208_DISPLAY_AUTHORITY_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite time_records 顯示快取空白，已由 01/02 權威檔回填 87 筆。",
+        "detail": "load_records_v210_canonical_display",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 3,
+        "log_time": "2026-05-29 17:43:22",
+        "user_name": "admin",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v210_canonical_active",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-29 17:43:22",
+        "user_name": "admin",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v210_canonical_active\n__spt_log_uid=7615c6e25c97472fa9e0fa1f58fdcc80",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1093
+    "system_logs": 1097
   }
 }
