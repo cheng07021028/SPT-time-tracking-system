@@ -2,12 +2,67 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "time_record_delete_guard",
   "kind": "records",
-  "updated_at": "2026-05-29 14:32:50",
-  "exported_at": "2026-05-29 14:32:50",
+  "updated_at": "2026-05-29 17:00:05",
+  "exported_at": "2026-05-29 17:00:05",
   "reason": "V196 hard delete guard",
   "empty_authoritative": false,
   "tables": {
     "deleted_time_records": [
+      {
+        "row": {
+          "id": 423,
+          "跨日提醒 / Cross Day Alert": "",
+          "employee_id": "SSS",
+          "status": "下班",
+          "employee_name": "SSS",
+          "work_order": "21M0241-01",
+          "department": NaN,
+          "title": NaN,
+          "part_no": "4TRSC020-004-02",
+          "type_name": "NTB 3 PORT",
+          "process_name": "前置鈑金",
+          "start_action": "開始",
+          "start_timestamp": "2026-05-29 16:05:34",
+          "end_action": "下班",
+          "end_timestamp": "2026-05-29 16:07:57",
+          "remark": "",
+          "start_date": "2026-05-29",
+          "start_time": "16:05:34",
+          "end_date": "2026-05-29",
+          "end_time": "16:07:57",
+          "work_hours": "00:02:24",
+          "assembly_location": "竹東",
+          "group_key": "SSS|前置鈑金|2026-05-29",
+          "跨日日期 / Cross Day Date": "",
+          "is_group_work": false,
+          "source": "streamlit",
+          "created_at": "2026-05-29 16:05:34",
+          "updated_at": "2026-05-29 16:07:57",
+          "record_key": "SSS|21M0241-01|前置鈑金|2026-05-29 16:05:34|a7c65db7",
+          "department_emp": "SSS",
+          "title_emp": "SSS"
+        },
+        "id": 423,
+        "record_key": "SSS|21M0241-01|前置鈑金|2026-05-29 16:05:34|a7c65db7",
+        "business_key": "SSS|SSS|21M0241-01|前置鈑金|2026-05-29 16:05:34",
+        "deleted_at": "2026-05-29 17:00:02",
+        "source": "V196",
+        "reason": "02 歷史紀錄啟動編輯後整列刪除 / V199 02 history same-lane delete",
+        "identities": [
+          "biz:SSS|SSS|21M0241-01|前置鈑金|2026-05-29 16:05:34",
+          "id:423",
+          "record_key:SSS|21M0241-01|前置鈑金|2026-05-29 16:05:34|a7c65db7"
+        ]
+      },
+      {
+        "id": 423,
+        "identities": [
+          "id:423"
+        ],
+        "deleted_at": "2026-05-29 17:00:02",
+        "source": "V196",
+        "reason": "02 歷史紀錄啟動編輯後整列刪除 / V199 02 history same-lane delete"
+      },
       {
         "row": {
           "id": 425,
@@ -297,6 +352,6 @@
   },
   "settings": {},
   "table_counts": {
-    "deleted_time_records": 12
+    "deleted_time_records": 14
   }
 }
