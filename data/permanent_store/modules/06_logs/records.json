@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 14:02:23",
-  "exported_at": "2026-05-29 14:02:23",
+  "updated_at": "2026-05-29 14:05:30",
+  "exported_at": "2026-05-29 14:05:30",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -11347,11 +11347,47 @@
         "detail": "__spt_log_uid=1ea69c4b92864cfea2aa592f4851d539",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 2577,
+        "log_time": "2026-05-29 14:05:21",
+        "user_name": "SPT151",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2576,
+        "log_time": "2026-05-29 14:05:18",
+        "user_name": "SPT151",
+        "action_type": "V201_SQLITE_ROW_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "340",
+        "message": "v201_finish_retry_before_core: 已由 01/02 權威資料回填 SQLite 單筆 cache，id=340",
+        "detail": "__spt_log_uid=df5b9d8a3752477fb819de03892a94a5",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2575,
+        "log_time": "2026-05-29 14:05:18",
+        "user_name": "SPT151",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 945
+    "system_logs": 948
   }
 }
