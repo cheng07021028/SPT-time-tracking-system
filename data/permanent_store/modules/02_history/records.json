@@ -2,12 +2,39 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-29 10:11:23",
-  "exported_at": "2026-05-29 10:11:23",
+  "updated_at": "2026-05-29 10:11:41",
+  "exported_at": "2026-05-29 10:11:41",
   "reason": "start_work_v195_consistency_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
+      {
+        "id": 384,
+        "record_key": "B164|26M0051-10|其他|2026-05-29 10:11:36|b53a284c",
+        "status": "作業中",
+        "work_order": "26M0051-10",
+        "part_no": "PSRSC151-SB4L-05",
+        "type_name": "RSC151-SB4L+Argus",
+        "process_name": "其他",
+        "employee_id": "B164",
+        "employee_name": "陳宛廷",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 10:11:36",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "加工",
+        "start_date": "2026-05-29",
+        "start_time": "10:11:36",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B164|其他|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 10:11:36",
+        "updated_at": "2026-05-29 10:11:36"
+      },
       {
         "id": 383,
         "record_key": "SPT203|25M0785-02|其他|2026-05-29 10:11:11|ea70128d",
@@ -1308,6 +1335,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 48
+    "time_records": 49
   }
 }
