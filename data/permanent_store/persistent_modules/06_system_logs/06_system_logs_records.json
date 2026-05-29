@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 11:03:33",
+  "exported_at": "2026-05-29 11:08:53",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -10919,10 +10919,241 @@
         "message": "UPDATE security_users",
         "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
         "level": "INFO"
+      },
+      {
+        "id": 993,
+        "log_time": "2026-05-29 11:04:06",
+        "user_name": "SPT087",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 994,
+        "log_time": "2026-05-29 11:04:07",
+        "user_name": "SPT087",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "394",
+        "message": "牟育玄 開始 25M0541-02 / 骨架組立",
+        "detail": "__spt_log_uid=bf52b774e04d496aa8f9f7bbc2dd7079\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 11:04:07\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"394\",\"target_ids\":[394],\"message\":\"牟育玄 開始 25M0541-02 / 骨架組立\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\",\"identity_key\":\"record_key:SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\",\"id\":\"394\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 11:03:31\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":394,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 11:03:31\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"11:03:31\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 11:03:31\",\"updated_at\":\"2026-05-29 11:03:31\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":394,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 11:03:31\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"11:03:31\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 11:03:31\",\"updated_at\":\"2026-05-29 11:03:31\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":394,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 11:03:31\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"11:03:31\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 11:03:31\",\"updated_at\":\"2026-05-29 11:03:31\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":394,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 11:03:31\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"11:03:31\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 11:03:31\",\"updated_at\":\"2026-05-29 11:03:31\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"c69e0d31dbf7769c6a8228e7a22c0eb1c8948a96f404937ac4fede53fc683ddc\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO"
+      },
+      {
+        "id": 995,
+        "log_time": "2026-05-29 11:04:10",
+        "user_name": "SPT087",
+        "action_type": "V200_ROW_START_WORK",
+        "target_table": "time_records",
+        "target_id": "394",
+        "message": "開始作業逐筆紀錄｜ID=394｜SPT087 牟育玄 25M0541-02 / 骨架組立",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"394\", \"record_key\": \"SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\", \"employee_id\": \"SPT087\", \"employee_name\": \"牟育玄\", \"work_order\": \"25M0541-02\", \"process_name\": \"骨架組立\", \"start_timestamp\": \"2026-05-29 11:03:31\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 394, \"record_key\": \"SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\", \"status\": \"作業中\", \"work_order\": \"25M0541-02\", \"part_no\": \"PSRSC150-SB4L-06\", \"type_name\": \"RSC150 Frame sorter\", \"process_name\": \"骨架組立\", \"employee_id\": \"SPT087\", \"employee_name\": \"牟育玄\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 11:03:31\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-29\", \"start_time\": \"11:03:31\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": 0.0, \"assembly_location\": \"竹東\", \"group_key\": \"SPT087|骨架組立|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 11:03:31\", \"updated_at\": \"2026-05-29 11:03:31\"}}\n__spt_log_uid=95fcc3b5cc894e5b9b5064f5df6ff63e\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 11:04:10\",\"action_type\":\"V200_ROW_START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"394\",\"target_ids\":[394],\"message\":\"開始作業逐筆紀錄｜ID=394｜SPT087 牟育玄 25M0541-02 / 骨架組立\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\",\"identity_key\":\"record_key:SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\",\"id\":\"394\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 11:03:31\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":394,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 11:03:31\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"11:03:31\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 11:03:31\",\"updated_at\":\"2026-05-29 11:03:31\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":394,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 11:03:31\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"11:03:31\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 11:03:31\",\"updated_at\":\"2026-05-29 11:03:31\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":394,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 11:03:31\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"11:03:31\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 11:03:31\",\"updated_at\":\"2026-05-29 11:03:31\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":394,\"record_key\":\"SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e\",\"status\":\"作業中\",\"work_order\":\"25M0541-02\",\"part_no\":\"PSRSC150-SB4L-06\",\"type_name\":\"RSC150 Frame sorter\",\"process_name\":\"骨架組立\",\"employee_id\":\"SPT087\",\"employee_name\":\"牟育玄\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 11:03:31\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"11:03:31\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT087|骨架組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 11:03:31\",\"updated_at\":\"2026-05-29 11:03:31\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"b42bcea7c4420b00e31cb9fab1302d62e767e48f59e2a0e951c8cb1f6f9e1963\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO"
+      },
+      {
+        "id": 996,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 997,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO"
+      },
+      {
+        "id": 998,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 999,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1000,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1001,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1002,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1003,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1004,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1005,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1006,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1007,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1008,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1009,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1010,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1011,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1012,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "B189",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1013,
+        "log_time": "2026-05-29 11:07:58",
+        "user_name": "B189",
+        "action_type": "UPDATE",
+        "target_table": "security_users",
+        "target_id": "",
+        "message": "UPDATE security_users",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 992
+    "system_logs": 1013
   }
 }
