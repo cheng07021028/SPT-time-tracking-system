@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-29 09:26:05",
-  "exported_at": "2026-05-29 09:26:05",
-  "reason": "start_work_v194_local_first_01",
+  "updated_at": "2026-05-29 09:26:13",
+  "exported_at": "2026-05-29 09:26:13",
+  "reason": "start_work_v195_consistency_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -34,6 +34,33 @@
         "source": "streamlit",
         "created_at": "2026-05-29 09:25:14",
         "updated_at": "2026-05-29 09:25:14"
+      },
+      {
+        "id": 355,
+        "record_key": "SPT231|25M0115-17|包機|2026-05-29 09:25:10|edfc4a13",
+        "status": "作業中",
+        "work_order": "25M0115-17",
+        "part_no": "4TRSC150-003-01",
+        "type_name": "12\" UFO EFEM",
+        "process_name": "包機",
+        "employee_id": "SPT231",
+        "employee_name": "陳建勳",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 09:25:10",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "09:25:10",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT231|包機|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 09:25:10",
+        "updated_at": "2026-05-29 09:25:10"
       },
       {
         "id": 354,
@@ -606,6 +633,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 22
+    "time_records": 23
   }
 }
