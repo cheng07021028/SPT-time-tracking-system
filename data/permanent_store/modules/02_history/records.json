@@ -2,12 +2,39 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-29 08:43:45",
-  "exported_at": "2026-05-29 08:43:45",
+  "updated_at": "2026-05-29 08:45:25",
+  "exported_at": "2026-05-29 08:45:25",
   "reason": "start_work_v195_consistency_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
+      {
+        "id": 337,
+        "record_key": "B259|25MN0014-10|左右塔組立|2026-05-29 08:45:21|74ec0861",
+        "status": "作業中",
+        "work_order": "25MN0014-10",
+        "part_no": "BWS3200\nRSC2A2-BWN01-03",
+        "type_name": "9MRSC2A2-BWN01-03",
+        "process_name": "左右塔組立",
+        "employee_id": "B259",
+        "employee_name": "鄧文誠",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 08:45:21",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "08:45:21",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B259|左右塔組立|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 08:45:21",
+        "updated_at": "2026-05-29 08:45:21"
+      },
       {
         "id": 336,
         "record_key": "B256|25MN0014-10|左右塔組立|2026-05-29 08:43:14|846c2b45",
@@ -147,6 +174,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 5
+    "time_records": 6
   }
 }
