@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 21:43:44",
-  "exported_at": "2026-05-29 21:43:44",
+  "updated_at": "2026-05-29 21:58:08",
+  "exported_at": "2026-05-29 21:58:08",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -15499,11 +15499,35 @@
         "detail": "start_work_v212_before_fast_insert\n__spt_log_uid=ae78134393a64b609517c7b8d7376f03",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-29 21:58:04",
+        "user_name": "admin",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "437",
+        "message": "V225 權威檔優先結束工時紀錄 #437，同步結束=1筆，狀態=完工。",
+        "detail": "437;V225_AUTHORITY_FIRST_FINISH",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-29 21:58:04",
+        "user_name": "admin",
+        "action_type": "V208_DISPLAY_AUTHORITY_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite time_records 顯示快取空白，已由 01/02 權威檔回填 1 筆。",
+        "detail": "v225_finish_work_sqlite_best_effort\n__spt_log_uid=f6efabafa05d434ba149ac2289f001bb",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1291
+    "system_logs": 1293
   }
 }
