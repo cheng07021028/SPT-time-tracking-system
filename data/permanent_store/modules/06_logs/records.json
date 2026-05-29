@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 16:08:09",
-  "exported_at": "2026-05-29 16:08:09",
+  "updated_at": "2026-05-29 16:40:46",
+  "exported_at": "2026-05-29 16:40:46",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -11731,11 +11731,119 @@
         "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 20,
+        "log_time": "2026-05-29 16:40:44",
+        "user_name": "B228",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v207",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 19,
+        "log_time": "2026-05-29 16:40:44",
+        "user_name": "B228",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_group_seed_v207",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 14,
+        "log_time": "2026-05-29 16:40:44",
+        "user_name": "admin",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v207",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 13,
+        "log_time": "2026-05-29 16:40:43",
+        "user_name": "admin",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_group_seed_v207",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 12,
+        "log_time": "2026-05-29 16:40:43",
+        "user_name": "B228",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v207",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 11,
+        "log_time": "2026-05-29 16:40:43",
+        "user_name": "admin",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v207",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-29 16:40:42",
+        "user_name": "admin",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v207",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 3,
+        "log_time": "2026-05-29 16:40:42",
+        "user_name": "admin",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_group_seed_v207",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-29 16:40:42",
+        "user_name": "admin",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v207\n__spt_log_uid=6fd0827934974e969b3724614a7f74bd",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 977
+    "system_logs": 986
   }
 }
