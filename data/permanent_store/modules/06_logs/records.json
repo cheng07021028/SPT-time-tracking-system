@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 13:53:56",
-  "exported_at": "2026-05-29 13:53:56",
+  "updated_at": "2026-05-29 13:54:30",
+  "exported_at": "2026-05-29 13:54:30",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -7735,11 +7735,35 @@
         "detail": "__spt_log_uid=5a08b3905a9042009e1690b182e70bf9",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 2153,
+        "log_time": "2026-05-29 13:54:23",
+        "user_name": "admin",
+        "action_type": "V201_SQLITE_ROW_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "425",
+        "message": "v201_finish_retry_before_core: 已由 01/02 權威資料回填 SQLite 單筆 cache，id=425",
+        "detail": "__spt_log_uid=5f3ae8d36dc645f8a21982b36463b44e",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2152,
+        "log_time": "2026-05-29 13:54:23",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 644
+    "system_logs": 646
   }
 }
