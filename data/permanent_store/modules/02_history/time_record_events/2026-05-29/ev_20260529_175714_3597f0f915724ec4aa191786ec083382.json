@@ -1,0 +1,47 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "3597f0f915724ec4aa191786ec083382",
+  "event_type": "OFF_DUTY",
+  "event_time": "2026-05-29 17:57:14",
+  "record_id": "394",
+  "record_key": "SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e",
+  "operator_account": "SPT087",
+  "reason": "finish_work_v212_restore_per_row_save",
+  "row": {
+    "id": "394",
+    "record_key": "SPT087|25M0541-02|骨架組立|2026-05-29 11:03:31|c425d65e",
+    "status": "下班",
+    "work_order": "25M0541-02",
+    "part_no": "PSRSC150-SB4L-06",
+    "type_name": "RSC150 Frame sorter",
+    "process_name": "骨架組立",
+    "employee_id": "SPT087",
+    "employee_name": "牟育玄",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-29 11:03:31",
+    "end_action": "下班",
+    "end_timestamp": "2026-05-29 17:57:13",
+    "remark": "",
+    "start_date": "2026-05-29",
+    "start_time": "11:03:31",
+    "end_date": "2026-05-29",
+    "end_time": "17:57:13",
+    "work_hours": "5.64",
+    "assembly_location": "竹東",
+    "group_key": "SPT087|骨架組立|2026-05-29",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-29 11:03:31",
+    "updated_at": "2026-05-29 17:57:13"
+  },
+  "extra": {
+    "end_action": "下班",
+    "remark": "",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      394
+    ]
+  },
+  "previous_checksum": "9d2c37626f6361cf80a623c051a92bcb31c1ad1866ea61c44a45aaa027d383ae",
+  "checksum": "ed568d1a394207abcbfa1baaa1c7c5c97214f4291a92588f99721f72ab27504d"
+}
