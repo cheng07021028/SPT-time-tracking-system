@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 13:33:51",
+  "exported_at": "2026-05-29 13:34:17",
   "source": "db_service_write",
   "module_key": "11_login_logs",
   "module_code": "11",
@@ -5963,11 +5963,26 @@
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 23:47:57"
+      },
+      {
+        "id": 51634,
+        "username": "SPT189",
+        "display_name": "劉欣惠",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "07_missing:can_view; employee_id=SPT189; roles=operator",
+        "module_code": "07_missing",
+        "login_time": "2026-05-29 13:34:04",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 13:34:04"
       }
     ]
   },
   "table_counts": {
     "auth_login_logs": 0,
-    "login_logs": 397
+    "login_logs": 398
   }
 }
