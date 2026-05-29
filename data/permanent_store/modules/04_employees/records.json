@@ -2,12 +2,25 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "04_employees",
   "kind": "records",
-  "updated_at": "2026-05-29 11:20:28",
-  "exported_at": "2026-05-29 11:20:28",
+  "updated_at": "2026-05-29 13:41:19",
+  "exported_at": "2026-05-29 13:41:19",
   "reason": "crud_save_employees_v113_normalize_id",
   "empty_authoritative": false,
   "tables": {
     "employees": [
+      {
+        "id": 52,
+        "employee_id": "SPT187",
+        "employee_name": "彭欣惠",
+        "department": "製造一課",
+        "title": "助理工程師",
+        "is_active": true,
+        "is_in_factory": false,
+        "is_today_attendance": false,
+        "note": "",
+        "created_at": "",
+        "updated_at": ""
+      },
       {
         "id": 51,
         "employee_id": "SPT259",
@@ -1195,6 +1208,6 @@
   },
   "settings": {},
   "table_counts": {
-    "employees": 91
+    "employees": 92
   }
 }
