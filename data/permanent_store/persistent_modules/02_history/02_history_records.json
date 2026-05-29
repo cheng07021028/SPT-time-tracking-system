@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 11:16:29",
+  "exported_at": "2026-05-29 11:29:41",
   "source": "db_service_write",
   "module_key": "02_history",
   "module_code": "02",
@@ -362,7 +362,7 @@
       {
         "id": 353,
         "record_key": "SPT121|24N4001-30|配電|2026-05-29 09:24:05|b0ad45d1",
-        "status": "作業中",
+        "status": "完工",
         "work_order": "24N4001-30",
         "part_no": "1SLP01S-FCA1-01",
         "type_name": "FCLP EFEM",
@@ -371,20 +371,20 @@
         "employee_name": "徐兆生",
         "start_action": "開始",
         "start_timestamp": "2026-05-29 09:24:05",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": "Port A & Port B Docking",
+        "end_action": "完工",
+        "end_timestamp": "2026-05-29 11:25:22",
+        "remark": "Port A & Port B Docking；同步作業平均分配：3筆，群組總工時=01:46:17，平均=00:35:24",
         "start_date": "2026-05-29",
         "start_time": "09:24:05",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
+        "end_date": "2026-05-29",
+        "end_time": "11:25:22",
+        "work_hours": 0.59,
         "assembly_location": "竹東",
         "group_key": "SPT121|配電|2026-05-29",
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-29 09:24:05",
-        "updated_at": "2026-05-29 09:59:22"
+        "updated_at": "2026-05-29 11:25:22"
       },
       {
         "id": 354,
@@ -686,7 +686,7 @@
       {
         "id": 377,
         "record_key": "SPT121|24N4001-32|配電|2026-05-29 09:59:22|9da73869",
-        "status": "作業中",
+        "status": "完工",
         "work_order": "24N4001-32",
         "part_no": "1SLP01S-FCA1-01",
         "type_name": "FCLP EFEM",
@@ -695,20 +695,20 @@
         "employee_name": "徐兆生",
         "start_action": "開始",
         "start_timestamp": "2026-05-29 09:59:22",
-        "end_action": null,
-        "end_timestamp": null,
-        "remark": "Port A & Port B Docking",
+        "end_action": "完工",
+        "end_timestamp": "2026-05-29 11:25:22",
+        "remark": "Port A & Port B Docking；同步作業平均分配：3筆，群組總工時=01:46:17，平均=00:35:24",
         "start_date": "2026-05-29",
         "start_time": "09:59:22",
-        "end_date": null,
-        "end_time": null,
-        "work_hours": 0.0,
+        "end_date": "2026-05-29",
+        "end_time": "11:25:22",
+        "work_hours": 0.59,
         "assembly_location": "竹東",
         "group_key": "SPT121|配電|2026-05-29",
         "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-29 09:59:22",
-        "updated_at": "2026-05-29 09:59:22"
+        "updated_at": "2026-05-29 11:25:22"
       },
       {
         "id": 378,
@@ -1249,10 +1249,37 @@
         "source": "streamlit",
         "created_at": "2026-05-29 11:16:27",
         "updated_at": "2026-05-29 11:16:27"
+      },
+      {
+        "id": 398,
+        "record_key": "SPT121|24N4001-31|配電|2026-05-29 11:29:39|6ea007e2",
+        "status": "作業中",
+        "work_order": "24N4001-31",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "配電",
+        "employee_id": "SPT121",
+        "employee_name": "徐兆生",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 11:29:39",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "Port A & Port B Docking",
+        "start_date": "2026-05-29",
+        "start_time": "11:29:39",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT121|配電|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 11:29:39",
+        "updated_at": "2026-05-29 11:29:39"
       }
     ]
   },
   "table_counts": {
-    "time_records": 46
+    "time_records": 47
   }
 }
