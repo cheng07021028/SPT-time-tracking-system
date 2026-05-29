@@ -15109,3 +15109,577 @@ def audit_v205_01_second_level_operation() -> dict:
     }
 
 # ================= END V205 01 SECOND-LEVEL FOREGROUND TRANSACTION =================
+
+# ================= V206 ACTIVE AUTHORITY FALLBACK｜2026-05-29 =================
+# 目的：保留 V205 秒級 SQLite fast path；只有 SQLite 查不到目前作業時，才輕量讀
+# 01_time_records / 02_history 權威檔補查 active。此補丁只改後端查詢，不改 UI/CSS/theme/table/buttons。
+try:
+    _v206_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v206_prev_get_active_records = None
+try:
+    _v206_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v206_prev_get_active_record = None
+try:
+    _v206_prev_get_active_group = get_active_group
+except Exception:  # pragma: no cover
+    _v206_prev_get_active_group = None
+try:
+    _v206_prev_refresh_active_records_for_employee = refresh_active_records_for_employee
+except Exception:  # pragma: no cover
+    _v206_prev_refresh_active_records_for_employee = None
+
+_V206_SQLITE_COLS = [
+    "id", "record_key", "status", "work_order", "part_no", "type_name", "process_name",
+    "employee_id", "employee_name", "start_action", "start_timestamp", "end_action", "end_timestamp",
+    "remark", "start_date", "start_time", "end_date", "end_time", "work_hours",
+    "assembly_location", "group_key", "is_group_work", "source", "created_at", "updated_at",
+]
+
+
+def _v206_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v206_is_blank(value) -> bool:
+    s = _v206_text(value)
+    return s == "" or s.lower() in {"none", "nan", "nat", "null"}
+
+
+def _v206_is_active_df(df: pd.DataFrame) -> pd.Series:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.Series(dtype=bool)
+    end_ts = df.get("end_timestamp", pd.Series([""] * len(df))).map(_v206_text)
+    status = df.get("status", pd.Series([""] * len(df))).map(_v206_text)
+    return end_ts.map(lambda x: x == "" or x.lower() in {"none", "nan", "nat", "null"}) & status.map(lambda x: x in {"", "作業中"})
+
+
+def _v206_normalize_time_records_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    for col in _V206_SQLITE_COLS:
+        if col not in out.columns:
+            out[col] = ""
+    try:
+        out["id"] = pd.to_numeric(out["id"], errors="coerce")
+    except Exception:
+        pass
+    for col in ["employee_id", "employee_name", "process_name", "work_order", "start_date", "start_timestamp", "end_timestamp", "status", "record_key"]:
+        if col in out.columns:
+            out[col] = out[col].map(_v206_text)
+    try:
+        blank_start_date = out["start_date"].map(_v206_is_blank)
+        out.loc[blank_start_date, "start_date"] = out.loc[blank_start_date, "start_timestamp"].astype(str).str.replace("/", "-", regex=False).str[:10]
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v206_sort_active_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        out["_v206_id_sort"] = pd.to_numeric(out.get("id", 0), errors="coerce").fillna(0)
+        out["_v206_start_sort"] = out.get("start_timestamp", "").astype(str)
+        out = out.sort_values(["employee_id", "employee_name", "process_name", "_v206_start_sort", "_v206_id_sort"], ascending=[True, True, True, True, True], kind="stable")
+        out = out.drop(columns=["_v206_id_sort", "_v206_start_sort"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v206_active_authority_df(
+    employee_id: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+) -> pd.DataFrame:
+    """Lightweight authority fallback for Finish Work active rows.
+
+    只讀本機 canonical JSON，不打 GitHub、不做全量重建。01 與 02 若同一列狀態不同，
+    以 row updated_at 較新的版本為準；避免舊 active authority 把已結束 SQLite 列救回。
+    """
+    frames: list[pd.DataFrame] = []
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df_from_table
+        for module_key, rank in (("01_time_records", 1), ("02_history", 2)):
+            try:
+                df = _pa_df_from_table(module_key, "time_records")
+                if isinstance(df, pd.DataFrame) and not df.empty:
+                    df = _v206_normalize_time_records_df(df)
+                    df["_v206_source_rank"] = rank
+                    frames.append(df)
+            except Exception:
+                continue
+    except Exception:
+        return pd.DataFrame()
+    if not frames:
+        return pd.DataFrame()
+    out = pd.concat(frames, ignore_index=True, sort=False)
+    if out.empty:
+        return pd.DataFrame()
+    try:
+        out["_v206_updated_sort"] = pd.to_datetime(out.get("updated_at", ""), errors="coerce")
+        out["_v206_id_sort"] = pd.to_numeric(out.get("id", 0), errors="coerce")
+        # 同 key 多來源時，取 updated_at 較新；同時間則 01 優先。
+        out = out.sort_values(["_v206_updated_sort", "_v206_source_rank"], ascending=[True, False], kind="stable")
+        key = out.get("record_key", pd.Series([""] * len(out))).map(_v206_text)
+        missing_key = key.map(_v206_is_blank)
+        fallback_key = out.get("id", pd.Series([""] * len(out))).astype(str).map(_v206_text)
+        out["_v206_dedupe_key"] = key.where(~missing_key, fallback_key)
+        out = out.drop_duplicates("_v206_dedupe_key", keep="last")
+    except Exception:
+        pass
+    try:
+        out = out.loc[_v206_is_active_df(out)].copy()
+    except Exception:
+        out = pd.DataFrame()
+    if out.empty:
+        return pd.DataFrame()
+    emp_id = _v206_text(employee_id)
+    emp_name = _v206_text(employee_name)
+    proc = _v206_text(process_name)
+    sd = _v206_text(start_date).replace("/", "-")[:10]
+    try:
+        if emp_id and "employee_id" in out.columns:
+            out = out.loc[out["employee_id"].map(_v206_text) == emp_id].copy()
+        if emp_name and "employee_name" in out.columns:
+            out = out.loc[out["employee_name"].map(_v206_text) == emp_name].copy()
+        if proc and "process_name" in out.columns:
+            out = out.loc[out["process_name"].map(_v206_text) == proc].copy()
+        if sd:
+            if "start_date" in out.columns:
+                out = out.loc[out["start_date"].map(_v206_text).str.replace("/", "-", regex=False).str[:10] == sd].copy()
+            elif "start_timestamp" in out.columns:
+                out = out.loc[out["start_timestamp"].map(_v206_text).str.replace("/", "-", regex=False).str[:10] == sd].copy()
+    except Exception:
+        pass
+    if out.empty:
+        return pd.DataFrame()
+    try:
+        out = _v205_filter_visible_rows(out) if "_v205_filter_visible_rows" in globals() else out
+    except Exception:
+        pass
+    out = out.drop(columns=[c for c in out.columns if str(c).startswith("_v206_")], errors="ignore")
+    return _v206_sort_active_df(_v206_normalize_time_records_df(out))
+
+
+def _v206_sqlite_row_is_nonactive(row: dict | None) -> bool:
+    if not row:
+        return False
+    end_ts = _v206_text(row.get("end_timestamp"))
+    status = _v206_text(row.get("status"))
+    active = (end_ts == "" or end_ts.lower() in {"none", "nan", "nat", "null"}) and status in {"", "作業中"}
+    return not active
+
+
+def _v206_authority_row_conflicts_with_closed_sqlite(row: dict) -> bool:
+    """If SQLite already has the same id/record_key closed, do not resurrect it."""
+    try:
+        rid = row.get("id")
+        rk = _v206_text(row.get("record_key"))
+        with _v205_conn() as conn:
+            found = None
+            if not _v206_is_blank(rid):
+                try:
+                    found = conn.execute("SELECT * FROM time_records WHERE id=? LIMIT 1", (int(float(rid)),)).fetchone()
+                except Exception:
+                    found = None
+            if found is None and rk:
+                found = conn.execute("SELECT * FROM time_records WHERE record_key=? LIMIT 1", (rk,)).fetchone()
+            return _v206_sqlite_row_is_nonactive(dict(found) if found else None)
+    except Exception:
+        return False
+
+
+def _v206_remove_rows_closed_in_sqlite(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    keep = []
+    for _, rr in df.iterrows():
+        row = dict(rr)
+        keep.append(not _v206_authority_row_conflicts_with_closed_sqlite(row))
+    try:
+        return df.loc[keep].reset_index(drop=True)
+    except Exception:
+        return df
+
+
+def _v206_upsert_active_rows_to_sqlite(df: pd.DataFrame, reason: str = "v206_active_authority_fallback") -> int:
+    """Best-effort cache refill. 不上傳 GitHub，不同步覆蓋權威檔。"""
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return 0
+    try:
+        from services.db_service import ensure_database as _ensure_database
+        _ensure_database()
+    except Exception:
+        pass
+    rows_df = _v206_normalize_time_records_df(df)
+    rows_df = rows_df.drop(columns=[c for c in rows_df.columns if str(c).startswith("_v206_")], errors="ignore")
+    count = 0
+    try:
+        with _v205_conn() as conn:
+            cols_info = conn.execute("PRAGMA table_info(time_records)").fetchall()
+            db_cols = [str(c[1]) for c in cols_info] if cols_info else list(_V206_SQLITE_COLS)
+            usable = [c for c in _V206_SQLITE_COLS if c in db_cols]
+            for _, rr in rows_df.iterrows():
+                row = {c: rr.get(c, "") for c in usable}
+                if _v206_is_blank(row.get("id")):
+                    row.pop("id", None)
+                else:
+                    try:
+                        row["id"] = int(float(row.get("id")))
+                    except Exception:
+                        row.pop("id", None)
+                if "source" in row and _v206_is_blank(row.get("source")):
+                    row["source"] = "authority_v206_fallback"
+                if "updated_at" in row and _v206_is_blank(row.get("updated_at")):
+                    row["updated_at"] = _v205_now() if "_v205_now" in globals() else now_text()
+                keys = list(row.keys())
+                if not keys:
+                    continue
+                placeholders = ",".join(["?"] * len(keys))
+                col_sql = ",".join(keys)
+                update_cols = [c for c in keys if c != "id"]
+                if "record_key" in keys:
+                    update_sql = ",".join([f"{c}=excluded.{c}" for c in update_cols])
+                    conn.execute(
+                        f"INSERT INTO time_records({col_sql}) VALUES({placeholders}) "
+                        f"ON CONFLICT(record_key) DO UPDATE SET {update_sql}",
+                        tuple(row.get(c) for c in keys),
+                    )
+                else:
+                    conn.execute(
+                        f"INSERT OR REPLACE INTO time_records({col_sql}) VALUES({placeholders})",
+                        tuple(row.get(c) for c in keys),
+                    )
+                count += 1
+            conn.commit()
+    except Exception as exc:
+        try:
+            _v205_direct_log("V206_ACTIVE_SQLITE_REFILL_WARN", f"權威檔 active 回填 SQLite 快取失敗：{exc}", detail=reason, level="WARN")
+        except Exception:
+            pass
+        return 0
+    if count:
+        try:
+            _v205_clear_caches()
+        except Exception:
+            pass
+        try:
+            _v205_direct_log("V206_ACTIVE_AUTHORITY_FALLBACK", f"SQLite 查無目前作業，已由權威檔回填 active {count} 筆。", detail=reason, level="INFO")
+        except Exception:
+            pass
+    return int(count)
+
+
+def _v206_sqlite_active_df(
+    employee_id: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+) -> pd.DataFrame:
+    if callable(_v206_prev_get_active_records):
+        try:
+            df = _v206_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+            if isinstance(df, pd.DataFrame):
+                return df.copy()
+        except TypeError:
+            try:
+                df = _v206_prev_get_active_records(employee_id=employee_id)
+                if isinstance(df, pd.DataFrame):
+                    return df.copy()
+            except Exception:
+                pass
+        except Exception:
+            pass
+    return pd.DataFrame()
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V206: V205 SQLite fast path first; authority fallback only when SQLite returns no active rows."""
+    sqlite_df = _v206_sqlite_active_df(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty:
+        return sqlite_df.reset_index(drop=True)
+    auth_df = _v206_active_authority_df(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    auth_df = _v206_remove_rows_closed_in_sqlite(auth_df)
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        _v206_upsert_active_rows_to_sqlite(auth_df, reason="get_active_records_v206")
+        return auth_df.reset_index(drop=True)
+    return pd.DataFrame()
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    """V206: keep Finish Work strict to selected employee_id + employee_name."""
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        tmp = df.copy()
+        if "id" in tmp.columns:
+            tmp["_v206_id_sort"] = pd.to_numeric(tmp["id"], errors="coerce").fillna(0)
+            tmp = tmp.sort_values("_v206_id_sort", ascending=False, kind="stable").drop(columns=["_v206_id_sort"], errors="ignore")
+        return dict(tmp.iloc[0].to_dict())
+    except Exception:
+        return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    """V206: group lookup supports authority row when SQLite missed the active record."""
+    rec: dict | None = None
+    try:
+        if callable(_v206_prev_get_active_group):
+            g = _v206_prev_get_active_group(record_id)
+            if isinstance(g, pd.DataFrame) and not g.empty:
+                return g.reset_index(drop=True)
+    except Exception:
+        pass
+    try:
+        rec = _v205_query_one("SELECT * FROM time_records WHERE id=?", (int(record_id),)) if "_v205_query_one" in globals() else None
+    except Exception:
+        rec = None
+    if not rec:
+        try:
+            auth_all = _v206_active_authority_df()
+            if isinstance(auth_all, pd.DataFrame) and not auth_all.empty and "id" in auth_all.columns:
+                ids = pd.to_numeric(auth_all["id"], errors="coerce")
+                hit = auth_all.loc[ids == int(record_id)].copy()
+                hit = _v206_remove_rows_closed_in_sqlite(hit)
+                if not hit.empty:
+                    rec = dict(hit.iloc[0].to_dict())
+                    _v206_upsert_active_rows_to_sqlite(hit, reason="get_active_group_seed_v206")
+        except Exception:
+            rec = None
+    if not rec:
+        return pd.DataFrame()
+    return get_active_records(
+        employee_id=_v206_text(rec.get("employee_id")),
+        employee_name=_v206_text(rec.get("employee_name")),
+        process_name=_v206_text(rec.get("process_name")),
+        start_date=_v206_text(rec.get("start_date")),
+    )
+
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v206_01_active_authority_fallback") -> int:  # type: ignore[override]
+    """Fast count for Finish Work; fallback only when SQLite says zero."""
+    n = 0
+    if callable(_v206_prev_refresh_active_records_for_employee):
+        try:
+            n = int(_v206_prev_refresh_active_records_for_employee(employee_id, employee_name, reason=reason) or 0)
+        except TypeError:
+            try:
+                n = int(_v206_prev_refresh_active_records_for_employee(employee_id, employee_name) or 0)
+            except Exception:
+                n = 0
+        except Exception:
+            n = 0
+    if n > 0:
+        return int(n)
+    auth_df = _v206_active_authority_df(employee_id=employee_id, employee_name=employee_name)
+    auth_df = _v206_remove_rows_closed_in_sqlite(auth_df)
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        _v206_upsert_active_rows_to_sqlite(auth_df, reason=str(reason or "refresh_active_records_for_employee_v206"))
+        return int(len(auth_df))
+    return 0
+
+
+def audit_v206_active_authority_fallback() -> dict:
+    return {
+        "version": "V206",
+        "scope": "services/time_record_service.py backend only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "v205_sqlite_fast_path_preserved": True,
+        "authority_fallback_when_sqlite_active_empty": True,
+        "authority_modules": ["01_time_records", "02_history"],
+        "github_foreground_sync": False,
+        "closed_sqlite_row_resurrection_guard": True,
+    }
+
+# ================= END V206 ACTIVE AUTHORITY FALLBACK =================
+
+# ================= V207 ACTIVE SQLITE STALE AUTHORITY GUARD｜2026-05-29 =================
+# 在 V206 fallback 基礎上，再補一層防呆：若 SQLite active 與 01/02 權威檔同 key 最新狀態衝突，
+# 且權威檔顯示已下班/暫停/完工/已結束，則不得把 SQLite 舊快取顯示到 Finish Work。
+# 本段仍只改後端，不改任何 UI/CSS/theme/table/buttons。
+
+
+def _v207_row_key(row: dict) -> str:
+    rk = _v206_text((row or {}).get("record_key"))
+    if rk:
+        return "rk:" + rk
+    rid = _v206_text((row or {}).get("id"))
+    return "id:" + rid if rid else ""
+
+
+def _v207_latest_authority_by_key(employee_id: str | None = None, employee_name: str | None = None) -> dict[str, dict]:
+    frames: list[pd.DataFrame] = []
+    try:
+        from services.permanent_authority_service import df_from_table as _pa_df_from_table
+        for module_key, rank in (("01_time_records", 1), ("02_history", 2)):
+            try:
+                df = _pa_df_from_table(module_key, "time_records")
+                if isinstance(df, pd.DataFrame) and not df.empty:
+                    df = _v206_normalize_time_records_df(df)
+                    emp_id = _v206_text(employee_id)
+                    emp_name = _v206_text(employee_name)
+                    if emp_id and "employee_id" in df.columns:
+                        df = df.loc[df["employee_id"].map(_v206_text) == emp_id].copy()
+                    if emp_name and "employee_name" in df.columns:
+                        df = df.loc[df["employee_name"].map(_v206_text) == emp_name].copy()
+                    if not df.empty:
+                        df["_v207_source_rank"] = rank
+                        frames.append(df)
+            except Exception:
+                continue
+    except Exception:
+        return {}
+    if not frames:
+        return {}
+    all_df = pd.concat(frames, ignore_index=True, sort=False)
+    if all_df.empty:
+        return {}
+    try:
+        all_df["_v207_updated_sort"] = pd.to_datetime(all_df.get("updated_at", ""), errors="coerce")
+        all_df["_v207_key"] = all_df.apply(lambda r: _v207_row_key(dict(r)), axis=1)
+        all_df = all_df.loc[all_df["_v207_key"].astype(str).str.len() > 0].copy()
+        all_df = all_df.sort_values(["_v207_updated_sort", "_v207_source_rank"], ascending=[True, False], kind="stable")
+        latest = all_df.drop_duplicates("_v207_key", keep="last")
+        return {str(r.get("_v207_key")): dict(r) for _, r in latest.iterrows()}
+    except Exception:
+        out: dict[str, dict] = {}
+        for _, rr in all_df.iterrows():
+            row = dict(rr)
+            k = _v207_row_key(row)
+            if k:
+                out[k] = row
+        return out
+
+
+def _v207_filter_sqlite_active_against_authority(sqlite_df: pd.DataFrame, employee_id: str | None = None, employee_name: str | None = None) -> pd.DataFrame:
+    if sqlite_df is None or not isinstance(sqlite_df, pd.DataFrame) or sqlite_df.empty:
+        return pd.DataFrame()
+    latest = _v207_latest_authority_by_key(employee_id=employee_id, employee_name=employee_name)
+    if not latest:
+        return sqlite_df.reset_index(drop=True)
+    keep: list[bool] = []
+    for _, rr in sqlite_df.iterrows():
+        row = dict(rr)
+        k = _v207_row_key(row)
+        auth_row = latest.get(k) if k else None
+        # 權威檔沒有此 key：代表可能是剛開始、背景尚未同步，保留 SQLite 快速路徑。
+        if not auth_row:
+            keep.append(True)
+            continue
+        auth_active = False
+        try:
+            auth_active = bool(_v206_is_active_df(pd.DataFrame([auth_row])).iloc[0])
+        except Exception:
+            auth_active = False
+        keep.append(auth_active)
+    try:
+        return sqlite_df.loc[keep].reset_index(drop=True)
+    except Exception:
+        return sqlite_df.reset_index(drop=True)
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V207: SQLite fast path + authority fallback + stale-active guard."""
+    sqlite_df = _v206_sqlite_active_df(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    if isinstance(sqlite_df, pd.DataFrame) and not sqlite_df.empty:
+        safe_sqlite_df = _v207_filter_sqlite_active_against_authority(sqlite_df, employee_id=employee_id, employee_name=employee_name)
+        if isinstance(safe_sqlite_df, pd.DataFrame) and not safe_sqlite_df.empty:
+            return safe_sqlite_df.reset_index(drop=True)
+    auth_df = _v206_active_authority_df(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    auth_df = _v206_remove_rows_closed_in_sqlite(auth_df)
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        _v206_upsert_active_rows_to_sqlite(auth_df, reason="get_active_records_v207")
+        return auth_df.reset_index(drop=True)
+    return pd.DataFrame()
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        tmp = df.copy()
+        if "id" in tmp.columns:
+            tmp["_v207_id_sort"] = pd.to_numeric(tmp["id"], errors="coerce").fillna(0)
+            tmp = tmp.sort_values("_v207_id_sort", ascending=False, kind="stable").drop(columns=["_v207_id_sort"], errors="ignore")
+        return dict(tmp.iloc[0].to_dict())
+    except Exception:
+        return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    rec = None
+    try:
+        rec = _v205_query_one("SELECT * FROM time_records WHERE id=?", (int(record_id),)) if "_v205_query_one" in globals() else None
+    except Exception:
+        rec = None
+    if rec:
+        g = get_active_records(
+            employee_id=_v206_text(rec.get("employee_id")),
+            employee_name=_v206_text(rec.get("employee_name")),
+            process_name=_v206_text(rec.get("process_name")),
+            start_date=_v206_text(rec.get("start_date")),
+        )
+        if isinstance(g, pd.DataFrame) and not g.empty:
+            return g.reset_index(drop=True)
+    try:
+        auth_all = _v206_active_authority_df()
+        if isinstance(auth_all, pd.DataFrame) and not auth_all.empty and "id" in auth_all.columns:
+            ids = pd.to_numeric(auth_all["id"], errors="coerce")
+            hit = auth_all.loc[ids == int(record_id)].copy()
+            hit = _v206_remove_rows_closed_in_sqlite(hit)
+            if not hit.empty:
+                rec = dict(hit.iloc[0].to_dict())
+                _v206_upsert_active_rows_to_sqlite(hit, reason="get_active_group_seed_v207")
+                return get_active_records(
+                    employee_id=_v206_text(rec.get("employee_id")),
+                    employee_name=_v206_text(rec.get("employee_name")),
+                    process_name=_v206_text(rec.get("process_name")),
+                    start_date=_v206_text(rec.get("start_date")),
+                )
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v207_01_active_authority_fallback") -> int:  # type: ignore[override]
+    # 不再使用舊 refresh 的 SQLite-only count，避免 stale active / empty cache 誤判。
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    return int(len(df)) if isinstance(df, pd.DataFrame) and not df.empty else 0
+
+
+def audit_v207_active_finish_work_backend_fix() -> dict:
+    return {
+        "version": "V207",
+        "scope": "services/time_record_service.py backend only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "v205_sqlite_fast_path_preserved": True,
+        "authority_fallback_when_sqlite_active_empty": True,
+        "stale_sqlite_active_guard_by_authority": True,
+        "github_foreground_sync": False,
+    }
+
+# ================= END V207 ACTIVE SQLITE STALE AUTHORITY GUARD =================
+
