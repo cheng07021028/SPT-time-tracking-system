@@ -2,30 +2,30 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 17:49:41",
-  "exported_at": "2026-05-29 17:49:41",
+  "updated_at": "2026-05-29 17:49:43",
+  "exported_at": "2026-05-29 17:49:43",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
       {
-        "id": 69164,
+        "id": 69850,
         "source": "v103_merge",
-        "username": "B244",
-        "display_name": "范耀文",
+        "username": "B002",
+        "display_name": "張文品",
         "event_type": "PASSWORD_CHANGE",
         "result": "SUCCESS",
-        "message": "force_password_change_completed; employee_id=B244; roles=operator",
+        "message": "force_password_change_completed; employee_id=B002; roles=operator",
         "module_code": "10_permissions",
-        "login_time": "2026-05-29 17:49:39",
+        "login_time": "2026-05-29 17:49:41",
         "logout_time": "",
         "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
-        "created_at": "2026-05-29 17:49:39"
+        "created_at": "2026-05-29 17:49:41"
       },
       {
-        "id": 67794,
+        "id": 67795,
         "source": "v103_merge",
         "username": "SPT220",
         "display_name": "劉韋廷",
@@ -33,12 +33,12 @@
         "result": "FAIL",
         "message": "密碼錯誤; employee_id=SPT220; roles=operator",
         "module_code": "LOGIN",
-        "login_time": "2026-05-29 17:49:37",
+        "login_time": "2026-05-29 17:49:38",
         "logout_time": "",
         "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
-        "created_at": "2026-05-29 17:49:37"
+        "created_at": "2026-05-29 17:49:38"
       },
       {
         "id": 67110,
