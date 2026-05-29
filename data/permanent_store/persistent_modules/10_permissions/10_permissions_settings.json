@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 13:25:36",
+  "exported_at": "2026-05-29 13:34:16",
   "source": "db_service_write",
   "module_key": "10_permissions",
   "module_code": "10",
@@ -8526,6 +8526,40 @@
         "can_restore": 1,
         "can_manage": 1,
         "updated_at": "2026-05-29 11:28:38"
+      },
+      {
+        "id": 1276,
+        "username": "SPT160",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-29 13:29:17"
+      },
+      {
+        "id": 1277,
+        "username": "SPT160",
+        "module_code": "14",
+        "module_name_zh": "資料健康檢查中心",
+        "module_name_en": "Data Health Center",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0,
+        "updated_at": "2026-05-29 13:29:17"
       }
     ],
     "auth_security_settings": [
@@ -8545,7 +8579,7 @@
   },
   "table_counts": {
     "auth_users": 34,
-    "auth_account_permissions": 469,
+    "auth_account_permissions": 471,
     "auth_security_settings": 2
   }
 }
