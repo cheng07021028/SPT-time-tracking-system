@@ -2,12 +2,67 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "time_record_delete_guard",
   "kind": "records",
-  "updated_at": "2026-05-29 14:31:34",
-  "exported_at": "2026-05-29 14:31:34",
+  "updated_at": "2026-05-29 14:32:50",
+  "exported_at": "2026-05-29 14:32:50",
   "reason": "V196 hard delete guard",
   "empty_authoritative": false,
   "tables": {
     "deleted_time_records": [
+      {
+        "row": {
+          "id": 425,
+          "跨日提醒 / Cross Day Alert": "⚠ 跨日結束｜請確認是否昨天忘記按結束",
+          "employee_id": "SSS",
+          "status": "完工",
+          "employee_name": "SSS",
+          "work_order": "NA",
+          "department": "SSS",
+          "title": "SSS",
+          "part_no": "",
+          "type_name": "",
+          "process_name": "6S",
+          "start_action": "開始",
+          "start_timestamp": "2026-05-29 13:47:04",
+          "end_action": "完工",
+          "end_timestamp": "2026-05-29 13:54:23",
+          "remark": "",
+          "start_date": "2026-05-28",
+          "start_time": "13:47:04",
+          "end_date": "2026-05-29",
+          "end_time": "13:54:23",
+          "work_hours": "21:52:19",
+          "assembly_location": "",
+          "group_key": "SSS|6S|2026-05-29",
+          "跨日日期 / Cross Day Date": "2026-05-28 → 2026-05-29",
+          "is_group_work": false,
+          "source": "streamlit",
+          "created_at": "2026-05-29 13:47:04",
+          "updated_at": "2026-05-29 14:02:17",
+          "record_key": "SSS|NA|6S|2026-05-29 13:47:04|54c21e36",
+          "department_emp": "SSS",
+          "title_emp": "SSS"
+        },
+        "id": 425,
+        "record_key": "SSS|NA|6S|2026-05-29 13:47:04|54c21e36",
+        "business_key": "SSS|SSS|NA|6S|2026-05-29 13:47:04",
+        "deleted_at": "2026-05-29 14:32:48",
+        "source": "V196",
+        "reason": "02 歷史紀錄啟動編輯後整列刪除 / V199 02 history same-lane delete",
+        "identities": [
+          "biz:SSS|SSS|NA|6S|2026-05-29 13:47:04",
+          "id:425",
+          "record_key:SSS|NA|6S|2026-05-29 13:47:04|54c21e36"
+        ]
+      },
+      {
+        "id": 425,
+        "identities": [
+          "id:425"
+        ],
+        "deleted_at": "2026-05-29 14:32:48",
+        "source": "V196",
+        "reason": "02 歷史紀錄啟動編輯後整列刪除 / V199 02 history same-lane delete"
+      },
       {
         "row": {
           "id": 422,
@@ -242,6 +297,6 @@
   },
   "settings": {},
   "table_counts": {
-    "deleted_time_records": 10
+    "deleted_time_records": 12
   }
 }
