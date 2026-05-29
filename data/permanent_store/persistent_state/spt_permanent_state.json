@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 13:29:42",
+  "exported_at": "2026-05-29 13:33:35",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
   "business_row_count": 52,
@@ -10,7 +10,7 @@
     "auth_security_settings": 2,
     "auth_users": 34,
     "employees": 0,
-    "login_logs": 397,
+    "login_logs": 398,
     "process_options": 17,
     "rest_periods": 5,
     "security_settings": 2,
@@ -14552,6 +14552,21 @@
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 23:47:57"
+      },
+      {
+        "id": 50002,
+        "username": "SPT158",
+        "display_name": "劉定澤",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=SPT158; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-29 13:33:25",
+        "logout_time": "2026-05-29 13:33:25",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 13:33:25"
       }
     ],
     "process_options": [
