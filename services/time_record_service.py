@@ -13903,3 +13903,272 @@ def audit_v200_log_completeness() -> dict:
     return out
 
 # =================== END V200 ROW-LEVEL TIME RECORD LOGGING ===================
+
+# ============================================================
+# V201｜Finish Work stale-id compatibility repair
+# ============================================================
+# Symptom fixed:
+# - pages/01 passes active2["id"] to finish_work().  After local-first/cache
+#   changes, get_active_same_work() can return a still-active authority row whose
+#   SQLite cache row is missing or out of sync.  The old core finish_work() then
+#   raises: 「找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。」
+# - This repair keeps the UI unchanged and makes finish_work() self-heal the
+#   single missing SQLite cache row from 01/02 authority before retrying.
+# ============================================================
+try:
+    _v201_prev_finish_work = finish_work
+except Exception:
+    _v201_prev_finish_work = None
+try:
+    _v201_prev_get_active_same_work = get_active_same_work
+except Exception:
+    _v201_prev_get_active_same_work = None
+
+
+def _v201_text(value) -> str:
+    try:
+        if value is None:
+            return ""
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    s = str(value).strip()
+    return "" if s.lower() in {"none", "nan", "nat", "null"} else s
+
+
+def _v201_int(value):
+    try:
+        if value is None:
+            return None
+        s = str(value).strip()
+        if not s or s.lower() in {"none", "nan", "nat", "null"}:
+            return None
+        return int(float(s))
+    except Exception:
+        return None
+
+
+def _v201_is_terminal_row(row: dict) -> bool:
+    status = _v201_text(row.get("status") or row.get("狀態") or row.get("Status"))
+    end_ts = _v201_text(row.get("end_timestamp") or row.get("End Timestamp") or row.get("結束時間戳") or row.get("結束時間"))
+    return bool(end_ts) or status in {"下班", "暫停", "完工", "已結束", "結束"}
+
+
+def _v201_sqlite_row_exists(record_id) -> bool:
+    rid = _v201_int(record_id)
+    if rid is None:
+        return False
+    try:
+        r = query_one("SELECT id FROM time_records WHERE id=?", (rid,)) or {}
+        return _v201_int(r.get("id")) is not None
+    except Exception:
+        return False
+
+
+def _v201_any_df_by_id(record_id) -> pd.DataFrame:
+    rid = _v201_int(record_id)
+    if rid is None:
+        return pd.DataFrame()
+    frames = []
+    for getter in (
+        lambda: _v194_sqlite_df([rid]) if callable(globals().get("_v194_sqlite_df")) else pd.DataFrame(),
+        lambda: _v194_authority_df("02_history") if callable(globals().get("_v194_authority_df")) else pd.DataFrame(),
+        lambda: _v194_authority_df("01_time_records") if callable(globals().get("_v194_authority_df")) else pd.DataFrame(),
+    ):
+        try:
+            df = getter()
+            if isinstance(df, pd.DataFrame) and not df.empty and "id" in df.columns:
+                sub = df[pd.to_numeric(df["id"], errors="coerce") == int(rid)].copy()
+                if not sub.empty:
+                    frames.append(sub)
+        except Exception:
+            pass
+    if not frames:
+        return pd.DataFrame()
+    try:
+        merged = _v194_merge_frames(frames) if callable(globals().get("_v194_merge_frames")) else pd.concat(frames, ignore_index=True)
+        if isinstance(merged, pd.DataFrame) and not merged.empty:
+            return merged.reset_index(drop=True)
+    except Exception:
+        pass
+    try:
+        return pd.concat(frames, ignore_index=True).drop_duplicates(subset=["id"], keep="last").reset_index(drop=True)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v201_row_by_id(record_id) -> dict | None:
+    df = _v201_any_df_by_id(record_id)
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return None
+    try:
+        # Prefer still-active rows. If all are terminal, return latest terminal row.
+        rows = [dict(r.to_dict()) for _, r in df.iterrows()]
+        active = [r for r in rows if not _v201_is_terminal_row(r)]
+        pool = active or rows
+        return pool[-1] if pool else None
+    except Exception:
+        try:
+            return dict(df.iloc[-1].to_dict())
+        except Exception:
+            return None
+
+
+def _v201_hydrate_sqlite_row(row: dict, reason: str = "v201_hydrate_missing_sqlite_row") -> int:
+    if not row:
+        return 0
+    try:
+        df = pd.DataFrame([row])
+        if callable(globals().get("_v104_upsert_rows_to_sqlite")):
+            n = int(_v104_upsert_rows_to_sqlite(df) or 0)
+        elif callable(globals().get("_v194_sync_sqlite_cache_from_df")):
+            # Fallback may rewrite cache, so use only when row-level upsert is unavailable.
+            _v194_sync_sqlite_cache_from_df(df)
+            n = 1
+        else:
+            n = 0
+        try:
+            write_log("V201_SQLITE_ROW_HYDRATE", f"{reason}: 已由 01/02 權威資料回填 SQLite 單筆 cache，id={row.get('id')}", "time_records", row.get("id"), level="INFO")
+        except Exception:
+            pass
+        return n
+    except Exception as exc:
+        try:
+            write_log("V201_SQLITE_ROW_HYDRATE_ERROR", f"{reason}: 回填 SQLite 單筆 cache 失敗 id={row.get('id')}: {exc}", "time_records", row.get("id"), level="ERROR")
+        except Exception:
+            pass
+        return 0
+
+
+def _v201_finish_authority_only(row: dict, end_action: str, remark: str = "") -> int:
+    """Last-resort finish when SQLite cannot be hydrated. Updates 01/02 local authority only."""
+    try:
+        if not row or _v201_is_terminal_row(row):
+            return 0
+        now = _now() if callable(globals().get("_now")) else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            end_date, end_time = split_timestamp(now)
+        except Exception:
+            end_date, end_time = now[:10], now[11:19]
+        status = end_action if end_action in ("下班", "暫停", "完工") else "已結束"
+        start_ts = _v201_text(row.get("start_timestamp") or row.get("Start Timestamp") or row.get("開始時間戳") or row.get("開始時間"))
+        try:
+            hours = calculate_work_hours(start_ts, now) if start_ts and callable(globals().get("calculate_work_hours")) else 0
+        except Exception:
+            hours = 0
+        old_remark = _v201_text(row.get("remark") or row.get("備註"))
+        new_remark = old_remark
+        if remark:
+            new_remark = (new_remark + "；" if new_remark else "") + str(remark)
+        row2 = dict(row)
+        row2.update({
+            "status": status,
+            "end_action": end_action,
+            "end_timestamp": now,
+            "end_date": end_date,
+            "end_time": end_time,
+            "work_hours": round(float(hours or 0), 2),
+            "remark": new_remark,
+            "updated_at": now,
+            "source": _v201_text(row2.get("source")) or "V201_AUTHORITY_ONLY_FINISH",
+        })
+        current = _v194_current_merged(include_sqlite=True) if callable(globals().get("_v194_current_merged")) else pd.DataFrame()
+        merged = _v194_merge_frames([current, pd.DataFrame([row2])]) if callable(globals().get("_v194_merge_frames")) else pd.DataFrame([row2])
+        n = _v194_save_0102_local(merged, "finish_work_v201_authority_only") if callable(globals().get("_v194_save_0102_local")) else 0
+        _v201_hydrate_sqlite_row(row2, reason="v201_finish_authority_only_sync_sqlite")
+        try:
+            write_log("V201_FINISH_AUTHORITY_ONLY", f"SQLite 找不到該筆，已以 01/02 權威資料完成結束：id={row2.get('id')} action={end_action}", "time_records", row2.get("id"), level="WARN")
+        except Exception:
+            pass
+        return 1 if n is not None else 1
+    except Exception as exc:
+        try:
+            write_log("V201_FINISH_AUTHORITY_ONLY_ERROR", f"V201 權威資料 fallback 結束失敗：{exc}", "time_records", row.get("id") if row else "", level="ERROR")
+        except Exception:
+            pass
+        raise
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V201-compatible finish_work.
+
+    If the active row is visible from 01/02 authority but the SQLite cache row is
+    missing after reboot/cache repair, hydrate that single row and retry.  This
+    prevents 01 Finish/Pause from crashing while preserving display/theme logic.
+    """
+    if not callable(_v201_prev_finish_work):
+        raise RuntimeError("finish_work implementation is unavailable")
+    try:
+        return int(_v201_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    except ValueError as exc:
+        msg = str(exc)
+        if "找不到工時紀錄" not in msg:
+            raise
+        row = _v201_row_by_id(record_id)
+        if not row:
+            raise
+        if _v201_is_terminal_row(row):
+            return 0
+        _v201_hydrate_sqlite_row(row, reason="v201_finish_retry_before_core")
+        try:
+            return int(_v201_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+        except ValueError as exc2:
+            if "找不到工時紀錄" in str(exc2):
+                return int(_v201_finish_authority_only(row, end_action, remark) or 0)
+            raise
+
+
+def get_active_same_work(
+    employee_id: str,
+    work_order: str,
+    process_name: str,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+) -> dict | None:  # type: ignore[override]
+    """Prefer active same-work rows that have an SQLite cache row, then fallback to authority."""
+    try:
+        df = get_active_records(
+            employee_id=employee_id,
+            process_name=process_name,
+            start_date=start_date,
+            employee_name=employee_name,
+        )
+        if callable(globals().get("_v197_filter_active_params")):
+            df = _v197_filter_active_params(df, work_order=work_order)
+        elif isinstance(df, pd.DataFrame) and not df.empty and "work_order" in df.columns:
+            df = df[df["work_order"].astype(str).str.strip() == str(work_order).strip()]
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            tmp = df.copy()
+            if "id" in tmp.columns:
+                tmp["_v201_id"] = pd.to_numeric(tmp["id"], errors="coerce")
+                tmp["_v201_sqlite_exists"] = tmp["_v201_id"].map(lambda x: 1 if _v201_sqlite_row_exists(x) else 0)
+                tmp = tmp.sort_values(["_v201_sqlite_exists", "_v201_id"], ascending=[False, False], kind="stable")
+                tmp = tmp.drop(columns=["_v201_sqlite_exists", "_v201_id"], errors="ignore")
+            return dict(tmp.iloc[0].to_dict())
+    except Exception:
+        pass
+    if callable(_v201_prev_get_active_same_work):
+        try:
+            return _v201_prev_get_active_same_work(employee_id, work_order, process_name, start_date=start_date, employee_name=employee_name)
+        except TypeError:
+            try:
+                return _v201_prev_get_active_same_work(employee_id, work_order, process_name)
+            except Exception:
+                return None
+        except Exception:
+            return None
+    return None
+
+
+def audit_v201_finish_work_stale_id_repair() -> dict:
+    return {
+        "version": "V201",
+        "finish_work_stale_sqlite_id_repair": True,
+        "single_row_sqlite_hydration_before_retry": True,
+        "authority_only_last_resort_finish": True,
+        "get_active_same_work_prefers_sqlite_backed_row": True,
+        "visual_change": False,
+    }
+
+# ================= END V201 FINISH WORK STALE-ID COMPATIBILITY REPAIR =================
