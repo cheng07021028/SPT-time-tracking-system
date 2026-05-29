@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 18:29:17",
-  "exported_at": "2026-05-29 18:29:17",
+  "updated_at": "2026-05-29 18:29:31",
+  "exported_at": "2026-05-29 18:29:31",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -15175,11 +15175,35 @@
         "detail": "today_records_v210_canonical_display",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1879,
+        "log_time": "2026-05-29 18:29:27",
+        "user_name": "admin",
+        "action_type": "V200_ROW_DELETE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "328",
+        "message": "02 歷史紀錄刪除逐筆紀錄｜02 歷史紀錄啟動編輯後整列刪除｜ID=328｜B002 張文品 21M0241-01 / 前置鈑金",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"before\", \"record_id\": \"328\", \"record_key\": \"B002|21M0241-01|前置鈑金|2026-05-29 01:10:53|bd84931b\", \"employee_id\": \"B002\", \"employee_name\": \"張文品\", \"work_order\": \"21M0241-01\", \"process_name\": \"前置鈑金\", \"start_timestamp\": \"2026-05-29 01:10:53\", \"end_timestamp\": \"2026-05-29 01:19:29\", \"status\": \"暫停\", \"row_snapshot\": {\"id\": 328, \"record_key\": \"B002|21M0241-01|前置鈑金|2026-05-29 01:10:53|bd84931b\", \"status\": \"暫停\", \"work_order\": \"21M0241-01\", \"part_no\": \"4TRSC020-004-02\", \"type_name\": \"NTB 3 PORT\", \"process_name\": \"前置鈑金\", \"employee_id\": \"B002\", \"employee_name\": \"張文品\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 01:10:53\", \"end_action\": \"暫停\", \"end_timestamp\": \"2026-05-29 01:19:29\", \"remark\": \"\", \"start_date\": \"2026-05-29\", \"start_time\": \"01:10:53\", \"end_date\": \"2026-05-29\", \"end_time\": \"01:19:29\", \"work_hours\": 0.14, \"assembly_location\": \"竹東\", \"group_key\": \"B002|前置鈑金|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 01:10:53\", \"updated_at\": \"2026-05-29 01:19:29\"}}\n__spt_log_uid=20751d9f588d4fef9fe5a8dcfc351e89",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1878,
+        "log_time": "2026-05-29 18:29:27",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V199",
+        "target_table": "time_records",
+        "target_id": "328",
+        "message": "02 歷史紀錄啟動編輯後整列刪除 / V199 02 history same-lane delete：V199 01/02 same-lane reboot-proof hard delete；ids=[328]；sqlite_deleted=1；authority_before=67；remaining=0",
+        "detail": "__spt_log_uid=7379943b95f4493b82e8711de8079cf7",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1264
+    "system_logs": 1266
   }
 }
