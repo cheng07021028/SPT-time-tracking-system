@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 13:17:04",
-  "exported_at": "2026-05-29 13:17:04",
+  "updated_at": "2026-05-29 13:17:07",
+  "exported_at": "2026-05-29 13:17:07",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -6523,11 +6523,23 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1508,
+        "log_time": "2026-05-29 13:17:04",
+        "user_name": "SPT231",
+        "action_type": "V200_ROW_START_WORK",
+        "target_table": "time_records",
+        "target_id": "407",
+        "message": "開始作業逐筆紀錄｜ID=407｜SPT231 陳建勳 26M0095-10 / 包機",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"407\", \"record_key\": \"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\", \"employee_id\": \"SPT231\", \"employee_name\": \"陳建勳\", \"work_order\": \"26M0095-10\", \"process_name\": \"包機\", \"start_timestamp\": \"2026-05-29 13:16:57\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 407, \"record_key\": \"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\", \"status\": \"作業中\", \"work_order\": \"26M0095-10\", \"part_no\": \"4TRSC131-005-05\", \"type_name\": \"2LP Asymtek EFEM (wafer)\", \"process_name\": \"包機\", \"employee_id\": \"SPT231\", \"employee_name\": \"陳建勳\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 13:16:57\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-29\", \"start_time\": \"13:16:57\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": 0.0, \"assembly_location\": \"竹東\", \"group_key\": \"SPT231|包機|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 13:16:57\", \"updated_at\": \"2026-05-29 13:16:57\"}}\n__spt_log_uid=d6076a08d4dd48f997b1820ff573ce6f\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:17:04\",\"action_type\":\"V200_ROW_START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"407\",\"target_ids\":[407],\"message\":\"開始作業逐筆紀錄｜ID=407｜SPT231 陳建勳 26M0095-10 / 包機\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"identity_key\":\"record_key:SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"id\":\"407\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":407,\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"status\":\"作業中\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:16:57\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT231|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:16:57\",\"updated_at\":\"2026-05-29 13:16:57\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":407,\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"status\":\"作業中\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:16:57\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT231|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:16:57\",\"updated_at\":\"2026-05-29 13:16:57\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":407,\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"status\":\"作業中\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:16:57\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT231|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:16:57\",\"updated_at\":\"2026-05-29 13:16:57\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":407,\"record_key\":\"SPT231|26M0095-10|包機|2026-05-29 13:16:57|198d7ab2\",\"status\":\"作業中\",\"work_order\":\"26M0095-10\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)\",\"process_name\":\"包機\",\"employee_id\":\"SPT231\",\"employee_name\":\"陳建勳\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:16:57\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:16:57\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT231|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:16:57\",\"updated_at\":\"2026-05-29 13:16:57\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"0a5c41bbfbddb8798bc26745422480c29bc71a5cf1009fa6f248bd495fb4a65a\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 543
+    "system_logs": 544
   }
 }
