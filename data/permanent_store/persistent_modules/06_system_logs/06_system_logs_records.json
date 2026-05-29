@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 13:29:46",
+  "exported_at": "2026-05-29 13:34:16",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -13251,10 +13251,54 @@
         "message": "UPDATE security_users",
         "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
         "level": "INFO"
+      },
+      {
+        "id": 1743,
+        "log_time": "2026-05-29 13:29:36",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1744,
+        "log_time": "2026-05-29 13:29:39",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1745,
+        "log_time": "2026-05-29 13:29:39",
+        "user_name": "SPT160",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO"
+      },
+      {
+        "id": 1746,
+        "log_time": "2026-05-29 13:29:39",
+        "user_name": "SPT160",
+        "action_type": "UPDATE",
+        "target_table": "security_users",
+        "target_id": "",
+        "message": "UPDATE security_users",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 1204
+    "system_logs": 1208
   }
 }
