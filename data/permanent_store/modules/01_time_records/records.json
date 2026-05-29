@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-29 13:48:10",
-  "exported_at": "2026-05-29 13:48:10",
-  "reason": "start_work_v195_consistency_01",
+  "updated_at": "2026-05-29 13:49:44",
+  "exported_at": "2026-05-29 13:49:44",
+  "reason": "finish_work_v194_local_first_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -1307,7 +1307,7 @@
       {
         "id": 373,
         "record_key": "SPT105|22M0162-91|Packing|2026-05-29 09:45:29|4082d7ba",
-        "status": "作業中",
+        "status": "完工",
         "work_order": "22M0162-91",
         "part_no": "4TRSC020-004-02->4TRSC020-004-06",
         "type_name": "NTB 3 LP +快拆+EMO",
@@ -1316,20 +1316,20 @@
         "employee_name": "劉秀鳳",
         "start_action": "開始",
         "start_timestamp": "2026-05-29 09:45:29",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "完工",
+        "end_timestamp": "2026-05-29 13:49:26",
         "remark": "",
         "start_date": "2026-05-29",
         "start_time": "09:45:29",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-29",
+        "end_time": "13:49:26",
+        "work_hours": 2.82,
         "assembly_location": "竹東",
         "group_key": "SPT105|Packing|2026-05-29",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-29 09:45:29",
-        "updated_at": "2026-05-29 09:45:29"
+        "updated_at": "2026-05-29 13:49:26"
       },
       {
         "id": 372,
