@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-29 13:19:16",
-  "exported_at": "2026-05-29 13:19:16",
+  "updated_at": "2026-05-29 18:18:21",
+  "exported_at": "2026-05-29 18:18:21",
   "reason": "v367_column_settings_saved_v72",
   "empty_authoritative": false,
   "tables": {},
@@ -258,7 +258,7 @@
             "order": 7
           }
         },
-        "updated_at": "2026-05-29 13:19:16",
+        "updated_at": "2026-05-29 18:18:21",
         "reason": "v367_column_settings_saved"
       },
       "80435544260397582": {
@@ -818,6 +818,20 @@
             "visible": true,
             "width": "medium",
             "order": 24
+          },
+          "department": {
+            "source": "department",
+            "label": "單位 / Department",
+            "visible": true,
+            "width": "medium",
+            "order": 25
+          },
+          "title": {
+            "source": "title",
+            "label": "職稱 / Title",
+            "visible": true,
+            "width": "medium",
+            "order": 26
           }
         },
         "updated_at": "2026-05-21 21:44:00",
