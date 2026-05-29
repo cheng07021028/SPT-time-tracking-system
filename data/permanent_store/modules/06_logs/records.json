@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 18:30:30",
-  "exported_at": "2026-05-29 18:30:30",
+  "updated_at": "2026-05-29 18:32:54",
+  "exported_at": "2026-05-29 18:32:54",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -15199,11 +15199,47 @@
         "detail": "__spt_log_uid=7379943b95f4493b82e8711de8079cf7",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 1749,
+        "log_time": "2026-05-29 18:32:50",
+        "user_name": "admin",
+        "action_type": "CLEAR_TODAY_FINISHED_VIEW",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01 工時紀錄手動重新整理顯示：cutoff=2026-05-29 02:00:00，隱藏設定時間前已結束紀錄，不影響 02 歷史紀錄，筆數=1",
+        "detail": "__spt_log_uid=aae6a9c11afc4d798d053a95e305a8c2",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1748,
+        "log_time": "2026-05-29 18:32:50",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "app_settings",
+        "target_id": "",
+        "message": "DELETE app_settings",
+        "detail": "DELETE FROM app_settings WHERE setting_key='live_page_restore_hidden_reset_key'",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1747,
+        "log_time": "2026-05-29 18:32:50",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "app_settings",
+        "target_id": "",
+        "message": "INSERT app_settings",
+        "detail": "INSERT INTO app_settings(setting_key, setting_value, note, updated_at)\n        VALUES (?, ?, ?, ?)\n        ON CONFLICT(setting_key) DO UPDATE SET\n            setting_value=excluded.setting_value,\n            note=excluded.note,\n            updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1266
+    "system_logs": 1269
   }
 }
