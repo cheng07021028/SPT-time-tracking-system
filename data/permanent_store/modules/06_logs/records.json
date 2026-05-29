@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 13:07:53",
-  "exported_at": "2026-05-29 13:07:53",
+  "updated_at": "2026-05-29 13:14:52",
+  "exported_at": "2026-05-29 13:14:52",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -6295,11 +6295,131 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1356,
+        "log_time": "2026-05-29 13:11:07",
+        "user_name": "SPT239",
+        "action_type": "V200_ROW_START_WORK",
+        "target_table": "time_records",
+        "target_id": "401",
+        "message": "開始作業逐筆紀錄｜ID=401｜SPT239 麥可 25M0694-01 / 清潔",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"401\", \"record_key\": \"SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\", \"employee_id\": \"SPT239\", \"employee_name\": \"麥可\", \"work_order\": \"25M0694-01\", \"process_name\": \"清潔\", \"start_timestamp\": \"2026-05-29 13:10:08\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 401, \"record_key\": \"SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\", \"status\": \"作業中\", \"work_order\": \"25M0694-01\", \"part_no\": \"4TRSC122-SB2-13\", \"type_name\": \"SORTER RSC121 SB (RR757)\", \"process_name\": \"清潔\", \"employee_id\": \"SPT239\", \"employee_name\": \"麥可\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 13:10:08\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-29\", \"start_time\": \"13:10:08\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": 0.0, \"assembly_location\": \"竹東\", \"group_key\": \"SPT239|清潔|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 13:10:08\", \"updated_at\": \"2026-05-29 13:10:08\"}}\n__spt_log_uid=67daba122aca4b2fa8a322abcc5f3b90\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:11:07\",\"action_type\":\"V200_ROW_START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"401\",\"target_ids\":[401],\"message\":\"開始作業逐筆紀錄｜ID=401｜SPT239 麥可 25M0694-01 / 清潔\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\",\"identity_key\":\"record_key:SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\",\"id\":\"401\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 13:10:08\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":401,\"record_key\":\"SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:10:08\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:10:08\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:10:08\",\"updated_at\":\"2026-05-29 13:10:08\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":401,\"record_key\":\"SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:10:08\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:10:08\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:10:08\",\"updated_at\":\"2026-05-29 13:10:08\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":401,\"record_key\":\"SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:10:08\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:10:08\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:10:08\",\"updated_at\":\"2026-05-29 13:10:08\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":401,\"record_key\":\"SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:10:08\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:10:08\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:10:08\",\"updated_at\":\"2026-05-29 13:10:08\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"c84025001d0aa475f2871239d547cd22cc543595414647819c0b7eb229966da2\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1355,
+        "log_time": "2026-05-29 13:11:03",
+        "user_name": "SPT239",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "401",
+        "message": "麥可 開始 25M0694-01 / 清潔",
+        "detail": "__spt_log_uid=4ea7b576167b4bb098d45180df0f0f60\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:11:03\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"401\",\"target_ids\":[401],\"message\":\"麥可 開始 25M0694-01 / 清潔\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\",\"identity_key\":\"record_key:SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\",\"id\":\"401\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 13:10:08\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":401,\"record_key\":\"SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:10:08\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:10:08\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:10:08\",\"updated_at\":\"2026-05-29 13:10:08\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":401,\"record_key\":\"SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:10:08\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:10:08\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:10:08\",\"updated_at\":\"2026-05-29 13:10:08\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":401,\"record_key\":\"SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:10:08\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:10:08\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:10:08\",\"updated_at\":\"2026-05-29 13:10:08\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":401,\"record_key\":\"SPT239|25M0694-01|清潔|2026-05-29 13:10:08|4df455cb\",\"status\":\"作業中\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:10:08\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:10:08\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT239|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:10:08\",\"updated_at\":\"2026-05-29 13:10:08\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"19e01c7af151062801179a0ab43ecd69dace92d3822c3271132b1993b37c498c\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1354,
+        "log_time": "2026-05-29 13:11:03",
+        "user_name": "SPT239",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1430,
+        "log_time": "2026-05-29 13:14:47",
+        "user_name": "SPT208",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "404",
+        "message": "邱珍娜 開始 26M0095-07 / 清潔",
+        "detail": "__spt_log_uid=b884fcb07ee1460b86d4d7882ec71b66\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:14:47\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"404\",\"target_ids\":[404],\"message\":\"邱珍娜 開始 26M0095-07 / 清潔\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT208|26M0095-07|清潔|2026-05-29 13:14:09|81d21f43\",\"identity_key\":\"record_key:SPT208|26M0095-07|清潔|2026-05-29 13:14:09|81d21f43\",\"id\":\"404\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"work_order\":\"26M0095-07\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)(宏田)\",\"process_name\":\"清潔\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 13:14:09\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":404,\"record_key\":\"SPT208|26M0095-07|清潔|2026-05-29 13:14:09|81d21f43\",\"status\":\"作業中\",\"work_order\":\"26M0095-07\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)(宏田)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:14:09\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:14:09\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"宏田\",\"group_key\":\"SPT208|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:14:09\",\"updated_at\":\"2026-05-29 13:14:09\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":404,\"record_key\":\"SPT208|26M0095-07|清潔|2026-05-29 13:14:09|81d21f43\",\"status\":\"作業中\",\"work_order\":\"26M0095-07\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)(宏田)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:14:09\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:14:09\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"宏田\",\"group_key\":\"SPT208|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:14:09\",\"updated_at\":\"2026-05-29 13:14:09\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":404,\"record_key\":\"SPT208|26M0095-07|清潔|2026-05-29 13:14:09|81d21f43\",\"status\":\"作業中\",\"work_order\":\"26M0095-07\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)(宏田)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:14:09\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:14:09\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"宏田\",\"group_key\":\"SPT208|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:14:09\",\"updated_at\":\"2026-05-29 13:14:09\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":404,\"record_key\":\"SPT208|26M0095-07|清潔|2026-05-29 13:14:09|81d21f43\",\"status\":\"作業中\",\"work_order\":\"26M0095-07\",\"part_no\":\"4TRSC131-005-05\",\"type_name\":\"2LP Asymtek EFEM (wafer)(宏田)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:14:09\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:14:09\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"宏田\",\"group_key\":\"SPT208|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:14:09\",\"updated_at\":\"2026-05-29 13:14:09\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"893822c1762c5ccd5027c32d5dd97880e28979282dbf3229b05436dcb0d9e784\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1429,
+        "log_time": "2026-05-29 13:14:46",
+        "user_name": "SPT208",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1428,
+        "log_time": "2026-05-29 13:14:45",
+        "user_name": "SPT174",
+        "action_type": "UPDATE",
+        "target_table": "security_users",
+        "target_id": "",
+        "message": "UPDATE security_users",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1427,
+        "log_time": "2026-05-29 13:14:45",
+        "user_name": "SPT174",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1426,
+        "log_time": "2026-05-29 13:14:45",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1412,
+        "log_time": "2026-05-29 13:14:45",
+        "user_name": "appuser",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1411,
+        "log_time": "2026-05-29 13:14:45",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 524
+    "system_logs": 534
   }
 }
