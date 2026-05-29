@@ -2,12 +2,39 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-29 08:39:48",
-  "exported_at": "2026-05-29 08:39:48",
+  "updated_at": "2026-05-29 08:40:19",
+  "exported_at": "2026-05-29 08:40:19",
   "reason": "start_work_v194_local_first_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
+      {
+        "id": 335,
+        "record_key": "B256|21M0241-01|左右塔組立|2026-05-29 08:40:17|c8670fcc",
+        "status": "作業中",
+        "work_order": "21M0241-01",
+        "part_no": "4TRSC020-004-02",
+        "type_name": "NTB 3 PORT",
+        "process_name": "左右塔組立",
+        "employee_id": "B256",
+        "employee_name": "莊翔宇",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 08:40:17",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "08:40:17",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B256|左右塔組立|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 08:40:17",
+        "updated_at": "2026-05-29 08:40:17"
+      },
       {
         "id": 334,
         "record_key": "B244|25MN0014-10|左右塔組立|2026-05-29 08:39:36|8950e102",
@@ -61,11 +88,38 @@
         "source": "streamlit",
         "created_at": "2026-05-29 08:39:10",
         "updated_at": "2026-05-29 08:39:10"
+      },
+      {
+        "id": 332,
+        "record_key": "B228|26N4001-07|配電|2026-05-29 08:35:05|d734c53c",
+        "status": "作業中",
+        "work_order": "26N4001-07",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "配電",
+        "employee_id": "B228",
+        "employee_name": "溫翠茹",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 08:35:05",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "08:35:05",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B228|配電|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 08:35:05",
+        "updated_at": "2026-05-29 08:35:05"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 2
+    "time_records": 4
   }
 }
