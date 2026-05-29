@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-29 08:55:56",
-  "exported_at": "2026-05-29 08:55:56",
-  "reason": "start_work_v194_local_first_01",
+  "updated_at": "2026-05-29 08:55:57",
+  "exported_at": "2026-05-29 08:55:57",
+  "reason": "start_work_v195_consistency_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -34,6 +34,33 @@
         "source": "streamlit",
         "created_at": "2026-05-29 08:55:51",
         "updated_at": "2026-05-29 08:55:51"
+      },
+      {
+        "id": 344,
+        "record_key": "B235|25M0785-02|配電|2026-05-29 08:55:47|9d57c181",
+        "status": "作業中",
+        "work_order": "25M0785-02",
+        "part_no": "PSRSC131-N01-04",
+        "type_name": "PSRSC131-N01",
+        "process_name": "配電",
+        "employee_id": "B235",
+        "employee_name": "徐聖淇",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 08:55:47",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "08:55:47",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B235|配電|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 08:55:47",
+        "updated_at": "2026-05-29 08:55:47"
       },
       {
         "id": 343,
@@ -336,6 +363,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 12
+    "time_records": 13
   }
 }
