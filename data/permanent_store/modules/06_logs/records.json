@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 16:51:45",
-  "exported_at": "2026-05-29 16:51:45",
+  "updated_at": "2026-05-29 16:51:52",
+  "exported_at": "2026-05-29 16:51:52",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -12427,11 +12427,47 @@
         "detail": "get_active_records_v207\n__spt_log_uid=2375ab77fe474ba1867058d56b7a6bba",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 16,
+        "log_time": "2026-05-29 16:51:49",
+        "user_name": "SPT227",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v207",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 15,
+        "log_time": "2026-05-29 16:51:49",
+        "user_name": "SPT227",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_group_seed_v207",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 13,
+        "log_time": "2026-05-29 16:51:48",
+        "user_name": "SPT227",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v207\n__spt_log_uid=937ae542b69a49528e7e82b9675d9a23",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1035
+    "system_logs": 1038
   }
 }
