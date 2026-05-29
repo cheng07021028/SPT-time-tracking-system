@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 13:44:16",
-  "exported_at": "2026-05-29 13:44:16",
+  "updated_at": "2026-05-29 13:47:40",
+  "exported_at": "2026-05-29 13:47:40",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -7567,11 +7567,71 @@
         "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 2016,
+        "log_time": "2026-05-29 13:44:39",
+        "user_name": "SPT138",
+        "action_type": "V200_ROW_FINISH_WORK",
+        "target_table": "time_records",
+        "target_id": "364",
+        "message": "結束作業逐筆紀錄｜動作=完工｜ID=364｜SPT138 蘇雍盛 V3141245 / GPTC Robot Teaching機構調整",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"364\", \"record_key\": \"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\", \"employee_id\": \"SPT138\", \"employee_name\": \"蘇雍盛\", \"work_order\": \"V3141245\", \"process_name\": \"GPTC Robot Teaching機構調整\", \"start_timestamp\": \"2026-05-29 09:31:48\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 364, \"record_key\": \"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\", \"status\": \"作業中\", \"work_order\": \"V3141245\", \"part_no\": \"PP411390041\", \"type_name\": \"BENCH 300 LPR Stripper Auto 2C 1Q 2D\", \"process_name\": \"GPTC Robot Teaching機構調整\", \"employee_id\": \"SPT138\", \"employee_name\": \"蘇雍盛\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 09:31:48\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"量測機台的震動值\", \"start_date\": \"2026-05-29\", \"start_time\": \"09:31:48\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": 0.0, \"assembly_location\": \"竹東\", \"group_key\": \"SPT138|GPTC Robot Teaching機構調整|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 09:31:48\", \"updated_at\": \"2026-05-29 09:31:48\"}}\n__spt_log_uid=1b71011801774b2583ea0a5f0fbd3ff3\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:44:39\",\"action_type\":\"V200_ROW_FINISH_WORK\",\"target_table\":\"time_records\",\"target_id\":\"364\",\"target_ids\":[364],\"message\":\"結束作業逐筆紀錄｜動作=完工｜ID=364｜SPT138 蘇雍盛 V3141245 / GPTC Robot Teaching機構調整\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":0,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"identity_key\":\"record_key:SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"id\":\"364\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":364,\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"status\":\"作業中\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"量測機台的震動值\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:48\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT138|GPTC Robot Teaching機構調整|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:48\",\"updated_at\":\"2026-05-29 09:31:48\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[],\"authority_01_time_records\":[{\"id\":364,\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"status\":\"作業中\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"量測機台的震動值\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:48\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT138|GPTC Robot Teaching機構調整|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:48\",\"updated_at\":\"2026-05-29 09:31:48\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":364,\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"status\":\"作業中\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"量測機台的震動值\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:48\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT138|GPTC Robot Teaching機構調整|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:48\",\"updated_at\":\"2026-05-29 09:31:48\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"074255f22f63db0c492071caa8dda846be3d49700148e2cc26297cbc88ba7d58\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2056,
+        "log_time": "2026-05-29 13:45:30",
+        "user_name": "B168",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "424",
+        "message": "洪敏強 開始 25MN0014-10 / 其他",
+        "detail": "__spt_log_uid=8def6cc6780e489cae71ededd6798b09",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2055,
+        "log_time": "2026-05-29 13:45:29",
+        "user_name": "B168",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2058,
+        "log_time": "2026-05-29 13:47:24",
+        "user_name": "SPT189",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "425",
+        "message": "SSS 開始 NA / 6S",
+        "detail": "__spt_log_uid=8874a46791e741bf8cc40ff765aa4f58\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:47:24\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"425\",\"target_ids\":[425],\"message\":\"SSS 開始 NA / 6S\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SSS|NA|6S|2026-05-29 13:47:04|54c21e36\",\"identity_key\":\"record_key:SSS|NA|6S|2026-05-29 13:47:04|54c21e36\",\"id\":\"425\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 13:47:04\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":425,\"record_key\":\"SSS|NA|6S|2026-05-29 13:47:04|54c21e36\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:47:04\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:47:04\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:47:04\",\"updated_at\":\"2026-05-29 13:47:04\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":425,\"record_key\":\"SSS|NA|6S|2026-05-29 13:47:04|54c21e36\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:47:04\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:47:04\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:47:04\",\"updated_at\":\"2026-05-29 13:47:04\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":425,\"record_key\":\"SSS|NA|6S|2026-05-29 13:47:04|54c21e36\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:47:04\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:47:04\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:47:04\",\"updated_at\":\"2026-05-29 13:47:04\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":425,\"record_key\":\"SSS|NA|6S|2026-05-29 13:47:04|54c21e36\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:47:04\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:47:04\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:47:04\",\"updated_at\":\"2026-05-29 13:47:04\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"19b464c20fcf06cabbbb86d99b8215c82f301b52866c876cf19978b3d9cf61b3\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2057,
+        "log_time": "2026-05-29 13:47:21",
+        "user_name": "SPT189",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 630
+    "system_logs": 635
   }
 }
