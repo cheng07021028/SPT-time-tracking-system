@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 08:45:27",
-  "exported_at": "2026-05-29 08:45:27",
+  "updated_at": "2026-05-29 08:48:20",
+  "exported_at": "2026-05-29 08:48:20",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -979,11 +979,35 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 289,
+        "log_time": "2026-05-29 08:48:15",
+        "user_name": "B255",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "338",
+        "message": "郭建佑 開始 25MN0014-10 / 左右塔組立",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 08:48:15\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"338\",\"target_ids\":[338],\"message\":\"郭建佑 開始 25MN0014-10 / 左右塔組立\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"B255|25MN0014-10|左右塔組立|2026-05-29 08:47:43|ef6824a9\",\"identity_key\":\"record_key:B255|25MN0014-10|左右塔組立|2026-05-29 08:47:43|ef6824a9\",\"id\":\"338\",\"employee_id\":\"B255\",\"employee_name\":\"郭建佑\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"左右塔組立\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 08:47:43\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":338,\"record_key\":\"B255|25MN0014-10|左右塔組立|2026-05-29 08:47:43|ef6824a9\",\"status\":\"作業中\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"左右塔組立\",\"employee_id\":\"B255\",\"employee_name\":\"郭建佑\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:47:43\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:47:43\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B255|左右塔組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:47:43\",\"updated_at\":\"2026-05-29 08:47:43\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":338,\"record_key\":\"B255|25MN0014-10|左右塔組立|2026-05-29 08:47:43|ef6824a9\",\"status\":\"作業中\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"左右塔組立\",\"employee_id\":\"B255\",\"employee_name\":\"郭建佑\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:47:43\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:47:43\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B255|左右塔組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:47:43\",\"updated_at\":\"2026-05-29 08:47:43\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":338,\"record_key\":\"B255|25MN0014-10|左右塔組立|2026-05-29 08:47:43|ef6824a9\",\"status\":\"作業中\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"左右塔組立\",\"employee_id\":\"B255\",\"employee_name\":\"郭建佑\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:47:43\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:47:43\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B255|左右塔組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:47:43\",\"updated_at\":\"2026-05-29 08:47:43\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":338,\"record_key\":\"B255|25MN0014-10|左右塔組立|2026-05-29 08:47:43|ef6824a9\",\"status\":\"作業中\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"左右塔組立\",\"employee_id\":\"B255\",\"employee_name\":\"郭建佑\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:47:43\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:47:43\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B255|左右塔組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:47:43\",\"updated_at\":\"2026-05-29 08:47:43\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"bde8b7fa051ca6412c06027ef623b4656376725d3965beee927a272555488f55\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 288,
+        "log_time": "2026-05-29 08:48:13",
+        "user_name": "B255",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 81
+    "system_logs": 83
   }
 }
