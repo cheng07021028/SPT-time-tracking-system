@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-29 22:34:06",
-  "exported_at": "2026-05-29 22:34:06",
+  "updated_at": "2026-05-30 00:32:04",
+  "exported_at": "2026-05-30 00:32:04",
   "reason": "v367_column_settings_saved_v72",
   "empty_authoritative": false,
   "tables": {},
@@ -258,7 +258,7 @@
             "order": 7
           }
         },
-        "updated_at": "2026-05-29 22:34:06",
+        "updated_at": "2026-05-30 00:32:03",
         "reason": "v367_column_settings_saved"
       },
       "80435544260397582": {
@@ -5102,6 +5102,131 @@
           }
         },
         "updated_at": "2026-05-28 15:46:21",
+        "reason": "v367_column_settings_saved"
+      },
+      "v234_daily_attendance_editor_2026-05-30": {
+        "columns": {
+          "刪除 / Delete": {
+            "source": "刪除 / Delete",
+            "label": "刪除 / Delete / 刪除 / Delete",
+            "visible": true,
+            "width": "medium",
+            "order": -999
+          },
+          "序號 / No.": {
+            "source": "序號 / No.",
+            "label": "序號 / No. / 序號 / No.",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "工號 / Employee ID": {
+            "source": "工號 / Employee ID",
+            "label": "工號 / Employee ID / 工號 / Employee ID",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "姓名 / Name": {
+            "source": "姓名 / Name",
+            "label": "姓名 / Name / 姓名 / Name",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "單位 / Department": {
+            "source": "單位 / Department",
+            "label": "單位 / Department / 單位 / Department",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "職稱 / Title": {
+            "source": "職稱 / Title",
+            "label": "職稱 / Title / 職稱 / Title",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "出勤狀態 / Attendance Status": {
+            "source": "出勤狀態 / Attendance Status",
+            "label": "出勤狀態 / Attendance Status / 出勤狀態 / Attendance Status",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "在廠 / In Factory": {
+            "source": "在廠 / In Factory",
+            "label": "在廠 / In Factory / 在廠 / In Factory",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "出勤 / Attendance": {
+            "source": "出勤 / Attendance",
+            "label": "出勤 / Attendance / 出勤 / Attendance",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "到廠時間 / Check In": {
+            "source": "到廠時間 / Check In",
+            "label": "到廠時間 / Check In / 到廠時間 / Check In",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "離廠時間 / Check Out": {
+            "source": "離廠時間 / Check Out",
+            "label": "離廠時間 / Check Out / 離廠時間 / Check Out",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          },
+          "備註 / Note": {
+            "source": "備註 / Note",
+            "label": "備註 / Note / 備註 / Note",
+            "visible": true,
+            "width": "medium",
+            "order": 10
+          },
+          "紀錄ID / Record ID": {
+            "source": "紀錄ID / Record ID",
+            "label": "紀錄ID / Record ID / 紀錄ID / Record ID",
+            "visible": true,
+            "width": "medium",
+            "order": 11
+          },
+          "日期 / Date": {
+            "source": "日期 / Date",
+            "label": "日期 / Date / 日期 / Date",
+            "visible": true,
+            "width": "medium",
+            "order": 12
+          },
+          "建立時間 / Created At": {
+            "source": "建立時間 / Created At",
+            "label": "建立時間 / Created At / 建立時間 / Created At",
+            "visible": true,
+            "width": "medium",
+            "order": 13
+          },
+          "更新時間 / Updated At": {
+            "source": "更新時間 / Updated At",
+            "label": "更新時間 / Updated At / 更新時間 / Updated At",
+            "visible": true,
+            "width": "medium",
+            "order": 14
+          },
+          "更新者 / Updated By": {
+            "source": "更新者 / Updated By",
+            "label": "更新者 / Updated By / 更新者 / Updated By",
+            "visible": true,
+            "width": "medium",
+            "order": 15
+          }
+        },
+        "updated_at": "2026-05-30 00:32:03",
         "reason": "v367_column_settings_saved"
       }
     },
