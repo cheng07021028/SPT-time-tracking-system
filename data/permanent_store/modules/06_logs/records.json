@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 14:29:46",
-  "exported_at": "2026-05-29 14:29:46",
+  "updated_at": "2026-05-29 14:31:42",
+  "exported_at": "2026-05-29 14:31:42",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -11443,11 +11443,35 @@
         "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1754,
+        "log_time": "2026-05-29 14:31:37",
+        "user_name": "admin",
+        "action_type": "V200_ROW_DELETE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "422",
+        "message": "刪除工時逐筆紀錄｜01 工時紀錄管理員維護區刪除｜ID=422｜SSS SSS NA / 6S",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"before\", \"record_id\": \"422\", \"record_key\": \"SSS|NA|6S|2026-05-29 14:27:21|8b0cbfe1\", \"employee_id\": \"SSS\", \"employee_name\": \"SSS\", \"work_order\": \"NA\", \"process_name\": \"6S\", \"start_timestamp\": \"2026-05-29 14:27:21\", \"end_timestamp\": \"2026-05-29 14:29:35\", \"status\": \"暫停\", \"row_snapshot\": {\"id\": 422, \"record_key\": \"SSS|NA|6S|2026-05-29 14:27:21|8b0cbfe1\", \"status\": \"暫停\", \"work_order\": \"NA\", \"part_no\": \"\", \"type_name\": \"\", \"process_name\": \"6S\", \"employee_id\": \"SSS\", \"employee_name\": \"SSS\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 14:27:21\", \"end_action\": \"暫停\", \"end_timestamp\": \"2026-05-29 14:29:35\", \"remark\": \"\", \"start_date\": \"2026-05-29\", \"start_time\": \"14:27:21\", \"end_date\": \"2026-05-29\", \"end_time\": \"14:29:35\", \"work_hours\": 0.04, \"assembly_location\": \"\", \"group_key\": \"SSS|6S|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 14:27:21\", \"updated_at\": \"2026-05-29 14:29:35\", \"department\": \"\", \"title\": \"\"}}\n__spt_log_uid=2b80d21c79c1421fa00e0ee953d71f02",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1753,
+        "log_time": "2026-05-29 14:31:37",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V199",
+        "target_table": "time_records",
+        "target_id": "422",
+        "message": "01 工時紀錄管理員維護區刪除 / V199 same-lane delete：V199 01/02 same-lane reboot-proof hard delete；ids=[422]；sqlite_deleted=1；authority_before=178；remaining=88",
+        "detail": "__spt_log_uid=9cbb05c7337844cabe250614d0544e73",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 953
+    "system_logs": 955
   }
 }
