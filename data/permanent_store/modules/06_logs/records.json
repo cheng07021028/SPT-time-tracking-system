@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 17:25:06",
-  "exported_at": "2026-05-29 17:25:06",
+  "updated_at": "2026-05-29 17:25:34",
+  "exported_at": "2026-05-29 17:25:34",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -12799,11 +12799,215 @@
         "detail": "get_active_records_v210_canonical_active\n__spt_log_uid=2ef2d64ffb4443dea718fd7ce208e21b",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 253,
+        "log_time": "2026-05-29 17:25:34",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "security_module_permissions",
+        "target_id": "",
+        "message": "INSERT security_module_permissions",
+        "detail": "INSERT OR IGNORE INTO security_module_permissions (role_code, module_code, module_no, module_name, module_name_en, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 252,
+        "log_time": "2026-05-29 17:25:34",
+        "user_name": "SPT063",
+        "action_type": "INSERT",
+        "target_table": "security_user_roles",
+        "target_id": "",
+        "message": "INSERT security_user_roles",
+        "detail": "INSERT OR IGNORE INTO security_user_roles (username, role_code, created_at)\n            VALUES (?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 251,
+        "log_time": "2026-05-29 17:25:34",
+        "user_name": "SPT150",
+        "action_type": "INSERT",
+        "target_table": "security_user_roles",
+        "target_id": "",
+        "message": "INSERT security_user_roles",
+        "detail": "INSERT OR IGNORE INTO security_user_roles (username, role_code, created_at)\n            VALUES (?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 239,
+        "log_time": "2026-05-29 17:25:34",
+        "user_name": "SPT150",
+        "action_type": "INSERT",
+        "target_table": "security_module_permissions",
+        "target_id": "",
+        "message": "INSERT security_module_permissions",
+        "detail": "INSERT OR IGNORE INTO security_module_permissions (role_code, module_code, module_no, module_name, module_name_en, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 238,
+        "log_time": "2026-05-29 17:25:34",
+        "user_name": "SPT063",
+        "action_type": "INSERT",
+        "target_table": "security_module_permissions",
+        "target_id": "",
+        "message": "INSERT security_module_permissions",
+        "detail": "INSERT OR IGNORE INTO security_module_permissions (role_code, module_code, module_no, module_name, module_name_en, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 199,
+        "log_time": "2026-05-29 17:25:33",
+        "user_name": "SPT063",
+        "action_type": "INSERT",
+        "target_table": "security_module_permissions",
+        "target_id": "",
+        "message": "INSERT security_module_permissions",
+        "detail": "INSERT OR IGNORE INTO security_module_permissions (role_code, module_code, module_no, module_name, module_name_en, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 198,
+        "log_time": "2026-05-29 17:25:33",
+        "user_name": "SPT150",
+        "action_type": "INSERT",
+        "target_table": "security_module_permissions",
+        "target_id": "",
+        "message": "INSERT security_module_permissions",
+        "detail": "INSERT OR IGNORE INTO security_module_permissions (role_code, module_code, module_no, module_name, module_name_en, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 173,
+        "log_time": "2026-05-29 17:25:33",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "security_module_permissions",
+        "target_id": "",
+        "message": "INSERT security_module_permissions",
+        "detail": "INSERT OR IGNORE INTO security_module_permissions (role_code, module_code, module_no, module_name, module_name_en, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 32,
+        "log_time": "2026-05-29 17:25:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "security_module_permissions",
+        "target_id": "",
+        "message": "INSERT security_module_permissions",
+        "detail": "INSERT OR IGNORE INTO security_module_permissions (role_code, module_code, module_no, module_name, module_name_en, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 31,
+        "log_time": "2026-05-29 17:25:32",
+        "user_name": "SPT063",
+        "action_type": "INSERT",
+        "target_table": "security_module_permissions",
+        "target_id": "",
+        "message": "INSERT security_module_permissions",
+        "detail": "INSERT OR IGNORE INTO security_module_permissions (role_code, module_code, module_no, module_name, module_name_en, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 30,
+        "log_time": "2026-05-29 17:25:32",
+        "user_name": "SPT150",
+        "action_type": "INSERT",
+        "target_table": "security_module_permissions",
+        "target_id": "",
+        "message": "INSERT security_module_permissions",
+        "detail": "INSERT OR IGNORE INTO security_module_permissions (role_code, module_code, module_no, module_name, module_name_en, can_view, can_create, can_edit, can_delete, can_import, can_export, can_backup, can_restore, can_manage, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 23,
+        "log_time": "2026-05-29 17:25:32",
+        "user_name": "SPT150",
+        "action_type": "INSERT",
+        "target_table": "security_roles",
+        "target_id": "",
+        "message": "INSERT security_roles",
+        "detail": "INSERT OR IGNORE INTO security_roles\n            (role_code, role_name, role_name_en, description, is_system_role, created_at, updated_at)\n            VALUES (?, ?, ?, ?, 1, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 21,
+        "log_time": "2026-05-29 17:25:32",
+        "user_name": "SPT063",
+        "action_type": "INSERT",
+        "target_table": "security_roles",
+        "target_id": "",
+        "message": "INSERT security_roles",
+        "detail": "INSERT OR IGNORE INTO security_roles\n            (role_code, role_name, role_name_en, description, is_system_role, created_at, updated_at)\n            VALUES (?, ?, ?, ?, 1, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 18,
+        "log_time": "2026-05-29 17:25:32",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "security_roles",
+        "target_id": "",
+        "message": "INSERT security_roles",
+        "detail": "INSERT OR IGNORE INTO security_roles\n            (role_code, role_name, role_name_en, description, is_system_role, created_at, updated_at)\n            VALUES (?, ?, ?, ?, 1, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 5,
+        "log_time": "2026-05-29 17:25:32",
+        "user_name": "SYSTEM",
+        "action_type": "AUTO_INIT_DATABASE",
+        "target_table": "ALL",
+        "target_id": "",
+        "message": "自動初始化資料庫完成",
+        "detail": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-29 17:25:30",
+        "user_name": "SPT150",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v210_canonical_active",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-29 17:25:30",
+        "user_name": "SPT150",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v210_canonical_active\n__spt_log_uid=e344162392944bbb954465576d745772",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1066
+    "system_logs": 1083
   }
 }
