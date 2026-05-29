@@ -13609,3 +13609,297 @@ def audit_v199_delete_lane() -> dict:
     return out
 
 # =================== END V199 01/02 DELETE SAME-LANE FIX ===================
+
+# ===================== V200 ROW-LEVEL TIME RECORD LOGGING =====================
+# 目的：06 LOG 查詢要能看到每一筆工時資料異動，而不是只看到摘要。
+# 不改 UI / CSS / theme / 表格渲染；只在後端操作完成後補逐筆稽核 LOG。
+import json as _v200_json
+
+try:
+    _v200_prev_start_work = start_work
+except Exception:
+    _v200_prev_start_work = None
+try:
+    _v200_prev_finish_work = finish_work
+except Exception:
+    _v200_prev_finish_work = None
+try:
+    _v200_prev_save_time_records = save_time_records
+except Exception:
+    _v200_prev_save_time_records = None
+try:
+    _v200_prev_delete_time_records = delete_time_records
+except Exception:
+    _v200_prev_delete_time_records = None
+try:
+    _v200_prev_delete_time_records_from_editor_df = delete_time_records_from_editor_df
+except Exception:
+    _v200_prev_delete_time_records_from_editor_df = None
+try:
+    _v200_prev_delete_time_records_from_02_history_editor = delete_time_records_from_02_history_editor
+except Exception:
+    _v200_prev_delete_time_records_from_02_history_editor = None
+try:
+    _v200_prev_delete_time_records_v178b_strict = delete_time_records_v178b_strict
+except Exception:
+    _v200_prev_delete_time_records_v178b_strict = None
+try:
+    _v200_prev_recalculate_time_records = recalculate_time_records
+except Exception:
+    _v200_prev_recalculate_time_records = None
+try:
+    _v200_prev_import_time_records = import_time_records
+except Exception:
+    _v200_prev_import_time_records = None
+
+
+def _v200_text(v) -> str:
+    try:
+        if pd.isna(v):
+            return ""
+    except Exception:
+        pass
+    if v is None:
+        return ""
+    t = str(v).strip()
+    return "" if t.lower() in {"none", "nan", "nat", "null", "<na>"} else t
+
+
+def _v200_int(v):
+    try:
+        t = _v200_text(v)
+        return int(float(t)) if t else None
+    except Exception:
+        return None
+
+
+def _v200_df_by_ids(ids: list[int]) -> pd.DataFrame:
+    ids = [int(x) for x in ids if _v200_int(x) is not None]
+    if not ids:
+        return pd.DataFrame()
+    # 優先從目前最終合併資料取完整欄位。
+    try:
+        if "_v194_current_merged" in globals() and callable(globals().get("_v194_current_merged")):
+            df = globals()["_v194_current_merged"](include_sqlite=True)
+            if isinstance(df, pd.DataFrame) and not df.empty and "id" in df.columns:
+                return df[df["id"].map(_v200_int).isin(set(ids))].copy()
+    except Exception:
+        pass
+    try:
+        q = ",".join("?" for _ in ids)
+        return query_df(f"SELECT * FROM time_records WHERE id IN ({q})", tuple(ids))
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v200_id_col(df: pd.DataFrame | None) -> str:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return ""
+    for c in ("id", "ID", "ID / ID", "ID / ID / ID", "紀錄編號", "record_id"):
+        if c in df.columns:
+            return c
+    return ""
+
+
+def _v200_checked(v) -> bool:
+    if isinstance(v, bool):
+        return v
+    return str(v).strip().lower() in {"true", "1", "yes", "y", "on", "checked", "selected", "勾選", "是"}
+
+
+def _v200_extract_editor_checked_ids(editor_df: pd.DataFrame | None, delete_column: str = "刪除 / Delete") -> list[int]:
+    if not isinstance(editor_df, pd.DataFrame) or editor_df.empty:
+        return []
+    id_col = _v200_id_col(editor_df)
+    if not id_col:
+        return []
+    try:
+        if delete_column in editor_df.columns:
+            rows = editor_df.loc[editor_df[delete_column].map(_v200_checked)]
+        else:
+            rows = editor_df
+        out = []
+        for x in rows[id_col].tolist():
+            i = _v200_int(x)
+            if i is not None and i > 0 and i not in out:
+                out.append(i)
+        return out
+    except Exception:
+        return []
+
+
+def _v200_json_safe_row(row: dict) -> dict:
+    out = {}
+    for k, v in (row or {}).items():
+        try:
+            if pd.isna(v):
+                out[str(k)] = ""
+            elif isinstance(v, (datetime, date)):
+                out[str(k)] = v.strftime("%Y-%m-%d %H:%M:%S") if isinstance(v, datetime) else v.strftime("%Y-%m-%d")
+            else:
+                out[str(k)] = v
+        except Exception:
+            out[str(k)] = str(v)
+    return out
+
+
+def _v200_row_target_id(row: dict) -> str:
+    return _v200_text(row.get("id") or row.get("ID") or row.get("ID / ID") or row.get("record_key") or row.get("Record Key"))
+
+
+def _v200_write_row_log(action: str, row: dict, message: str, level: str = "INFO", before_after: str = "after") -> None:
+    try:
+        from services import log_service as _v200_log_service
+        payload = {
+            "schema_version": "V200_ROW_AUDIT",
+            "before_after": before_after,
+            "record_id": _v200_row_target_id(row),
+            "record_key": _v200_text(row.get("record_key")),
+            "employee_id": _v200_text(row.get("employee_id")),
+            "employee_name": _v200_text(row.get("employee_name")),
+            "work_order": _v200_text(row.get("work_order")),
+            "process_name": _v200_text(row.get("process_name")),
+            "start_timestamp": _v200_text(row.get("start_timestamp")),
+            "end_timestamp": _v200_text(row.get("end_timestamp")),
+            "status": _v200_text(row.get("status")),
+            "row_snapshot": _v200_json_safe_row(row),
+        }
+        _v200_log_service.write_log(
+            action,
+            message,
+            "time_records",
+            _v200_row_target_id(row),
+            _v200_json.dumps(payload, ensure_ascii=False, default=str),
+            level,
+        )
+    except Exception:
+        pass
+
+
+def _v200_log_rows(action: str, df: pd.DataFrame | None, message_prefix: str, level: str = "INFO", before_after: str = "after", max_rows: int = 2000) -> int:
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return 0
+    count = 0
+    try:
+        for _, rr in df.head(max_rows).iterrows():
+            row = dict(rr.to_dict())
+            rid = _v200_row_target_id(row)
+            msg = f"{message_prefix}｜ID={rid}｜{_v200_text(row.get('employee_id'))} {_v200_text(row.get('employee_name'))} {_v200_text(row.get('work_order'))} / {_v200_text(row.get('process_name'))}"
+            _v200_write_row_log(action, row, msg, level=level, before_after=before_after)
+            count += 1
+        if len(df) > max_rows:
+            try:
+                from services import log_service as _v200_log_service
+                _v200_log_service.write_log(action + "_TRUNCATED", f"{message_prefix}：逐筆 LOG 超過 {max_rows} 筆，已記錄前 {max_rows} 筆；總筆數={len(df)}", "time_records", level="WARN")
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return count
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    rid = int(_v200_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0) if callable(_v200_prev_start_work) else 0
+    if rid:
+        df = _v200_df_by_ids([rid])
+        _v200_log_rows("V200_ROW_START_WORK", df, "開始作業逐筆紀錄", before_after="after")
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    rid = _v200_int(record_id)
+    n = int(_v200_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0) if callable(_v200_prev_finish_work) else 0
+    if rid:
+        # 至少記錄被點選結束的那一筆；若群組結束，舊函式已另有 END_WORK_GROUP 摘要。
+        df = _v200_df_by_ids([rid])
+        _v200_log_rows("V200_ROW_FINISH_WORK", df, f"結束作業逐筆紀錄｜動作={end_action}", before_after="after")
+    return n
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    result = int(_v200_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0) if callable(_v200_prev_save_time_records) else 0
+    try:
+        edit = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+        _v200_log_rows("V200_ROW_SAVE_TIME_RECORD", edit, "儲存工時逐筆紀錄", before_after="after")
+    except Exception:
+        pass
+    return result
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = [i for i in (_v200_int(x) for x in (record_ids or [])) if i is not None and i > 0]
+    before = _v200_df_by_ids(ids)
+    result = int(_v200_prev_delete_time_records(ids, reason=reason) or 0) if callable(_v200_prev_delete_time_records) else 0
+    _v200_log_rows("V200_ROW_DELETE_TIME_RECORD", before, f"刪除工時逐筆紀錄｜{reason}", level="WARN", before_after="before")
+    return result
+
+
+def delete_time_records_from_editor_df(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete", reason: str = "01 管理員維護表刪除") -> int:  # type: ignore[override]
+    ids = _v200_extract_editor_checked_ids(editor_df, delete_column=delete_column)
+    before = _v200_df_by_ids(ids)
+    if callable(_v200_prev_delete_time_records_from_editor_df):
+        result = int(_v200_prev_delete_time_records_from_editor_df(editor_df, delete_column=delete_column, reason=reason) or 0)
+    else:
+        result = delete_time_records(ids, reason=reason)
+        return result
+    _v200_log_rows("V200_ROW_DELETE_TIME_RECORD", before if not before.empty else editor_df, f"01 管理員維護刪除逐筆紀錄｜{reason}", level="WARN", before_after="before")
+    return result
+
+
+def delete_time_records_from_02_history_editor(editor_df: pd.DataFrame, record_ids: list[int] | None = None, delete_column: str = "刪除 / Delete", reason: str = "02 歷史紀錄刪除") -> dict:  # type: ignore[override]
+    ids = [i for i in (_v200_int(x) for x in (record_ids or [])) if i is not None and i > 0]
+    if not ids:
+        ids = _v200_extract_editor_checked_ids(editor_df, delete_column=delete_column)
+    before = _v200_df_by_ids(ids)
+    if callable(_v200_prev_delete_time_records_from_02_history_editor):
+        res = _v200_prev_delete_time_records_from_02_history_editor(editor_df, record_ids=ids, delete_column=delete_column, reason=reason)
+    else:
+        deleted = delete_time_records(ids, reason=reason)
+        res = {"ok": bool(deleted), "deleted_count": deleted, "ids": ids}
+        return res
+    _v200_log_rows("V200_ROW_DELETE_TIME_RECORD", before if not before.empty else editor_df, f"02 歷史紀錄刪除逐筆紀錄｜{reason}", level="WARN", before_after="before")
+    return res if isinstance(res, dict) else {"ok": True, "deleted_count": int(res or 0), "ids": ids}
+
+
+def delete_time_records_v178b_strict(record_ids: list[int], reason: str = "02 歷史紀錄嚴格刪除", editor_df=None) -> dict:  # type: ignore[override]
+    ids = [i for i in (_v200_int(x) for x in (record_ids or [])) if i is not None and i > 0]
+    before = _v200_df_by_ids(ids)
+    if callable(_v200_prev_delete_time_records_v178b_strict):
+        res = _v200_prev_delete_time_records_v178b_strict(ids, reason=reason, editor_df=editor_df)
+    else:
+        res = delete_time_records_from_02_history_editor(editor_df if isinstance(editor_df, pd.DataFrame) else pd.DataFrame(), record_ids=ids, reason=reason)
+        return res
+    _v200_log_rows("V200_ROW_DELETE_TIME_RECORD", before if not before.empty else (editor_df if isinstance(editor_df, pd.DataFrame) else pd.DataFrame()), f"02 歷史紀錄嚴格刪除逐筆紀錄｜{reason}", level="WARN", before_after="before")
+    return res if isinstance(res, dict) else {"ok": True, "deleted_count": int(res or 0), "ids": ids}
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    result = int(_v200_prev_recalculate_time_records(record_ids) or 0) if callable(_v200_prev_recalculate_time_records) else 0
+    ids = [i for i in (_v200_int(x) for x in (record_ids or [])) if i is not None and i > 0]
+    if ids:
+        _v200_log_rows("V200_ROW_RECALC_TIME_RECORD", _v200_df_by_ids(ids), "重算工時逐筆紀錄", before_after="after")
+    return result
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    result = _v200_prev_import_time_records(df, recalc=recalc, source=source) if callable(_v200_prev_import_time_records) else {"inserted": 0, "updated": 0}
+    try:
+        _v200_log_rows("V200_ROW_IMPORT_TIME_RECORD", df if isinstance(df, pd.DataFrame) else pd.DataFrame(), f"匯入工時逐筆紀錄｜source={source}", before_after="after")
+    except Exception:
+        pass
+    return result if isinstance(result, dict) else {"result": result}
+
+
+def audit_v200_log_completeness() -> dict:
+    out = {"version": "V200", "row_level_logging": True}
+    try:
+        from services import log_service as _ls
+        status = _ls.get_system_log_authority_status() if hasattr(_ls, "get_system_log_authority_status") else {}
+        out.update({"log_status": status})
+        out["write_log_many_available"] = hasattr(_ls, "write_log_many")
+        out["load_logs_page_available"] = hasattr(_ls, "load_logs_page")
+    except Exception as exc:
+        out["error"] = str(exc)[:300]
+    return out
+
+# =================== END V200 ROW-LEVEL TIME RECORD LOGGING ===================

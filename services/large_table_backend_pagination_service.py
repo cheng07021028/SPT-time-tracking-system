@@ -366,3 +366,53 @@ def export_v189_report_excel_bytes(report: dict[str, Any]) -> bytes:
         pd.DataFrame({"recommendation": report.get("recommendations", [])}).to_excel(writer, sheet_name="Recommendations", index=False)
     output.seek(0)
     return output.getvalue()
+
+# ===================== V200 LOG BACKEND PAGINATION USES COMPLETE LOG SOURCE =====================
+# 06 LOG 查詢不可只查 SQLite system_logs，否則會漏掉 authority / JSONL shard 中的逐筆 LOG。
+try:
+    _v200_prev_query_logs_backend_page = query_logs_backend_page
+except Exception:  # pragma: no cover
+    _v200_prev_query_logs_backend_page = None
+
+
+def query_logs_backend_page(
+    *,
+    start_date: Any | None = None,
+    end_date: Any | None = None,
+    action_type: str | None = None,
+    level: str | None = None,
+    keyword: str | None = None,
+    page: int = 1,
+    page_size: int = 500,
+) -> dict[str, Any]:  # type: ignore[override]
+    try:
+        from services import log_service as _v200_log_service
+        if hasattr(_v200_log_service, "load_logs_page"):
+            res = _v200_log_service.load_logs_page(
+                start_date=start_date,
+                end_date=end_date,
+                action_type=action_type,
+                level=level,
+                keyword=keyword,
+                page=page,
+                page_size=page_size,
+            )
+            if isinstance(res, dict) and res.get("ok"):
+                res["where_pushed_to_sql"] = False
+                res["complete_log_source"] = True
+                return res
+    except Exception:
+        pass
+    if callable(_v200_prev_query_logs_backend_page):
+        return _v200_prev_query_logs_backend_page(
+            start_date=start_date,
+            end_date=end_date,
+            action_type=action_type,
+            level=level,
+            keyword=keyword,
+            page=page,
+            page_size=page_size,
+        )
+    return {"ok": False, "df": pd.DataFrame(), "rows": [], "total_rows": 0, "reason": "query_logs_backend_page unavailable"}
+
+# =================== END V200 LOG BACKEND PAGINATION USES COMPLETE LOG SOURCE ===================

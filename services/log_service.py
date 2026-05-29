@@ -953,3 +953,341 @@ def write_log(action_type: str, message: str, target_table: str = "", target_id:
     return None
 
 # =================== END V166C TIME RECORD FULL SNAPSHOT LOGGING ===================
+
+# ===================== V200 COMPLETE ROW-LEVEL LOG RELIABILITY =====================
+# 目的：
+# 1) 06 LOG 查詢必須保留每一次操作、每一筆資料異動紀錄，不可因同秒重複、authority 去重、
+#    SQLite/權威檔不同步而漏顯。
+# 2) 不改 UI / CSS / theme / 表格渲染。
+# 3) 寫 LOG 仍先快速寫 SQLite；同時追加本機 JSONL append-only shard，避免 Reboot 後 SQLite/authority
+#    不完整時 06 查詢少資料。
+# 4) V189 後端分頁可透過 load_logs_page() 使用完整來源。
+try:
+    import uuid as _v200_uuid
+    import re as _v200_re
+except Exception:  # pragma: no cover
+    _v200_uuid = None
+    _v200_re = None
+
+try:
+    _ACTION_LABELS.update({
+        "V200_ROW_START_WORK": "逐筆紀錄-開始作業",
+        "V200_ROW_FINISH_WORK": "逐筆紀錄-結束作業",
+        "V200_ROW_SAVE_TIME_RECORD": "逐筆紀錄-儲存工時",
+        "V200_ROW_DELETE_TIME_RECORD": "逐筆紀錄-刪除工時",
+        "V200_ROW_RECALC_TIME_RECORD": "逐筆紀錄-重算工時",
+        "V200_ROW_IMPORT_TIME_RECORD": "逐筆紀錄-匯入工時",
+    })
+except Exception:
+    pass
+
+try:
+    _v200_prev_write_log = write_log
+except Exception:  # pragma: no cover
+    _v200_prev_write_log = None
+try:
+    _v200_prev_load_logs = load_logs
+except Exception:  # pragma: no cover
+    _v200_prev_load_logs = None
+try:
+    _v200_prev_count_logs_by_date_range = count_logs_by_date_range
+except Exception:  # pragma: no cover
+    _v200_prev_count_logs_by_date_range = None
+try:
+    _v200_prev_delete_logs_by_date_range = delete_logs_by_date_range
+except Exception:  # pragma: no cover
+    _v200_prev_delete_logs_by_date_range = None
+
+_V200_LOG_SHARD_DIR = _V122_LOG_AUTH_DIR / "log_shards" if "_V122_LOG_AUTH_DIR" in globals() else (_V122_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "06_logs" / "log_shards")
+_V200_LOG_UID_PREFIX = "__spt_log_uid="
+
+
+def _v200_now_text_precise() -> str:
+    try:
+        base = now_text()
+        # now_text()通常到秒，補上微秒，避免同秒 LOG 被誤判為同一筆。
+        return f"{base}.{datetime.now().strftime('%f')}"
+    except Exception:
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+
+
+def _v200_new_uid() -> str:
+    try:
+        return _v200_uuid.uuid4().hex if _v200_uuid is not None else str(datetime.now().timestamp()).replace('.', '')
+    except Exception:
+        return str(datetime.now().timestamp()).replace('.', '')
+
+
+def _v200_detail_with_uid(detail: Any, uid: str) -> str:
+    text = _clean_text(detail)
+    if _V200_LOG_UID_PREFIX in text:
+        return text
+    return (text + "\n" if text else "") + f"{_V200_LOG_UID_PREFIX}{uid}"
+
+
+def _v200_extract_uid(row_or_detail: Any) -> str:
+    try:
+        if isinstance(row_or_detail, dict):
+            detail = _clean_text(row_or_detail.get("detail") or row_or_detail.get("明細 / Detail"))
+            direct = _clean_text(row_or_detail.get("log_uid") or row_or_detail.get("uid"))
+            if direct:
+                return direct
+        else:
+            detail = _clean_text(row_or_detail)
+        if _V200_LOG_UID_PREFIX in detail:
+            part = detail.split(_V200_LOG_UID_PREFIX, 1)[1]
+            return part.split()[0].split("|")[0].strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _v200_shard_path_for_log_time(log_time: Any) -> _V122Path:
+    d = _v122_log_date(log_time) if "_v122_log_date" in globals() else str(log_time or "")[:10]
+    if not d:
+        d = today_text() if "today_text" in globals() else datetime.now().strftime("%Y-%m-%d")
+    return _V200_LOG_SHARD_DIR / f"{d}.jsonl"
+
+
+def _v200_append_shard(row: dict[str, Any]) -> None:
+    try:
+        p = _v200_shard_path_for_log_time(row.get("log_time"))
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a", encoding="utf-8") as f:
+            f.write(_v122_json.dumps(row, ensure_ascii=False, default=str) + "\n")
+    except Exception:
+        pass
+
+
+def _v200_read_shard_rows(start_date: Any | None = None, end_date: Any | None = None, max_days: int = 370) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    try:
+        s = _date_text(start_date) or "0000-00-00"
+        e = _date_text(end_date) or "9999-99-99"
+        if not _V200_LOG_SHARD_DIR.exists():
+            return []
+        files = sorted(_V200_LOG_SHARD_DIR.glob("*.jsonl"), reverse=True)[:max_days]
+        for p in files:
+            d = p.stem[:10]
+            if d < s or d > e:
+                continue
+            try:
+                for line in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    if not line.strip():
+                        continue
+                    obj = _v122_json.loads(line)
+                    if isinstance(obj, dict):
+                        rows.append(_v122_log_clean_row(obj, "v200_shard") if "_v122_log_clean_row" in globals() else obj)
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return rows
+
+
+def _v200_log_key(row: dict[str, Any]) -> str:
+    uid = _v200_extract_uid(row)
+    if uid:
+        return "uid:" + uid
+    if "_v122_log_key" in globals():
+        try:
+            return "v122:" + _v122_log_key(row)
+        except Exception:
+            pass
+    parts = [_clean_text(row.get(c)) for c in ("log_time", "user_name", "action_type", "target_table", "target_id", "message", "detail", "level")]
+    return "raw:" + "|".join(parts)
+
+
+def _v200_dedupe_rows(rows: list[dict[str, Any]], apply_tombstone: bool = True) -> list[dict[str, Any]]:
+    deleted = _v122_deleted_key_set() if apply_tombstone and "_v122_deleted_key_set" in globals() else set()
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        clean = _v122_log_clean_row(r, str(r.get("source") or "")) if "_v122_log_clean_row" in globals() else dict(r)
+        legacy_key = _v122_log_key(clean) if "_v122_log_key" in globals() else ""
+        key = _v200_log_key(clean)
+        if legacy_key and legacy_key in deleted:
+            continue
+        if key in deleted:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(clean)
+    return out
+
+
+def _v200_all_log_rows(start_date: Any | None = None, end_date: Any | None = None, include_sqlite: bool = True, include_authority: bool = True, include_shards: bool = True) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    if include_authority and "_v122_read_authority_log_rows" in globals():
+        try:
+            rows += _v122_read_authority_log_rows()
+        except Exception:
+            pass
+    if include_sqlite and "_v122_sqlite_log_rows" in globals():
+        try:
+            rows += _v122_sqlite_log_rows(limit=300000)
+        except Exception:
+            pass
+    if include_shards:
+        rows += _v200_read_shard_rows(start_date, end_date)
+    rows = _v200_dedupe_rows(rows, apply_tombstone=True)
+    try:
+        rows = _v122_apply_log_filters(rows, start_date, end_date) if "_v122_apply_log_filters" in globals() else rows
+    except Exception:
+        pass
+    try:
+        rows.sort(key=lambda r: (_clean_text(r.get("log_time")), int(float(r.get("id") or 0))), reverse=True)
+    except Exception:
+        rows.sort(key=lambda r: _clean_text(r.get("log_time")), reverse=True)
+    return rows
+
+
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    """V200：每一次 LOG 都加入唯一 UID，並同步追加 JSONL shard，避免漏記/漏顯。"""
+    uid = _v200_new_uid()
+    log_time = _v200_now_text_precise()
+    user = user_name or _current_log_user()
+    new_detail = _v200_detail_with_uid(detail, uid)
+    # 先走舊鏈路，保留 V166C snapshot、V147 背景批次、V156 cache 等既有功能。
+    if callable(_v200_prev_write_log):
+        try:
+            _v200_prev_write_log(action_type, message, target_table, target_id, new_detail, level, user)
+        except Exception:
+            try:
+                execute(
+                    """
+                    INSERT INTO system_logs
+                    (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (log_time, user, action_type, target_table, str(target_id or ""), message, new_detail, level),
+                )
+            except Exception:
+                pass
+    else:
+        try:
+            execute(
+                """
+                INSERT INTO system_logs
+                (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (log_time, user, action_type, target_table, str(target_id or ""), message, new_detail, level),
+            )
+        except Exception:
+            pass
+    # append-only shard：不覆蓋、不等待 GitHub，給 06 查詢與 Reboot 後追查使用。
+    _v200_append_shard({
+        "log_time": log_time,
+        "user_name": user,
+        "action_type": action_type,
+        "target_table": target_table,
+        "target_id": str(target_id or ""),
+        "message": message,
+        "detail": new_detail,
+        "level": level,
+        "source": "v200_shard",
+        "log_uid": uid,
+    })
+    try:
+        clear_log_query_cache()  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def write_log_many(rows: list[dict[str, Any]], *, default_target_table: str = "", default_level: str = "INFO", user_name: str | None = None) -> int:
+    """V200 row-level bulk helper. Each row is inserted as an independent LOG entry."""
+    count = 0
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        write_log(
+            _clean_text(r.get("action_type") or r.get("action") or "ROW_LOG"),
+            _clean_text(r.get("message") or r.get("操作內容 / Message") or "row log"),
+            _clean_text(r.get("target_table") or default_target_table),
+            _clean_text(r.get("target_id") or r.get("id") or r.get("record_key")),
+            _clean_text(r.get("detail") or r.get("明細 / Detail")),
+            _clean_text(r.get("level") or default_level or "INFO"),
+            user_name=user_name,
+        )
+        count += 1
+    return count
+
+
+def load_logs(limit: int = 500, start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None):  # type: ignore[override]
+    rows = _v200_all_log_rows(start_date, end_date, include_sqlite=True, include_authority=True, include_shards=True)
+    rows = _v122_apply_log_filters(rows, start_date, end_date, action_type, level, keyword) if "_v122_apply_log_filters" in globals() else rows
+    limit = max(1, _safe_int(limit, 500))
+    df = pd.DataFrame(rows[:limit])
+    for c in ["id", "log_time", "user_name", "action_type", "target_table", "target_id", "message", "detail", "level", "source"]:
+        if c not in df.columns:
+            df[c] = ""
+    return df[["id", "log_time", "user_name", "action_type", "target_table", "target_id", "message", "detail", "level", "source"]]
+
+
+def load_logs_page(start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None, page: int = 1, page_size: int = 500) -> dict[str, Any]:
+    t0 = _v122_time.time() if "_v122_time" in globals() else datetime.now().timestamp()
+    rows = _v200_all_log_rows(start_date, end_date, include_sqlite=True, include_authority=True, include_shards=True)
+    rows = _v122_apply_log_filters(rows, start_date, end_date, action_type, level, keyword) if "_v122_apply_log_filters" in globals() else rows
+    size = max(1, min(_safe_int(page_size, 500), 5000))
+    p = max(1, _safe_int(page, 1))
+    total = len(rows)
+    start = (p - 1) * size
+    end = start + size
+    df = pd.DataFrame(rows[start:end])
+    for c in ["id", "log_time", "user_name", "action_type", "target_table", "target_id", "message", "detail", "level", "source"]:
+        if c not in df.columns:
+            df[c] = ""
+    elapsed = (_v122_time.time() if "_v122_time" in globals() else datetime.now().timestamp()) - t0
+    return {
+        "ok": True,
+        "df": df[["id", "log_time", "user_name", "action_type", "target_table", "target_id", "message", "detail", "level", "source"]],
+        "rows": df.to_dict("records"),
+        "total_rows": total,
+        "page": p,
+        "page_size": size,
+        "total_pages": max(1, (total + size - 1) // size),
+        "elapsed_seconds": round(float(elapsed), 4),
+        "source": "v200_sqlite_authority_shard",
+    }
+
+
+def count_logs_by_date_range(start_date: Any, end_date: Any) -> int:  # type: ignore[override]
+    try:
+        return int(load_logs_page(start_date=start_date, end_date=end_date, page=1, page_size=1).get("total_rows", 0) or 0)
+    except Exception:
+        if callable(_v200_prev_count_logs_by_date_range):
+            return int(_v200_prev_count_logs_by_date_range(start_date, end_date) or 0)
+        return 0
+
+
+def get_system_log_authority_status() -> dict[str, Any]:  # type: ignore[override]
+    base = {}
+    try:
+        if "_v122_read_log_delete_state" in globals():
+            state = _v122_read_log_delete_state()
+        else:
+            state = {}
+        base = {
+            "module_key": "06_logs",
+            "path": str(_V122_LOG_AUTH_DIR / "records.json") if "_V122_LOG_AUTH_DIR" in globals() else "",
+            "exists": bool((_V122_LOG_AUTH_DIR / "records.json").exists()) if "_V122_LOG_AUTH_DIR" in globals() else False,
+            "count": len(_v122_read_authority_log_rows()) if "_v122_read_authority_log_rows" in globals() else 0,
+            "db_count": len(_v122_sqlite_log_rows(limit=300000)) if "_v122_sqlite_log_rows" in globals() else 0,
+            "shard_count": len(_v200_read_shard_rows()),
+            "delete_state_path": str(_V122_LOG_DELETE_STATE_PATH) if "_V122_LOG_DELETE_STATE_PATH" in globals() else "",
+            "delete_state_exists": bool(_V122_LOG_DELETE_STATE_PATH.exists()) if "_V122_LOG_DELETE_STATE_PATH" in globals() else False,
+            "deleted_keys": len(state.get("deleted_keys") or []),
+            "deleted_ranges": len(state.get("deleted_ranges") or []),
+            "v200_complete_log": True,
+        }
+        try:
+            base.update(get_log_batch_status())
+        except Exception:
+            pass
+    except Exception as exc:
+        base = {"v200_complete_log": True, "error": str(exc)[:300]}
+    return base
+
+# =================== END V200 COMPLETE ROW-LEVEL LOG RELIABILITY ===================
