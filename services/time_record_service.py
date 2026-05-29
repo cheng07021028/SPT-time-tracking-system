@@ -17975,3 +17975,277 @@ def _v220_rebuild_front_cache(reason: str = "v220_rebuild") -> None:  # type: ig
         pass
 
 # ================= END V220 DIRECT AUTHORITY REBUILD GUARD =================
+
+
+# ================= V221 SQLITE TABLE GUARD FOR FRONTEND ISOLATION｜2026-05-29 =================
+# 修正：V220 第一階段保留了 V212/V205 快速前景交易，但在部分部署環境中
+# data/permanent_store/database/spt_time_tracking.db 可能只有權限/登入表，尚未建立 time_records。
+# 這會造成按「開始作業」時 SQLite insert / duplicate check 直接噴出：no such table: time_records。
+# V221 只補後端保護：開始/結束前確保 SQLite cache table 存在；必要時把該筆/該群組
+# 從前台快取或 01/02 權威檔回填到 SQLite，再交給 V220/V212 的正確讀寫鏈處理。
+# 不改 UI/CSS/theme/table/buttons；不回退 SQLite-only；權威檔仍是最終真實來源。
+try:
+    _v221_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v221_prev_start_work = None
+try:
+    _v221_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v221_prev_finish_work = None
+try:
+    _v221_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v221_prev_get_active_records = None
+try:
+    _v221_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v221_prev_today_records = None
+
+
+def _v221_log(event: str, message: str, *, detail: str = "", target_id: str = "", level: str = "INFO") -> None:
+    try:
+        if "_v205_direct_log" in globals() and callable(_v205_direct_log):
+            _v205_direct_log(event, message, target_id=target_id, detail=detail, level=level)
+    except TypeError:
+        try:
+            _v205_direct_log(event, message, target_id, detail=detail, level=level)  # type: ignore[misc]
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def _v221_ensure_time_records_table(reason: str = "v221") -> bool:
+    """Ensure SQLite time_records exists before V205/V212 fast transaction code touches it."""
+    ok = False
+    try:
+        if "_v208_ensure_time_records_table" in globals() and callable(_v208_ensure_time_records_table):
+            _v208_ensure_time_records_table()
+            ok = True
+    except Exception as exc:
+        _v221_log("V221_SQLITE_TABLE_GUARD_WARN", f"V221 建立 time_records 快取表失敗：{exc}", detail=reason, level="WARN")
+    if ok:
+        return True
+    # 極端 fallback：若 V208 helper 不可用，直接建立最小相容 schema。
+    try:
+        with _v205_conn() as conn:  # type: ignore[name-defined]
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS time_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                record_key TEXT UNIQUE,
+                status TEXT,
+                work_order TEXT,
+                part_no TEXT,
+                type_name TEXT,
+                process_name TEXT,
+                employee_id TEXT,
+                employee_name TEXT,
+                start_action TEXT,
+                start_timestamp TEXT,
+                end_action TEXT,
+                end_timestamp TEXT,
+                remark TEXT,
+                start_date TEXT,
+                start_time TEXT,
+                end_date TEXT,
+                end_time TEXT,
+                work_hours REAL DEFAULT 0,
+                assembly_location TEXT,
+                group_key TEXT,
+                is_group_work INTEGER DEFAULT 0,
+                source TEXT DEFAULT 'streamlit',
+                created_at TEXT,
+                updated_at TEXT
+            )
+            """)
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_time_records_record_key_v221 ON time_records(record_key)")
+            conn.commit()
+        return True
+    except Exception as exc:
+        _v221_log("V221_SQLITE_TABLE_GUARD_FAIL", f"V221 無法建立 time_records 快取表：{exc}", detail=reason, level="ERROR")
+        return False
+
+
+def _v221_sqlite_has_record(record_id: int) -> bool:
+    try:
+        _v221_ensure_time_records_table("has_record")
+        with _v205_conn() as conn:  # type: ignore[name-defined]
+            row = conn.execute("SELECT 1 FROM time_records WHERE id=? LIMIT 1", (int(record_id),)).fetchone()
+        return bool(row)
+    except Exception:
+        return False
+
+
+def _v221_authority_df() -> pd.DataFrame:
+    try:
+        if "_v220_direct_authority_records_df" in globals() and callable(_v220_direct_authority_records_df):
+            df = _v220_direct_authority_records_df()
+            return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    except Exception:
+        pass
+    try:
+        if "_v208_authority_records_df" in globals() and callable(_v208_authority_records_df):
+            df = _v208_authority_records_df()
+            return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v221_rows_by_ids_from_cache_or_authority(ids) -> pd.DataFrame:
+    clean: list[int] = []
+    for x in ids or []:
+        try:
+            v = int(float(x))
+            if v not in clean:
+                clean.append(v)
+        except Exception:
+            pass
+    if not clean:
+        return pd.DataFrame()
+    frames: list[pd.DataFrame] = []
+    try:
+        active_df = _v220_get_active_cache_df(reason="v221_rows_by_ids_active_cache") if "_v220_get_active_cache_df" in globals() else pd.DataFrame()
+        if isinstance(active_df, pd.DataFrame) and not active_df.empty and "id" in active_df.columns:
+            ids_series = pd.to_numeric(active_df["id"], errors="coerce")
+            frames.append(active_df.loc[ids_series.isin(clean)].copy())
+    except Exception:
+        pass
+    try:
+        today_df = _v220_get_today_cache_df(reason="v221_rows_by_ids_today_cache") if "_v220_get_today_cache_df" in globals() else pd.DataFrame()
+        if isinstance(today_df, pd.DataFrame) and not today_df.empty and "id" in today_df.columns:
+            ids_series = pd.to_numeric(today_df["id"], errors="coerce")
+            frames.append(today_df.loc[ids_series.isin(clean)].copy())
+    except Exception:
+        pass
+    try:
+        auth_df = _v221_authority_df()
+        if isinstance(auth_df, pd.DataFrame) and not auth_df.empty and "id" in auth_df.columns:
+            ids_series = pd.to_numeric(auth_df["id"], errors="coerce")
+            frames.append(auth_df.loc[ids_series.isin(clean)].copy())
+    except Exception:
+        pass
+    frames = [f for f in frames if isinstance(f, pd.DataFrame) and not f.empty]
+    if not frames:
+        return pd.DataFrame()
+    try:
+        out = pd.concat(frames, ignore_index=True, sort=False)
+        if "_v206_normalize_time_records_df" in globals() and callable(_v206_normalize_time_records_df):
+            out = _v206_normalize_time_records_df(out)
+        if "id" in out.columns:
+            out["_v221_id"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.loc[out["_v221_id"].isin(clean)].copy()
+        # keep latest duplicate by record key/id
+        if "_v220_dedupe_records" in globals() and callable(_v220_dedupe_records) and "_v220_df_to_records" in globals() and callable(_v220_df_to_records):
+            rows = _v220_dedupe_records(_v220_df_to_records(out))
+            out = _v220_records_to_df(rows) if "_v220_records_to_df" in globals() else pd.DataFrame(rows)
+        out = out.drop(columns=[c for c in out.columns if str(c).startswith("_v221_")], errors="ignore")
+        return out.reset_index(drop=True)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v221_hydrate_sqlite_rows(df: pd.DataFrame, reason: str = "v221_hydrate") -> int:
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return 0
+    try:
+        _v221_ensure_time_records_table(reason)
+        if "_v208_upsert_records_to_sqlite" in globals() and callable(_v208_upsert_records_to_sqlite):
+            return int(_v208_upsert_records_to_sqlite(df, reason=reason) or 0)
+    except Exception as exc:
+        _v221_log("V221_SQLITE_HYDRATE_WARN", f"V221 回填 SQLite 快取失敗：{exc}", detail=reason, level="WARN")
+    return 0
+
+
+def _v221_hydrate_record_for_finish(record_id: int, finish_parallel_group: bool = True, reason: str = "v221_before_finish") -> int:
+    """Before V212/V205 finish, ensure the selected active row (and same group if known) exists in SQLite."""
+    try:
+        rid = int(float(record_id))
+    except Exception:
+        return 0
+    ids: set[int] = {rid}
+    try:
+        if finish_parallel_group and "_v220_group_rows_from_cache" in globals() and callable(_v220_group_rows_from_cache):
+            group_df = _v220_group_rows_from_cache(rid)
+            if isinstance(group_df, pd.DataFrame) and not group_df.empty and "id" in group_df.columns:
+                for x in pd.to_numeric(group_df["id"], errors="coerce").dropna().tolist():
+                    try:
+                        ids.add(int(x))
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    missing = [x for x in ids if not _v221_sqlite_has_record(x)]
+    if not missing:
+        return 0
+    rows = _v221_rows_by_ids_from_cache_or_authority(missing)
+    count = _v221_hydrate_sqlite_rows(rows, reason=reason)
+    if count:
+        _v221_log("V221_SQLITE_HYDRATE_FOR_FINISH", f"V221 結束前已回填 SQLite time_records {count} 筆。", target_id=",".join(map(str, missing)), detail=reason, level="INFO")
+    return int(count or 0)
+
+
+def _v221_is_no_such_time_records_error(exc: Exception) -> bool:
+    text = str(exc or "").lower()
+    return "no such table" in text and "time_records" in text
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V221: keep V220/V214/V212 correct chain, but ensure SQLite time_records table before Start Work."""
+    if not callable(_v221_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    _v221_ensure_time_records_table("start_work_v221_before_base")
+    try:
+        return int(_v221_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)
+    except Exception as exc:
+        # Cold deployments may hit no-such-table before all nested wrappers have initialized. Create table once and retry.
+        if _v221_is_no_such_time_records_error(exc):
+            _v221_ensure_time_records_table("start_work_v221_retry_after_no_such_table")
+            _v221_log("V221_SQLITE_TABLE_RETRY", "V221 偵測到 no such table: time_records，已建立快取表並重試開始作業。", detail=str(exc), level="WARN")
+            return int(_v221_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)
+        raise
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V221: keep V220/V214/V212 finish chain, but hydrate selected authority/cache row into SQLite first when needed."""
+    if not callable(_v221_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    _v221_ensure_time_records_table("finish_work_v221_before_base")
+    _v221_hydrate_record_for_finish(record_id, finish_parallel_group=finish_parallel_group, reason="finish_work_v221_before_base")
+    try:
+        return int(_v221_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)
+    except Exception as exc:
+        if _v221_is_no_such_time_records_error(exc):
+            _v221_ensure_time_records_table("finish_work_v221_retry_after_no_such_table")
+            _v221_hydrate_record_for_finish(record_id, finish_parallel_group=finish_parallel_group, reason="finish_work_v221_retry_after_no_such_table")
+            _v221_log("V221_SQLITE_TABLE_RETRY", "V221 偵測到 no such table: time_records，已建立快取表並重試結束作業。", target_id=str(record_id), detail=str(exc), level="WARN")
+            return int(_v221_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)
+        raise
+
+
+def audit_v221_sqlite_table_guard() -> dict:
+    ok = _v221_ensure_time_records_table("audit_v221")
+    exists = False
+    count = 0
+    try:
+        with _v205_conn() as conn:  # type: ignore[name-defined]
+            exists = bool(conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='time_records'").fetchone())
+            if exists:
+                count = int(conn.execute("SELECT COUNT(*) FROM time_records").fetchone()[0])
+    except Exception:
+        pass
+    return {
+        "version": "V221",
+        "scope": "SQLite time_records table guard for V220 frontend operation isolation",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "authority_write_preserved": True,
+        "frontend_cache_preserved": True,
+        "sqlite_table_guard_ok": bool(ok),
+        "sqlite_time_records_table_exists": bool(exists),
+        "sqlite_time_records_count": int(count),
+        "fixes": "prevents no such table: time_records on Start Work / Finish Work after cold deploy or empty SQLite cache",
+    }
+
+# ================= END V221 SQLITE TABLE GUARD FOR FRONTEND ISOLATION =================
