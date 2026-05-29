@@ -15109,3 +15109,345 @@ def audit_v205_01_second_level_operation() -> dict:
     }
 
 # ================= END V205 01 SECOND-LEVEL FOREGROUND TRANSACTION =================
+
+# ================= V206 FINISH WORK ACTIVE DISPLAY FALLBACK =================
+# Direct-overwrite version. UI-neutral: no pages/CSS/theme/table rendering changes.
+# Purpose:
+# - 01 Finish Work must display the selected employee's unfinished records even
+#   when SQLite cache is temporarily missing but 01/02 final view still has the
+#   active row.
+# - If a user finishes a fallback active row, materialize only that active group
+#   back into SQLite, then reuse the existing V205 fast finish path.
+
+_v206_prev_get_active_records = get_active_records
+_v206_prev_get_active_record = get_active_record
+_v206_prev_get_active_same_work = get_active_same_work
+_v206_prev_get_active_group = get_active_group
+_v206_prev_finish_work = finish_work
+
+
+def _v206_txt(v) -> str:
+    if v is None:
+        return ""
+    try:
+        if pd.isna(v):
+            return ""
+    except Exception:
+        pass
+    s = str(v).strip()
+    if s.lower() in {"nan", "none", "nat", "null"}:
+        return ""
+    return s
+
+
+def _v206_int(v, default=None):
+    try:
+        s = _v206_txt(v)
+        if not s:
+            return default
+        return int(float(s))
+    except Exception:
+        return default
+
+
+def _v206_is_terminal_row(row: dict) -> bool:
+    status = _v206_txt(row.get("status") or row.get("狀態") or row.get("狀態 / Status"))
+    end_action = _v206_txt(row.get("end_action") or row.get("結束動作 / End Action"))
+    end_ts = _v206_txt(row.get("end_timestamp") or row.get("結束時間戳 / End Timestamp") or row.get("結束時間 / End Timestamp"))
+    joined = f"{status} {end_action}"
+    return bool(end_ts) or any(k in joined for k in ("下班", "暫停", "完工", "已結束", "結束", "補登結束", "人工結算"))
+
+
+def _v206_final_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:
+    try:
+        from services.final_time_records_view_service import load_final_active_records
+        df = load_final_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+        if isinstance(df, pd.DataFrame):
+            return df.copy().reset_index(drop=True)
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v206_final_all_records() -> pd.DataFrame:
+    try:
+        from services.final_time_records_view_service import load_final_time_records
+        df = load_final_time_records(include_recovery=False, include_sqlite=True)
+        if isinstance(df, pd.DataFrame):
+            return df.copy().reset_index(drop=True)
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v206_filter_active_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    keep = []
+    for _, rr in df.iterrows():
+        keep.append(not _v206_is_terminal_row(dict(rr.to_dict())))
+    return df.loc[keep].reset_index(drop=True)
+
+
+def _v206_filter_by_id(df: pd.DataFrame, record_id: int) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    cols = [c for c in ("id", "ID", "ID / ID", "紀錄編號", "record_id") if c in df.columns]
+    if not cols:
+        return pd.DataFrame()
+    mask = False
+    for c in cols:
+        try:
+            mask = mask | (pd.to_numeric(df[c], errors="coerce").fillna(-1).astype(int) == int(record_id))
+        except Exception:
+            mask = mask | (df[c].astype(str).str.strip() == str(record_id))
+    return df.loc[mask].reset_index(drop=True)
+
+
+def _v206_sort_active(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    for c in ("id", "start_timestamp", "updated_at"):
+        if c not in out.columns:
+            out[c] = ""
+    try:
+        out["_v206_id_sort"] = pd.to_numeric(out["id"], errors="coerce").fillna(0)
+        out = out.sort_values(["_v206_id_sort", "start_timestamp"], ascending=[False, False], kind="stable")
+        out = out.drop(columns=["_v206_id_sort"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        df = _v206_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return df.reset_index(drop=True)
+    except TypeError:
+        try:
+            df = _v206_prev_get_active_records(employee_id=employee_id)
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                return df.reset_index(drop=True)
+        except Exception:
+            pass
+    except Exception:
+        pass
+    # Fallback: final view may still contain active 01/02 rows even when SQLite cache is empty.
+    df = _v206_final_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    if df.empty and employee_id and employee_name:
+        df = _v206_final_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=None)
+    return _v206_sort_active(_v206_filter_active_df(df))
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    try:
+        rec = _v206_prev_get_active_record(employee_id, employee_name=employee_name)
+    except TypeError:
+        try:
+            rec = _v206_prev_get_active_record(employee_id)
+        except Exception:
+            rec = None
+    except Exception:
+        rec = None
+    if isinstance(rec, dict) and rec:
+        return rec
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or df.empty:
+        return None
+    df = _v206_sort_active(df)
+    return dict(df.iloc[0].to_dict()) if not df.empty else None
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    try:
+        rec = _v206_prev_get_active_same_work(employee_id, work_order, process_name, start_date=start_date, employee_name=employee_name)
+    except TypeError:
+        try:
+            rec = _v206_prev_get_active_same_work(employee_id, work_order, process_name)
+        except Exception:
+            rec = None
+    except Exception:
+        rec = None
+    if isinstance(rec, pd.DataFrame):
+        if not rec.empty:
+            return dict(rec.iloc[0].to_dict())
+    elif isinstance(rec, dict) and rec:
+        return rec
+    df = get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    if df is None or df.empty:
+        return None
+    cols = [c for c in ("work_order", "製令", "製令 / Work Order", "Work Order") if c in df.columns]
+    if cols:
+        mask = False
+        for c in cols:
+            mask = mask | (df[c].astype(str).str.strip() == str(work_order).strip())
+        df = df.loc[mask].reset_index(drop=True)
+    df = _v206_sort_active(df)
+    return dict(df.iloc[0].to_dict()) if not df.empty else None
+
+
+def _v206_find_final_active_by_id(record_id: int) -> dict | None:
+    df = _v206_filter_active_df(_v206_final_all_records())
+    if df.empty:
+        return None
+    hit = _v206_filter_by_id(df, int(record_id))
+    if hit.empty:
+        return None
+    return dict(hit.iloc[0].to_dict())
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        df = _v206_prev_get_active_group(int(record_id))
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return df.reset_index(drop=True)
+    except Exception:
+        pass
+    rec = _v206_find_final_active_by_id(int(record_id))
+    if not rec:
+        return pd.DataFrame()
+    df = get_active_records(
+        employee_id=_v206_txt(rec.get("employee_id") or rec.get("工號") or rec.get("工號 / Employee ID")),
+        employee_name=_v206_txt(rec.get("employee_name") or rec.get("姓名") or rec.get("姓名 / Name")),
+        process_name=_v206_txt(rec.get("process_name") or rec.get("工段名稱") or rec.get("工段名稱 / Process") or rec.get("工段 / Process")),
+        start_date=_v206_txt(rec.get("start_date") or rec.get("開始日期") or rec.get("開始日期 / Start Date"))[:10],
+    )
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()
+
+
+def _v206_sqlite_columns() -> list[str]:
+    try:
+        with _v205_conn() as conn:  # type: ignore[name-defined]
+            rows = conn.execute("PRAGMA table_info(time_records)").fetchall()
+        return [str(r[1]) for r in rows]
+    except Exception:
+        return []
+
+
+def _v206_row_value(row: dict, col: str):
+    aliases = {
+        "id": ["id", "ID", "ID / ID", "record_id", "紀錄編號"],
+        "record_key": ["record_key", "Record Key", "紀錄鍵 / Record Key"],
+        "status": ["status", "狀態", "狀態 / Status"],
+        "work_order": ["work_order", "製令", "製令 / Work Order", "Work Order"],
+        "part_no": ["part_no", "P/N", "料號", "P/N / 料號"],
+        "type_name": ["type_name", "機型", "機型 / Type"],
+        "process_name": ["process_name", "工段名稱", "工段名稱 / Process", "工段 / Process", "Process"],
+        "employee_id": ["employee_id", "工號", "工號 / Employee ID", "Employee ID"],
+        "employee_name": ["employee_name", "姓名", "姓名 / Name", "Name"],
+        "start_action": ["start_action", "開始動作 / Start Action"],
+        "start_timestamp": ["start_timestamp", "開始時間戳 / Start Timestamp", "開始時間 / Start Timestamp", "開始時間"],
+        "end_action": ["end_action", "結束動作 / End Action"],
+        "end_timestamp": ["end_timestamp", "結束時間戳 / End Timestamp", "結束時間 / End Timestamp", "結束時間"],
+        "remark": ["remark", "備註", "備註 / Remark"],
+        "start_date": ["start_date", "開始日期", "開始日期 / Start Date"],
+        "start_time": ["start_time", "開始時刻", "開始時刻 / Start Time"],
+        "end_date": ["end_date", "結束日期", "結束日期 / End Date"],
+        "end_time": ["end_time", "結束時刻", "結束時刻 / End Time"],
+        "assembly_location": ["assembly_location", "組立地點", "組立地點 / Assembly Location"],
+        "group_key": ["group_key"],
+        "is_group_work": ["is_group_work"],
+        "source": ["source", "資料來源"],
+        "created_at": ["created_at"],
+        "updated_at": ["updated_at"],
+        "work_hours": ["work_hours", "工時", "工時 / Work Hours"],
+    }
+    for k in aliases.get(col, [col]):
+        if k in row:
+            v = row.get(k)
+            if _v206_txt(v) != "":
+                return v
+    return None
+
+
+def _v206_materialize_final_group_to_sqlite(record_id: int) -> int:
+    rec = _v206_find_final_active_by_id(int(record_id))
+    if not rec:
+        return 0
+    group = get_active_group(int(record_id))
+    if not isinstance(group, pd.DataFrame) or group.empty:
+        group = pd.DataFrame([rec])
+    cols = _v206_sqlite_columns()
+    if not cols:
+        return 0
+    inserted = 0
+    now = _v205_now() if "_v205_now" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with _v205_conn() as conn:  # type: ignore[name-defined]
+        for _, rr in group.iterrows():
+            row = dict(rr.to_dict())
+            rid = _v206_int(_v206_row_value(row, "id"))
+            if rid is not None:
+                exists = conn.execute("SELECT id FROM time_records WHERE id=?", (rid,)).fetchone()
+                if exists:
+                    continue
+            values = {}
+            for c in cols:
+                v = _v206_row_value(row, c)
+                if c == "status" and _v206_txt(v) == "":
+                    v = "作業中"
+                if c == "source" and _v206_txt(v) == "":
+                    v = "v206_active_materialized_from_final_view"
+                if c in ("created_at", "updated_at") and _v206_txt(v) == "":
+                    v = now
+                if c == "is_group_work" and _v206_txt(v) == "":
+                    v = 0
+                if c == "record_key" and _v206_txt(v) == "":
+                    try:
+                        v = make_record_key(
+                            _v206_txt(_v206_row_value(row, "employee_id")),
+                            _v206_txt(_v206_row_value(row, "work_order")),
+                            _v206_txt(_v206_row_value(row, "process_name")),
+                            _v206_txt(_v206_row_value(row, "start_timestamp")) or now,
+                        )
+                    except Exception:
+                        v = ""
+                # Keep only non-empty values except id/source/status dates; SQLite default handles the rest.
+                if _v206_txt(v) != "" or c in ("id", "status", "source", "created_at", "updated_at", "is_group_work"):
+                    values[c] = v
+            if not values:
+                continue
+            insert_cols = list(values.keys())
+            placeholders = ",".join(["?"] * len(insert_cols))
+            sql = f"INSERT OR IGNORE INTO time_records({','.join(insert_cols)}) VALUES({placeholders})"
+            try:
+                conn.execute(sql, [values[c] for c in insert_cols])
+                inserted += 1
+            except Exception:
+                pass
+        conn.commit()
+    if inserted:
+        try:
+            _v205_clear_caches()  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return inserted
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    try:
+        return int(_v206_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    except ValueError as exc:
+        msg = str(exc)
+        if "找不到工時紀錄" not in msg and "已刪除" not in msg:
+            raise
+        restored = _v206_materialize_final_group_to_sqlite(int(record_id))
+        if restored <= 0:
+            raise
+        return int(_v206_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+
+
+def audit_v206_finish_active_display() -> dict:
+    return {
+        "version": "V206",
+        "ui_changed": False,
+        "pages_changed": False,
+        "theme_service_changed": False,
+        "css_changed": False,
+        "purpose": "Finish Work selected employee active records fallback from final view when SQLite cache is missing",
+        "active_record_sources": ["sqlite_fast", "final_time_records_view_fallback"],
+        "finish_materializes_missing_sqlite_active_row": True,
+    }
+
+# ================= END V206 FINISH WORK ACTIVE DISPLAY FALLBACK =================
