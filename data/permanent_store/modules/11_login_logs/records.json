@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 15:16:10",
-  "exported_at": "2026-05-29 15:16:10",
+  "updated_at": "2026-05-29 15:16:11",
+  "exported_at": "2026-05-29 15:16:11",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 71552,
+        "source": "v103_merge",
+        "username": "SSS",
+        "display_name": "SSS",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "06_logs:can_view; employee_id=SSS; roles=operator",
+        "module_code": "06_logs",
+        "login_time": "2026-05-29 15:16:10",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 15:16:10"
+      },
       {
         "id": 71019,
         "source": "v103_merge",
@@ -8526,7 +8542,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 532,
+    "login_logs": 533,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
