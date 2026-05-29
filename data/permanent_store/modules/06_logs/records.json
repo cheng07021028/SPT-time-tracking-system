@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 09:22:23",
-  "exported_at": "2026-05-29 09:22:23",
+  "updated_at": "2026-05-29 09:23:39",
+  "exported_at": "2026-05-29 09:23:39",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -1339,11 +1339,143 @@
         "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 09:22:16\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"350\",\"target_ids\":[350],\"message\":\"麥可 開始 25M00541-02 / 前置鈑金\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT239|25M00541-02|前置鈑金|2026-05-29 09:21:21|cd345684\",\"identity_key\":\"record_key:SPT239|25M00541-02|前置鈑金|2026-05-29 09:21:21|cd345684\",\"id\":\"350\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"work_order\":\"25M00541-02\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"前置鈑金\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:21:21\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":350,\"record_key\":\"SPT239|25M00541-02|前置鈑金|2026-05-29 09:21:21|cd345684\",\"status\":\"作業中\",\"work_order\":\"25M00541-02\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:21:21\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:21:21\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SPT239|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:21:21\",\"updated_at\":\"2026-05-29 09:21:21\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":350,\"record_key\":\"SPT239|25M00541-02|前置鈑金|2026-05-29 09:21:21|cd345684\",\"status\":\"作業中\",\"work_order\":\"25M00541-02\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:21:21\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:21:21\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SPT239|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:21:21\",\"updated_at\":\"2026-05-29 09:21:21\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":350,\"record_key\":\"SPT239|25M00541-02|前置鈑金|2026-05-29 09:21:21|cd345684\",\"status\":\"作業中\",\"work_order\":\"25M00541-02\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:21:21\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:21:21\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SPT239|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:21:21\",\"updated_at\":\"2026-05-29 09:21:21\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":350,\"record_key\":\"SPT239|25M00541-02|前置鈑金|2026-05-29 09:21:21|cd345684\",\"status\":\"作業中\",\"work_order\":\"25M00541-02\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SPT239\",\"employee_name\":\"麥可\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:21:21\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:21:21\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SPT239|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:21:21\",\"updated_at\":\"2026-05-29 09:21:21\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"6fa0dc6a01e8ba31ef1af875b1718f08084ea223f7647881a666fd0b233eb7d1\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 666,
+        "log_time": "2026-05-29 09:22:42",
+        "user_name": "SPT077",
+        "action_type": "UPDATE",
+        "target_table": "security_users",
+        "target_id": "",
+        "message": "UPDATE security_users",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 665,
+        "log_time": "2026-05-29 09:22:41",
+        "user_name": "SPT077",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 664,
+        "log_time": "2026-05-29 09:22:41",
+        "user_name": "SPT228",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 659,
+        "log_time": "2026-05-29 09:22:40",
+        "user_name": "SPT228",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 652,
+        "log_time": "2026-05-29 09:22:39",
+        "user_name": "SPT228",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 650,
+        "log_time": "2026-05-29 09:22:39",
+        "user_name": "SPT228",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 649,
+        "log_time": "2026-05-29 09:22:39",
+        "user_name": "SPT228",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 644,
+        "log_time": "2026-05-29 09:22:38",
+        "user_name": "SPT228",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 638,
+        "log_time": "2026-05-29 09:22:37",
+        "user_name": "SPT228",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 637,
+        "log_time": "2026-05-29 09:22:37",
+        "user_name": "SPT228",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 686,
+        "log_time": "2026-05-29 09:23:34",
+        "user_name": "SPT089",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "352",
+        "message": "陳凱彥 開始 25MN0014-06 / S.T.",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 111
+    "system_logs": 122
   }
 }
