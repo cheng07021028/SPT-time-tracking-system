@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 13:10:26",
+  "exported_at": "2026-05-29 13:10:48",
   "source": "db_service_write",
   "module_key": "02_history",
   "module_code": "02",
@@ -1384,10 +1384,37 @@
         "source": "streamlit",
         "created_at": "2026-05-29 13:10:08",
         "updated_at": "2026-05-29 13:10:08"
+      },
+      {
+        "id": 402,
+        "record_key": "B226|25M0541-02|骨架組立|2026-05-29 13:10:46|e90d1bb4",
+        "status": "作業中",
+        "work_order": "25M0541-02",
+        "part_no": "PSRSC150-SB4L-06",
+        "type_name": "RSC150 Frame sorter",
+        "process_name": "骨架組立",
+        "employee_id": "B226",
+        "employee_name": "周政龍",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 13:10:46",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "13:10:46",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B226|骨架組立|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 13:10:46",
+        "updated_at": "2026-05-29 13:10:46"
       }
     ]
   },
   "table_counts": {
-    "time_records": 51
+    "time_records": 52
   }
 }
