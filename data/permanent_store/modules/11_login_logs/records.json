@@ -2,27 +2,43 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 13:33:41",
-  "exported_at": "2026-05-29 13:33:41",
+  "updated_at": "2026-05-29 13:33:49",
+  "exported_at": "2026-05-29 13:33:49",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
       {
-        "id": 50409,
+        "id": 51225,
         "source": "v103_merge",
-        "username": "SPT189",
-        "display_name": "劉欣惠",
-        "event_type": "PERMISSION_DENIED",
-        "result": "FAIL",
-        "message": "V142 hard deny 10_permissions:can_manage; role must be admin; employee_id=SPT189; roles=operator",
-        "module_code": "10_permissions",
-        "login_time": "2026-05-29 13:33:34",
-        "logout_time": "",
+        "username": "SPT158",
+        "display_name": "劉定澤",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=SPT158; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-29 13:33:45",
+        "logout_time": "2026-05-29 13:33:45",
         "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
-        "created_at": "2026-05-29 13:33:34"
+        "created_at": "2026-05-29 13:33:45"
+      },
+      {
+        "id": 50410,
+        "source": "v103_merge",
+        "username": "SPT158",
+        "display_name": "劉定澤",
+        "event_type": "LOGOUT",
+        "result": "SUCCESS",
+        "message": "使用者手動登出; employee_id=SPT158; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-29 13:33:40",
+        "logout_time": "2026-05-29 13:33:40",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 13:33:40"
       },
       {
         "id": 50002,
@@ -6526,7 +6542,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 407,
+    "login_logs": 408,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
