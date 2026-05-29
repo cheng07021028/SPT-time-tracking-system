@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 15:11:09",
-  "exported_at": "2026-05-29 15:11:09",
+  "updated_at": "2026-05-29 15:15:36",
+  "exported_at": "2026-05-29 15:15:36",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 69426,
+        "source": "v103_merge",
+        "username": "SPT236",
+        "display_name": "賴智文",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=SPT236; roles=admin",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-29 15:15:36",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 15:15:36"
+      },
       {
         "id": 68897,
         "source": "v103_merge",
@@ -8462,7 +8478,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 528,
+    "login_logs": 529,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
