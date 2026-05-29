@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 09:59:57",
-  "exported_at": "2026-05-29 09:59:57",
+  "updated_at": "2026-05-29 10:03:01",
+  "exported_at": "2026-05-29 10:03:01",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -2287,11 +2287,167 @@
         "detail": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 353,
+        "log_time": "2026-05-29 10:03:00",
+        "user_name": "SPT220",
+        "action_type": "V200_ROW_START_WORK",
+        "target_table": "time_records",
+        "target_id": "378",
+        "message": "開始作業逐筆紀錄｜ID=378｜SPT220 劉韋廷 26M0242-01 / S.T.",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"378\", \"record_key\": \"SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\", \"employee_id\": \"SPT220\", \"employee_name\": \"劉韋廷\", \"work_order\": \"26M0242-01\", \"process_name\": \"S.T.\", \"start_timestamp\": \"2026-05-29 10:02:24\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 378, \"record_key\": \"SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\", \"status\": \"作業中\", \"work_order\": \"26M0242-01\", \"part_no\": \"PSRSC151-SB4L-06\", \"type_name\": \"RSC151 (Standalone) SB4L+Argus\", \"process_name\": \"S.T.\", \"employee_id\": \"SPT220\", \"employee_name\": \"劉韋廷\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 10:02:24\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-29\", \"start_time\": \"10:02:24\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": 0.0, \"assembly_location\": \"竹東\", \"group_key\": \"SPT220|S.T.|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 10:02:24\", \"updated_at\": \"2026-05-29 10:02:24\"}}\n__spt_log_uid=682dd1904c834711978b1bd97c8af4dc\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 10:03:00\",\"action_type\":\"V200_ROW_START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"378\",\"target_ids\":[378],\"message\":\"開始作業逐筆紀錄｜ID=378｜SPT220 劉韋廷 26M0242-01 / S.T.\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\",\"identity_key\":\"record_key:SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\",\"id\":\"378\",\"employee_id\":\"SPT220\",\"employee_name\":\"劉韋廷\",\"work_order\":\"26M0242-01\",\"part_no\":\"PSRSC151-SB4L-06\",\"type_name\":\"RSC151 (Standalone) SB4L+Argus\",\"process_name\":\"S.T.\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 10:02:24\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":378,\"record_key\":\"SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\",\"status\":\"作業中\",\"work_order\":\"26M0242-01\",\"part_no\":\"PSRSC151-SB4L-06\",\"type_name\":\"RSC151 (Standalone) SB4L+Argus\",\"process_name\":\"S.T.\",\"employee_id\":\"SPT220\",\"employee_name\":\"劉韋廷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:02:24\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:02:24\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT220|S.T.|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:02:24\",\"updated_at\":\"2026-05-29 10:02:24\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":378,\"record_key\":\"SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\",\"status\":\"作業中\",\"work_order\":\"26M0242-01\",\"part_no\":\"PSRSC151-SB4L-06\",\"type_name\":\"RSC151 (Standalone) SB4L+Argus\",\"process_name\":\"S.T.\",\"employee_id\":\"SPT220\",\"employee_name\":\"劉韋廷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:02:24\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:02:24\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT220|S.T.|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:02:24\",\"updated_at\":\"2026-05-29 10:02:24\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":378,\"record_key\":\"SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\",\"status\":\"作業中\",\"work_order\":\"26M0242-01\",\"part_no\":\"PSRSC151-SB4L-06\",\"type_name\":\"RSC151 (Standalone) SB4L+Argus\",\"process_name\":\"S.T.\",\"employee_id\":\"SPT220\",\"employee_name\":\"劉韋廷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:02:24\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:02:24\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT220|S.T.|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:02:24\",\"updated_at\":\"2026-05-29 10:02:24\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":378,\"record_key\":\"SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\",\"status\":\"作業中\",\"work_order\":\"26M0242-01\",\"part_no\":\"PSRSC151-SB4L-06\",\"type_name\":\"RSC151 (Standalone) SB4L+Argus\",\"process_name\":\"S.T.\",\"employee_id\":\"SPT220\",\"employee_name\":\"劉韋廷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:02:24\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:02:24\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT220|S.T.|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:02:24\",\"updated_at\":\"2026-05-29 10:02:24\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"14adb62ee9a70dee3414d5f573185ad11114fff98c89953c2948d8e87f3d6b17\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 352,
+        "log_time": "2026-05-29 10:02:57",
+        "user_name": "SPT220",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "378",
+        "message": "劉韋廷 開始 26M0242-01 / S.T.",
+        "detail": "__spt_log_uid=197c026ebbae4e6a83f13048c173b188\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 10:02:57\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"378\",\"target_ids\":[378],\"message\":\"劉韋廷 開始 26M0242-01 / S.T.\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\",\"identity_key\":\"record_key:SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\",\"id\":\"378\",\"employee_id\":\"SPT220\",\"employee_name\":\"劉韋廷\",\"work_order\":\"26M0242-01\",\"part_no\":\"PSRSC151-SB4L-06\",\"type_name\":\"RSC151 (Standalone) SB4L+Argus\",\"process_name\":\"S.T.\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 10:02:24\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":378,\"record_key\":\"SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\",\"status\":\"作業中\",\"work_order\":\"26M0242-01\",\"part_no\":\"PSRSC151-SB4L-06\",\"type_name\":\"RSC151 (Standalone) SB4L+Argus\",\"process_name\":\"S.T.\",\"employee_id\":\"SPT220\",\"employee_name\":\"劉韋廷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:02:24\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:02:24\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT220|S.T.|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:02:24\",\"updated_at\":\"2026-05-29 10:02:24\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":378,\"record_key\":\"SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\",\"status\":\"作業中\",\"work_order\":\"26M0242-01\",\"part_no\":\"PSRSC151-SB4L-06\",\"type_name\":\"RSC151 (Standalone) SB4L+Argus\",\"process_name\":\"S.T.\",\"employee_id\":\"SPT220\",\"employee_name\":\"劉韋廷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:02:24\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:02:24\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT220|S.T.|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:02:24\",\"updated_at\":\"2026-05-29 10:02:24\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":378,\"record_key\":\"SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\",\"status\":\"作業中\",\"work_order\":\"26M0242-01\",\"part_no\":\"PSRSC151-SB4L-06\",\"type_name\":\"RSC151 (Standalone) SB4L+Argus\",\"process_name\":\"S.T.\",\"employee_id\":\"SPT220\",\"employee_name\":\"劉韋廷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:02:24\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:02:24\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT220|S.T.|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:02:24\",\"updated_at\":\"2026-05-29 10:02:24\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":378,\"record_key\":\"SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2\",\"status\":\"作業中\",\"work_order\":\"26M0242-01\",\"part_no\":\"PSRSC151-SB4L-06\",\"type_name\":\"RSC151 (Standalone) SB4L+Argus\",\"process_name\":\"S.T.\",\"employee_id\":\"SPT220\",\"employee_name\":\"劉韋廷\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:02:24\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:02:24\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT220|S.T.|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:02:24\",\"updated_at\":\"2026-05-29 10:02:24\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"106891c2bf88cfec4a501a46b48fe0d19a60ccbd8243062afec9a812ac87742f\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 351,
+        "log_time": "2026-05-29 10:02:56",
+        "user_name": "SPT220",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 350,
+        "log_time": "2026-05-29 10:01:15",
+        "user_name": "SPT220",
+        "action_type": "UPDATE",
+        "target_table": "security_users",
+        "target_id": "",
+        "message": "UPDATE security_users",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 349,
+        "log_time": "2026-05-29 10:01:15",
+        "user_name": "SPT220",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 348,
+        "log_time": "2026-05-29 10:01:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 334,
+        "log_time": "2026-05-29 10:01:15",
+        "user_name": "appuser",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 333,
+        "log_time": "2026-05-29 10:01:15",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 332,
+        "log_time": "2026-05-29 10:00:10",
+        "user_name": "B164",
+        "action_type": "UPDATE",
+        "target_table": "security_users",
+        "target_id": "",
+        "message": "UPDATE security_users",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 331,
+        "log_time": "2026-05-29 10:00:10",
+        "user_name": "B164",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 330,
+        "log_time": "2026-05-29 10:00:10",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 316,
+        "log_time": "2026-05-29 10:00:10",
+        "user_name": "appuser",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 315,
+        "log_time": "2026-05-29 10:00:10",
+        "user_name": "appuser",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 190
+    "system_logs": 203
   }
 }
