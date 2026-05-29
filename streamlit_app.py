@@ -40,7 +40,7 @@ render_global_font_controls(username=str(_current_user))
 st.success("系統初始化成功。請從左側選單進入各功能頁。")
 
 render_kpi_cards([
-    ("核心模組 / Modules", "13"),
+    ("核心模組 / Modules", "14"),
     ("資料庫 / Database", "SQLite"),
     ("雲端保存 / GitHub", "Ready"),
     ("權限系統 / Permission", "Enabled"),
