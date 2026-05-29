@@ -2,27 +2,27 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 17:33:47",
-  "exported_at": "2026-05-29 17:33:47",
+  "updated_at": "2026-05-29 17:33:49",
+  "exported_at": "2026-05-29 17:33:49",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
       {
-        "id": 65744,
+        "id": 66388,
         "source": "v103_merge",
-        "username": "B155",
-        "display_name": "趙健浩",
+        "username": "SPT092",
+        "display_name": "林昶志",
         "event_type": "PASSWORD_CHANGE",
         "result": "SUCCESS",
-        "message": "force_password_change_completed; employee_id=B155; roles=operator",
+        "message": "force_password_change_completed; employee_id=SPT092; roles=operator",
         "module_code": "10_permissions",
-        "login_time": "2026-05-29 17:33:47",
+        "login_time": "2026-05-29 17:33:49",
         "logout_time": "",
         "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
-        "created_at": "2026-05-29 17:33:47"
+        "created_at": "2026-05-29 17:33:49"
       },
       {
         "id": 65744,
