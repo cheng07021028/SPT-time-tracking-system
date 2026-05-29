@@ -1,9 +1,9 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 13:48:36",
+  "exported_at": "2026-05-29 13:51:40",
   "source": "db_service_write",
   "db_path": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
-  "business_row_count": 55,
+  "business_row_count": 56,
   "table_counts": {
     "auth_account_permissions": 471,
     "auth_login_logs": 0,
@@ -16,13 +16,13 @@
     "security_settings": 2,
     "security_user_roles": 9,
     "security_users": 9,
-    "system_logs": 1208,
+    "system_logs": 1209,
     "system_settings": 6,
     "table_column_settings": 0,
     "table_sort_settings": 0,
     "time_record_events": 0,
     "time_record_outbox": 0,
-    "time_records": 55,
+    "time_records": 56,
     "work_orders": 0
   },
   "tables": {
@@ -28618,6 +28618,17 @@
         "message": "UPDATE security_users",
         "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
         "level": "INFO"
+      },
+      {
+        "id": 2108,
+        "log_time": "2026-05-29 13:51:40",
+        "user_name": "SPT138",
+        "action_type": "V200_ROW_FINISH_WORK",
+        "target_table": "time_records",
+        "target_id": "364",
+        "message": "結束作業逐筆紀錄｜動作=暫停｜ID=364｜SPT138 蘇雍盛 V3141245 / GPTC Robot Teaching機構調整",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"364\", \"record_key\": \"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\", \"employee_id\": \"SPT138\", \"employee_name\": \"蘇雍盛\", \"work_order\": \"V3141245\", \"process_name\": \"GPTC Robot Teaching機構調整\", \"start_timestamp\": \"2026-05-29 09:31:48\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 364, \"record_key\": \"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\", \"status\": \"作業中\", \"work_order\": \"V3141245\", \"part_no\": \"PP411390041\", \"type_name\": \"BENCH 300 LPR Stripper Auto 2C 1Q 2D\", \"process_name\": \"GPTC Robot Teaching機構調整\", \"employee_id\": \"SPT138\", \"employee_name\": \"蘇雍盛\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 09:31:48\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"量測機台的震動值\", \"start_date\": \"2026-05-29\", \"start_time\": \"09:31:48\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": 0.0, \"assembly_location\": \"竹東\", \"group_key\": \"SPT138|GPTC Robot Teaching機構調整|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 09:31:48\", \"updated_at\": \"2026-05-29 09:31:48\"}}\n__spt_log_uid=670459259a574021b46ed2650eda97a5\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:51:40\",\"action_type\":\"V200_ROW_FINISH_WORK\",\"target_table\":\"time_records\",\"target_id\":\"364\",\"target_ids\":[364],\"message\":\"結束作業逐筆紀錄｜動作=暫停｜ID=364｜SPT138 蘇雍盛 V3141245 / GPTC Robot Teaching機構調整\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":0,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"identity_key\":\"record_key:SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"id\":\"364\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":364,\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"status\":\"作業中\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"量測機台的震動值\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:48\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT138|GPTC Robot Teaching機構調整|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:48\",\"updated_at\":\"2026-05-29 09:31:48\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[],\"authority_01_time_records\":[{\"id\":364,\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"status\":\"作業中\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"量測機台的震動值\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:48\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT138|GPTC Robot Teaching機構調整|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:48\",\"updated_at\":\"2026-05-29 09:31:48\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":364,\"record_key\":\"SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da\",\"status\":\"作業中\",\"work_order\":\"V3141245\",\"part_no\":\"PP411390041\",\"type_name\":\"BENCH 300 LPR Stripper Auto 2C 1Q 2D\",\"process_name\":\"GPTC Robot Teaching機構調整\",\"employee_id\":\"SPT138\",\"employee_name\":\"蘇雍盛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:31:48\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"量測機台的震動值\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:31:48\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT138|GPTC Robot Teaching機構調整|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:31:48\",\"updated_at\":\"2026-05-29 09:31:48\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"ca93d0dfc55f2d1016eba1353cd90b81011fdf524e1736dee9f87f82a523a963\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO"
       }
     ],
     "system_settings": [
@@ -30147,6 +30158,33 @@
         "source": "streamlit",
         "created_at": "2026-05-29 13:35:53",
         "updated_at": "2026-05-29 13:35:53"
+      },
+      {
+        "id": 427,
+        "record_key": "SPT138|25MN0014-10|其他|2026-05-29 13:51:26|6c07164c",
+        "status": "作業中",
+        "work_order": "25MN0014-10",
+        "part_no": "BWS3200\nRSC2A2-BWN01-03",
+        "type_name": "9MRSC2A2-BWN01-03",
+        "process_name": "其他",
+        "employee_id": "SPT138",
+        "employee_name": "蘇雍盛",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 13:51:26",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "SENSOR線材製作",
+        "start_date": "2026-05-29",
+        "start_time": "13:51:26",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT138|其他|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 13:51:26",
+        "updated_at": "2026-05-29 13:51:26"
       }
     ],
     "work_orders": []
