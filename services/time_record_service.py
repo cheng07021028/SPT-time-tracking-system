@@ -14,6 +14,75 @@ from .log_service import write_log
 from .duration_service import hms_to_hours
 
 
+# ===== V209: SQLite schema guard for direct time_record_service connections =====
+def _v209_ensure_time_records_sqlite_schema(trigger: str = "v209") -> None:
+    """Ensure the SQLite time_records table exists before any direct sqlite3 access.
+
+    Some legacy / performance wrappers in this module still open sqlite3 directly
+    with DB_PATH for speed.  If Streamlit Cloud has just recreated the DB file, or
+    if db_service.ensure_database() has not run in this process yet, those direct
+    reads can fail with: "no such table: time_records".  This guard is intentionally
+    idempotent, non-destructive, and only creates/migrates schema; it never deletes
+    or rewrites user data.
+    """
+    try:
+        from services.db_service import ensure_database as _ensure_database
+        _ensure_database()
+        return
+    except Exception:
+        pass
+
+    # Last-resort local schema bootstrap.  Keep this minimal and compatible with
+    # db_service._init_schema.  It is used only when db_service could not be called.
+    try:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(DB_PATH, timeout=30) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS time_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                record_key TEXT UNIQUE,
+                status TEXT,
+                work_order TEXT,
+                part_no TEXT,
+                type_name TEXT,
+                process_name TEXT,
+                employee_id TEXT,
+                employee_name TEXT,
+                start_action TEXT,
+                start_timestamp TEXT,
+                end_action TEXT,
+                end_timestamp TEXT,
+                remark TEXT,
+                start_date TEXT,
+                start_time TEXT,
+                end_date TEXT,
+                end_time TEXT,
+                work_hours REAL DEFAULT 0,
+                assembly_location TEXT,
+                group_key TEXT,
+                is_group_work INTEGER DEFAULT 0,
+                source TEXT DEFAULT 'streamlit',
+                created_at TEXT,
+                updated_at TEXT
+            )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_time_records_emp_date ON time_records(employee_id, start_date)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_time_records_work_order ON time_records(work_order)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_time_records_status ON time_records(status)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_time_records_start_date ON time_records(start_date)")
+            conn.commit()
+    except Exception:
+        # The caller will surface the original DB error if the database is not writable.
+        pass
+
+
+# Run once at module import so direct sqlite3.connect(DB_PATH) code paths never hit
+# an empty DB file before db_service has initialized the schema.
+_v209_ensure_time_records_sqlite_schema("module_import")
+
+
 
 def ensure_time_records_available(trigger: str = "time_record_service") -> None:
     """V3.02: restore 01/02 shared records if DB was recreated empty after update."""
@@ -808,6 +877,7 @@ def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工
     now = _now()
     user_name = _audit_user_name()
     deleted = 0
+    _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
@@ -907,6 +977,7 @@ def recalculate_time_records(record_ids: list[int] | None = None) -> int:
         return 0
 
     user_name = _audit_user_name()
+    _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=15)
     try:
@@ -1103,6 +1174,7 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
             result["skipped"] += 1
             errors.append(f"第 {idx + 1} 筆匯入失敗：{exc}")
 
+    _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=15)
     try:
@@ -1577,6 +1649,7 @@ def _v75_delete_sqlite_first(record_ids: list[int], reason: str) -> int:
     now = _now()
     user_name = _audit_user_name()
     deleted = 0
+    _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
@@ -1826,6 +1899,7 @@ def _v76_direct_sqlite_time_records_df() -> pd.DataFrame:
     except Exception:
         pass
     try:
+        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH, timeout=15) as conn:
             conn.row_factory = sqlite3.Row
@@ -2037,6 +2111,7 @@ def _safe_app_setting_value(setting_key: str) -> str | None:  # type: ignore[ove
 
 def _v77_direct_query_df(sql: str, params: tuple = ()) -> pd.DataFrame:
     try:
+        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH, timeout=8) as conn:
             conn.row_factory = sqlite3.Row
@@ -2223,6 +2298,7 @@ def _v79_clear_fast_caches() -> None:
 
 def _v79_rows_from_sqlite() -> list[dict]:
     try:
+        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH, timeout=8) as conn:
             conn.row_factory = sqlite3.Row
@@ -2898,6 +2974,7 @@ def _v89_sync_sqlite_cache_from_authority(df: pd.DataFrame) -> int:
             clean = clean[cols].where(pd.notna(clean[cols]), None)
             rows = clean.to_dict(orient="records")
         import sqlite3 as _sqlite3
+        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         conn = _sqlite3.connect(DB_PATH, timeout=15)
         try:
@@ -5526,6 +5603,7 @@ def _v134_read_sqlite_time_records(record_ids: list[int] | None = None) -> pd.Da
             rid = _v134_to_int(x)
             if rid is not None and rid not in ids:
                 ids.append(int(rid))
+        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH, timeout=8) as conn:
             conn.row_factory = sqlite3.Row
@@ -5920,6 +5998,7 @@ def _v137_authority_df(module_key: str) -> pd.DataFrame:
 
 def _v137_sqlite_df(ids: list[int] | None = None) -> pd.DataFrame:
     try:
+        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH, timeout=15) as conn:
             conn.row_factory = sqlite3.Row
@@ -6721,6 +6800,7 @@ def _v139_table_df(module_key: str) -> pd.DataFrame:
 
 def _v139_sqlite_all_df() -> pd.DataFrame:
     try:
+        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH, timeout=15) as conn:
             conn.row_factory = sqlite3.Row
