@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 11:09:30",
-  "exported_at": "2026-05-29 11:09:30",
+  "updated_at": "2026-05-29 11:09:49",
+  "exported_at": "2026-05-29 11:09:49",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 16667,
+        "source": "v103_merge",
+        "username": "B190",
+        "display_name": "黃瑞翎",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=B190",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-29 11:09:49",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 11:09:49"
+      },
+      {
+        "id": 68,
+        "source": "v103_merge",
+        "username": "B190",
+        "display_name": "黃瑞翎",
+        "event_type": "LOGIN",
+        "result": "SUCCESS",
+        "message": "role=operator;source=authority; employee_id=B190",
+        "module_code": "",
+        "login_time": "2026-05-29 11:09:49",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 11:09:49"
+      },
       {
         "id": 16367,
         "source": "v103_merge",
@@ -4798,7 +4830,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 299,
+    "login_logs": 301,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
