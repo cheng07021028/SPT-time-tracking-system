@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 09:39:24",
-  "exported_at": "2026-05-29 09:39:24",
+  "updated_at": "2026-05-29 09:39:27",
+  "exported_at": "2026-05-29 09:39:27",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 11906,
+        "source": "v103_merge",
+        "username": "SPT145",
+        "display_name": "潘威捷",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=SPT145; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-29 09:39:26",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 09:39:26"
+      },
+      {
+        "id": 11905,
+        "source": "v103_merge",
+        "username": "SPT145",
+        "display_name": "潘威捷",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=SPT145; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-29 09:39:25",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 09:39:25"
+      },
       {
         "id": 11742,
         "source": "v103_merge",
@@ -2606,7 +2638,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 162,
+    "login_logs": 164,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
