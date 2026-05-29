@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-29 10:57:37",
-  "exported_at": "2026-05-29 10:57:37",
-  "reason": "start_work_v194_local_first_02",
+  "updated_at": "2026-05-29 10:57:39",
+  "exported_at": "2026-05-29 10:57:39",
+  "reason": "start_work_v195_consistency_02",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
@@ -34,6 +34,33 @@
         "source": "streamlit",
         "created_at": "2026-05-29 10:57:33",
         "updated_at": "2026-05-29 10:57:33"
+      },
+      {
+        "id": 392,
+        "record_key": "B226|26M0021-03|骨架組立|2026-05-29 10:46:49|f5e300b1",
+        "status": "作業中",
+        "work_order": "26M0021-03",
+        "part_no": "1GRSC150-003-04",
+        "type_name": "4 Port Frame Long-type EFEM",
+        "process_name": "骨架組立",
+        "employee_id": "B226",
+        "employee_name": "周政龍",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 10:46:49",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "10:46:49",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B226|骨架組立|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 10:46:49",
+        "updated_at": "2026-05-29 10:46:49"
       },
       {
         "id": 391,
@@ -497,7 +524,7 @@
       {
         "id": 374,
         "record_key": "B135|25M0541-02|骨架組立|2026-05-29 09:48:37|67286f1e",
-        "status": "作業中",
+        "status": "暫停",
         "work_order": "25M0541-02",
         "part_no": "PSRSC150-SB4L-06",
         "type_name": "RSC150 Frame sorter",
@@ -506,20 +533,20 @@
         "employee_name": "鍾明志",
         "start_action": "開始",
         "start_timestamp": "2026-05-29 09:48:37",
-        "end_action": "",
-        "end_timestamp": "",
+        "end_action": "暫停",
+        "end_timestamp": "2026-05-29 10:56:42",
         "remark": "",
         "start_date": "2026-05-29",
         "start_time": "09:48:37",
-        "end_date": "",
-        "end_time": "",
-        "work_hours": 0.0,
+        "end_date": "2026-05-29",
+        "end_time": "10:56:42",
+        "work_hours": 0.88,
         "assembly_location": "竹東",
         "group_key": "B135|骨架組立|2026-05-29",
         "is_group_work": 0,
         "source": "streamlit",
         "created_at": "2026-05-29 09:48:37",
-        "updated_at": "2026-05-29 09:48:37"
+        "updated_at": "2026-05-29 10:56:42"
       },
       {
         "id": 373,
@@ -1551,6 +1578,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 57
+    "time_records": 58
   }
 }
