@@ -2,15 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-29 22:34:31",
-  "exported_at": "2026-05-29 22:34:31",
-  "reason": "v223_reboot_proof_delete|01 工時紀錄管理員維護區刪除",
-  "empty_authoritative": true,
+  "updated_at": "2026-05-29 22:42:56",
+  "exported_at": "2026-05-29 22:42:56",
+  "reason": "v232_admin_save_non_destructive_merge",
+  "empty_authoritative": false,
   "tables": {
-    "time_records": []
+    "time_records": [
+      {
+        "id": 443,
+        "record_key": "SSS|NA|6S|2026-05-29 22:42:01|16dae695",
+        "status": "作業中",
+        "work_order": "NA",
+        "part_no": "",
+        "type_name": "",
+        "process_name": "6S",
+        "employee_id": "SSS",
+        "employee_name": "SSS",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 09:00:00",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "22:42:01",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "",
+        "group_key": "SSS|6S|2026-05-29",
+        "is_group_work": 1,
+        "source": "streamlit_v205_fast",
+        "created_at": "2026-05-29 22:42:01",
+        "updated_at": "2026-05-29 22:42:01",
+        "v232_last_op": "v232_admin_save_non_destructive_merge"
+      }
+    ]
   },
   "settings": {},
   "table_counts": {
-    "time_records": 0
+    "time_records": 1
   }
 }
