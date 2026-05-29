@@ -2,12 +2,39 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-29 09:30:25",
-  "exported_at": "2026-05-29 09:30:25",
-  "reason": "start_work_v195_consistency_01",
+  "updated_at": "2026-05-29 09:32:03",
+  "exported_at": "2026-05-29 09:32:03",
+  "reason": "start_work_v194_local_first_01",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
+      {
+        "id": 364,
+        "record_key": "SPT138|V3141245|GPTC Robot Teaching機構調整|2026-05-29 09:31:48|afda91da",
+        "status": "作業中",
+        "work_order": "V3141245",
+        "part_no": "PP411390041",
+        "type_name": "BENCH 300 LPR Stripper Auto 2C 1Q 2D",
+        "process_name": "GPTC Robot Teaching機構調整",
+        "employee_id": "SPT138",
+        "employee_name": "蘇雍盛",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 09:31:48",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "量測機台的震動值",
+        "start_date": "2026-05-29",
+        "start_time": "09:31:48",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT138|GPTC Robot Teaching機構調整|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 09:31:48",
+        "updated_at": "2026-05-29 09:31:48"
+      },
       {
         "id": 362,
         "record_key": "SPT158|25M0115-17|包機|2026-05-29 09:30:08|0cb83dae",
@@ -768,6 +795,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 28
+    "time_records": 29
   }
 }
