@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 13:32:56",
-  "exported_at": "2026-05-29 13:32:56",
+  "updated_at": "2026-05-29 13:33:18",
+  "exported_at": "2026-05-29 13:33:18",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 50001,
+        "source": "v103_merge",
+        "username": "SPT189",
+        "display_name": "劉欣惠",
+        "event_type": "PASSWORD_CHANGE",
+        "result": "SUCCESS",
+        "message": "force_password_change_completed; employee_id=SPT189; roles=operator",
+        "module_code": "10_permissions",
+        "login_time": "2026-05-29 13:33:07",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 13:33:07"
+      },
       {
         "id": 49192,
         "source": "v103_merge",
@@ -6478,7 +6494,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 404,
+    "login_logs": 405,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
