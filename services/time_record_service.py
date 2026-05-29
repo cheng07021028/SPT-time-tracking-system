@@ -19710,3 +19710,311 @@ def audit_v224_start_display_guard() -> dict:
     }
 
 # ================= END V224 START DISPLAY SAME-LANE GUARD =================
+
+
+# ================= V225 FINISH WORK SQLITE-SAFE AUTHORITY FIRST｜2026-05-29 =================
+# 目的：修正 V224 結束作業仍呼叫 V212/V205 舊 SQLite 結束鏈，導致 SQLite table 缺失/損壞時 APP 直接崩潰。
+# 原則：不改 UI/CSS/theme/table/buttons；不回退 SQLite-only；Finish Work 改為權威檔/前台快取安全結束，SQLite 僅做 best-effort 同步快取。
+try:
+    _v225_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v225_prev_finish_work = None
+
+_V225_VERSION = "V225_FINISH_WORK_SQLITE_SAFE_AUTHORITY_FIRST"
+_V225_FINISHED_STATUS = {"下班", "暫停", "完工", "已結束", "結束", "完成", "off_duty", "paused", "finished", "end", "ended", "complete", "completed"}
+
+
+def _v225_text(v) -> str:
+    try:
+        return _v224_text(v)  # type: ignore[name-defined]
+    except Exception:
+        try:
+            if pd.isna(v):  # type: ignore[name-defined]
+                return ""
+        except Exception:
+            pass
+        if v is None:
+            return ""
+        s = str(v).strip()
+        return "" if s.lower() in {"none", "nan", "nat", "null", "<na>"} else s
+
+
+def _v225_int(v) -> int | None:
+    try:
+        return _v224_int(v)  # type: ignore[name-defined]
+    except Exception:
+        s = _v225_text(v)
+        if not s:
+            return None
+        try:
+            i = int(float(s))
+            return i if i > 0 else None
+        except Exception:
+            return None
+
+
+def _v225_now() -> str:
+    try:
+        return _v224_now()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return now_text()  # type: ignore[name-defined]
+        except Exception:
+            return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v225_date(v) -> str:
+    try:
+        return _v224_date(v)  # type: ignore[name-defined]
+    except Exception:
+        s = _v225_text(v).replace("/", "-")
+        return s[:10] if len(s) >= 10 else ""
+
+
+def _v225_is_active_row(row: dict) -> bool:
+    if not isinstance(row, dict):
+        return False
+    end_ts = _v225_text(row.get("end_timestamp") or row.get("結束時間戳 / End Timestamp") or row.get("結束時間"))
+    end_action = _v225_text(row.get("end_action") or row.get("結束動作 / End Action") or row.get("結束動作"))
+    status = _v225_text(row.get("status") or row.get("狀態 / Status") or row.get("狀態"))
+    if end_ts or end_action:
+        return False
+    if status and status not in {"作業中", "工作中", "進行中", "未結束", "ACTIVE", "Active", "active"}:
+        return False
+    return True
+
+
+def _v225_status_from_action(end_action: str) -> str:
+    action = _v225_text(end_action)
+    return action if action in {"下班", "暫停", "完工"} else "已結束"
+
+
+def _v225_all_rows_no_sqlite_required() -> list[dict]:
+    rows: list[dict] = []
+    # 先用 V224 合併來源；該函式內 SQLite 錯誤已被吞掉，不會讓畫面崩潰。
+    try:
+        rows.extend([dict(r) for r in _v224_all_display_rows() if isinstance(r, dict)])  # type: ignore[name-defined]
+    except Exception:
+        pass
+    # 直接補 01/02 權威與前台快取，避免 V224 合併來源在極端狀態回傳空白。
+    try:
+        rows.extend([dict(r) for r in _v224_raw_authority_rows() if isinstance(r, dict)])  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        rows.extend([dict(r) for r in _v224_cache_rows() if isinstance(r, dict)])  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        return _v224_dedupe(_v224_filter_deleted(rows))  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return _v223_dedupe_rows(_v223_filter_deleted_exact(rows))  # type: ignore[name-defined]
+        except Exception:
+            return rows
+
+
+def _v225_find_seed(record_id: int) -> dict | None:
+    rid0 = _v225_int(record_id)
+    if rid0 is None:
+        return None
+    try:
+        seed = _v224_find_row_by_id(rid0)  # type: ignore[name-defined]
+        if isinstance(seed, dict):
+            return dict(seed)
+    except Exception:
+        pass
+    for row in _v225_all_rows_no_sqlite_required():
+        if _v225_int(row.get("id") or row.get("ID") or row.get("ID / ID")) == rid0:
+            return dict(row)
+    return None
+
+
+def _v225_group_rows(seed: dict, finish_parallel_group: bool = True) -> list[dict]:
+    if not isinstance(seed, dict):
+        return []
+    if not finish_parallel_group:
+        return [dict(seed)] if _v225_is_active_row(seed) else []
+    emp = _v225_text(seed.get("employee_id") or seed.get("工號 / Employee ID") or seed.get("工號"))
+    proc = _v225_text(seed.get("process_name") or seed.get("工段名稱 / Process") or seed.get("工段 / Process") or seed.get("工段"))
+    sd = _v225_date(seed.get("start_date") or seed.get("start_timestamp"))
+    out: list[dict] = []
+    for row in _v225_all_rows_no_sqlite_required():
+        if not isinstance(row, dict) or not _v225_is_active_row(row):
+            continue
+        remp = _v225_text(row.get("employee_id") or row.get("工號 / Employee ID") or row.get("工號"))
+        rproc = _v225_text(row.get("process_name") or row.get("工段名稱 / Process") or row.get("工段 / Process") or row.get("工段"))
+        rsd = _v225_date(row.get("start_date") or row.get("start_timestamp"))
+        if emp and remp != emp:
+            continue
+        if proc and rproc != proc:
+            continue
+        if sd and rsd != sd:
+            continue
+        out.append(dict(row))
+    if not out and _v225_is_active_row(seed):
+        out = [dict(seed)]
+    try:
+        return _v224_dedupe(out)  # type: ignore[name-defined]
+    except Exception:
+        return out
+
+
+def _v225_append_remark(old_remark: str, append: str) -> str:
+    old = _v225_text(old_remark)
+    add = _v225_text(append)
+    if old and add:
+        return old + "；" + add
+    return old or add
+
+
+def _v225_build_finished_rows(rows: list[dict], end_action: str, remark: str = "") -> list[dict]:
+    if not rows:
+        return []
+    now = _v225_now()
+    try:
+        end_date, end_time = split_timestamp(now)  # type: ignore[name-defined]
+    except Exception:
+        end_date, end_time = now[:10], (now[11:19] if len(now) >= 19 else "")
+    status = _v225_status_from_action(end_action)
+    ids = [_v225_int(r.get("id")) for r in rows if isinstance(r, dict)]
+    ids = [i for i in ids if i is not None]
+    starts = [_v225_text(r.get("start_timestamp")) for r in rows if isinstance(r, dict) and _v225_text(r.get("start_timestamp"))]
+    earliest_start = min(starts) if starts else now
+    try:
+        total_hours = float(calculate_work_hours(earliest_start, now) or 0)  # type: ignore[name-defined]
+    except Exception:
+        total_hours = 0.0
+    avg_hours = round(total_hours / max(len(ids), 1), 2)
+    group_key = _v225_text(rows[0].get("group_key")) or "|".join([
+        _v225_text(rows[0].get("employee_id")),
+        _v225_text(rows[0].get("process_name")),
+        _v225_date(rows[0].get("start_date") or rows[0].get("start_timestamp")),
+    ])
+    append = _v225_text(remark)
+    if len(ids) > 1:
+        try:
+            summary = _v138_parallel_summary_text(len(ids), total_hours, avg_hours)  # type: ignore[name-defined]
+        except Exception:
+            summary = f"同步作業平均分配：{len(ids)}筆，平均工時={avg_hours}"
+        append = (append + "；" if append else "") + summary
+    finished: list[dict] = []
+    for row in rows:
+        r = dict(row)
+        r["status"] = status
+        r["end_action"] = _v225_text(end_action)
+        r["end_timestamp"] = now
+        r["end_date"] = end_date
+        r["end_time"] = end_time
+        r["work_hours"] = avg_hours
+        r["remark"] = _v225_append_remark(_v225_text(r.get("remark")), append)
+        r["group_key"] = group_key
+        r["is_group_work"] = 1 if len(ids) > 1 else int(_v225_int(r.get("is_group_work")) or 0)
+        r["updated_at"] = now
+        r.setdefault("source", "streamlit_v225_finish_authority_first")
+        finished.append(r)
+    return finished
+
+
+def _v225_persist_finished_rows(finished: list[dict], reason: str = "v225_finish_work_authority_first") -> int:
+    if not finished:
+        return 0
+    # 01/02 權威檔是主要保存點。
+    try:
+        base = _v225_all_rows_no_sqlite_required()
+        merged = _v224_dedupe(_v224_filter_deleted(base + [dict(r) for r in finished]))  # type: ignore[name-defined]
+        _v223_write_modules(merged, reason, github=False)  # type: ignore[name-defined]
+    except Exception as exc:
+        try:
+            _v205_direct_log("V225_AUTHORITY_FINISH_WRITE_FAIL", f"V225 結束作業寫入 01/02 權威檔失敗：{exc}", detail=reason, level="ERROR")  # type: ignore[name-defined]
+        except Exception:
+            pass
+        raise
+    # 前台快取同步：Today Records 更新為已結束；Active index 自動移除。
+    for row in finished:
+        try:
+            if "_v220_upsert_cache_row" in globals() and callable(_v220_upsert_cache_row):  # type: ignore[name-defined]
+                _v220_upsert_cache_row(dict(row), reason=reason + "_front_cache")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    try:
+        if "_v205_clear_caches" in globals() and callable(_v205_clear_caches):  # type: ignore[name-defined]
+            _v205_clear_caches()  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return len(finished)
+
+
+def _v225_best_effort_sqlite_sync(rows: list[dict], reason: str = "v225_finish_sqlite_best_effort") -> int:
+    if not rows:
+        return 0
+    # SQLite 只是前台快取，不可再因 SQLite 缺表/損壞讓 APP 當掉。
+    try:
+        df = pd.DataFrame(rows)  # type: ignore[name-defined]
+        if "_v208_upsert_records_to_sqlite" in globals() and callable(_v208_upsert_records_to_sqlite):  # type: ignore[name-defined]
+            return int(_v208_upsert_records_to_sqlite(df, reason=reason) or 0)  # type: ignore[name-defined]
+        if "_v206_upsert_active_rows_to_sqlite" in globals() and callable(_v206_upsert_active_rows_to_sqlite):  # type: ignore[name-defined]
+            return int(_v206_upsert_active_rows_to_sqlite(df, reason=reason) or 0)  # type: ignore[name-defined]
+    except Exception as exc:
+        try:
+            _v205_direct_log("V225_SQLITE_FINISH_SYNC_WARN", f"V225 結束作業同步 SQLite 快取失敗，已略過不影響 01/02 權威檔：{exc}", detail=reason, level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return 0
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V225: Finish Work must not depend on old SQLite-only chains.
+
+    The selected row is taken from the same visible/authority source as Today Records, written to
+    01_time_records + 02_history first, and SQLite is synced best-effort only.
+    """
+    rid0 = _v225_int(record_id)
+    if rid0 is None:
+        raise ValueError("結束作業失敗：工時紀錄 ID 無效。")
+    seed = _v225_find_seed(rid0)
+    if not seed:
+        raise ValueError("找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。")
+    if not _v225_is_active_row(seed):
+        return 0
+    group = _v225_group_rows(seed, finish_parallel_group=finish_parallel_group)
+    if not group:
+        return 0
+    finished = _v225_build_finished_rows(group, end_action, remark=remark)
+    n = _v225_persist_finished_rows(finished, "v225_finish_work_authority_first")
+    _v225_best_effort_sqlite_sync(finished, "v225_finish_work_sqlite_best_effort")
+    ids = [_v225_text(r.get("id")) for r in finished if isinstance(r, dict)]
+    try:
+        if "_v205_direct_log" in globals() and callable(_v205_direct_log):  # type: ignore[name-defined]
+            _v205_direct_log(
+                "END_WORK_GROUP" if n > 1 else "END_WORK",
+                f"V225 權威檔優先結束工時紀錄 #{rid0}，同步結束={n}筆，狀態={_v225_status_from_action(end_action)}。",
+                target_id=str(rid0),
+                detail=",".join(ids) + ";V225_AUTHORITY_FIRST_FINISH",
+                level="INFO",
+            )  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return int(n)
+
+
+def audit_v225_finish_work_sqlite_safe() -> dict:
+    try:
+        active_df = today_records(include_finished=False, unfinished_only=True)
+    except Exception:
+        active_df = pd.DataFrame()  # type: ignore[name-defined]
+    return {
+        "version": "V225",
+        "scope": "Finish Work authority-first; SQLite best-effort only; backend only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "finish_work_calls_legacy_v212_sqlite_chain": False,
+        "sqlite_failure_can_crash_finish_work": False,
+        "authority_01_02_write_first": True,
+        "today_active_rows_visible": int(len(active_df)) if isinstance(active_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+    }
+
+# ================= END V225 FINISH WORK SQLITE-SAFE AUTHORITY FIRST =================
