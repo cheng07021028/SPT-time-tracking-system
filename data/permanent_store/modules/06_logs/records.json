@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 22:20:40",
-  "exported_at": "2026-05-29 22:20:40",
+  "updated_at": "2026-05-29 22:20:48",
+  "exported_at": "2026-05-29 22:20:48",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -91,11 +91,131 @@
         "detail": "v231_load_records\n__spt_log_uid=816d355a6ade4623814dd362065d9dbe",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 11,
+        "log_time": "2026-05-29 22:20:47",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_start_fast_cache_upsert_base",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 10,
+        "log_time": "2026-05-29 22:20:47",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_start_fast_find",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9,
+        "log_time": "2026-05-29 22:20:46",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v230_find_ids",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 8,
+        "log_time": "2026-05-29 22:20:46",
+        "user_name": "admin",
+        "action_type": "V224_START_DISPLAY_GUARD",
+        "target_table": "time_records",
+        "target_id": "424",
+        "message": "V224 已強制同步開始作業至 01/02 權威與前台快取，ID=424。",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7,
+        "log_time": "2026-05-29 22:20:45",
+        "user_name": "admin",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "424",
+        "message": "張文品 開始 21M0241-01 / 前置鈑金",
+        "detail": "V205_FAST_START",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6,
+        "log_time": "2026-05-29 22:20:45",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 5,
+        "log_time": "2026-05-29 22:20:44",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-29 22:20:44",
+        "user_name": "admin",
+        "action_type": "V212_SQLITE_SEQUENCE_GUARD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 工時 ID 序號已對齊權威檔 max_id=423，避免新增紀錄 ID 撞號。",
+        "detail": "start_work_v212_before_fast_insert",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 3,
+        "log_time": "2026-05-29 22:20:44",
+        "user_name": "admin",
+        "action_type": "V221_SQLITE_TABLE_RETRY",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V221 偵測到 no such table: time_records，已建立快取表並重試開始作業。",
+        "detail": "no such table: time_records",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-29 22:20:44",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records\n__spt_log_uid=f876e3442eae45b7aa3e8fdea4f65e82",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 7
+    "system_logs": 17
   }
 }
