@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 13:26:32",
-  "exported_at": "2026-05-29 13:26:32",
+  "updated_at": "2026-05-29 13:26:43",
+  "exported_at": "2026-05-29 13:26:43",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -6907,11 +6907,47 @@
         "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1722,
+        "log_time": "2026-05-29 13:26:39",
+        "user_name": "SPT149",
+        "action_type": "V200_ROW_FINISH_WORK",
+        "target_table": "time_records",
+        "target_id": "411",
+        "message": "結束作業逐筆紀錄｜動作=暫停｜ID=411｜SPT149 江金福 26M0051-09 / 模組",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"411\", \"record_key\": \"SPT149|26M0051-09|模組|2026-05-29 13:22:02|5e1c901d\", \"employee_id\": \"SPT149\", \"employee_name\": \"江金福\", \"work_order\": \"26M0051-09\", \"process_name\": \"模組\", \"start_timestamp\": \"2026-05-29 13:22:02\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 411, \"record_key\": \"SPT149|26M0051-09|模組|2026-05-29 13:22:02|5e1c901d\", \"status\": \"作業中\", \"work_order\": \"26M0051-09\", \"part_no\": \"PSRSC151-SB4L-05\", \"type_name\": \"RSC151-SB4L+Argus\", \"process_name\": \"模組\", \"employee_id\": \"SPT149\", \"employee_name\": \"江金福\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 13:22:02\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-29\", \"start_time\": \"13:22:02\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": 0.0, \"assembly_location\": \"竹東\", \"group_key\": \"SPT149|模組|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 13:22:02\", \"updated_at\": \"2026-05-29 13:22:02\"}}\n__spt_log_uid=d20dc5ec787d403d80f2e6d8c9708242\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:26:39\",\"action_type\":\"V200_ROW_FINISH_WORK\",\"target_table\":\"time_records\",\"target_id\":\"411\",\"target_ids\":[411],\"message\":\"結束作業逐筆紀錄｜動作=暫停｜ID=411｜SPT149 江金福 26M0051-09 / 模組\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":0,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT149|26M0051-09|模組|2026-05-29 13:22:02|5e1c901d\",\"identity_key\":\"record_key:SPT149|26M0051-09|模組|2026-05-29 13:22:02|5e1c901d\",\"id\":\"411\",\"employee_id\":\"SPT149\",\"employee_name\":\"江金福\",\"work_order\":\"26M0051-09\",\"part_no\":\"PSRSC151-SB4L-05\",\"type_name\":\"RSC151-SB4L+Argus\",\"process_name\":\"模組\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 13:22:02\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":411,\"record_key\":\"SPT149|26M0051-09|模組|2026-05-29 13:22:02|5e1c901d\",\"status\":\"作業中\",\"work_order\":\"26M0051-09\",\"part_no\":\"PSRSC151-SB4L-05\",\"type_name\":\"RSC151-SB4L+Argus\",\"process_name\":\"模組\",\"employee_id\":\"SPT149\",\"employee_name\":\"江金福\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:22:02\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:22:02\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT149|模組|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:22:02\",\"updated_at\":\"2026-05-29 13:22:02\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[],\"authority_01_time_records\":[{\"id\":411,\"record_key\":\"SPT149|26M0051-09|模組|2026-05-29 13:22:02|5e1c901d\",\"status\":\"作業中\",\"work_order\":\"26M0051-09\",\"part_no\":\"PSRSC151-SB4L-05\",\"type_name\":\"RSC151-SB4L+Argus\",\"process_name\":\"模組\",\"employee_id\":\"SPT149\",\"employee_name\":\"江金福\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:22:02\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:22:02\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT149|模組|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:22:02\",\"updated_at\":\"2026-05-29 13:22:02\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":411,\"record_key\":\"SPT149|26M0051-09|模組|2026-05-29 13:22:02|5e1c901d\",\"status\":\"作業中\",\"work_order\":\"26M0051-09\",\"part_no\":\"PSRSC151-SB4L-05\",\"type_name\":\"RSC151-SB4L+Argus\",\"process_name\":\"模組\",\"employee_id\":\"SPT149\",\"employee_name\":\"江金福\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:22:02\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:22:02\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT149|模組|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:22:02\",\"updated_at\":\"2026-05-29 13:22:02\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"197832dae4da3b149298f82878f0f58e23c143c54d54e89a5e212a31f5cf5289\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1721,
+        "log_time": "2026-05-29 13:26:38",
+        "user_name": "SPT158",
+        "action_type": "V201_SQLITE_ROW_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "412",
+        "message": "v201_finish_retry_before_core: 已由 01/02 權威資料回填 SQLite 單筆 cache，id=412",
+        "detail": "__spt_log_uid=9616aec271934f188c243dae35ae812d",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1720,
+        "log_time": "2026-05-29 13:26:38",
+        "user_name": "SPT158",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 575
+    "system_logs": 578
   }
 }
