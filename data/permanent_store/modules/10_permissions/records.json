@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+  "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-29 13:31:15",
-  "exported_at": "2026-05-29 08:47:04",
-  "reason": "v125_get_permissions_repair",
+  "updated_at": "2026-05-29 13:32:48",
+  "exported_at": "2026-05-29 13:32:48",
+  "reason": "v106_force_password_change",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -1060,17 +1060,26 @@
       },
       {
         "username": "SPT189",
-        "password_hash": "pbkdf2_sha256$e6fa9ab8cddc6bcdad088497b88fdf30$a22fc545aa64adf7ba8a4e6aba69596f644100527bac8bae18ddf5fb63f4c774",
+        "password_hash": "pbkdf2_sha256$180000$p7r35fq6LK4Lpb5XzVflhQ==$R0c8udf526fLkOlK6yYn6mHCdxsuQs3m+RWm0j+vHhw=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT189",
         "display_name": "劉欣惠",
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-29 11:17:38"
+        "updated_at": "2026-05-29 13:32:48",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT193",
@@ -25631,8 +25640,5 @@
     "security_settings": 2,
     "security_users": 6,
     "security_user_roles": 6
-  },
-  "deleted_usernames": [],
-  "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
+  }
 }
