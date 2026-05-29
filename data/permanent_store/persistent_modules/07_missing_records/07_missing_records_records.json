@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 10:39:48",
+  "exported_at": "2026-05-29 10:46:51",
   "source": "db_service_write",
   "module_key": "07_missing_records",
   "module_code": "07",
@@ -1061,11 +1061,65 @@
         "source": "streamlit",
         "created_at": "2026-05-29 10:32:27",
         "updated_at": "2026-05-29 10:32:27"
+      },
+      {
+        "id": 391,
+        "record_key": "SPT244|26M0095-07|清潔|2026-05-29 10:39:44|b4605221",
+        "status": "作業中",
+        "work_order": "26M0095-07",
+        "part_no": "4TRSC131-005-05",
+        "type_name": "2LP Asymtek EFEM (wafer)(宏田)",
+        "process_name": "清潔",
+        "employee_id": "SPT244",
+        "employee_name": "費南",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 10:39:44",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "10:39:44",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "宏田",
+        "group_key": "SPT244|清潔|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 10:39:44",
+        "updated_at": "2026-05-29 10:39:44"
+      },
+      {
+        "id": 392,
+        "record_key": "B226|26M0021-03|骨架組立|2026-05-29 10:46:49|f5e300b1",
+        "status": "作業中",
+        "work_order": "26M0021-03",
+        "part_no": "1GRSC150-003-04",
+        "type_name": "4 Port Frame Long-type EFEM",
+        "process_name": "骨架組立",
+        "employee_id": "B226",
+        "employee_name": "周政龍",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 10:46:49",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "10:46:49",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B226|骨架組立|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 10:46:49",
+        "updated_at": "2026-05-29 10:46:49"
       }
     ]
   },
   "table_counts": {
     "employees": 0,
-    "time_records": 39
+    "time_records": 41
   }
 }
