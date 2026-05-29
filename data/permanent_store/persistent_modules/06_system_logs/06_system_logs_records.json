@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 10:56:44",
+  "exported_at": "2026-05-29 11:03:33",
   "source": "db_service_write",
   "module_key": "06_system_logs",
   "module_code": "06",
@@ -10688,10 +10688,241 @@
         "message": "UPDATE security_users",
         "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
         "level": "INFO"
+      },
+      {
+        "id": 972,
+        "log_time": "2026-05-29 10:57:35",
+        "user_name": "B135",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO"
+      },
+      {
+        "id": 973,
+        "log_time": "2026-05-29 10:57:36",
+        "user_name": "B135",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "393",
+        "message": "鍾明志 開始 25M0694-02 / 收機",
+        "detail": "__spt_log_uid=7ca07fa53c9144a8b2fade1164e7a8f3\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 10:57:36\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"393\",\"target_ids\":[393],\"message\":\"鍾明志 開始 25M0694-02 / 收機\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\",\"identity_key\":\"record_key:B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\",\"id\":\"393\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"work_order\":\"25M0694-02\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 10:57:33\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":393,\"record_key\":\"B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\",\"status\":\"作業中\",\"work_order\":\"25M0694-02\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:57:33\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:57:33\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B135|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:57:33\",\"updated_at\":\"2026-05-29 10:57:33\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":393,\"record_key\":\"B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\",\"status\":\"作業中\",\"work_order\":\"25M0694-02\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:57:33\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:57:33\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B135|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:57:33\",\"updated_at\":\"2026-05-29 10:57:33\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":393,\"record_key\":\"B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\",\"status\":\"作業中\",\"work_order\":\"25M0694-02\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:57:33\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:57:33\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B135|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:57:33\",\"updated_at\":\"2026-05-29 10:57:33\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":393,\"record_key\":\"B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\",\"status\":\"作業中\",\"work_order\":\"25M0694-02\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:57:33\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:57:33\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B135|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:57:33\",\"updated_at\":\"2026-05-29 10:57:33\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"fd0d32cfb2a09758ca4ccf4ccf6db81c1958e189f29bebe9ec55f2f1f1f54f17\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO"
+      },
+      {
+        "id": 974,
+        "log_time": "2026-05-29 10:57:39",
+        "user_name": "B135",
+        "action_type": "V200_ROW_START_WORK",
+        "target_table": "time_records",
+        "target_id": "393",
+        "message": "開始作業逐筆紀錄｜ID=393｜B135 鍾明志 25M0694-02 / 收機",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"393\", \"record_key\": \"B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\", \"employee_id\": \"B135\", \"employee_name\": \"鍾明志\", \"work_order\": \"25M0694-02\", \"process_name\": \"收機\", \"start_timestamp\": \"2026-05-29 10:57:33\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 393, \"record_key\": \"B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\", \"status\": \"作業中\", \"work_order\": \"25M0694-02\", \"part_no\": \"4TRSC122-SB2-13\", \"type_name\": \"SORTER RSC121 SB (RR757)\", \"process_name\": \"收機\", \"employee_id\": \"B135\", \"employee_name\": \"鍾明志\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 10:57:33\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-29\", \"start_time\": \"10:57:33\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": 0.0, \"assembly_location\": \"竹東\", \"group_key\": \"B135|收機|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 10:57:33\", \"updated_at\": \"2026-05-29 10:57:33\"}}\n__spt_log_uid=b0b31f6017304450a3904022b96e2a43\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 10:57:39\",\"action_type\":\"V200_ROW_START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"393\",\"target_ids\":[393],\"message\":\"開始作業逐筆紀錄｜ID=393｜B135 鍾明志 25M0694-02 / 收機\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\",\"identity_key\":\"record_key:B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\",\"id\":\"393\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"work_order\":\"25M0694-02\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 10:57:33\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":393,\"record_key\":\"B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\",\"status\":\"作業中\",\"work_order\":\"25M0694-02\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:57:33\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:57:33\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B135|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:57:33\",\"updated_at\":\"2026-05-29 10:57:33\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":393,\"record_key\":\"B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\",\"status\":\"作業中\",\"work_order\":\"25M0694-02\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:57:33\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:57:33\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B135|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:57:33\",\"updated_at\":\"2026-05-29 10:57:33\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":393,\"record_key\":\"B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\",\"status\":\"作業中\",\"work_order\":\"25M0694-02\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:57:33\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:57:33\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B135|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:57:33\",\"updated_at\":\"2026-05-29 10:57:33\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":393,\"record_key\":\"B135|25M0694-02|收機|2026-05-29 10:57:33|555850be\",\"status\":\"作業中\",\"work_order\":\"25M0694-02\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"收機\",\"employee_id\":\"B135\",\"employee_name\":\"鍾明志\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 10:57:33\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"10:57:33\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B135|收機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 10:57:33\",\"updated_at\":\"2026-05-29 10:57:33\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"5d3e1971ea4adb75deeb6a4a8f37800cf16a9f1330115d85ac400d9bab9788e5\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO"
+      },
+      {
+        "id": 975,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "INSERT auth_users",
+        "detail": "INSERT INTO auth_users\n            (username,password_hash,password_hint,employee_id,display_name,email,role_code,is_active,force_password_change,last_login_at,note,created_at,updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ON CONFLICT(username) DO UPDATE SET\n                password_hash=excluded.password_hash,\n                employee_id=excluded.employee_id,\n                display_name=excluded.display_name,\n                email=excluded.email,\n                role_code=excluded.role_code,\n                is_active=excluded.is_active,\n                force_password_change=excluded.force_password_change,\n                last_login_at=excluded.last_login_at,\n                note=excluded.note,\n                updated_at=excluded.updated_at",
+        "level": "INFO"
+      },
+      {
+        "id": 976,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "DELETE",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "DELETE auth_account_permissions",
+        "detail": "DELETE FROM auth_account_permissions WHERE lower(username)=lower(?)",
+        "level": "INFO"
+      },
+      {
+        "id": 977,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 978,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 979,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 980,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 981,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 982,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 983,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 984,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 985,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 986,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 987,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 988,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 989,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 990,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT149",
+        "action_type": "INSERT",
+        "target_table": "auth_account_permissions",
+        "target_id": "",
+        "message": "INSERT auth_account_permissions",
+        "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "level": "INFO"
+      },
+      {
+        "id": 991,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT087",
+        "action_type": "UPDATE",
+        "target_table": "auth_users",
+        "target_id": "",
+        "message": "UPDATE auth_users",
+        "detail": "UPDATE auth_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO"
+      },
+      {
+        "id": 992,
+        "log_time": "2026-05-29 11:02:58",
+        "user_name": "SPT087",
+        "action_type": "UPDATE",
+        "target_table": "security_users",
+        "target_id": "",
+        "message": "UPDATE security_users",
+        "detail": "UPDATE security_users SET last_login_at=?, updated_at=? WHERE lower(username)=lower(?)",
+        "level": "INFO"
       }
     ]
   },
   "table_counts": {
-    "system_logs": 971
+    "system_logs": 992
   }
 }
