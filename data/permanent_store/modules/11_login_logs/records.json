@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 13:34:52",
-  "exported_at": "2026-05-29 13:34:52",
+  "updated_at": "2026-05-29 13:34:58",
+  "exported_at": "2026-05-29 13:34:58",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 53280,
+        "source": "v103_merge",
+        "username": "SPT189",
+        "display_name": "劉欣惠",
+        "event_type": "PERMISSION_DENIED",
+        "result": "FAIL",
+        "message": "04_employees:can_view; employee_id=SPT189; roles=operator",
+        "module_code": "04_employees",
+        "login_time": "2026-05-29 13:34:57",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 13:34:57"
+      },
+      {
+        "id": 52456,
+        "source": "v103_merge",
+        "username": "B168",
+        "display_name": "洪敏強",
+        "event_type": "POST_RECORD_LOGOUT",
+        "result": "SUCCESS",
+        "message": "完成工時後選擇不繼續記錄，自動登出; employee_id=B168; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-29 13:34:51",
+        "logout_time": "2026-05-29 13:34:51",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 13:34:51"
+      },
       {
         "id": 52457,
         "source": "v103_merge",
@@ -6583,22 +6615,6 @@
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 23:47:57"
-      },
-      {
-        "id": 52456,
-        "source": "v103_merge",
-        "username": "B168",
-        "display_name": "洪敏強",
-        "event_type": "POST_RECORD_LOGOUT",
-        "result": "SUCCESS",
-        "message": "完成工時後選擇不繼續記錄，自動登出; employee_id=B168; roles=operator",
-        "module_code": "",
-        "login_time": "2026-05-29 13:34:51",
-        "logout_time": "2026-05-29 13:34:51",
-        "idle_minutes": null,
-        "ip_address": "",
-        "user_agent": "streamlit",
-        "created_at": "2026-05-29 13:34:51"
       }
     ],
     "auth_login_logs": [],
@@ -6606,7 +6622,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 412,
+    "login_logs": 413,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
