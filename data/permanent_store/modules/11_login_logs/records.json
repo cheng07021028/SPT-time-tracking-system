@@ -2,27 +2,27 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 18:07:49",
-  "exported_at": "2026-05-29 18:07:49",
+  "updated_at": "2026-05-29 18:07:51",
+  "exported_at": "2026-05-29 18:07:51",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
       {
-        "id": 1,
+        "id": 65744,
         "source": "v103_merge",
-        "username": "SPT250",
-        "display_name": "鄭至賢",
+        "username": "SPT091",
+        "display_name": "魏瑄毅",
         "event_type": "LOGIN",
         "result": "SUCCESS",
-        "message": "role=operator;source=authority; employee_id=SPT250",
+        "message": "role=operator;source=authority; employee_id=SPT091",
         "module_code": "LOGIN",
-        "login_time": "2026-05-29 18:07:49",
+        "login_time": "2026-05-29 18:07:51",
         "logout_time": "",
         "idle_minutes": NaN,
         "ip_address": "",
         "user_agent": "streamlit",
-        "created_at": "2026-05-29 18:07:49"
+        "created_at": "2026-05-29 18:07:51"
       },
       {
         "id": 73106,
