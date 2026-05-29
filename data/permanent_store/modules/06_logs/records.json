@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 17:40:54",
-  "exported_at": "2026-05-29 17:40:54",
+  "updated_at": "2026-05-29 17:43:15",
+  "exported_at": "2026-05-29 17:43:15",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -13111,11 +13111,23 @@
         "detail": "get_active_records_v210_canonical_active\n__spt_log_uid=3ec9e584f1924104901b196cfcc2a4d2",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-29 17:43:11",
+        "user_name": "admin",
+        "action_type": "V208_DISPLAY_AUTHORITY_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite time_records 顯示快取空白，已由 01/02 權威檔回填 87 筆。",
+        "detail": "load_records_v210_canonical_display\n__spt_log_uid=b121d002153b43aaa99a829f2028627f",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1092
+    "system_logs": 1093
   }
 }
