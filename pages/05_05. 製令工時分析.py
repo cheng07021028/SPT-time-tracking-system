@@ -158,7 +158,7 @@ def _apply_filters(df: pd.DataFrame, f: dict) -> pd.DataFrame:
             out = out[~((st_series == "作業中") & (end_ts.isin(["", "None", "none", "nan"])))]
 
     if "work_hours" in out.columns:
-        out["work_hours"] = pd.to_numeric(out["work_hours"], errors="coerce").fillna(0)
+        out["work_hours"] = _coerce_work_hours(out["work_hours"])
     else:
         out["work_hours"] = 0.0
 
@@ -204,6 +204,159 @@ def _apply_top(df: pd.DataFrame, top_n: str) -> pd.DataFrame:
         return df.head(n)
     except Exception:
         return df.head(20)
+
+
+def _blank_to_unknown(series: pd.Series, unknown: str) -> pd.Series:
+    s = series.fillna("").astype(str).str.strip()
+    return s.mask(s.isin(["", "None", "none", "nan", "NaN"]), unknown)
+
+
+def _parse_work_hours_value(value) -> float:
+    """Return decimal hours from numeric values or HH:MM:SS text.
+
+    Some legacy records store work_hours as decimal hours, while others store
+    display text such as 00:12:30. This page must aggregate both correctly.
+    """
+    if value is None:
+        return 0.0
+    try:
+        if pd.isna(value):
+            return 0.0
+    except Exception:
+        pass
+    if isinstance(value, (int, float)):
+        try:
+            return float(value)
+        except Exception:
+            return 0.0
+    s = str(value).strip()
+    if not s or s.lower() in {"none", "nan", "nat"}:
+        return 0.0
+    s = s.replace("，", ",").replace(",", "")
+    if ":" in s:
+        try:
+            parts = [float(x or 0) for x in s.split(":")]
+            if len(parts) == 3:
+                return max(0.0, parts[0] + parts[1] / 60 + parts[2] / 3600)
+            if len(parts) == 2:
+                return max(0.0, parts[0] + parts[1] / 60)
+        except Exception:
+            return 0.0
+    try:
+        return float(s)
+    except Exception:
+        return 0.0
+
+
+def _coerce_work_hours(series: pd.Series) -> pd.Series:
+    return series.map(_parse_work_hours_value).astype(float)
+
+
+def _build_work_order_process_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Build the requested work-order total + per-process hour summaries.
+
+    Returns:
+        detail: one row per Work Order + Process.
+        pivot_hours: matrix with work orders as rows and process names as columns.
+        pivot_text: same matrix but formatted as HH:MM:SS text for Excel/readability.
+    """
+    if df is None or df.empty:
+        empty_detail = pd.DataFrame(columns=[
+            "work_order", "process_name", "process_hours", "process_time",
+            "work_order_total_hours", "work_order_total_time", "share_percent",
+            "count", "employee_count", "avg_hours", "avg_time",
+        ])
+        return empty_detail, pd.DataFrame(), pd.DataFrame()
+
+    work = df.copy()
+    if "work_order" not in work.columns:
+        work["work_order"] = ""
+    if "process_name" not in work.columns:
+        work["process_name"] = ""
+    if "work_hours" not in work.columns:
+        work["work_hours"] = 0.0
+    if "employee_id" not in work.columns:
+        work["employee_id"] = ""
+    if "id" not in work.columns:
+        work["id"] = range(1, len(work) + 1)
+
+    work["work_order"] = _blank_to_unknown(work["work_order"], "未填製令")
+    work["process_name"] = _blank_to_unknown(work["process_name"], "未填工段")
+    work["work_hours"] = _coerce_work_hours(work["work_hours"])
+
+    detail = (
+        work.groupby(["work_order", "process_name"], dropna=False)
+        .agg(
+            process_hours=("work_hours", "sum"),
+            count=("id", "count"),
+            employee_count=("employee_id", "nunique"),
+            avg_hours=("work_hours", "mean"),
+        )
+        .reset_index()
+    )
+    totals = (
+        work.groupby("work_order", dropna=False)["work_hours"]
+        .sum()
+        .reset_index()
+        .rename(columns={"work_hours": "work_order_total_hours"})
+    )
+    detail = detail.merge(totals, on="work_order", how="left")
+    detail["share_percent"] = detail.apply(
+        lambda r: round((float(r["process_hours"]) / float(r["work_order_total_hours"]) * 100), 2)
+        if float(r.get("work_order_total_hours") or 0) > 0 else 0.0,
+        axis=1,
+    )
+    detail["process_time"] = detail["process_hours"].map(hours_to_hms)
+    detail["work_order_total_time"] = detail["work_order_total_hours"].map(hours_to_hms)
+    detail["avg_time"] = detail["avg_hours"].map(hours_to_hms)
+    detail = detail.sort_values(
+        ["work_order_total_hours", "work_order", "process_hours"],
+        ascending=[False, True, False],
+        na_position="last",
+    ).reset_index(drop=True)
+
+    pivot_hours = (
+        work.pivot_table(
+            index="work_order",
+            columns="process_name",
+            values="work_hours",
+            aggfunc="sum",
+            fill_value=0,
+        )
+        .reset_index()
+    )
+    if not pivot_hours.empty:
+        process_cols = [c for c in pivot_hours.columns if c != "work_order"]
+        pivot_hours["總工時 / Total Hours"] = pivot_hours[process_cols].sum(axis=1) if process_cols else 0
+        pivot_hours = pivot_hours.sort_values("總工時 / Total Hours", ascending=False).reset_index(drop=True)
+        # Put total immediately after work_order for easier reading.
+        cols = ["work_order", "總工時 / Total Hours"] + [c for c in pivot_hours.columns if c not in {"work_order", "總工時 / Total Hours"}]
+        pivot_hours = pivot_hours[cols]
+
+    pivot_text = pivot_hours.copy()
+    for col in [c for c in pivot_text.columns if c != "work_order"]:
+        pivot_text[col] = pd.to_numeric(pivot_text[col], errors="coerce").fillna(0).map(hours_to_hms)
+
+    return detail, pivot_hours, pivot_text
+
+
+def _localize_work_order_process_table(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+    cols = {
+        "work_order": "製令 / Work Order",
+        "process_name": "工段名稱 / Process",
+        "process_hours": "工段工時(小時) / Process Hours",
+        "process_time": "工段工時 / Process Time",
+        "work_order_total_hours": "製令總工時(小時) / WO Total Hours",
+        "work_order_total_time": "製令總工時 / WO Total Time",
+        "share_percent": "工段佔比% / Share %",
+        "count": "紀錄筆數 / Records",
+        "employee_count": "人員數 / Employees",
+        "avg_hours": "平均工時(小時) / Avg Hours",
+        "avg_time": "平均工時 / Avg Time",
+    }
+    return df.rename(columns={k: v for k, v in cols.items() if k in df.columns})
 
 
 start_saved = _parse_date(filters.get("start_date"), today_date() - timedelta(days=30))
@@ -299,7 +452,7 @@ if df.empty:
 
 if "work_hours" not in df.columns:
     df["work_hours"] = 0.0
-df["work_hours"] = pd.to_numeric(df["work_hours"], errors="coerce").fillna(0)
+df["work_hours"] = _coerce_work_hours(df["work_hours"])
 df["work_time_text"] = df["work_hours"].map(hours_to_hms)
 
 end_ts = df.get("end_timestamp", pd.Series([""] * len(df))).fillna("").astype(str).str.strip()
@@ -345,6 +498,10 @@ by_proc = _sort_summary(by_proc, sort_by, "process_name")
 by_proc["工時 / Time"] = by_proc["total_hours"].map(hours_to_hms)
 by_proc["平均 / Avg"] = by_proc["avg_hours"].map(hours_to_hms)
 
+# V233：每個製令總工時 + 各工段名稱 / Process 的工時拆解。
+wo_process, wo_process_pivot_hours, wo_process_pivot_text = _build_work_order_process_summary(df)
+wo_process_display = _localize_work_order_process_table(wo_process)
+
 by_emp = (
     df.groupby(["employee_id", "employee_name", "department"], dropna=False)
     .agg(total_hours=("work_hours", "sum"), count=("id", "count"), avg_hours=("work_hours", "mean"), work_order_count=("work_order", "nunique"), process_count=("process_name", "nunique"))
@@ -387,6 +544,9 @@ st.download_button(
     "⟰ 下載目前分析結果 Excel / Export Current Analysis",
     data=_excel_bytes({
         "summary_work_order": by_wo,
+        "work_order_process": wo_process_display,
+        "wo_process_pivot_hours": wo_process_pivot_hours,
+        "wo_process_pivot_time": wo_process_pivot_text,
         "summary_process": by_proc,
         "summary_employee": by_emp,
         "daily_trend": trend,
@@ -397,7 +557,7 @@ st.download_button(
     use_container_width=True,
 )
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["製令分析", "工段分析", "人員分析", "趨勢分析", "明細編輯"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["製令分析", "製令 x 工段", "工段分析", "人員分析", "趨勢分析", "明細編輯"])
 
 with tab1:
     st.subheader("製令累積工時 / Work Order Time")
@@ -416,6 +576,70 @@ with tab1:
     render_table(by_wo.drop(columns=["工時 / Time", "平均 / Avg"], errors="ignore"), "analysis_by_work_order", editable=False, height=380)
 
 with tab2:
+    st.subheader("每個製令總工時與各工段工時 / Work Order by Process")
+    st.caption("依目前篩選條件彙總：每個製令的總工時，以及該製令底下各工段名稱 / Process 的工時、佔比、筆數與人員數。")
+    p1, p2, p3 = st.columns(3)
+    p1.metric("製令 x 工段組合 / WO-Process", f"{len(wo_process):,}")
+    p2.metric("製令總數 / Work Orders", f"{wo_process['work_order'].nunique():,}" if not wo_process.empty and "work_order" in wo_process.columns else "0")
+    p3.metric("工段總數 / Processes", f"{wo_process['process_name'].nunique():,}" if not wo_process.empty and "process_name" in wo_process.columns else "0")
+
+    if not wo_process.empty:
+        top_work_orders = _apply_top(by_wo, top_n)["work_order"].astype(str).tolist() if "work_order" in by_wo.columns else []
+        plot_df = wo_process[wo_process["work_order"].astype(str).isin(top_work_orders)].copy() if top_work_orders else wo_process.copy()
+        if plot_df.empty:
+            plot_df = wo_process.copy()
+        fig = px.bar(
+            plot_df,
+            x="work_order",
+            y="process_hours",
+            color="process_name",
+            text="process_time",
+            hover_data={
+                "process_hours": ":.2f",
+                "process_time": True,
+                "work_order_total_time": True,
+                "share_percent": ":.2f",
+                "count": True,
+                "employee_count": True,
+            },
+            labels={
+                "work_order": "製令 / Work Order",
+                "process_hours": "工段工時 / Process Hours",
+                "process_name": "工段名稱 / Process",
+                "share_percent": "佔比%",
+            },
+            title=f"{top_n} 製令各工段工時堆疊 / Work Order Process Breakdown",
+        )
+        fig.update_traces(textposition="inside")
+        st.plotly_chart(style_fig(fig, 520), use_container_width=True)
+
+    st.markdown("#### 製令 x 工段明細 / Work Order x Process Detail")
+    render_table(wo_process_display, "analysis_work_order_process_detail_v233", editable=False, height=420)
+
+    st.markdown("#### 製令工段矩陣 / Work Order Process Matrix")
+    matrix_mode = st.radio(
+        "矩陣顯示格式 / Matrix Format",
+        ["時:分:秒", "小時數"],
+        horizontal=True,
+        key="analysis_wo_process_matrix_mode_v233",
+    )
+    matrix_df = wo_process_pivot_text if matrix_mode == "時:分:秒" else wo_process_pivot_hours
+    render_table(matrix_df, "analysis_work_order_process_matrix_v233", editable=False, height=420)
+
+    st.download_button(
+        "⟰ 下載製令 x 工段分析 Excel / Export Work Order Process Analysis",
+        data=_excel_bytes({
+            "work_order_process": wo_process_display,
+            "pivot_hours": wo_process_pivot_hours,
+            "pivot_time": wo_process_pivot_text,
+            "filtered_detail": df.head(int(filters.get("detail_limit", 1000) or 1000)),
+        }),
+        file_name="SPT_製令工段工時分析.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
+
+with tab3:
     st.subheader("工段累積工時 / Process Time")
     plot_df = _apply_top(by_proc, top_n)
     fig = px.bar(
@@ -431,7 +655,7 @@ with tab2:
     st.plotly_chart(style_fig(fig, 460), use_container_width=True)
     render_table(by_proc.drop(columns=["工時 / Time", "平均 / Avg"], errors="ignore"), "analysis_by_process", editable=False, height=380)
 
-with tab3:
+with tab4:
     st.subheader("人員累積工時 / Employee Time")
     plot_df = _apply_top(by_emp, top_n)
     fig = px.bar(
@@ -448,7 +672,7 @@ with tab3:
     st.plotly_chart(style_fig(fig, 480), use_container_width=True)
     render_table(by_emp.drop(columns=["工時 / Time", "平均 / Avg"], errors="ignore"), "analysis_by_employee", editable=False, height=380)
 
-with tab4:
+with tab5:
     st.subheader("每日趨勢 / Daily Trend")
     fig = px.line(
         trend,
@@ -464,7 +688,7 @@ with tab4:
     st.plotly_chart(style_fig(fig, 430), use_container_width=True)
     render_table(trend.drop(columns=["工時 / Time"], errors="ignore"), "analysis_daily_trend", editable=False, height=320)
 
-with tab5:
+with tab6:
     st.caption("此處編輯的是分析來源明細，儲存後會影響歷史紀錄與後續統計。工時欄位以 00:00:00 顯示，需調整時請改開始/結束時間後重新計算。")
     detail_limit = int(filters.get("detail_limit", 1000) or 1000)
     detail_df = df.head(detail_limit).drop(columns=["work_time_text"], errors="ignore")
