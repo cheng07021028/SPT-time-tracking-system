@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 09:25:17",
+  "exported_at": "2026-05-29 09:29:39",
   "source": "db_service_write",
   "module_key": "02_history",
   "module_code": "02",
@@ -466,10 +466,64 @@
         "source": "streamlit",
         "created_at": "2026-05-29 09:25:14",
         "updated_at": "2026-05-29 09:25:14"
+      },
+      {
+        "id": 359,
+        "record_key": "SPT077|26N4001-02|前置鈑金|2026-05-29 09:29:16|ca105f8b",
+        "status": "作業中",
+        "work_order": "26N4001-02",
+        "part_no": "1SLP01S-FCA1-01",
+        "type_name": "FCLP EFEM",
+        "process_name": "前置鈑金",
+        "employee_id": "SPT077",
+        "employee_name": "謝宛庭",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 09:29:16",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "前置線材加工",
+        "start_date": "2026-05-29",
+        "start_time": "09:29:16",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT077|前置鈑金|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 09:29:16",
+        "updated_at": "2026-05-29 09:29:16"
+      },
+      {
+        "id": 360,
+        "record_key": "SPT174|25M0115-17|包機|2026-05-29 09:29:19|88d5cf9a",
+        "status": "作業中",
+        "work_order": "25M0115-17",
+        "part_no": "4TRSC150-003-01",
+        "type_name": "12\" UFO EFEM",
+        "process_name": "包機",
+        "employee_id": "SPT174",
+        "employee_name": "龍才華",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 09:29:19",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "09:29:19",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT174|包機|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 09:29:19",
+        "updated_at": "2026-05-29 09:29:19"
       }
     ]
   },
   "table_counts": {
-    "time_records": 17
+    "time_records": 19
   }
 }
