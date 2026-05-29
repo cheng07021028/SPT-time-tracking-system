@@ -1471,3 +1471,57 @@ if v190_report:
         )
 else:
     st.info("尚未執行 V190 PostgreSQL / SQL Server 轉換前評估。")
+
+# ================= V202 TIME RECORD GOVERNANCE CENTER =================
+try:
+    import streamlit as st  # type: ignore
+    import pandas as pd  # type: ignore
+    from services.final_time_records_view_service import (
+        audit_v202_time_records_governance,
+        rebuild_authority_from_final_view,
+        load_final_time_records,
+    )
+
+    st.markdown("---")
+    st.subheader("V202 工時資料治理核心重整 / Time Record Governance Core")
+    st.caption("統一 01 / 02 / SQLite 顯示來源；隔離 LOGRECOVERY；event journal 僅當稽核；hard delete guard 為最終防復活規則。")
+
+    c1, c2, c3 = st.columns([1, 1, 1])
+    with c1:
+        run_v202_audit = st.button("執行 V202 一致性檢查", key="v202_run_governance_audit")
+    with c2:
+        run_v202_preview = st.button("預覽 V202 最終工時視圖", key="v202_preview_final_view")
+    with c3:
+        run_v202_dry = st.button("Dry Run 整理 01/02", key="v202_dry_rebuild_0102")
+
+    if run_v202_audit:
+        report = audit_v202_time_records_governance()
+        st.json(report)
+
+    if run_v202_preview:
+        df_v202 = load_final_time_records(include_recovery=False, include_sqlite=True)
+        st.info(f"V202 final_time_records_view 筆數：{len(df_v202)}。未人工結算 LOGRECOVERY 不列入正常顯示。")
+        st.dataframe(df_v202.head(500), use_container_width=True, hide_index=True)
+
+    if run_v202_dry:
+        result = rebuild_authority_from_final_view(dry_run=True, github=False, reason="V202 dry run rebuild 01/02 from final view")
+        st.json(result)
+
+    with st.expander("V202 安全整理：依 final view 重建 01/02 權威檔", expanded=False):
+        st.warning("此功能只重建 01_time_records / 02_history 顯示權威檔；不恢復 hard delete guard 命中的資料，不讓未結算 LOGRECOVERY 進入正式畫面。")
+        confirm_v202 = st.checkbox("我確認要依 V202 final view 重建 01/02 權威檔", key="v202_confirm_rebuild_0102")
+        github_v202 = st.checkbox("同步嘗試寫入 GitHub 備份（可能較慢）", value=False, key="v202_rebuild_github")
+        if st.button("執行 V202 安全整理", key="v202_execute_rebuild_0102", disabled=not confirm_v202):
+            result = rebuild_authority_from_final_view(dry_run=False, github=bool(github_v202), reason="V202 rebuild 01/02 from final view")
+            st.json(result)
+            if result.get("ok", True):
+                st.success("V202 安全整理完成。請重新整理 01 / 02 檢查顯示一致性。")
+            else:
+                st.error(f"V202 安全整理失敗：{result.get('error')}")
+except Exception as _v202_page_exc:
+    try:
+        import streamlit as st  # type: ignore
+        st.warning(f"V202 工時資料治理中心載入失敗，不影響其他健康檢查：{_v202_page_exc}")
+    except Exception:
+        pass
+# ================= END V202 TIME RECORD GOVERNANCE CENTER =================

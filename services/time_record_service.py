@@ -14172,3 +14172,185 @@ def audit_v201_finish_work_stale_id_repair() -> dict:
     }
 
 # ================= END V201 FINISH WORK STALE-ID COMPATIBILITY REPAIR =================
+
+# ================= V202 TIME RECORD GOVERNANCE CORE =================
+# Direct-overwrite version.  UI-neutral: no CSS/theme/page rendering changes.
+# Purpose:
+# - 01 Today Records, 02 History, and Active Work use one final view.
+# - event journal / row shard stay as audit/rebuild sources, not normal display.
+# - unresolved LOGRECOVERY is isolated from Active Work and Today/History display.
+# - hard delete guard is final; deleted rows never return after Reboot.
+
+try:
+    _v202_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v202_prev_load_records = None
+try:
+    _v202_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v202_prev_today_records = None
+try:
+    _v202_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v202_prev_get_active_records = None
+try:
+    _v202_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v202_prev_get_active_record = None
+try:
+    _v202_prev_get_active_same_work = get_active_same_work
+except Exception:  # pragma: no cover
+    _v202_prev_get_active_same_work = None
+
+
+def _v202_final_service():
+    from services import final_time_records_view_service as svc
+    return svc
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V202: 02 History reads from final_time_records_view.
+
+    This prevents 01/02/SQLite/event recovery from producing different visible
+    rows.  If V202 service is unavailable, fall back to the previous chain.
+    """
+    try:
+        return _v202_final_service().load_final_time_records(
+            start_date=start_date,
+            end_date=end_date,
+            employee_id=employee_id,
+            work_order=work_order,
+            include_recovery=False,
+            include_sqlite=True,
+        )
+    except Exception:
+        if callable(_v202_prev_load_records):
+            return _v202_prev_load_records(start_date, end_date, employee_id, work_order)
+        return pd.DataFrame()
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """V202: 01 Today Records uses the same final view as 02 History."""
+    try:
+        return _v202_final_service().load_final_today_records(
+            include_finished=include_finished,
+            unfinished_only=unfinished_only,
+            include_recovery=False,
+        )
+    except Exception:
+        if callable(_v202_prev_today_records):
+            return _v202_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+        return pd.DataFrame()
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V202: Active Work excludes LOGRECOVERY and hard-deleted rows."""
+    try:
+        return _v202_final_service().load_final_active_records(
+            employee_id=employee_id,
+            process_name=process_name,
+            start_date=start_date,
+            employee_name=employee_name,
+        )
+    except Exception:
+        if callable(_v202_prev_get_active_records):
+            return _v202_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+        return pd.DataFrame()
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    try:
+        df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            tmp = df.copy()
+            if "id" in tmp.columns:
+                tmp["_v202_id_sort"] = pd.to_numeric(tmp["id"], errors="coerce")
+                tmp = tmp.sort_values("_v202_id_sort", ascending=False, kind="stable").drop(columns=["_v202_id_sort"], errors="ignore")
+            return dict(tmp.iloc[0].to_dict())
+    except Exception:
+        pass
+    if callable(_v202_prev_get_active_record):
+        try:
+            return _v202_prev_get_active_record(employee_id)  # type: ignore[misc]
+        except TypeError:
+            try:
+                return _v202_prev_get_active_record(employee_id, employee_name=employee_name)  # type: ignore[misc]
+            except Exception:
+                return None
+        except Exception:
+            return None
+    return None
+
+
+def get_active_same_work(
+    employee_id: str,
+    work_order: str,
+    process_name: str,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+) -> dict | None:  # type: ignore[override]
+    """V202-compatible active same-work lookup.
+
+    Keeps the V197/V201 signature compatibility while using final view data.
+    """
+    try:
+        df = get_active_records(
+            employee_id=employee_id,
+            process_name=process_name,
+            start_date=start_date,
+            employee_name=employee_name,
+        )
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            wo = str(work_order or "").strip()
+            cols = [c for c in ("work_order", "製令", "製令 / Work Order", "Work Order") if c in df.columns]
+            if wo and cols:
+                mask = False
+                for c in cols:
+                    mask = mask | (df[c].astype(str).str.strip() == wo)
+                df = df.loc[mask]
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                tmp = df.copy()
+                if "id" in tmp.columns:
+                    tmp["_v202_id_sort"] = pd.to_numeric(tmp["id"], errors="coerce")
+                    tmp = tmp.sort_values("_v202_id_sort", ascending=False, kind="stable").drop(columns=["_v202_id_sort"], errors="ignore")
+                return dict(tmp.iloc[0].to_dict())
+    except Exception:
+        pass
+    if callable(_v202_prev_get_active_same_work):
+        try:
+            return _v202_prev_get_active_same_work(employee_id, work_order, process_name, start_date=start_date, employee_name=employee_name)  # type: ignore[misc]
+        except TypeError:
+            try:
+                return _v202_prev_get_active_same_work(employee_id, work_order, process_name)  # type: ignore[misc]
+            except Exception:
+                return None
+        except Exception:
+            return None
+    return None
+
+
+def sync_time_records_authority_now(reason: str = "v202_final_view_manual_sync", github: bool = False) -> int:  # type: ignore[override]
+    """Rewrite 01/02 authority from final view without restoring hard-deleted rows."""
+    try:
+        result = _v202_final_service().rebuild_authority_from_final_view(dry_run=False, github=bool(github), reason=reason)
+        try:
+            clear_query_cache()
+        except Exception:
+            pass
+        try:
+            if "clear_today_records_fast_cache" in globals() and callable(clear_today_records_fast_cache):
+                clear_today_records_fast_cache()
+        except Exception:
+            pass
+        return int(result.get("final_rows") or 0) if isinstance(result, dict) and result.get("ok", True) else 0
+    except Exception:
+        return 0
+
+
+def audit_v202_time_record_governance() -> dict:
+    try:
+        return _v202_final_service().audit_v202_time_records_governance()
+    except Exception as exc:
+        return {"version": "V202", "ok": False, "error": str(exc)}
+
+# ================= END V202 TIME RECORD GOVERNANCE CORE =================
