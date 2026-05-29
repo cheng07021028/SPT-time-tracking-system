@@ -16749,3 +16749,208 @@ def audit_v212_per_row_durable_save() -> dict:
     }
 
 # ================= END V212 RESTORE PER-ROW DURABLE SAVE + AUTHORITY ID SEQUENCE GUARD =================
+
+
+# ================= V213 FINISH WORK EMPLOYEE-ID AUTHORITY FALLBACK｜2026-05-29 =================
+# Problem observed on site:
+# - Start Work appears in 今日工時紀錄 / Today Records.
+# - The same user selected in 結束目前作業 / Finish Work can still show
+#   「此人員目前沒有未結束作業」.
+# Root cause class:
+# - Today Records display accepts the row by canonical record data.
+# - Finish Work used a stricter employee_id + employee_name active lookup.
+# - If employee master display name, login display name, or a recovered row's employee_name differs
+#   even slightly, the same employee_id can be filtered out.
+# Safety rule:
+# - Never broaden to all employees.  Fallback is employee_id-only and then re-filters employee_id exactly.
+# - This keeps the earlier SSS/SPT243 cross-person guard intact.
+try:
+    _v213_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v213_prev_get_active_records = None
+try:
+    _v213_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v213_prev_get_active_record = None
+try:
+    _v213_prev_refresh_active_records_for_employee = refresh_active_records_for_employee
+except Exception:  # pragma: no cover
+    _v213_prev_refresh_active_records_for_employee = None
+
+
+def _v213_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    s = str(value).strip()
+    if s.lower() in {"none", "nan", "nat", "null", "<na>"}:
+        return ""
+    return s
+
+
+def _v213_key(value) -> str:
+    return _v213_text(value).casefold()
+
+
+def _v213_filter_employee_id_exact(df: pd.DataFrame, employee_id: str | None) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    emp = _v213_key(employee_id)
+    if not emp:
+        return df.reset_index(drop=True)
+    out = df.copy()
+    if "employee_id" not in out.columns:
+        return pd.DataFrame()
+    try:
+        out = out.loc[out["employee_id"].map(_v213_key) == emp].copy()
+    except Exception:
+        return pd.DataFrame()
+    return out.reset_index(drop=True) if not out.empty else pd.DataFrame()
+
+
+def _v213_is_active_frame(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        if "_v206_is_active_df" in globals() and callable(_v206_is_active_df):
+            out = out.loc[_v206_is_active_df(out)].copy()
+        else:
+            end_ts = out.get("end_timestamp", pd.Series([""] * len(out))).map(_v213_key)
+            status = out.get("status", pd.Series([""] * len(out))).map(_v213_text)
+            out = out.loc[end_ts.isin(["", "none", "nan", "nat", "null"]) & status.isin(["", "作業中"])].copy()
+    except Exception:
+        pass
+    return out.reset_index(drop=True) if not out.empty else pd.DataFrame()
+
+
+def _v213_sort_active_latest(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        if "id" in out.columns:
+            out["_v213_id_sort"] = pd.to_numeric(out["id"], errors="coerce").fillna(0)
+            out = out.sort_values("_v213_id_sort", ascending=False, kind="stable").drop(columns=["_v213_id_sort"], errors="ignore")
+        elif "start_timestamp" in out.columns:
+            out["_v213_start_sort"] = pd.to_datetime(out["start_timestamp"], errors="coerce")
+            out = out.sort_values("_v213_start_sort", ascending=False, kind="stable").drop(columns=["_v213_start_sort"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v213_employee_id_only_active_lookup(employee_id: str | None, process_name: str | None = None, start_date: str | None = None) -> pd.DataFrame:
+    """Lookup active rows by employee_id only, without widening to another person."""
+    emp = _v213_text(employee_id)
+    if not emp:
+        return pd.DataFrame()
+    frames: list[pd.DataFrame] = []
+    # 1) SQLite fast path, direct and explicit.  This avoids reusing a strict-name wrapper.
+    try:
+        if "_v206_sqlite_active_df" in globals() and callable(_v206_sqlite_active_df):
+            df_sql = _v206_sqlite_active_df(employee_id=emp, process_name=process_name, start_date=start_date, employee_name=None)
+            df_sql = _v213_filter_employee_id_exact(_v213_is_active_frame(df_sql), emp)
+            if isinstance(df_sql, pd.DataFrame) and not df_sql.empty:
+                frames.append(df_sql)
+    except Exception:
+        pass
+    # 2) 01/02 authority fallback by employee_id only.
+    try:
+        if "_v206_active_authority_df" in globals() and callable(_v206_active_authority_df):
+            df_auth = _v206_active_authority_df(employee_id=emp, process_name=process_name, start_date=start_date, employee_name=None)
+            df_auth = _v213_filter_employee_id_exact(_v213_is_active_frame(df_auth), emp)
+            if isinstance(df_auth, pd.DataFrame) and not df_auth.empty:
+                try:
+                    if "_v206_upsert_active_rows_to_sqlite" in globals() and callable(_v206_upsert_active_rows_to_sqlite):
+                        _v206_upsert_active_rows_to_sqlite(df_auth, reason="v213_finish_employee_id_only_fallback")
+                except Exception:
+                    pass
+                frames.append(df_auth)
+    except Exception:
+        pass
+    if not frames:
+        return pd.DataFrame()
+    try:
+        merged = pd.concat(frames, ignore_index=True, sort=False)
+        # Prefer canonical merge/dedupe when available, but never let it widen employee_id.
+        if "_v209_merge_display_frames" in globals() and callable(_v209_merge_display_frames):
+            merged = _v209_merge_display_frames(frames[0], pd.concat(frames[1:], ignore_index=True, sort=False) if len(frames) > 1 else pd.DataFrame())
+        merged = _v213_filter_employee_id_exact(_v213_is_active_frame(merged), emp)
+        return _v213_sort_active_latest(merged)
+    except Exception:
+        merged = pd.concat(frames, ignore_index=True, sort=False)
+        return _v213_sort_active_latest(_v213_filter_employee_id_exact(_v213_is_active_frame(merged), emp))
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V213: strict lookup first; if only the name blocks it, retry by employee_id only."""
+    df = pd.DataFrame()
+    if callable(_v213_prev_get_active_records):
+        try:
+            df = _v213_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+        except TypeError:
+            try:
+                df = _v213_prev_get_active_records(employee_id=employee_id)
+            except Exception:
+                df = pd.DataFrame()
+        except Exception:
+            df = pd.DataFrame()
+    df = _v213_filter_employee_id_exact(_v213_is_active_frame(df), employee_id)
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return _v213_sort_active_latest(df)
+    # Only when caller supplied a name and strict lookup found nothing, relax name but keep employee_id exact.
+    if _v213_text(employee_id) and _v213_text(employee_name):
+        fallback = _v213_employee_id_only_active_lookup(employee_id, process_name=process_name, start_date=start_date)
+        if isinstance(fallback, pd.DataFrame) and not fallback.empty:
+            try:
+                _v205_direct_log(
+                    "V213_FINISH_ACTIVE_ID_FALLBACK",
+                    f"Finish Work active lookup used employee_id-only fallback for {employee_id}; selected name={employee_name}",
+                    target_id=",".join([str(x) for x in fallback.get("id", pd.Series([], dtype=str)).tolist()]) if "id" in fallback.columns else "",
+                    detail="strict employee_id+employee_name lookup returned zero; employee_id exact fallback returned active rows",
+                    level="INFO",
+                )
+            except Exception:
+                pass
+            return fallback.reset_index(drop=True)
+    return pd.DataFrame()
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        return dict(_v213_sort_active_latest(df).iloc[0].to_dict())
+    except Exception:
+        return None
+
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v213_finish_employee_id_fallback") -> int:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    return int(len(df)) if isinstance(df, pd.DataFrame) and not df.empty else 0
+
+
+def audit_v213_finish_work_active_identity_fallback() -> dict:
+    return {
+        "version": "V213",
+        "scope": "services/time_record_service.py backend only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "v205_sqlite_fast_transaction_preserved": True,
+        "v212_row_durable_save_preserved": True,
+        "finish_work_strict_lookup_first": True,
+        "fallback_scope": "employee_id_only_exact_match_when_employee_name_blocks_active_row",
+        "cross_person_widening": False,
+        "reason": "Fix Today Records shows just-started work but Finish Work says no active work due to employee_name mismatch/stale display name.",
+    }
+
+# ================= END V213 FINISH WORK EMPLOYEE-ID AUTHORITY FALLBACK =================
