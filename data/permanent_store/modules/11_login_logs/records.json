@@ -2,12 +2,28 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 08:41:43",
-  "exported_at": "2026-05-29 08:41:43",
+  "updated_at": "2026-05-29 08:41:52",
+  "exported_at": "2026-05-29 08:41:52",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 567,
+        "source": "v103_merge",
+        "username": "B256",
+        "display_name": "莊翔宇",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=B256; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-29 08:41:51",
+        "logout_time": "",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 08:41:51"
+      },
       {
         "id": 500,
         "source": "v103_merge",
@@ -1070,7 +1086,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 66,
+    "login_logs": 67,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
