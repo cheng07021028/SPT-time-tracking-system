@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 18:11:23",
-  "exported_at": "2026-05-29 18:11:23",
+  "updated_at": "2026-05-29 18:11:32",
+  "exported_at": "2026-05-29 18:11:32",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -13603,11 +13603,59 @@
         "detail": "today_records_v210_canonical_display\n__spt_log_uid=1ba150e110ed413eac29612ab4a2883b",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 20,
+        "log_time": "2026-05-29 18:11:32",
+        "user_name": "SPT089",
+        "action_type": "V206_ACTIVE_AUTHORITY_FALLBACK",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 查無目前作業，已由權威檔回填 active 44 筆。",
+        "detail": "v214_finish_same_display_source",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 19,
+        "log_time": "2026-05-29 18:11:31",
+        "user_name": "SPT089",
+        "action_type": "V206_ACTIVE_AUTHORITY_FALLBACK",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 查無目前作業，已由權威檔回填 active 1 筆。",
+        "detail": "v214_finish_same_display_source",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 18,
+        "log_time": "2026-05-29 18:11:28",
+        "user_name": "admin",
+        "action_type": "V208_DISPLAY_AUTHORITY_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite time_records 顯示快取空白，已由 01/02 權威檔回填 88 筆。",
+        "detail": "today_records_v210_canonical_display\n__spt_log_uid=977b3565e4b34d1bb270168656e7d5de",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 17,
+        "log_time": "2026-05-29 18:11:28",
+        "user_name": "SPT089",
+        "action_type": "V208_DISPLAY_AUTHORITY_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite time_records 顯示快取空白，已由 01/02 權威檔回填 88 筆。",
+        "detail": "today_records_v210_canonical_display\n__spt_log_uid=1c2af84ab26a49949bcb6c59b21280c4",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1133
+    "system_logs": 1137
   }
 }
