@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 13:54:30",
-  "exported_at": "2026-05-29 13:54:30",
+  "updated_at": "2026-05-29 13:55:25",
+  "exported_at": "2026-05-29 13:55:25",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -7759,11 +7759,71 @@
         "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 2161,
+        "log_time": "2026-05-29 13:55:23",
+        "user_name": "SPT138",
+        "action_type": "V201_FINISH_AUTHORITY_ONLY",
+        "target_table": "time_records",
+        "target_id": "364",
+        "message": "SQLite 找不到該筆，已以 01/02 權威資料完成結束：id=364 action=完工",
+        "detail": "__spt_log_uid=1b2cef122ddf455e991eda88af77e2ef",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 2160,
+        "log_time": "2026-05-29 13:55:23",
+        "user_name": "SPT138",
+        "action_type": "V201_SQLITE_ROW_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "364",
+        "message": "v201_finish_authority_only_sync_sqlite: 已由 01/02 權威資料回填 SQLite 單筆 cache，id=364",
+        "detail": "__spt_log_uid=8d59f0941bab4a88adacc704c2f7f5f5",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2159,
+        "log_time": "2026-05-29 13:55:23",
+        "user_name": "SPT138",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2158,
+        "log_time": "2026-05-29 13:55:21",
+        "user_name": "SPT138",
+        "action_type": "V201_SQLITE_ROW_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "364",
+        "message": "v201_finish_retry_before_core: 已由 01/02 權威資料回填 SQLite 單筆 cache，id=364",
+        "detail": "__spt_log_uid=ba94819f4d554dab94c92872e0da2047",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2157,
+        "log_time": "2026-05-29 13:55:21",
+        "user_name": "SPT138",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 646
+    "system_logs": 651
   }
 }
