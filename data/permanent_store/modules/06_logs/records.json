@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 14:39:27",
-  "exported_at": "2026-05-29 14:39:27",
+  "updated_at": "2026-05-29 14:40:06",
+  "exported_at": "2026-05-29 14:40:06",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -11539,11 +11539,59 @@
         "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1802,
+        "log_time": "2026-05-29 14:40:04",
+        "user_name": "SPT208",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "413",
+        "message": "V96 結束工時紀錄 #413，同步結束=1筆，狀態=完工",
+        "detail": "413\n__spt_log_uid=1fa55695d8914995abc887eade75c186\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 14:40:04\",\"action_type\":\"END_WORK\",\"target_table\":\"time_records\",\"target_id\":\"413\",\"target_ids\":[413],\"message\":\"V96 結束工時紀錄 #413，同步結束=1筆，狀態=完工\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT208|25M0694-01|清潔|2026-05-29 13:24:29|7187dc7c\",\"identity_key\":\"record_key:SPT208|25M0694-01|清潔|2026-05-29 13:24:29|7187dc7c\",\"id\":\"413\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"status\":\"完工\",\"start_timestamp\":\"2026-05-29 13:24:29\",\"end_timestamp\":\"2026-05-29 14:40:01\",\"work_hours\":\"1.26\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":413,\"record_key\":\"SPT208|25M0694-01|清潔|2026-05-29 13:24:29|7187dc7c\",\"status\":\"完工\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:24:29\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 14:40:01\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:24:29\",\"end_date\":\"2026-05-29\",\"end_time\":\"14:40:01\",\"work_hours\":1.26,\"assembly_location\":\"竹東\",\"group_key\":\"SPT208|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:24:29\",\"updated_at\":\"2026-05-29 14:40:01\",\"department\":\"\",\"title\":\"\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":413,\"record_key\":\"SPT208|25M0694-01|清潔|2026-05-29 13:24:29|7187dc7c\",\"status\":\"完工\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:24:29\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 14:40:01\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:24:29\",\"end_date\":\"2026-05-29\",\"end_time\":\"14:40:01\",\"work_hours\":1.26,\"assembly_location\":\"竹東\",\"group_key\":\"SPT208|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:24:29\",\"updated_at\":\"2026-05-29 14:40:01\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":413,\"record_key\":\"SPT208|25M0694-01|清潔|2026-05-29 13:24:29|7187dc7c\",\"status\":\"完工\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:24:29\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 14:40:01\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:24:29\",\"end_date\":\"2026-05-29\",\"end_time\":\"14:40:01\",\"work_hours\":1.26,\"assembly_location\":\"竹東\",\"group_key\":\"SPT208|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:24:29\",\"updated_at\":\"2026-05-29 14:40:01\",\"department\":\"\",\"title\":\"\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":413,\"record_key\":\"SPT208|25M0694-01|清潔|2026-05-29 13:24:29|7187dc7c\",\"status\":\"完工\",\"work_order\":\"25M0694-01\",\"part_no\":\"4TRSC122-SB2-13\",\"type_name\":\"SORTER RSC121 SB (RR757)\",\"process_name\":\"清潔\",\"employee_id\":\"SPT208\",\"employee_name\":\"邱珍娜\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:24:29\",\"end_action\":\"完工\",\"end_timestamp\":\"2026-05-29 14:40:01\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:24:29\",\"end_date\":\"2026-05-29\",\"end_time\":\"14:40:01\",\"work_hours\":1.26,\"assembly_location\":\"竹東\",\"group_key\":\"SPT208|清潔|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:24:29\",\"updated_at\":\"2026-05-29 14:40:01\",\"department\":\"\",\"title\":\"\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"03b02cda7b416fa182322cd704bfd47ed2e53151ce827d83b958008aae0f7fad\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1801,
+        "log_time": "2026-05-29 14:40:04",
+        "user_name": "SPT208",
+        "action_type": "UPDATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "UPDATE time_records",
+        "detail": "UPDATE time_records\n            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,\n                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?\n            WHERE id=? AND end_timestamp IS NULL",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1800,
+        "log_time": "2026-05-29 14:40:01",
+        "user_name": "SPT208",
+        "action_type": "V201_SQLITE_ROW_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "413",
+        "message": "v201_finish_retry_before_core: 已由 01/02 權威資料回填 SQLite 單筆 cache，id=413",
+        "detail": "__spt_log_uid=1f297753dd4f4d25927ecb744067d279",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1799,
+        "log_time": "2026-05-29 14:40:01",
+        "user_name": "SPT208",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT OR REPLACE INTO time_records (id, record_key, status, work_order, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, assembly_location, group_key, is_group_work, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 961
+    "system_logs": 965
   }
 }
