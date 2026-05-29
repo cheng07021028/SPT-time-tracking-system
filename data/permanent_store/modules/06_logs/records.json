@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 14:28:02",
-  "exported_at": "2026-05-29 14:28:02",
+  "updated_at": "2026-05-29 14:28:06",
+  "exported_at": "2026-05-29 14:28:06",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -11407,11 +11407,23 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1749,
+        "log_time": "2026-05-29 14:28:02",
+        "user_name": "admin",
+        "action_type": "V200_ROW_START_WORK",
+        "target_table": "time_records",
+        "target_id": "422",
+        "message": "開始作業逐筆紀錄｜ID=422｜SSS SSS NA / 6S",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"422\", \"record_key\": \"SSS|NA|6S|2026-05-29 14:27:21|8b0cbfe1\", \"employee_id\": \"SSS\", \"employee_name\": \"SSS\", \"work_order\": \"NA\", \"process_name\": \"6S\", \"start_timestamp\": \"2026-05-29 14:27:21\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 422, \"record_key\": \"SSS|NA|6S|2026-05-29 14:27:21|8b0cbfe1\", \"status\": \"作業中\", \"work_order\": \"NA\", \"part_no\": \"\", \"type_name\": \"\", \"process_name\": \"6S\", \"employee_id\": \"SSS\", \"employee_name\": \"SSS\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 14:27:21\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-29\", \"start_time\": \"14:27:21\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": 0.0, \"assembly_location\": \"\", \"group_key\": \"SSS|6S|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 14:27:21\", \"updated_at\": \"2026-05-29 14:27:21\", \"department\": \"\", \"title\": \"\"}}\n__spt_log_uid=2ef2ab06d42043ef92a28a7957b9e4ff\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 14:28:02\",\"action_type\":\"V200_ROW_START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"422\",\"target_ids\":[422],\"message\":\"開始作業逐筆紀錄｜ID=422｜SSS SSS NA / 6S\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SSS|NA|6S|2026-05-29 14:27:21|8b0cbfe1\",\"identity_key\":\"record_key:SSS|NA|6S|2026-05-29 14:27:21|8b0cbfe1\",\"id\":\"422\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 14:27:21\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":422,\"record_key\":\"SSS|NA|6S|2026-05-29 14:27:21|8b0cbfe1\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 14:27:21\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"14:27:21\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 14:27:21\",\"updated_at\":\"2026-05-29 14:27:21\",\"department\":\"\",\"title\":\"\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":422,\"record_key\":\"SSS|NA|6S|2026-05-29 14:27:21|8b0cbfe1\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 14:27:21\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"14:27:21\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 14:27:21\",\"updated_at\":\"2026-05-29 14:27:21\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":422,\"record_key\":\"SSS|NA|6S|2026-05-29 14:27:21|8b0cbfe1\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 14:27:21\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"14:27:21\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 14:27:21\",\"updated_at\":\"2026-05-29 14:27:21\",\"department\":\"\",\"title\":\"\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":422,\"record_key\":\"SSS|NA|6S|2026-05-29 14:27:21|8b0cbfe1\",\"status\":\"作業中\",\"work_order\":\"NA\",\"part_no\":\"\",\"type_name\":\"\",\"process_name\":\"6S\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 14:27:21\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"14:27:21\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"\",\"group_key\":\"SSS|6S|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 14:27:21\",\"updated_at\":\"2026-05-29 14:27:21\",\"department\":\"\",\"title\":\"\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"b8ffc93c809d8621ed4c07ff1ce4c66665c631420de5aaa045b506d5ab7a1d27\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 950
+    "system_logs": 951
   }
 }
