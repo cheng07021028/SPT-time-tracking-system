@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 02:14:26",
-  "exported_at": "2026-05-29 02:14:26",
+  "updated_at": "2026-05-29 08:39:45",
+  "exported_at": "2026-05-29 08:39:45",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -847,11 +847,59 @@
         "detail": "",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 150,
+        "log_time": "2026-05-29 08:39:42",
+        "user_name": "B244",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "334",
+        "message": "范耀文 開始 25MN0014-10 / 左右塔組立",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 08:39:42\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"334\",\"target_ids\":[334],\"message\":\"范耀文 開始 25MN0014-10 / 左右塔組立\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"B244|25MN0014-10|左右塔組立|2026-05-29 08:39:36|8950e102\",\"identity_key\":\"record_key:B244|25MN0014-10|左右塔組立|2026-05-29 08:39:36|8950e102\",\"id\":\"334\",\"employee_id\":\"B244\",\"employee_name\":\"范耀文\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"左右塔組立\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 08:39:36\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":334,\"record_key\":\"B244|25MN0014-10|左右塔組立|2026-05-29 08:39:36|8950e102\",\"status\":\"作業中\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"左右塔組立\",\"employee_id\":\"B244\",\"employee_name\":\"范耀文\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:39:36\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:39:36\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B244|左右塔組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:39:36\",\"updated_at\":\"2026-05-29 08:39:36\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":334,\"record_key\":\"B244|25MN0014-10|左右塔組立|2026-05-29 08:39:36|8950e102\",\"status\":\"作業中\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"左右塔組立\",\"employee_id\":\"B244\",\"employee_name\":\"范耀文\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:39:36\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:39:36\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B244|左右塔組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:39:36\",\"updated_at\":\"2026-05-29 08:39:36\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":334,\"record_key\":\"B244|25MN0014-10|左右塔組立|2026-05-29 08:39:36|8950e102\",\"status\":\"作業中\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"左右塔組立\",\"employee_id\":\"B244\",\"employee_name\":\"范耀文\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:39:36\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:39:36\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B244|左右塔組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:39:36\",\"updated_at\":\"2026-05-29 08:39:36\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":334,\"record_key\":\"B244|25MN0014-10|左右塔組立|2026-05-29 08:39:36|8950e102\",\"status\":\"作業中\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"左右塔組立\",\"employee_id\":\"B244\",\"employee_name\":\"范耀文\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:39:36\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:39:36\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B244|左右塔組立|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:39:36\",\"updated_at\":\"2026-05-29 08:39:36\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"4e3a92748c7c29eb5081332dbf28881f3b95129c078665dc9b570244d2d13ff2\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 149,
+        "log_time": "2026-05-29 08:39:41",
+        "user_name": "B211",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "333",
+        "message": "張瑀榛 開始 26M0021-03 / 前置鈑金",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 08:39:41\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"333\",\"target_ids\":[333],\"message\":\"張瑀榛 開始 26M0021-03 / 前置鈑金\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"B211|26M0021-03|前置鈑金|2026-05-29 08:39:10|5adacfaa\",\"identity_key\":\"record_key:B211|26M0021-03|前置鈑金|2026-05-29 08:39:10|5adacfaa\",\"id\":\"333\",\"employee_id\":\"B211\",\"employee_name\":\"張瑀榛\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"前置鈑金\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 08:39:10\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":333,\"record_key\":\"B211|26M0021-03|前置鈑金|2026-05-29 08:39:10|5adacfaa\",\"status\":\"作業中\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"前置鈑金\",\"employee_id\":\"B211\",\"employee_name\":\"張瑀榛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:39:10\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:39:10\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B211|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:39:10\",\"updated_at\":\"2026-05-29 08:39:10\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":333,\"record_key\":\"B211|26M0021-03|前置鈑金|2026-05-29 08:39:10|5adacfaa\",\"status\":\"作業中\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"前置鈑金\",\"employee_id\":\"B211\",\"employee_name\":\"張瑀榛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:39:10\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:39:10\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B211|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:39:10\",\"updated_at\":\"2026-05-29 08:39:10\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":333,\"record_key\":\"B211|26M0021-03|前置鈑金|2026-05-29 08:39:10|5adacfaa\",\"status\":\"作業中\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"前置鈑金\",\"employee_id\":\"B211\",\"employee_name\":\"張瑀榛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:39:10\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:39:10\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B211|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:39:10\",\"updated_at\":\"2026-05-29 08:39:10\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":333,\"record_key\":\"B211|26M0021-03|前置鈑金|2026-05-29 08:39:10|5adacfaa\",\"status\":\"作業中\",\"work_order\":\"26M0021-03\",\"part_no\":\"1GRSC150-003-04\",\"type_name\":\"4 Port Frame Long-type EFEM\",\"process_name\":\"前置鈑金\",\"employee_id\":\"B211\",\"employee_name\":\"張瑀榛\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 08:39:10\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"08:39:10\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B211|前置鈑金|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 08:39:10\",\"updated_at\":\"2026-05-29 08:39:10\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"99cf14989dd6e450f077492022c9cef76f7a83d0d1b79d3bcc9c7c7fbbcb0688\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 148,
+        "log_time": "2026-05-29 08:39:39",
+        "user_name": "B244",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 147,
+        "log_time": "2026-05-29 08:39:39",
+        "user_name": "B211",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 70
+    "system_logs": 74
   }
 }
