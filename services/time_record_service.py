@@ -20018,3 +20018,738 @@ def audit_v225_finish_work_sqlite_safe() -> dict:
     }
 
 # ================= END V225 FINISH WORK SQLITE-SAFE AUTHORITY FIRST =================
+
+# ================= V230 FRONTEND OPERATION ISOLATION PHASE 2｜2026-05-29 =================
+# 目的：以 V225 功能正確版為基準，只把 01. 工時紀錄前台重讀/重算隔離到低頻快取。
+# 原則：不改 UI/CSS/theme/table/buttons；不回退 SQLite-only；不改 V225 權威檔優先讀寫規則。
+# 做法：
+# 1) load_records/today_records/get_active_* 優先讀 V230 display cache + memory cache。
+# 2) cache 只用檔案 mtime/size 低成本簽章判斷是否需要重建，避免每次 Streamlit rerun 掃 01/02 權威檔。
+# 3) start/finish/delete/save 後只做單筆 cache upsert/remove；重工作業寫入背景佇列記錄，前台不等待。
+try:
+    _v230_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v230_prev_load_records = None
+try:
+    _v230_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v230_prev_today_records = None
+try:
+    _v230_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v230_prev_get_active_records = None
+try:
+    _v230_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v230_prev_get_active_record = None
+try:
+    _v230_prev_get_active_group = get_active_group
+except Exception:  # pragma: no cover
+    _v230_prev_get_active_group = None
+try:
+    _v230_prev_refresh_active_records_for_employee = refresh_active_records_for_employee
+except Exception:  # pragma: no cover
+    _v230_prev_refresh_active_records_for_employee = None
+try:
+    _v230_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v230_prev_start_work = None
+try:
+    _v230_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v230_prev_finish_work = None
+try:
+    _v230_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v230_prev_delete_time_records = None
+try:
+    _v230_prev_delete_time_records_from_editor_df = delete_time_records_from_editor_df
+except Exception:  # pragma: no cover
+    _v230_prev_delete_time_records_from_editor_df = None
+try:
+    _v230_prev_delete_time_records_from_02_history_editor = delete_time_records_from_02_history_editor
+except Exception:  # pragma: no cover
+    _v230_prev_delete_time_records_from_02_history_editor = None
+try:
+    _v230_prev_delete_time_records_v178b_strict = delete_time_records_v178b_strict
+except Exception:  # pragma: no cover
+    _v230_prev_delete_time_records_v178b_strict = None
+try:
+    _v230_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v230_prev_save_time_records = None
+
+import json as _v230_json
+import os as _v230_os
+import time as _v230_time
+from pathlib import Path as _v230_Path
+from datetime import datetime as _v230_datetime
+
+_V230_VERSION = "V230_FRONTEND_OPERATION_ISOLATION_PHASE2"
+try:
+    _V230_PROJECT_ROOT = _v230_Path(__file__).resolve().parents[1]
+except Exception:  # pragma: no cover
+    _V230_PROJECT_ROOT = _v230_Path(".").resolve()
+_V230_CACHE_DIR = _V230_PROJECT_ROOT / "data" / "persistent_state" / "frontend_cache"
+_V230_DISPLAY_CACHE = _V230_CACHE_DIR / "01_display_records_fast_cache.json"
+_V230_META_CACHE = _V230_CACHE_DIR / "01_frontend_phase2_meta.json"
+_V230_QUEUE_PATH = _V230_CACHE_DIR / "01_background_queue.jsonl"
+_V230_MEMORY_CACHE: dict = {"rows": None, "signature": "", "epoch": 0.0, "date": ""}
+_V230_MEMORY_TTL_SECONDS = 15.0
+_V230_FILE_TTL_SECONDS = 30.0
+
+
+def _v230_text(v) -> str:
+    try:
+        if "_v225_text" in globals() and callable(_v225_text):  # type: ignore[name-defined]
+            return _v225_text(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if v is None:
+        return ""
+    try:
+        if pd.isna(v):  # type: ignore[name-defined]
+            return ""
+    except Exception:
+        pass
+    s = str(v).strip()
+    return "" if s.lower() in ("none", "nan", "nat", "null", "<na>") else s
+
+
+def _v230_int(v) -> int | None:
+    try:
+        if "_v225_int" in globals() and callable(_v225_int):  # type: ignore[name-defined]
+            return _v225_int(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    s = _v230_text(v)
+    if not s:
+        return None
+    try:
+        i = int(float(s))
+        return i if i > 0 else None
+    except Exception:
+        return None
+
+
+def _v230_date(v) -> str:
+    try:
+        if "_v225_date" in globals() and callable(_v225_date):  # type: ignore[name-defined]
+            return _v225_date(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    s = _v230_text(v).replace("/", "-")
+    if " " in s:
+        s = s.split(" ", 1)[0]
+    if "T" in s:
+        s = s.split("T", 1)[0]
+    return s[:10] if len(s) >= 10 else ""
+
+
+def _v230_today() -> str:
+    try:
+        return _v230_date(today_date())  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return _v230_date(today_text())  # type: ignore[name-defined]
+        except Exception:
+            return _v230_datetime.now().strftime("%Y-%m-%d")
+
+
+def _v230_now() -> str:
+    try:
+        return now_text()  # type: ignore[name-defined]
+    except Exception:
+        return _v230_datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v230_json_default(v):
+    try:
+        if pd.isna(v):  # type: ignore[name-defined]
+            return ""
+    except Exception:
+        pass
+    try:
+        if hasattr(v, "item"):
+            return v.item()
+    except Exception:
+        pass
+    return str(v)
+
+
+def _v230_safe_read_json(path: _v230_Path, default):
+    try:
+        if path.exists():
+            text = path.read_text(encoding="utf-8")
+            if text.strip():
+                return _v230_json.loads(text)
+    except Exception:
+        return default
+    return default
+
+
+def _v230_safe_write_json(path: _v230_Path, payload) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(_v230_json.dumps(payload, ensure_ascii=False, indent=2, default=_v230_json_default), encoding="utf-8")
+        _v230_json.loads(tmp.read_text(encoding="utf-8"))
+        _v230_os.replace(tmp, path)
+    except Exception as exc:
+        try:
+            if "_v205_direct_log" in globals() and callable(_v205_direct_log):  # type: ignore[name-defined]
+                _v205_direct_log("V230_CACHE_WRITE_WARN", f"V230 前台隔離快取寫入失敗：{exc}", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+
+
+def _v230_record_key(row: dict) -> str:
+    try:
+        return _v223_row_key(row)  # type: ignore[name-defined]
+    except Exception:
+        rid = _v230_int(row.get("id") if isinstance(row, dict) else None)
+        if rid is not None:
+            return f"id:{rid}"
+        rk = _v230_text(row.get("record_key") if isinstance(row, dict) else "")
+        if rk:
+            return "record_key:" + rk
+        return "biz:" + "|".join([
+            _v230_text(row.get("employee_id") if isinstance(row, dict) else ""),
+            _v230_text(row.get("work_order") if isinstance(row, dict) else ""),
+            _v230_text(row.get("process_name") if isinstance(row, dict) else ""),
+            _v230_text(row.get("start_timestamp") if isinstance(row, dict) else ""),
+        ])
+
+
+def _v230_dedupe_rows(rows: list[dict]) -> list[dict]:
+    clean = [dict(r) for r in (rows or []) if isinstance(r, dict)]
+    try:
+        clean = _v223_filter_deleted_exact(clean)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        return _v223_dedupe_rows(clean)  # type: ignore[name-defined]
+    except Exception:
+        by: dict[str, dict] = {}
+        order: list[str] = []
+        for r in clean:
+            k = _v230_record_key(r)
+            if not k:
+                continue
+            if k not in by:
+                order.append(k)
+                by[k] = dict(r)
+            else:
+                old = dict(by[k])
+                old.update({kk: vv for kk, vv in r.items() if _v230_text(vv) or kk not in old})
+                by[k] = old
+        return [by[k] for k in order if k in by]
+
+
+def _v230_rows_to_df(rows: list[dict]) -> pd.DataFrame:  # type: ignore[name-defined]
+    try:
+        return _v223_to_df(rows)  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return pd.DataFrame(rows).reset_index(drop=True) if rows else pd.DataFrame()  # type: ignore[name-defined]
+        except Exception:
+            return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v230_is_active_row(row: dict) -> bool:
+    try:
+        return bool(_v225_is_active_row(row))  # type: ignore[name-defined]
+    except Exception:
+        end_ts = _v230_text(row.get("end_timestamp") if isinstance(row, dict) else "")
+        if end_ts:
+            return False
+        status = _v230_text(row.get("status") if isinstance(row, dict) else "").lower()
+        end_action = _v230_text(row.get("end_action") if isinstance(row, dict) else "").lower()
+        finished = {"下班", "暫停", "完工", "已結束", "結束", "完成", "off_duty", "paused", "finished", "end", "ended", "complete", "completed"}
+        return status not in finished and end_action not in finished
+
+
+def _v230_filter_df(df: pd.DataFrame, start_date=None, end_date=None, employee_id=None, work_order=None, process_name=None, employee_name=None, *, active_only=False) -> pd.DataFrame:  # type: ignore[name-defined]
+    if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return pd.DataFrame()  # type: ignore[name-defined]
+    out = df.copy()
+    try:
+        if active_only:
+            mask = out.apply(lambda r: _v230_is_active_row(dict(r)), axis=1)
+            out = out.loc[mask].copy()
+        emp = _v230_text(employee_id)
+        if emp and "employee_id" in out.columns:
+            out = out.loc[out["employee_id"].map(_v230_text) == emp].copy()
+        # employee_name 只在沒有 employee_id 時才當主條件；避免姓名格式差異擋同工號。
+        name = _v230_text(employee_name)
+        if name and not emp and "employee_name" in out.columns:
+            out = out.loc[out["employee_name"].map(_v230_text) == name].copy()
+        wo = _v230_text(work_order)
+        if wo and "work_order" in out.columns:
+            out = out.loc[out["work_order"].map(_v230_text) == wo].copy()
+        proc = _v230_text(process_name)
+        if proc and "process_name" in out.columns:
+            out = out.loc[out["process_name"].map(_v230_text) == proc].copy()
+        sd = _v230_date(start_date)
+        ed = _v230_date(end_date)
+        if sd or ed:
+            if "start_date" in out.columns:
+                ds = out["start_date"].map(_v230_date)
+            elif "start_timestamp" in out.columns:
+                ds = out["start_timestamp"].map(_v230_date)
+            else:
+                ds = pd.Series([""] * len(out), index=out.index)  # type: ignore[name-defined]
+            if sd:
+                out = out.loc[ds >= sd].copy()
+            if ed:
+                out = out.loc[ds <= ed].copy()
+        return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+    except Exception:
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v230_signature_paths() -> list[_v230_Path]:
+    paths = [
+        _V230_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "01_time_records" / "records.json",
+        _V230_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "02_history" / "records.json",
+        _V230_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_guard" / "records.json",
+        _V230_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_tombstones" / "records.json",
+        _V230_CACHE_DIR / "01_today_records_cache.json",
+        _V230_CACHE_DIR / "01_active_records_index.json",
+    ]
+    return paths
+
+
+def _v230_authority_signature() -> str:
+    parts: list[str] = [_V230_VERSION, _v230_today()]
+    for p in _v230_signature_paths():
+        try:
+            st = p.stat()
+            parts.append(f"{p.name}:{int(st.st_mtime)}:{int(st.st_size)}")
+        except Exception:
+            parts.append(f"{p.name}:missing")
+    return "|".join(parts)
+
+
+def _v230_read_meta() -> dict:
+    meta = _v230_safe_read_json(_V230_META_CACHE, {})
+    return meta if isinstance(meta, dict) else {}
+
+
+def _v230_write_meta(rows_count: int, active_count: int, signature: str, reason: str = "") -> None:
+    _v230_safe_write_json(_V230_META_CACHE, {
+        "cache_version": _V230_VERSION,
+        "cache_date": _v230_today(),
+        "signature": signature,
+        "rows_count": int(rows_count or 0),
+        "active_count": int(active_count or 0),
+        "last_refresh_at": _v230_now(),
+        "last_refresh_epoch": _v230_time.time(),
+        "reason": str(reason or ""),
+    })
+
+
+def _v230_cache_file_valid(signature: str) -> bool:
+    if not _V230_DISPLAY_CACHE.exists():
+        return False
+    meta = _v230_read_meta()
+    if meta.get("cache_version") != _V230_VERSION:
+        return False
+    if _v230_date(meta.get("cache_date")) != _v230_today():
+        return False
+    # 簽章相同代表 01/02/tombstone/cache file 未被外部改動，可直接用。
+    if meta.get("signature") == signature:
+        return True
+    # 簽章不同時，若在短 TTL 內仍允許前台先顯示既有快取；重建交給下一次/背景佇列。
+    try:
+        epoch = float(meta.get("last_refresh_epoch") or 0)
+        if epoch > 0 and (_v230_time.time() - epoch) < _V230_FILE_TTL_SECONDS:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _v230_rows_from_v225_correct_source(reason: str = "v230_rebuild") -> list[dict]:
+    rows: list[dict] = []
+    # V225 是目前功能正確基準；重建時才允許走較完整來源。
+    try:
+        rows.extend([dict(r) for r in _v225_all_rows_no_sqlite_required() if isinstance(r, dict)])  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if not rows:
+        try:
+            rows.extend([dict(r) for r in _v224_all_display_rows() if isinstance(r, dict)])  # type: ignore[name-defined]
+        except Exception:
+            pass
+    if not rows:
+        try:
+            rows.extend([dict(r) for r in _v223_authority_rows_for_display(allow_recovery=True) if isinstance(r, dict)])  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return _v230_dedupe_rows(rows)
+
+
+def _v230_rebuild_display_cache(reason: str = "v230_rebuild") -> list[dict]:
+    rows = _v230_rows_from_v225_correct_source(reason=reason)
+    signature = _v230_authority_signature()
+    _v230_safe_write_json(_V230_DISPLAY_CACHE, rows)
+    active_rows = [dict(r) for r in rows if _v230_is_active_row(r)]
+    # 同步更新 V220 舊快取檔，避免其他內部 helper 讀到 stale data。
+    try:
+        today = _v230_today()
+        today_rows = [dict(r) for r in rows if _v230_date(r.get("start_date") or r.get("start_timestamp")) == today]
+        if "_V220_TODAY_CACHE" in globals():
+            _v230_safe_write_json(_V220_TODAY_CACHE, today_rows)  # type: ignore[name-defined]
+        if "_V220_ACTIVE_CACHE" in globals():
+            _v230_safe_write_json(_V220_ACTIVE_CACHE, active_rows)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    _v230_write_meta(len(rows), len(active_rows), signature, reason=reason)
+    _V230_MEMORY_CACHE.update({"rows": rows, "signature": signature, "epoch": _v230_time.time(), "date": _v230_today()})
+    try:
+        if "_v205_direct_log" in globals() and callable(_v205_direct_log):  # type: ignore[name-defined]
+            _v205_direct_log("V230_FRONT_CACHE_REBUILD", f"V230 前台快取低頻重建完成：{len(rows)} 筆，active={len(active_rows)}。", detail=reason, level="INFO")  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return rows
+
+
+def _v230_get_display_rows(reason: str = "v230_get", *, allow_stale: bool = True) -> list[dict]:
+    signature = _v230_authority_signature()
+    try:
+        mem_rows = _V230_MEMORY_CACHE.get("rows")
+        mem_epoch = float(_V230_MEMORY_CACHE.get("epoch") or 0)
+        if isinstance(mem_rows, list) and mem_rows and _V230_MEMORY_CACHE.get("date") == _v230_today():
+            if _V230_MEMORY_CACHE.get("signature") == signature or (_v230_time.time() - mem_epoch) < _V230_MEMORY_TTL_SECONDS:
+                return [dict(r) for r in mem_rows if isinstance(r, dict)]
+    except Exception:
+        pass
+    if _v230_cache_file_valid(signature):
+        rows = _v230_safe_read_json(_V230_DISPLAY_CACHE, [])
+        if isinstance(rows, list) and rows:
+            rows = _v230_dedupe_rows([dict(r) for r in rows if isinstance(r, dict)])
+            _V230_MEMORY_CACHE.update({"rows": rows, "signature": signature, "epoch": _v230_time.time(), "date": _v230_today()})
+            return rows
+    # cache 無效或空白時才重建；這是低頻動作，不在每次互動執行。
+    return _v230_rebuild_display_cache(reason=reason)
+
+
+def _v230_write_display_rows(rows: list[dict], reason: str = "v230_write_cache") -> list[dict]:
+    rows = _v230_dedupe_rows(rows)
+    signature = _v230_authority_signature()
+    _v230_safe_write_json(_V230_DISPLAY_CACHE, rows)
+    active_rows = [dict(r) for r in rows if _v230_is_active_row(r)]
+    try:
+        today = _v230_today()
+        today_rows = [dict(r) for r in rows if _v230_date(r.get("start_date") or r.get("start_timestamp")) == today]
+        if "_V220_TODAY_CACHE" in globals():
+            _v230_safe_write_json(_V220_TODAY_CACHE, today_rows)  # type: ignore[name-defined]
+        if "_V220_ACTIVE_CACHE" in globals():
+            _v230_safe_write_json(_V220_ACTIVE_CACHE, active_rows)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    _v230_write_meta(len(rows), len(active_rows), signature, reason=reason)
+    _V230_MEMORY_CACHE.update({"rows": rows, "signature": signature, "epoch": _v230_time.time(), "date": _v230_today()})
+    return rows
+
+
+def _v230_find_rows_by_ids(ids: list[int | str]) -> list[dict]:
+    wanted = {i for i in (_v230_int(x) for x in (ids or [])) if i is not None}
+    if not wanted:
+        return []
+    rows: list[dict] = []
+    for source in ("cache", "v224", "v223"):
+        try:
+            if source == "cache":
+                src_rows = _v230_get_display_rows("v230_find_ids", allow_stale=True)
+            elif source == "v224":
+                src_rows = _v224_all_display_rows()  # type: ignore[name-defined]
+            else:
+                src_rows = _v223_rows_by_ids(list(wanted))  # type: ignore[name-defined]
+            rows.extend([dict(r) for r in src_rows if isinstance(r, dict) and _v230_int(r.get("id") or r.get("ID") or r.get("ID / ID")) in wanted])
+        except Exception:
+            pass
+        if rows:
+            break
+    return _v230_dedupe_rows(rows)
+
+
+
+def _v230_find_rows_by_ids_authority_first(ids: list[int | str]) -> list[dict]:
+    """Find rows after write actions from 01/02 authority first, avoiding stale frontend cache."""
+    wanted = {i for i in (_v230_int(x) for x in (ids or [])) if i is not None}
+    if not wanted:
+        return []
+    rows: list[dict] = []
+    try:
+        src_rows = _v223_rows_by_ids(list(wanted))  # type: ignore[name-defined]
+        rows.extend([dict(r) for r in src_rows if isinstance(r, dict) and _v230_int(r.get("id") or r.get("ID") or r.get("ID / ID")) in wanted])
+    except Exception:
+        pass
+    if rows:
+        return _v230_dedupe_rows(rows)
+    try:
+        src_rows = _v224_raw_authority_rows()  # type: ignore[name-defined]
+        rows.extend([dict(r) for r in src_rows if isinstance(r, dict) and _v230_int(r.get("id") or r.get("ID") or r.get("ID / ID")) in wanted])
+    except Exception:
+        pass
+    if rows:
+        return _v230_dedupe_rows(rows)
+    # Last fallback can use display/cache lane.
+    return _v230_find_rows_by_ids(list(wanted))
+
+def _v230_upsert_cache_rows(rows: list[dict], reason: str = "v230_upsert") -> None:
+    incoming = [dict(r) for r in (rows or []) if isinstance(r, dict)]
+    if not incoming:
+        return
+    base = _v230_get_display_rows(reason + "_base", allow_stale=True)
+    merged = _v230_dedupe_rows(base + incoming)
+    _v230_write_display_rows(merged, reason=reason)
+
+
+def _v230_remove_cache_ids(record_ids: list[int | str], reason: str = "v230_remove") -> None:
+    ids = {i for i in (_v230_int(x) for x in (record_ids or [])) if i is not None}
+    if not ids:
+        return
+    rows = _v230_get_display_rows(reason + "_base", allow_stale=True)
+    kept = []
+    for r in rows:
+        rid = _v230_int(r.get("id") or r.get("ID") or r.get("ID / ID")) if isinstance(r, dict) else None
+        if rid is not None and rid in ids:
+            continue
+        kept.append(dict(r))
+    _v230_write_display_rows(kept, reason=reason)
+
+
+def _v230_enqueue_background_task(kind: str, payload: dict | None = None) -> None:
+    # Streamlit Cloud 不適合在 request thread 啟動長駐背景程序；這裡採用 durable queue marker，
+    # 讓前台不等待重建/GitHub/SQLite 修復。後續若有 runner，可消化此 queue。
+    try:
+        _V230_QUEUE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        event = {
+            "version": _V230_VERSION,
+            "kind": str(kind or "task"),
+            "created_at": _v230_now(),
+            "payload": payload or {},
+            "status": "queued",
+        }
+        with _V230_QUEUE_PATH.open("a", encoding="utf-8") as fh:
+            fh.write(_v230_json.dumps(event, ensure_ascii=False, default=_v230_json_default) + "\n")
+    except Exception:
+        pass
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V230: 02/01 display uses low-frequency frontend cache; V225 remains write authority."""
+    rows = _v230_get_display_rows("v230_load_records")
+    df = _v230_rows_to_df(rows)
+    return _v230_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """V230: Today Records is served from the same cache lane as Finish Work."""
+    today = _v230_today()
+    df = load_records(today, today, None, None)
+    if unfinished_only or not include_finished:
+        df = _v230_filter_df(df, active_only=True)
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) and not df.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = today_records(include_finished=False, unfinished_only=True)
+    out = _v230_filter_df(df, employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name, active_only=True)
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return None
+    return dict(df.iloc[0].to_dict())
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    rows = _v230_find_rows_by_ids([record_id])
+    if not rows:
+        try:
+            if callable(_v230_prev_get_active_group):
+                return _v230_prev_get_active_group(record_id)
+        except Exception:
+            pass
+        return pd.DataFrame()  # type: ignore[name-defined]
+    seed = rows[0]
+    return get_active_records(
+        employee_id=_v230_text(seed.get("employee_id")),
+        process_name=_v230_text(seed.get("process_name")),
+        start_date=_v230_date(seed.get("start_date") or seed.get("start_timestamp")),
+    )
+
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v230_refresh_active") -> int:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    return int(len(df)) if isinstance(df, pd.DataFrame) and not df.empty else 0  # type: ignore[name-defined]
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v230_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    rid = int(_v230_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        rows = _v230_find_rows_by_ids([rid])
+        if rows:
+            _v230_upsert_cache_rows(rows, reason="v230_start_work_single_row_cache")
+        else:
+            # 找不到時只使快取失效，不阻擋正確寫入；下次讀取會低頻重建。
+            try:
+                _V230_META_CACHE.unlink(missing_ok=True)
+            except Exception:
+                pass
+        _v230_enqueue_background_task("post_start_sync", {"id": rid, "process_name": process_name})
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v230_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    affected_ids: list[int] = []
+    try:
+        group_df = get_active_group(record_id) if finish_parallel_group else pd.DataFrame()  # type: ignore[name-defined]
+        if isinstance(group_df, pd.DataFrame) and not group_df.empty and "id" in group_df.columns:  # type: ignore[name-defined]
+            affected_ids.extend([i for i in (_v230_int(x) for x in group_df["id"].tolist()) if i is not None])
+    except Exception:
+        pass
+    rid0 = _v230_int(record_id)
+    if rid0 is not None:
+        affected_ids.append(rid0)
+    affected_ids = sorted(set(affected_ids))
+    n = int(_v230_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)
+    try:
+        rows = _v230_find_rows_by_ids_authority_first(affected_ids)
+        if rows:
+            _v230_upsert_cache_rows(rows, reason="v230_finish_work_single_row_cache")
+        else:
+            # 若剛結束後某層尚未可讀，先從 active cache 移除，避免 Finish Work 顯示舊 active。
+            _v230_remove_cache_ids(affected_ids, reason="v230_finish_work_remove_old_active")
+            try:
+                _V230_META_CACHE.unlink(missing_ok=True)
+            except Exception:
+                pass
+        _v230_enqueue_background_task("post_finish_sync", {"ids": affected_ids, "end_action": end_action, "result": n})
+    except Exception:
+        pass
+    return int(n)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = sorted({i for i in (_v230_int(x) for x in (record_ids or [])) if i is not None})
+    if not ids:
+        return 0
+    if not callable(_v230_prev_delete_time_records):
+        raise RuntimeError("delete_time_records base function is unavailable")
+    n = int(_v230_prev_delete_time_records(ids, reason=reason) or 0)
+    _v230_remove_cache_ids(ids, reason="v230_delete_cache_remove")
+    _v230_enqueue_background_task("post_delete_sync", {"ids": ids, "result": n, "reason": reason})
+    return int(n)
+
+
+def _v230_extract_checked_ids(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete") -> list[int]:  # type: ignore[name-defined]
+    try:
+        if "_v223_extract_checked_ids" in globals() and callable(_v223_extract_checked_ids):  # type: ignore[name-defined]
+            return list(_v223_extract_checked_ids(editor_df, delete_column=delete_column))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if editor_df is None or not isinstance(editor_df, pd.DataFrame) or editor_df.empty:  # type: ignore[name-defined]
+        return []
+    candidates = [delete_column, "刪除 / Delete", "刪除", "Delete", "_delete"]
+    del_col = next((c for c in candidates if c in editor_df.columns), "")
+    if not del_col or "id" not in editor_df.columns:
+        return []
+    ids = []
+    for _, rr in editor_df.iterrows():
+        try:
+            if bool(rr.get(del_col)):
+                rid = _v230_int(rr.get("id"))
+                if rid is not None:
+                    ids.append(rid)
+        except Exception:
+            pass
+    return sorted(set(ids))
+
+
+def delete_time_records_from_editor_df(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete", reason: str = "01 管理員維護表刪除") -> int:  # type: ignore[override]
+    ids = _v230_extract_checked_ids(editor_df, delete_column=delete_column)
+    if not ids:
+        return 0
+    return delete_time_records(ids, reason=reason)
+
+
+def delete_time_records_from_02_history_editor(editor_df: pd.DataFrame, record_ids: list[int] | None = None, delete_column: str = "刪除 / Delete", reason: str = "02 歷史紀錄刪除") -> dict:  # type: ignore[override]
+    ids = sorted({i for i in (_v230_int(x) for x in (record_ids or [])) if i is not None}) or _v230_extract_checked_ids(editor_df, delete_column=delete_column)
+    if not ids:
+        return {"ok": False, "deleted_count": 0, "ids": [], "message": "沒有勾選可刪除的紀錄"}
+    n = delete_time_records(ids, reason=reason)
+    return {"ok": True, "deleted_count": int(n), "ids": ids, "version": "V230"}
+
+
+def delete_time_records_v178b_strict(record_ids: list[int], reason: str = "02 歷史紀錄嚴格刪除", editor_df=None) -> dict:  # type: ignore[override]
+    ids = sorted({i for i in (_v230_int(x) for x in (record_ids or [])) if i is not None})
+    if not ids and isinstance(editor_df, pd.DataFrame):  # type: ignore[name-defined]
+        ids = _v230_extract_checked_ids(editor_df)
+    if not ids:
+        return {"ok": False, "deleted_count": 0, "ids": [], "message": "沒有勾選可刪除的紀錄"}
+    n = delete_time_records(ids, reason=reason)
+    return {"ok": True, "deleted_count": int(n), "ids": ids, "version": "V230"}
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    n = 0
+    if callable(_v230_prev_save_time_records):
+        n = int(_v230_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    try:
+        if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+            clean = df.drop(columns=["刪除 / Delete", "重算 / Recalc", "刪除", "重算"], errors="ignore")
+            _v230_upsert_cache_rows(clean.to_dict(orient="records"), reason="v230_save_time_records_cache")
+            _v230_enqueue_background_task("post_save_sync", {"rows": int(len(clean)), "result": int(n)})
+    except Exception:
+        pass
+    return int(n)
+
+
+def clear_v230_frontend_cache(reason: str = "manual") -> None:
+    _V230_MEMORY_CACHE.update({"rows": None, "signature": "", "epoch": 0.0, "date": ""})
+    for p in (_V230_DISPLAY_CACHE, _V230_META_CACHE):
+        try:
+            p.unlink(missing_ok=True)
+        except Exception:
+            pass
+    _v230_enqueue_background_task("clear_cache", {"reason": reason})
+
+
+def audit_v230_frontend_operation_isolation_phase2() -> dict:
+    meta = _v230_read_meta()
+    try:
+        rows = _v230_get_display_rows("v230_audit")
+    except Exception:
+        rows = []
+    active_count = sum(1 for r in rows if isinstance(r, dict) and _v230_is_active_row(r))
+    return {
+        "version": "V230",
+        "scope": "01 工時紀錄前台操作隔離第二階段；以 V225 讀寫正確版為基準",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "v225_authority_first_finish_preserved": True,
+        "sqlite_only_rollback": False,
+        "today_records_and_finish_work_same_source": True,
+        "frontend_cache_file": str(_V230_DISPLAY_CACHE),
+        "queue_file": str(_V230_QUEUE_PATH),
+        "cache_rows": int(len(rows)),
+        "active_rows": int(active_count),
+        "meta": meta,
+        "rule": "前台讀快取與單筆更新；完整校正/GitHub/SQLite修復以 queue marker 延後，不阻塞操作。",
+    }
+
+# ================= END V230 FRONTEND OPERATION ISOLATION PHASE 2 =================
