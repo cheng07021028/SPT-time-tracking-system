@@ -19261,3 +19261,452 @@ def audit_v223_0102_sync_and_delete() -> dict:
     }
 
 # ================= END V223 01/02 SAME-LANE AUTHORITY REPAIR + REBOOT-PROOF DELETE GUARD =================
+
+# ================= V224 START DISPLAY SAME-LANE GUARD｜2026-05-29 =================
+# 目的：修正 V223 後「開始作業成功但 01 Today Records 沒有立即顯示」的情境。
+# 原則：不改 UI/CSS/theme/table/buttons；不回退 SQLite-only；保留 V214/V223 讀寫正確與刪除防復活。
+# 做法：
+# 1) Start Work 前，SQLite AUTOINCREMENT 序號同時對齊 01/02 權威、SQLite、前台快取、event journal、delete tombstone 最大 ID，避免新資料 ID 撞到已刪除 tombstone 而被精準刪除過濾。
+# 2) Start Work 後，強制把剛新增那一筆寫入 01/02 權威與前台快取；若底層未回傳可見 row，則用入參建立保底 row。
+# 3) Today Records / 02 History 顯示改為「快取 + 01/02 權威 + SQLite」合併同源，不再因單一 stale cache 非空就遮蔽新資料。
+try:
+    _v224_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v224_prev_start_work = None
+try:
+    _v224_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v224_prev_finish_work = None
+try:
+    _v224_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v224_prev_today_records = None
+try:
+    _v224_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v224_prev_load_records = None
+
+import uuid as _v224_uuid
+from datetime import datetime as _v224_datetime
+
+_V224_VERSION = "V224_START_DISPLAY_SAME_LANE_GUARD"
+
+
+def _v224_text(v) -> str:
+    try:
+        return _v223_text(v)  # type: ignore[name-defined]
+    except Exception:
+        if v is None:
+            return ""
+        try:
+            if pd.isna(v):  # type: ignore[name-defined]
+                return ""
+        except Exception:
+            pass
+        s = str(v).strip()
+        return "" if s.lower() in ("none", "nan", "nat", "null", "<na>") else s
+
+
+def _v224_int(v) -> int | None:
+    try:
+        return _v223_int(v)  # type: ignore[name-defined]
+    except Exception:
+        s = _v224_text(v)
+        if not s:
+            return None
+        try:
+            i = int(float(s))
+            return i if i > 0 else None
+        except Exception:
+            return None
+
+
+def _v224_now() -> str:
+    try:
+        return _v223_now()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return now_text()  # type: ignore[name-defined]
+        except Exception:
+            return _v224_datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v224_date(v) -> str:
+    try:
+        return _v223_date(v)  # type: ignore[name-defined]
+    except Exception:
+        s = _v224_text(v).replace("/", "-")
+        return s[:10] if len(s) >= 10 else ""
+
+
+def _v224_raw_authority_rows() -> list[dict]:
+    rows: list[dict] = []
+    for module_key in ("02_history", "01_time_records"):
+        try:
+            rows.extend(_v223_read_module_rows(module_key))  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return [dict(r) for r in rows if isinstance(r, dict)]
+
+
+def _v224_sqlite_rows() -> list[dict]:
+    try:
+        return [dict(r) for r in _v223_sqlite_rows() if isinstance(r, dict)]  # type: ignore[name-defined]
+    except Exception:
+        return []
+
+
+def _v224_cache_rows() -> list[dict]:
+    try:
+        return [dict(r) for r in _v223_cache_rows() if isinstance(r, dict)]  # type: ignore[name-defined]
+    except Exception:
+        return []
+
+
+def _v224_event_rows() -> list[dict]:
+    try:
+        return [dict(r) for r in _v223_event_rows(1200) if isinstance(r, dict)]  # type: ignore[name-defined]
+    except Exception:
+        return []
+
+
+def _v224_deleted_ids() -> set[int]:
+    try:
+        ids, _keys = _v223_deleted_exact_sets()  # type: ignore[name-defined]
+        return {int(x) for x in ids if _v224_int(x) is not None}
+    except Exception:
+        return set()
+
+
+def _v224_filter_deleted(rows: list[dict]) -> list[dict]:
+    try:
+        return _v223_filter_deleted_exact(rows)  # type: ignore[name-defined]
+    except Exception:
+        return [dict(r) for r in rows if isinstance(r, dict)]
+
+
+def _v224_dedupe(rows: list[dict]) -> list[dict]:
+    try:
+        return _v223_dedupe_rows(rows)  # type: ignore[name-defined]
+    except Exception:
+        by: dict[str, dict] = {}
+        order: list[str] = []
+        for r in rows or []:
+            if not isinstance(r, dict):
+                continue
+            rid = _v224_text(r.get("id"))
+            rk = _v224_text(r.get("record_key"))
+            key = ("rk:" + rk) if rk else ("id:" + rid if rid else "raw:" + str(len(order)))
+            if key not in by:
+                order.append(key)
+                by[key] = dict(r)
+            else:
+                old = dict(by[key])
+                old.update({k: v for k, v in r.items() if _v224_text(v) or k not in old})
+                by[key] = old
+        return [by[k] for k in order if k in by]
+
+
+def _v224_all_display_rows() -> list[dict]:
+    # 快取、權威、SQLite 三者合併同源；避免單一 stale cache 非空時遮蔽剛新增資料。
+    rows: list[dict] = []
+    rows.extend(_v224_cache_rows())
+    rows.extend(_v224_raw_authority_rows())
+    rows.extend(_v224_sqlite_rows())
+    rows = _v224_dedupe(_v224_filter_deleted(rows))
+    if rows:
+        return rows
+    # 極端復原：01/02 曾被洗空時，最後才讀 event journal。
+    rows.extend(_v224_event_rows())
+    return _v224_dedupe(_v224_filter_deleted(rows))
+
+
+def _v224_to_df(rows: list[dict]):
+    try:
+        return _v223_to_df(rows)  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return pd.DataFrame(rows).reset_index(drop=True) if rows else pd.DataFrame()  # type: ignore[name-defined]
+        except Exception:
+            return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v224_filter_df(df, start_date=None, end_date=None, employee_id=None, work_order=None, *, active_only=False):
+    try:
+        return _v223_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order, active_only=active_only)  # type: ignore[name-defined]
+    except Exception:
+        if df is None or not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+            return pd.DataFrame()  # type: ignore[name-defined]
+        out = df.copy()
+        emp = _v224_text(employee_id)
+        if emp and "employee_id" in out.columns:
+            out = out.loc[out["employee_id"].map(_v224_text) == emp].copy()
+        wo = _v224_text(work_order)
+        if wo and "work_order" in out.columns:
+            out = out.loc[out["work_order"].map(_v224_text) == wo].copy()
+        sd = _v224_date(start_date)
+        ed = _v224_date(end_date)
+        if sd or ed:
+            if "start_date" in out.columns:
+                ds = out["start_date"].map(_v224_date)
+            elif "start_timestamp" in out.columns:
+                ds = out["start_timestamp"].map(_v224_date)
+            else:
+                ds = pd.Series([""] * len(out), index=out.index)  # type: ignore[name-defined]
+            if sd:
+                out = out.loc[ds >= sd].copy()
+            if ed:
+                out = out.loc[ds <= ed].copy()
+        if active_only:
+            end_ts = out.get("end_timestamp", pd.Series([""] * len(out))).map(_v224_text)  # type: ignore[name-defined]
+            status = out.get("status", pd.Series([""] * len(out))).map(_v224_text)  # type: ignore[name-defined]
+            out = out.loc[(end_ts == "") & (status.isin(["", "作業中"]))].copy()
+        return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v224_max_known_id() -> int:
+    max_id = 0
+    for rows in (_v224_raw_authority_rows(), _v224_sqlite_rows(), _v224_cache_rows(), _v224_event_rows()):
+        for r in rows:
+            rid = _v224_int(r.get("id") or r.get("ID") or r.get("ID / ID")) if isinstance(r, dict) else None
+            if rid is not None:
+                max_id = max(max_id, int(rid))
+    for rid in _v224_deleted_ids():
+        max_id = max(max_id, int(rid))
+    return int(max_id or 0)
+
+
+def _v224_sync_sqlite_sequence(reason: str = "v224_before_start") -> int:
+    max_id = _v224_max_known_id()
+    if max_id <= 0:
+        return 0
+    try:
+        if "_v221_ensure_time_records_table" in globals() and callable(_v221_ensure_time_records_table):  # type: ignore[name-defined]
+            _v221_ensure_time_records_table(reason)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        with _v205_conn() as conn:  # type: ignore[name-defined]
+            exists = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='time_records'").fetchone()
+            if not exists:
+                return 0
+            seq_row = conn.execute("SELECT seq FROM sqlite_sequence WHERE name='time_records'").fetchone()
+            if seq_row is None:
+                conn.execute("INSERT INTO sqlite_sequence(name, seq) VALUES('time_records', ?)", (max_id,))
+            else:
+                conn.execute("UPDATE sqlite_sequence SET seq=? WHERE name='time_records' AND seq<?", (max_id, max_id))
+            conn.commit()
+            return max_id
+    except Exception as exc:
+        try:
+            if "_v205_direct_log" in globals() and callable(_v205_direct_log):  # type: ignore[name-defined]
+                _v205_direct_log("V224_SEQUENCE_GUARD_WARN", f"V224 對齊 SQLite 工時 ID 序號失敗：{exc}", detail=reason, level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return 0
+
+
+def _v224_find_row_by_id(record_id: int) -> dict | None:
+    rid0 = _v224_int(record_id)
+    if rid0 is None:
+        return None
+    # 找剛新增資料時先不套 tombstone；因 V224 已避免新 ID 撞 tombstone。
+    for rows in (_v224_raw_authority_rows(), _v224_sqlite_rows(), _v224_cache_rows(), _v224_event_rows()):
+        for r in rows:
+            if isinstance(r, dict) and _v224_int(r.get("id") or r.get("ID") or r.get("ID / ID")) == rid0:
+                return dict(r)
+    return None
+
+
+def _v224_pick(d: dict, *keys: str) -> str:
+    for k in keys:
+        v = _v224_text(d.get(k)) if isinstance(d, dict) else ""
+        if v:
+            return v
+    return ""
+
+
+def _v224_build_start_row(record_id: int, employee: dict, work_order: dict, process_name: str, remark: str = "") -> dict:
+    now = _v224_now()
+    emp_id = _v224_pick(employee, "employee_id", "工號", "工號 / Employee ID", "id")
+    emp_name = _v224_pick(employee, "employee_name", "姓名", "姓名 / Name", "name")
+    wo = _v224_pick(work_order, "work_order", "製令", "製令 / Work Order", "work_order_no")
+    pn = _v224_pick(work_order, "part_no", "P/N", "P/N / Part No.", "料號")
+    typ = _v224_pick(work_order, "type_name", "model", "機型", "型別", "type")
+    loc = _v224_pick(work_order, "assembly_location", "組立地點", "location")
+    sd = _v224_date(now)
+    st = now[11:19] if len(now) >= 19 else ""
+    rk = f"{emp_id}|{wo}|{process_name}|{now}|{str(_v224_uuid.uuid4())[:8]}"
+    return {
+        "id": int(record_id),
+        "record_key": rk,
+        "status": "作業中",
+        "work_order": wo,
+        "part_no": pn,
+        "type_name": typ,
+        "process_name": _v224_text(process_name),
+        "employee_id": emp_id,
+        "employee_name": emp_name,
+        "start_action": "開始",
+        "start_timestamp": now,
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": _v224_text(remark),
+        "start_date": sd,
+        "start_time": st,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": loc,
+        "group_key": f"{emp_id}|{_v224_text(process_name)}|{sd}",
+        "is_group_work": 0,
+        "source": "streamlit_v224_start_display_guard",
+        "created_at": now,
+        "updated_at": now,
+        "department": _v224_pick(employee, "department", "單位"),
+        "title": _v224_pick(employee, "title", "職稱"),
+    }
+
+
+def _v224_force_upsert_row(row: dict, reason: str = "v224_force_upsert_start_row") -> None:
+    if not isinstance(row, dict) or _v224_int(row.get("id")) is None:
+        return
+    base = _v224_all_display_rows()
+    merged = _v224_dedupe(_v224_filter_deleted(base) + [dict(row)])
+    try:
+        _v223_write_modules(merged, reason, github=False)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if "_v220_upsert_cache_row" in globals() and callable(_v220_upsert_cache_row):  # type: ignore[name-defined]
+            _v220_upsert_cache_row(dict(row), reason=reason + "_front_cache")  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if "_v205_clear_caches" in globals() and callable(_v205_clear_caches):  # type: ignore[name-defined]
+            _v205_clear_caches()  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    rows = _v224_all_display_rows()
+    df = _v224_to_df(rows)
+    return _v224_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        today = today_date()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            today = today_text()  # type: ignore[name-defined]
+        except Exception:
+            today = _v224_now()[:10]
+    out = load_records(str(today), str(today), None, None)
+    if unfinished_only or not include_finished:
+        out = _v224_filter_df(out, active_only=True)
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = today_records(include_finished=False, unfinished_only=True)
+    out = _v224_filter_df(df, employee_id=employee_id, active_only=True)
+    proc = _v224_text(process_name)
+    if proc and isinstance(out, pd.DataFrame) and not out.empty and "process_name" in out.columns:  # type: ignore[name-defined]
+        out = out.loc[out["process_name"].map(_v224_text) == proc].copy()
+    if start_date and isinstance(out, pd.DataFrame) and not out.empty:  # type: ignore[name-defined]
+        out = _v224_filter_df(out, start_date=start_date, end_date=start_date, active_only=True)
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return None
+    return dict(df.iloc[0].to_dict())
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    seed = _v224_find_row_by_id(int(record_id))
+    if not seed:
+        return pd.DataFrame()  # type: ignore[name-defined]
+    return get_active_records(
+        employee_id=_v224_text(seed.get("employee_id")),
+        process_name=_v224_text(seed.get("process_name")),
+        start_date=_v224_date(seed.get("start_date") or seed.get("start_timestamp")),
+        employee_name=None,
+    )
+
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v224_refresh_active") -> int:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    return int(len(df)) if isinstance(df, pd.DataFrame) and not df.empty else 0  # type: ignore[name-defined]
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v224_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    # 防止 01/02 曾被洗空或刪除 tombstone ID 較大時，新紀錄 ID 撞到 tombstone 後被顯示層濾掉。
+    _v224_sync_sqlite_sequence("v224_before_start_include_delete_tombstones")
+    rid = int(_v224_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        row = _v224_find_row_by_id(rid)
+        if not row:
+            row = _v224_build_start_row(rid, employee, work_order, process_name, remark)
+        # 確保狀態是 active，避免底層快取 stale row 寫回後 Today Records 不顯示。
+        row = dict(row)
+        row.setdefault("status", "作業中")
+        if not _v224_text(row.get("status")):
+            row["status"] = "作業中"
+        row.setdefault("end_timestamp", "")
+        if _v224_text(row.get("end_timestamp")) == "":
+            row["end_action"] = _v224_text(row.get("end_action"))
+        _v224_force_upsert_row(row, "v224_start_work_force_today_history_visible")
+        try:
+            if "_v205_direct_log" in globals() and callable(_v205_direct_log):  # type: ignore[name-defined]
+                _v205_direct_log("V224_START_DISPLAY_GUARD", f"V224 已強制同步開始作業至 01/02 權威與前台快取，ID={rid}。", target_id=str(rid), level="INFO")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v224_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    n = int(_v224_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)
+    # 結束後用合併同源刷新受影響 row，避免 01/02 或快取顯示不同步。
+    try:
+        ids = [int(record_id)]
+        row = _v224_find_row_by_id(int(record_id))
+        if row:
+            _v224_force_upsert_row(row, "v224_finish_work_force_today_history_visible")
+    except Exception:
+        pass
+    return n
+
+
+def audit_v224_start_display_guard() -> dict:
+    try:
+        today_df = today_records(include_finished=True, unfinished_only=False)
+    except Exception:
+        today_df = pd.DataFrame()  # type: ignore[name-defined]
+    try:
+        active_df = today_records(include_finished=False, unfinished_only=True)
+    except Exception:
+        active_df = pd.DataFrame()  # type: ignore[name-defined]
+    return {
+        "version": "V224",
+        "scope": "Start Work display same-lane guard; ID tombstone collision prevention; backend only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "max_known_id_including_tombstones": _v224_max_known_id(),
+        "deleted_exact_ids": len(_v224_deleted_ids()),
+        "today_rows_visible": int(len(today_df)) if isinstance(today_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+        "today_active_rows_visible": int(len(active_df)) if isinstance(active_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+    }
+
+# ================= END V224 START DISPLAY SAME-LANE GUARD =================
