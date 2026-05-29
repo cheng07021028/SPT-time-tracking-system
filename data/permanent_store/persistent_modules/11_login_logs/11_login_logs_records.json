@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 13:37:20",
+  "exported_at": "2026-05-29 13:37:55",
   "source": "db_service_write",
   "module_key": "11_login_logs",
   "module_code": "11",
@@ -5978,11 +5978,26 @@
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-29 13:34:04"
+      },
+      {
+        "id": 55362,
+        "username": "B260",
+        "display_name": "莊仕琦",
+        "event_type": "POST_RECORD_LOGOUT",
+        "result": "SUCCESS",
+        "message": "完成工時後選擇不繼續記錄，自動登出; employee_id=B260; roles=operator",
+        "module_code": "",
+        "login_time": "2026-05-29 13:37:48",
+        "logout_time": "2026-05-29 13:37:48",
+        "idle_minutes": null,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 13:37:48"
       }
     ]
   },
   "table_counts": {
     "auth_login_logs": 0,
-    "login_logs": 398
+    "login_logs": 399
   }
 }
