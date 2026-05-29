@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 09:24:32",
-  "exported_at": "2026-05-29 09:24:32",
+  "updated_at": "2026-05-29 09:26:08",
+  "exported_at": "2026-05-29 09:26:08",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -1519,11 +1519,23 @@
         "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 09:24:30\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"354\",\"target_ids\":[354],\"message\":\"黃建堃 開始 25M0115-17 / 包機\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT196|25M0115-17|包機|2026-05-29 09:24:12|c9a2c2fd\",\"identity_key\":\"record_key:SPT196|25M0115-17|包機|2026-05-29 09:24:12|c9a2c2fd\",\"id\":\"354\",\"employee_id\":\"SPT196\",\"employee_name\":\"黃建堃\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:24:12\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":354,\"record_key\":\"SPT196|25M0115-17|包機|2026-05-29 09:24:12|c9a2c2fd\",\"status\":\"作業中\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT196\",\"employee_name\":\"黃建堃\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:24:12\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:24:12\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT196|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:24:12\",\"updated_at\":\"2026-05-29 09:24:12\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":354,\"record_key\":\"SPT196|25M0115-17|包機|2026-05-29 09:24:12|c9a2c2fd\",\"status\":\"作業中\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT196\",\"employee_name\":\"黃建堃\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:24:12\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:24:12\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT196|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:24:12\",\"updated_at\":\"2026-05-29 09:24:12\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":354,\"record_key\":\"SPT196|25M0115-17|包機|2026-05-29 09:24:12|c9a2c2fd\",\"status\":\"作業中\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT196\",\"employee_name\":\"黃建堃\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:24:12\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:24:12\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT196|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:24:12\",\"updated_at\":\"2026-05-29 09:24:12\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":354,\"record_key\":\"SPT196|25M0115-17|包機|2026-05-29 09:24:12|c9a2c2fd\",\"status\":\"作業中\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT196\",\"employee_name\":\"黃建堃\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:24:12\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:24:12\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT196|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:24:12\",\"updated_at\":\"2026-05-29 09:24:12\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"f8d62bfd3f0538fec7782f6fc295bbe5ee3e740403f18cef419f4193e716e8ec\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 724,
+        "log_time": "2026-05-29 09:26:08",
+        "user_name": "SPT077",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "357",
+        "message": "謝宛庭 開始 26N4001-01 / 其他",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 126
+    "system_logs": 127
   }
 }
