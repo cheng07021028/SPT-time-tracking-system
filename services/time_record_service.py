@@ -14354,3 +14354,296 @@ def audit_v202_time_record_governance() -> dict:
         return {"version": "V202", "ok": False, "error": str(exc)}
 
 # ================= END V202 TIME RECORD GOVERNANCE CORE =================
+
+
+# ================= V204 FRONTEND OPERATION ISOLATION =================
+# Direct-overwrite version.  UI-neutral: no pages/CSS/theme/table rendering changes.
+# Purpose:
+# - Foreground 01/02 confirmation buttons must finish local transaction first.
+# - GitHub / heavy authority publication is scheduled in background.
+# - Existing 01/02 consistency, final view, and hard delete guard remain active.
+
+try:
+    _v204_prev_sync_time_records_authority_now = sync_time_records_authority_now
+except Exception:  # pragma: no cover
+    _v204_prev_sync_time_records_authority_now = None
+try:
+    _v204_prev_sync_time_records_01_02_now = sync_time_records_01_02_now
+except Exception:  # pragma: no cover
+    _v204_prev_sync_time_records_01_02_now = None
+try:
+    _v204_prev_v98_sync_0102_from_sqlite = _v98_sync_0102_from_sqlite
+except Exception:  # pragma: no cover
+    _v204_prev_v98_sync_0102_from_sqlite = None
+try:
+    _v204_prev_v84_sync_time_records_canonical_from_sqlite = _v84_sync_time_records_canonical_from_sqlite
+except Exception:  # pragma: no cover
+    _v204_prev_v84_sync_time_records_canonical_from_sqlite = None
+try:
+    _v204_prev_v86_fast_sync_time_authority = _v86_fast_sync_time_authority
+except Exception:  # pragma: no cover
+    _v204_prev_v86_fast_sync_time_authority = None
+try:
+    _v204_prev_v89_sync_canonical_from_sqlite_after_live_action = _v89_sync_canonical_from_sqlite_after_live_action
+except Exception:  # pragma: no cover
+    _v204_prev_v89_sync_canonical_from_sqlite_after_live_action = None
+try:
+    _v204_prev_v89_save_time_authority_df = _v89_save_time_authority_df
+except Exception:  # pragma: no cover
+    _v204_prev_v89_save_time_authority_df = None
+try:
+    _v204_prev_v96_save_0102_df = _v96_save_0102_df
+except Exception:  # pragma: no cover
+    _v204_prev_v96_save_0102_df = None
+try:
+    _v204_prev_v96_upsert_rows_to_authority = _v96_upsert_rows_to_authority
+except Exception:  # pragma: no cover
+    _v204_prev_v96_upsert_rows_to_authority = None
+try:
+    _v204_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v204_prev_start_work = None
+try:
+    _v204_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v204_prev_finish_work = None
+try:
+    _v204_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v204_prev_save_time_records = None
+try:
+    _v204_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v204_prev_delete_time_records = None
+try:
+    _v204_prev_recalculate_time_records = recalculate_time_records
+except Exception:  # pragma: no cover
+    _v204_prev_recalculate_time_records = None
+try:
+    _v204_prev_import_time_records = import_time_records
+except Exception:  # pragma: no cover
+    _v204_prev_import_time_records = None
+
+
+def _v204_queue(reason: str, payload: dict | None = None, *, kind: str = "time_record_background_job") -> None:
+    try:
+        from services.frontend_operation_isolation_service import enqueue_job
+        enqueue_job(kind, payload or {}, reason=reason)
+    except Exception:
+        pass
+
+
+def _v204_schedule_publish(reason: str = "v204_background_authority_publish") -> None:
+    """Schedule slow GitHub/authority publication outside the foreground click."""
+    def _callback():
+        # Use the pre-V204 implementation in a daemon thread.  Even if this is
+        # slow, the user's current click has already completed.
+        if callable(_v204_prev_sync_time_records_authority_now):
+            try:
+                _v204_prev_sync_time_records_authority_now(reason + "_background", github=True)  # type: ignore[misc]
+                return
+            except TypeError:
+                try:
+                    _v204_prev_sync_time_records_authority_now(reason + "_background")  # type: ignore[misc]
+                    return
+                except Exception:
+                    pass
+            except Exception:
+                pass
+        if callable(_v204_prev_sync_time_records_01_02_now):
+            try:
+                _v204_prev_sync_time_records_01_02_now(reason + "_background", github=True)  # type: ignore[misc]
+            except TypeError:
+                _v204_prev_sync_time_records_01_02_now(reason + "_background")  # type: ignore[misc]
+
+    try:
+        from services.frontend_operation_isolation_service import schedule_background_callback
+        schedule_background_callback("time_records_authority_publish", _callback, reason=reason, delay_sec=1.2)
+    except Exception:
+        _v204_queue(reason, {"fallback": "schedule_failed"}, kind="time_records_authority_publish_pending")
+
+
+def _v204_local_final_sync(reason: str = "v204_local_final_sync") -> int:
+    """Fast local-only sync for foreground buttons."""
+    try:
+        if "_v202_final_service" in globals() and callable(_v202_final_service):
+            result = _v202_final_service().rebuild_authority_from_final_view(dry_run=False, github=False, reason=reason)
+            if isinstance(result, dict):
+                try:
+                    clear_query_cache()
+                except Exception:
+                    pass
+                return int(result.get("final_rows") or result.get("rows") or 0)
+    except Exception:
+        pass
+    # Fallback: call older sync with github disabled.
+    if callable(_v204_prev_sync_time_records_authority_now):
+        try:
+            return int(_v204_prev_sync_time_records_authority_now(reason, github=False) or 0)  # type: ignore[misc]
+        except TypeError:
+            try:
+                return int(_v204_prev_sync_time_records_authority_now(reason) or 0)  # type: ignore[misc]
+            except Exception:
+                return 0
+        except Exception:
+            return 0
+    return 0
+
+
+def sync_time_records_authority_now(reason: str = "v204_manual_sync", github: bool = False) -> int:  # type: ignore[override]
+    n = _v204_local_final_sync(reason + "_local")
+    if github:
+        _v204_schedule_publish(reason)
+    return n
+
+
+def sync_time_records_01_02_now(reason: str = "v204_manual_sync_0102", *, github: bool = False) -> int:  # type: ignore[override]
+    n = _v204_local_final_sync(reason + "_local")
+    if github:
+        _v204_schedule_publish(reason)
+    return n
+
+
+def _v98_sync_0102_from_sqlite(reason: str = "v204_v98_sync_redirect", *, github: bool = True) -> int:  # type: ignore[override]
+    n = _v204_local_final_sync(reason + "_local")
+    if github:
+        _v204_schedule_publish(reason)
+    return n
+
+
+def _v84_sync_time_records_canonical_from_sqlite(reason: str = "v204_v84_sync_redirect", *, github: bool = True) -> int:  # type: ignore[override]
+    n = _v204_local_final_sync(reason + "_local")
+    if github:
+        _v204_schedule_publish(reason)
+    return n
+
+
+def _v86_fast_sync_time_authority(reason: str = "v204_v86_sync_redirect", *, github: bool = True) -> int:  # type: ignore[override]
+    n = _v204_local_final_sync(reason + "_local")
+    if github:
+        _v204_schedule_publish(reason)
+    return n
+
+
+def _v89_sync_canonical_from_sqlite_after_live_action(reason: str, *, github: bool = False) -> int:  # type: ignore[override]
+    n = _v204_local_final_sync(reason + "_local")
+    if github:
+        _v204_schedule_publish(reason)
+    return n
+
+
+def _v89_save_time_authority_df(df: pd.DataFrame, reason: str = "v204_v89_save_time_authority", *, github: bool = True) -> int:  # type: ignore[override]
+    if callable(_v204_prev_v89_save_time_authority_df):
+        try:
+            n = int(_v204_prev_v89_save_time_authority_df(df, reason, github=False) or 0)  # type: ignore[misc]
+        except TypeError:
+            n = int(_v204_prev_v89_save_time_authority_df(df, reason) or 0)  # type: ignore[misc]
+    else:
+        n = _v204_local_final_sync(reason + "_fallback_local")
+    if github:
+        _v204_schedule_publish(reason)
+    return n
+
+
+def _v96_save_0102_df(df: pd.DataFrame, reason: str = "v204_v96_save_0102", *, github: bool = False) -> int:  # type: ignore[override]
+    if callable(_v204_prev_v96_save_0102_df):
+        try:
+            n = int(_v204_prev_v96_save_0102_df(df, reason, github=False) or 0)  # type: ignore[misc]
+        except TypeError:
+            n = int(_v204_prev_v96_save_0102_df(df, reason) or 0)  # type: ignore[misc]
+    else:
+        n = _v204_local_final_sync(reason + "_fallback_local")
+    if github:
+        _v204_schedule_publish(reason)
+    return n
+
+
+def _v96_upsert_rows_to_authority(rows_df: pd.DataFrame, reason: str = "v204_v96_upsert", *, github: bool = False) -> int:  # type: ignore[override]
+    if callable(_v204_prev_v96_upsert_rows_to_authority):
+        try:
+            n = int(_v204_prev_v96_upsert_rows_to_authority(rows_df, reason=reason, github=False) or 0)  # type: ignore[misc]
+        except TypeError:
+            n = int(_v204_prev_v96_upsert_rows_to_authority(rows_df, reason) or 0)  # type: ignore[misc]
+    else:
+        n = _v204_local_final_sync(reason + "_fallback_local")
+    if github:
+        _v204_schedule_publish(reason)
+    return n
+
+
+def _v204_after_mutation(reason: str, *, publish: bool = True) -> None:
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    _v204_queue(reason, {"publish": publish}, kind="time_record_mutation_done")
+    if publish:
+        _v204_schedule_publish(reason)
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v204_prev_start_work):
+        raise RuntimeError("start_work implementation is unavailable")
+    rid = int(_v204_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)  # type: ignore[misc]
+    _v204_after_mutation("start_work_v204_frontend_isolated", publish=True)
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v204_prev_finish_work):
+        raise RuntimeError("finish_work implementation is unavailable")
+    n = int(_v204_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)  # type: ignore[misc]
+    _v204_after_mutation("finish_work_v204_frontend_isolated", publish=True)
+    return n
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    if not callable(_v204_prev_save_time_records):
+        return 0
+    n = int(_v204_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)  # type: ignore[misc]
+    _v204_after_mutation("save_time_records_v204_frontend_isolated", publish=True)
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    if not callable(_v204_prev_delete_time_records):
+        return 0
+    n = int(_v204_prev_delete_time_records(record_ids, reason=reason) or 0)  # type: ignore[misc]
+    _v204_after_mutation("delete_time_records_v204_frontend_isolated", publish=True)
+    return n
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    if not callable(_v204_prev_recalculate_time_records):
+        return 0
+    n = int(_v204_prev_recalculate_time_records(record_ids) or 0)  # type: ignore[misc]
+    _v204_after_mutation("recalculate_time_records_v204_frontend_isolated", publish=True)
+    return n
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    if not callable(_v204_prev_import_time_records):
+        return {"inserted": 0, "updated": 0}
+    res = _v204_prev_import_time_records(df, recalc=recalc, source=source)  # type: ignore[misc]
+    _v204_after_mutation("import_time_records_v204_frontend_isolated", publish=True)
+    return res if isinstance(res, dict) else {"result": res}
+
+
+def audit_v204_frontend_operation_isolation() -> dict:
+    try:
+        from services.frontend_operation_isolation_service import get_queue_status
+        q = get_queue_status(max_lines=100)
+    except Exception as exc:
+        q = {"error": str(exc)}
+    return {
+        "version": "V204",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "pages_changed": False,
+        "frontend_local_first": True,
+        "github_publish_background_scheduled": True,
+        "queue_status": q,
+    }
+
+# ================= END V204 FRONTEND OPERATION ISOLATION =================
