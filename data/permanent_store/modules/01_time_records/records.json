@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "records",
-  "updated_at": "2026-05-29 09:30:18",
-  "exported_at": "2026-05-29 09:30:18",
+  "updated_at": "2026-05-29 09:30:23",
+  "exported_at": "2026-05-29 09:30:23",
   "reason": "start_work_v194_local_first_01",
   "empty_authoritative": false,
   "tables": {
@@ -34,6 +34,33 @@
         "source": "streamlit",
         "created_at": "2026-05-29 09:30:08",
         "updated_at": "2026-05-29 09:30:08"
+      },
+      {
+        "id": 361,
+        "record_key": "SPT089|25MN0014-06|S.T.|2026-05-29 09:29:32|fe671972",
+        "status": "作業中",
+        "work_order": "25MN0014-06",
+        "part_no": "9MRSC2A2-BWN01-03",
+        "type_name": "BWS3200\nRSC2A2-BWN01-03",
+        "process_name": "S.T.",
+        "employee_id": "SPT089",
+        "employee_name": "陳凱彥",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 09:29:32",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "09:29:32",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT089|S.T.|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 09:29:32",
+        "updated_at": "2026-05-29 09:29:32"
       },
       {
         "id": 360,
@@ -714,6 +741,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 26
+    "time_records": 27
   }
 }
