@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 22:20:48",
-  "exported_at": "2026-05-29 22:20:48",
+  "updated_at": "2026-05-29 22:23:05",
+  "exported_at": "2026-05-29 22:23:05",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -211,11 +211,23 @@
         "detail": "v231_load_records\n__spt_log_uid=f876e3442eae45b7aa3e8fdea4f65e82",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-29 22:23:04",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records\n__spt_log_uid=4b7e2214d38d48768a3a9e8c7ca4f3d0",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 17
+    "system_logs": 18
   }
 }
