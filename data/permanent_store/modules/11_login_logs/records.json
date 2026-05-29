@@ -2,12 +2,44 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "11_login_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 16:14:59",
-  "exported_at": "2026-05-29 16:14:59",
+  "updated_at": "2026-05-29 16:15:36",
+  "exported_at": "2026-05-29 16:15:36",
   "reason": "v115_login_event_write_through",
   "empty_authoritative": false,
   "tables": {
     "login_logs": [
+      {
+        "id": 65744,
+        "source": "v103_merge",
+        "username": "SPT174",
+        "display_name": "龍才華",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=SPT174; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-29 16:15:35",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 16:15:35"
+      },
+      {
+        "id": 66322,
+        "source": "v103_merge",
+        "username": "SPT174",
+        "display_name": "龍才華",
+        "event_type": "LOGIN",
+        "result": "FAIL",
+        "message": "密碼錯誤; employee_id=SPT174; roles=operator",
+        "module_code": "LOGIN",
+        "login_time": "2026-05-29 16:14:58",
+        "logout_time": "",
+        "idle_minutes": NaN,
+        "ip_address": "",
+        "user_agent": "streamlit",
+        "created_at": "2026-05-29 16:14:58"
+      },
       {
         "id": 65744,
         "source": "v103_merge",
@@ -9239,22 +9271,6 @@
         "ip_address": "",
         "user_agent": "streamlit",
         "created_at": "2026-05-28 23:47:57"
-      },
-      {
-        "id": 66322,
-        "source": "v103_merge",
-        "username": "SPT174",
-        "display_name": "龍才華",
-        "event_type": "LOGIN",
-        "result": "FAIL",
-        "message": "密碼錯誤; employee_id=SPT174; roles=operator",
-        "module_code": "LOGIN",
-        "login_time": "2026-05-29 16:14:58",
-        "logout_time": "",
-        "idle_minutes": null,
-        "ip_address": "",
-        "user_agent": "streamlit",
-        "created_at": "2026-05-29 16:14:58"
       }
     ],
     "auth_login_logs": [],
@@ -9262,7 +9278,7 @@
   },
   "settings": {},
   "table_counts": {
-    "login_logs": 578,
+    "login_logs": 579,
     "auth_login_logs": 0,
     "security_login_logs": 0
   }
