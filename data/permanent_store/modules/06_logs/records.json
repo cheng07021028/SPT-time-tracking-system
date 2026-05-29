@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 13:22:17",
-  "exported_at": "2026-05-29 13:22:17",
+  "updated_at": "2026-05-29 13:22:28",
+  "exported_at": "2026-05-29 13:22:28",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -6787,11 +6787,23 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1614,
+        "log_time": "2026-05-29 13:22:20",
+        "user_name": "B002",
+        "action_type": "V200_ROW_START_WORK",
+        "target_table": "time_records",
+        "target_id": "410",
+        "message": "開始作業逐筆紀錄｜ID=410｜B002 張文品 25MN0014-10 / 其他",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"410\", \"record_key\": \"B002|25MN0014-10|其他|2026-05-29 13:21:56|9978cc04\", \"employee_id\": \"B002\", \"employee_name\": \"張文品\", \"work_order\": \"25MN0014-10\", \"process_name\": \"其他\", \"start_timestamp\": \"2026-05-29 13:21:56\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 410, \"record_key\": \"B002|25MN0014-10|其他|2026-05-29 13:21:56|9978cc04\", \"status\": \"作業中\", \"work_order\": \"25MN0014-10\", \"part_no\": \"BWS3200\\nRSC2A2-BWN01-03\", \"type_name\": \"9MRSC2A2-BWN01-03\", \"process_name\": \"其他\", \"employee_id\": \"B002\", \"employee_name\": \"張文品\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-29 13:21:56\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"線材前制\", \"start_date\": \"2026-05-29\", \"start_time\": \"13:21:56\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": 0.0, \"assembly_location\": \"竹東\", \"group_key\": \"B002|其他|2026-05-29\", \"is_group_work\": 0, \"source\": \"streamlit\", \"created_at\": \"2026-05-29 13:21:56\", \"updated_at\": \"2026-05-29 13:21:56\"}}\n__spt_log_uid=0f3b1fe5919e4e6a905367272508fde9\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 13:22:20\",\"action_type\":\"V200_ROW_START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"410\",\"target_ids\":[410],\"message\":\"開始作業逐筆紀錄｜ID=410｜B002 張文品 25MN0014-10 / 其他\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"B002|25MN0014-10|其他|2026-05-29 13:21:56|9978cc04\",\"identity_key\":\"record_key:B002|25MN0014-10|其他|2026-05-29 13:21:56|9978cc04\",\"id\":\"410\",\"employee_id\":\"B002\",\"employee_name\":\"張文品\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"其他\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 13:21:56\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":410,\"record_key\":\"B002|25MN0014-10|其他|2026-05-29 13:21:56|9978cc04\",\"status\":\"作業中\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"其他\",\"employee_id\":\"B002\",\"employee_name\":\"張文品\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:21:56\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"線材前制\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:21:56\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B002|其他|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:21:56\",\"updated_at\":\"2026-05-29 13:21:56\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":410,\"record_key\":\"B002|25MN0014-10|其他|2026-05-29 13:21:56|9978cc04\",\"status\":\"作業中\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"其他\",\"employee_id\":\"B002\",\"employee_name\":\"張文品\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:21:56\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"線材前制\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:21:56\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B002|其他|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:21:56\",\"updated_at\":\"2026-05-29 13:21:56\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":410,\"record_key\":\"B002|25MN0014-10|其他|2026-05-29 13:21:56|9978cc04\",\"status\":\"作業中\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"其他\",\"employee_id\":\"B002\",\"employee_name\":\"張文品\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:21:56\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"線材前制\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:21:56\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B002|其他|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:21:56\",\"updated_at\":\"2026-05-29 13:21:56\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":410,\"record_key\":\"B002|25MN0014-10|其他|2026-05-29 13:21:56|9978cc04\",\"status\":\"作業中\",\"work_order\":\"25MN0014-10\",\"part_no\":\"BWS3200\\nRSC2A2-BWN01-03\",\"type_name\":\"9MRSC2A2-BWN01-03\",\"process_name\":\"其他\",\"employee_id\":\"B002\",\"employee_name\":\"張文品\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 13:21:56\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"線材前制\",\"start_date\":\"2026-05-29\",\"start_time\":\"13:21:56\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"B002|其他|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 13:21:56\",\"updated_at\":\"2026-05-29 13:21:56\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"242cde55a2bcb7c818b24ccc230013255dfa9a60ae06107be4df391ff873fe9f\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 565
+    "system_logs": 566
   }
 }
