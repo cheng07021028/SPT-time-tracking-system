@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 09:29:47",
+  "exported_at": "2026-05-29 09:34:38",
   "source": "db_service_write",
   "module_key": "08_daily_hours",
   "module_code": "08",
@@ -548,11 +548,65 @@
         "source": "streamlit",
         "created_at": "2026-05-29 09:29:32",
         "updated_at": "2026-05-29 09:29:32"
+      },
+      {
+        "id": 366,
+        "record_key": "SPT150|26M0021-02|S.T.|2026-05-29 09:34:12|6b40aed7",
+        "status": "作業中",
+        "work_order": "26M0021-02",
+        "part_no": "1GRSC150-003-04",
+        "type_name": "4 Port Frame Long-type EFEM",
+        "process_name": "S.T.",
+        "employee_id": "SPT150",
+        "employee_name": "李守益",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 09:34:12",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "09:34:12",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT150|S.T.|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 09:34:12",
+        "updated_at": "2026-05-29 09:34:12"
+      },
+      {
+        "id": 367,
+        "record_key": "SPT105|22M0162-91|Packing|2026-05-29 09:34:36|d074de29",
+        "status": "作業中",
+        "work_order": "22M0162-91",
+        "part_no": "4TRSC020-004-02->4TRSC020-004-06",
+        "type_name": "NTB 3 LP +快拆+EMO",
+        "process_name": "Packing",
+        "employee_id": "SPT105",
+        "employee_name": "劉秀鳳",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 09:34:36",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "09:34:36",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT105|Packing|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 09:34:36",
+        "updated_at": "2026-05-29 09:34:36"
       }
     ]
   },
   "table_counts": {
     "employees": 0,
-    "time_records": 20
+    "time_records": 22
   }
 }
