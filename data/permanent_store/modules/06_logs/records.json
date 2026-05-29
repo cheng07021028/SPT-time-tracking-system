@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 19:19:43",
-  "exported_at": "2026-05-29 19:19:43",
+  "updated_at": "2026-05-29 19:19:56",
+  "exported_at": "2026-05-29 19:19:56",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -15355,11 +15355,35 @@
         "detail": "start_work_v212_before_fast_insert\n__spt_log_uid=6ce6789ecec24bb190deba8cb5139c0c",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-29 19:19:52",
+        "user_name": "admin",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "424",
+        "message": "張文品 開始 21M0241-01 / 前置鈑金",
+        "detail": "V205_FAST_START",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-29 19:19:52",
+        "user_name": "admin",
+        "action_type": "V212_SQLITE_SEQUENCE_GUARD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 工時 ID 序號已對齊權威檔 max_id=423，避免新增紀錄 ID 撞號。",
+        "detail": "start_work_v212_before_fast_insert\n__spt_log_uid=2f376fd0a78e42a1a46ccb6a090d6d79",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1279
+    "system_logs": 1281
   }
 }
