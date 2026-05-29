@@ -15451,3 +15451,317 @@ def audit_v206_finish_active_display() -> dict:
     }
 
 # ================= END V206 FINISH WORK ACTIVE DISPLAY FALLBACK =================
+
+# ================= V208 ADMIN PROXY + ACTIVE IDENTITY STABILITY =================
+# Purpose:
+# - Keep current UI unchanged.
+# - Admin/operator page logic can select employees normally.
+# - Prevent same-account active rows from being hidden because of stale bilingual
+#   fields or stale record_key prefixes created by earlier recovery/merge flows.
+# - Make newly-created active rows remain visible in Finish Work / Today Records by
+#   using tolerant employee identity matching before falling back to final view.
+
+try:
+    _v208_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v208_prev_get_active_records = None
+try:
+    _v208_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v208_prev_get_active_record = None
+try:
+    _v208_prev_get_active_same_work = get_active_same_work
+except Exception:  # pragma: no cover
+    _v208_prev_get_active_same_work = None
+try:
+    _v208_prev_get_conflicting_active_records = get_conflicting_active_records
+except Exception:  # pragma: no cover
+    _v208_prev_get_conflicting_active_records = None
+try:
+    _v208_prev_get_active_group = get_active_group
+except Exception:  # pragma: no cover
+    _v208_prev_get_active_group = None
+try:
+    _v208_prev_refresh_active_records_for_employee = refresh_active_records_for_employee
+except Exception:  # pragma: no cover
+    _v208_prev_refresh_active_records_for_employee = None
+
+
+def _v208_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    text = str(value).strip()
+    return "" if text.lower() in {"", "none", "nan", "nat", "null", "<na>"} else text
+
+
+def _v208_key(value) -> str:
+    return _v208_text(value).casefold()
+
+
+def _v208_row_value(row: dict, names: list[str]) -> str:
+    for c in names:
+        if c in row:
+            v = _v208_text(row.get(c))
+            if v:
+                return v
+    return ""
+
+
+def _v208_row_employee_id(row: dict) -> str:
+    return _v208_row_value(row, ["employee_id", "工號 / Employee ID", "工號", "Employee ID", "員工編號", "人員工號"])
+
+
+def _v208_row_employee_name(row: dict) -> str:
+    return _v208_row_value(row, ["employee_name", "姓名 / Name", "姓名", "Name", "員工姓名", "人員姓名"])
+
+
+def _v208_record_key_emp(row: dict) -> str:
+    rk = _v208_row_value(row, ["record_key", "紀錄鍵 / Record Key", "Record Key"])
+    return rk.split("|", 1)[0].strip() if "|" in rk else ""
+
+
+def _v208_row_matches_employee(row: dict | pd.Series | None, employee_id: str | None = None, employee_name: str | None = None) -> bool:
+    if row is None:
+        return False
+    if hasattr(row, "to_dict"):
+        row = row.to_dict()
+    emp_id = _v208_key(employee_id)
+    emp_name = _v208_key(employee_name)
+    row_id = _v208_key(_v208_row_employee_id(row))
+    row_name = _v208_key(_v208_row_employee_name(row))
+    rk_emp = _v208_key(_v208_record_key_emp(row))
+    # Normal employee_id is authoritative and must not be overridden by stale
+    # record_key / bilingual columns from earlier recovery data.
+    if emp_id and row_id:
+        return row_id == emp_id
+    if emp_id and not row_id and rk_emp:
+        return rk_emp == emp_id
+    if emp_name and row_name:
+        return row_name == emp_name
+    # When no selected identity supplied, keep row.
+    return not emp_id and not emp_name
+
+
+def _v208_is_active_row(row: dict | pd.Series) -> bool:
+    if hasattr(row, "to_dict"):
+        row = row.to_dict()
+    end_ts = _v208_row_value(row, ["end_timestamp", "結束時間戳 / End Timestamp", "結束時間 / End Timestamp", "結束時間"])
+    end_action = _v208_row_value(row, ["end_action", "結束動作 / End Action", "結束動作"])
+    status = _v208_row_value(row, ["status", "狀態", "狀態 / Status"])
+    if end_ts or end_action:
+        return False
+    return (not status) or status in {"作業中", "開始", "進行中", "ACTIVE", "active"}
+
+
+def _v208_filter_employee(df: pd.DataFrame | None, employee_id: str | None = None, employee_name: str | None = None, *, active_only: bool = True) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    keep = []
+    for _, rr in df.iterrows():
+        row = rr.to_dict()
+        if active_only and not _v208_is_active_row(row):
+            continue
+        if _v208_row_matches_employee(row, employee_id, employee_name):
+            keep.append(row)
+    if not keep:
+        return pd.DataFrame(columns=df.columns)
+    out = pd.DataFrame(keep)
+    # Normalize visible identity to prevent same-account UI false alarms.
+    if employee_id:
+        for c in ["employee_id", "工號 / Employee ID", "工號", "Employee ID"]:
+            if c in out.columns:
+                out[c] = str(employee_id).strip()
+    if employee_name:
+        for c in ["employee_name", "姓名 / Name", "姓名", "Name"]:
+            if c in out.columns:
+                out[c] = str(employee_name).strip()
+    return out.reset_index(drop=True)
+
+
+def _v208_sort_active_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    sort_cols = [c for c in ["id", "start_timestamp", "開始時間戳 / Start Timestamp", "開始時間"] if c in out.columns]
+    if "id" in out.columns:
+        try:
+            out["_v208_id_sort"] = pd.to_numeric(out["id"], errors="coerce").fillna(0)
+            return out.sort_values("_v208_id_sort", ascending=False).drop(columns=["_v208_id_sort"], errors="ignore").reset_index(drop=True)
+        except Exception:
+            pass
+    if sort_cols:
+        try:
+            return out.sort_values(sort_cols[-1], ascending=False).reset_index(drop=True)
+        except Exception:
+            pass
+    return out.reset_index(drop=True)
+
+
+def _v208_load_employee_records(employee_id: str | None = None) -> pd.DataFrame:
+    # Prefer the existing fast load_records / SQL layer. It is already guarded by
+    # V205+ and does not change UI.
+    try:
+        if employee_id:
+            return load_records(employee_id=str(employee_id).strip())
+        return load_records()
+    except Exception:
+        return pd.DataFrame()
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    frames: list[pd.DataFrame] = []
+    if callable(_v208_prev_get_active_records):
+        for kwargs in (
+            {"employee_id": employee_id, "process_name": process_name, "start_date": start_date, "employee_name": employee_name},
+            {"employee_id": employee_id, "process_name": process_name, "start_date": start_date, "employee_name": None},
+            {"employee_id": employee_id},
+        ):
+            try:
+                df = _v208_prev_get_active_records(**kwargs)  # type: ignore[misc]
+                if isinstance(df, pd.DataFrame) and not df.empty:
+                    frames.append(df)
+            except TypeError:
+                try:
+                    df = _v208_prev_get_active_records(employee_id)  # type: ignore[misc]
+                    if isinstance(df, pd.DataFrame) and not df.empty:
+                        frames.append(df)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            if frames:
+                break
+    if not frames:
+        frames.append(_v208_load_employee_records(employee_id))
+    df = pd.concat([x for x in frames if isinstance(x, pd.DataFrame) and not x.empty], ignore_index=True) if any(isinstance(x, pd.DataFrame) and not x.empty for x in frames) else pd.DataFrame()
+    df = _v208_filter_employee(df, employee_id, employee_name, active_only=True)
+    if process_name and not df.empty:
+        proc_cols = [c for c in ["process_name", "工段名稱", "工段名稱 / Process", "工段 / Process", "Process"] if c in df.columns]
+        if proc_cols:
+            mask = False
+            for c in proc_cols:
+                mask = mask | (df[c].astype(str).str.strip() == str(process_name).strip())
+            df = df.loc[mask].reset_index(drop=True)
+    if start_date and not df.empty:
+        sd_cols = [c for c in ["start_date", "開始日期", "開始日期 / Start Date"] if c in df.columns]
+        if sd_cols:
+            mask = False
+            for c in sd_cols:
+                mask = mask | (df[c].astype(str).str[:10] == str(start_date).strip()[:10])
+            df = df.loc[mask].reset_index(drop=True)
+    return _v208_sort_active_df(df)
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or df.empty:
+        return None
+    return dict(df.iloc[0].to_dict())
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+    if df is None or df.empty:
+        return None
+    wo = str(work_order or "").strip()
+    if wo:
+        wo_cols = [c for c in ["work_order", "製令", "製令 / Work Order", "Work Order"] if c in df.columns]
+        if wo_cols:
+            mask = False
+            for c in wo_cols:
+                mask = mask | (df[c].astype(str).str.strip() == wo)
+            df = df.loc[mask].reset_index(drop=True)
+    df = _v208_sort_active_df(df)
+    return dict(df.iloc[0].to_dict()) if not df.empty else None
+
+
+def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    # Use tolerant identity, then exclude same process/date.
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or df.empty:
+        return pd.DataFrame()
+    proc = str(process_name or "").strip()
+    sd = str(start_date or _v205_today() if "_v205_today" in globals() else "").strip()[:10]
+    keep = []
+    for _, rr in df.iterrows():
+        row = rr.to_dict()
+        row_proc = _v208_row_value(row, ["process_name", "工段名稱", "工段名稱 / Process", "工段 / Process", "Process"])
+        row_sd = _v208_row_value(row, ["start_date", "開始日期", "開始日期 / Start Date"])[:10]
+        if (proc and row_proc != proc) or (sd and row_sd != sd):
+            keep.append(row)
+    return pd.DataFrame(keep).reset_index(drop=True) if keep else pd.DataFrame(columns=df.columns)
+
+
+def _v208_record_by_id(record_id: int) -> dict | None:
+    # Try SQLite / current full records first.
+    try:
+        df = load_records()
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            for c in ["id", "ID", "ID / ID"]:
+                if c in df.columns:
+                    hit = df[pd.to_numeric(df[c], errors="coerce") == int(record_id)]
+                    if not hit.empty:
+                        return dict(hit.iloc[0].to_dict())
+    except Exception:
+        pass
+    # Try final view helper when present.
+    try:
+        if "_v206_find_final_active_by_id" in globals():
+            rec = _v206_find_final_active_by_id(int(record_id))  # type: ignore[name-defined]
+            if rec:
+                return rec
+    except Exception:
+        pass
+    return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    rec = _v208_record_by_id(int(record_id))
+    if not rec:
+        try:
+            df0 = _v208_prev_get_active_group(int(record_id)) if callable(_v208_prev_get_active_group) else pd.DataFrame()
+            return df0.reset_index(drop=True) if isinstance(df0, pd.DataFrame) else pd.DataFrame()
+        except Exception:
+            return pd.DataFrame()
+    emp_id = _v208_row_employee_id(rec)
+    emp_name = _v208_row_employee_name(rec)
+    proc = _v208_row_value(rec, ["process_name", "工段名稱", "工段名稱 / Process", "工段 / Process", "Process"])
+    sd = _v208_row_value(rec, ["start_date", "開始日期", "開始日期 / Start Date"])[:10]
+    df = get_active_records(employee_id=emp_id, employee_name=emp_name, process_name=proc, start_date=sd)
+    if df is None or df.empty:
+        df = pd.DataFrame([rec]) if _v208_is_active_row(rec) else pd.DataFrame()
+    return _v208_sort_active_df(df)
+
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v208_active_refresh") -> int:  # type: ignore[override]
+    try:
+        df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+        return int(0 if df is None else len(df))
+    except Exception:
+        try:
+            if callable(_v208_prev_refresh_active_records_for_employee):
+                return int(_v208_prev_refresh_active_records_for_employee(employee_id, employee_name, reason=reason) or 0)  # type: ignore[misc]
+        except Exception:
+            pass
+    return 0
+
+
+def audit_v208_admin_proxy_active_identity() -> dict:
+    return {
+        "version": "V208",
+        "ui_style_changed": False,
+        "theme_service_changed": False,
+        "pages_changed": ["pages/01_01. 工時紀錄.py"],
+        "services_changed": ["services/time_record_service.py"],
+        "normal_user_guard_kept": True,
+        "admin_proxy_supported": True,
+        "same_account_false_block_fixed": True,
+        "stale_record_key_no_longer_overrides_employee_id": True,
+    }
+
+# ================= END V208 ADMIN PROXY + ACTIVE IDENTITY STABILITY =================

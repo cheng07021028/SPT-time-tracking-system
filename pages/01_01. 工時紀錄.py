@@ -363,6 +363,41 @@ def _v127_clear_legacy_employee_select_state() -> None:
 # ===== END V127 EMPLOYEE SELECTBOX SESSION ISOLATION =====
 
 
+
+
+# ===== V207 ADMIN FINISH WORK IDENTITY GUARD BYPASS =====
+def _v207_current_user_is_admin() -> bool:
+    """Return True when the logged-in account is a system administrator.
+
+    V208 keeps the same visual UI, but makes the admin check more tolerant:
+    username=admin, role/role_code/admin flags, and session-state roles all count.
+    Normal users still keep identity protection.
+    """
+    try:
+        user = get_current_user() or {}
+    except Exception:
+        user = {}
+    username = str(user.get("username") or st.session_state.get("auth_username") or "").strip().casefold()
+    role_code = str(user.get("role_code") or user.get("role") or st.session_state.get("auth_role_code") or st.session_state.get("auth_role") or "").strip().casefold()
+    roles_raw = user.get("roles") or st.session_state.get("auth_roles") or []
+    if isinstance(roles_raw, str):
+        roles = {r.strip().casefold() for r in re.split(r"[,;|]", roles_raw) if r.strip()}
+    else:
+        roles = {str(r).strip().casefold() for r in roles_raw if str(r).strip()}
+    flags = {str(user.get(k) or st.session_state.get(k) or "").strip().casefold() for k in ("is_admin", "admin", "auth_is_admin")}
+    return username == "admin" or role_code == "admin" or "admin" in roles or bool(flags & {"1", "true", "yes", "y"})
+
+
+def _v208_current_user_can_proxy_employee() -> bool:
+    """System admin can select any employee and perform 01 actions on that account.
+
+    This does not alter button appearance or table rendering. It only prevents the
+    Finish Work identity guard from blocking admin repair/operation workflows.
+    """
+    return _v207_current_user_is_admin()
+# ===== END V207 ADMIN FINISH WORK IDENTITY GUARD BYPASS =====
+
+
 # ===== V141 SELECTED EMPLOYEE / ACTIVE WORK STRICT BINDING =====
 def _v141_norm_employee_text(value) -> str:
     try:
@@ -460,6 +495,20 @@ def _v143_ui_identity_values(row: dict, cols: list[str]) -> list[str]:
 
 
 def _v143_ui_row_matches_selected(row: dict | pd.Series | None, employee_id: str, employee_name: str = "") -> bool:
+    """Return True if the row positively belongs to the selected employee.
+
+    V143 was intentionally strict, but it treated any stale bilingual/record_key
+    identity value as a hard conflict.  After LOG recovery / 01-02 repair, some
+    rows can contain the correct employee_id plus a stale record_key prefix or
+    blank/old display-name field.  That caused the same account (e.g. SSS/SSS)
+    to be blocked.
+
+    V208 rule:
+    - A direct employee_id match is enough to allow the row.
+    - If no employee_id is available, a name match is accepted.
+    - A stale record_key prefix is only used when no normal employee_id columns
+      exist; it must not override a correct employee_id.
+    """
     if row is None:
         return False
     if hasattr(row, "to_dict"):
@@ -468,20 +517,23 @@ def _v143_ui_row_matches_selected(row: dict | pd.Series | None, employee_id: str
     emp_name = _v143_ui_key(employee_name)
     id_cols = ["employee_id", "工號 / Employee ID", "工號", "Employee ID", "員工編號", "人員工號"]
     name_cols = ["employee_name", "姓名 / Name", "姓名", "Name", "員工姓名", "人員姓名"]
-    id_vals = _v143_ui_identity_values(row, id_cols)
-    rk_emp = _v143_ui_record_key_emp(row)
-    if rk_emp:
-        id_vals.append(rk_emp)
-    id_keys = {_v143_ui_key(v) for v in id_vals if _v143_ui_key(v)}
+    normal_id_keys = {_v143_ui_key(v) for v in _v143_ui_identity_values(row, id_cols) if _v143_ui_key(v)}
     name_keys = {_v143_ui_key(v) for v in _v143_ui_identity_values(row, name_cols) if _v143_ui_key(v)}
-    if emp_id:
-        if not id_keys:
-            return False
-        if any(k != emp_id for k in id_keys):
-            return False
-    if emp_name and name_keys and any(k != emp_name for k in name_keys):
-        return False
-    return True
+    rk_emp = _v143_ui_key(_v143_ui_record_key_emp(row))
+
+    # Correct employee_id wins over stale/legacy display fields.
+    if emp_id and emp_id in normal_id_keys:
+        return True
+    # Only use record_key when there is no trustworthy employee_id field.
+    if emp_id and not normal_id_keys and rk_emp == emp_id:
+        return True
+    # Some legacy/recovery rows only have name, not employee_id.
+    if emp_name and emp_name in name_keys and not normal_id_keys:
+        return True
+    # If no selected id was provided, fall back to name only.
+    if not emp_id and emp_name and emp_name in name_keys:
+        return True
+    return False
 
 
 def _v143_ui_filter_group_for_selected(group_df: pd.DataFrame, employee_id: str, employee_name: str = "") -> pd.DataFrame:
@@ -781,7 +833,8 @@ with right:
         active2 = get_active_record(emp_id2, employee_name=_emp2_name)
     except TypeError:
         active2 = get_active_record(emp_id2)
-    if active2 and (not _v141_active_matches_employee(active2, emp_id2, _emp2_name) or not _v143_ui_row_matches_selected(active2, emp_id2, _emp2_name)):
+    _v207_admin_finish_bypass = _v207_current_user_is_admin()
+    if (not _v207_admin_finish_bypass) and active2 and (not _v141_active_matches_employee(active2, emp_id2, _emp2_name) or not _v143_ui_row_matches_selected(active2, emp_id2, _emp2_name)):
         st.error(
             "Active Work 人員不一致，已停止顯示其他人員資料。"
             f"目前選擇：{emp_id2} {_emp2_name}；讀到資料：{_v143_ui_identity_debug_text(active2)}。"
@@ -792,7 +845,13 @@ with right:
         st.success("此人員目前沒有未結束作業。")
     else:
         raw_group_df = get_active_group(int(active2["id"]))
-        group_df = _v143_ui_filter_group_for_selected(raw_group_df, emp_id2, _emp2_name)
+        group_df = raw_group_df.copy().reset_index(drop=True) if _v207_admin_finish_bypass and isinstance(raw_group_df, pd.DataFrame) else _v143_ui_filter_group_for_selected(raw_group_df, emp_id2, _emp2_name)
+        _v208_force_single_finish = False
+        if group_df.empty and active2 and _v143_ui_row_matches_selected(active2, emp_id2, _emp2_name):
+            # Same selected employee, but group rows contain stale identity fields.
+            # Show the active row instead of blocking the same account.
+            group_df = pd.DataFrame([active2])
+            _v208_force_single_finish = True
         if group_df.empty:
             st.error(
                 "目前作業中資料已被擋下：系統讀到的群組資料不屬於目前選擇人員，為避免誤結束他人工時，已停止顯示。請重新整理；若仍出現，請由管理員檢查 01/02 權威檔身份欄位。"
@@ -811,27 +870,28 @@ with right:
                 unsafe_allow_html=True,
             )
             render_table(group_df, "active_parallel_group", editable=False, height=230)
+        _v208_finish_parallel_group = (not _v208_force_single_finish)
         end_remark = st.text_input("結束備註｜Finish Remark", key="end_remark", disabled=group_df.empty)
         c1, c2, c3 = st.columns(3)
         if c1.button("⏸ 暫停 / Pause", use_container_width=True, disabled=group_df.empty):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
-                n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=True)
+                n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=_v208_finish_parallel_group)
                 trigger_post_record_continue_prompt(f"已同步暫停 {n} 筆並平均計算工時。", title="工時已暫停")
                 st.rerun()
         if c2.button("⟡ 完工 / Complete", use_container_width=True):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
-                n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=True)
+                n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=_v208_finish_parallel_group)
                 trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。", title="工時已完工")
                 st.rerun()
         if c3.button("◐ 下班 / Off Duty", use_container_width=True, disabled=group_df.empty):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
-                n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=True)
+                n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=_v208_finish_parallel_group)
                 trigger_post_record_continue_prompt(f"已同步下班 {n} 筆並平均計算工時。", title="工時已結束")
                 st.rerun()
 
