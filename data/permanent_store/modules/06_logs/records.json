@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 19:32:23",
-  "exported_at": "2026-05-29 19:32:23",
+  "updated_at": "2026-05-29 19:32:42",
+  "exported_at": "2026-05-29 19:32:42",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -15415,11 +15415,47 @@
         "detail": "434;V205_FAST_FINISH",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 3,
+        "log_time": "2026-05-29 19:32:38",
+        "user_name": "admin",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "434",
+        "message": "結束工時紀錄 #434，同步結束=1筆，狀態=下班",
+        "detail": "434;V205_FAST_FINISH",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-29 19:32:38",
+        "user_name": "admin",
+        "action_type": "V221_SQLITE_HYDRATE_FOR_FINISH",
+        "target_table": "time_records",
+        "target_id": "434",
+        "message": "V221 結束前已回填 SQLite time_records 1 筆。",
+        "detail": "finish_work_v221_before_base",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-29 19:32:38",
+        "user_name": "admin",
+        "action_type": "V208_DISPLAY_AUTHORITY_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite time_records 顯示快取空白，已由 01/02 權威檔回填 1 筆。",
+        "detail": "finish_work_v221_before_base\n__spt_log_uid=936aa3decf6042ca971905f85545d11c",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1284
+    "system_logs": 1287
   }
 }
