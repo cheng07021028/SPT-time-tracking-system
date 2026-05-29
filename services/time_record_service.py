@@ -14,75 +14,6 @@ from .log_service import write_log
 from .duration_service import hms_to_hours
 
 
-# ===== V209: SQLite schema guard for direct time_record_service connections =====
-def _v209_ensure_time_records_sqlite_schema(trigger: str = "v209") -> None:
-    """Ensure the SQLite time_records table exists before any direct sqlite3 access.
-
-    Some legacy / performance wrappers in this module still open sqlite3 directly
-    with DB_PATH for speed.  If Streamlit Cloud has just recreated the DB file, or
-    if db_service.ensure_database() has not run in this process yet, those direct
-    reads can fail with: "no such table: time_records".  This guard is intentionally
-    idempotent, non-destructive, and only creates/migrates schema; it never deletes
-    or rewrites user data.
-    """
-    try:
-        from services.db_service import ensure_database as _ensure_database
-        _ensure_database()
-        return
-    except Exception:
-        pass
-
-    # Last-resort local schema bootstrap.  Keep this minimal and compatible with
-    # db_service._init_schema.  It is used only when db_service could not be called.
-    try:
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(DB_PATH, timeout=30) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA busy_timeout=30000")
-            conn.execute("""
-            CREATE TABLE IF NOT EXISTS time_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                record_key TEXT UNIQUE,
-                status TEXT,
-                work_order TEXT,
-                part_no TEXT,
-                type_name TEXT,
-                process_name TEXT,
-                employee_id TEXT,
-                employee_name TEXT,
-                start_action TEXT,
-                start_timestamp TEXT,
-                end_action TEXT,
-                end_timestamp TEXT,
-                remark TEXT,
-                start_date TEXT,
-                start_time TEXT,
-                end_date TEXT,
-                end_time TEXT,
-                work_hours REAL DEFAULT 0,
-                assembly_location TEXT,
-                group_key TEXT,
-                is_group_work INTEGER DEFAULT 0,
-                source TEXT DEFAULT 'streamlit',
-                created_at TEXT,
-                updated_at TEXT
-            )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_time_records_emp_date ON time_records(employee_id, start_date)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_time_records_work_order ON time_records(work_order)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_time_records_status ON time_records(status)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_time_records_start_date ON time_records(start_date)")
-            conn.commit()
-    except Exception:
-        # The caller will surface the original DB error if the database is not writable.
-        pass
-
-
-# Run once at module import so direct sqlite3.connect(DB_PATH) code paths never hit
-# an empty DB file before db_service has initialized the schema.
-_v209_ensure_time_records_sqlite_schema("module_import")
-
-
 
 def ensure_time_records_available(trigger: str = "time_record_service") -> None:
     """V3.02: restore 01/02 shared records if DB was recreated empty after update."""
@@ -877,7 +808,6 @@ def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工
     now = _now()
     user_name = _audit_user_name()
     deleted = 0
-    _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
@@ -977,7 +907,6 @@ def recalculate_time_records(record_ids: list[int] | None = None) -> int:
         return 0
 
     user_name = _audit_user_name()
-    _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=15)
     try:
@@ -1174,7 +1103,6 @@ def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "hi
             result["skipped"] += 1
             errors.append(f"第 {idx + 1} 筆匯入失敗：{exc}")
 
-    _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=15)
     try:
@@ -1649,7 +1577,6 @@ def _v75_delete_sqlite_first(record_ids: list[int], reason: str) -> int:
     now = _now()
     user_name = _audit_user_name()
     deleted = 0
-    _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
@@ -1899,7 +1826,6 @@ def _v76_direct_sqlite_time_records_df() -> pd.DataFrame:
     except Exception:
         pass
     try:
-        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH, timeout=15) as conn:
             conn.row_factory = sqlite3.Row
@@ -2111,7 +2037,6 @@ def _safe_app_setting_value(setting_key: str) -> str | None:  # type: ignore[ove
 
 def _v77_direct_query_df(sql: str, params: tuple = ()) -> pd.DataFrame:
     try:
-        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH, timeout=8) as conn:
             conn.row_factory = sqlite3.Row
@@ -2298,7 +2223,6 @@ def _v79_clear_fast_caches() -> None:
 
 def _v79_rows_from_sqlite() -> list[dict]:
     try:
-        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH, timeout=8) as conn:
             conn.row_factory = sqlite3.Row
@@ -2974,7 +2898,6 @@ def _v89_sync_sqlite_cache_from_authority(df: pd.DataFrame) -> int:
             clean = clean[cols].where(pd.notna(clean[cols]), None)
             rows = clean.to_dict(orient="records")
         import sqlite3 as _sqlite3
-        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         conn = _sqlite3.connect(DB_PATH, timeout=15)
         try:
@@ -5603,7 +5526,6 @@ def _v134_read_sqlite_time_records(record_ids: list[int] | None = None) -> pd.Da
             rid = _v134_to_int(x)
             if rid is not None and rid not in ids:
                 ids.append(int(rid))
-        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH, timeout=8) as conn:
             conn.row_factory = sqlite3.Row
@@ -5998,7 +5920,6 @@ def _v137_authority_df(module_key: str) -> pd.DataFrame:
 
 def _v137_sqlite_df(ids: list[int] | None = None) -> pd.DataFrame:
     try:
-        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH, timeout=15) as conn:
             conn.row_factory = sqlite3.Row
@@ -6800,7 +6721,6 @@ def _v139_table_df(module_key: str) -> pd.DataFrame:
 
 def _v139_sqlite_all_df() -> pd.DataFrame:
     try:
-        _v209_ensure_time_records_sqlite_schema("direct_sqlite_connect")
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH, timeout=15) as conn:
             conn.row_factory = sqlite3.Row
@@ -15189,659 +15109,3 @@ def audit_v205_01_second_level_operation() -> dict:
     }
 
 # ================= END V205 01 SECOND-LEVEL FOREGROUND TRANSACTION =================
-
-# ================= V206 FINISH WORK ACTIVE DISPLAY FALLBACK =================
-# Direct-overwrite version. UI-neutral: no pages/CSS/theme/table rendering changes.
-# Purpose:
-# - 01 Finish Work must display the selected employee's unfinished records even
-#   when SQLite cache is temporarily missing but 01/02 final view still has the
-#   active row.
-# - If a user finishes a fallback active row, materialize only that active group
-#   back into SQLite, then reuse the existing V205 fast finish path.
-
-_v206_prev_get_active_records = get_active_records
-_v206_prev_get_active_record = get_active_record
-_v206_prev_get_active_same_work = get_active_same_work
-_v206_prev_get_active_group = get_active_group
-_v206_prev_finish_work = finish_work
-
-
-def _v206_txt(v) -> str:
-    if v is None:
-        return ""
-    try:
-        if pd.isna(v):
-            return ""
-    except Exception:
-        pass
-    s = str(v).strip()
-    if s.lower() in {"nan", "none", "nat", "null"}:
-        return ""
-    return s
-
-
-def _v206_int(v, default=None):
-    try:
-        s = _v206_txt(v)
-        if not s:
-            return default
-        return int(float(s))
-    except Exception:
-        return default
-
-
-def _v206_is_terminal_row(row: dict) -> bool:
-    status = _v206_txt(row.get("status") or row.get("狀態") or row.get("狀態 / Status"))
-    end_action = _v206_txt(row.get("end_action") or row.get("結束動作 / End Action"))
-    end_ts = _v206_txt(row.get("end_timestamp") or row.get("結束時間戳 / End Timestamp") or row.get("結束時間 / End Timestamp"))
-    joined = f"{status} {end_action}"
-    return bool(end_ts) or any(k in joined for k in ("下班", "暫停", "完工", "已結束", "結束", "補登結束", "人工結算"))
-
-
-def _v206_final_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:
-    try:
-        from services.final_time_records_view_service import load_final_active_records
-        df = load_final_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
-        if isinstance(df, pd.DataFrame):
-            return df.copy().reset_index(drop=True)
-    except Exception:
-        pass
-    return pd.DataFrame()
-
-
-def _v206_final_all_records() -> pd.DataFrame:
-    try:
-        from services.final_time_records_view_service import load_final_time_records
-        df = load_final_time_records(include_recovery=False, include_sqlite=True)
-        if isinstance(df, pd.DataFrame):
-            return df.copy().reset_index(drop=True)
-    except Exception:
-        pass
-    return pd.DataFrame()
-
-
-def _v206_filter_active_df(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return pd.DataFrame()
-    keep = []
-    for _, rr in df.iterrows():
-        keep.append(not _v206_is_terminal_row(dict(rr.to_dict())))
-    return df.loc[keep].reset_index(drop=True)
-
-
-def _v206_filter_by_id(df: pd.DataFrame, record_id: int) -> pd.DataFrame:
-    if df is None or df.empty:
-        return pd.DataFrame()
-    cols = [c for c in ("id", "ID", "ID / ID", "紀錄編號", "record_id") if c in df.columns]
-    if not cols:
-        return pd.DataFrame()
-    mask = False
-    for c in cols:
-        try:
-            mask = mask | (pd.to_numeric(df[c], errors="coerce").fillna(-1).astype(int) == int(record_id))
-        except Exception:
-            mask = mask | (df[c].astype(str).str.strip() == str(record_id))
-    return df.loc[mask].reset_index(drop=True)
-
-
-def _v206_sort_active(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or df.empty:
-        return pd.DataFrame()
-    out = df.copy()
-    for c in ("id", "start_timestamp", "updated_at"):
-        if c not in out.columns:
-            out[c] = ""
-    try:
-        out["_v206_id_sort"] = pd.to_numeric(out["id"], errors="coerce").fillna(0)
-        out = out.sort_values(["_v206_id_sort", "start_timestamp"], ascending=[False, False], kind="stable")
-        out = out.drop(columns=["_v206_id_sort"], errors="ignore")
-    except Exception:
-        pass
-    return out.reset_index(drop=True)
-
-
-def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
-    try:
-        df = _v206_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            return df.reset_index(drop=True)
-    except TypeError:
-        try:
-            df = _v206_prev_get_active_records(employee_id=employee_id)
-            if isinstance(df, pd.DataFrame) and not df.empty:
-                return df.reset_index(drop=True)
-        except Exception:
-            pass
-    except Exception:
-        pass
-    # Fallback: final view may still contain active 01/02 rows even when SQLite cache is empty.
-    df = _v206_final_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
-    if df.empty and employee_id and employee_name:
-        df = _v206_final_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=None)
-    return _v206_sort_active(_v206_filter_active_df(df))
-
-
-def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
-    try:
-        rec = _v206_prev_get_active_record(employee_id, employee_name=employee_name)
-    except TypeError:
-        try:
-            rec = _v206_prev_get_active_record(employee_id)
-        except Exception:
-            rec = None
-    except Exception:
-        rec = None
-    if isinstance(rec, dict) and rec:
-        return rec
-    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
-    if df is None or df.empty:
-        return None
-    df = _v206_sort_active(df)
-    return dict(df.iloc[0].to_dict()) if not df.empty else None
-
-
-def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
-    try:
-        rec = _v206_prev_get_active_same_work(employee_id, work_order, process_name, start_date=start_date, employee_name=employee_name)
-    except TypeError:
-        try:
-            rec = _v206_prev_get_active_same_work(employee_id, work_order, process_name)
-        except Exception:
-            rec = None
-    except Exception:
-        rec = None
-    if isinstance(rec, pd.DataFrame):
-        if not rec.empty:
-            return dict(rec.iloc[0].to_dict())
-    elif isinstance(rec, dict) and rec:
-        return rec
-    df = get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
-    if df is None or df.empty:
-        return None
-    cols = [c for c in ("work_order", "製令", "製令 / Work Order", "Work Order") if c in df.columns]
-    if cols:
-        mask = False
-        for c in cols:
-            mask = mask | (df[c].astype(str).str.strip() == str(work_order).strip())
-        df = df.loc[mask].reset_index(drop=True)
-    df = _v206_sort_active(df)
-    return dict(df.iloc[0].to_dict()) if not df.empty else None
-
-
-def _v206_find_final_active_by_id(record_id: int) -> dict | None:
-    df = _v206_filter_active_df(_v206_final_all_records())
-    if df.empty:
-        return None
-    hit = _v206_filter_by_id(df, int(record_id))
-    if hit.empty:
-        return None
-    return dict(hit.iloc[0].to_dict())
-
-
-def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
-    try:
-        df = _v206_prev_get_active_group(int(record_id))
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            return df.reset_index(drop=True)
-    except Exception:
-        pass
-    rec = _v206_find_final_active_by_id(int(record_id))
-    if not rec:
-        return pd.DataFrame()
-    df = get_active_records(
-        employee_id=_v206_txt(rec.get("employee_id") or rec.get("工號") or rec.get("工號 / Employee ID")),
-        employee_name=_v206_txt(rec.get("employee_name") or rec.get("姓名") or rec.get("姓名 / Name")),
-        process_name=_v206_txt(rec.get("process_name") or rec.get("工段名稱") or rec.get("工段名稱 / Process") or rec.get("工段 / Process")),
-        start_date=_v206_txt(rec.get("start_date") or rec.get("開始日期") or rec.get("開始日期 / Start Date"))[:10],
-    )
-    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()
-
-
-def _v206_sqlite_columns() -> list[str]:
-    try:
-        with _v205_conn() as conn:  # type: ignore[name-defined]
-            rows = conn.execute("PRAGMA table_info(time_records)").fetchall()
-        return [str(r[1]) for r in rows]
-    except Exception:
-        return []
-
-
-def _v206_row_value(row: dict, col: str):
-    aliases = {
-        "id": ["id", "ID", "ID / ID", "record_id", "紀錄編號"],
-        "record_key": ["record_key", "Record Key", "紀錄鍵 / Record Key"],
-        "status": ["status", "狀態", "狀態 / Status"],
-        "work_order": ["work_order", "製令", "製令 / Work Order", "Work Order"],
-        "part_no": ["part_no", "P/N", "料號", "P/N / 料號"],
-        "type_name": ["type_name", "機型", "機型 / Type"],
-        "process_name": ["process_name", "工段名稱", "工段名稱 / Process", "工段 / Process", "Process"],
-        "employee_id": ["employee_id", "工號", "工號 / Employee ID", "Employee ID"],
-        "employee_name": ["employee_name", "姓名", "姓名 / Name", "Name"],
-        "start_action": ["start_action", "開始動作 / Start Action"],
-        "start_timestamp": ["start_timestamp", "開始時間戳 / Start Timestamp", "開始時間 / Start Timestamp", "開始時間"],
-        "end_action": ["end_action", "結束動作 / End Action"],
-        "end_timestamp": ["end_timestamp", "結束時間戳 / End Timestamp", "結束時間 / End Timestamp", "結束時間"],
-        "remark": ["remark", "備註", "備註 / Remark"],
-        "start_date": ["start_date", "開始日期", "開始日期 / Start Date"],
-        "start_time": ["start_time", "開始時刻", "開始時刻 / Start Time"],
-        "end_date": ["end_date", "結束日期", "結束日期 / End Date"],
-        "end_time": ["end_time", "結束時刻", "結束時刻 / End Time"],
-        "assembly_location": ["assembly_location", "組立地點", "組立地點 / Assembly Location"],
-        "group_key": ["group_key"],
-        "is_group_work": ["is_group_work"],
-        "source": ["source", "資料來源"],
-        "created_at": ["created_at"],
-        "updated_at": ["updated_at"],
-        "work_hours": ["work_hours", "工時", "工時 / Work Hours"],
-    }
-    for k in aliases.get(col, [col]):
-        if k in row:
-            v = row.get(k)
-            if _v206_txt(v) != "":
-                return v
-    return None
-
-
-def _v206_materialize_final_group_to_sqlite(record_id: int) -> int:
-    rec = _v206_find_final_active_by_id(int(record_id))
-    if not rec:
-        return 0
-    group = get_active_group(int(record_id))
-    if not isinstance(group, pd.DataFrame) or group.empty:
-        group = pd.DataFrame([rec])
-    cols = _v206_sqlite_columns()
-    if not cols:
-        return 0
-    inserted = 0
-    now = _v205_now() if "_v205_now" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with _v205_conn() as conn:  # type: ignore[name-defined]
-        for _, rr in group.iterrows():
-            row = dict(rr.to_dict())
-            rid = _v206_int(_v206_row_value(row, "id"))
-            if rid is not None:
-                exists = conn.execute("SELECT id FROM time_records WHERE id=?", (rid,)).fetchone()
-                if exists:
-                    continue
-            values = {}
-            for c in cols:
-                v = _v206_row_value(row, c)
-                if c == "status" and _v206_txt(v) == "":
-                    v = "作業中"
-                if c == "source" and _v206_txt(v) == "":
-                    v = "v206_active_materialized_from_final_view"
-                if c in ("created_at", "updated_at") and _v206_txt(v) == "":
-                    v = now
-                if c == "is_group_work" and _v206_txt(v) == "":
-                    v = 0
-                if c == "record_key" and _v206_txt(v) == "":
-                    try:
-                        v = make_record_key(
-                            _v206_txt(_v206_row_value(row, "employee_id")),
-                            _v206_txt(_v206_row_value(row, "work_order")),
-                            _v206_txt(_v206_row_value(row, "process_name")),
-                            _v206_txt(_v206_row_value(row, "start_timestamp")) or now,
-                        )
-                    except Exception:
-                        v = ""
-                # Keep only non-empty values except id/source/status dates; SQLite default handles the rest.
-                if _v206_txt(v) != "" or c in ("id", "status", "source", "created_at", "updated_at", "is_group_work"):
-                    values[c] = v
-            if not values:
-                continue
-            insert_cols = list(values.keys())
-            placeholders = ",".join(["?"] * len(insert_cols))
-            sql = f"INSERT OR IGNORE INTO time_records({','.join(insert_cols)}) VALUES({placeholders})"
-            try:
-                conn.execute(sql, [values[c] for c in insert_cols])
-                inserted += 1
-            except Exception:
-                pass
-        conn.commit()
-    if inserted:
-        try:
-            _v205_clear_caches()  # type: ignore[name-defined]
-        except Exception:
-            pass
-    return inserted
-
-
-def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
-    try:
-        return int(_v206_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
-    except ValueError as exc:
-        msg = str(exc)
-        if "找不到工時紀錄" not in msg and "已刪除" not in msg:
-            raise
-        restored = _v206_materialize_final_group_to_sqlite(int(record_id))
-        if restored <= 0:
-            raise
-        return int(_v206_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
-
-
-def audit_v206_finish_active_display() -> dict:
-    return {
-        "version": "V206",
-        "ui_changed": False,
-        "pages_changed": False,
-        "theme_service_changed": False,
-        "css_changed": False,
-        "purpose": "Finish Work selected employee active records fallback from final view when SQLite cache is missing",
-        "active_record_sources": ["sqlite_fast", "final_time_records_view_fallback"],
-        "finish_materializes_missing_sqlite_active_row": True,
-    }
-
-# ================= END V206 FINISH WORK ACTIVE DISPLAY FALLBACK =================
-
-# ================= V208 ADMIN PROXY + ACTIVE IDENTITY STABILITY =================
-# Purpose:
-# - Keep current UI unchanged.
-# - Admin/operator page logic can select employees normally.
-# - Prevent same-account active rows from being hidden because of stale bilingual
-#   fields or stale record_key prefixes created by earlier recovery/merge flows.
-# - Make newly-created active rows remain visible in Finish Work / Today Records by
-#   using tolerant employee identity matching before falling back to final view.
-
-try:
-    _v208_prev_get_active_records = get_active_records
-except Exception:  # pragma: no cover
-    _v208_prev_get_active_records = None
-try:
-    _v208_prev_get_active_record = get_active_record
-except Exception:  # pragma: no cover
-    _v208_prev_get_active_record = None
-try:
-    _v208_prev_get_active_same_work = get_active_same_work
-except Exception:  # pragma: no cover
-    _v208_prev_get_active_same_work = None
-try:
-    _v208_prev_get_conflicting_active_records = get_conflicting_active_records
-except Exception:  # pragma: no cover
-    _v208_prev_get_conflicting_active_records = None
-try:
-    _v208_prev_get_active_group = get_active_group
-except Exception:  # pragma: no cover
-    _v208_prev_get_active_group = None
-try:
-    _v208_prev_refresh_active_records_for_employee = refresh_active_records_for_employee
-except Exception:  # pragma: no cover
-    _v208_prev_refresh_active_records_for_employee = None
-
-
-def _v208_text(value) -> str:
-    try:
-        if pd.isna(value):
-            return ""
-    except Exception:
-        pass
-    if value is None:
-        return ""
-    text = str(value).strip()
-    return "" if text.lower() in {"", "none", "nan", "nat", "null", "<na>"} else text
-
-
-def _v208_key(value) -> str:
-    return _v208_text(value).casefold()
-
-
-def _v208_row_value(row: dict, names: list[str]) -> str:
-    for c in names:
-        if c in row:
-            v = _v208_text(row.get(c))
-            if v:
-                return v
-    return ""
-
-
-def _v208_row_employee_id(row: dict) -> str:
-    return _v208_row_value(row, ["employee_id", "工號 / Employee ID", "工號", "Employee ID", "員工編號", "人員工號"])
-
-
-def _v208_row_employee_name(row: dict) -> str:
-    return _v208_row_value(row, ["employee_name", "姓名 / Name", "姓名", "Name", "員工姓名", "人員姓名"])
-
-
-def _v208_record_key_emp(row: dict) -> str:
-    rk = _v208_row_value(row, ["record_key", "紀錄鍵 / Record Key", "Record Key"])
-    return rk.split("|", 1)[0].strip() if "|" in rk else ""
-
-
-def _v208_row_matches_employee(row: dict | pd.Series | None, employee_id: str | None = None, employee_name: str | None = None) -> bool:
-    if row is None:
-        return False
-    if hasattr(row, "to_dict"):
-        row = row.to_dict()
-    emp_id = _v208_key(employee_id)
-    emp_name = _v208_key(employee_name)
-    row_id = _v208_key(_v208_row_employee_id(row))
-    row_name = _v208_key(_v208_row_employee_name(row))
-    rk_emp = _v208_key(_v208_record_key_emp(row))
-    # Normal employee_id is authoritative and must not be overridden by stale
-    # record_key / bilingual columns from earlier recovery data.
-    if emp_id and row_id:
-        return row_id == emp_id
-    if emp_id and not row_id and rk_emp:
-        return rk_emp == emp_id
-    if emp_name and row_name:
-        return row_name == emp_name
-    # When no selected identity supplied, keep row.
-    return not emp_id and not emp_name
-
-
-def _v208_is_active_row(row: dict | pd.Series) -> bool:
-    if hasattr(row, "to_dict"):
-        row = row.to_dict()
-    end_ts = _v208_row_value(row, ["end_timestamp", "結束時間戳 / End Timestamp", "結束時間 / End Timestamp", "結束時間"])
-    end_action = _v208_row_value(row, ["end_action", "結束動作 / End Action", "結束動作"])
-    status = _v208_row_value(row, ["status", "狀態", "狀態 / Status"])
-    if end_ts or end_action:
-        return False
-    return (not status) or status in {"作業中", "開始", "進行中", "ACTIVE", "active"}
-
-
-def _v208_filter_employee(df: pd.DataFrame | None, employee_id: str | None = None, employee_name: str | None = None, *, active_only: bool = True) -> pd.DataFrame:
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return pd.DataFrame()
-    keep = []
-    for _, rr in df.iterrows():
-        row = rr.to_dict()
-        if active_only and not _v208_is_active_row(row):
-            continue
-        if _v208_row_matches_employee(row, employee_id, employee_name):
-            keep.append(row)
-    if not keep:
-        return pd.DataFrame(columns=df.columns)
-    out = pd.DataFrame(keep)
-    # Normalize visible identity to prevent same-account UI false alarms.
-    if employee_id:
-        for c in ["employee_id", "工號 / Employee ID", "工號", "Employee ID"]:
-            if c in out.columns:
-                out[c] = str(employee_id).strip()
-    if employee_name:
-        for c in ["employee_name", "姓名 / Name", "姓名", "Name"]:
-            if c in out.columns:
-                out[c] = str(employee_name).strip()
-    return out.reset_index(drop=True)
-
-
-def _v208_sort_active_df(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or df.empty:
-        return pd.DataFrame()
-    out = df.copy()
-    sort_cols = [c for c in ["id", "start_timestamp", "開始時間戳 / Start Timestamp", "開始時間"] if c in out.columns]
-    if "id" in out.columns:
-        try:
-            out["_v208_id_sort"] = pd.to_numeric(out["id"], errors="coerce").fillna(0)
-            return out.sort_values("_v208_id_sort", ascending=False).drop(columns=["_v208_id_sort"], errors="ignore").reset_index(drop=True)
-        except Exception:
-            pass
-    if sort_cols:
-        try:
-            return out.sort_values(sort_cols[-1], ascending=False).reset_index(drop=True)
-        except Exception:
-            pass
-    return out.reset_index(drop=True)
-
-
-def _v208_load_employee_records(employee_id: str | None = None) -> pd.DataFrame:
-    # Prefer the existing fast load_records / SQL layer. It is already guarded by
-    # V205+ and does not change UI.
-    try:
-        if employee_id:
-            return load_records(employee_id=str(employee_id).strip())
-        return load_records()
-    except Exception:
-        return pd.DataFrame()
-
-
-def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
-    frames: list[pd.DataFrame] = []
-    if callable(_v208_prev_get_active_records):
-        for kwargs in (
-            {"employee_id": employee_id, "process_name": process_name, "start_date": start_date, "employee_name": employee_name},
-            {"employee_id": employee_id, "process_name": process_name, "start_date": start_date, "employee_name": None},
-            {"employee_id": employee_id},
-        ):
-            try:
-                df = _v208_prev_get_active_records(**kwargs)  # type: ignore[misc]
-                if isinstance(df, pd.DataFrame) and not df.empty:
-                    frames.append(df)
-            except TypeError:
-                try:
-                    df = _v208_prev_get_active_records(employee_id)  # type: ignore[misc]
-                    if isinstance(df, pd.DataFrame) and not df.empty:
-                        frames.append(df)
-                except Exception:
-                    pass
-            except Exception:
-                pass
-            if frames:
-                break
-    if not frames:
-        frames.append(_v208_load_employee_records(employee_id))
-    df = pd.concat([x for x in frames if isinstance(x, pd.DataFrame) and not x.empty], ignore_index=True) if any(isinstance(x, pd.DataFrame) and not x.empty for x in frames) else pd.DataFrame()
-    df = _v208_filter_employee(df, employee_id, employee_name, active_only=True)
-    if process_name and not df.empty:
-        proc_cols = [c for c in ["process_name", "工段名稱", "工段名稱 / Process", "工段 / Process", "Process"] if c in df.columns]
-        if proc_cols:
-            mask = False
-            for c in proc_cols:
-                mask = mask | (df[c].astype(str).str.strip() == str(process_name).strip())
-            df = df.loc[mask].reset_index(drop=True)
-    if start_date and not df.empty:
-        sd_cols = [c for c in ["start_date", "開始日期", "開始日期 / Start Date"] if c in df.columns]
-        if sd_cols:
-            mask = False
-            for c in sd_cols:
-                mask = mask | (df[c].astype(str).str[:10] == str(start_date).strip()[:10])
-            df = df.loc[mask].reset_index(drop=True)
-    return _v208_sort_active_df(df)
-
-
-def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
-    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
-    if df is None or df.empty:
-        return None
-    return dict(df.iloc[0].to_dict())
-
-
-def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
-    df = get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
-    if df is None or df.empty:
-        return None
-    wo = str(work_order or "").strip()
-    if wo:
-        wo_cols = [c for c in ["work_order", "製令", "製令 / Work Order", "Work Order"] if c in df.columns]
-        if wo_cols:
-            mask = False
-            for c in wo_cols:
-                mask = mask | (df[c].astype(str).str.strip() == wo)
-            df = df.loc[mask].reset_index(drop=True)
-    df = _v208_sort_active_df(df)
-    return dict(df.iloc[0].to_dict()) if not df.empty else None
-
-
-def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
-    # Use tolerant identity, then exclude same process/date.
-    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
-    if df is None or df.empty:
-        return pd.DataFrame()
-    proc = str(process_name or "").strip()
-    sd = str(start_date or _v205_today() if "_v205_today" in globals() else "").strip()[:10]
-    keep = []
-    for _, rr in df.iterrows():
-        row = rr.to_dict()
-        row_proc = _v208_row_value(row, ["process_name", "工段名稱", "工段名稱 / Process", "工段 / Process", "Process"])
-        row_sd = _v208_row_value(row, ["start_date", "開始日期", "開始日期 / Start Date"])[:10]
-        if (proc and row_proc != proc) or (sd and row_sd != sd):
-            keep.append(row)
-    return pd.DataFrame(keep).reset_index(drop=True) if keep else pd.DataFrame(columns=df.columns)
-
-
-def _v208_record_by_id(record_id: int) -> dict | None:
-    # Try SQLite / current full records first.
-    try:
-        df = load_records()
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            for c in ["id", "ID", "ID / ID"]:
-                if c in df.columns:
-                    hit = df[pd.to_numeric(df[c], errors="coerce") == int(record_id)]
-                    if not hit.empty:
-                        return dict(hit.iloc[0].to_dict())
-    except Exception:
-        pass
-    # Try final view helper when present.
-    try:
-        if "_v206_find_final_active_by_id" in globals():
-            rec = _v206_find_final_active_by_id(int(record_id))  # type: ignore[name-defined]
-            if rec:
-                return rec
-    except Exception:
-        pass
-    return None
-
-
-def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
-    rec = _v208_record_by_id(int(record_id))
-    if not rec:
-        try:
-            df0 = _v208_prev_get_active_group(int(record_id)) if callable(_v208_prev_get_active_group) else pd.DataFrame()
-            return df0.reset_index(drop=True) if isinstance(df0, pd.DataFrame) else pd.DataFrame()
-        except Exception:
-            return pd.DataFrame()
-    emp_id = _v208_row_employee_id(rec)
-    emp_name = _v208_row_employee_name(rec)
-    proc = _v208_row_value(rec, ["process_name", "工段名稱", "工段名稱 / Process", "工段 / Process", "Process"])
-    sd = _v208_row_value(rec, ["start_date", "開始日期", "開始日期 / Start Date"])[:10]
-    df = get_active_records(employee_id=emp_id, employee_name=emp_name, process_name=proc, start_date=sd)
-    if df is None or df.empty:
-        df = pd.DataFrame([rec]) if _v208_is_active_row(rec) else pd.DataFrame()
-    return _v208_sort_active_df(df)
-
-
-def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v208_active_refresh") -> int:  # type: ignore[override]
-    try:
-        df = get_active_records(employee_id=employee_id, employee_name=employee_name)
-        return int(0 if df is None else len(df))
-    except Exception:
-        try:
-            if callable(_v208_prev_refresh_active_records_for_employee):
-                return int(_v208_prev_refresh_active_records_for_employee(employee_id, employee_name, reason=reason) or 0)  # type: ignore[misc]
-        except Exception:
-            pass
-    return 0
-
-
-def audit_v208_admin_proxy_active_identity() -> dict:
-    return {
-        "version": "V208",
-        "ui_style_changed": False,
-        "theme_service_changed": False,
-        "pages_changed": ["pages/01_01. 工時紀錄.py"],
-        "services_changed": ["services/time_record_service.py"],
-        "normal_user_guard_kept": True,
-        "admin_proxy_supported": True,
-        "same_account_false_block_fixed": True,
-        "stale_record_key_no_longer_overrides_employee_id": True,
-    }
-
-# ================= END V208 ADMIN PROXY + ACTIVE IDENTITY STABILITY =================
