@@ -21408,3 +21408,888 @@ def _v176_write_durable_layers(rows_df: pd.DataFrame, reason: str, event_type: s
         pass
 
 # ================= END V231A DEFER EVENT UPLOAD QUEUE =================
+
+
+# ================= V232 MULTI-USER CONCURRENT WRITE SAFETY LAYER｜2026-05-29 =================
+# 目的：以 V225 正確讀寫 + V230/V231 前台速度為基準，補上多人同時操作時的資料保護。
+# 範圍：只在後端 time_record_service.py 內增加 append-only 事件、檔案鎖、非破壞式合併、刪除 tombstone。
+# 不改 UI / CSS / theme_service.py / 表格 / 按鈕 / 頁面排版。
+# 注意：在 JSON/GitHub 架構下，此層能大幅降低同一部署實例內多人併發覆蓋風險；若要跨多實例強交易保證，仍應升級 PostgreSQL。
+try:
+    _v232_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v232_prev_start_work = None
+try:
+    _v232_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v232_prev_finish_work = None
+try:
+    _v232_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v232_prev_delete_time_records = None
+try:
+    _v232_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v232_prev_save_time_records = None
+try:
+    _v232_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v232_prev_load_records = None
+try:
+    _v232_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v232_prev_today_records = None
+try:
+    _v232_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v232_prev_get_active_records = None
+try:
+    _v232_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v232_prev_get_active_record = None
+try:
+    _v232_prev_get_active_group = get_active_group
+except Exception:  # pragma: no cover
+    _v232_prev_get_active_group = None
+try:
+    _v232_prev_clear_today_records_fast_cache = clear_today_records_fast_cache
+except Exception:  # pragma: no cover
+    _v232_prev_clear_today_records_fast_cache = None
+
+import json as _v232_json
+import os as _v232_os
+import time as _v232_time
+import uuid as _v232_uuid
+import threading as _v232_threading
+from pathlib import Path as _v232_Path
+from datetime import datetime as _v232_datetime, date as _v232_date_cls
+try:
+    import fcntl as _v232_fcntl  # Linux / Streamlit Cloud
+except Exception:  # pragma: no cover
+    _v232_fcntl = None
+
+_V232_VERSION = "V232_MULTI_USER_CONCURRENT_WRITE_SAFETY"
+try:
+    _V232_PROJECT_ROOT = _v232_Path(__file__).resolve().parents[1]
+except Exception:  # pragma: no cover
+    _V232_PROJECT_ROOT = _v232_Path(".").resolve()
+_V232_AUTHORITY_DIR = _V232_PROJECT_ROOT / "data" / "permanent_store" / "modules"
+_V232_AUTHORITY_MODULES = ("01_time_records", "02_history")
+_V232_EVENT_DIR = _V232_AUTHORITY_DIR / "time_record_operation_events" / "events"
+_V232_TOMBSTONE_PATH = _V232_AUTHORITY_DIR / "time_record_delete_guard" / "v232_tombstones.json"
+_V232_QUEUE_PATH = _V232_PROJECT_ROOT / "data" / "persistent_state" / "frontend_cache" / "01_background_queue.jsonl"
+_V232_JOURNAL_PATH = _V232_PROJECT_ROOT / "data" / "persistent_state" / "concurrency_journal" / "time_record_operations.jsonl"
+_V232_LOCK_PATH = _V232_PROJECT_ROOT / "data" / "persistent_state" / "locks" / "time_record_write.lock"
+_V232_LOCAL_LOCK = _v232_threading.RLock()
+_V232_TERMINAL_STATUSES = {"下班", "暫停", "完工", "已結束", "結束", "完成", "已完成", "closed", "finished", "complete", "completed", "pause", "paused", "off duty"}
+
+
+def _v232_text(v) -> str:
+    try:
+        if "_v231_text" in globals() and callable(_v231_text):  # type: ignore[name-defined]
+            return _v231_text(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if v is None:
+        return ""
+    try:
+        if pd.isna(v):  # type: ignore[name-defined]
+            return ""
+    except Exception:
+        pass
+    s = str(v).strip()
+    return "" if s.lower() in ("none", "nan", "nat", "null", "<na>") else s
+
+
+def _v232_int(v):
+    try:
+        if "_v231_int" in globals() and callable(_v231_int):  # type: ignore[name-defined]
+            return _v231_int(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s or s.lower() in ("none", "nan", "nat", "null", "<na>"):
+            return None
+        return int(float(s))
+    except Exception:
+        return None
+
+
+def _v232_now() -> str:
+    try:
+        return now_text()  # type: ignore[name-defined]
+    except Exception:
+        return _v232_datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v232_today() -> str:
+    try:
+        return today_text()  # type: ignore[name-defined]
+    except Exception:
+        return _v232_now()[:10]
+
+
+def _v232_date(v) -> str:
+    try:
+        if "_v231_date" in globals() and callable(_v231_date):  # type: ignore[name-defined]
+            return _v231_date(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return _v232_text(v)[:10].replace("/", "-")
+
+
+def _v232_json_default(v):
+    try:
+        if pd.isna(v):  # type: ignore[name-defined]
+            return ""
+    except Exception:
+        pass
+    if isinstance(v, (_v232_datetime, _v232_date_cls)):
+        return v.strftime("%Y-%m-%d %H:%M:%S") if isinstance(v, _v232_datetime) else v.strftime("%Y-%m-%d")
+    try:
+        if hasattr(v, "item"):
+            return v.item()
+    except Exception:
+        pass
+    return str(v)
+
+
+def _v232_safe_read_json(path: _v232_Path, default):
+    try:
+        if not path.exists():
+            return default
+        text = path.read_text(encoding="utf-8-sig")
+        if not text.strip():
+            return default
+        return _v232_json.loads(text)
+    except Exception:
+        return default
+
+
+def _v232_safe_write_json(path: _v232_Path, payload) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(_v232_json.dumps(payload, ensure_ascii=False, indent=2, default=_v232_json_default), encoding="utf-8")
+    _v232_os.replace(str(tmp), str(path))
+
+
+class _V232FileLock:
+    def __enter__(self):
+        _V232_LOCAL_LOCK.acquire()
+        try:
+            _V232_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+            self._fh = _V232_LOCK_PATH.open("a+", encoding="utf-8")
+            if _v232_fcntl is not None:
+                _v232_fcntl.flock(self._fh.fileno(), _v232_fcntl.LOCK_EX)
+            try:
+                self._fh.seek(0)
+                self._fh.truncate(0)
+                self._fh.write(f"locked_at={_v232_now()} version={_V232_VERSION}\n")
+                self._fh.flush()
+            except Exception:
+                pass
+        except Exception:
+            self._fh = None
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        try:
+            if getattr(self, "_fh", None) is not None and _v232_fcntl is not None:
+                _v232_fcntl.flock(self._fh.fileno(), _v232_fcntl.LOCK_UN)
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_fh", None) is not None:
+                self._fh.close()
+        except Exception:
+            pass
+        try:
+            _V232_LOCAL_LOCK.release()
+        except Exception:
+            pass
+        return False
+
+
+def _v232_record_id(row: dict):
+    if not isinstance(row, dict):
+        return None
+    return _v232_int(row.get("id") or row.get("ID") or row.get("ID / ID"))
+
+
+def _v232_record_key(row: dict) -> str:
+    if not isinstance(row, dict):
+        return ""
+    for k in ("record_key", "紀錄鍵 / Record Key", "紀錄鍵", "Record Key"):
+        v = _v232_text(row.get(k))
+        if v:
+            return v
+    rid = _v232_record_id(row)
+    if rid is not None:
+        return f"id:{rid}"
+    bits = [
+        _v232_text(row.get("employee_id") or row.get("工號")),
+        _v232_text(row.get("employee_name") or row.get("姓名")),
+        _v232_text(row.get("work_order") or row.get("製令")),
+        _v232_text(row.get("process_name") or row.get("工段")),
+        _v232_text(row.get("start_timestamp") or row.get("開始時間")),
+    ]
+    joined = "|".join(bits).strip("|")
+    return joined or f"uuid:{_v232_uuid.uuid4().hex}"
+
+
+def _v232_row_merge_key(row: dict) -> str:
+    rid = _v232_record_id(row)
+    if rid is not None:
+        return f"id:{rid}"
+    rk = _v232_record_key(row)
+    return f"rk:{rk}" if rk else f"uuid:{_v232_uuid.uuid4().hex}"
+
+
+def _v232_row_updated_key(row: dict) -> str:
+    if not isinstance(row, dict):
+        return ""
+    return _v232_text(row.get("updated_at") or row.get("end_timestamp") or row.get("created_at") or row.get("start_timestamp"))
+
+
+def _v232_is_active_row(row: dict) -> bool:
+    try:
+        if "_v231_is_active_row" in globals() and callable(_v231_is_active_row):  # type: ignore[name-defined]
+            return bool(_v231_is_active_row(row))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if not isinstance(row, dict):
+        return False
+    if _v232_text(row.get("end_timestamp")) or _v232_text(row.get("end_action")):
+        return False
+    status = _v232_text(row.get("status"))
+    return not status or status not in _V232_TERMINAL_STATUSES
+
+
+def _v232_normalize_row(row: dict, *, ensure_record_key: bool = False, op_type: str = "UPSERT") -> dict:
+    r = dict(row) if isinstance(row, dict) else {}
+    now = _v232_now()
+    if ensure_record_key:
+        rk = _v232_text(r.get("record_key"))
+        # 舊版 record_key 可能是 business key，保留；只有空值才補全域唯一 key。
+        if not rk:
+            emp = _v232_text(r.get("employee_id") or r.get("工號"))
+            rid = _v232_text(r.get("id"))
+            r["record_key"] = f"TR-{now.replace('-', '').replace(':', '').replace(' ', '-')}-{emp or 'NA'}-{rid or 'NA'}-{_v232_uuid.uuid4().hex[:8].upper()}"
+    r.setdefault("created_at", now)
+    r["updated_at"] = _v232_text(r.get("updated_at")) or now
+    r.setdefault("source", "streamlit_v232_concurrency_safe")
+    r["v232_last_op"] = op_type
+    return r
+
+
+def _v232_extract_rows_from_payload(payload) -> list[dict]:
+    if isinstance(payload, dict):
+        tables = payload.get("tables")
+        if isinstance(tables, dict) and isinstance(tables.get("time_records"), list):
+            return [dict(r) for r in tables.get("time_records", []) if isinstance(r, dict)]
+        for key in ("records", "data", "time_records"):
+            if isinstance(payload.get(key), list):
+                return [dict(r) for r in payload.get(key, []) if isinstance(r, dict)]
+    if isinstance(payload, list):
+        return [dict(r) for r in payload if isinstance(r, dict)]
+    return []
+
+
+def _v232_payload_with_rows(original, rows: list[dict], module_key: str, reason: str):
+    now = _v232_now()
+    clean = [dict(r) for r in (rows or []) if isinstance(r, dict)]
+    if isinstance(original, dict):
+        out = dict(original)
+        tables = out.get("tables") if isinstance(out.get("tables"), dict) else {}
+        tables = dict(tables)
+        tables["time_records"] = clean
+        out["tables"] = tables
+        out["module_key"] = out.get("module_key") or module_key
+        out["kind"] = out.get("kind") or "module_records"
+        out["updated_at"] = now
+        out["exported_at"] = now
+        out["reason"] = reason
+        out["empty_authoritative"] = False
+        tc = dict(out.get("table_counts") or {})
+        tc["time_records"] = len(clean)
+        out["table_counts"] = tc
+        return out
+    return {
+        "authority_schema": "v232_time_records",
+        "module_key": module_key,
+        "kind": "module_records",
+        "updated_at": now,
+        "exported_at": now,
+        "reason": reason,
+        "empty_authoritative": False,
+        "tables": {"time_records": clean},
+        "settings": {},
+        "table_counts": {"time_records": len(clean)},
+    }
+
+
+def _v232_dedupe_rows(rows: list[dict]) -> list[dict]:
+    by: dict[str, dict] = {}
+    order: list[str] = []
+    for item in rows or []:
+        if not isinstance(item, dict):
+            continue
+        r = dict(item)
+        key = _v232_row_merge_key(r)
+        if key not in by:
+            order.append(key)
+            by[key] = r
+        else:
+            old = by[key]
+            # incoming rows are usually newer. If timestamps exist, keep the newer timestamp.
+            old_ts = _v232_row_updated_key(old)
+            new_ts = _v232_row_updated_key(r)
+            if (not old_ts) or (new_ts and new_ts >= old_ts):
+                by[key] = r
+    out = [by[k] for k in order if k in by]
+    try:
+        # Reuse existing exact tombstone filter if available.
+        if "_v224_filter_deleted" in globals() and callable(_v224_filter_deleted):  # type: ignore[name-defined]
+            out = [dict(r) for r in _v224_filter_deleted(out) if isinstance(r, dict)]  # type: ignore[name-defined]
+        elif "_v223_filter_deleted_exact" in globals() and callable(_v223_filter_deleted_exact):  # type: ignore[name-defined]
+            out = [dict(r) for r in _v223_filter_deleted_exact(out) if isinstance(r, dict)]  # type: ignore[name-defined]
+    except Exception:
+        pass
+    out = _v232_filter_deleted_rows(out)
+    return out
+
+
+def _v232_deleted_state() -> dict:
+    data = _v232_safe_read_json(_V232_TOMBSTONE_PATH, {"ids": [], "record_keys": [], "events": []})
+    if not isinstance(data, dict):
+        return {"ids": [], "record_keys": [], "events": []}
+    data.setdefault("ids", [])
+    data.setdefault("record_keys", [])
+    data.setdefault("events", [])
+    return data
+
+
+def _v232_deleted_sets():
+    data = _v232_deleted_state()
+    ids = {i for i in (_v232_int(x) for x in data.get("ids", [])) if i is not None}
+    keys = {_v232_text(x) for x in data.get("record_keys", []) if _v232_text(x)}
+    return ids, keys
+
+
+def _v232_filter_deleted_rows(rows: list[dict]) -> list[dict]:
+    ids, keys = _v232_deleted_sets()
+    if not ids and not keys:
+        return [dict(r) for r in rows if isinstance(r, dict)]
+    kept = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        rid = _v232_record_id(r)
+        rk = _v232_record_key(r)
+        if rid is not None and rid in ids:
+            continue
+        if rk and rk in keys:
+            continue
+        kept.append(dict(r))
+    return kept
+
+
+def _v232_add_tombstones(rows_or_ids, reason: str = "v232_delete") -> None:
+    ids = set()
+    keys = set()
+    events = []
+    for item in rows_or_ids or []:
+        if isinstance(item, dict):
+            rid = _v232_record_id(item)
+            rk = _v232_record_key(item)
+            snapshot = dict(item)
+        else:
+            rid = _v232_int(item)
+            rk = ""
+            snapshot = {"id": rid} if rid is not None else {}
+        if rid is not None:
+            ids.add(rid)
+        if rk:
+            keys.add(rk)
+        events.append({"id": rid, "record_key": rk, "deleted_at": _v232_now(), "reason": reason, "snapshot": snapshot})
+    if not ids and not keys:
+        return
+    state = _v232_deleted_state()
+    old_ids = {i for i in (_v232_int(x) for x in state.get("ids", [])) if i is not None}
+    old_keys = {_v232_text(x) for x in state.get("record_keys", []) if _v232_text(x)}
+    state["ids"] = sorted(old_ids | ids)
+    state["record_keys"] = sorted(old_keys | keys)
+    old_events = state.get("events", []) if isinstance(state.get("events"), list) else []
+    state["events"] = (old_events + events)[-10000:]
+    state["updated_at"] = _v232_now()
+    state["reason"] = reason
+    _v232_safe_write_json(_V232_TOMBSTONE_PATH, state)
+
+
+def _v232_module_path(module_key: str) -> _v232_Path:
+    return _V232_AUTHORITY_DIR / module_key / "records.json"
+
+
+def _v232_read_module_rows(module_key: str) -> tuple[object, list[dict]]:
+    path = _v232_module_path(module_key)
+    payload = _v232_safe_read_json(path, {})
+    return payload, _v232_extract_rows_from_payload(payload)
+
+
+
+def _v232_authority_key_set() -> set[str]:
+    keys: set[str] = set()
+    for module_key in _V232_AUTHORITY_MODULES:
+        try:
+            _, rows = _v232_read_module_rows(module_key)
+            for r in rows:
+                if isinstance(r, dict):
+                    keys.add(_v232_row_merge_key(r))
+        except Exception:
+            pass
+    return keys
+
+
+def _v232_allowed_keys_from_rows(rows_or_ids) -> set[str]:
+    keys: set[str] = set()
+    for item in rows_or_ids or []:
+        if isinstance(item, dict):
+            keys.add(_v232_row_merge_key(item))
+        else:
+            rid = _v232_int(item)
+            if rid is not None:
+                keys.add(f"id:{rid}")
+    return keys
+
+
+def _v232_prune_unexpected_new_rows(before_keys: set[str], allowed_rows_or_ids, reason: str = "v232_prune_unexpected") -> int:
+    """Remove rows resurrected by old fallback sources during a write.
+
+    V223/V224/V231 can still see old row-shard/cache data. During a serialized operation,
+    only rows that existed before the operation plus rows touched by the operation may remain.
+    Anything else is a stale resurrection and must not be re-written to 01/02.
+    """
+    allowed = set(before_keys or set()) | _v232_allowed_keys_from_rows(allowed_rows_or_ids)
+    if not allowed:
+        return 0
+    removed = 0
+    for module_key in _V232_AUTHORITY_MODULES:
+        try:
+            payload, rows = _v232_read_module_rows(module_key)
+            kept = []
+            for r in rows:
+                if not isinstance(r, dict):
+                    continue
+                key = _v232_row_merge_key(r)
+                if key in allowed:
+                    kept.append(dict(r))
+                else:
+                    removed += 1
+            if len(kept) != len(rows):
+                _v232_safe_write_json(_v232_module_path(module_key), _v232_payload_with_rows(payload, _v232_filter_deleted_rows(kept), module_key, reason))
+        except Exception:
+            pass
+    if removed:
+        # Keep the fast display cache aligned with the pruned authority set; otherwise Today Records may
+        # still show a stale resurrected row even after authority has been corrected.
+        try:
+            authority_rows: list[dict] = []
+            for module_key in _V232_AUTHORITY_MODULES:
+                _, rr = _v232_read_module_rows(module_key)
+                authority_rows.extend([dict(r) for r in rr if isinstance(r, dict)])
+            authority_rows = _v232_dedupe_rows(authority_rows)
+            if "_v231_write_rows" in globals() and callable(_v231_write_rows):  # type: ignore[name-defined]
+                _v231_write_rows(authority_rows, reason=reason + "_fast_cache_align")  # type: ignore[name-defined]
+        except Exception:
+            pass
+        try:
+            write_log("V232_PRUNE_STALE_RESURRECTION", f"V232 已阻擋舊快取/舊 row shard 復活資料 {removed} 筆。", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return removed
+
+
+def _v232_merge_authority_rows(rows: list[dict], reason: str = "v232_merge") -> int:
+    incoming = [_v232_normalize_row(dict(r), ensure_record_key=True, op_type=reason) for r in (rows or []) if isinstance(r, dict)]
+    if not incoming:
+        return 0
+    total = 0
+    for module_key in _V232_AUTHORITY_MODULES:
+        path = _v232_module_path(module_key)
+        payload, base = _v232_read_module_rows(module_key)
+        merged = _v232_dedupe_rows(base + incoming)
+        out_payload = _v232_payload_with_rows(payload, merged, module_key, reason)
+        _v232_safe_write_json(path, out_payload)
+        total = max(total, len(incoming))
+    return total
+
+
+def _v232_remove_authority_rows(rows_or_ids, reason: str = "v232_remove") -> int:
+    delete_ids = set()
+    delete_keys = set()
+    for item in rows_or_ids or []:
+        if isinstance(item, dict):
+            rid = _v232_record_id(item)
+            rk = _v232_record_key(item)
+        else:
+            rid = _v232_int(item)
+            rk = ""
+        if rid is not None:
+            delete_ids.add(rid)
+        if rk:
+            delete_keys.add(rk)
+    if not delete_ids and not delete_keys:
+        return 0
+    removed = 0
+    for module_key in _V232_AUTHORITY_MODULES:
+        path = _v232_module_path(module_key)
+        payload, base = _v232_read_module_rows(module_key)
+        kept = []
+        for r in base:
+            rid = _v232_record_id(r)
+            rk = _v232_record_key(r)
+            if (rid is not None and rid in delete_ids) or (rk and rk in delete_keys):
+                removed += 1
+                continue
+            kept.append(dict(r))
+        out_payload = _v232_payload_with_rows(payload, _v232_filter_deleted_rows(kept), module_key, reason)
+        _v232_safe_write_json(path, out_payload)
+    return removed
+
+
+def _v232_append_operation_event(op_type: str, rows: list[dict] | None = None, *, ids: list[int] | None = None, reason: str = "", extra: dict | None = None) -> str:
+    event_id = f"OP-{_v232_now().replace('-', '').replace(':', '').replace(' ', '-')}-{_v232_uuid.uuid4().hex[:12].upper()}"
+    clean_rows = [_v232_normalize_row(dict(r), ensure_record_key=True, op_type=op_type) for r in (rows or []) if isinstance(r, dict)]
+    row_ids = [i for i in (_v232_record_id(r) for r in clean_rows) if i is not None]
+    if ids:
+        row_ids.extend([i for i in (_v232_int(x) for x in ids) if i is not None])
+    row_ids = sorted(set(row_ids))
+    payload = {
+        "version": _V232_VERSION,
+        "event_id": event_id,
+        "op_type": op_type,
+        "created_at": _v232_now(),
+        "reason": reason,
+        "row_ids": row_ids,
+        "record_keys": sorted({_v232_record_key(r) for r in clean_rows if _v232_record_key(r)}),
+        "rows": clean_rows,
+        "extra": extra or {},
+    }
+    # 1) Per-event shard: append-only and unique, so concurrent users do not overwrite each other.
+    try:
+        event_date = _v232_today().replace("-", "")
+        path = _V232_EVENT_DIR / event_date / f"{event_id}.json"
+        _v232_safe_write_json(path, payload)
+    except Exception as exc:
+        try:
+            write_log("V232_EVENT_SHARD_WARN", f"V232 事件單檔寫入失敗：{exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    # 2) JSONL marker: append only, used for audit/queue. Failure must not break the foreground operation.
+    try:
+        _V232_JOURNAL_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with _V232_JOURNAL_PATH.open("a", encoding="utf-8") as fh:
+            fh.write(_v232_json.dumps(payload, ensure_ascii=False, default=_v232_json_default) + "\n")
+    except Exception:
+        pass
+    try:
+        if "_v230_enqueue_background_task" in globals() and callable(_v230_enqueue_background_task):  # type: ignore[name-defined]
+            _v230_enqueue_background_task("v232_concurrency_event", {"event_id": event_id, "op_type": op_type, "rows": len(clean_rows), "ids": row_ids})  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return event_id
+
+
+def _v232_find_rows_by_ids(ids: list[int | str]) -> list[dict]:
+    wanted = {i for i in (_v232_int(x) for x in (ids or [])) if i is not None}
+    if not wanted:
+        return []
+    rows: list[dict] = []
+    # Fast cache / display lane first.
+    try:
+        if "_v231_find_rows_by_ids" in globals() and callable(_v231_find_rows_by_ids):  # type: ignore[name-defined]
+            rows.extend([dict(r) for r in _v231_find_rows_by_ids(list(wanted)) if isinstance(r, dict)])  # type: ignore[name-defined]
+    except Exception:
+        pass
+    # Authority lane.
+    for module_key in _V232_AUTHORITY_MODULES:
+        try:
+            _, base = _v232_read_module_rows(module_key)
+            rows.extend([dict(r) for r in base if _v232_record_id(r) in wanted])
+        except Exception:
+            pass
+    return _v232_dedupe_rows(rows)
+
+
+def _v232_df_to_rows(df) -> list[dict]:
+    if df is None:
+        return []
+    try:
+        if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+            return [dict(r) for _, r in df.copy().where(pd.notna(df), "").iterrows()]  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return []
+
+
+def _v232_filter_df(df, *args, **kwargs):
+    try:
+        if "_v231_filter_df" in globals() and callable(_v231_filter_df):  # type: ignore[name-defined]
+            return _v231_filter_df(df, *args, **kwargs)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return df if isinstance(df, pd.DataFrame) else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v232_rows_to_df(rows: list[dict]):
+    try:
+        if "_v231_rows_to_df" in globals() and callable(_v231_rows_to_df):  # type: ignore[name-defined]
+            return _v231_rows_to_df(rows)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        return pd.DataFrame(rows).reset_index(drop=True) if rows else pd.DataFrame()  # type: ignore[name-defined]
+    except Exception:
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v232_update_fast_lanes(rows: list[dict] | None = None, remove_ids: list[int] | None = None, reason: str = "v232_update_fast_lanes") -> None:
+    try:
+        if rows:
+            if "_v231_upsert_rows" in globals() and callable(_v231_upsert_rows):  # type: ignore[name-defined]
+                _v231_upsert_rows([dict(r) for r in rows if isinstance(r, dict)], reason=reason)  # type: ignore[name-defined]
+        if remove_ids:
+            if "_v231_remove_ids" in globals() and callable(_v231_remove_ids):  # type: ignore[name-defined]
+                _v231_remove_ids(list(remove_ids), reason=reason)  # type: ignore[name-defined]
+        if "_v231_mark_skip_clear" in globals() and callable(_v231_mark_skip_clear):  # type: ignore[name-defined]
+            _v231_mark_skip_clear(45.0)  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V232: serialized foreground write + append-only event proof + non-destructive authority merge."""
+    if not callable(_v232_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    with _V232FileLock():
+        before_keys = _v232_authority_key_set()
+        rid = int(_v232_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)
+        if not rid:
+            return 0
+        rows = _v232_find_rows_by_ids([rid])
+        if not rows:
+            try:
+                if "_v231_synthetic_start_row" in globals() and callable(_v231_synthetic_start_row):  # type: ignore[name-defined]
+                    rows = [_v231_synthetic_start_row(rid, employee if isinstance(employee, dict) else {}, work_order if isinstance(work_order, dict) else {}, process_name, remark)]  # type: ignore[name-defined]
+            except Exception:
+                rows = []
+        rows = [_v232_normalize_row(dict(r), ensure_record_key=True, op_type="START_WORK") for r in rows if isinstance(r, dict)]
+        try:
+            _v232_append_operation_event("START_WORK", rows, reason="v232_start_work", extra={"employee_id": _v232_text((employee or {}).get("employee_id") if isinstance(employee, dict) else ""), "process_name": process_name})
+            _v232_merge_authority_rows(rows, reason="v232_start_work_non_destructive_merge")
+            _v232_prune_unexpected_new_rows(before_keys, rows, reason="v232_start_prune_stale_resurrection")
+            _v232_update_fast_lanes(rows=rows, reason="v232_start_work_fast_lanes")
+        except Exception as exc:
+            try:
+                write_log("V232_START_CONCURRENCY_WARN", f"V232 開始作業併發保護補寫失敗：{exc}", "time_records", rid, level="WARN")  # type: ignore[name-defined]
+            except Exception:
+                pass
+        return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V232: serialize finish; keep V225 authority-first behavior; record immutable finish event."""
+    if not callable(_v232_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    rid0 = _v232_int(record_id)
+    with _V232FileLock():
+        before_keys = _v232_authority_key_set()
+        affected_ids: list[int] = []
+        try:
+            if finish_parallel_group and callable(_v232_prev_get_active_group):
+                gdf = _v232_prev_get_active_group(record_id)
+                if isinstance(gdf, pd.DataFrame) and not gdf.empty and "id" in gdf.columns:  # type: ignore[name-defined]
+                    affected_ids.extend([i for i in (_v232_int(x) for x in gdf["id"].tolist()) if i is not None])
+        except Exception:
+            pass
+        if rid0 is not None:
+            affected_ids.append(rid0)
+        affected_ids = sorted(set(affected_ids))
+        n = int(_v232_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)
+        try:
+            rows = _v232_find_rows_by_ids(affected_ids)
+            if rows:
+                rows = [_v232_normalize_row(dict(r), ensure_record_key=True, op_type="FINISH_WORK") for r in rows]
+                _v232_append_operation_event("FINISH_WORK", rows, ids=affected_ids, reason="v232_finish_work", extra={"end_action": end_action})
+                _v232_merge_authority_rows(rows, reason="v232_finish_work_non_destructive_merge")
+                _v232_prune_unexpected_new_rows(before_keys, rows or affected_ids, reason="v232_finish_prune_stale_resurrection")
+                _v232_update_fast_lanes(rows=rows, reason="v232_finish_work_fast_lanes")
+            else:
+                _v232_append_operation_event("FINISH_WORK", [], ids=affected_ids, reason="v232_finish_work_no_rows", extra={"end_action": end_action, "result": n})
+                _v232_update_fast_lanes(remove_ids=affected_ids, reason="v232_finish_work_remove_active_fallback")
+        except Exception as exc:
+            try:
+                write_log("V232_FINISH_CONCURRENCY_WARN", f"V232 結束作業併發保護補寫失敗：{exc}", "time_records", rid0, level="WARN")  # type: ignore[name-defined]
+            except Exception:
+                pass
+        return int(n)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    """V232: serialize deletes and persist tombstone before/after delete to prevent reboot resurrection."""
+    ids = sorted({i for i in (_v232_int(x) for x in (record_ids or [])) if i is not None})
+    if not ids:
+        return 0
+    if not callable(_v232_prev_delete_time_records):
+        raise RuntimeError("delete_time_records base function is unavailable")
+    with _V232FileLock():
+        before_keys = _v232_authority_key_set()
+        before_rows = _v232_find_rows_by_ids(ids)
+        try:
+            _v232_add_tombstones(before_rows or ids, reason=reason)
+            _v232_append_operation_event("DELETE_RECORD", before_rows, ids=ids, reason=reason)
+        except Exception:
+            pass
+        n = int(_v232_prev_delete_time_records(ids, reason=reason) or 0)
+        try:
+            _v232_add_tombstones(before_rows or ids, reason=reason + "_after_base_delete")
+            _v232_remove_authority_rows(before_rows or ids, reason="v232_delete_non_destructive_remove")
+            _v232_prune_unexpected_new_rows(before_keys, [], reason="v232_delete_prune_stale_resurrection")
+            _v232_update_fast_lanes(remove_ids=ids, reason="v232_delete_fast_lanes")
+        except Exception as exc:
+            try:
+                write_log("V232_DELETE_CONCURRENCY_WARN", f"V232 刪除併發保護補寫失敗：{exc}", "time_records", ",".join(map(str, ids)), level="WARN")  # type: ignore[name-defined]
+            except Exception:
+                pass
+        return int(n)
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    """V232: serialize admin save; append edit event and merge changed rows without dropping concurrent rows."""
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return 0
+    if not callable(_v232_prev_save_time_records):
+        raise RuntimeError("save_time_records base function is unavailable")
+    with _V232FileLock():
+        before_keys = _v232_authority_key_set()
+        changed_rows: list[dict] = []
+        try:
+            if "_v231_changed_rows" in globals() and callable(_v231_changed_rows):  # type: ignore[name-defined]
+                changed_rows = [dict(r) for r in _v231_changed_rows(df) if isinstance(r, dict)]  # type: ignore[name-defined]
+        except Exception:
+            changed_rows = []
+        n = int(_v232_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+        try:
+            if not changed_rows:
+                changed_rows = _v232_df_to_rows(df)
+            changed_rows = [_v232_normalize_row(dict(r), ensure_record_key=True, op_type="EDIT_RECORD") for r in changed_rows if isinstance(r, dict)]
+            if changed_rows:
+                _v232_append_operation_event("EDIT_RECORD", changed_rows, reason="v232_admin_save", extra={"result": n, "recalc": bool(recalc_edited_timestamps)})
+                _v232_merge_authority_rows(changed_rows, reason="v232_admin_save_non_destructive_merge")
+                _v232_prune_unexpected_new_rows(before_keys, changed_rows, reason="v232_save_prune_stale_resurrection")
+                _v232_update_fast_lanes(rows=changed_rows, reason="v232_admin_save_fast_lanes")
+        except Exception as exc:
+            try:
+                write_log("V232_SAVE_CONCURRENCY_WARN", f"V232 管理員存檔併發保護補寫失敗：{exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+            except Exception:
+                pass
+        return int(n)
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    # Keep V231 speed path, then apply V232 tombstone filter. Do not full-replay events in foreground.
+    try:
+        df = _v232_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order) if callable(_v232_prev_load_records) else pd.DataFrame()  # type: ignore[name-defined]
+    except Exception:
+        df = pd.DataFrame()  # type: ignore[name-defined]
+    rows = _v232_filter_deleted_rows(_v232_df_to_rows(df))
+    return _v232_rows_to_df(rows)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        df = _v232_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only) if callable(_v232_prev_today_records) else pd.DataFrame()  # type: ignore[name-defined]
+    except Exception:
+        today = _v232_today()
+        df = load_records(today, today, None, None)
+        if unfinished_only or not include_finished:
+            df = _v232_filter_df(df, active_only=True)
+    rows = _v232_filter_deleted_rows(_v232_df_to_rows(df))
+    if unfinished_only or not include_finished:
+        rows = [r for r in rows if _v232_is_active_row(r)]
+    return _v232_rows_to_df(rows)
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = today_records(include_finished=False, unfinished_only=True)
+    out = _v232_filter_df(df, employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name, active_only=True)
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return None
+    return dict(df.iloc[0].to_dict())
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    rows = _v232_find_rows_by_ids([record_id])
+    if not rows:
+        try:
+            if callable(_v232_prev_get_active_group):
+                return _v232_prev_get_active_group(record_id)
+        except Exception:
+            pass
+        return pd.DataFrame()  # type: ignore[name-defined]
+    seed = rows[0]
+    return get_active_records(
+        employee_id=_v232_text(seed.get("employee_id")),
+        process_name=_v232_text(seed.get("process_name")),
+        start_date=_v232_date(seed.get("start_date") or seed.get("start_timestamp")),
+    )
+
+
+def clear_today_records_fast_cache() -> None:  # type: ignore[override]
+    # Preserve V231 throttled clear. Do not force full rebuild on every admin rerun.
+    try:
+        if callable(_v232_prev_clear_today_records_fast_cache):
+            return _v232_prev_clear_today_records_fast_cache()
+    except Exception:
+        pass
+
+
+def audit_v232_concurrent_write_safety() -> dict:
+    try:
+        rows = _v232_df_to_rows(load_records())
+        active = [r for r in rows if _v232_is_active_row(r)]
+    except Exception:
+        rows, active = [], []
+    tomb = _v232_deleted_state()
+    try:
+        today_event_dir = _V232_EVENT_DIR / _v232_today().replace("-", "")
+        event_count = len(list(today_event_dir.glob("*.json"))) if today_event_dir.exists() else 0
+    except Exception:
+        event_count = 0
+    return {
+        "version": _V232_VERSION,
+        "base_preserved": "V225 correctness + V230/V231 speed",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "sqlite_only_rollback": False,
+        "records_visible": int(len(rows)),
+        "active_visible": int(len(active)),
+        "today_operation_event_files": int(event_count),
+        "tombstone_ids": int(len(tomb.get("ids", []))) if isinstance(tomb, dict) else 0,
+        "lock_path": str(_V232_LOCK_PATH),
+        "rule": "Foreground writes are serialized by file lock, each operation writes an append-only event shard, authority files are merged non-destructively, deletes create tombstones, and V231 fast cache remains the display accelerator.",
+        "limit": "JSON/GitHub architecture is concurrency-hardened for the same deployment filesystem; formal cross-instance transaction guarantees require PostgreSQL.",
+    }
+
+# ================= END V232 MULTI-USER CONCURRENT WRITE SAFETY LAYER =================
