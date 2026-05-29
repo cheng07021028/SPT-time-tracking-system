@@ -18249,3 +18249,325 @@ def audit_v221_sqlite_table_guard() -> dict:
     }
 
 # ================= END V221 SQLITE TABLE GUARD FOR FRONTEND ISOLATION =================
+
+# ================= V222 DELETE CACHE SYNC + 02 HISTORY DIRECT AUTHORITY FALLBACK｜2026-05-29 =================
+# 修正兩個 V220/V221 前台隔離後暴露的問題：
+# 1) 01 今日工時紀錄管理員刪除後，01_today_records_cache / 01_active_records_index 未同步移除，
+#    導致畫面顯示「已刪除 N 筆」但資料仍在 Today Records 快取裡。
+# 2) 02 歷史紀錄不得依賴任何可能空白的 SQLite / wrapper 快取；若原 load_records 回傳空白，
+#    必須直接讀 01_time_records / 02_history 本機權威 JSON 顯示，避免 02 完全空白。
+# 限制：只改後端資料服務；不改 UI/CSS/theme/table/buttons；不回退到 SQLite-only；權威檔仍為最終真實來源。
+try:
+    _v222_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v222_prev_load_records = None
+try:
+    _v222_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v222_prev_delete_time_records = None
+try:
+    _v222_prev_delete_time_records_from_editor_df = delete_time_records_from_editor_df
+except Exception:  # pragma: no cover
+    _v222_prev_delete_time_records_from_editor_df = None
+try:
+    _v222_prev_delete_time_records_from_02_history_editor = delete_time_records_from_02_history_editor
+except Exception:  # pragma: no cover
+    _v222_prev_delete_time_records_from_02_history_editor = None
+try:
+    _v222_prev_delete_time_records_v178b_strict = delete_time_records_v178b_strict
+except Exception:  # pragma: no cover
+    _v222_prev_delete_time_records_v178b_strict = None
+
+
+def _v222_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v222_int(value):
+    try:
+        if value is None:
+            return None
+        text = _v222_text(value)
+        if not text:
+            return None
+        return int(float(text))
+    except Exception:
+        return None
+
+
+def _v222_ids(values) -> list[int]:
+    out: list[int] = []
+    for v in values or []:
+        iv = _v222_int(v)
+        if iv is not None and iv > 0 and iv not in out:
+            out.append(iv)
+    return out
+
+
+def _v222_truthy(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    text = _v222_text(value).lower()
+    return text in {"1", "true", "yes", "y", "是", "勾選", "刪除", "delete", "checked"}
+
+
+def _v222_extract_checked_ids(editor_df=None, delete_column: str = "刪除 / Delete") -> list[int]:
+    if not isinstance(editor_df, pd.DataFrame) or editor_df.empty:
+        return []
+    id_col = None
+    for cand in ("id", "ID", "record_id", "Record ID", "紀錄ID", "紀錄編號"):
+        if cand in editor_df.columns:
+            id_col = cand
+            break
+    if not id_col:
+        return []
+    delete_col = delete_column if delete_column in editor_df.columns else None
+    if not delete_col:
+        for cand in ("刪除 / Delete", "刪除", "Delete", "delete", "勾選刪除"):
+            if cand in editor_df.columns:
+                delete_col = cand
+                break
+    if not delete_col:
+        return []
+    try:
+        selected = editor_df.loc[editor_df[delete_col].map(_v222_truthy)].copy()
+        return _v222_ids(selected[id_col].tolist())
+    except Exception:
+        return []
+
+
+def _v222_clear_runtime_caches() -> None:
+    for fn_name in ("_v205_clear_caches", "clear_today_records_fast_cache"):
+        try:
+            fn = globals().get(fn_name)
+            if callable(fn):
+                fn()
+        except Exception:
+            pass
+
+
+def _v222_filter_json_rows_not_deleted(rows, ids: set[int]) -> list[dict]:
+    if not isinstance(rows, list):
+        return []
+    out: list[dict] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        rid = _v222_int(row.get("id"))
+        if rid is not None and rid in ids:
+            continue
+        out.append(row)
+    return out
+
+
+def _v222_sync_front_cache_after_delete(record_ids, reason: str = "v222_delete_cache_sync") -> None:
+    ids = set(_v222_ids(record_ids))
+    if not ids:
+        return
+    removed_today = 0
+    removed_active = 0
+    try:
+        if "_V220_TODAY_CACHE" in globals() and "_v220_safe_read_json" in globals() and "_v220_safe_write_json" in globals():
+            today_rows = _v220_safe_read_json(_V220_TODAY_CACHE, [])  # type: ignore[name-defined]
+            before = len(today_rows) if isinstance(today_rows, list) else 0
+            today_rows = _v222_filter_json_rows_not_deleted(today_rows, ids)
+            removed_today = before - len(today_rows)
+            _v220_safe_write_json(_V220_TODAY_CACHE, today_rows)  # type: ignore[name-defined]
+        if "_V220_ACTIVE_CACHE" in globals() and "_v220_safe_read_json" in globals() and "_v220_safe_write_json" in globals():
+            active_rows = _v220_safe_read_json(_V220_ACTIVE_CACHE, [])  # type: ignore[name-defined]
+            before = len(active_rows) if isinstance(active_rows, list) else 0
+            active_rows = _v222_filter_json_rows_not_deleted(active_rows, ids)
+            removed_active = before - len(active_rows)
+            _v220_safe_write_json(_V220_ACTIVE_CACHE, active_rows)  # type: ignore[name-defined]
+        if "_v220_write_meta" in globals() and callable(_v220_write_meta):
+            today_n = len(_v220_safe_read_json(_V220_TODAY_CACHE, []) or []) if "_V220_TODAY_CACHE" in globals() else 0  # type: ignore[name-defined]
+            active_n = len(_v220_safe_read_json(_V220_ACTIVE_CACHE, []) or []) if "_V220_ACTIVE_CACHE" in globals() else 0  # type: ignore[name-defined]
+            _v220_write_meta(today_n, active_n, reason=reason)  # type: ignore[name-defined]
+    except Exception as exc:
+        try:
+            if "_v205_direct_log" in globals() and callable(_v205_direct_log):
+                _v205_direct_log("V222_DELETE_CACHE_SYNC_WARN", f"V222 刪除後同步前台快取失敗：{exc}", target_id=",".join(map(str, ids)), detail=reason, level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    _v222_clear_runtime_caches()
+    try:
+        if "_v205_direct_log" in globals() and callable(_v205_direct_log):
+            _v205_direct_log(
+                "V222_DELETE_CACHE_SYNC",
+                f"V222 已同步移除前台快取刪除資料：Today {removed_today} 筆、Active {removed_active} 筆。",
+                target_id=",".join(map(str, sorted(ids))),
+                detail=reason,
+                level="INFO",
+            )  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def _v222_direct_authority_records_df(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    employee_id: str | None = None,
+    work_order: str | None = None,
+) -> pd.DataFrame:
+    df = pd.DataFrame()
+    try:
+        if "_v220_direct_authority_records_df" in globals() and callable(_v220_direct_authority_records_df):
+            df = _v220_direct_authority_records_df()  # type: ignore[name-defined]
+    except Exception:
+        df = pd.DataFrame()
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        rows: list[dict] = []
+        try:
+            root = _V220_PROJECT_ROOT if "_V220_PROJECT_ROOT" in globals() else Path(__file__).resolve().parents[1]  # type: ignore[name-defined]
+            for module_key in ("02_history", "01_time_records"):
+                path = root / "data" / "permanent_store" / "modules" / module_key / "records.json"
+                data = _v220_safe_read_json(path, {}) if "_v220_safe_read_json" in globals() else {}  # type: ignore[name-defined]
+                part = data.get("tables", {}).get("time_records", []) if isinstance(data, dict) else []
+                if isinstance(part, list):
+                    rows.extend([r for r in part if isinstance(r, dict)])
+            if rows and "_v220_dedupe_records" in globals() and callable(_v220_dedupe_records):
+                rows = _v220_dedupe_records(rows)  # type: ignore[name-defined]
+            df = pd.DataFrame(rows)
+        except Exception:
+            df = pd.DataFrame()
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    try:
+        if "_v206_normalize_time_records_df" in globals() and callable(_v206_normalize_time_records_df):
+            df = _v206_normalize_time_records_df(df)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if "_v205_filter_visible_rows" in globals() and callable(_v205_filter_visible_rows):
+            df = _v205_filter_visible_rows(df)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if "_v208_filter_df" in globals() and callable(_v208_filter_df):
+            df = _v208_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) and not df.empty else pd.DataFrame()
+
+
+def _v222_merge_history_display(base_df: pd.DataFrame, auth_df: pd.DataFrame) -> pd.DataFrame:
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        try:
+            if "_v210_merge_canonical_display" in globals() and callable(_v210_merge_canonical_display):
+                return _v210_merge_canonical_display(base_df, auth_df).reset_index(drop=True)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        return auth_df.reset_index(drop=True)
+    return base_df.reset_index(drop=True) if isinstance(base_df, pd.DataFrame) and not base_df.empty else pd.DataFrame()
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V222: 02 歷史紀錄使用直接權威 JSON 作為安全顯示來源，避免 wrapper/cache 空白造成 02 No data。"""
+    base_df = pd.DataFrame()
+    if callable(_v222_prev_load_records):
+        try:
+            base_df = _v222_prev_load_records(start_date, end_date, employee_id, work_order)
+        except Exception:
+            base_df = pd.DataFrame()
+    auth_df = _v222_direct_authority_records_df(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+    if isinstance(auth_df, pd.DataFrame) and not auth_df.empty:
+        return _v222_merge_history_display(base_df, auth_df)
+    return base_df.reset_index(drop=True) if isinstance(base_df, pd.DataFrame) and not base_df.empty else pd.DataFrame()
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = _v222_ids(record_ids)
+    if not callable(_v222_prev_delete_time_records):
+        return 0
+    n = int(_v222_prev_delete_time_records(ids, reason=reason) or 0)  # type: ignore[misc]
+    if n > 0:
+        _v222_sync_front_cache_after_delete(ids, reason=f"delete_time_records_v222|{reason}")
+    return n
+
+
+def delete_time_records_from_editor_df(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete", reason: str = "01 管理員維護表刪除") -> int:  # type: ignore[override]
+    ids = _v222_extract_checked_ids(editor_df, delete_column=delete_column)
+    if callable(_v222_prev_delete_time_records_from_editor_df):
+        n = int(_v222_prev_delete_time_records_from_editor_df(editor_df, delete_column=delete_column, reason=reason) or 0)  # type: ignore[misc]
+    else:
+        n = delete_time_records(ids, reason=reason)
+        return n
+    if n > 0:
+        _v222_sync_front_cache_after_delete(ids, reason=f"delete_time_records_from_editor_df_v222|{reason}")
+    return n
+
+
+def delete_time_records_from_02_history_editor(editor_df: pd.DataFrame, record_ids: list[int] | None = None, delete_column: str = "刪除 / Delete", reason: str = "02 歷史紀錄刪除") -> dict:
+    ids = _v222_ids(record_ids) or _v222_extract_checked_ids(editor_df, delete_column=delete_column)
+    if callable(_v222_prev_delete_time_records_from_02_history_editor):
+        res = _v222_prev_delete_time_records_from_02_history_editor(editor_df, record_ids=ids, delete_column=delete_column, reason=reason)  # type: ignore[misc]
+    else:
+        n = delete_time_records(ids, reason=reason)
+        res = {"ok": bool(n), "deleted_count": int(n or 0), "ids": ids}
+        return res
+    deleted_count = 0
+    try:
+        if isinstance(res, dict):
+            deleted_count = int(res.get("deleted_count") or res.get("count") or 0)
+            ids = _v222_ids(res.get("ids") or ids)
+        else:
+            deleted_count = int(res or 0)
+    except Exception:
+        deleted_count = 0
+    if deleted_count > 0:
+        _v222_sync_front_cache_after_delete(ids, reason=f"delete_time_records_from_02_history_editor_v222|{reason}")
+    return res if isinstance(res, dict) else {"ok": bool(deleted_count), "deleted_count": deleted_count, "ids": ids}
+
+
+def delete_time_records_v178b_strict(record_ids: list[int], reason: str = "02 歷史紀錄嚴格刪除", editor_df=None) -> dict:  # type: ignore[override]
+    ids = _v222_ids(record_ids)
+    if callable(_v222_prev_delete_time_records_v178b_strict):
+        res = _v222_prev_delete_time_records_v178b_strict(ids, reason=reason, editor_df=editor_df)  # type: ignore[misc]
+    else:
+        res = delete_time_records_from_02_history_editor(editor_df if isinstance(editor_df, pd.DataFrame) else pd.DataFrame(), record_ids=ids, reason=reason)
+        return res
+    deleted_count = 0
+    try:
+        if isinstance(res, dict):
+            deleted_count = int(res.get("deleted_count") or res.get("count") or 0)
+            ids = _v222_ids(res.get("ids") or ids)
+        else:
+            deleted_count = int(res or 0)
+    except Exception:
+        deleted_count = 0
+    if deleted_count > 0:
+        _v222_sync_front_cache_after_delete(ids, reason=f"delete_time_records_v178b_strict_v222|{reason}")
+    return res if isinstance(res, dict) else {"ok": bool(deleted_count), "deleted_count": deleted_count, "ids": ids}
+
+
+def audit_v222_delete_cache_and_history_display() -> dict:
+    try:
+        hist_df = load_records(None, None, None, None)
+    except Exception:
+        hist_df = pd.DataFrame()
+    try:
+        today_df = today_records(include_finished=True, unfinished_only=False)
+    except Exception:
+        today_df = pd.DataFrame()
+    return {
+        "version": "V222",
+        "scope": "delete cache sync + 02 history direct authority fallback; services/time_record_service.py only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "delete_updates_frontend_cache": True,
+        "history_direct_authority_fallback": True,
+        "today_rows": int(len(today_df)) if isinstance(today_df, pd.DataFrame) else 0,
+        "history_rows": int(len(hist_df)) if isinstance(hist_df, pd.DataFrame) else 0,
+    }
+
+# ================= END V222 DELETE CACHE SYNC + 02 HISTORY DIRECT AUTHORITY FALLBACK =================
