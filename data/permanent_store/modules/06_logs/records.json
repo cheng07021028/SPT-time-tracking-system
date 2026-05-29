@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 17:30:23",
-  "exported_at": "2026-05-29 17:30:23",
+  "updated_at": "2026-05-29 17:33:56",
+  "exported_at": "2026-05-29 17:33:56",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -13063,11 +13063,59 @@
         "detail": "today_records_v210_canonical_display\n__spt_log_uid=1dac90ac2e9842ec93297e1ee2dde2ed",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 7,
+        "log_time": "2026-05-29 17:33:55",
+        "user_name": "B155",
+        "action_type": "V208_DISPLAY_AUTHORITY_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite time_records 顯示快取空白，已由 01/02 權威檔回填 87 筆。",
+        "detail": "load_records_v210_canonical_display",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6,
+        "log_time": "2026-05-29 17:33:55",
+        "user_name": "B155",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v210_canonical_active",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-29 17:33:54",
+        "user_name": "B155",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v210_canonical_active",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-29 17:33:54",
+        "user_name": "B155",
+        "action_type": "V206_ACTIVE_SQLITE_REFILL_WARN",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "權威檔 active 回填 SQLite 快取失敗：no such table: time_records",
+        "detail": "get_active_records_v210_canonical_active\n__spt_log_uid=3ec9e584f1924104901b196cfcc2a4d2",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 1088
+    "system_logs": 1092
   }
 }
