@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 09:27:02",
-  "exported_at": "2026-05-29 09:27:02",
+  "updated_at": "2026-05-29 09:30:24",
+  "exported_at": "2026-05-29 09:30:24",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -1639,11 +1639,83 @@
         "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 846,
+        "log_time": "2026-05-29 09:30:15",
+        "user_name": "SPT158",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "362",
+        "message": "劉定澤 開始 25M0115-17 / 包機",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 09:30:15\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"362\",\"target_ids\":[362],\"message\":\"劉定澤 開始 25M0115-17 / 包機\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT158|25M0115-17|包機|2026-05-29 09:30:08|0cb83dae\",\"identity_key\":\"record_key:SPT158|25M0115-17|包機|2026-05-29 09:30:08|0cb83dae\",\"id\":\"362\",\"employee_id\":\"SPT158\",\"employee_name\":\"劉定澤\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:30:08\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":362,\"record_key\":\"SPT158|25M0115-17|包機|2026-05-29 09:30:08|0cb83dae\",\"status\":\"作業中\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT158\",\"employee_name\":\"劉定澤\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:30:08\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:30:08\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT158|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:30:08\",\"updated_at\":\"2026-05-29 09:30:08\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":362,\"record_key\":\"SPT158|25M0115-17|包機|2026-05-29 09:30:08|0cb83dae\",\"status\":\"作業中\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT158\",\"employee_name\":\"劉定澤\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:30:08\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:30:08\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT158|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:30:08\",\"updated_at\":\"2026-05-29 09:30:08\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":362,\"record_key\":\"SPT158|25M0115-17|包機|2026-05-29 09:30:08|0cb83dae\",\"status\":\"作業中\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT158\",\"employee_name\":\"劉定澤\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:30:08\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:30:08\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT158|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:30:08\",\"updated_at\":\"2026-05-29 09:30:08\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":362,\"record_key\":\"SPT158|25M0115-17|包機|2026-05-29 09:30:08|0cb83dae\",\"status\":\"作業中\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT158\",\"employee_name\":\"劉定澤\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:30:08\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:30:08\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT158|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:30:08\",\"updated_at\":\"2026-05-29 09:30:08\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"4d068cb2678deec63221155fea1910daa8bbf7aeb930950d933ddbe1f0fc7cfe\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 845,
+        "log_time": "2026-05-29 09:30:13",
+        "user_name": "SPT158",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 844,
+        "log_time": "2026-05-29 09:30:12",
+        "user_name": "SPT174",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "360",
+        "message": "龍才華 開始 25M0115-17 / 包機",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 09:30:12\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"360\",\"target_ids\":[360],\"message\":\"龍才華 開始 25M0115-17 / 包機\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT174|25M0115-17|包機|2026-05-29 09:29:19|88d5cf9a\",\"identity_key\":\"record_key:SPT174|25M0115-17|包機|2026-05-29 09:29:19|88d5cf9a\",\"id\":\"360\",\"employee_id\":\"SPT174\",\"employee_name\":\"龍才華\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:29:19\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":360,\"record_key\":\"SPT174|25M0115-17|包機|2026-05-29 09:29:19|88d5cf9a\",\"status\":\"作業中\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT174\",\"employee_name\":\"龍才華\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:29:19\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:29:19\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT174|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:29:19\",\"updated_at\":\"2026-05-29 09:29:19\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":360,\"record_key\":\"SPT174|25M0115-17|包機|2026-05-29 09:29:19|88d5cf9a\",\"status\":\"作業中\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT174\",\"employee_name\":\"龍才華\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:29:19\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:29:19\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT174|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:29:19\",\"updated_at\":\"2026-05-29 09:29:19\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":360,\"record_key\":\"SPT174|25M0115-17|包機|2026-05-29 09:29:19|88d5cf9a\",\"status\":\"作業中\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT174\",\"employee_name\":\"龍才華\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:29:19\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:29:19\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT174|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:29:19\",\"updated_at\":\"2026-05-29 09:29:19\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":360,\"record_key\":\"SPT174|25M0115-17|包機|2026-05-29 09:29:19|88d5cf9a\",\"status\":\"作業中\",\"work_order\":\"25M0115-17\",\"part_no\":\"4TRSC150-003-01\",\"type_name\":\"12\\\" UFO EFEM\",\"process_name\":\"包機\",\"employee_id\":\"SPT174\",\"employee_name\":\"龍才華\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:29:19\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:29:19\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT174|包機|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:29:19\",\"updated_at\":\"2026-05-29 09:29:19\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"d4bb6620f3b1999edf83a550cfb9cea7b7b7a1227f561ee3a5f30590de1a52be\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 843,
+        "log_time": "2026-05-29 09:30:09",
+        "user_name": "SPT174",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 848,
+        "log_time": "2026-05-29 09:30:20",
+        "user_name": "SPT089",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "361",
+        "message": "陳凱彥 開始 25MN0014-06 / S.T.",
+        "detail": "[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-29 09:30:20\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"361\",\"target_ids\":[361],\"message\":\"陳凱彥 開始 25MN0014-06 / S.T.\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":1,\"authority_02_history\":1,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SPT089|25MN0014-06|S.T.|2026-05-29 09:29:32|fe671972\",\"identity_key\":\"record_key:SPT089|25MN0014-06|S.T.|2026-05-29 09:29:32|fe671972\",\"id\":\"361\",\"employee_id\":\"SPT089\",\"employee_name\":\"陳凱彥\",\"work_order\":\"25MN0014-06\",\"part_no\":\"9MRSC2A2-BWN01-03\",\"type_name\":\"BWS3200\\nRSC2A2-BWN01-03\",\"process_name\":\"S.T.\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-29 09:29:32\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"streamlit\"}],\"rows\":{\"best_rows\":[{\"id\":361,\"record_key\":\"SPT089|25MN0014-06|S.T.|2026-05-29 09:29:32|fe671972\",\"status\":\"作業中\",\"work_order\":\"25MN0014-06\",\"part_no\":\"9MRSC2A2-BWN01-03\",\"type_name\":\"BWS3200\\nRSC2A2-BWN01-03\",\"process_name\":\"S.T.\",\"employee_id\":\"SPT089\",\"employee_name\":\"陳凱彥\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:29:32\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:29:32\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT089|S.T.|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:29:32\",\"updated_at\":\"2026-05-29 09:29:32\",\"_snapshot_source\":\"authority.02_history\"}],\"sqlite_time_records\":[{\"id\":361,\"record_key\":\"SPT089|25MN0014-06|S.T.|2026-05-29 09:29:32|fe671972\",\"status\":\"作業中\",\"work_order\":\"25MN0014-06\",\"part_no\":\"9MRSC2A2-BWN01-03\",\"type_name\":\"BWS3200\\nRSC2A2-BWN01-03\",\"process_name\":\"S.T.\",\"employee_id\":\"SPT089\",\"employee_name\":\"陳凱彥\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:29:32\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:29:32\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT089|S.T.|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:29:32\",\"updated_at\":\"2026-05-29 09:29:32\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[{\"id\":361,\"record_key\":\"SPT089|25MN0014-06|S.T.|2026-05-29 09:29:32|fe671972\",\"status\":\"作業中\",\"work_order\":\"25MN0014-06\",\"part_no\":\"9MRSC2A2-BWN01-03\",\"type_name\":\"BWS3200\\nRSC2A2-BWN01-03\",\"process_name\":\"S.T.\",\"employee_id\":\"SPT089\",\"employee_name\":\"陳凱彥\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:29:32\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:29:32\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT089|S.T.|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:29:32\",\"updated_at\":\"2026-05-29 09:29:32\",\"_snapshot_source\":\"authority.01_time_records\"}],\"authority_02_history\":[{\"id\":361,\"record_key\":\"SPT089|25MN0014-06|S.T.|2026-05-29 09:29:32|fe671972\",\"status\":\"作業中\",\"work_order\":\"25MN0014-06\",\"part_no\":\"9MRSC2A2-BWN01-03\",\"type_name\":\"BWS3200\\nRSC2A2-BWN01-03\",\"process_name\":\"S.T.\",\"employee_id\":\"SPT089\",\"employee_name\":\"陳凱彥\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-29 09:29:32\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-29\",\"start_time\":\"09:29:32\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SPT089|S.T.|2026-05-29\",\"is_group_work\":0,\"source\":\"streamlit\",\"created_at\":\"2026-05-29 09:29:32\",\"updated_at\":\"2026-05-29 09:29:32\",\"_snapshot_source\":\"authority.02_history\"}]},\"snapshot_hash\":\"495d6d6221baead1874a5436cc4c3980065e70e07fda8b30f383668b824222a9\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 847,
+        "log_time": "2026-05-29 09:30:18",
+        "user_name": "SPT089",
+        "action_type": "INSERT",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "INSERT time_records",
+        "detail": "INSERT INTO time_records(\n            record_key, status, work_order, part_no, type_name, process_name,\n            employee_id, employee_name, start_action, start_timestamp,\n            remark, start_date, start_time, assembly_location,\n            group_key, is_group_work, source, created_at, updated_at\n        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 136
+    "system_logs": 142
   }
 }
