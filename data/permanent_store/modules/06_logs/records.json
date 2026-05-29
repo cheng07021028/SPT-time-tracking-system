@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-29 13:31:45",
-  "exported_at": "2026-05-29 13:31:45",
+  "updated_at": "2026-05-29 13:31:49",
+  "exported_at": "2026-05-29 13:31:49",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -7087,11 +7087,23 @@
         "detail": "INSERT OR REPLACE INTO auth_account_permissions\n                (username,module_code,module_name_zh,module_name_en,can_view,can_create,can_edit,can_delete,can_import,can_export,can_backup,can_restore,can_manage,updated_at)\n                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1773,
+        "log_time": "2026-05-29 13:31:45",
+        "user_name": "B168",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "415",
+        "message": "洪敏強 開始 25MN0014-10 / 其他",
+        "detail": "__spt_log_uid=4c89d1c0209b4367a603f407f36bdcec",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 590
+    "system_logs": 591
   }
 }
