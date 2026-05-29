@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
+  "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-29 15:01:47",
-  "exported_at": "2026-05-29 14:43:31",
-  "reason": "v125_save_account_master_reconcile",
+  "updated_at": "2026-05-29 15:02:05",
+  "exported_at": "2026-05-29 15:02:05",
+  "reason": "v106_force_password_change",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -1452,17 +1452,26 @@
       },
       {
         "username": "SSS",
-        "password_hash": "pbkdf2_sha256$ee4a14a60fe38b218ad14cf8b9968883$46f9ef63577e919ec6785731356270f155762c3ecf46dcd49ff2b9891242291f",
+        "password_hash": "pbkdf2_sha256$180000$sEngCkl4H/TN2h7Im2Vzuw==$cBzRfL0PvFXS7d1PXRIjC/WkqlvOjmKNo7EX74YrIXM=",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SSS",
         "display_name": "SSS",
         "email": "",
         "role_code": "operator",
         "is_active": 1,
-        "force_password_change": 1,
+        "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 15:01:16",
-        "updated_at": "2026-05-29 15:01:40"
+        "updated_at": "2026-05-29 15:02:05",
+        "password_display": "********",
+        "new_password": "",
+        "password": "",
+        "密碼": "",
+        "密碼 / Password": "",
+        "新密碼": "",
+        "新密碼 / New Password": "",
+        "強制改密碼": false,
+        "強制改密碼 / Force Change": false
       }
     ],
     "auth_account_permissions": [
@@ -23557,8 +23566,5 @@
     "security_settings": 0,
     "security_users": 0,
     "security_user_roles": 0
-  },
-  "deleted_usernames": [],
-  "version": "V96-direct-authority",
-  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
+  }
 }
