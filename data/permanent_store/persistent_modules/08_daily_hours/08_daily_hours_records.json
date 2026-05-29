@@ -1,6 +1,6 @@
 {
   "version": "V1.48",
-  "exported_at": "2026-05-29 09:59:24",
+  "exported_at": "2026-05-29 10:02:26",
   "source": "db_service_write",
   "module_key": "08_daily_hours",
   "module_code": "08",
@@ -382,10 +382,10 @@
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT121|配電|2026-05-29",
-        "is_group_work": 0,
+        "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-29 09:24:05",
-        "updated_at": "2026-05-29 09:24:05"
+        "updated_at": "2026-05-29 09:59:22"
       },
       {
         "id": 354,
@@ -706,15 +706,42 @@
         "work_hours": 0.0,
         "assembly_location": "竹東",
         "group_key": "SPT121|配電|2026-05-29",
-        "is_group_work": 0,
+        "is_group_work": 1,
         "source": "streamlit",
         "created_at": "2026-05-29 09:59:22",
         "updated_at": "2026-05-29 09:59:22"
+      },
+      {
+        "id": 378,
+        "record_key": "SPT220|26M0242-01|S.T.|2026-05-29 10:02:24|1def49c2",
+        "status": "作業中",
+        "work_order": "26M0242-01",
+        "part_no": "PSRSC151-SB4L-06",
+        "type_name": "RSC151 (Standalone) SB4L+Argus",
+        "process_name": "S.T.",
+        "employee_id": "SPT220",
+        "employee_name": "劉韋廷",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-29 10:02:24",
+        "end_action": null,
+        "end_timestamp": null,
+        "remark": "",
+        "start_date": "2026-05-29",
+        "start_time": "10:02:24",
+        "end_date": null,
+        "end_time": null,
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "SPT220|S.T.|2026-05-29",
+        "is_group_work": 0,
+        "source": "streamlit",
+        "created_at": "2026-05-29 10:02:24",
+        "updated_at": "2026-05-29 10:02:24"
       }
     ]
   },
   "table_counts": {
     "employees": 0,
-    "time_records": 26
+    "time_records": 27
   }
 }
