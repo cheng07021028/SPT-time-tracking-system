@@ -17283,3 +17283,695 @@ def audit_v214_finish_same_display_source_fix() -> dict:
     }
 
 # ================= END V214 FINISH WORK SAME DISPLAY SOURCE FIX =================
+
+# ================= V220 01 FRONTEND OPERATION ISOLATION PHASE 1｜2026-05-29 =================
+# 目的：保留 V214 讀寫正確、V212 逐筆權威檔保存、Finish Work 與 Today Records 同源判斷，
+#      但把 01. 工時紀錄前台常用查詢隔離到本機前台快取，避免每次 Streamlit rerun
+#      都重掃 01/02 權威檔造成顯示變慢。
+# 限制：不改 UI/CSS/theme/table/buttons；不回退到 SQLite-only；權威檔仍是最終真實來源。
+try:
+    _v220_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v220_prev_today_records = None
+try:
+    _v220_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v220_prev_get_active_records = None
+try:
+    _v220_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v220_prev_get_active_record = None
+try:
+    _v220_prev_get_active_group = get_active_group
+except Exception:  # pragma: no cover
+    _v220_prev_get_active_group = None
+try:
+    _v220_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v220_prev_start_work = None
+try:
+    _v220_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v220_prev_finish_work = None
+
+import json as _v220_json
+import time as _v220_time
+from pathlib import Path as _v220_Path
+
+_V220_VERSION = "V220_FRONTEND_OPERATION_ISOLATION_PHASE1"
+try:
+    _V220_PROJECT_ROOT = _v220_Path(__file__).resolve().parents[1]
+except Exception:  # pragma: no cover
+    _V220_PROJECT_ROOT = _v220_Path(".").resolve()
+_V220_CACHE_DIR = _V220_PROJECT_ROOT / "data" / "persistent_state" / "frontend_cache"
+_V220_TODAY_CACHE = _V220_CACHE_DIR / "01_today_records_cache.json"
+_V220_ACTIVE_CACHE = _V220_CACHE_DIR / "01_active_records_index.json"
+_V220_META_CACHE = _V220_CACHE_DIR / "01_cache_meta.json"
+_V220_CACHE_TTL_SECONDS = 300.0  # 低頻校正：5 分鐘內不反覆重建權威檔快取。
+_V220_FINISHED_STATUS = {
+    "下班", "暫停", "完工", "已結束", "結束", "完成",
+    "off_duty", "paused", "finished", "end", "ended", "complete", "completed",
+}
+
+
+def _v220_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v220_norm_date(value) -> str:
+    text = _v220_text(value).replace("/", "-")
+    if not text:
+        return ""
+    if " " in text:
+        text = text.split(" ", 1)[0]
+    if "T" in text:
+        text = text.split("T", 1)[0]
+    return text[:10]
+
+
+def _v220_today() -> str:
+    try:
+        if "_v205_today" in globals() and callable(_v205_today):
+            return _v220_norm_date(_v205_today())
+    except Exception:
+        pass
+    try:
+        return _v220_norm_date(today_text())
+    except Exception:
+        return datetime.now().strftime("%Y-%m-%d")
+
+
+def _v220_row_date(row: dict) -> str:
+    d = _v220_norm_date(row.get("start_date"))
+    if d:
+        return d
+    return _v220_norm_date(row.get("start_timestamp"))
+
+
+def _v220_record_key(row: dict) -> str:
+    rk = _v220_text(row.get("record_key"))
+    if rk:
+        return "rk:" + rk
+    rid = _v220_text(row.get("id"))
+    if rid:
+        return "id:" + rid
+    # 極端 fallback：避免無 key 資料互相覆蓋。
+    return "raw:" + "|".join([
+        _v220_text(row.get("employee_id")),
+        _v220_text(row.get("work_order")),
+        _v220_text(row.get("process_name")),
+        _v220_text(row.get("start_timestamp")),
+    ])
+
+
+def _v220_is_active_row(row: dict) -> bool:
+    if not isinstance(row, dict):
+        return False
+    end_ts = _v220_text(row.get("end_timestamp"))
+    if end_ts:
+        return False
+    status = _v220_text(row.get("status")).lower()
+    if status and status in _V220_FINISHED_STATUS:
+        return False
+    end_action = _v220_text(row.get("end_action")).lower()
+    if end_action and end_action in _V220_FINISHED_STATUS:
+        return False
+    return True
+
+
+def _v220_sanitize_value(value):
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    if isinstance(value, (datetime, date)):
+        if isinstance(value, datetime):
+            return value.strftime("%Y-%m-%d %H:%M:%S")
+        return value.strftime("%Y-%m-%d")
+    try:
+        # pandas Timestamp / numpy scalar 等轉成可 JSON 化。
+        if hasattr(value, "item"):
+            value = value.item()
+    except Exception:
+        pass
+    if isinstance(value, (int, float, str, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def _v220_df_to_records(df: pd.DataFrame) -> list[dict]:
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return []
+    try:
+        tmp = df.copy()
+        tmp = tmp.drop(columns=[c for c in tmp.columns if str(c).startswith("_v")], errors="ignore")
+        rows = tmp.to_dict(orient="records")
+    except Exception:
+        return []
+    out: list[dict] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        clean = {str(k): _v220_sanitize_value(v) for k, v in row.items()}
+        out.append(clean)
+    return out
+
+
+def _v220_records_to_df(records: list[dict]) -> pd.DataFrame:
+    if not records:
+        return pd.DataFrame()
+    try:
+        df = pd.DataFrame(records)
+        if "_v206_normalize_time_records_df" in globals() and callable(_v206_normalize_time_records_df):
+            df = _v206_normalize_time_records_df(df)
+        return df.reset_index(drop=True)
+    except Exception:
+        return pd.DataFrame(records)
+
+
+def _v220_safe_read_json(path: _v220_Path, default):
+    try:
+        if not path.exists():
+            return default
+        text = path.read_text(encoding="utf-8")
+        if not text.strip():
+            return default
+        return _v220_json.loads(text)
+    except Exception:
+        return default
+
+
+def _v220_safe_write_json(path: _v220_Path, value) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(_v220_json.dumps(value, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        tmp.replace(path)
+    except Exception as exc:
+        try:
+            if "_v205_direct_log" in globals() and callable(_v205_direct_log):
+                _v205_direct_log("V220_CACHE_WRITE_WARN", f"V220 前台快取寫入失敗：{exc}", level="WARN")
+        except Exception:
+            pass
+
+
+def _v220_read_meta() -> dict:
+    meta = _v220_safe_read_json(_V220_META_CACHE, {})
+    return meta if isinstance(meta, dict) else {}
+
+
+def _v220_write_meta(today_rows: int, active_rows: int, reason: str = "") -> None:
+    meta = {
+        "cache_version": _V220_VERSION,
+        "cache_date": _v220_today(),
+        "last_rebuild_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "last_rebuild_epoch": _v220_time.time(),
+        "today_rows": int(today_rows or 0),
+        "active_rows": int(active_rows or 0),
+        "reason": str(reason or ""),
+    }
+    _v220_safe_write_json(_V220_META_CACHE, meta)
+
+
+def _v220_cache_valid() -> bool:
+    meta = _v220_read_meta()
+    if meta.get("cache_version") != _V220_VERSION:
+        return False
+    if _v220_norm_date(meta.get("cache_date")) != _v220_today():
+        return False
+    if not _V220_TODAY_CACHE.exists() or not _V220_ACTIVE_CACHE.exists():
+        return False
+    # 避免每次互動都做權威檔健康檢查；快取由 start/finish 單筆同步維持。
+    try:
+        epoch = float(meta.get("last_rebuild_epoch") or 0)
+        if epoch > 0 and (_v220_time.time() - epoch) < _V220_CACHE_TTL_SECONDS:
+            return True
+    except Exception:
+        pass
+    return True
+
+
+def _v220_sort_records(records: list[dict]) -> list[dict]:
+    def _sort_key(row: dict):
+        try:
+            rid = int(float(row.get("id") or 0))
+        except Exception:
+            rid = 0
+        return (rid, _v220_text(row.get("updated_at")), _v220_text(row.get("start_timestamp")))
+    try:
+        return sorted(records, key=_sort_key, reverse=True)
+    except Exception:
+        return records
+
+
+def _v220_dedupe_records(records: list[dict]) -> list[dict]:
+    if not records:
+        return []
+    by_key: dict[str, dict] = {}
+    for row in records:
+        if not isinstance(row, dict):
+            continue
+        by_key[_v220_record_key(row)] = row
+    return _v220_sort_records(list(by_key.values()))
+
+
+def _v220_filter_records_df(
+    df: pd.DataFrame,
+    *,
+    employee_id: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+    work_order: str | None = None,
+    active_only: bool = False,
+) -> pd.DataFrame:
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        if active_only:
+            mask = out.apply(lambda r: _v220_is_active_row(dict(r)), axis=1)
+            out = out.loc[mask].copy()
+        emp = _v220_text(employee_id)
+        if emp and "employee_id" in out.columns:
+            out = out.loc[out["employee_id"].map(_v220_text) == emp].copy()
+        # employee_name 只在沒有 employee_id 時才當作主要條件；避免姓名顯示差異擋住同一工號。
+        name = _v220_text(employee_name)
+        if name and not emp and "employee_name" in out.columns:
+            out = out.loc[out["employee_name"].map(_v220_text) == name].copy()
+        proc = _v220_text(process_name)
+        if proc and "process_name" in out.columns:
+            out = out.loc[out["process_name"].map(_v220_text) == proc].copy()
+        wo = _v220_text(work_order)
+        if wo and "work_order" in out.columns:
+            out = out.loc[out["work_order"].map(_v220_text) == wo].copy()
+        sd = _v220_norm_date(start_date)
+        if sd:
+            if "start_date" in out.columns:
+                out = out.loc[out["start_date"].map(_v220_norm_date) == sd].copy()
+            elif "start_timestamp" in out.columns:
+                out = out.loc[out["start_timestamp"].map(_v220_norm_date) == sd].copy()
+        if not out.empty and "id" in out.columns:
+            out["_v220_id_sort"] = pd.to_numeric(out["id"], errors="coerce").fillna(0)
+            out = out.sort_values("_v220_id_sort", ascending=False, kind="stable").drop(columns=["_v220_id_sort"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()
+
+
+def _v220_rebuild_front_cache(reason: str = "v220_rebuild") -> None:
+    today_df = pd.DataFrame()
+    active_df = pd.DataFrame()
+    try:
+        if callable(_v220_prev_today_records):
+            today_df = _v220_prev_today_records(include_finished=True, unfinished_only=False)
+    except Exception:
+        today_df = pd.DataFrame()
+    try:
+        if callable(_v220_prev_get_active_records):
+            active_df = _v220_prev_get_active_records(employee_id=None, employee_name=None)
+    except Exception:
+        active_df = pd.DataFrame()
+    today_records_list = _v220_dedupe_records(_v220_df_to_records(today_df))
+    active_records_list = _v220_dedupe_records([r for r in _v220_df_to_records(active_df) if _v220_is_active_row(r)])
+    _v220_safe_write_json(_V220_TODAY_CACHE, today_records_list)
+    _v220_safe_write_json(_V220_ACTIVE_CACHE, active_records_list)
+    _v220_write_meta(len(today_records_list), len(active_records_list), reason=reason)
+    try:
+        if "_v205_direct_log" in globals() and callable(_v205_direct_log):
+            _v205_direct_log(
+                "V220_FRONT_CACHE_REBUILD",
+                f"V220 前台快取已重建：Today Records {len(today_records_list)} 筆、Active Index {len(active_records_list)} 筆。",
+                detail=str(reason or ""),
+                level="INFO",
+            )
+    except Exception:
+        pass
+
+
+def _v220_get_today_cache_df(force_rebuild: bool = False, reason: str = "v220_today_cache") -> pd.DataFrame:
+    if force_rebuild or not _v220_cache_valid():
+        _v220_rebuild_front_cache(reason=reason)
+    records = _v220_safe_read_json(_V220_TODAY_CACHE, [])
+    if not isinstance(records, list):
+        records = []
+    return _v220_records_to_df(records)
+
+
+def _v220_get_active_cache_df(force_rebuild: bool = False, reason: str = "v220_active_cache") -> pd.DataFrame:
+    if force_rebuild or not _v220_cache_valid():
+        _v220_rebuild_front_cache(reason=reason)
+    records = _v220_safe_read_json(_V220_ACTIVE_CACHE, [])
+    if not isinstance(records, list):
+        records = []
+    df = _v220_records_to_df(records)
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        df = _v220_filter_records_df(df, active_only=True)
+    return df
+
+
+def _v220_upsert_cache_row(row: dict, reason: str = "") -> None:
+    if not isinstance(row, dict) or not row:
+        return
+    key = _v220_record_key(row)
+    # Today Records 快取只收今日資料；跨日 active 仍會保留在 active index。
+    if _v220_row_date(row) == _v220_today():
+        today_rows = _v220_safe_read_json(_V220_TODAY_CACHE, [])
+        if not isinstance(today_rows, list):
+            today_rows = []
+        replaced = False
+        for i, old in enumerate(today_rows):
+            if isinstance(old, dict) and _v220_record_key(old) == key:
+                today_rows[i] = row
+                replaced = True
+                break
+        if not replaced:
+            today_rows.append(row)
+        today_rows = _v220_dedupe_records(today_rows)
+        _v220_safe_write_json(_V220_TODAY_CACHE, today_rows)
+    active_rows = _v220_safe_read_json(_V220_ACTIVE_CACHE, [])
+    if not isinstance(active_rows, list):
+        active_rows = []
+    # 先移除同 key，再視狀態決定是否加入，避免已結束資料復活。
+    active_rows = [r for r in active_rows if not (isinstance(r, dict) and _v220_record_key(r) == key)]
+    if _v220_is_active_row(row):
+        active_rows.append(row)
+    active_rows = _v220_dedupe_records(active_rows)
+    _v220_safe_write_json(_V220_ACTIVE_CACHE, active_rows)
+    _v220_write_meta(
+        len(_v220_safe_read_json(_V220_TODAY_CACHE, []) or []),
+        len(active_rows),
+        reason=reason or "v220_upsert_cache_row",
+    )
+
+
+def _v220_remove_active_keys(keys: set[str], reason: str = "") -> None:
+    if not keys:
+        return
+    active_rows = _v220_safe_read_json(_V220_ACTIVE_CACHE, [])
+    if not isinstance(active_rows, list):
+        active_rows = []
+    active_rows = [r for r in active_rows if not (isinstance(r, dict) and _v220_record_key(r) in keys)]
+    _v220_safe_write_json(_V220_ACTIVE_CACHE, _v220_dedupe_records(active_rows))
+    _v220_write_meta(
+        len(_v220_safe_read_json(_V220_TODAY_CACHE, []) or []),
+        len(active_rows),
+        reason=reason or "v220_remove_active_keys",
+    )
+
+
+def _v220_find_record_by_id(record_id: int) -> dict | None:
+    rid = _v220_text(record_id)
+    if not rid:
+        return None
+    # 1) SQLite 直接按 id 查，成本最低。
+    try:
+        if "_v205_query_df" in globals() and callable(_v205_query_df):
+            df = _v205_query_df("SELECT * FROM time_records WHERE id=? LIMIT 1", (int(float(rid)),))
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                return dict(df.iloc[0].to_dict())
+    except Exception:
+        pass
+    try:
+        df = query_df("SELECT * FROM time_records WHERE id=? LIMIT 1", (int(float(rid)),))
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return dict(df.iloc[0].to_dict())
+    except Exception:
+        pass
+    # 2) 只在 SQLite 找不到時才讀權威檔，且只在開始/結束操作後使用，不會每次前台互動掃描。
+    try:
+        if "_v208_authority_records_df" in globals() and callable(_v208_authority_records_df):
+            auth = _v208_authority_records_df()
+            if isinstance(auth, pd.DataFrame) and not auth.empty and "id" in auth.columns:
+                ids = pd.to_numeric(auth["id"], errors="coerce")
+                hit = auth.loc[ids == int(float(rid))].copy()
+                if not hit.empty:
+                    return dict(hit.iloc[0].to_dict())
+    except Exception:
+        pass
+    return None
+
+
+def _v220_group_rows_from_cache(record_id: int) -> pd.DataFrame:
+    active = _v220_get_active_cache_df(reason="v220_group_rows_before_finish")
+    if not isinstance(active, pd.DataFrame) or active.empty or "id" not in active.columns:
+        return pd.DataFrame()
+    try:
+        ids = pd.to_numeric(active["id"], errors="coerce")
+        seed_df = active.loc[ids == int(record_id)].copy()
+        if seed_df.empty:
+            return pd.DataFrame()
+        seed = dict(seed_df.iloc[0].to_dict())
+        return _v220_filter_records_df(
+            active,
+            employee_id=_v220_text(seed.get("employee_id")),
+            process_name=_v220_text(seed.get("process_name")),
+            start_date=_v220_row_date(seed),
+            active_only=True,
+        )
+    except Exception:
+        return pd.DataFrame()
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """V220: 01 Today Records uses frontend isolated cache; authority is rebuilt only when cache is missing/invalid."""
+    df = _v220_get_today_cache_df(reason="v220_today_records")
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        # 安全 fallback：快取重建仍失敗時，回到 V214 正確來源，避免 No data。
+        try:
+            if callable(_v220_prev_today_records):
+                return _v220_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+        except Exception:
+            pass
+        return pd.DataFrame()
+    if unfinished_only or not include_finished:
+        df = _v220_filter_records_df(df, active_only=True)
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) and not df.empty else pd.DataFrame()
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V220: Finish Work reads the same frontend cache/index as Today Records, then falls back to V214 only if needed."""
+    active = _v220_get_active_cache_df(reason="v220_get_active_records")
+    out = _v220_filter_records_df(
+        active,
+        employee_id=employee_id,
+        process_name=process_name,
+        start_date=start_date,
+        employee_name=employee_name,
+        active_only=True,
+    )
+    if isinstance(out, pd.DataFrame) and not out.empty:
+        return out.reset_index(drop=True)
+    # 補查 Today cache：避免 active index 檔案損壞但 Today Records 還有未結束資料。
+    today_df = _v220_get_today_cache_df(reason="v220_get_active_records_today_fallback")
+    out = _v220_filter_records_df(
+        today_df,
+        employee_id=employee_id,
+        process_name=process_name,
+        start_date=start_date,
+        employee_name=employee_name,
+        active_only=True,
+    )
+    if isinstance(out, pd.DataFrame) and not out.empty:
+        for row in _v220_df_to_records(out):
+            _v220_upsert_cache_row(row, reason="v220_active_index_repair_from_today_cache")
+        return out.reset_index(drop=True)
+    # 最後才回到 V214 正確來源，並把查到的 active 回補到前台快取。
+    try:
+        if callable(_v220_prev_get_active_records):
+            out = _v220_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=None)
+            out = _v220_filter_records_df(out, employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name, active_only=True)
+            if isinstance(out, pd.DataFrame) and not out.empty:
+                for row in _v220_df_to_records(out):
+                    _v220_upsert_cache_row(row, reason="v220_active_fallback_backfill")
+                return out.reset_index(drop=True)
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return None
+    try:
+        return dict(df.iloc[0].to_dict())
+    except Exception:
+        return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    df = _v220_group_rows_from_cache(int(record_id))
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df.reset_index(drop=True)
+    try:
+        if callable(_v220_prev_get_active_group):
+            df = _v220_prev_get_active_group(record_id)
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                for row in _v220_df_to_records(df):
+                    _v220_upsert_cache_row(row, reason="v220_group_fallback_backfill")
+                return df.reset_index(drop=True)
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def refresh_active_records_for_employee(employee_id: str | None = None, employee_name: str | None = None, *, reason: str = "v220_frontend_operation_isolation") -> int:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    return int(len(df)) if isinstance(df, pd.DataFrame) and not df.empty else 0
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V220: keep the V214/V212 correct durable write path, then update 01 frontend cache by single-row upsert."""
+    if not callable(_v220_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    rid = _v220_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old)
+    try:
+        row = _v220_find_record_by_id(int(rid))
+        if row:
+            _v220_upsert_cache_row(row, reason="v220_start_work_single_row_cache_update")
+        else:
+            # 找不到單筆時只讓下一次前台讀取重建，不阻擋現場作業。
+            _V220_META_CACHE.unlink(missing_ok=True)
+    except Exception as exc:
+        try:
+            if "_v205_direct_log" in globals() and callable(_v205_direct_log):
+                _v205_direct_log("V220_START_CACHE_WARN", f"開始作業後更新前台快取失敗：{exc}", target_id=str(rid), level="WARN")
+        except Exception:
+            pass
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    """V220: keep the V214/V212 correct durable finish path, then update Today cache and active index by affected ids."""
+    if not callable(_v220_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    affected_ids: set[int] = set()
+    affected_keys: set[str] = set()
+    seed_row: dict | None = None
+    try:
+        group_df = _v220_group_rows_from_cache(int(record_id)) if finish_parallel_group else pd.DataFrame()
+        if isinstance(group_df, pd.DataFrame) and not group_df.empty:
+            for row in _v220_df_to_records(group_df):
+                try:
+                    affected_ids.add(int(float(row.get("id"))))
+                except Exception:
+                    pass
+                affected_keys.add(_v220_record_key(row))
+            seed_row = dict(group_df.iloc[0].to_dict())
+        else:
+            row = _v220_find_record_by_id(int(record_id))
+            if row:
+                seed_row = row
+                affected_keys.add(_v220_record_key(row))
+            affected_ids.add(int(record_id))
+    except Exception:
+        affected_ids.add(int(record_id))
+    result = _v220_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group)
+    try:
+        # 先用受影響 id 更新 Today cache；已結束資料會自動從 active index 移除。
+        for gid in sorted(affected_ids):
+            row = _v220_find_record_by_id(int(gid))
+            if row:
+                affected_keys.add(_v220_record_key(row))
+                _v220_upsert_cache_row(row, reason="v220_finish_work_single_row_cache_update")
+        # 若是群組結束，但某些 group row 沒查到，至少移除原 active key，避免 Finish Work 看到舊 active。
+        _v220_remove_active_keys(affected_keys, reason="v220_finish_work_remove_finished_active")
+        # 保險：同人同工段同日期群組全部移除 active；Today cache 狀態仍以查到的 rows 更新。
+        if seed_row:
+            active_df = _v220_get_active_cache_df(reason="v220_finish_group_cleanup")
+            same_group = _v220_filter_records_df(
+                active_df,
+                employee_id=_v220_text(seed_row.get("employee_id")),
+                process_name=_v220_text(seed_row.get("process_name")),
+                start_date=_v220_row_date(seed_row),
+                active_only=True,
+            )
+            if isinstance(same_group, pd.DataFrame) and not same_group.empty:
+                keys = {_v220_record_key(r) for r in _v220_df_to_records(same_group)}
+                _v220_remove_active_keys(keys, reason="v220_finish_group_cleanup_remove")
+    except Exception as exc:
+        try:
+            if "_v205_direct_log" in globals() and callable(_v205_direct_log):
+                _v205_direct_log("V220_FINISH_CACHE_WARN", f"結束作業後更新前台快取失敗：{exc}", target_id=str(record_id), level="WARN")
+        except Exception:
+            pass
+    return result
+
+
+def audit_v220_frontend_operation_isolation() -> dict:
+    meta = _v220_read_meta()
+    today_df = _v220_get_today_cache_df(reason="v220_audit_today")
+    active_df = _v220_get_active_cache_df(reason="v220_audit_active")
+    return {
+        "version": "V220",
+        "scope": "01 工時紀錄前台操作隔離第一階段；services/time_record_service.py only",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "authority_write_preserved": True,
+        "v212_row_durable_save_preserved": True,
+        "finish_work_same_source_preserved": True,
+        "today_records_source": "frontend cache, rebuilt directly from local 01/02 authority JSON only when missing/invalid",
+        "finish_work_source": "active frontend index, fallback to today cache, then V214 correct source",
+        "cache_dir": str(_V220_CACHE_DIR),
+        "cache_meta": meta,
+        "today_cache_rows": int(len(today_df)) if isinstance(today_df, pd.DataFrame) else 0,
+        "active_cache_rows": int(len(active_df)) if isinstance(active_df, pd.DataFrame) else 0,
+        "employee_safety": "employee_id exact match required; employee_name does not block same employee_id",
+    }
+
+# ================= END V220 01 FRONTEND OPERATION ISOLATION PHASE 1 =================
+
+# ================= V220 DIRECT AUTHORITY REBUILD GUARD｜2026-05-29 =================
+# 修正：V220 快取首次重建不可再呼叫較慢的 V214 display wrapper，改為直接讀本機權威 JSON。
+
+def _v220_direct_authority_records() -> list[dict]:
+    rows: list[dict] = []
+    for module_key in ("01_time_records", "02_history"):
+        path = _V220_PROJECT_ROOT / "data" / "permanent_store" / "modules" / module_key / "records.json"
+        data = _v220_safe_read_json(path, {})
+        try:
+            part = data.get("tables", {}).get("time_records", []) if isinstance(data, dict) else []
+            if isinstance(part, list):
+                rows.extend([r for r in part if isinstance(r, dict)])
+        except Exception:
+            pass
+    return _v220_dedupe_records(rows)
+
+
+def _v220_direct_authority_records_df() -> pd.DataFrame:
+    return _v220_records_to_df(_v220_direct_authority_records())
+
+
+def _v220_rebuild_front_cache(reason: str = "v220_rebuild") -> None:  # type: ignore[override]
+    """V220 guarded rebuild: direct local authority JSON read, no slow display wrapper scan."""
+    all_rows = _v220_direct_authority_records()
+    today = _v220_today()
+    today_records_list = _v220_dedupe_records([r for r in all_rows if _v220_row_date(r) == today])
+    active_records_list = _v220_dedupe_records([r for r in all_rows if _v220_is_active_row(r)])
+    _v220_safe_write_json(_V220_TODAY_CACHE, today_records_list)
+    _v220_safe_write_json(_V220_ACTIVE_CACHE, active_records_list)
+    _v220_write_meta(len(today_records_list), len(active_records_list), reason=reason + "|direct_authority_json")
+    try:
+        if "_v205_direct_log" in globals() and callable(_v205_direct_log):
+            _v205_direct_log(
+                "V220_FRONT_CACHE_REBUILD_DIRECT",
+                f"V220 前台快取已用權威 JSON 直接重建：Today Records {len(today_records_list)} 筆、Active Index {len(active_records_list)} 筆。",
+                detail=str(reason or ""),
+                level="INFO",
+            )
+    except Exception:
+        pass
+
+# ================= END V220 DIRECT AUTHORITY REBUILD GUARD =================
