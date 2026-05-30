@@ -24984,3 +24984,237 @@ def audit_v239_lossless_integrity(start_date: str | None = None, end_date: str |
         return {"version": _V239_VERSION, "ok": False, "error": str(exc)[:1000]}
 
 # ================= END V239 LOSSLESS RECORD GUARANTEE + LOG LAST-RESORT RECOVERY =================
+
+# ================= V240 ADMIN-ONLY DELETE POLICY｜2026-05-30 =================
+# 使用者明確規則：
+#   - 「不能刪除」是指系統/背景修復/快取重建/去重/同步/防復活流程不能自己刪除或隱藏有效工時資料。
+#   - 系統管理員仍可透過正式管理功能新增、修改、刪除資料。
+#   - 管理員刪除必須留下 delete event / tombstone / LOG；背景程序只能標記稽核，不得物理移除有效資料。
+try:
+    _v240_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v240_prev_delete_time_records = None
+try:
+    _v240_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v240_prev_save_time_records = None
+
+_V240_VERSION = "V240_ADMIN_ONLY_DELETE_POLICY"
+_V240_ADMIN_DELETE_EVENTS = _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_guard" / "v240_admin_delete_events.jsonl"
+_V240_ADMIN_TOMBSTONES = _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_guard" / "v240_admin_tombstones.json"
+
+
+def _v240_reason_text(reason: str | None = "") -> str:
+    return _v239_text(reason).lower()
+
+
+def _v240_is_admin_delete_reason(reason: str | None = "") -> bool:
+    """Only explicit human/admin delete reasons are allowed to hide/delete rows.
+
+    This prevents historical auto-prune / cache-repair / sync-cleanup tombstones from hiding valid records.
+    """
+    s = _v240_reason_text(reason)
+    if not s:
+        return False
+    admin_tokens = [
+        "管理員", "admin", "人工", "manual", "維護", "editor", "02", "01 管理", "刪除", "delete",
+    ]
+    system_block_tokens = [
+        "prune", "resurrection", "repair", "cache", "sync", "rebuild", "auto", "background",
+        "system", "guard", "cleanup", "clean", "v232_prune", "v235_disable", "v239_lossless",
+    ]
+    if any(t in s for t in system_block_tokens) and not any(t in s for t in ("管理員", "admin", "manual", "人工", "維護", "editor")):
+        return False
+    return any(t in s for t in admin_tokens)
+
+
+def _v240_tombstone_reason(row: dict) -> str:
+    if not isinstance(row, dict):
+        return ""
+    for k in ("reason", "delete_reason", "deleted_reason", "source_reason", "operation_reason"):
+        s = _v239_text(row.get(k))
+        if s:
+            return s
+    extra = row.get("extra")
+    if isinstance(extra, dict):
+        for k in ("reason", "delete_reason", "deleted_reason"):
+            s = _v239_text(extra.get(k))
+            if s:
+                return s
+    return ""
+
+
+def _v240_collect_authorized_tombstones() -> tuple[set[int], set[str]]:
+    ids, keys = set(), set()
+
+    # V240 explicit admin tombstone file.
+    payload = _v239_safe_read_json(_V240_ADMIN_TOMBSTONES, {})
+    rows = []
+    if isinstance(payload, dict):
+        for k in ("records", "tombstones", "deleted", "rows"):
+            if isinstance(payload.get(k), list):
+                rows.extend(payload.get(k))
+    elif isinstance(payload, list):
+        rows = payload
+
+    # Existing tombstone files, but only when they carry an explicit admin/manual delete reason.
+    for p in [
+        _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_guard" / "records.json",
+        _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_guard" / "v232_tombstones.json",
+        _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_tombstones" / "records.json",
+    ]:
+        payload2 = _v239_safe_read_json(p, None)
+        if isinstance(payload2, dict):
+            for k in ("records", "tombstones", "deleted", "rows"):
+                if isinstance(payload2.get(k), list):
+                    rows.extend(payload2.get(k))
+        elif isinstance(payload2, list):
+            rows.extend(payload2)
+
+    for r in rows:
+        if isinstance(r, dict):
+            reason = _v240_tombstone_reason(r)
+            if not _v240_is_admin_delete_reason(reason):
+                continue
+            rid = _v239_int(r.get("id") or r.get("record_id") or r.get("target_id"))
+            if rid is not None:
+                ids.add(rid)
+            rk = _v239_text(r.get("record_key") or r.get("target_record_key"))
+            if rk:
+                keys.add(rk)
+        else:
+            # Plain ID tombstones have no audit reason; do not trust them as delete authority in V240.
+            continue
+    return ids, keys
+
+
+# Override V239 deletion filter so automatic/system tombstones cannot hide valid rows.
+def _v239_deleted_ids_keys():  # type: ignore[override]
+    return _v240_collect_authorized_tombstones()
+
+
+def _v239_filter_deleted(rows: list[dict]) -> list[dict]:  # type: ignore[override]
+    ids, keys = _v240_collect_authorized_tombstones()
+    out = []
+    for r in rows or []:
+        rid = _v239_record_id(r)
+        rk = _v239_text((r or {}).get("record_key"))
+        if (rid is not None and rid in ids) or (rk and rk in keys):
+            continue
+        out.append(r)
+    return out
+
+
+def _v240_write_admin_tombstones(rows: list[dict], reason: str = "管理員刪除工時紀錄") -> None:
+    clean = [_v239_normalize_row(r, op_type="ADMIN_DELETE_TOMBSTONE") for r in (rows or []) if isinstance(r, dict)]
+    if not clean:
+        return
+    now = _v239_now()
+    event_rows = []
+    for r in clean:
+        event_rows.append({
+            "id": _v239_record_id(r),
+            "record_key": _v239_text(r.get("record_key")),
+            "deleted_at": now,
+            "reason": reason,
+            "delete_reason": reason,
+            "delete_policy": _V240_VERSION,
+            "admin_delete": True,
+            "snapshot": r,
+        })
+    payload = _v239_safe_read_json(_V240_ADMIN_TOMBSTONES, {})
+    old = []
+    if isinstance(payload, dict) and isinstance(payload.get("records"), list):
+        old = payload.get("records")
+    elif isinstance(payload, list):
+        old = payload
+    by = {}
+    for item in old + event_rows:
+        if not isinstance(item, dict):
+            continue
+        rid = _v239_int(item.get("id") or item.get("record_id") or item.get("target_id"))
+        rk = _v239_text(item.get("record_key"))
+        key = f"id:{rid}" if rid is not None else ("key:" + rk if rk else _v239_uuid.uuid4().hex)
+        by[key] = item
+    _v239_safe_write_json(_V240_ADMIN_TOMBSTONES, {
+        "version": _V240_VERSION,
+        "updated_at": now,
+        "policy": "Only admin/manual delete tombstones are allowed to hide rows. System/background/prune/cache repair cannot delete valid records.",
+        "records": list(by.values()),
+    })
+    try:
+        _V240_ADMIN_DELETE_EVENTS.parent.mkdir(parents=True, exist_ok=True)
+        with _V240_ADMIN_DELETE_EVENTS.open("a", encoding="utf-8") as fh:
+            for e in event_rows:
+                fh.write(_v239_json.dumps(e, ensure_ascii=False, default=_v239_json_default) + "\n")
+    except Exception:
+        pass
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    """V240: admin delete is allowed; system/background delete is not.
+
+    Page/admin delete flows call this function. Automatic repair code should not call this function with system/prune reasons.
+    """
+    ids = [int(x) for x in (record_ids or []) if _v239_int(x) is not None]
+    if not ids:
+        return 0
+    if not _v240_is_admin_delete_reason(reason):
+        # Do not delete. Record audit only, keep data visible.
+        try:
+            _v239_append_lossless_event("SYSTEM_DELETE_BLOCKED", [{"id": i, "blocked_reason": reason} for i in ids], reason="v240_block_system_delete", extra={"requested_reason": reason, "policy": _V240_VERSION})
+            write_log("V240_BLOCK_SYSTEM_DELETE", f"V240 已阻擋非管理員/非人工刪除請求，保留資料：ids={ids}；reason={reason}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+        return 0
+
+    rows = _v239_collect_rows_for_ids(ids)
+    try:
+        _v239_append_lossless_event("ADMIN_DELETE_INTENT", rows or [{"id": i} for i in ids], reason=reason, extra={"ids": ids, "policy": _V240_VERSION})
+    except Exception:
+        pass
+    _v240_write_admin_tombstones(rows or [{"id": i} for i in ids], reason=reason)
+
+    n = 0
+    if callable(_v240_prev_delete_time_records):
+        try:
+            n = int(_v240_prev_delete_time_records(ids, reason=reason) or 0)
+        except Exception as exc:
+            # If older delete chain fails, do precise visibility remove/tombstone is already written.
+            try:
+                write_log("V240_ADMIN_DELETE_BASE_WARN", f"V240 管理員刪除舊鏈失敗，已保留 tombstone 與事件：{exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+            except Exception:
+                pass
+            n = len(ids)
+    else:
+        n = len(ids)
+    try:
+        _v239_append_lossless_event("ADMIN_DELETE", rows or [{"id": i} for i in ids], reason=reason, extra={"ids": ids, "deleted_count": n, "policy": _V240_VERSION})
+    except Exception:
+        pass
+    try:
+        if "_v231_remove_ids" in globals() and callable(_v231_remove_ids):  # type: ignore[name-defined]
+            _v231_remove_ids(ids, reason="v240_admin_delete_cache_remove")  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        _V239_MEMORY["rows"] = None
+        _V239_MEMORY["epoch"] = 0.0
+    except Exception:
+        pass
+    return int(n)
+
+
+def audit_v240_admin_delete_policy() -> dict:
+    ids, keys = _v240_collect_authorized_tombstones()
+    return {
+        "version": _V240_VERSION,
+        "ok": True,
+        "policy": "System/background/prune/cache/sync repair cannot delete or hide valid time records. Only admin/manual delete through official function creates authorized tombstone and hides the row.",
+        "authorized_tombstone_ids": len(ids),
+        "authorized_tombstone_keys": len(keys),
+        "system_delete_blocked": True,
+        "admin_delete_allowed": True,
+    }
+
+# ================= END V240 ADMIN-ONLY DELETE POLICY =================
