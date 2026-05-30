@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 10:20:51",
-  "exported_at": "2026-05-30 10:20:51",
+  "updated_at": "2026-05-30 10:22:30",
+  "exported_at": "2026-05-30 10:22:30",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -7111,11 +7111,59 @@
         "detail": "v241_today_records_fast",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1750,
+        "log_time": "2026-05-30 10:22:26",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：13 筆，active=11。",
+        "detail": "v241_today_records_fast",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1749,
+        "log_time": "2026-05-30 10:22:26",
+        "user_name": "admin",
+        "action_type": "CLEAR_TODAY_FINISHED_VIEW",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "01 工時紀錄手動重新整理顯示：cutoff=2026-05-30 02:00:00，隱藏設定時間前已結束紀錄，不影響 02 歷史紀錄，筆數=13",
+        "detail": "__spt_log_uid=d2abd5aefc23475b8491eb0d81f02bc6",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1748,
+        "log_time": "2026-05-30 10:22:26",
+        "user_name": "admin",
+        "action_type": "DELETE",
+        "target_table": "app_settings",
+        "target_id": "",
+        "message": "DELETE app_settings",
+        "detail": "DELETE FROM app_settings WHERE setting_key='live_page_restore_hidden_reset_key'",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1747,
+        "log_time": "2026-05-30 10:22:26",
+        "user_name": "admin",
+        "action_type": "INSERT",
+        "target_table": "app_settings",
+        "target_id": "",
+        "message": "INSERT app_settings",
+        "detail": "INSERT INTO app_settings(setting_key, setting_value, note, updated_at)\n        VALUES (?, ?, ?, ?)\n        ON CONFLICT(setting_key) DO UPDATE SET\n            setting_value=excluded.setting_value,\n            note=excluded.note,\n            updated_at=excluded.updated_at",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 592
+    "system_logs": 596
   }
 }
