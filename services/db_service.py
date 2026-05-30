@@ -1971,6 +1971,11 @@ def _v25_pg_sync_identity(cur, table_name: str) -> None:
 
 def _v25_pg_auto_import_authority_json(cur) -> int:
     """Import bundled permanent JSON once when a new PostgreSQL database is empty."""
+    # Large authority imports can make Streamlit Cloud cold starts spin before
+    # the login page appears. Keep boot fast unless an explicit one-time
+    # bootstrap flag is enabled in secrets/environment.
+    if not _v25_config_truthy("SPT_PG_AUTO_IMPORT_ON_EMPTY", "SPT_PG_BOOTSTRAP_IMPORT"):
+        return 0
     try:
         total = 0
         for table in ("work_orders", "employees", "time_records"):
