@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 16:50:53",
-  "exported_at": "2026-05-30 16:50:53",
+  "updated_at": "2026-05-30 16:53:44",
+  "exported_at": "2026-05-30 16:53:44",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -9295,11 +9295,35 @@
         "detail": "v235_cache_recover\n__spt_log_uid=411d3d59ef9244868818920828027b98",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-30 16:53:43",
+        "user_name": "SYSTEM",
+        "action_type": "AUTO_INIT_DATABASE",
+        "target_table": "ALL",
+        "target_id": "",
+        "message": "自動初始化資料庫完成",
+        "detail": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-30 16:53:40",
+        "user_name": "SPT243",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：16 筆，active=12。",
+        "detail": "v235_cache_recover\n__spt_log_uid=c1aa10fbac794031baf91eedd53a45c1",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 774
+    "system_logs": 776
   }
 }
