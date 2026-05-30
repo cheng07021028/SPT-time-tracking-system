@@ -1843,6 +1843,180 @@ def _v25_pg_special_query_df(sql: str, params: Iterable[Any] | None = None) -> p
     return None
 
 
+_V25_PG_IMPORT_PLAN: list[tuple[str, str, str, tuple[str, ...]]] = [
+    ("03_work_orders", "work_orders", "work_orders", ("work_order",)),
+    ("04_employees", "employees", "employees", ("employee_id",)),
+    ("01_time_records", "time_records", "time_records", ("record_key",)),
+    ("02_history", "time_records", "time_records", ("record_key",)),
+    ("06_logs", "system_logs", "system_logs", ("id",)),
+    ("10_permissions", "auth_users", "auth_users", ("username",)),
+    ("10_permissions", "auth_account_permissions", "auth_account_permissions", ("username", "module_code")),
+    ("10_permissions", "auth_security_settings", "auth_security_settings", ("setting_key",)),
+    ("10_permissions", "security_settings", "security_settings", ("setting_key",)),
+    ("10_permissions", "security_users", "security_users", ("username",)),
+    ("10_permissions", "security_user_roles", "security_user_roles", ("username", "role_code")),
+    ("13_system_settings", "process_categories", "process_categories", ("category_name",)),
+    ("13_system_settings", "process_category_options", "process_category_options", ("category_name", "process_name")),
+    ("13_system_settings", "process_options", "process_options", ("process_name",)),
+    ("13_system_settings", "rest_periods", "rest_periods", ("id",)),
+    ("13_system_settings", "app_settings", "app_settings", ("setting_key",)),
+]
+
+
+def _v25_pg_load_module_rows(module_key: str, table_name: str) -> list[dict[str, Any]]:
+    path = PROJECT_ROOT / "data" / "permanent_store" / "modules" / module_key / "records.json"
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    if isinstance(payload, list):
+        return [dict(r) for r in payload if isinstance(r, dict)]
+    tables = payload.get("tables", {}) if isinstance(payload, dict) else {}
+    rows = tables.get(table_name, [])
+    return [dict(r) for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+def _v25_pg_clean_value(value: Any) -> Any:
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    if value is None:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        return None if text.lower() in {"", "none", "nan", "nat", "null", "<na>"} else text
+    if isinstance(value, (dict, list)):
+        try:
+            return json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+    return value
+
+
+def _v25_pg_table_columns(cur, table_name: str) -> list[str]:
+    try:
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema='public' AND table_name=%s
+            ORDER BY ordinal_position
+            """,
+            (table_name,),
+        )
+        return [str(r.get("column_name")) for r in cur.fetchall()]
+    except Exception:
+        return []
+
+
+def _v25_pg_prepare_import_row(row: dict[str, Any], columns: list[str]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    int_cols = {
+        "id", "is_active", "is_in_factory", "is_today_attendance", "is_group_work", "sort_order",
+        "can_view", "can_create", "can_edit", "can_delete", "can_import", "can_export",
+        "can_backup", "can_restore", "can_manage", "force_password_change", "idle_seconds",
+    }
+    for col in columns:
+        if col not in row:
+            continue
+        value = _v25_pg_clean_value(row.get(col))
+        if value is None:
+            continue
+        if col in int_cols:
+            text = str(value).strip().lower()
+            if text in {"true", "yes", "y", "是", "啟用"}:
+                value = 1
+            elif text in {"false", "no", "n", "否", "停用"}:
+                value = 0
+            else:
+                try:
+                    value = int(float(text))
+                except Exception:
+                    value = 0
+        elif col == "work_hours":
+            try:
+                value = float(value)
+            except Exception:
+                value = 0.0
+        out[col] = value
+    return out
+
+
+def _v25_pg_choose_conflict(row: dict[str, Any], preferred: tuple[str, ...]) -> tuple[str, ...]:
+    if preferred and all(_v25_pg_clean_value(row.get(c)) is not None for c in preferred):
+        return preferred
+    if row.get("id") is not None:
+        return ("id",)
+    return ()
+
+
+def _v25_pg_sync_identity(cur, table_name: str) -> None:
+    try:
+        cur.execute(
+            f"""
+            SELECT setval(
+                pg_get_serial_sequence('{table_name}', 'id'),
+                GREATEST(COALESCE((SELECT MAX(id) FROM {table_name}), 1), 1),
+                true
+            )
+            """
+        )
+    except Exception:
+        pass
+
+
+def _v25_pg_auto_import_authority_json(cur) -> int:
+    """Import bundled permanent JSON once when a new PostgreSQL database is empty."""
+    try:
+        total = 0
+        for table in ("work_orders", "employees", "time_records"):
+            cur.execute(f"SELECT COUNT(*) AS n FROM {table}")
+            total += int((cur.fetchone() or {}).get("n") or 0)
+        if total > 0:
+            return 0
+    except Exception:
+        return 0
+
+    imported = 0
+    for module_key, source_table, target_table, conflict_cols in _V25_PG_IMPORT_PLAN:
+        rows = _v25_pg_load_module_rows(module_key, source_table)
+        if not rows:
+            continue
+        columns = _v25_pg_table_columns(cur, target_table)
+        if not columns:
+            continue
+        for raw in rows:
+            row = _v25_pg_prepare_import_row(raw, columns)
+            conflict = _v25_pg_choose_conflict(row, conflict_cols)
+            if not row or not conflict:
+                continue
+            cols = [c for c in columns if c in row]
+            placeholders = ", ".join(["%s"] * len(cols))
+            update_cols = [c for c in cols if c not in conflict]
+            if update_cols:
+                update_sql = ", ".join([f"{c}=EXCLUDED.{c}" for c in update_cols])
+                sql = f"INSERT INTO {target_table} ({', '.join(cols)}) VALUES ({placeholders}) ON CONFLICT ({', '.join(conflict)}) DO UPDATE SET {update_sql}"
+            else:
+                sql = f"INSERT INTO {target_table} ({', '.join(cols)}) VALUES ({placeholders}) ON CONFLICT ({', '.join(conflict)}) DO NOTHING"
+            try:
+                cur.execute("SAVEPOINT v25_import_row")
+                cur.execute(sql, tuple(row.get(c) for c in cols))
+                cur.execute("RELEASE SAVEPOINT v25_import_row")
+                imported += 1
+            except Exception:
+                try:
+                    cur.execute("ROLLBACK TO SAVEPOINT v25_import_row")
+                    cur.execute("RELEASE SAVEPOINT v25_import_row")
+                except Exception:
+                    pass
+        _v25_pg_sync_identity(cur, target_table)
+    return imported
+
+
 def _v25_pg_init_schema() -> None:
     global _V25_PG_SCHEMA_READY
     if _V25_PG_SCHEMA_READY:
@@ -2244,6 +2418,17 @@ def _v25_pg_init_schema() -> None:
                 """,
                 (now,),
             )
+            imported = _v25_pg_auto_import_authority_json(cur)
+            if imported:
+                cur.execute(
+                    """
+                    INSERT INTO app_settings(setting_key, setting_value, note, updated_at)
+                    VALUES ('postgres_initial_authority_import_rows', %s, 'Initial JSON authority import into PostgreSQL', %s)
+                    ON CONFLICT (setting_key) DO UPDATE
+                    SET setting_value=EXCLUDED.setting_value, note=EXCLUDED.note, updated_at=EXCLUDED.updated_at
+                    """,
+                    (str(imported), now),
+                )
         conn.commit()
     _V25_PG_SCHEMA_READY = True
 
