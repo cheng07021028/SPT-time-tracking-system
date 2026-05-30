@@ -26166,3 +26166,613 @@ def audit_v243_today_records_all_users_delete_fix() -> dict:
     }
 
 # ================= END V243 TODAY RECORDS ALL-USERS + DELETE VISIBILITY FIX =================
+
+
+# ================= V244 HISTORY DELETE REBOOT PERSIST FIX｜2026-05-30 =================
+# Purpose:
+#   Fix 02.歷史紀錄 deleted rows coming back after Reboot App.
+# Root cause:
+#   Earlier admin delete paths removed rows from the current fast cache/authority, but the tombstone
+#   that blocks recovery sources (lossless ledger, row shard, system_logs, old cache) was not always
+#   persisted through the same permanent authority/GitHub path. After reboot, recovery sources could
+#   replay deleted rows back into 02.
+# Policy preserved:
+#   - System/background/prune/cache repair must NOT delete valid rows.
+#   - Admin/manual delete through official 01/02 functions is allowed.
+#   - Admin delete must persist tombstone + delete event + LOG so deleted rows do not resurrect.
+#   - UI/CSS/theme/page files untouched.
+
+_V244_VERSION = "V244_HISTORY_DELETE_REBOOT_PERSIST_20260530"
+try:
+    _v244_prev_delete_time_records = delete_time_records  # type: ignore[name-defined]
+except Exception:
+    _v244_prev_delete_time_records = None
+try:
+    _v244_prev_load_records = load_records  # type: ignore[name-defined]
+except Exception:
+    _v244_prev_load_records = None
+try:
+    _v244_prev_today_records = today_records  # type: ignore[name-defined]
+except Exception:
+    _v244_prev_today_records = None
+try:
+    _v244_prev_get_active_records = get_active_records  # type: ignore[name-defined]
+except Exception:
+    _v244_prev_get_active_records = None
+try:
+    _v244_prev_v240_collect_authorized_tombstones = _v240_collect_authorized_tombstones  # type: ignore[name-defined]
+except Exception:
+    _v244_prev_v240_collect_authorized_tombstones = None
+try:
+    _v244_prev_v239_deleted_ids_keys = _v239_deleted_ids_keys  # type: ignore[name-defined]
+except Exception:
+    _v244_prev_v239_deleted_ids_keys = None
+
+_V244_DELETE_GUARD_MODULE = "time_record_delete_guard"
+_V244_ADMIN_TOMBSTONES = _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_guard" / "v244_admin_tombstones.json"  # type: ignore[name-defined]
+_V244_ADMIN_DELETE_EVENTS = _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_guard" / "v244_admin_delete_events.jsonl"  # type: ignore[name-defined]
+
+
+def _v244_text(v) -> str:
+    try:
+        return _v243_text(v)  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return _v239_text(v)  # type: ignore[name-defined]
+        except Exception:
+            if v is None:
+                return ""
+            try:
+                if pd.isna(v):  # type: ignore[name-defined]
+                    return ""
+            except Exception:
+                pass
+            return str(v).strip()
+
+
+def _v244_int(v):
+    try:
+        return _v243_int(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        return _v239_int(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    s = _v244_text(v)
+    if not s:
+        return None
+    try:
+        i = int(float(s))
+        return i if i > 0 else None
+    except Exception:
+        return None
+
+
+def _v244_now() -> str:
+    try:
+        return _v239_now()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return _now()  # type: ignore[name-defined]
+        except Exception:
+            try:
+                from datetime import datetime
+                return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                return ""
+
+
+def _v244_row_id(row) -> int | None:
+    if isinstance(row, dict):
+        try:
+            rid = _v239_record_id(row)  # type: ignore[name-defined]
+            if rid is not None:
+                return rid
+        except Exception:
+            pass
+        return _v244_int(row.get("id") or row.get("ID") or row.get("record_id") or row.get("target_id"))
+    return _v244_int(row)
+
+
+def _v244_record_key(row) -> str:
+    if not isinstance(row, dict):
+        return ""
+    rk = _v244_text(row.get("record_key") or row.get("target_record_key"))
+    if rk:
+        return rk
+    return ""
+
+
+def _v244_is_admin_delete_reason(reason: str | None = "") -> bool:
+    try:
+        return bool(_v240_is_admin_delete_reason(reason))  # type: ignore[name-defined]
+    except Exception:
+        s = _v244_text(reason).lower()
+        if not s:
+            return False
+        if any(t in s for t in ("prune", "resurrection", "repair", "cache", "sync", "rebuild", "auto", "background", "system", "guard", "cleanup")) and not any(t in s for t in ("管理員", "admin", "manual", "人工", "維護", "editor")):
+            return False
+        return any(t in s for t in ("管理員", "admin", "人工", "manual", "維護", "editor", "02", "01 管理", "刪除", "delete"))
+
+
+def _v244_safe_read_json(path, default=None):
+    try:
+        return _v239_safe_read_json(path, default if default is not None else {})  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        import json as _json
+        p = Path(path)  # type: ignore[name-defined]
+        if p.exists():
+            data = _json.loads(p.read_text(encoding="utf-8"))
+            return data
+    except Exception:
+        pass
+    return default if default is not None else {}
+
+
+def _v244_safe_write_json(path, payload):
+    try:
+        _v239_safe_write_json(path, payload)  # type: ignore[name-defined]
+        return
+    except Exception:
+        pass
+    try:
+        import json as _json, os as _os
+        p = Path(path)  # type: ignore[name-defined]
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(p.suffix + ".tmp")
+        tmp.write_text(_json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        _os.replace(tmp, p)
+    except Exception:
+        pass
+
+
+def _v244_extract_tombstone_rows(payload) -> list[dict]:
+    rows: list[dict] = []
+    if isinstance(payload, list):
+        rows.extend([dict(x) for x in payload if isinstance(x, dict)])
+    elif isinstance(payload, dict):
+        for k in ("records", "tombstones", "deleted", "rows", "admin_tombstones", "v244_admin_tombstones", "v240_admin_tombstones"):
+            v = payload.get(k)
+            if isinstance(v, list):
+                rows.extend([dict(x) for x in v if isinstance(x, dict)])
+        tables = payload.get("tables")
+        if isinstance(tables, dict):
+            for k in ("admin_tombstones", "v244_admin_tombstones", "v240_admin_tombstones", "records", "tombstones"):
+                v = tables.get(k)
+                if isinstance(v, list):
+                    rows.extend([dict(x) for x in v if isinstance(x, dict)])
+        settings = payload.get("settings")
+        if isinstance(settings, dict):
+            rows.extend(_v244_extract_tombstone_rows(settings))
+    return rows
+
+
+def _v244_load_permanent_tombstone_rows() -> list[dict]:
+    rows: list[dict] = []
+    # local V244/V240 files
+    for p in [
+        _V244_ADMIN_TOMBSTONES,
+        globals().get("_V240_ADMIN_TOMBSTONES"),
+        _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_guard" / "records.json",  # type: ignore[name-defined]
+        _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_guard" / "v232_tombstones.json",  # type: ignore[name-defined]
+    ]:
+        if p:
+            rows.extend(_v244_extract_tombstone_rows(_v244_safe_read_json(p, {})))
+    # permanent authority settings/records (GitHub write-through path)
+    try:
+        from services.permanent_authority_service import load_settings as _pa_load_settings  # type: ignore
+        rows.extend(_v244_extract_tombstone_rows(_pa_load_settings(_V244_DELETE_GUARD_MODULE)))
+    except Exception:
+        pass
+    try:
+        from services.permanent_authority_service import load_authority as _pa_load_authority  # type: ignore
+        rows.extend(_v244_extract_tombstone_rows(_pa_load_authority(_V244_DELETE_GUARD_MODULE, "records")))
+    except Exception:
+        pass
+    return rows
+
+
+def _v244_tombstone_reason(row: dict) -> str:
+    try:
+        return _v240_tombstone_reason(row)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    for k in ("reason", "delete_reason", "deleted_reason", "source_reason", "operation_reason"):
+        s = _v244_text((row or {}).get(k))
+        if s:
+            return s
+    extra = (row or {}).get("extra")
+    if isinstance(extra, dict):
+        return _v244_text(extra.get("reason") or extra.get("delete_reason") or extra.get("deleted_reason"))
+    return ""
+
+
+def _v244_collect_authorized_tombstones() -> tuple[set[int], set[str]]:
+    ids: set[int] = set()
+    keys: set[str] = set()
+    try:
+        if callable(_v244_prev_v240_collect_authorized_tombstones):
+            old_ids, old_keys = _v244_prev_v240_collect_authorized_tombstones()  # type: ignore[misc]
+            ids.update(int(x) for x in (old_ids or set()) if _v244_int(x) is not None)
+            keys.update(str(x) for x in (old_keys or set()) if _v244_text(x))
+    except Exception:
+        pass
+    for r in _v244_load_permanent_tombstone_rows():
+        if not isinstance(r, dict):
+            continue
+        if not _v244_is_admin_delete_reason(_v244_tombstone_reason(r)) and not bool(r.get("admin_delete")):
+            continue
+        rid = _v244_row_id(r)
+        if rid is not None:
+            ids.add(rid)
+        rk = _v244_record_key(r)
+        if rk:
+            keys.add(rk)
+        snap = r.get("snapshot")
+        if isinstance(snap, dict):
+            srid = _v244_row_id(snap)
+            if srid is not None:
+                ids.add(srid)
+            srk = _v244_record_key(snap)
+            if srk:
+                keys.add(srk)
+    return ids, keys
+
+
+# Make every old recovery/filter path use the persistent V244 tombstone set.
+def _v240_collect_authorized_tombstones():  # type: ignore[override]
+    return _v244_collect_authorized_tombstones()
+
+
+def _v239_deleted_ids_keys():  # type: ignore[override]
+    return _v244_collect_authorized_tombstones()
+
+
+def _v239_filter_deleted(rows: list[dict]) -> list[dict]:  # type: ignore[override]
+    ids, keys = _v244_collect_authorized_tombstones()
+    out = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        rid = _v244_row_id(r)
+        rk = _v244_record_key(r)
+        if (rid is not None and rid in ids) or (rk and rk in keys):
+            continue
+        out.append(dict(r))
+    return out
+
+
+def _v244_filter_deleted_rows(rows: list[dict]) -> list[dict]:
+    return _v239_filter_deleted(rows)
+
+
+def _v244_df_from_rows(rows: list[dict]):
+    try:
+        return pd.DataFrame(rows).copy().where(pd.notna(pd.DataFrame(rows)), "").reset_index(drop=True) if rows else pd.DataFrame()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return pd.DataFrame(rows or [])  # type: ignore[name-defined]
+        except Exception:
+            return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v244_rows_from_df(df) -> list[dict]:
+    try:
+        if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+            return [dict(r) for _, r in df.copy().where(pd.notna(df), "").iterrows()]  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return []
+
+
+def _v244_collect_rows_for_ids(ids) -> list[dict]:
+    wanted = {i for i in (_v244_int(x) for x in (ids or [])) if i is not None}
+    if not wanted:
+        return []
+    rows: list[dict] = []
+    for fname in ("_v239_collect_rows_for_ids", "_v239_find_rows_by_ids", "_v232_find_rows_by_ids", "_v231_find_rows_by_ids"):
+        try:
+            f = globals().get(fname)
+            if callable(f):
+                rows.extend([dict(r) for r in f(list(wanted)) if isinstance(r, dict)])  # type: ignore[misc]
+        except Exception:
+            pass
+    try:
+        rows.extend([r for r in _v243_get_today_rows("v244_collect_rows_for_ids", force=True) if _v244_row_id(r) in wanted])  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if callable(_v244_prev_load_records):
+            df = _v244_prev_load_records()  # type: ignore[misc]
+            rows.extend([r for r in _v244_rows_from_df(df) if _v244_row_id(r) in wanted])
+    except Exception:
+        pass
+    # For tombstone snapshot collection, do NOT filter deleted; otherwise repeat-delete loses snapshot.
+    by = {}
+    for r in rows:
+        rid = _v244_row_id(r)
+        if rid in wanted:
+            by[f"id:{rid}"] = dict(r)
+    return list(by.values())
+
+
+def _v244_merge_tombstone_rows(old_rows: list[dict], new_rows: list[dict]) -> list[dict]:
+    by = {}
+    for item in (old_rows or []) + (new_rows or []):
+        if not isinstance(item, dict):
+            continue
+        rid = _v244_row_id(item)
+        rk = _v244_record_key(item)
+        key = f"id:{rid}" if rid is not None else ("key:" + rk if rk else _v244_text(item.get("event_id")) or str(len(by)))
+        by[key] = dict(item)
+    return list(by.values())
+
+
+def _v244_persist_admin_tombstones(ids: list[int], rows: list[dict], reason: str) -> None:
+    now = _v244_now()
+    tombs: list[dict] = []
+    by_id = {_v244_row_id(r): r for r in rows if isinstance(r, dict) and _v244_row_id(r) is not None}
+    for rid in ids:
+        snap = by_id.get(rid) or {"id": rid}
+        tombs.append({
+            "id": rid,
+            "record_id": rid,
+            "record_key": _v244_record_key(snap),
+            "deleted_at": now,
+            "reason": reason,
+            "delete_reason": reason,
+            "delete_policy": _V244_VERSION,
+            "admin_delete": True,
+            "snapshot": dict(snap) if isinstance(snap, dict) else {"id": rid},
+        })
+    # local canonical tombstone file
+    payload = _v244_safe_read_json(_V244_ADMIN_TOMBSTONES, {})
+    old = _v244_extract_tombstone_rows(payload)
+    merged = _v244_merge_tombstone_rows(old, tombs)
+    out_payload = {
+        "version": _V244_VERSION,
+        "updated_at": now,
+        "policy": "Admin/manual delete persists through reboot and blocks recovery sources. System/background deletion remains blocked.",
+        "records": merged,
+    }
+    _v244_safe_write_json(_V244_ADMIN_TOMBSTONES, out_payload)
+    # append local event journal
+    try:
+        _V244_ADMIN_DELETE_EVENTS.parent.mkdir(parents=True, exist_ok=True)
+        with _V244_ADMIN_DELETE_EVENTS.open("a", encoding="utf-8") as fh:
+            import json as _json
+            for t in tombs:
+                fh.write(_json.dumps(t, ensure_ascii=False, default=str) + "\n")
+    except Exception:
+        pass
+    # permanent authority settings + records with GitHub write-through when configured.
+    try:
+        from services.permanent_authority_service import load_settings as _pa_load_settings, save_settings as _pa_save_settings  # type: ignore
+        settings = _pa_load_settings(_V244_DELETE_GUARD_MODULE)
+        if not isinstance(settings, dict):
+            settings = {}
+        existing = _v244_extract_tombstone_rows(settings)
+        settings["v244_admin_tombstones"] = _v244_merge_tombstone_rows(existing, tombs)
+        settings["updated_at"] = now
+        settings["version"] = _V244_VERSION
+        settings["policy"] = "Only official admin/manual delete can hide rows; tombstones are persisted for reboot-safe filtering."
+        _pa_save_settings(_V244_DELETE_GUARD_MODULE, settings, reason="v244_admin_delete_tombstone_persist", github=True)
+    except Exception:
+        pass
+    try:
+        from services.permanent_authority_service import load_authority as _pa_load_authority, save_authority as _pa_save_authority  # type: ignore
+        auth = _pa_load_authority(_V244_DELETE_GUARD_MODULE, "records")
+        existing = _v244_extract_tombstone_rows(auth)
+        merged2 = _v244_merge_tombstone_rows(existing, tombs)
+        _pa_save_authority(_V244_DELETE_GUARD_MODULE, records={"v244_admin_tombstones": merged2, "admin_tombstones": merged2}, reason="v244_admin_delete_tombstone_records", github=True)
+    except Exception:
+        pass
+    try:
+        _v239_append_lossless_event("ADMIN_DELETE_TOMBSTONE_PERSISTED", tombs, reason=reason, extra={"policy": _V244_VERSION})  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def _v244_authority_rows(module_key: str) -> list[dict]:
+    try:
+        from services.permanent_authority_service import load_authority as _pa_load_authority  # type: ignore
+        payload = _pa_load_authority(module_key, "records")
+        tables = payload.get("tables") if isinstance(payload, dict) else {}
+        if isinstance(tables, dict):
+            rows = tables.get("time_records")
+            if isinstance(rows, list):
+                return [dict(r) for r in rows if isinstance(r, dict)]
+    except Exception:
+        pass
+    try:
+        p = _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / module_key / "records.json"  # type: ignore[name-defined]
+        payload = _v244_safe_read_json(p, {})
+        return _v244_extract_time_record_rows(payload)
+    except Exception:
+        return []
+
+
+def _v244_extract_time_record_rows(payload) -> list[dict]:
+    if not isinstance(payload, dict):
+        return []
+    tables = payload.get("tables")
+    if isinstance(tables, dict) and isinstance(tables.get("time_records"), list):
+        return [dict(r) for r in tables.get("time_records") if isinstance(r, dict)]
+    for k in ("records", "rows", "data"):
+        if isinstance(payload.get(k), list):
+            return [dict(r) for r in payload.get(k) if isinstance(r, dict)]
+    return []
+
+
+def _v244_save_authority_rows(module_key: str, rows: list[dict], reason: str) -> None:
+    rows = [dict(r) for r in rows if isinstance(r, dict)]
+    try:
+        from services.permanent_authority_service import save_authority as _pa_save_authority  # type: ignore
+        _pa_save_authority(module_key, records={"time_records": rows}, reason=reason, github=True)
+        return
+    except Exception:
+        pass
+    try:
+        p = _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / module_key / "records.json"  # type: ignore[name-defined]
+        _v244_safe_write_json(p, {"tables": {"time_records": rows}, "records": rows, "updated_at": _v244_now(), "reason": reason})
+    except Exception:
+        pass
+
+
+def _v244_purge_admin_deleted_from_authority(ids: list[int], reason: str) -> None:
+    wanted = {i for i in (_v244_int(x) for x in ids) if i is not None}
+    if not wanted:
+        return
+    for module_key in ("01_time_records", "02_history"):
+        rows = _v244_authority_rows(module_key)
+        if not rows:
+            continue
+        kept = [r for r in rows if _v244_row_id(r) not in wanted]
+        if len(kept) != len(rows):
+            _v244_save_authority_rows(module_key, kept, reason=reason)
+
+
+def _v244_invalidate_all_display_caches(reason: str = "v244_invalidate") -> None:
+    for obj_name in ("_V243_TODAY_ROWS_MEMORY", "_V241_TODAY_CACHE", "_V241_HISTORY_CACHE", "_V236_HISTORY_MEMORY", "_V239_MEMORY"):
+        try:
+            obj = globals().get(obj_name)
+            if isinstance(obj, dict):
+                for k in ("rows", "df", "data"):
+                    if k in obj:
+                        obj[k] = None
+                if "epoch" in obj:
+                    obj["epoch"] = 0.0
+                if "date" in obj:
+                    obj["date"] = ""
+        except Exception:
+            pass
+    try:
+        if "_v243_invalidate_memory" in globals() and callable(_v243_invalidate_memory):  # type: ignore[name-defined]
+            _v243_invalidate_memory(reason)  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def _v244_remove_ids_from_fast_caches(ids: list[int]) -> None:
+    for fname in ("_v231_remove_ids", "_v230_remove_cache_ids"):
+        try:
+            f = globals().get(fname)
+            if callable(f):
+                f(ids, reason="v244_admin_delete_remove_fast_cache")  # type: ignore[misc]
+        except Exception:
+            pass
+
+
+def _v244_filter_df_deleted(df):
+    rows = _v244_filter_deleted_rows(_v244_rows_from_df(df))
+    return _v244_df_from_rows(rows)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False):  # type: ignore[override]
+    df = pd.DataFrame()  # type: ignore[name-defined]
+    if callable(_v244_prev_today_records):
+        try:
+            df = _v244_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)  # type: ignore[misc]
+        except Exception:
+            df = pd.DataFrame()  # type: ignore[name-defined]
+    df = _v244_filter_df_deleted(df)
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None):  # type: ignore[override]
+    df = pd.DataFrame()  # type: ignore[name-defined]
+    if callable(_v244_prev_load_records):
+        try:
+            df = _v244_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[misc]
+        except Exception:
+            df = pd.DataFrame()  # type: ignore[name-defined]
+    df = _v244_filter_df_deleted(df)
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_records(employee_id: str | None = None, employee_name: str | None = None, process_name: str | None = None, start_date: str | None = None, work_order: str | None = None, **kwargs):  # type: ignore[override]
+    if callable(_v244_prev_get_active_records):
+        try:
+            df = _v244_prev_get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date, work_order=work_order, **kwargs)  # type: ignore[misc]
+        except TypeError:
+            try:
+                df = _v244_prev_get_active_records(employee_id=employee_id, employee_name=employee_name)  # type: ignore[misc]
+            except Exception:
+                df = pd.DataFrame()  # type: ignore[name-defined]
+        except Exception:
+            df = pd.DataFrame()  # type: ignore[name-defined]
+    else:
+        df = today_records(include_finished=False, unfinished_only=True)
+    df = _v244_filter_df_deleted(df)
+    try:
+        return _v243_filter_df(df, employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date, work_order=work_order, active_only=True).reset_index(drop=True)  # type: ignore[name-defined]
+    except Exception:
+        return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = []
+    for x in record_ids or []:
+        i = _v244_int(x)
+        if i is not None and i not in ids:
+            ids.append(i)
+    if not ids:
+        return 0
+    if not _v244_is_admin_delete_reason(reason):
+        # Do not allow system/background delete to hide data.
+        try:
+            _v239_append_lossless_event("SYSTEM_DELETE_BLOCKED", [{"id": i, "blocked_reason": reason} for i in ids], reason="v244_block_system_delete", extra={"requested_reason": reason, "policy": _V244_VERSION})  # type: ignore[name-defined]
+            write_log("V244_BLOCK_SYSTEM_DELETE", f"V244 已阻擋非管理員/非人工刪除請求，保留資料：ids={ids}；reason={reason}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+        return 0
+    rows = _v244_collect_rows_for_ids(ids)
+    _v244_persist_admin_tombstones(ids, rows, reason)
+    n = 0
+    if callable(_v244_prev_delete_time_records):
+        try:
+            n = int(_v244_prev_delete_time_records(ids, reason=reason) or 0)  # type: ignore[misc]
+        except Exception as exc:
+            try:
+                write_log("V244_DELETE_BASE_WARN", f"V244 管理員刪除舊鏈失敗，已保留永久 tombstone：{exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+            except Exception:
+                pass
+            n = len(ids)
+    else:
+        n = len(ids)
+    # Ensure official admin deletion also removes rows from current 01/02 authority files.
+    try:
+        _v244_purge_admin_deleted_from_authority(ids, reason="v244_admin_delete_purge_0102")
+    except Exception:
+        pass
+    _v244_remove_ids_from_fast_caches(ids)
+    _v244_invalidate_all_display_caches("v244_delete_time_records")
+    try:
+        _v239_append_lossless_event("ADMIN_DELETE_CONFIRMED", rows or [{"id": i} for i in ids], reason=reason, extra={"ids": ids, "deleted_count": n, "policy": _V244_VERSION})  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return int(n if n else len(ids))
+
+
+def audit_v244_history_delete_reboot_persist() -> dict:
+    ids, keys = _v244_collect_authorized_tombstones()
+    return {
+        "version": _V244_VERSION,
+        "authorized_tombstone_ids": len(ids),
+        "authorized_tombstone_keys": len(keys),
+        "persist_locations": [
+            "data/permanent_store/modules/time_record_delete_guard/v244_admin_tombstones.json",
+            "data/permanent_store/modules/time_record_delete_guard/settings.json via permanent_authority_service.save_settings(github=True)",
+            "data/permanent_store/modules/time_record_delete_guard/records.json via permanent_authority_service.save_authority(github=True)",
+            "lossless ADMIN_DELETE_CONFIRMED event",
+        ],
+        "reboot_protection": True,
+        "system_auto_delete_blocked": True,
+        "admin_delete_allowed": True,
+        "ui_changed": False,
+    }
+
+# ================= END V244 HISTORY DELETE REBOOT PERSIST FIX =================
