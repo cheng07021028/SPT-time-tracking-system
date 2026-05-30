@@ -2,14 +2,14 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "time_record_delete_guard",
   "kind": "settings",
-  "updated_at": "2026-05-30 12:43:35",
-  "exported_at": "2026-05-30 12:43:35",
-  "reason": "v246_admin_delete_tombstone_settings",
+  "updated_at": "2026-05-30 12:43:38",
+  "exported_at": "2026-05-30 12:43:38",
+  "reason": "v244_admin_delete_tombstone_persist",
   "empty_authoritative": false,
   "tables": {},
   "settings": {
-    "version": "V246_0102_DELETE_SYNC_SIGNATURE_FIX",
-    "updated_at": "2026-05-30 04:43:35.736218",
+    "version": "V244_HISTORY_DELETE_REBOOT_PERSIST_20260530",
+    "updated_at": "2026-05-30 04:43:38",
     "v246_admin_tombstones": [
       {
         "id": 463,
@@ -117,7 +117,63 @@
           "v238_enriched_at": "2026-05-30 12:41:22"
         }
       }
-    ]
+    ],
+    "v244_admin_tombstones": [
+      {
+        "id": 463,
+        "record_id": 463,
+        "record_key": "SSS|21M0241-01|前置鈑金|2026-05-30 12:40:32|035e6c8a",
+        "deleted_at": "2026-05-30 04:43:38",
+        "reason": "01 工時紀錄管理員維護區刪除",
+        "delete_reason": "01 工時紀錄管理員維護區刪除",
+        "delete_policy": "V244_HISTORY_DELETE_REBOOT_PERSIST_20260530",
+        "admin_delete": true,
+        "snapshot": {
+          "id": 463,
+          "record_key": "SSS|21M0241-01|前置鈑金|2026-05-30 12:40:32|035e6c8a",
+          "status": "下班",
+          "work_order": "21M0241-01",
+          "part_no": "4TRSC020-004-02",
+          "type_name": "NTB 3 PORT",
+          "process_name": "前置鈑金",
+          "employee_id": "SSS",
+          "employee_name": "SSS",
+          "start_action": "開始",
+          "start_timestamp": "2026-05-30 12:40:32",
+          "end_action": "下班",
+          "end_timestamp": "2026-05-30 12:41:13",
+          "remark": "",
+          "start_date": "2026-05-30",
+          "start_time": "12:40:32",
+          "end_date": "2026-05-30",
+          "end_time": "12:41:13",
+          "work_hours": 0.0,
+          "assembly_location": "竹東",
+          "group_key": "SSS|前置鈑金|2026-05-30",
+          "is_group_work": 0,
+          "source": "streamlit_v205_fast",
+          "created_at": "2026-05-30 12:40:32",
+          "updated_at": "2026-05-30 12:40:32",
+          "v232_last_op": "V235_RECOVER",
+          "v239_first_seen_at": "2026-05-30 04:40:33",
+          "v239_saved_at": "2026-05-30 04:43:35",
+          "v239_last_op": "FINISH_WORK",
+          "department": "SSS",
+          "title": "SSS",
+          "department_emp": NaN,
+          "title_emp": NaN,
+          "recovery_status": "V238_ENRICHED",
+          "recovery_note": "V238補值:department=employee_master/consensus,title=employee_master/consensus",
+          "is_deleted": NaN,
+          "deleted_at": NaN,
+          "work_hours_hms": NaN,
+          "recovery_closed_at": NaN,
+          "recovery_closed_source": NaN,
+          "v238_enriched_at": "2026-05-30 12:41:22"
+        }
+      }
+    ],
+    "policy": "Only official admin/manual delete can hide rows; tombstones are persisted for reboot-safe filtering."
   },
   "table_counts": {}
 }
