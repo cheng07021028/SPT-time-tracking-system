@@ -1102,9 +1102,19 @@ if is_admin:
                 st.info("V92：載入、卸載、全選、取消、儲存、重算、刪除按鈕已改成即時狀態同步，不再只改畫面草稿。")
 
                 try:
-                    from services.table_ui_service import apply_column_order, build_column_config
+                    from services.table_ui_service import apply_column_order, build_column_config, render_width_settings
                     display_admin = apply_column_order("today_records_admin_maintenance", admin_df)
                     column_cfg = build_column_config("today_records_admin_maintenance", display_admin)
+                    # V245：只在管理員維護表新增「顯示欄框設定」。
+                    # 預設關閉，設定區與 data_editor 編輯 form 分離，避免影響修改、刪除、存檔與畫面穩定性。
+                    try:
+                        render_width_settings(
+                            "today_records_admin_maintenance",
+                            display_admin,
+                            title="管理員維護顯示欄框設定 / Admin Maintenance Column Frame Settings",
+                        )
+                    except Exception as _v245_width_error:
+                        st.caption(f"欄框設定暫時無法載入，不影響維護表編輯功能：{_v245_width_error}")
                 except Exception:
                     display_admin = admin_df.copy()
                     column_cfg = {}
