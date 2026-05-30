@@ -2,20 +2,21 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "time_record_delete_guard",
   "kind": "records",
-  "updated_at": "2026-05-30 12:43:36",
-  "exported_at": "2026-05-30 12:43:36",
-  "reason": "v246_admin_delete_tombstone_records",
+  "updated_at": "2026-05-30 12:43:39",
+  "exported_at": "2026-05-30 12:43:39",
+  "reason": "v244_admin_delete_tombstone_records",
   "empty_authoritative": false,
   "tables": {
-    "v246_admin_tombstones": [
+    "v244_admin_tombstones": [
       {
         "id": 463,
+        "record_id": 463,
         "record_key": "SSS|21M0241-01|前置鈑金|2026-05-30 12:40:32|035e6c8a",
-        "business_signature": "sss|21m0241-01|前置鈑金|2026-05-30|12:40",
-        "deleted_at": "2026-05-30 04:43:35.736218",
+        "deleted_at": "2026-05-30 04:43:38",
         "reason": "01 工時紀錄管理員維護區刪除",
+        "delete_reason": "01 工時紀錄管理員維護區刪除",
+        "delete_policy": "V244_HISTORY_DELETE_REBOOT_PERSIST_20260530",
         "admin_delete": true,
-        "source": "V246_0102_DELETE_SYNC_SIGNATURE_FIX",
         "snapshot": {
           "id": 463,
           "record_key": "SSS|21M0241-01|前置鈑金|2026-05-30 12:40:32|035e6c8a",
@@ -48,15 +49,15 @@
           "v239_last_op": "FINISH_WORK",
           "department": "SSS",
           "title": "SSS",
-          "department_emp": "",
-          "title_emp": "",
+          "department_emp": NaN,
+          "title_emp": NaN,
           "recovery_status": "V238_ENRICHED",
           "recovery_note": "V238補值:department=employee_master/consensus,title=employee_master/consensus",
-          "is_deleted": "",
-          "deleted_at": "",
-          "work_hours_hms": "",
-          "recovery_closed_at": "",
-          "recovery_closed_source": "",
+          "is_deleted": NaN,
+          "deleted_at": NaN,
+          "work_hours_hms": NaN,
+          "recovery_closed_at": NaN,
+          "recovery_closed_source": NaN,
           "v238_enriched_at": "2026-05-30 12:41:22"
         }
       }
@@ -64,12 +65,13 @@
     "admin_tombstones": [
       {
         "id": 463,
+        "record_id": 463,
         "record_key": "SSS|21M0241-01|前置鈑金|2026-05-30 12:40:32|035e6c8a",
-        "business_signature": "sss|21m0241-01|前置鈑金|2026-05-30|12:40",
-        "deleted_at": "2026-05-30 04:43:35.736218",
+        "deleted_at": "2026-05-30 04:43:38",
         "reason": "01 工時紀錄管理員維護區刪除",
+        "delete_reason": "01 工時紀錄管理員維護區刪除",
+        "delete_policy": "V244_HISTORY_DELETE_REBOOT_PERSIST_20260530",
         "admin_delete": true,
-        "source": "V246_0102_DELETE_SYNC_SIGNATURE_FIX",
         "snapshot": {
           "id": 463,
           "record_key": "SSS|21M0241-01|前置鈑金|2026-05-30 12:40:32|035e6c8a",
@@ -102,15 +104,15 @@
           "v239_last_op": "FINISH_WORK",
           "department": "SSS",
           "title": "SSS",
-          "department_emp": "",
-          "title_emp": "",
+          "department_emp": NaN,
+          "title_emp": NaN,
           "recovery_status": "V238_ENRICHED",
           "recovery_note": "V238補值:department=employee_master/consensus,title=employee_master/consensus",
-          "is_deleted": "",
-          "deleted_at": "",
-          "work_hours_hms": "",
-          "recovery_closed_at": "",
-          "recovery_closed_source": "",
+          "is_deleted": NaN,
+          "deleted_at": NaN,
+          "work_hours_hms": NaN,
+          "recovery_closed_at": NaN,
+          "recovery_closed_source": NaN,
           "v238_enriched_at": "2026-05-30 12:41:22"
         }
       }
@@ -118,7 +120,7 @@
   },
   "settings": {},
   "table_counts": {
-    "v246_admin_tombstones": 1,
+    "v244_admin_tombstones": 1,
     "admin_tombstones": 1
   }
 }
