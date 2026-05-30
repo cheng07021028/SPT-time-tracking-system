@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "settings",
-  "updated_at": "2026-05-30 09:19:08",
-  "exported_at": "2026-05-30 09:19:08",
+  "updated_at": "2026-05-30 09:19:49",
+  "exported_at": "2026-05-30 09:19:49",
   "reason": "V196 hard delete guard",
   "empty_authoritative": false,
   "tables": {},
@@ -224,7 +224,12 @@
           "id:430",
           "id:431",
           "id:432",
-          "id:433"
+          "id:433",
+          "id:434",
+          "id:435",
+          "id:436",
+          "id:437",
+          "id:438"
         ]
       },
       {
@@ -12368,7 +12373,7 @@
         "log_id": 144
       }
     ],
-    "v196_hard_delete_updated_at": "2026-05-30 09:19:08"
+    "v196_hard_delete_updated_at": "2026-05-30 09:19:49"
   },
   "table_counts": {}
 }
