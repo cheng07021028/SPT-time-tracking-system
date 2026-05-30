@@ -27318,3 +27318,488 @@ def audit_v246_0102_delete_sync_signature_fix() -> dict:
     }
 
 # ================= END V246 01/2 DELETE SYNC SIGNATURE FIX =================
+
+
+# ================= V248 FOREGROUND COMPUTE OFFLOAD｜2026-05-30 =================
+# Purpose:
+# - Keep V225/V230/V231/V232/V239/V240/V244/V246 correctness and delete policy.
+# - Stop running expensive tombstone/recovery filtering repeatedly in the 01 foreground path.
+# - Restore fast Today Records / Finish Work by using short TTL caches and by bypassing V243 full-refresh
+#   after start/finish; start/finish now merge a single changed row into the existing all-users cache.
+# - No UI/CSS/theme/page changes.
+
+try:
+    _v248_prev_today_records = today_records  # type: ignore[name-defined]
+except Exception:
+    _v248_prev_today_records = None
+try:
+    _v248_prev_load_records = load_records  # type: ignore[name-defined]
+except Exception:
+    _v248_prev_load_records = None
+try:
+    _v248_prev_get_active_records = get_active_records  # type: ignore[name-defined]
+except Exception:
+    _v248_prev_get_active_records = None
+try:
+    _v248_prev_start_work = start_work  # type: ignore[name-defined]
+except Exception:
+    _v248_prev_start_work = None
+try:
+    _v248_prev_finish_work = finish_work  # type: ignore[name-defined]
+except Exception:
+    _v248_prev_finish_work = None
+try:
+    _v248_prev_delete_time_records = delete_time_records  # type: ignore[name-defined]
+except Exception:
+    _v248_prev_delete_time_records = None
+try:
+    _v248_prev_save_time_records = save_time_records  # type: ignore[name-defined]
+except Exception:
+    _v248_prev_save_time_records = None
+try:
+    _v248_prev_v246_target_sets_from_tombstones = _v246_target_sets_from_tombstones  # type: ignore[name-defined]
+except Exception:
+    _v248_prev_v246_target_sets_from_tombstones = None
+
+_V248_VERSION = "V248_FOREGROUND_COMPUTE_OFFLOAD_20260530"
+_V248_TOMBSTONE_CACHE = {"epoch": 0.0, "ids": set(), "keys": set(), "sigs": set()}
+_V248_TOMBSTONE_TTL_SECONDS = 30.0
+_V248_TODAY_MEMORY = {"rows": None, "epoch": 0.0, "date": ""}
+_V248_TODAY_TTL_SECONDS = 20.0
+
+
+def _v248_now_epoch() -> float:
+    try:
+        import time as _t
+        return float(_t.time())
+    except Exception:
+        return 0.0
+
+
+def _v248_text(v) -> str:
+    try:
+        return _v243_text(v)  # type: ignore[name-defined]
+    except Exception:
+        if v is None:
+            return ""
+        try:
+            if pd.isna(v):  # type: ignore[name-defined]
+                return ""
+        except Exception:
+            pass
+        return str(v).strip()
+
+
+def _v248_today() -> str:
+    try:
+        return _v243_today()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            from datetime import datetime
+            return datetime.now().strftime("%Y-%m-%d")
+        except Exception:
+            return ""
+
+
+def _v248_date(v) -> str:
+    try:
+        return _v243_date(v)  # type: ignore[name-defined]
+    except Exception:
+        s = _v248_text(v).replace("/", "-")
+        if " " in s:
+            s = s.split(" ", 1)[0]
+        if "T" in s:
+            s = s.split("T", 1)[0]
+        return s[:10] if len(s) >= 10 else ""
+
+
+def _v248_int(v) -> int | None:
+    try:
+        return _v243_int(v)  # type: ignore[name-defined]
+    except Exception:
+        try:
+            i = int(float(_v248_text(v)))
+            return i if i > 0 else None
+        except Exception:
+            return None
+
+
+def _v248_row_id(row) -> int | None:
+    try:
+        return _v243_row_id(row)  # type: ignore[name-defined]
+    except Exception:
+        if not isinstance(row, dict):
+            return None
+        return _v248_int(row.get("id") or row.get("ID") or row.get("record_id"))
+
+
+def _v248_record_key(row) -> str:
+    try:
+        return _v246_record_key(row)  # type: ignore[name-defined]
+    except Exception:
+        if not isinstance(row, dict):
+            return ""
+        return _v248_text(row.get("record_key"))
+
+
+def _v248_row_signature(row) -> str:
+    try:
+        return _v246_row_signature(row)  # type: ignore[name-defined]
+    except Exception:
+        if not isinstance(row, dict):
+            return ""
+        return "|".join([
+            _v248_text(row.get("employee_id")),
+            _v248_text(row.get("work_order")),
+            _v248_text(row.get("process_name")),
+            _v248_date(row.get("start_date") or row.get("start_timestamp")),
+            _v248_text(row.get("start_time")) or _v248_text(row.get("start_timestamp"))[11:19],
+        ])
+
+
+def _v248_deleted_sets(force: bool = False):
+    now = _v248_now_epoch()
+    try:
+        if (not force) and (now - float(_V248_TOMBSTONE_CACHE.get("epoch") or 0.0)) <= _V248_TOMBSTONE_TTL_SECONDS:
+            return (
+                set(_V248_TOMBSTONE_CACHE.get("ids") or set()),
+                set(_V248_TOMBSTONE_CACHE.get("keys") or set()),
+                set(_V248_TOMBSTONE_CACHE.get("sigs") or set()),
+            )
+    except Exception:
+        pass
+    ids, keys, sigs = set(), set(), set()
+    try:
+        if callable(_v248_prev_v246_target_sets_from_tombstones):
+            ids, keys, sigs = _v248_prev_v246_target_sets_from_tombstones()  # type: ignore[misc]
+    except Exception:
+        ids, keys, sigs = set(), set(), set()
+    try:
+        _V248_TOMBSTONE_CACHE.update({"epoch": now, "ids": set(ids), "keys": set(keys), "sigs": set(sigs)})
+    except Exception:
+        pass
+    return set(ids), set(keys), set(sigs)
+
+
+# Speed up all older V246 filters by replacing the expensive per-row tombstone loader with a TTL cache.
+def _v246_target_sets_from_tombstones():  # type: ignore[override]
+    return _v248_deleted_sets(force=False)
+
+
+def _v248_is_deleted(row) -> bool:
+    if not isinstance(row, dict):
+        return False
+    ids, keys, sigs = _v248_deleted_sets(force=False)
+    rid = _v248_row_id(row)
+    if rid is not None and rid in ids:
+        return True
+    rk = _v248_record_key(row)
+    if rk and rk in keys:
+        return True
+    sig = _v248_row_signature(row)
+    if sig and sig in sigs:
+        return True
+    return False
+
+
+def _v248_dedupe_rows(rows: list[dict]) -> list[dict]:
+    try:
+        return [dict(r) for r in _v243_dedupe_rows(rows) if isinstance(r, dict)]  # type: ignore[name-defined]
+    except Exception:
+        by = {}
+        for r in rows or []:
+            if not isinstance(r, dict):
+                continue
+            rid = _v248_row_id(r)
+            key = f"id:{rid}" if rid is not None else (_v248_record_key(r) or _v248_row_signature(r) or str(len(by)))
+            by[key] = dict(r)
+        return list(by.values())
+
+
+def _v248_sort_rows(rows: list[dict]) -> list[dict]:
+    try:
+        return _v243_sort_rows(rows)  # type: ignore[name-defined]
+    except Exception:
+        return list(rows or [])
+
+
+def _v248_rows_to_df(rows: list[dict]):
+    try:
+        return _v243_rows_to_df(rows)  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return pd.DataFrame(rows or []).copy().where(pd.notna(pd.DataFrame(rows or [])), "").reset_index(drop=True)  # type: ignore[name-defined]
+        except Exception:
+            return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v248_filter_visible_rows(rows: list[dict]) -> list[dict]:
+    out = []
+    today = _v248_today()
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        if _v248_is_deleted(r):
+            continue
+        d = _v248_date(r.get("start_date") or r.get("start_timestamp"))
+        if d == today:
+            out.append(dict(r))
+    return _v248_sort_rows(_v248_dedupe_rows(out))
+
+
+def _v248_get_cached_today_rows() -> list[dict]:
+    today = _v248_today()
+    now = _v248_now_epoch()
+    try:
+        rows = _V248_TODAY_MEMORY.get("rows")
+        if isinstance(rows, list) and _V248_TODAY_MEMORY.get("date") == today and (now - float(_V248_TODAY_MEMORY.get("epoch") or 0.0)) <= _V248_TODAY_TTL_SECONDS:
+            return [dict(r) for r in rows if isinstance(r, dict)]
+    except Exception:
+        pass
+    try:
+        rows = _V243_TODAY_ROWS_MEMORY.get("rows")  # type: ignore[name-defined]
+        if isinstance(rows, list) and _V243_TODAY_ROWS_MEMORY.get("date") == today:  # type: ignore[name-defined]
+            rows2 = _v248_filter_visible_rows([dict(r) for r in rows if isinstance(r, dict)])
+            if rows2:
+                _V248_TODAY_MEMORY.update({"rows": rows2, "epoch": now, "date": today})
+                return rows2
+    except Exception:
+        pass
+    return []
+
+
+def _v248_collect_today_rows_fast(reason: str = "v248_today_fast", *, force: bool = False) -> list[dict]:
+    if not force:
+        cached = _v248_get_cached_today_rows()
+        if cached:
+            return cached
+    rows: list[dict] = []
+    # Fast display-cache sources first; do not scan system_logs/lossless ledger here.
+    for fname in ("_v231_get_display_rows", "_v230_get_display_rows"):
+        try:
+            f = globals().get(fname)
+            if callable(f):
+                rows.extend([dict(r) for r in f(reason) if isinstance(r, dict)])  # type: ignore[misc]
+        except Exception:
+            pass
+    if not rows:
+        try:
+            if callable(_v248_prev_today_records):
+                df0 = _v248_prev_today_records(include_finished=True, unfinished_only=False)  # type: ignore[misc]
+                if isinstance(df0, pd.DataFrame) and not df0.empty:  # type: ignore[name-defined]
+                    rows.extend([dict(r) for _, r in df0.copy().where(pd.notna(df0), "").iterrows()])  # type: ignore[name-defined]
+        except Exception:
+            pass
+    rows = _v248_filter_visible_rows(rows)
+    try:
+        _V248_TODAY_MEMORY.update({"rows": [dict(r) for r in rows], "epoch": _v248_now_epoch(), "date": _v248_today()})
+        if "_V243_TODAY_ROWS_MEMORY" in globals() and isinstance(_V243_TODAY_ROWS_MEMORY, dict):  # type: ignore[name-defined]
+            _V243_TODAY_ROWS_MEMORY.update({"rows": [dict(r) for r in rows], "epoch": _v248_now_epoch(), "date": _v248_today()})  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return rows
+
+
+def _v248_write_today_rows(rows: list[dict], reason: str = "v248_write_today") -> None:
+    rows = _v248_filter_visible_rows(rows)
+    try:
+        if "_v231_write_rows" in globals() and callable(_v231_write_rows):  # type: ignore[name-defined]
+            _v231_write_rows(rows, reason=reason)  # type: ignore[name-defined]
+        elif "_v230_write_display_rows" in globals() and callable(_v230_write_display_rows):  # type: ignore[name-defined]
+            _v230_write_display_rows(rows, reason=reason)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        _V248_TODAY_MEMORY.update({"rows": [dict(r) for r in rows], "epoch": _v248_now_epoch(), "date": _v248_today()})
+        if "_V243_TODAY_ROWS_MEMORY" in globals() and isinstance(_V243_TODAY_ROWS_MEMORY, dict):  # type: ignore[name-defined]
+            _V243_TODAY_ROWS_MEMORY.update({"rows": [dict(r) for r in rows], "epoch": _v248_now_epoch(), "date": _v248_today()})  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def _v248_find_rows_by_ids_fast(ids: list[int]) -> list[dict]:
+    wanted = {i for i in (_v248_int(x) for x in ids or []) if i is not None}
+    if not wanted:
+        return []
+    rows = []
+    try:
+        for r in _v248_collect_today_rows_fast("v248_find_ids", force=False):
+            if _v248_row_id(r) in wanted:
+                rows.append(dict(r))
+    except Exception:
+        pass
+    if rows:
+        return rows
+    try:
+        if "_v241_find_rows_by_ids_fast" in globals() and callable(_v241_find_rows_by_ids_fast):  # type: ignore[name-defined]
+            return [dict(r) for r in _v241_find_rows_by_ids_fast(list(wanted)) if isinstance(r, dict)]  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return []
+
+
+def _v248_is_active_row(row: dict) -> bool:
+    try:
+        return bool(_v243_is_active_row(row))  # type: ignore[name-defined]
+    except Exception:
+        if _v248_text(row.get("end_timestamp")):
+            return False
+        closed = {"下班", "暫停", "完工", "已結束", "結束", "完成"}
+        return _v248_text(row.get("status")) not in closed and _v248_text(row.get("end_action")) not in closed
+
+
+def _v248_basic_filter_df(df, *, employee_id=None, employee_name=None, process_name=None, start_date=None, work_order=None, active_only: bool = False):
+    try:
+        return _v243_filter_df(df, employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date, work_order=work_order, active_only=active_only).reset_index(drop=True)  # type: ignore[name-defined]
+    except Exception:
+        return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v248_invalidate_foreground(reason: str = "") -> None:
+    try:
+        _V248_TODAY_MEMORY.update({"rows": None, "epoch": 0.0, "date": ""})
+    except Exception:
+        pass
+    try:
+        if "_v243_invalidate_memory" in globals() and callable(_v243_invalidate_memory):  # type: ignore[name-defined]
+            _v243_invalidate_memory("v248_" + reason)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if "_V241_TODAY_CACHE" in globals() and isinstance(_V241_TODAY_CACHE, dict):  # type: ignore[name-defined]
+            _V241_TODAY_CACHE["epoch"] = 0.0  # type: ignore[name-defined]
+            _V241_TODAY_CACHE["df"] = None  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False):  # type: ignore[override]
+    rows = _v248_collect_today_rows_fast("v248_today_records", force=False)
+    if unfinished_only or not include_finished:
+        rows = [dict(r) for r in rows if _v248_is_active_row(r)]
+    return _v248_rows_to_df(rows).reset_index(drop=True)
+
+
+def get_active_records(employee_id: str | None = None, employee_name: str | None = None, process_name: str | None = None, start_date: str | None = None, work_order: str | None = None, **kwargs):  # type: ignore[override]
+    df = today_records(include_finished=False, unfinished_only=True)
+    return _v248_basic_filter_df(df, employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date, work_order=work_order, active_only=True)
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None):  # type: ignore[override]
+    today = _v248_today()
+    sd = _v248_date(start_date)
+    ed = _v248_date(end_date)
+    if sd == today and ed == today and not _v248_text(employee_id) and not _v248_text(work_order):
+        return today_records(include_finished=True, unfinished_only=False)
+    try:
+        return _v248_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[misc]
+    except Exception:
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    before = _v248_collect_today_rows_fast("v248_pre_start", force=False)
+    base = globals().get("_v243_prev_start_work")
+    if not callable(base):
+        base = _v248_prev_start_work
+    if not callable(base):
+        raise RuntimeError("start_work base function is unavailable")
+    rid = int(base(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)  # type: ignore[misc]
+    if rid:
+        rows = _v248_find_rows_by_ids_fast([rid])
+        if not rows:
+            try:
+                if "_v239_compose_start_row" in globals() and callable(_v239_compose_start_row):  # type: ignore[name-defined]
+                    rows = [_v239_compose_start_row(rid, employee or {}, work_order or {}, process_name, remark)]  # type: ignore[name-defined]
+            except Exception:
+                rows = []
+        _v248_write_today_rows(before + (rows or []), reason="v248_post_start_merge_cache")
+        try:
+            if "_v241_fast_lossless_event" in globals() and callable(_v241_fast_lossless_event):  # type: ignore[name-defined]
+                _v241_fast_lossless_event("START_WORK", rows or [], reason="v248_start_fast_lossless")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    rid = int(record_id)
+    before = _v248_collect_today_rows_fast("v248_pre_finish", force=False)
+    before_target = [dict(r) for r in before if _v248_row_id(r) == rid]
+    base = globals().get("_v243_prev_finish_work")
+    if not callable(base):
+        base = _v248_prev_finish_work
+    if not callable(base):
+        raise RuntimeError("finish_work base function is unavailable")
+    n = int(base(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)  # type: ignore[misc]
+    if n:
+        rows = _v248_find_rows_by_ids_fast([rid])
+        if not rows and before_target:
+            rows = []
+            try:
+                now_s = _v239_now() if "_v239_now" in globals() and callable(_v239_now) else ""  # type: ignore[name-defined]
+            except Exception:
+                now_s = ""
+            for r in before_target:
+                rr = dict(r)
+                rr["status"] = end_action
+                rr["end_action"] = end_action
+                rr["end_timestamp"] = now_s
+                rr["end_date"] = now_s[:10]
+                rr["end_time"] = now_s[11:19]
+                if remark:
+                    old = _v248_text(rr.get("remark"))
+                    rr["remark"] = (old + "；" + remark).strip("；") if old else remark
+                rows.append(rr)
+        merged = [dict(r) for r in before if _v248_row_id(r) != rid] + (rows or [])
+        _v248_write_today_rows(merged, reason="v248_post_finish_merge_cache")
+        try:
+            if "_v241_fast_lossless_event" in globals() and callable(_v241_fast_lossless_event):  # type: ignore[name-defined]
+                _v241_fast_lossless_event("FINISH_WORK", rows or before_target or [{"id": rid, "end_action": end_action}], reason="v248_finish_fast_lossless", extra={"end_action": end_action})  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = []
+    for x in record_ids or []:
+        i = _v248_int(x)
+        if i is not None and i not in ids:
+            ids.append(i)
+    if not ids:
+        return 0
+    n = int(_v248_prev_delete_time_records(ids, reason=reason) or 0) if callable(_v248_prev_delete_time_records) else len(ids)  # type: ignore[misc]
+    try:
+        _V248_TOMBSTONE_CACHE["epoch"] = 0.0
+    except Exception:
+        pass
+    kept = [dict(r) for r in _v248_collect_today_rows_fast("v248_post_delete_base", force=False) if _v248_row_id(r) not in set(ids)]
+    _v248_write_today_rows(kept, reason="v248_post_delete_remove_cache")
+    _v248_invalidate_foreground("delete_time_records")
+    return int(n if n else len(ids))
+
+
+def save_time_records(df, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    n = int(_v248_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0) if callable(_v248_prev_save_time_records) else 0  # type: ignore[misc]
+    if n:
+        _v248_invalidate_foreground("save_time_records")
+    return n
+
+
+def audit_v248_foreground_compute_offload() -> dict:
+    rows = _v248_collect_today_rows_fast("v248_audit", force=False)
+    ids, keys, sigs = _v248_deleted_sets(force=False)
+    return {
+        "version": _V248_VERSION,
+        "today_rows_cached": len(rows),
+        "tombstone_ids_cached": len(ids),
+        "foreground_heavy_recovery": "disabled_for_01_today_and_active_paths",
+        "history_load": "delegated_to_existing_stable_source",
+        "system_auto_delete_blocked": True,
+        "admin_delete_allowed": True,
+        "ui_changed": False,
+        "service_only": True,
+    }
+
+# ================= END V248 FOREGROUND COMPUTE OFFLOAD =================
