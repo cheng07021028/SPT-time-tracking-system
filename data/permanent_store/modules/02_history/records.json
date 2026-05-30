@@ -2,12 +2,40 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "records",
-  "updated_at": "2026-05-30 08:38:53",
-  "exported_at": "2026-05-30 08:38:53",
+  "updated_at": "2026-05-30 08:47:35",
+  "exported_at": "2026-05-30 08:47:35",
   "reason": "v232_start_work_non_destructive_merge",
   "empty_authoritative": false,
   "tables": {
     "time_records": [
+      {
+        "id": 455,
+        "record_key": "B164|26A0230-09|其他|2026-05-30 08:47:35|adf13164",
+        "status": "作業中",
+        "work_order": "26A0230-09",
+        "part_no": "MZ8-26A0230",
+        "type_name": "SORTER 加裝防拖片SENSOR",
+        "process_name": "其他",
+        "employee_id": "B164",
+        "employee_name": "陳宛廷",
+        "start_action": "開始",
+        "start_timestamp": "2026-05-30 08:47:35",
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": "加工",
+        "start_date": "2026-05-30",
+        "start_time": "08:47:35",
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0.0,
+        "assembly_location": "竹東",
+        "group_key": "B164|其他|2026-05-30",
+        "is_group_work": 0,
+        "source": "streamlit_v205_fast",
+        "created_at": "2026-05-30 08:47:35",
+        "updated_at": "2026-05-30 08:47:35",
+        "v232_last_op": "v232_start_work_non_destructive_merge"
+      },
       {
         "id": 454,
         "record_key": "B235|26M0051-09|配電|2026-05-30 08:38:52|2db0956c",
@@ -180,6 +208,6 @@
   },
   "settings": {},
   "table_counts": {
-    "time_records": 6
+    "time_records": 7
   }
 }
