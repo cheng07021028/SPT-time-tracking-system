@@ -1565,3 +1565,815 @@ def execute_transaction(
         pass
     return ids
 # ===== END V24 LIGHTWEIGHT SYSTEM LOG AUDIT FOR ALL DB WRITES =====
+
+
+# ===== V25 POSTGRESQL BACKEND FOR CLOUD DEPLOYMENT =====
+# Enable by setting one of:
+#   DATABASE_URL / POSTGRES_URL / POSTGRESQL_URL / SUPABASE_DB_URL
+# If no PostgreSQL URL is present the existing SQLite path is preserved.
+
+_v25_sqlite_ensure_database = ensure_database
+_v25_sqlite_query_df = query_df
+_v25_sqlite_query_one = query_one
+_v25_sqlite_execute = execute
+_v25_sqlite_executemany = executemany
+_v25_sqlite_execute_transaction = execute_transaction
+_v25_sqlite_database_business_row_count = database_business_row_count
+_v25_sqlite_get_connection = get_connection
+
+_V25_PG_SCHEMA_READY = False
+
+
+def _v25_postgres_dsn() -> str:
+    for key in ("DATABASE_URL", "POSTGRES_URL", "POSTGRESQL_URL", "SUPABASE_DB_URL", "NEON_DATABASE_URL", "DB_URL"):
+        val = str(os.environ.get(key, "") or "").strip()
+        if val:
+            return val
+    try:
+        import streamlit as _v25_st
+        secrets = getattr(_v25_st, "secrets", {}) or {}
+        for key in ("DATABASE_URL", "POSTGRES_URL", "POSTGRESQL_URL", "SUPABASE_DB_URL", "NEON_DATABASE_URL", "DB_URL", "database_url", "postgres_url"):
+            val = str(secrets.get(key, "") or "").strip()
+            if val:
+                return val
+        # Streamlit common format:
+        # [connections.postgresql]
+        # url = "postgresql://..."
+        for section_path in (
+            ("connections", "postgresql"),
+            ("connections", "postgres"),
+            ("postgresql",),
+            ("postgres",),
+            ("database",),
+            ("db",),
+        ):
+            obj = secrets
+            for part in section_path:
+                try:
+                    obj = obj.get(part, {})
+                except Exception:
+                    obj = {}
+                if not obj:
+                    break
+            if not obj:
+                continue
+            if isinstance(obj, str):
+                text = obj.strip()
+                if text:
+                    return text
+            for key in ("url", "dsn", "uri", "database_url", "connection_string"):
+                try:
+                    val = str(obj.get(key, "") or "").strip()
+                except Exception:
+                    val = ""
+                if val:
+                    return val
+            try:
+                host = str(obj.get("host", "") or "").strip()
+                database = str(obj.get("database", obj.get("dbname", "")) or "").strip()
+                user = str(obj.get("username", obj.get("user", "")) or "").strip()
+                password = str(obj.get("password", "") or "")
+                port = str(obj.get("port", "5432") or "5432").strip()
+                sslmode = str(obj.get("sslmode", "require") or "require").strip()
+                if host and database and user:
+                    from urllib.parse import quote
+                    return f"postgresql://{quote(user)}:{quote(password)}@{host}:{port}/{quote(database)}?sslmode={quote(sslmode)}"
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return ""
+
+
+def is_postgres_enabled() -> bool:
+    dsn = _v25_postgres_dsn().lower()
+    return bool(dsn and not dsn.startswith("sqlite"))
+
+
+def get_database_backend() -> str:
+    return "postgresql" if is_postgres_enabled() else "sqlite"
+
+
+def _v25_pg_connect():
+    try:
+        import psycopg
+        from psycopg.rows import dict_row
+    except Exception as exc:
+        raise RuntimeError("PostgreSQL mode requires psycopg[binary]. Run: pip install -r requirements.txt") from exc
+    return psycopg.connect(_v25_postgres_dsn(), row_factory=dict_row, connect_timeout=15)
+
+
+def _v25_pg_placeholder_sql(sql: str) -> str:
+    text = str(sql or "")
+    out: list[str] = []
+    in_single = False
+    in_double = False
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if ch == "'" and not in_double:
+            out.append(ch)
+            if in_single and i + 1 < len(text) and text[i + 1] == "'":
+                out.append(text[i + 1])
+                i += 2
+                continue
+            in_single = not in_single
+        elif ch == '"' and not in_single:
+            out.append(ch)
+            in_double = not in_double
+        elif ch == "?" and not in_single and not in_double:
+            out.append("%s")
+        else:
+            out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def _v25_pg_insert_returning_sql(sql: str) -> str:
+    low = " ".join(str(sql or "").lower().split())
+    if not low.startswith("insert ") or " returning " in low:
+        return sql
+    if " into system_logs " in f" {low} " or " into auth_login_logs " in f" {low} " or " into security_login_logs " in f" {low} ":
+        return sql.rstrip().rstrip(";") + " RETURNING id"
+    for table in ("work_orders", "employees", "time_records", "rest_periods", "process_options", "table_column_settings", "table_sort_settings", "auth_users", "auth_account_permissions"):
+        if f" into {table} " in f" {low} " or f" into {table}(" in f" {low} ":
+            return sql.rstrip().rstrip(";") + " RETURNING id"
+    return sql
+
+
+def _v25_pg_translate_sql(sql: str) -> str:
+    import re
+    text = str(sql or "").strip()
+    if not text:
+        return text
+    if text.lower().startswith("pragma "):
+        return ""
+    if "sqlite_sequence" in text.lower():
+        return ""
+    text = re.sub(r"\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b", "INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY", text, flags=re.I)
+    text = re.sub(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", "INSERT INTO", text, flags=re.I)
+    if re.search(r"\binsert\s+into\b", text, flags=re.I) and " on conflict " not in text.lower() and " do nothing" not in text.lower():
+        # Seed statements converted from INSERT OR IGNORE need a generic no-op conflict handler.
+        raw_low = str(sql or "").lower()
+        if "insert or ignore into" in raw_low:
+            text = text.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+    m = re.match(r"(?is)^\s*INSERT\s+OR\s+REPLACE\s+INTO\s+([A-Za-z_][\w]*)\s*\(([^)]*)\)\s*VALUES\s*\(([^)]*)\)\s*$", str(sql or "").strip())
+    if m:
+        table = m.group(1)
+        cols = [c.strip().strip('"') for c in m.group(2).split(",")]
+        vals = m.group(3)
+        conflict = "id" if "id" in cols else ("record_key" if "record_key" in cols else cols[0])
+        updates = [c for c in cols if c != conflict]
+        if updates:
+            update_sql = ", ".join([f"{c}=EXCLUDED.{c}" for c in updates])
+            text = f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({vals}) ON CONFLICT ({conflict}) DO UPDATE SET {update_sql}"
+        else:
+            text = f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({vals}) ON CONFLICT ({conflict}) DO NOTHING"
+    text = _v25_pg_placeholder_sql(text)
+    return _v25_pg_insert_returning_sql(text)
+
+
+def _v25_pg_table_info_df(table_name: str) -> pd.DataFrame:
+    with _v25_pg_connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns
+            WHERE table_schema='public' AND table_name=%s
+            ORDER BY ordinal_position
+            """,
+            (table_name,),
+        ).fetchall()
+    pk_cols: set[str] = set()
+    try:
+        with _v25_pg_connect() as conn:
+            pk_rows = conn.execute(
+                """
+                SELECT kcu.column_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                  ON tc.constraint_name=kcu.constraint_name AND tc.table_schema=kcu.table_schema
+                WHERE tc.constraint_type='PRIMARY KEY' AND tc.table_schema='public' AND tc.table_name=%s
+                """,
+                (table_name,),
+            ).fetchall()
+            pk_cols = {str(r.get("column_name")) for r in pk_rows}
+    except Exception:
+        pk_cols = set()
+    out = []
+    for idx, row in enumerate(rows):
+        name = str(row.get("column_name") or "")
+        out.append({
+            "cid": idx,
+            "name": name,
+            "type": str(row.get("data_type") or "").upper(),
+            "notnull": 1 if str(row.get("is_nullable") or "").upper() == "NO" else 0,
+            "dflt_value": row.get("column_default"),
+            "pk": 1 if name in pk_cols else 0,
+        })
+    return pd.DataFrame(out, columns=["cid", "name", "type", "notnull", "dflt_value", "pk"])
+
+
+def _v25_pg_special_query_df(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame | None:
+    import re
+    text = str(sql or "").strip()
+    low = " ".join(text.lower().split())
+    m = re.match(r"(?is)^pragma\s+table_info\((?:\"?)([A-Za-z_][\w]*)(?:\"?)\)\s*$", text)
+    if m:
+        return _v25_pg_table_info_df(m.group(1))
+    if "sqlite_master" in low:
+        with _v25_pg_connect() as conn:
+            if "name=%s" in _v25_pg_placeholder_sql(text).lower() or "name=?" in low:
+                table = tuple(params or ("",))[0]
+                rows = conn.execute(
+                    "SELECT table_name AS name FROM information_schema.tables WHERE table_schema='public' AND table_name=%s",
+                    (table,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT table_name AS name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name"
+                ).fetchall()
+        return pd.DataFrame(rows)
+    return None
+
+
+def _v25_pg_init_schema() -> None:
+    global _V25_PG_SCHEMA_READY
+    if _V25_PG_SCHEMA_READY:
+        return
+    statements = [
+        """
+        CREATE TABLE IF NOT EXISTS work_orders (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            work_order TEXT UNIQUE NOT NULL,
+            part_no TEXT,
+            type_name TEXT,
+            assembly_location TEXT,
+            customer TEXT,
+            note TEXT,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS employees (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            employee_id TEXT UNIQUE NOT NULL,
+            employee_name TEXT NOT NULL,
+            department TEXT,
+            title TEXT,
+            is_active INTEGER DEFAULT 1,
+            is_in_factory INTEGER DEFAULT 1,
+            is_today_attendance INTEGER DEFAULT 1,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS time_records (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            record_key TEXT UNIQUE,
+            status TEXT,
+            work_order TEXT,
+            part_no TEXT,
+            type_name TEXT,
+            process_name TEXT,
+            employee_id TEXT,
+            employee_name TEXT,
+            start_action TEXT,
+            start_timestamp TEXT,
+            end_action TEXT,
+            end_timestamp TEXT,
+            remark TEXT,
+            start_date TEXT,
+            start_time TEXT,
+            end_date TEXT,
+            end_time TEXT,
+            work_hours DOUBLE PRECISION DEFAULT 0,
+            assembly_location TEXT,
+            group_key TEXT,
+            is_group_work INTEGER DEFAULT 0,
+            source TEXT DEFAULT 'streamlit',
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS system_logs (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            log_time TEXT,
+            user_name TEXT,
+            action_type TEXT,
+            target_table TEXT,
+            target_id TEXT,
+            message TEXT,
+            detail TEXT,
+            level TEXT DEFAULT 'INFO'
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS rest_periods (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            name TEXT,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS process_options (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            process_name TEXT UNIQUE NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS system_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT,
+            note TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS table_column_settings (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            page_key TEXT,
+            table_key TEXT,
+            column_key TEXT,
+            column_width INTEGER,
+            sort_order INTEGER,
+            updated_at TEXT,
+            UNIQUE(page_key, table_key, column_key)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS table_sort_settings (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            page_key TEXT,
+            table_key TEXT,
+            sort_column TEXT,
+            sort_ascending INTEGER DEFAULT 1,
+            updated_at TEXT,
+            UNIQUE(page_key, table_key)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS auth_users (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            password_hint TEXT,
+            employee_id TEXT,
+            display_name TEXT,
+            email TEXT,
+            role_code TEXT DEFAULT 'operator',
+            is_active INTEGER DEFAULT 1,
+            force_password_change INTEGER DEFAULT 0,
+            last_login_at TEXT,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS auth_account_permissions (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            username TEXT NOT NULL,
+            module_code TEXT NOT NULL,
+            module_name_zh TEXT,
+            module_name_en TEXT,
+            can_view INTEGER DEFAULT 0,
+            can_create INTEGER DEFAULT 0,
+            can_edit INTEGER DEFAULT 0,
+            can_delete INTEGER DEFAULT 0,
+            can_import INTEGER DEFAULT 0,
+            can_export INTEGER DEFAULT 0,
+            can_backup INTEGER DEFAULT 0,
+            can_restore INTEGER DEFAULT 0,
+            can_manage INTEGER DEFAULT 0,
+            updated_at TEXT,
+            UNIQUE(username, module_code)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS auth_login_logs (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            username TEXT,
+            display_name TEXT,
+            event_time TEXT,
+            event_type TEXT,
+            result TEXT,
+            module_code TEXT,
+            module_name TEXT,
+            message TEXT,
+            ip_address TEXT,
+            user_agent TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS auth_security_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT,
+            note TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS app_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT,
+            note TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS process_categories (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            category_name TEXT UNIQUE,
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS process_category_options (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            category_name TEXT,
+            process_name TEXT,
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            UNIQUE(category_name, process_name)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS process_model_options (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            model_name TEXT UNIQUE,
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS security_users (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            employee_id TEXT,
+            display_name TEXT,
+            email TEXT,
+            is_active INTEGER DEFAULT 1,
+            force_password_change INTEGER DEFAULT 0,
+            last_login_at TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS security_roles (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            role_code TEXT UNIQUE NOT NULL,
+            role_name TEXT NOT NULL,
+            role_name_en TEXT,
+            description TEXT,
+            is_system_role INTEGER DEFAULT 1,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS security_user_roles (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            username TEXT NOT NULL,
+            role_code TEXT NOT NULL,
+            created_at TEXT,
+            UNIQUE(username, role_code)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS security_module_permissions (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            role_code TEXT NOT NULL,
+            module_code TEXT NOT NULL,
+            module_no TEXT,
+            module_name TEXT,
+            module_name_en TEXT,
+            can_view INTEGER DEFAULT 0,
+            can_create INTEGER DEFAULT 0,
+            can_edit INTEGER DEFAULT 0,
+            can_delete INTEGER DEFAULT 0,
+            can_import INTEGER DEFAULT 0,
+            can_export INTEGER DEFAULT 0,
+            can_backup INTEGER DEFAULT 0,
+            can_restore INTEGER DEFAULT 0,
+            can_manage INTEGER DEFAULT 0,
+            updated_at TEXT,
+            UNIQUE(role_code, module_code)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS security_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT,
+            note TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS security_login_logs (
+            id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            username TEXT,
+            display_name TEXT,
+            event_type TEXT,
+            result TEXT,
+            message TEXT,
+            module_code TEXT,
+            login_time TEXT,
+            logout_time TEXT,
+            idle_seconds INTEGER,
+            user_agent TEXT,
+            created_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS time_record_transaction_guard (
+            op_key TEXT PRIMARY KEY,
+            op_type TEXT,
+            last_at TEXT,
+            detail TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS time_record_delete_tombstones (
+            record_id INTEGER,
+            record_key TEXT,
+            business_key TEXT,
+            deleted_at TEXT,
+            reason TEXT
+        )
+        """,
+    ]
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_work_orders_order ON work_orders(work_order)",
+        "CREATE INDEX IF NOT EXISTS idx_work_orders_active ON work_orders(is_active)",
+        "CREATE INDEX IF NOT EXISTS idx_employees_empid ON employees(employee_id)",
+        "CREATE INDEX IF NOT EXISTS idx_employees_active_factory ON employees(is_active, is_in_factory, is_today_attendance)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_emp_date ON time_records(employee_id, start_date)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_work_order ON time_records(work_order)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_status ON time_records(status)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_start_date ON time_records(start_date)",
+        "CREATE INDEX IF NOT EXISTS idx_auth_users_username ON auth_users(username)",
+        "CREATE INDEX IF NOT EXISTS idx_auth_perm_user_module ON auth_account_permissions(username, module_code)",
+        "CREATE INDEX IF NOT EXISTS idx_auth_login_logs_time ON auth_login_logs(event_time)",
+    ]
+    now = _now()
+    default_rests = [
+        (1, "上午休息", "10:30", "10:45", 1),
+        (2, "午休", "12:00", "13:00", 2),
+        (3, "下午休息", "15:00", "15:15", 3),
+        (4, "晚餐休息", "18:00", "18:30", 4),
+        (5, "晚上休息", "20:00", "20:15", 5),
+    ]
+    default_processes = [
+        "前置鈑金", "LP改造", "骨架組立", "配電", "模組", "水平", "S.T.", "清潔", "收機", "包機",
+        "Packing", "異常", "設變", "重工", "教育訓練", "IPQC", "其他",
+    ]
+    with _v25_pg_connect() as conn:
+        with conn.cursor() as cur:
+            for stmt in statements:
+                cur.execute(stmt)
+            for stmt in indexes:
+                cur.execute(stmt)
+            cur.executemany(
+                """
+                INSERT INTO rest_periods (id, name, start_time, end_time, is_active, sort_order)
+                VALUES (%s, %s, %s, %s, 1, %s)
+                ON CONFLICT (id) DO NOTHING
+                """,
+                default_rests,
+            )
+            cur.executemany(
+                """
+                INSERT INTO process_options(process_name, is_active, sort_order, note, created_at, updated_at)
+                VALUES (%s, 1, %s, '系統預設工段，可於 13 系統設定修改', %s, %s)
+                ON CONFLICT (process_name) DO NOTHING
+                """,
+                [(name, idx, now, now) for idx, name in enumerate(default_processes, start=1)],
+            )
+            cur.executemany(
+                """
+                INSERT INTO system_settings (setting_key, setting_value, note, updated_at)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (setting_key) DO NOTHING
+                """,
+                [
+                    ("company_name", "超慧科技", "公司名稱", now),
+                    ("system_name", "製造部智慧工時紀錄系統", "系統名稱", now),
+                    ("standard_work_start", "09:00", "標準上班時間", now),
+                    ("standard_work_end", "18:00", "標準下班時間", now),
+                    ("daily_expected_hours_min", "7.0", "每日最低合理工時", now),
+                    ("daily_expected_hours_max", "7.5", "每日最高合理工時", now),
+                ],
+            )
+            cur.execute(
+                """
+                INSERT INTO auth_security_settings(setting_key, setting_value, note, updated_at)
+                VALUES ('idle_timeout_minutes','15','閒置自動登出分鐘數 / Idle logout minutes',%s)
+                ON CONFLICT (setting_key) DO NOTHING
+                """,
+                (now,),
+            )
+        conn.commit()
+    _V25_PG_SCHEMA_READY = True
+
+
+def ensure_database() -> None:  # type: ignore[override]
+    global _SCHEMA_READY
+    if not is_postgres_enabled():
+        return _v25_sqlite_ensure_database()
+    _v25_pg_init_schema()
+    _SCHEMA_READY = True
+
+
+def get_connection():  # type: ignore[override]
+    ensure_database()
+    if is_postgres_enabled():
+        return _v25_pg_connect()
+    return _v25_sqlite_get_connection()
+
+
+def _v25_pg_fetch_df(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:
+    special = _v25_pg_special_query_df(sql, params)
+    if special is not None:
+        return special
+    translated = _v25_pg_translate_sql(sql)
+    if not translated:
+        return pd.DataFrame()
+    with _v25_pg_connect() as conn:
+        rows = conn.execute(translated, tuple(params or ())).fetchall()
+    return pd.DataFrame(rows)
+
+
+def query_df(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_query_df(sql, params)
+    ensure_database()
+    if params is None:
+        params = ()
+    cacheable = _is_select_sql(sql)
+    key = _query_cache_key(sql, params)
+    now_ts = time.time()
+    if cacheable:
+        hit = _v7_cache_get_df(key, now_ts) if "_v7_cache_get_df" in globals() else None
+        if hit is not None:
+            return hit
+    df = _v25_pg_fetch_df(sql, params)
+    if cacheable:
+        try:
+            _v7_cache_put_df(key, now_ts, df)
+        except Exception:
+            pass
+    return df
+
+
+def query_one(sql: str, params: Iterable[Any] | None = None) -> dict | None:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_query_one(sql, params)
+    df = query_df(sql, params)
+    if df is None or df.empty:
+        return None
+    return df.iloc[0].where(pd.notna(df.iloc[0]), None).to_dict()
+
+
+def execute(sql: str, params: Iterable[Any] | None = None) -> int:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_execute(sql, params)
+    ensure_database()
+    if params is None:
+        params = ()
+    translated = _v25_pg_translate_sql(sql)
+    if not translated:
+        return 0
+    out = 0
+    with _v25_pg_connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(translated, tuple(params))
+            if cur.description:
+                row = cur.fetchone()
+                if row and "id" in row:
+                    out = int(row.get("id") or 0)
+            else:
+                out = int(cur.rowcount or 0)
+        conn.commit()
+    clear_query_cache()
+    if _should_after_write_sync(sql):
+        try:
+            mark_data_changed(reason="PostgreSQL 資料已變更", source_sql=sql)
+        except Exception:
+            pass
+        if str(os.environ.get("SPT_PG_EXPORT_AFTER_WRITE", "0")).strip().lower() in {"1", "true", "yes", "on"}:
+            try:
+                _after_write(sql)
+            except Exception:
+                pass
+    return out
+
+
+def executemany(sql: str, rows: list[Iterable[Any]]) -> None:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_executemany(sql, rows)
+    ensure_database()
+    translated = _v25_pg_translate_sql(sql)
+    if not translated:
+        return None
+    with _v25_pg_connect() as conn:
+        with conn.cursor() as cur:
+            cur.executemany(translated, rows or [])
+        conn.commit()
+    clear_query_cache()
+    if _should_after_write_sync(sql):
+        try:
+            mark_data_changed(reason="PostgreSQL 批次資料已變更", source_sql=sql)
+        except Exception:
+            pass
+    return None
+
+
+def execute_transaction(
+    operations: list[tuple[str, Iterable[Any]]] | tuple[tuple[str, Iterable[Any]], ...],
+    mark_changed: bool = True,
+    reason: str = "資料已變更，待備份",
+    source_sql: str = "BATCH_TRANSACTION",
+) -> list[int]:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_execute_transaction(operations, mark_changed=mark_changed, reason=reason, source_sql=source_sql)
+    ensure_database()
+    ids: list[int] = []
+    with _v25_pg_connect() as conn:
+        with conn.cursor() as cur:
+            for sql, params in operations or []:
+                translated = _v25_pg_translate_sql(sql)
+                if not translated:
+                    ids.append(0)
+                    continue
+                cur.execute(translated, tuple(params or ()))
+                if cur.description:
+                    row = cur.fetchone()
+                    ids.append(int((row or {}).get("id") or 0))
+                else:
+                    ids.append(int(cur.rowcount or 0))
+        conn.commit()
+    clear_query_cache()
+    if mark_changed:
+        try:
+            mark_data_changed(reason=reason, source_sql=source_sql)
+        except Exception:
+            pass
+    return ids
+
+
+def database_business_row_count() -> int:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_database_business_row_count()
+    ensure_database()
+    total = 0
+    with _v25_pg_connect() as conn:
+        for table in ("work_orders", "employees", "time_records"):
+            try:
+                row = conn.execute(f"SELECT COUNT(*) AS n FROM {table}").fetchone()
+                total += int((row or {}).get("n") or 0)
+            except Exception:
+                pass
+    return total
+
+
+def audit_v25_postgresql_backend() -> dict:
+    source = ""
+    if _v25_postgres_dsn():
+        source = "configured"
+    return {
+        "backend": get_database_backend(),
+        "postgres_enabled": is_postgres_enabled(),
+        "dsn_configured": bool(_v25_postgres_dsn()),
+        "dsn_source": source,
+        "schema_ready": bool(_V25_PG_SCHEMA_READY) if is_postgres_enabled() else bool(_SCHEMA_READY),
+        "business_rows": database_business_row_count() if is_postgres_enabled() else _v25_sqlite_database_business_row_count(),
+        "sqlite_fallback_preserved": True,
+    }
+
+# ===== END V25 POSTGRESQL BACKEND FOR CLOUD DEPLOYMENT =====
