@@ -24086,7 +24086,7 @@ def today_records(include_finished: bool = True, unfinished_only: bool = False) 
     return _v238_enrich_df(df, reason="v238_today_records", write_back=False)
 
 
-def get_active_records(employee_id: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+def get_active_records(employee_id: str | None = None, employee_name: str | None = None, process_name: str | None = None, start_date: str | None = None, work_order: str | None = None, **kwargs) -> pd.DataFrame:  # type: ignore[override]
     # 仍沿用 V237/V231 快速 active 查詢，但輸出補值，避免 Finish Work 明細空白。
     try:
         if callable(_v238_prev_get_active_records):
@@ -24182,3 +24182,805 @@ def audit_v238_02_history_field_integrity(start_date: str = "2026-04-30", end_da
         return {"version": _V238_VERSION, "ok": False, "error": str(exc)[:800]}
 
 # ================= END V238 02 HISTORY DEEP FIELD REPAIR =================
+
+
+# ================= V239 LOSSLESS RECORD GUARANTEE + LOG LAST-RESORT RECOVERY｜2026-05-30 =================
+# 目的：回應現場稽核要求：「每一筆工時紀錄都必須完整儲存，不可遺失、被覆蓋、被隱藏或被誤刪」。
+# 原則：
+#   - 保留 V225 讀寫正確、V230/V231 速度、V232 併發保護、V236 02 穩定來源、V238 欄位補值。
+#   - 不改 UI/CSS/theme/table/buttons/pages。
+#   - 新增不可覆蓋 lossless ledger：每筆 START/FINISH/SAVE 都保存單筆快照與 append-only event。
+#   - load_records/today_records 將 lossless ledger 與 system_logs START_WORK last-resort 一起納入顯示來源，再套精準 tombstone。
+try:
+    _v239_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v239_prev_load_records = None
+try:
+    _v239_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v239_prev_today_records = None
+try:
+    _v239_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v239_prev_start_work = None
+try:
+    _v239_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v239_prev_finish_work = None
+try:
+    _v239_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v239_prev_save_time_records = None
+try:
+    _v239_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v239_prev_delete_time_records = None
+try:
+    _v239_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v239_prev_get_active_records = None
+try:
+    _v239_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v239_prev_get_active_record = None
+
+import json as _v239_json
+import os as _v239_os
+import re as _v239_re
+import time as _v239_time
+import uuid as _v239_uuid
+from pathlib import Path as _v239_Path
+from datetime import datetime as _v239_datetime
+
+_V239_VERSION = "V239_LOSSLESS_RECORD_GUARANTEE"
+try:
+    _V239_PROJECT_ROOT = _v239_Path(__file__).resolve().parents[1]
+except Exception:
+    _V239_PROJECT_ROOT = _v239_Path(".").resolve()
+_V239_LEDGER_ROOT = _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_lossless_ledger"
+_V239_EVENT_ROOT = _V239_LEDGER_ROOT / "events"
+_V239_RECORD_ROOT = _V239_LEDGER_ROOT / "records"
+_V239_JSONL_PATH = _V239_PROJECT_ROOT / "data" / "persistent_state" / "lossless_journal" / "time_record_lossless_events.jsonl"
+_V239_MEMORY = {"rows": None, "epoch": 0.0}
+_V239_TTL = 30.0
+_V239_TERMINAL = {"下班", "暫停", "完工", "已結束", "結束", "完成", "已完成", "closed", "finished", "complete", "completed", "off duty", "pause", "paused"}
+
+
+def _v239_text(v) -> str:
+    if v is None:
+        return ""
+    try:
+        if pd.isna(v):  # type: ignore[name-defined]
+            return ""
+    except Exception:
+        pass
+    return str(v).strip()
+
+
+def _v239_now() -> str:
+    return _v239_datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v239_today() -> str:
+    return _v239_now()[:10]
+
+
+def _v239_int(v):
+    s = _v239_text(v)
+    if not s:
+        return None
+    try:
+        return int(float(s))
+    except Exception:
+        return None
+
+
+def _v239_json_default(v):
+    try:
+        if pd.isna(v):  # type: ignore[name-defined]
+            return ""
+    except Exception:
+        pass
+    try:
+        if hasattr(v, "item"):
+            return v.item()
+    except Exception:
+        pass
+    try:
+        return str(v)
+    except Exception:
+        return ""
+
+
+def _v239_safe_write_json(path: _v239_Path, payload) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(_v239_json.dumps(payload, ensure_ascii=False, indent=2, default=_v239_json_default), encoding="utf-8")
+    _v239_os.replace(str(tmp), str(path))
+
+
+def _v239_safe_read_json(path: _v239_Path, default=None):
+    try:
+        if path.exists():
+            text = path.read_text(encoding="utf-8-sig", errors="ignore")
+            if text.strip():
+                return _v239_json.loads(text)
+    except Exception:
+        return default
+    return default
+
+
+def _v239_date_of_row(row: dict) -> str:
+    for k in ("start_date", "log_time", "created_at", "start_timestamp", "updated_at"):
+        s = _v239_text((row or {}).get(k))
+        if len(s) >= 10:
+            return s[:10].replace("/", "-")
+    return _v239_today()
+
+
+def _v239_record_id(row: dict):
+    return _v239_int((row or {}).get("id"))
+
+
+def _v239_record_key(row: dict) -> str:
+    r = row or {}
+    for k in ("record_key", "uuid", "operation_record_key"):
+        s = _v239_text(r.get(k))
+        if s:
+            return s
+    rid = _v239_record_id(r)
+    if rid is not None:
+        emp = _v239_text(r.get("employee_id"))
+        ts = _v239_text(r.get("start_timestamp")) or _v239_text(r.get("start_date")) + " " + _v239_text(r.get("start_time"))
+        wo = _v239_text(r.get("work_order"))
+        proc = _v239_text(r.get("process_name"))
+        return f"RID-{rid}-{emp}-{ts}-{wo}-{proc}".replace(" ", "_")[:180]
+    return "RK-" + _v239_uuid.uuid4().hex
+
+
+def _v239_normalize_row(row: dict, *, op_type: str = "") -> dict:
+    r = dict(row or {})
+    rid = _v239_record_id(r)
+    if rid is not None:
+        r["id"] = rid
+    if not _v239_text(r.get("record_key")):
+        r["record_key"] = _v239_record_key(r)
+    if not _v239_text(r.get("start_date")) and _v239_text(r.get("start_timestamp")):
+        r["start_date"] = _v239_text(r.get("start_timestamp"))[:10]
+    if not _v239_text(r.get("start_time")) and len(_v239_text(r.get("start_timestamp"))) >= 16:
+        r["start_time"] = _v239_text(r.get("start_timestamp"))[11:19]
+    if _v239_text(r.get("end_timestamp")):
+        if not _v239_text(r.get("end_date")):
+            r["end_date"] = _v239_text(r.get("end_timestamp"))[:10]
+        if not _v239_text(r.get("end_time")) and len(_v239_text(r.get("end_timestamp"))) >= 16:
+            r["end_time"] = _v239_text(r.get("end_timestamp"))[11:19]
+        # 有結束時間卻仍顯示作業中時，修正為結束動作，避免 Finish 後仍被判 active。
+        if _v239_text(r.get("status")) in {"", "作業中", "進行中", "open", "active"}:
+            r["status"] = _v239_text(r.get("end_action")) or "已結束"
+    if not _v239_text(r.get("source")):
+        r["source"] = _V239_VERSION
+    if op_type:
+        r["v239_last_op"] = op_type
+    if not _v239_text(r.get("v239_first_seen_at")):
+        r["v239_first_seen_at"] = _v239_now()
+    r["v239_saved_at"] = _v239_now()
+    return r
+
+
+def _v239_row_identity(row: dict) -> str:
+    rid = _v239_record_id(row)
+    if rid is not None:
+        return "id:" + str(rid)
+    rk = _v239_text((row or {}).get("record_key"))
+    if rk:
+        return "key:" + rk
+    return "sig:" + "|".join(_v239_text((row or {}).get(k)) for k in ("employee_id", "work_order", "process_name", "start_timestamp"))
+
+
+def _v239_dedupe_rows(rows: list[dict]) -> list[dict]:
+    by = {}
+    order = []
+    for item in rows or []:
+        if not isinstance(item, dict):
+            continue
+        r = _v239_normalize_row(item)
+        key = _v239_row_identity(r)
+        if key not in by:
+            by[key] = r
+            order.append(key)
+        else:
+            base = by[key]
+            # 非空欄位合併，後來來源只補空白，不輕易覆蓋已有值。
+            for k, v in r.items():
+                if _v239_text(v) and not _v239_text(base.get(k)):
+                    base[k] = v
+            # 結束欄位與狀態若後來來源有值，視為更完整結果。
+            for k in ("status", "end_action", "end_timestamp", "end_date", "end_time", "work_hours", "remark", "updated_at"):
+                if _v239_text(r.get(k)):
+                    base[k] = r.get(k)
+            by[key] = base
+    def sort_key(r):
+        rid = _v239_record_id(r)
+        return rid if rid is not None else -1
+    try:
+        return sorted([by[k] for k in order], key=sort_key)
+    except Exception:
+        return [by[k] for k in order]
+
+
+def _v239_deleted_ids_keys():
+    ids, keys = set(), set()
+    for func in ("_v232_deleted_ids_keys", "_v235_deleted_ids_keys", "_v223_deleted_ids_keys"):
+        try:
+            f = globals().get(func)
+            if callable(f):
+                out = f()  # type: ignore[misc]
+                if isinstance(out, tuple) and len(out) >= 2:
+                    ids.update({_v239_int(x) for x in out[0] if _v239_int(x) is not None})
+                    keys.update({_v239_text(x) for x in out[1] if _v239_text(x)})
+        except Exception:
+            pass
+    # 讀取常見 tombstone 檔。
+    for p in [
+        _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_guard" / "records.json",
+        _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_guard" / "v232_tombstones.json",
+        _V239_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_delete_tombstones" / "records.json",
+    ]:
+        payload = _v239_safe_read_json(p, None)
+        rows = []
+        if isinstance(payload, dict):
+            for k in ("records", "tombstones", "deleted", "rows"):
+                if isinstance(payload.get(k), list):
+                    rows.extend(payload.get(k))
+        elif isinstance(payload, list):
+            rows = payload
+        for r in rows:
+            if isinstance(r, dict):
+                rid = _v239_int(r.get("id") or r.get("record_id") or r.get("target_id"))
+                if rid is not None:
+                    ids.add(rid)
+                rk = _v239_text(r.get("record_key"))
+                if rk:
+                    keys.add(rk)
+            else:
+                rid = _v239_int(r)
+                if rid is not None:
+                    ids.add(rid)
+    return ids, keys
+
+
+def _v239_filter_deleted(rows: list[dict]) -> list[dict]:
+    ids, keys = _v239_deleted_ids_keys()
+    out = []
+    for r in rows or []:
+        rid = _v239_record_id(r)
+        rk = _v239_text((r or {}).get("record_key"))
+        if (rid is not None and rid in ids) or (rk and rk in keys):
+            continue
+        out.append(r)
+    return out
+
+
+def _v239_filter_visible_rows(rows: list[dict]) -> list[dict]:
+    out = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        op = _v239_text(r.get("v239_last_op") or r.get("op_type") or r.get("operation_type"))
+        status = _v239_text(r.get("status"))
+        rid_text = _v239_text(r.get("id"))
+        # INTENT 是不可覆蓋稽核證據，不是正式工時 row，不能進入 Today/History/duplicate active 判斷。
+        if op.endswith("INTENT") or status.endswith("INTENT") or rid_text.upper() == "PENDING":
+            continue
+        out.append(r)
+    return out
+
+
+def _v239_payload_rows(payload) -> list[dict]:
+    rows = []
+    if isinstance(payload, dict):
+        if any(k in payload for k in ("employee_id", "work_order", "start_timestamp", "record_key", "id")):
+            rows.append(dict(payload))
+        for k in ("records", "rows", "data", "items"):
+            if isinstance(payload.get(k), list):
+                rows.extend([dict(x) for x in payload.get(k) if isinstance(x, dict)])
+    elif isinstance(payload, list):
+        rows.extend([dict(x) for x in payload if isinstance(x, dict)])
+    return rows
+
+
+def _v239_append_lossless_event(op_type: str, rows: list[dict] | None = None, *, reason: str = "", extra: dict | None = None) -> str:
+    clean = [_v239_normalize_row(dict(r), op_type=op_type) for r in (rows or []) if isinstance(r, dict)]
+    event_id = f"LSS-{_v239_now().replace('-', '').replace(':', '').replace(' ', '-')}-{_v239_uuid.uuid4().hex[:12].upper()}"
+    payload = {
+        "version": _V239_VERSION,
+        "event_id": event_id,
+        "op_type": op_type,
+        "created_at": _v239_now(),
+        "reason": reason,
+        "row_ids": sorted({i for i in (_v239_record_id(r) for r in clean) if i is not None}),
+        "record_keys": sorted({_v239_text(r.get("record_key")) for r in clean if _v239_text(r.get("record_key"))}),
+        "rows": clean,
+        "extra": extra or {},
+    }
+    # event 單檔，不覆蓋。
+    try:
+        event_date = _v239_today().replace("-", "")
+        _v239_safe_write_json(_V239_EVENT_ROOT / event_date / f"{event_id}.json", payload)
+    except Exception as exc:
+        try:
+            write_log("V239_EVENT_WRITE_WARN", f"V239 lossless event 寫入失敗：{exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    # 每筆 row 單獨保存，避免 records.json 整包覆蓋。
+    for r in clean:
+        try:
+            d = _v239_date_of_row(r).replace("-", "")
+            rid = _v239_record_id(r)
+            rk = _v239_text(r.get("record_key")) or _v239_uuid.uuid4().hex
+            stem = f"{rid if rid is not None else 'NOID'}_{rk[:80]}".replace("/", "_").replace("\\", "_").replace(":", "_")
+            _v239_safe_write_json(_V239_RECORD_ROOT / d / f"{stem}.json", {"version": _V239_VERSION, "saved_at": _v239_now(), "op_type": op_type, "record": r})
+        except Exception:
+            pass
+    # JSONL append，不覆蓋。
+    try:
+        _V239_JSONL_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with _V239_JSONL_PATH.open("a", encoding="utf-8") as fh:
+            fh.write(_v239_json.dumps(payload, ensure_ascii=False, default=_v239_json_default) + "\n")
+    except Exception:
+        pass
+    # 也寫到 V232 事件與 V151 row shard，做多重保險。
+    try:
+        if "_v232_append_operation_event" in globals() and callable(_v232_append_operation_event):  # type: ignore[name-defined]
+            _v232_append_operation_event("V239_" + op_type, clean, reason=reason, extra={"source": _V239_VERSION})  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if clean and "_v151_write_row_shards" in globals() and callable(_v151_write_row_shards):  # type: ignore[name-defined]
+            _v151_write_row_shards(clean, "v239_lossless_" + op_type.lower(), github=False)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return event_id
+
+
+def _v239_read_lossless_rows() -> list[dict]:
+    now = _v239_time.time()
+    try:
+        cached = _V239_MEMORY.get("rows")
+        epoch = float(_V239_MEMORY.get("epoch") or 0.0)
+        if isinstance(cached, list) and now - epoch <= _V239_TTL:
+            return [dict(r) for r in cached if isinstance(r, dict)]
+    except Exception:
+        pass
+    rows = []
+    # 單筆 row 快照。
+    try:
+        if _V239_RECORD_ROOT.exists():
+            files = [p for p in _V239_RECORD_ROOT.rglob("*.json") if p.is_file()]
+            files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+            for p in files[:12000]:
+                payload = _v239_safe_read_json(p, None)
+                if isinstance(payload, dict) and isinstance(payload.get("record"), dict):
+                    rows.append(dict(payload.get("record")))
+                else:
+                    rows.extend(_v239_payload_rows(payload))
+    except Exception:
+        pass
+    # event 快照。
+    try:
+        if _V239_EVENT_ROOT.exists():
+            files = [p for p in _V239_EVENT_ROOT.rglob("*.json") if p.is_file()]
+            files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+            for p in files[:12000]:
+                rows.extend(_v239_payload_rows(_v239_safe_read_json(p, None)))
+    except Exception:
+        pass
+    # jsonl。
+    try:
+        if _V239_JSONL_PATH.exists():
+            for line in _V239_JSONL_PATH.read_text(encoding="utf-8", errors="ignore").splitlines()[-20000:]:
+                line = line.strip()
+                if line.startswith("{"):
+                    rows.extend(_v239_payload_rows(_v239_json.loads(line)))
+    except Exception:
+        pass
+    rows = _v239_filter_visible_rows(_v239_filter_deleted(_v239_dedupe_rows(rows)))
+    _V239_MEMORY["rows"] = rows
+    _V239_MEMORY["epoch"] = now
+    return [dict(r) for r in rows]
+
+
+def _v239_read_sqlite_system_start_logs(limit: int = 10000) -> list[dict]:
+    """最後防線：若 START_WORK 已寫入 LOG 但 01/02/event/row shard 沒有，至少從 LOG 重建 skeleton row。
+    這不是取代正常儲存；只是避免畫面完全漏資料。欄位會再由 V238 主檔補值。
+    """
+    rows = []
+    try:
+        import sqlite3 as _v239_sqlite3
+        db_path = globals().get("DB_PATH") or (_V239_PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db")
+        if not _v239_Path(db_path).exists():
+            return []
+        conn = _v239_sqlite3.connect(str(db_path), timeout=3)
+        conn.row_factory = _v239_sqlite3.Row
+        try:
+            # system_logs 不存在時直接略過。
+            q = """
+            SELECT log_time, action_type, target_id, message, detail, user_name, level
+            FROM system_logs
+            WHERE action_type IN ('START_WORK','開始作業 / START_WORK','V212_ROW_SAVE_TIME_RECORD','V224_START_DISPLAY_GUARD')
+               OR message LIKE '% 開始 %'
+            ORDER BY rowid DESC
+            LIMIT ?
+            """
+            for rec in conn.execute(q, (int(limit),)).fetchall():
+                d = dict(rec)
+                rid = _v239_int(d.get("target_id"))
+                msg = _v239_text(d.get("message"))
+                detail = _v239_text(d.get("detail"))
+                log_time = _v239_text(d.get("log_time"))
+                if rid is None or not msg:
+                    continue
+                # 解析格式：SPT250 鄭至賢 開始 25MN0014-07 / 左右塔配線
+                emp_id = emp_name = wo = proc = ""
+                m = _v239_re.search(r"^\s*(\S+)\s+(.+?)\s+開始\s+(.+?)\s*/\s*(.+?)\s*$", msg)
+                if m:
+                    emp_id, emp_name, wo, proc = [x.strip() for x in m.groups()]
+                else:
+                    # 若 message 不標準，從 detail 嘗試抓。
+                    m2 = _v239_re.search(r"([A-Z]+\d+)\s+([^\s]+).*?([0-9A-Z]+[-][0-9A-Z]+).*?[/／]\s*([^,;，；]+)", msg + " " + detail)
+                    if m2:
+                        emp_id, emp_name, wo, proc = [x.strip() for x in m2.groups()]
+                if not emp_id and not wo:
+                    continue
+                rows.append(_v239_normalize_row({
+                    "id": rid,
+                    "record_key": f"LOGSTART-{rid}-{emp_id}-{log_time}",
+                    "status": "作業中",
+                    "employee_id": emp_id,
+                    "employee_name": emp_name,
+                    "work_order": wo,
+                    "process_name": proc,
+                    "start_action": "開始",
+                    "start_timestamp": log_time,
+                    "start_date": log_time[:10],
+                    "start_time": log_time[11:19] if len(log_time) >= 19 else "",
+                    "source": "V239_SYSTEM_LOG_LAST_RESORT",
+                    "recovery_status": "V239_LOG_LAST_RESORT_RECONSTRUCTED",
+                    "recovery_note": "此筆由 START_WORK LOG 反向重建；若主檔有資料，系統會自動補 P/N、機型、單位等欄位。",
+                }, op_type="LOG_RECOVERY"))
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return _v239_filter_visible_rows(_v239_filter_deleted(_v239_dedupe_rows(rows)))
+
+
+def _v239_find_rows_by_ids(ids) -> list[dict]:
+    wanted = {i for i in (_v239_int(x) for x in (ids or [])) if i is not None}
+    if not wanted:
+        return []
+    rows = []
+    # 先用既有多源查詢。
+    for func_name in ("_v232_find_rows_by_ids", "_v231_find_rows_by_ids"):
+        try:
+            f = globals().get(func_name)
+            if callable(f):
+                rows.extend([dict(r) for r in f(list(wanted)) if isinstance(r, dict)])  # type: ignore[misc]
+        except Exception:
+            pass
+    try:
+        rows.extend([r for r in _v239_read_lossless_rows() if _v239_record_id(r) in wanted])
+    except Exception:
+        pass
+    try:
+        df = _v239_prev_load_records() if callable(_v239_prev_load_records) else None
+        if isinstance(df, pd.DataFrame) and not df.empty and "id" in df.columns:  # type: ignore[name-defined]
+            for _, rr in df.iterrows():
+                d = rr.to_dict()
+                if _v239_record_id(d) in wanted:
+                    rows.append(d)
+    except Exception:
+        pass
+    return _v239_filter_visible_rows(_v239_filter_deleted(_v239_dedupe_rows(rows)))
+
+
+def _v239_persist_rows_everywhere(rows: list[dict], *, op_type: str, reason: str = "") -> int:
+    rows = _v239_filter_visible_rows(_v239_filter_deleted(_v239_dedupe_rows([_v239_normalize_row(r, op_type=op_type) for r in (rows or []) if isinstance(r, dict)])))
+    if not rows:
+        return 0
+    _v239_append_lossless_event(op_type, rows, reason=reason or op_type)
+    # 非破壞式 merge 回 01/02。這裡直接呼叫 V232 merge，避免 V235 的「只在落後時才寫」條件漏掉單筆新增。
+    try:
+        if "_v232_merge_authority_rows" in globals() and callable(_v232_merge_authority_rows):  # type: ignore[name-defined]
+            _v232_merge_authority_rows(rows, reason="v239_lossless_" + op_type.lower())  # type: ignore[name-defined]
+        elif "_v235_write_authority_rows_if_needed" in globals() and callable(_v235_write_authority_rows_if_needed):  # type: ignore[name-defined]
+            _v235_write_authority_rows_if_needed(rows, reason="v239_lossless_" + op_type.lower())  # type: ignore[name-defined]
+    except Exception as exc:
+        try:
+            write_log("V239_AUTHORITY_MERGE_WARN", f"V239 合併 01/02 權威檔失敗：{exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    # 更新前台快取。
+    try:
+        if "_v231_write_rows" in globals() and callable(_v231_write_rows):  # type: ignore[name-defined]
+            _v231_write_rows(rows, reason="v239_lossless_" + op_type.lower())  # type: ignore[name-defined]
+        elif "_v230_write_display_rows" in globals() and callable(_v230_write_display_rows):  # type: ignore[name-defined]
+            _v230_write_display_rows(rows, reason="v239_lossless_" + op_type.lower())  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        _V239_MEMORY["rows"] = None
+        _V239_MEMORY["epoch"] = 0.0
+        if "_v238_invalidate_cache" in globals() and callable(_v238_invalidate_cache):  # type: ignore[name-defined]
+            _v238_invalidate_cache("v239_" + op_type)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return len(rows)
+
+
+def _v239_compose_start_row(rid: int, employee: dict, work_order: dict, process_name: str, remark: str = "") -> dict:
+    emp = employee or {}
+    wo = work_order or {}
+    now = _v239_now()
+    return _v239_normalize_row({
+        "id": rid,
+        "record_key": f"RID-{rid}-{_v239_text(emp.get('employee_id'))}-{now}-{_v239_uuid.uuid4().hex[:8]}",
+        "status": "作業中",
+        "work_order": _v239_text(wo.get("work_order") or wo.get("製令") or wo.get("work_order_no") or wo.get("order_no")),
+        "part_no": _v239_text(wo.get("part_no") or wo.get("P/N") or wo.get("料號")),
+        "type_name": _v239_text(wo.get("type_name") or wo.get("model") or wo.get("機型")),
+        "assembly_location": _v239_text(wo.get("assembly_location") or wo.get("組立地點")),
+        "process_name": _v239_text(process_name),
+        "employee_id": _v239_text(emp.get("employee_id") or emp.get("工號")),
+        "employee_name": _v239_text(emp.get("employee_name") or emp.get("姓名")),
+        "department": _v239_text(emp.get("department") or emp.get("單位")),
+        "title": _v239_text(emp.get("title") or emp.get("職稱")),
+        "start_action": "開始",
+        "start_timestamp": now,
+        "start_date": now[:10],
+        "start_time": now[11:19],
+        "remark": remark or "",
+        "source": _V239_VERSION,
+    }, op_type="START_WORK")
+
+
+def _v239_merge_rows_for_history(base_df=None) -> list[dict]:
+    rows = []
+    try:
+        if isinstance(base_df, pd.DataFrame) and not base_df.empty:  # type: ignore[name-defined]
+            rows.extend([dict(r) for _, r in base_df.copy().where(pd.notna(base_df), "").iterrows()])  # type: ignore[name-defined]
+    except Exception:
+        pass
+    # 讀 lossless + LOG last resort。LOG last resort 只補不存在的 START_WORK；不會覆蓋既有完整 row。
+    try:
+        rows.extend(_v239_read_lossless_rows())
+    except Exception:
+        pass
+    try:
+        rows.extend(_v239_read_sqlite_system_start_logs())
+    except Exception:
+        pass
+    rows = _v239_filter_visible_rows(_v239_filter_deleted(_v239_dedupe_rows(rows)))
+    try:
+        enriched, _ = _v238_enrich_rows(rows, reason="v239_lossless_history_merge") if "_v238_enrich_rows" in globals() and callable(_v238_enrich_rows) else (rows, 0)  # type: ignore[name-defined]
+        rows = enriched
+    except Exception:
+        pass
+    return _v239_filter_visible_rows(_v239_filter_deleted(_v239_dedupe_rows(rows)))
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    base = _v239_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order) if callable(_v239_prev_load_records) else pd.DataFrame()  # type: ignore[name-defined]
+    rows = _v239_merge_rows_for_history(base)
+    try:
+        df = pd.DataFrame(rows) if rows else pd.DataFrame()  # type: ignore[name-defined]
+        # 使用既有 filter，確保 02 日期/人員/製令篩選穩定。
+        if "_v235_filter_df" in globals() and callable(_v235_filter_df):  # type: ignore[name-defined]
+            df = _v235_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[name-defined]
+        else:
+            # 最低限度日期篩選。
+            if not df.empty and (start_date or end_date):
+                if "start_date" in df.columns:
+                    ds = df["start_date"].map(lambda x: _v239_text(x)[:10])
+                elif "start_timestamp" in df.columns:
+                    ds = df["start_timestamp"].map(lambda x: _v239_text(x)[:10])
+                else:
+                    ds = pd.Series([""] * len(df), index=df.index)  # type: ignore[name-defined]
+                if start_date:
+                    df = df.loc[ds >= _v239_text(start_date)[:10]].copy()
+                if end_date:
+                    df = df.loc[ds <= _v239_text(end_date)[:10]].copy()
+        return _v238_enrich_df(df, reason="v239_load_records", write_back=False) if "_v238_enrich_df" in globals() and callable(_v238_enrich_df) else df.reset_index(drop=True)  # type: ignore[name-defined]
+    except Exception as exc:
+        try:
+            write_log("V239_LOAD_RECORDS_WARN", f"V239 load_records fallback failed: {exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+        return base if isinstance(base, pd.DataFrame) else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    # 保留 V231/V230 快速前台基礎，再額外合併 lossless 中今天資料，避免剛新增但快取漏掉。
+    base = _v239_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only) if callable(_v239_prev_today_records) else pd.DataFrame()  # type: ignore[name-defined]
+    try:
+        rows = _v239_merge_rows_for_history(base)
+        today = _v239_today()
+        rows = [r for r in rows if _v239_date_of_row(r) == today]
+        if unfinished_only or not include_finished:
+            rows = [r for r in rows if _v239_text(r.get("status")) not in _V239_TERMINAL and not _v239_text(r.get("end_timestamp"))]
+        df = pd.DataFrame(rows) if rows else pd.DataFrame()  # type: ignore[name-defined]
+        return _v238_enrich_df(df, reason="v239_today_records", write_back=False) if "_v238_enrich_df" in globals() and callable(_v238_enrich_df) else df.reset_index(drop=True)  # type: ignore[name-defined]
+    except Exception:
+        return base if isinstance(base, pd.DataFrame) else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_records(employee_id: str | None = None, employee_name: str | None = None, process_name: str | None = None, start_date: str | None = None, work_order: str | None = None, **kwargs) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        df = today_records(include_finished=False, unfinished_only=True)
+        if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+            return pd.DataFrame()  # type: ignore[name-defined]
+        emp = _v239_text(employee_id)
+        if emp and "employee_id" in df.columns:
+            df = df.loc[df["employee_id"].map(_v239_text) == emp].copy()
+        elif _v239_text(employee_name) and "employee_name" in df.columns:
+            df = df.loc[df["employee_name"].map(_v239_text) == _v239_text(employee_name)].copy()
+        proc = _v239_text(process_name or kwargs.get("process"))
+        if proc and "process_name" in df.columns:
+            df = df.loc[df["process_name"].map(_v239_text) == proc].copy()
+        wo = _v239_text(work_order or kwargs.get("wo") or kwargs.get("work_order_no"))
+        if wo and "work_order" in df.columns:
+            df = df.loc[df["work_order"].map(_v239_text) == wo].copy()
+        sd = _v239_text(start_date or kwargs.get("date") or kwargs.get("start_dt"))[:10]
+        if sd:
+            if "start_date" in df.columns:
+                ds = df["start_date"].map(lambda x: _v239_text(x)[:10])
+            elif "start_timestamp" in df.columns:
+                ds = df["start_timestamp"].map(lambda x: _v239_text(x)[:10])
+            else:
+                ds = pd.Series([""] * len(df), index=df.index)  # type: ignore[name-defined]
+            df = df.loc[ds == sd].copy()
+        return df.reset_index(drop=True)
+    except Exception:
+        if callable(_v239_prev_get_active_records):
+            return _v239_prev_get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date, work_order=work_order, **kwargs)  # type: ignore[misc]
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    try:
+        df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+        if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+            return df.iloc[0].to_dict()
+    except Exception:
+        pass
+    if callable(_v239_prev_get_active_record):
+        try:
+            return _v239_prev_get_active_record(employee_id, employee_name=employee_name)  # type: ignore[misc]
+        except Exception:
+            return None
+    return None
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v239_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    # 先寫入 intent，若後段異常仍留下操作證據。
+    intent_row = _v239_compose_start_row(0, employee or {}, work_order or {}, process_name, remark)
+    intent_row["id"] = "PENDING"
+    intent_row["operation_id"] = "INTENT-" + _v239_uuid.uuid4().hex
+    _v239_append_lossless_event("START_WORK_INTENT", [intent_row], reason="v239_pre_start_intent")
+    rid = int(_v239_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)  # type: ignore[misc]
+    if rid:
+        rows = _v239_find_rows_by_ids([rid])
+        if not rows:
+            rows = [_v239_compose_start_row(rid, employee or {}, work_order or {}, process_name, remark)]
+        _v239_persist_rows_everywhere(rows, op_type="START_WORK", reason="v239_start_work_lossless")
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v239_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    rid = int(record_id)
+    before_rows = _v239_find_rows_by_ids([rid])
+    _v239_append_lossless_event("FINISH_WORK_INTENT", before_rows or [{"id": rid, "end_action": end_action, "remark": remark}], reason="v239_pre_finish_intent", extra={"end_action": end_action})
+    n = int(_v239_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)  # type: ignore[misc]
+    if n:
+        after_rows = _v239_find_rows_by_ids([rid])
+        if not after_rows and before_rows:
+            now = _v239_now()
+            after_rows = []
+            for r in before_rows:
+                rr = dict(r)
+                rr["status"] = end_action
+                rr["end_action"] = end_action
+                rr["end_timestamp"] = now
+                rr["end_date"] = now[:10]
+                rr["end_time"] = now[11:19]
+                if remark:
+                    rr["remark"] = (_v239_text(rr.get("remark")) + "；" + remark).strip("；") if _v239_text(rr.get("remark")) else remark
+                after_rows.append(rr)
+        if after_rows:
+            _v239_persist_rows_everywhere(after_rows, op_type="FINISH_WORK", reason="v239_finish_work_lossless")
+    return n
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    if not callable(_v239_prev_save_time_records):
+        raise RuntimeError("save_time_records base function is unavailable")
+    rows_before = []
+    try:
+        if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+            rows_before = [dict(r) for _, r in df.copy().where(pd.notna(df), "").iterrows()]  # type: ignore[name-defined]
+            _v239_append_lossless_event("SAVE_TIME_RECORDS_INTENT", rows_before, reason="v239_pre_save_intent")
+    except Exception:
+        pass
+    n = int(_v239_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)  # type: ignore[misc]
+    if n and rows_before:
+        _v239_persist_rows_everywhere(rows_before, op_type="SAVE_TIME_RECORDS", reason="v239_save_lossless")
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    if not callable(_v239_prev_delete_time_records):
+        raise RuntimeError("delete_time_records base function is unavailable")
+    ids = [int(x) for x in (record_ids or []) if _v239_int(x) is not None]
+    rows = _v239_find_rows_by_ids(ids)
+    _v239_append_lossless_event("DELETE_TIME_RECORDS_INTENT", rows, reason="v239_pre_delete_intent", extra={"ids": ids, "delete_reason": reason})
+    n = int(_v239_prev_delete_time_records(record_ids, reason=reason) or 0)  # type: ignore[misc]
+    if n:
+        _v239_append_lossless_event("DELETE_TIME_RECORDS", rows, reason="v239_delete_lossless", extra={"ids": ids, "delete_reason": reason})
+        try:
+            _V239_MEMORY["rows"] = None
+            _V239_MEMORY["epoch"] = 0.0
+        except Exception:
+            pass
+    return n
+
+
+def audit_v239_lossless_integrity(start_date: str | None = None, end_date: str | None = None, suspect_ids: list[int] | None = None) -> dict:
+    suspect_ids = suspect_ids or [444, 445, 446, 451, 452]
+    try:
+        base_df = _v239_prev_load_records(start_date=start_date, end_date=end_date, employee_id=None, work_order=None) if callable(_v239_prev_load_records) else pd.DataFrame()  # type: ignore[name-defined]
+        fixed_df = load_records(start_date=start_date, end_date=end_date, employee_id=None, work_order=None)
+        def idset(df):
+            if isinstance(df, pd.DataFrame) and not df.empty and "id" in df.columns:  # type: ignore[name-defined]
+                return {_v239_int(x) for x in df["id"].tolist() if _v239_int(x) is not None}
+            return set()
+        base_ids = idset(base_df)
+        fixed_ids = idset(fixed_df)
+        lossless_ids = {_v239_record_id(r) for r in _v239_read_lossless_rows() if _v239_record_id(r) is not None}
+        log_rows = _v239_read_sqlite_system_start_logs()
+        log_ids = {_v239_record_id(r) for r in log_rows if _v239_record_id(r) is not None}
+        suspect = {}
+        for i in suspect_ids:
+            suspect[str(i)] = {
+                "in_base": i in base_ids,
+                "in_v239_display": i in fixed_ids,
+                "in_lossless_ledger": i in lossless_ids,
+                "in_system_log_recovery": i in log_ids,
+            }
+        blanks = {}
+        for f in ["work_order", "part_no", "type_name", "assembly_location", "employee_id", "employee_name", "process_name", "start_timestamp"]:
+            try:
+                blanks[f] = int((fixed_df[f].fillna("").astype(str).str.strip() == "").sum()) if f in fixed_df.columns else -1
+            except Exception:
+                blanks[f] = -1
+        return {
+            "version": _V239_VERSION,
+            "ok": True,
+            "rule": "Every START/FINISH/SAVE now writes to lossless append-only event, per-row ledger, row shard, V232 event, 01/02 authority, and frontend cache. load_records merges these sources plus START_WORK logs as last-resort recovery.",
+            "base_rows": int(len(base_df)) if isinstance(base_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+            "v239_rows": int(len(fixed_df)) if isinstance(fixed_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+            "lossless_rows": len(lossless_ids),
+            "system_log_recovery_rows": len(log_ids),
+            "suspect_ids": suspect,
+            "blank_counts_after": blanks,
+        }
+    except Exception as exc:
+        return {"version": _V239_VERSION, "ok": False, "error": str(exc)[:1000]}
+
+# ================= END V239 LOSSLESS RECORD GUARANTEE + LOG LAST-RESORT RECOVERY =================
