@@ -27803,3 +27803,278 @@ def audit_v248_foreground_compute_offload() -> dict:
     }
 
 # ================= END V248 FOREGROUND COMPUTE OFFLOAD =================
+
+
+# ================= V249 BACKEND DATA CONSISTENCY GUARD｜2026-05-30 =================
+# Purpose:
+# - Preserve the V248 foreground fast path and all existing UI/CSS/theme/table behavior.
+# - Prevent ordinary 02 history reads from writing back 01/02 authority files.
+# - After official admin/manual deletes, force a lightweight 01/02 authority purge using
+#   existing tombstone id / record_key / business-signature rules.
+# - Do not make cache, SQLite, row-shard, lossless, or recovery data the sole authority.
+
+try:
+    _v249_prev_load_records = load_records  # type: ignore[name-defined]
+except Exception:
+    _v249_prev_load_records = None
+try:
+    _v249_prev_delete_time_records = delete_time_records  # type: ignore[name-defined]
+except Exception:
+    _v249_prev_delete_time_records = None
+try:
+    _v249_prev_audit_v248_foreground_compute_offload = audit_v248_foreground_compute_offload  # type: ignore[name-defined]
+except Exception:
+    _v249_prev_audit_v248_foreground_compute_offload = None
+try:
+    _v249_prev_v238_maybe_write_back = _v238_maybe_write_back  # type: ignore[name-defined]
+except Exception:
+    _v249_prev_v238_maybe_write_back = None
+try:
+    _v249_prev_v235_write_authority_rows_if_needed = _v235_write_authority_rows_if_needed  # type: ignore[name-defined]
+except Exception:
+    _v249_prev_v235_write_authority_rows_if_needed = None
+
+_V249_VERSION = "V249_BACKEND_DATA_CONSISTENCY_GUARD_20260530"
+
+
+def _v249_env_enabled(name: str, default: str = "0") -> bool:
+    try:
+        import os as _v249_os
+        val = str(_v249_os.environ.get(name, default)).strip().lower()
+        return val in {"1", "true", "yes", "y", "on", "enable", "enabled"}
+    except Exception:
+        return str(default).strip().lower() in {"1", "true", "yes", "y", "on", "enable", "enabled"}
+
+
+def _v249_admin_delete_reason(reason: str | None = "") -> bool:
+    try:
+        return bool(_v244_is_admin_delete_reason(reason))  # type: ignore[name-defined]
+    except Exception:
+        s = _v248_text(reason).lower() if "_v248_text" in globals() else str(reason or "").strip().lower()
+        if not s:
+            return False
+        system_tokens = ("prune", "repair", "cache", "sync", "rebuild", "auto", "background", "system", "cleanup", "resurrection")
+        admin_tokens = ("管理員", "人工", "維護", "admin", "manual", "editor")
+        if any(t in s for t in system_tokens) and not any(t in s for t in admin_tokens):
+            return False
+        return any(t in s for t in admin_tokens) or "刪除" in s or "delete" in s
+
+
+def _v249_collect_rows_for_ids(ids: list[int]) -> list[dict]:
+    clean_ids = []
+    for x in ids or []:
+        try:
+            i = _v248_int(x) if "_v248_int" in globals() and callable(_v248_int) else int(float(str(x).strip()))  # type: ignore[name-defined]
+        except Exception:
+            i = None
+        if i is not None and i not in clean_ids:
+            clean_ids.append(i)
+    if not clean_ids:
+        return []
+    for fname in ("_v246_collect_rows_for_ids", "_v244_collect_rows_for_ids", "_v239_collect_rows_for_ids", "_v239_find_rows_by_ids"):
+        try:
+            f = globals().get(fname)
+            if callable(f):
+                rows = [dict(r) for r in (f(clean_ids) or []) if isinstance(r, dict)]  # type: ignore[misc]
+                if rows:
+                    return rows
+        except Exception:
+            pass
+    rows = []
+    try:
+        wanted = set(clean_ids)
+        for module_key in ("01_time_records", "02_history"):
+            f = globals().get("_v246_authority_rows") or globals().get("_v244_authority_rows")
+            if not callable(f):
+                continue
+            for r in f(module_key) or []:  # type: ignore[misc]
+                if not isinstance(r, dict):
+                    continue
+                rid = _v248_row_id(r) if "_v248_row_id" in globals() and callable(_v248_row_id) else None  # type: ignore[name-defined]
+                if rid in wanted:
+                    rows.append(dict(r))
+    except Exception:
+        pass
+    return rows
+
+
+def _v249_force_0102_purge(ids: list[int], rows: list[dict], reason: str) -> dict:
+    try:
+        if "_v246_purge_admin_deleted_from_0102" in globals() and callable(_v246_purge_admin_deleted_from_0102):  # type: ignore[name-defined]
+            return dict(_v246_purge_admin_deleted_from_0102(ids, rows or [], reason=reason) or {})  # type: ignore[name-defined]
+    except Exception:
+        pass
+    result = {"01_time_records": 0, "02_history": 0, "fallback": True}
+    try:
+        if "_v246_target_sets_from_tombstones" in globals() and callable(_v246_target_sets_from_tombstones):  # type: ignore[name-defined]
+            t_ids, t_keys, t_sigs = _v246_target_sets_from_tombstones()  # type: ignore[name-defined]
+        else:
+            t_ids, t_keys, t_sigs = set(), set(), set()
+        target_ids = set(t_ids or set()) | {i for i in ids if i is not None}
+        target_keys = set(t_keys or set())
+        target_sigs = set(t_sigs or set())
+        for r in rows or []:
+            if not isinstance(r, dict):
+                continue
+            try:
+                rid = _v248_row_id(r)  # type: ignore[name-defined]
+                if rid is not None:
+                    target_ids.add(rid)
+            except Exception:
+                pass
+            try:
+                rk = _v248_record_key(r)  # type: ignore[name-defined]
+                if rk:
+                    target_keys.add(rk)
+            except Exception:
+                pass
+            try:
+                sig = _v248_row_signature(r)  # type: ignore[name-defined]
+                if sig:
+                    target_sigs.add(sig)
+            except Exception:
+                pass
+        for module_key in ("01_time_records", "02_history"):
+            rows0 = []
+            try:
+                f = globals().get("_v246_authority_rows") or globals().get("_v244_authority_rows")
+                if callable(f):
+                    rows0 = [dict(r) for r in (f(module_key) or []) if isinstance(r, dict)]  # type: ignore[misc]
+            except Exception:
+                rows0 = []
+            kept = []
+            removed = 0
+            for r in rows0:
+                hit = False
+                try:
+                    rid = _v248_row_id(r)  # type: ignore[name-defined]
+                    hit = hit or (rid is not None and rid in target_ids)
+                except Exception:
+                    pass
+                try:
+                    rk = _v248_record_key(r)  # type: ignore[name-defined]
+                    hit = hit or bool(rk and rk in target_keys)
+                except Exception:
+                    pass
+                try:
+                    sig = _v248_row_signature(r)  # type: ignore[name-defined]
+                    hit = hit or bool(sig and sig in target_sigs)
+                except Exception:
+                    pass
+                if hit:
+                    removed += 1
+                else:
+                    kept.append(r)
+            if removed:
+                save_f = globals().get("_v246_save_authority_rows") or globals().get("_v244_save_authority_rows")
+                if callable(save_f):
+                    save_f(module_key, kept, reason=reason)  # type: ignore[misc]
+            result[module_key] = removed
+    except Exception as exc:
+        result["error"] = str(exc)[:500]
+    return result
+
+
+def _v249_noop_v238_write_back(rows: list[dict], *, reason: str = "v249_suppressed_v238_write_back") -> None:
+    try:
+        if "_v230_enqueue_background_task" in globals() and callable(_v230_enqueue_background_task):  # type: ignore[name-defined]
+            _v230_enqueue_background_task("v249_suppressed_read_writeback", {"reason": reason, "rows": len(rows or [])})  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def _v249_noop_authority_writeback(rows: list[dict], *args, reason: str = "v249_suppressed_authority_writeback", **kwargs) -> int:
+    try:
+        if "_v230_enqueue_background_task" in globals() and callable(_v230_enqueue_background_task):  # type: ignore[name-defined]
+            _v230_enqueue_background_task("v249_suppressed_authority_writeback", {"reason": reason, "rows": len(rows or [])})  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return 0
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None):  # type: ignore[override]
+    if not callable(_v249_prev_load_records):
+        return pd.DataFrame()  # type: ignore[name-defined]
+    allow_writeback = _v249_env_enabled("SPT_ALLOW_HISTORY_READ_WRITEBACK", "0")
+    if allow_writeback:
+        return _v249_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[misc]
+    old_write_back = globals().get("_v238_maybe_write_back")
+    old_authority_writeback = globals().get("_v235_write_authority_rows_if_needed")
+    try:
+        if callable(_v249_prev_v238_maybe_write_back):
+            globals()["_v238_maybe_write_back"] = _v249_noop_v238_write_back
+        if callable(_v249_prev_v235_write_authority_rows_if_needed):
+            globals()["_v235_write_authority_rows_if_needed"] = _v249_noop_authority_writeback
+        return _v249_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[misc]
+    finally:
+        try:
+            globals()["_v238_maybe_write_back"] = old_write_back if callable(old_write_back) else _v249_prev_v238_maybe_write_back
+        except Exception:
+            pass
+        try:
+            globals()["_v235_write_authority_rows_if_needed"] = old_authority_writeback if callable(old_authority_writeback) else _v249_prev_v235_write_authority_rows_if_needed
+        except Exception:
+            pass
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = []
+    for x in record_ids or []:
+        try:
+            i = _v248_int(x) if "_v248_int" in globals() and callable(_v248_int) else int(float(str(x).strip()))  # type: ignore[name-defined]
+        except Exception:
+            i = None
+        if i is not None and i not in ids:
+            ids.append(i)
+    if not ids:
+        return 0
+    rows_before = _v249_collect_rows_for_ids(ids)
+    n = int(_v249_prev_delete_time_records(ids, reason=reason) or 0) if callable(_v249_prev_delete_time_records) else 0  # type: ignore[misc]
+    if _v249_admin_delete_reason(reason):
+        try:
+            if "_v246_persist_admin_tombstones" in globals() and callable(_v246_persist_admin_tombstones):  # type: ignore[name-defined]
+                _v246_persist_admin_tombstones(ids, rows_before, reason)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        purge_result = _v249_force_0102_purge(ids, rows_before, reason="v249_post_delete_force_0102_purge")
+        try:
+            if "_V248_TOMBSTONE_CACHE" in globals() and isinstance(_V248_TOMBSTONE_CACHE, dict):  # type: ignore[name-defined]
+                _V248_TOMBSTONE_CACHE["epoch"] = 0.0  # type: ignore[name-defined]
+        except Exception:
+            pass
+        try:
+            if "_v248_invalidate_foreground" in globals() and callable(_v248_invalidate_foreground):  # type: ignore[name-defined]
+                _v248_invalidate_foreground("v249_delete_time_records")  # type: ignore[name-defined]
+        except Exception:
+            pass
+        try:
+            if "_v239_append_lossless_event" in globals() and callable(_v239_append_lossless_event):  # type: ignore[name-defined]
+                _v239_append_lossless_event("V249_ADMIN_DELETE_PURGE_CONFIRMED", rows_before or [{"id": i} for i in ids], reason=reason, extra={"ids": ids, "deleted_count": n, "purge_result": purge_result, "policy": _V249_VERSION})  # type: ignore[name-defined]
+        except Exception:
+            pass
+        try:
+            return int(max(n, int(purge_result.get("01_time_records") or 0), int(purge_result.get("02_history") or 0), len(ids) if rows_before else 0))
+        except Exception:
+            return int(n or (len(ids) if rows_before else 0))
+    return int(n or 0)
+
+
+def audit_v249_backend_data_consistency_guard() -> dict:
+    base = {}
+    try:
+        if callable(_v249_prev_audit_v248_foreground_compute_offload):
+            base = dict(_v249_prev_audit_v248_foreground_compute_offload() or {})  # type: ignore[misc]
+    except Exception:
+        base = {}
+    base.update({
+        "version": _V249_VERSION,
+        "history_read_writeback_default": "suppressed",
+        "history_read_writeback_env_override": "SPT_ALLOW_HISTORY_READ_WRITEBACK=1",
+        "post_delete_0102_force_purge": True,
+        "ui_changed": False,
+        "css_theme_changed": False,
+        "service_only": True,
+    })
+    return base
+
+# ================= END V249 BACKEND DATA CONSISTENCY GUARD =================
