@@ -1560,3 +1560,53 @@ def get_system_log_authority_status() -> dict[str, Any]:  # type: ignore[overrid
     return base
 
 # =================== END V210 LOG SCHEMA GUARD + REBOOT-SAFE DISPLAY ===================
+
+
+# =================== V211 POSTGRESQL FAST LOG PATH ===================
+# On Streamlit Cloud, PostgreSQL is the durable log store. Keep every operation
+# log visible in 06, but avoid the legacy local SQLite/schema/shard chain on the
+# foreground button path.
+try:
+    _v211_prev_write_log = write_log
+except Exception:  # pragma: no cover
+    _v211_prev_write_log = None
+
+
+def _v211_pg_enabled() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled
+        return bool(is_postgres_enabled())
+    except Exception:
+        return False
+
+
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    if _v211_pg_enabled():
+        try:
+            from services.db_service import execute
+            execute(
+                """
+                INSERT INTO system_logs
+                (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (now_text(), user_name or _current_log_user(), action_type, target_table, str(target_id or ""), message, detail, level),
+            )
+        except Exception:
+            pass
+        return None
+    if callable(_v211_prev_write_log):
+        return _v211_prev_write_log(action_type, message, target_table, target_id, detail, level, user_name)
+    return None
+
+
+def audit_v211_postgresql_fast_log_path() -> dict[str, Any]:
+    return {
+        "version": "V211_POSTGRESQL_FAST_LOG_PATH",
+        "postgres_enabled": _v211_pg_enabled(),
+        "foreground_log_path": "postgresql_direct" if _v211_pg_enabled() else "legacy",
+        "keeps_06_log_query_visible": True,
+    }
+
+
+# ================= END V211 POSTGRESQL FAST LOG PATH =================

@@ -3040,3 +3040,132 @@ def audit_v29_postgresql_hot_path() -> dict[str, Any]:
 
 
 # ===== END V29 POSTGRESQL HOT PATH CONNECTION REUSE =====
+
+
+# ===== V30 TARGETED CACHE INVALIDATION FOR BUTTON SPEED =====
+# A button write to system_logs should not evict cached employees/work_orders/time
+# records, and a time_records write should not force every master/settings query to
+# reload. Keep data fresh for affected tables only; full clear_query_cache remains
+# available for explicit refresh/repair paths.
+
+def _v30_mutated_tables_from_sql(sql: str | None) -> set[str]:
+    try:
+        import re
+        text = " ".join(str(sql or "").lower().split())
+        out: set[str] = set()
+        for pat in (
+            r"\binsert\s+into\s+([a-zA-Z_][\w]*)",
+            r"\bupdate\s+([a-zA-Z_][\w]*)",
+            r"\bdelete\s+from\s+([a-zA-Z_][\w]*)",
+            r"\breplace\s+into\s+([a-zA-Z_][\w]*)",
+        ):
+            for m in re.finditer(pat, text):
+                out.add(str(m.group(1)).lower())
+        return out
+    except Exception:
+        return set()
+
+
+def _v30_cache_key_sql(key: Any) -> str:
+    try:
+        if isinstance(key, tuple) and key:
+            return str(key[0] or "").lower()
+    except Exception:
+        pass
+    return str(key or "").lower()
+
+
+def _v30_clear_cache_for_tables(tables: set[str]) -> None:
+    if not tables:
+        clear_query_cache()
+        return
+    try:
+        for key in list(_QUERY_CACHE.keys()):
+            key_sql = _v30_cache_key_sql(key)
+            if any(t in key_sql for t in tables):
+                _QUERY_CACHE.pop(key, None)
+    except Exception:
+        pass
+    try:
+        for key in list(_QUERY_ONE_CACHE.keys()):
+            key_sql = _v30_cache_key_sql(key)
+            if any(t in key_sql for t in tables):
+                _QUERY_ONE_CACHE.pop(key, None)
+    except Exception:
+        pass
+
+
+def _v30_clear_cache_for_sql(sql: str | None) -> None:
+    _v30_clear_cache_for_tables(_v30_mutated_tables_from_sql(sql))
+
+
+def execute(sql: str, params: Iterable[Any] | None = None) -> int:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_execute(sql, params)
+    ensure_database()
+    out = _v29_pg_retry(_v29_pg_write_once, sql, params or ())
+    _v30_clear_cache_for_sql(sql)
+    if _should_after_write_sync(sql):
+        try:
+            mark_data_changed(reason="PostgreSQL data changed", source_sql=sql)
+        except Exception:
+            pass
+        if str(os.environ.get("SPT_PG_EXPORT_AFTER_WRITE", "0")).strip().lower() in {"1", "true", "yes", "on"}:
+            try:
+                _after_write(sql)
+            except Exception:
+                pass
+    return int(out or 0)
+
+
+def executemany(sql: str, rows: list[Iterable[Any]]) -> None:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_executemany(sql, rows)
+    ensure_database()
+    _v29_pg_retry(_v29_pg_write_many_once, sql, rows or [])
+    _v30_clear_cache_for_sql(sql)
+    if _should_after_write_sync(sql):
+        try:
+            mark_data_changed(reason="PostgreSQL batch data changed", source_sql=sql)
+        except Exception:
+            pass
+    return None
+
+
+def execute_transaction(
+    operations: list[tuple[str, Iterable[Any]]] | tuple[tuple[str, Iterable[Any]], ...],
+    mark_changed: bool = True,
+    reason: str = "data changed",
+    source_sql: str = "BATCH_TRANSACTION",
+) -> list[int]:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_execute_transaction(operations, mark_changed=mark_changed, reason=reason, source_sql=source_sql)
+    ensure_database()
+    ops = list(operations or [])
+    ids = _v29_pg_retry(_v29_pg_transaction_once, ops)
+    tables: set[str] = set()
+    for sql, _params in ops:
+        tables.update(_v30_mutated_tables_from_sql(sql))
+    if not tables and source_sql:
+        tables.update(_v30_mutated_tables_from_sql(source_sql))
+    _v30_clear_cache_for_tables(tables)
+    if mark_changed:
+        try:
+            mark_data_changed(reason=reason, source_sql=source_sql)
+        except Exception:
+            pass
+    return ids
+
+
+def audit_v30_targeted_cache_invalidation() -> dict[str, Any]:
+    return {
+        "version": "V30_TARGETED_CACHE_INVALIDATION_FOR_BUTTON_SPEED",
+        "postgres_enabled": is_postgres_enabled(),
+        "query_cache_items": len(_QUERY_CACHE) if isinstance(_QUERY_CACHE, dict) else 0,
+        "query_one_cache_items": len(_QUERY_ONE_CACHE) if isinstance(_QUERY_ONE_CACHE, dict) else 0,
+        "system_log_writes_keep_business_cache": True,
+        "table_writes_clear_only_matching_select_cache": True,
+    }
+
+
+# ===== END V30 TARGETED CACHE INVALIDATION FOR BUTTON SPEED =====
