@@ -2787,3 +2787,256 @@ def audit_v26_postgres_bootstrap_import() -> dict[str, Any]:
 
 
 # ===== END V26 BACKGROUND POSTGRESQL AUTHORITY BOOTSTRAP =====
+
+
+# ===== V29 POSTGRESQL HOT PATH CONNECTION REUSE =====
+# Streamlit reruns 01/02 pages often. Opening a new remote PostgreSQL connection
+# for every SELECT/INSERT makes operator buttons feel much slower than the old
+# local/frontend path. Keep one PostgreSQL connection per Streamlit worker thread
+# and retry once after idle disconnects. SQLite behavior is untouched.
+
+import threading as _v29_threading
+
+_V29_PG_LOCAL = _v29_threading.local()
+
+
+def _v29_pg_close_cached_connection() -> None:
+    conn = getattr(_V29_PG_LOCAL, "conn", None)
+    try:
+        if conn is not None:
+            conn.close()
+    except Exception:
+        pass
+    try:
+        _V29_PG_LOCAL.conn = None
+    except Exception:
+        pass
+
+
+def _v29_pg_connection():
+    conn = getattr(_V29_PG_LOCAL, "conn", None)
+    try:
+        if conn is not None and not getattr(conn, "closed", True):
+            return conn
+    except Exception:
+        pass
+    try:
+        import psycopg
+        from psycopg.rows import dict_row
+    except Exception as exc:
+        raise RuntimeError("PostgreSQL mode requires psycopg[binary]. Run: pip install -r requirements.txt") from exc
+    conn = psycopg.connect(_v25_postgres_dsn(), row_factory=dict_row, connect_timeout=8)
+    try:
+        conn.execute("SET statement_timeout = '8000ms'")
+    except Exception:
+        pass
+    _V29_PG_LOCAL.conn = conn
+    return conn
+
+
+def _v29_pg_fetch_df_once(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:
+    special = _v25_pg_special_query_df(sql, params)
+    if special is not None:
+        return special
+    translated = _v25_pg_translate_sql(sql)
+    if not translated:
+        return pd.DataFrame()
+    conn = _v29_pg_connection()
+    with conn.cursor() as cur:
+        cur.execute(translated, tuple(params or ()))
+        rows = cur.fetchall()
+    return pd.DataFrame(rows)
+
+
+def _v29_pg_fetch_one_once(sql: str, params: Iterable[Any] | None = None) -> dict | None:
+    translated = _v25_pg_translate_sql(sql)
+    if not translated:
+        return None
+    conn = _v29_pg_connection()
+    with conn.cursor() as cur:
+        cur.execute(translated, tuple(params or ()))
+        row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def _v29_pg_write_once(sql: str, params: Iterable[Any] | None = None) -> int:
+    translated = _v25_pg_translate_sql(sql)
+    if not translated:
+        return 0
+    conn = _v29_pg_connection()
+    out = 0
+    with conn.cursor() as cur:
+        cur.execute(translated, tuple(params or ()))
+        if cur.description:
+            row = cur.fetchone()
+            if row and "id" in row:
+                out = int(row.get("id") or 0)
+        else:
+            out = int(cur.rowcount or 0)
+    conn.commit()
+    return out
+
+
+def _v29_pg_write_many_once(sql: str, rows: list[Iterable[Any]]) -> None:
+    translated = _v25_pg_translate_sql(sql)
+    if not translated:
+        return None
+    conn = _v29_pg_connection()
+    with conn.cursor() as cur:
+        cur.executemany(translated, rows or [])
+    conn.commit()
+    return None
+
+
+def _v29_pg_transaction_once(operations: list[tuple[str, Iterable[Any]]] | tuple[tuple[str, Iterable[Any]], ...]) -> list[int]:
+    conn = _v29_pg_connection()
+    ids: list[int] = []
+    with conn.cursor() as cur:
+        for sql, params in operations or []:
+            translated = _v25_pg_translate_sql(sql)
+            if not translated:
+                ids.append(0)
+                continue
+            cur.execute(translated, tuple(params or ()))
+            if cur.description:
+                row = cur.fetchone()
+                ids.append(int((row or {}).get("id") or 0))
+            else:
+                ids.append(int(cur.rowcount or 0))
+    conn.commit()
+    return ids
+
+
+def _v29_pg_retry(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs)
+    except Exception:
+        try:
+            conn = getattr(_V29_PG_LOCAL, "conn", None)
+            if conn is not None and not getattr(conn, "closed", True):
+                conn.rollback()
+        except Exception:
+            pass
+        _v29_pg_close_cached_connection()
+        return fn(*args, **kwargs)
+
+
+def _v25_pg_fetch_df(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:  # type: ignore[override]
+    return _v29_pg_retry(_v29_pg_fetch_df_once, sql, params)
+
+
+def query_df(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_query_df(sql, params)
+    ensure_database()
+    if params is None:
+        params = ()
+    cacheable = _is_select_sql(sql)
+    key = _query_cache_key(sql, params)
+    now_ts = time.time()
+    if cacheable:
+        hit = _v7_cache_get_df(key, now_ts) if "_v7_cache_get_df" in globals() else None
+        if hit is not None:
+            return hit
+    df = _v25_pg_fetch_df(sql, params)
+    if cacheable:
+        try:
+            _v7_cache_put_df(key, now_ts, df)
+        except Exception:
+            pass
+    return df
+
+
+def query_one(sql: str, params: Iterable[Any] | None = None) -> dict | None:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_query_one(sql, params)
+    ensure_database()
+    if params is None:
+        params = ()
+    cacheable = _is_select_sql(sql)
+    key = _query_cache_key(sql, params)
+    now_ts = time.time()
+    if cacheable:
+        try:
+            cached = _QUERY_ONE_CACHE.get(key)
+            if cached and now_ts - cached[0] <= _QUERY_CACHE_TTL_SEC:
+                return dict(cached[1]) if isinstance(cached[1], dict) else None
+        except Exception:
+            pass
+    out = _v29_pg_retry(_v29_pg_fetch_one_once, sql, params)
+    if cacheable:
+        try:
+            if len(_QUERY_ONE_CACHE) >= _QUERY_CACHE_MAX_ITEMS:
+                oldest = min(_QUERY_ONE_CACHE.items(), key=lambda kv: kv[1][0])[0]
+                _QUERY_ONE_CACHE.pop(oldest, None)
+            _QUERY_ONE_CACHE[key] = (now_ts, dict(out) if isinstance(out, dict) else None)
+        except Exception:
+            pass
+    return out
+
+
+def execute(sql: str, params: Iterable[Any] | None = None) -> int:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_execute(sql, params)
+    ensure_database()
+    out = _v29_pg_retry(_v29_pg_write_once, sql, params or ())
+    clear_query_cache()
+    if _should_after_write_sync(sql):
+        try:
+            mark_data_changed(reason="PostgreSQL data changed", source_sql=sql)
+        except Exception:
+            pass
+        if str(os.environ.get("SPT_PG_EXPORT_AFTER_WRITE", "0")).strip().lower() in {"1", "true", "yes", "on"}:
+            try:
+                _after_write(sql)
+            except Exception:
+                pass
+    return int(out or 0)
+
+
+def executemany(sql: str, rows: list[Iterable[Any]]) -> None:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_executemany(sql, rows)
+    ensure_database()
+    _v29_pg_retry(_v29_pg_write_many_once, sql, rows or [])
+    clear_query_cache()
+    if _should_after_write_sync(sql):
+        try:
+            mark_data_changed(reason="PostgreSQL batch data changed", source_sql=sql)
+        except Exception:
+            pass
+    return None
+
+
+def execute_transaction(
+    operations: list[tuple[str, Iterable[Any]]] | tuple[tuple[str, Iterable[Any]], ...],
+    mark_changed: bool = True,
+    reason: str = "data changed",
+    source_sql: str = "BATCH_TRANSACTION",
+) -> list[int]:  # type: ignore[override]
+    if not is_postgres_enabled():
+        return _v25_sqlite_execute_transaction(operations, mark_changed=mark_changed, reason=reason, source_sql=source_sql)
+    ensure_database()
+    ids = _v29_pg_retry(_v29_pg_transaction_once, operations or [])
+    clear_query_cache()
+    if mark_changed:
+        try:
+            mark_data_changed(reason=reason, source_sql=source_sql)
+        except Exception:
+            pass
+    return ids
+
+
+def audit_v29_postgresql_hot_path() -> dict[str, Any]:
+    conn = getattr(_V29_PG_LOCAL, "conn", None)
+    return {
+        "version": "V29_POSTGRESQL_HOT_PATH_CONNECTION_REUSE",
+        "postgres_enabled": is_postgres_enabled(),
+        "thread_cached_connection": bool(conn is not None and not getattr(conn, "closed", True)),
+        "query_df_direct_postgres": True,
+        "query_one_direct_postgres": True,
+        "writes_reuse_thread_connection": True,
+    }
+
+
+# ===== END V29 POSTGRESQL HOT PATH CONNECTION REUSE =====
