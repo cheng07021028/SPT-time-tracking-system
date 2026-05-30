@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 08:07:08",
-  "exported_at": "2026-05-30 08:07:08",
+  "updated_at": "2026-05-30 08:07:16",
+  "exported_at": "2026-05-30 08:07:16",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -4651,11 +4651,83 @@
         "detail": "v231_load_records\n__spt_log_uid=2beabb73274b4d93bf3969f84c9864ea",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 24,
+        "log_time": "2026-05-30 08:07:16",
+        "user_name": "SPT250",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 23,
+        "log_time": "2026-05-30 08:07:15",
+        "user_name": "SPT250",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 21,
+        "log_time": "2026-05-30 08:07:14",
+        "user_name": "SPT250",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 19,
+        "log_time": "2026-05-30 08:07:13",
+        "user_name": "SPT250",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 18,
+        "log_time": "2026-05-30 08:07:12",
+        "user_name": "SPT250",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 17,
+        "log_time": "2026-05-30 08:07:12",
+        "user_name": "SPT250",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：0 筆，active=0。",
+        "detail": "v231_load_records\n__spt_log_uid=004dad459d7f4048acbe8a2908135a93",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 387
+    "system_logs": 393
   }
 }
