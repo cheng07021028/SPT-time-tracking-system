@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 22:24:02",
-  "exported_at": "2026-05-30 22:24:02",
+  "updated_at": "2026-05-31 00:09:36",
+  "exported_at": "2026-05-31 00:09:36",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -9799,11 +9799,23 @@
         "detail": "__spt_log_uid=15ce636c45be4f88a879c92d36240ee8",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 1773,
+        "log_time": "2026-05-31 00:09:29",
+        "user_name": "admin",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "2",
+        "message": "SSS 開始 21M0241-01 / 前置鈑金",
+        "detail": "__spt_log_uid=fc25421413424228931e5dc7566a7e94\n\n[V166C_TIME_RECORD_SNAPSHOT_JSON]\n{\"schema_version\":\"V166C\",\"snapshot_type\":\"time_record_full_snapshot\",\"captured_at\":\"2026-05-31 00:09:29\",\"action_type\":\"START_WORK\",\"target_table\":\"time_records\",\"target_id\":\"2\",\"target_ids\":[2],\"message\":\"SSS 開始 21M0241-01 / 前置鈑金\",\"recovery_priority\":[\"row_shard\",\"time_record_events\",\"v166c_log_snapshot\",\"log_only_text\"],\"snapshot_counts\":{\"sqlite_time_records\":1,\"authority_01_time_records\":0,\"authority_02_history\":0,\"best_rows\":1},\"best_summaries\":[{\"record_key\":\"SSS|21M0241-01|前置鈑金|2026-05-31 00:09:24|801ecf1e\",\"identity_key\":\"record_key:SSS|21M0241-01|前置鈑金|2026-05-31 00:09:24|801ecf1e\",\"id\":\"2\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"work_order\":\"21M0241-01\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"status\":\"作業中\",\"start_timestamp\":\"2026-05-31 00:09:24\",\"end_timestamp\":\"\",\"work_hours\":\"0\",\"work_hours_hms\":\"\",\"source\":\"postgresql_v251\"}],\"rows\":{\"best_rows\":[{\"id\":2,\"record_key\":\"SSS|21M0241-01|前置鈑金|2026-05-31 00:09:24|801ecf1e\",\"status\":\"作業中\",\"work_order\":\"21M0241-01\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-31 00:09:24\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-31\",\"start_time\":\"00:09:24\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SSS|前置鈑金|2026-05-31\",\"is_group_work\":0,\"source\":\"postgresql_v251\",\"created_at\":\"2026-05-31 00:09:24\",\"updated_at\":\"2026-05-31 00:09:24\",\"_snapshot_source\":\"sqlite.time_records\"}],\"sqlite_time_records\":[{\"id\":2,\"record_key\":\"SSS|21M0241-01|前置鈑金|2026-05-31 00:09:24|801ecf1e\",\"status\":\"作業中\",\"work_order\":\"21M0241-01\",\"part_no\":\"4TRSC020-004-02\",\"type_name\":\"NTB 3 PORT\",\"process_name\":\"前置鈑金\",\"employee_id\":\"SSS\",\"employee_name\":\"SSS\",\"start_action\":\"開始\",\"start_timestamp\":\"2026-05-31 00:09:24\",\"end_action\":\"\",\"end_timestamp\":\"\",\"remark\":\"\",\"start_date\":\"2026-05-31\",\"start_time\":\"00:09:24\",\"end_date\":\"\",\"end_time\":\"\",\"work_hours\":0,\"assembly_location\":\"竹東\",\"group_key\":\"SSS|前置鈑金|2026-05-31\",\"is_group_work\":0,\"source\":\"postgresql_v251\",\"created_at\":\"2026-05-31 00:09:24\",\"updated_at\":\"2026-05-31 00:09:24\",\"_snapshot_source\":\"sqlite.time_records\"}],\"authority_01_time_records\":[],\"authority_02_history\":[]},\"snapshot_hash\":\"3b795ebe627d9cfdb33d6d592fd0f180f588847258ca84997eda94f7a50d1a5d\"}\n[/V166C_TIME_RECORD_SNAPSHOT_JSON]",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 816
+    "system_logs": 817
   }
 }
