@@ -2,12 +2,77 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "time_record_delete_guard",
   "kind": "records",
-  "updated_at": "2026-05-30 10:31:31",
-  "exported_at": "2026-05-30 10:31:31",
+  "updated_at": "2026-05-30 10:33:27",
+  "exported_at": "2026-05-30 10:33:27",
   "reason": "V196 hard delete guard",
   "empty_authoritative": false,
   "tables": {
     "deleted_time_records": [
+      {
+        "row": {
+          "id": 462,
+          "record_key": "SSS|21M0241-01|前置鈑金|2026-05-30 10:32:37|b97faadf",
+          "status": "下班",
+          "work_order": "21M0241-01",
+          "part_no": "4TRSC020-004-02",
+          "type_name": "NTB 3 PORT",
+          "process_name": "前置鈑金",
+          "employee_id": "SSS",
+          "employee_name": "SSS",
+          "start_action": "開始",
+          "start_timestamp": "2026-05-30 10:32:37",
+          "end_action": "下班",
+          "end_timestamp": "2026-05-30 10:32:54",
+          "remark": "",
+          "start_date": "2026-05-30",
+          "start_time": "10:32:37",
+          "end_date": "2026-05-30",
+          "end_time": "10:32:54",
+          "work_hours": 0.0,
+          "assembly_location": "竹東",
+          "group_key": "SSS|前置鈑金|2026-05-30",
+          "is_group_work": 0,
+          "source": "streamlit_v205_fast",
+          "created_at": "2026-05-30 10:32:37",
+          "updated_at": "2026-05-30 10:32:54",
+          "v232_last_op": "V235_RECOVER",
+          "v239_first_seen_at": "2026-05-30 02:32:38",
+          "v239_saved_at": "2026-05-30 02:33:24",
+          "v239_last_op": "ADMIN_DELETE_INTENT",
+          "department": "SSS",
+          "title": "SSS",
+          "department_emp": NaN,
+          "title_emp": NaN,
+          "recovery_status": "V238_ENRICHED",
+          "recovery_note": "V238補值:department=employee_master/consensus,title=employee_master/consensus",
+          "is_deleted": NaN,
+          "deleted_at": NaN,
+          "work_hours_hms": NaN,
+          "recovery_closed_at": NaN,
+          "recovery_closed_source": NaN,
+          "v238_enriched_at": "2026-05-30 10:33:24"
+        },
+        "id": 462,
+        "record_key": "SSS|21M0241-01|前置鈑金|2026-05-30 10:32:37|b97faadf",
+        "business_key": "SSS|SSS|21M0241-01|前置鈑金|2026-05-30 10:32:37",
+        "deleted_at": "2026-05-30 10:33:24",
+        "source": "V196",
+        "reason": "01 工時紀錄管理員維護區刪除",
+        "identities": [
+          "biz:SSS|SSS|21M0241-01|前置鈑金|2026-05-30 10:32:37",
+          "id:462",
+          "record_key:SSS|21M0241-01|前置鈑金|2026-05-30 10:32:37|b97faadf"
+        ]
+      },
+      {
+        "id": 462,
+        "identities": [
+          "id:462"
+        ],
+        "deleted_at": "2026-05-30 10:33:24",
+        "source": "V196",
+        "reason": "01 工時紀錄管理員維護區刪除"
+      },
       {
         "row": {
           "id": 461,
@@ -12379,6 +12444,6 @@
   },
   "settings": {},
   "table_counts": {
-    "deleted_time_records": 439
+    "deleted_time_records": 441
   }
 }
