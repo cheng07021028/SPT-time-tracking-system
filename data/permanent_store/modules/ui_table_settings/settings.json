@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-30 00:32:04",
-  "exported_at": "2026-05-30 00:32:04",
+  "updated_at": "2026-05-30 09:58:22",
+  "exported_at": "2026-05-30 09:58:22",
   "reason": "v367_column_settings_saved_v72",
   "empty_authoritative": false,
   "tables": {},
@@ -258,7 +258,7 @@
             "order": 7
           }
         },
-        "updated_at": "2026-05-30 00:32:03",
+        "updated_at": "2026-05-30 09:58:21",
         "reason": "v367_column_settings_saved"
       },
       "80435544260397582": {
@@ -825,6 +825,69 @@
             "visible": true,
             "width": "medium",
             "order": 25
+          },
+          "v239_first_seen_at": {
+            "source": "v239_first_seen_at",
+            "label": "v239_first_seen_at / v239_first_seen_at",
+            "visible": true,
+            "width": "medium",
+            "order": 26
+          },
+          "v239_saved_at": {
+            "source": "v239_saved_at",
+            "label": "v239_saved_at / v239_saved_at",
+            "visible": true,
+            "width": "medium",
+            "order": 27
+          },
+          "department": {
+            "source": "department",
+            "label": "單位 / Department",
+            "visible": true,
+            "width": "medium",
+            "order": 28
+          },
+          "title": {
+            "source": "title",
+            "label": "職稱 / Title",
+            "visible": true,
+            "width": "medium",
+            "order": 29
+          },
+          "recovery_status": {
+            "source": "recovery_status",
+            "label": "recovery_status / recovery_status",
+            "visible": true,
+            "width": "medium",
+            "order": 30
+          },
+          "recovery_note": {
+            "source": "recovery_note",
+            "label": "recovery_note / recovery_note",
+            "visible": true,
+            "width": "medium",
+            "order": 31
+          },
+          "v238_enriched_at": {
+            "source": "v238_enriched_at",
+            "label": "v238_enriched_at / v238_enriched_at",
+            "visible": true,
+            "width": "medium",
+            "order": 32
+          },
+          "v239_last_op": {
+            "source": "v239_last_op",
+            "label": "v239_last_op / v239_last_op",
+            "visible": true,
+            "width": "medium",
+            "order": 33
+          },
+          "operation_id": {
+            "source": "operation_id",
+            "label": "operation_id / operation_id",
+            "visible": true,
+            "width": "medium",
+            "order": 34
           }
         },
         "updated_at": "2026-05-21 21:44:00",
