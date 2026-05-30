@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "02_history",
   "kind": "settings",
-  "updated_at": "2026-05-30 10:41:45",
-  "exported_at": "2026-05-30 10:41:45",
+  "updated_at": "2026-05-30 12:43:40",
+  "exported_at": "2026-05-30 12:43:40",
   "reason": "V196 hard delete guard",
   "empty_authoritative": false,
   "tables": {},
@@ -570,6 +570,15 @@
     "column_settings": {},
     "v196_hard_deleted_time_records": [
       {
+        "id": 463,
+        "identities": [
+          "id:463"
+        ],
+        "deleted_at": "2026-05-30 12:43:40",
+        "source": "V196",
+        "reason": "01 工時紀錄管理員維護區刪除"
+      },
+      {
         "row": {
           "id": 462,
           "record_key": "SSS|21M0241-01|前置鈑金|2026-05-30 10:32:37|b97faadf",
@@ -903,7 +912,8 @@
           "id:436",
           "id:437",
           "id:438",
-          "id:461"
+          "id:461",
+          "id:463"
         ]
       },
       {
@@ -13047,7 +13057,7 @@
         "log_id": 144
       }
     ],
-    "v196_hard_delete_updated_at": "2026-05-30 10:41:45"
+    "v196_hard_delete_updated_at": "2026-05-30 12:43:40"
   },
   "table_counts": {}
 }
