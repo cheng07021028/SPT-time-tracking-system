@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 14:25:20",
-  "exported_at": "2026-05-30 14:25:20",
+  "updated_at": "2026-05-30 14:26:19",
+  "exported_at": "2026-05-30 14:26:19",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -9127,11 +9127,59 @@
         "detail": "v225_finish_work_sqlite_best_effort",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1750,
+        "log_time": "2026-05-30 14:26:15",
+        "user_name": "SPT239",
+        "action_type": "V235_DISABLE_BROAD_PRUNE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已停用非 tombstone 廣泛清除；避免有效工時被誤判為舊快取復活資料。",
+        "detail": "__spt_log_uid=09cdc8baa1d44d60a6a3d010b82e3ef2",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1749,
+        "log_time": "2026-05-30 14:26:15",
+        "user_name": "SPT239",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：16 筆，active=12。",
+        "detail": "v230_finish_work_single_row_cache_base",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1748,
+        "log_time": "2026-05-30 14:26:15",
+        "user_name": "SPT239",
+        "action_type": "END_WORK",
+        "target_table": "time_records",
+        "target_id": "460",
+        "message": "V225 權威檔優先結束工時紀錄 #460，同步結束=1筆，狀態=完工。",
+        "detail": "460;V225_AUTHORITY_FIRST_FINISH",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1747,
+        "log_time": "2026-05-30 14:26:15",
+        "user_name": "SPT239",
+        "action_type": "V208_DISPLAY_AUTHORITY_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite time_records 顯示快取空白，已由 01/02 權威檔回填 1 筆。",
+        "detail": "v225_finish_work_sqlite_best_effort",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 760
+    "system_logs": 764
   }
 }
