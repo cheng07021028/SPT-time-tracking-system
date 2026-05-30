@@ -25587,3 +25587,86 @@ def audit_v241_foreground_speed_policy() -> dict:
     }
 
 # ================= END V241 FOREGROUND FAST LANE RESTORE =================
+
+# ================= V242 DELETE HELPER COMPATIBILITY FIX｜2026-05-30 =================
+# Purpose:
+#   V240 delete_time_records() calls _v239_collect_rows_for_ids(), but some later
+#   V239/V240/V241 assembled files only retained _v239_find_rows_by_ids().
+#   This small compatibility shim restores the missing helper name without changing
+#   UI/CSS/pages or the V241 foreground fast lane.
+_V242_VERSION = "V242_DELETE_HELPER_NAMEERROR_FIX"
+
+
+def _v239_collect_rows_for_ids(ids):  # type: ignore[override]
+    """Compatibility alias used by V240 admin-delete policy.
+
+    Keep admin delete legal and auditable, while preventing NameError in 02 History delete flow.
+    The lookup order is deliberately lightweight:
+      1) V241 fast display cache by ID
+      2) V239 multi-source find by ID
+      3) currently loaded records fallback
+    """
+    wanted = []
+    for x in (ids or []):
+        try:
+            if x is not None and str(x).strip() != "":
+                wanted.append(int(str(x).strip()))
+        except Exception:
+            pass
+    if not wanted:
+        return []
+
+    # Fast path first, so admin delete does not trigger heavy full recovery unnecessarily.
+    try:
+        f_fast = globals().get("_v241_find_rows_by_ids_fast")
+        if callable(f_fast):
+            rows = [dict(r) for r in f_fast(wanted) if isinstance(r, dict)]
+            if rows:
+                return rows
+    except Exception:
+        pass
+
+    # Existing V239 multi-source helper.
+    try:
+        f_find = globals().get("_v239_find_rows_by_ids")
+        if callable(f_find):
+            rows = [dict(r) for r in f_find(wanted) if isinstance(r, dict)]
+            if rows:
+                return rows
+    except Exception:
+        pass
+
+    # Last lightweight fallback from records already exposed by load_records.
+    rows = []
+    try:
+        df = load_records()  # type: ignore[name-defined]
+        if isinstance(df, pd.DataFrame) and not df.empty and "id" in df.columns:  # type: ignore[name-defined]
+            wanted_set = set(wanted)
+            for _, rr in df.iterrows():
+                d = rr.to_dict()
+                try:
+                    rid = int(str(d.get("id")).strip())
+                except Exception:
+                    continue
+                if rid in wanted_set:
+                    rows.append(d)
+    except Exception:
+        pass
+
+    try:
+        if "_v239_filter_visible_rows" in globals() and "_v239_filter_deleted" in globals() and "_v239_dedupe_rows" in globals():
+            return _v239_filter_visible_rows(_v239_filter_deleted(_v239_dedupe_rows(rows)))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return rows
+
+
+def audit_v242_delete_helper_nameerror_fix() -> dict:
+    return {
+        "version": _V242_VERSION,
+        "ok": callable(globals().get("_v239_collect_rows_for_ids")),
+        "fix": "Restored _v239_collect_rows_for_ids compatibility helper required by V240 delete_time_records().",
+        "scope": "services/time_record_service.py only; no UI/CSS/theme/page changes.",
+    }
+
+# ================= END V242 DELETE HELPER COMPATIBILITY FIX =================
