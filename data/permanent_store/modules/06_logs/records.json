@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 08:49:00",
-  "exported_at": "2026-05-30 08:49:00",
+  "updated_at": "2026-05-30 08:49:12",
+  "exported_at": "2026-05-30 08:49:12",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -5215,11 +5215,83 @@
         "detail": "v231_load_records\n__spt_log_uid=c05ac73b26e148c185bff445b60e7e6c",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 5,
+        "log_time": "2026-05-30 08:49:08",
+        "user_name": "B177",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：8 筆，active=8。",
+        "detail": "v230_find_ids",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-30 08:49:08",
+        "user_name": "B177",
+        "action_type": "V224_START_DISPLAY_GUARD",
+        "target_table": "time_records",
+        "target_id": "456",
+        "message": "V224 已強制同步開始作業至 01/02 權威與前台快取，ID=456。",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 3,
+        "log_time": "2026-05-30 08:49:08",
+        "user_name": "B177",
+        "action_type": "V212_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "456",
+        "message": "儲存工時逐筆紀錄：START_WORK，1 筆已寫入 01/02 權威檔與事件紀錄。",
+        "detail": "start_work_v212_restore_per_row_save",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-30 08:49:08",
+        "user_name": "B177",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "456",
+        "message": "羅章淳 開始 26M0051-09 / 配電",
+        "detail": "V205_FAST_START",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-30 08:49:08",
+        "user_name": "B177",
+        "action_type": "V212_SQLITE_SEQUENCE_GUARD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 工時 ID 序號已對齊權威檔 max_id=455，避免新增紀錄 ID 撞號。",
+        "detail": "start_work_v212_before_fast_insert\n__spt_log_uid=3f0a0a26b3214712869f040a87116d28",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6,
+        "log_time": "2026-05-30 08:49:12",
+        "user_name": "SYSTEM",
+        "action_type": "AUTO_INIT_DATABASE",
+        "target_table": "ALL",
+        "target_id": "",
+        "message": "自動初始化資料庫完成",
+        "detail": "/mount/src/spt-time-tracking-system/data/permanent_store/database/spt_time_tracking.db",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 434
+    "system_logs": 440
   }
 }
