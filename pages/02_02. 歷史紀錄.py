@@ -22,6 +22,10 @@ from services.table_ui_service import render_table, label_for, render_width_sett
 from services.time_record_delete_unifier_service import delete_selected_time_records_from_editor
 from services.duration_service import hours_to_hms
 from services.history_filter_service import load_history_filters, save_history_filters, reset_history_filters
+try:
+    from services.large_table_query_service import load_history_records_sql_filtered
+except Exception:
+    load_history_records_sql_filtered = None
 
 # === V180B_HISTORY_TOTAL_TIME_TYPE_FIX_BEGIN ===
 def _v180b_parse_work_hours_to_decimal_hours(value):
@@ -1292,7 +1296,24 @@ _seed_start, _seed_end = _date_range_from_preset(
     _history_filter_seed.get("end_date"),
 )
 base_df = load_records(str(_seed_start), str(_seed_end), None, None)
-df, history_filters = _render_history_filter_panel(base_df, employees, work_orders)
+_panel_df, history_filters = _render_history_filter_panel(base_df, employees, work_orders)
+
+df = _panel_df
+if callable(load_history_records_sql_filtered):
+    try:
+        _detail_limit = int(history_filters.get("detail_limit") or 1000)
+    except Exception:
+        _detail_limit = 1000
+    _needs_python_post_filter = bool(
+        history_filters.get("departments")
+        or history_filters.get("titles")
+        or str(history_filters.get("anomaly_filter") or "?券") != "?券"
+        or str(history_filters.get("sort_by") or "") in {"撌交??勗之?啣?", "撌交??勗??啣之"}
+    )
+    _sql_limit = min(50000, max(_detail_limit, 5000)) if _needs_python_post_filter else _detail_limit
+    _sql_df = load_history_records_sql_filtered(history_filters, limit=_sql_limit)
+    if isinstance(_sql_df, pd.DataFrame):
+        df = _apply_history_filters(_sql_df, history_filters)
 
 start = history_filters.get("start_date", str(_seed_start))
 end = history_filters.get("end_date", str(_seed_end))
