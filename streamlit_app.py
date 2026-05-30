@@ -25,6 +25,11 @@ st.set_page_config(
 
 apply_theme()
 require_login("home")
+try:
+    from services.db_service import start_postgres_authority_bootstrap_import_background
+    start_postgres_authority_bootstrap_import_background()
+except Exception:
+    pass
 # V3.64: login/home must stay fast.
 # Do NOT run restore/export/GitHub/persistence migration immediately after login.
 # Each module loads its own lightweight settings when opened; this prevents login spinning.
