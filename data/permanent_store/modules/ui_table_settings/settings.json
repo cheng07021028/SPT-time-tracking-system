@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "ui_table_settings",
   "kind": "settings",
-  "updated_at": "2026-05-30 09:58:22",
-  "exported_at": "2026-05-30 09:58:22",
+  "updated_at": "2026-05-30 10:23:52",
+  "exported_at": "2026-05-30 10:23:52",
   "reason": "v367_column_settings_saved_v72",
   "empty_authoritative": false,
   "tables": {},
@@ -258,7 +258,7 @@
             "order": 7
           }
         },
-        "updated_at": "2026-05-30 09:58:21",
+        "updated_at": "2026-05-30 10:23:52",
         "reason": "v367_column_settings_saved"
       },
       "80435544260397582": {
@@ -651,12 +651,12 @@
             "width": "medium",
             "order": 0
           },
-          "record_key": {
-            "source": "record_key",
-            "label": "紀錄鍵 / Record Key",
+          "employee_id": {
+            "source": "employee_id",
+            "label": "工號 / Employee ID",
             "visible": true,
             "width": "medium",
-            "order": 1
+            "order": 7
           },
           "status": {
             "source": "status",
@@ -665,12 +665,33 @@
             "width": "medium",
             "order": 2
           },
+          "employee_name": {
+            "source": "employee_name",
+            "label": "姓名 / Name",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
           "work_order": {
             "source": "work_order",
             "label": "製令 / Work Order",
             "visible": true,
             "width": "medium",
             "order": 3
+          },
+          "department": {
+            "source": "department",
+            "label": "單位 / Department",
+            "visible": true,
+            "width": "medium",
+            "order": 28
+          },
+          "title": {
+            "source": "title",
+            "label": "職稱 / Title",
+            "visible": true,
+            "width": "medium",
+            "order": 29
           },
           "part_no": {
             "source": "part_no",
@@ -692,20 +713,6 @@
             "visible": true,
             "width": "medium",
             "order": 6
-          },
-          "employee_id": {
-            "source": "employee_id",
-            "label": "工號 / Employee ID",
-            "visible": true,
-            "width": "medium",
-            "order": 7
-          },
-          "employee_name": {
-            "source": "employee_name",
-            "label": "姓名 / Name",
-            "visible": true,
-            "width": "medium",
-            "order": 8
           },
           "start_action": {
             "source": "start_action",
@@ -819,12 +826,89 @@
             "width": "medium",
             "order": 24
           },
+          "record_key": {
+            "source": "record_key",
+            "label": "紀錄鍵 / Record Key",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
           "v232_last_op": {
             "source": "v232_last_op",
             "label": "v232_last_op / v232_last_op",
             "visible": true,
             "width": "medium",
             "order": 25
+          },
+          "department_emp": {
+            "source": "department_emp",
+            "label": "department_emp / department_emp",
+            "visible": true,
+            "width": "medium",
+            "order": 30
+          },
+          "title_emp": {
+            "source": "title_emp",
+            "label": "title_emp / title_emp",
+            "visible": true,
+            "width": "medium",
+            "order": 31
+          },
+          "recovery_status": {
+            "source": "recovery_status",
+            "label": "recovery_status / recovery_status",
+            "visible": true,
+            "width": "medium",
+            "order": 32
+          },
+          "recovery_note": {
+            "source": "recovery_note",
+            "label": "recovery_note / recovery_note",
+            "visible": true,
+            "width": "medium",
+            "order": 33
+          },
+          "is_deleted": {
+            "source": "is_deleted",
+            "label": "is_deleted / is_deleted",
+            "visible": true,
+            "width": "medium",
+            "order": 35
+          },
+          "deleted_at": {
+            "source": "deleted_at",
+            "label": "deleted_at / deleted_at",
+            "visible": true,
+            "width": "medium",
+            "order": 37
+          },
+          "work_hours_hms": {
+            "source": "work_hours_hms",
+            "label": "工時小計 / Work Hours",
+            "visible": true,
+            "width": "medium",
+            "order": 38
+          },
+          "recovery_closed_at": {
+            "source": "recovery_closed_at",
+            "label": "recovery_closed_at / recovery_closed_at",
+            "visible": true,
+            "width": "medium",
+            "order": 39
+          },
+          "recovery_closed_source": {
+            "source": "recovery_closed_source",
+            "label": "recovery_closed_source / recovery_closed_source",
+            "visible": true,
+            "width": "medium",
+            "order": 40
+          },
+          "v238_enriched_at": {
+            "source": "v238_enriched_at",
+            "label": "v238_enriched_at / v238_enriched_at",
+            "visible": true,
+            "width": "medium",
+            "order": 34
           },
           "v239_first_seen_at": {
             "source": "v239_first_seen_at",
@@ -840,54 +924,12 @@
             "width": "medium",
             "order": 27
           },
-          "department": {
-            "source": "department",
-            "label": "單位 / Department",
-            "visible": true,
-            "width": "medium",
-            "order": 28
-          },
-          "title": {
-            "source": "title",
-            "label": "職稱 / Title",
-            "visible": true,
-            "width": "medium",
-            "order": 29
-          },
-          "recovery_status": {
-            "source": "recovery_status",
-            "label": "recovery_status / recovery_status",
-            "visible": true,
-            "width": "medium",
-            "order": 30
-          },
-          "recovery_note": {
-            "source": "recovery_note",
-            "label": "recovery_note / recovery_note",
-            "visible": true,
-            "width": "medium",
-            "order": 31
-          },
-          "v238_enriched_at": {
-            "source": "v238_enriched_at",
-            "label": "v238_enriched_at / v238_enriched_at",
-            "visible": true,
-            "width": "medium",
-            "order": 32
-          },
           "v239_last_op": {
             "source": "v239_last_op",
             "label": "v239_last_op / v239_last_op",
             "visible": true,
             "width": "medium",
-            "order": 33
-          },
-          "operation_id": {
-            "source": "operation_id",
-            "label": "operation_id / operation_id",
-            "visible": true,
-            "width": "medium",
-            "order": 34
+            "order": 36
           }
         },
         "updated_at": "2026-05-21 21:44:00",
