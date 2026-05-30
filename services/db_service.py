@@ -2661,7 +2661,7 @@ _V26_BOOTSTRAP_PLAN: list[tuple[str, str, str, tuple[str, ...]]] = [
 ]
 
 
-_V26_BOOTSTRAP_MARKER_KEY = "postgres_core_authority_import_v27_completed"
+_V26_BOOTSTRAP_MARKER_KEY = "postgres_core_authority_import_v28_completed"
 
 
 def _v26_pg_bootstrap_marker(cur) -> bool:
@@ -2707,16 +2707,25 @@ def _v26_pg_import_authority_rows(cur) -> int:
             cols = [c for c in columns if c in row]
             if not cols:
                 continue
-            placeholders = ", ".join(["%s"] * len(cols))
-            update_cols = [c for c in cols if c not in conflict]
-            if update_cols:
-                update_sql = ", ".join([f"{c}=EXCLUDED.{c}" for c in update_cols])
-                sql = f"INSERT INTO {target_table} ({', '.join(cols)}) VALUES ({placeholders}) ON CONFLICT ({', '.join(conflict)}) DO UPDATE SET {update_sql}"
-            else:
-                sql = f"INSERT INTO {target_table} ({', '.join(cols)}) VALUES ({placeholders}) ON CONFLICT ({', '.join(conflict)}) DO NOTHING"
             try:
                 cur.execute("SAVEPOINT v26_import_row")
-                cur.execute(sql, tuple(row.get(c) for c in cols))
+                where_sql = " AND ".join([f"{c}=%s" for c in conflict])
+                cur.execute(f"SELECT id FROM {target_table} WHERE {where_sql} LIMIT 1", tuple(row.get(c) for c in conflict))
+                existing = cur.fetchone()
+                update_cols = [c for c in cols if c not in conflict and c != "id"]
+                if existing and update_cols:
+                    set_sql = ", ".join([f"{c}=%s" for c in update_cols])
+                    cur.execute(
+                        f"UPDATE {target_table} SET {set_sql} WHERE {where_sql}",
+                        tuple(row.get(c) for c in update_cols) + tuple(row.get(c) for c in conflict),
+                    )
+                elif not existing:
+                    insert_cols = [c for c in cols if c != "id"]
+                    placeholders = ", ".join(["%s"] * len(insert_cols))
+                    cur.execute(
+                        f"INSERT INTO {target_table} ({', '.join(insert_cols)}) VALUES ({placeholders})",
+                        tuple(row.get(c) for c in insert_cols),
+                    )
                 cur.execute("RELEASE SAVEPOINT v26_import_row")
                 imported += 1
             except Exception:
