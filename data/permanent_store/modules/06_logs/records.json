@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 11:03:45",
-  "exported_at": "2026-05-30 11:03:45",
+  "updated_at": "2026-05-30 11:03:59",
+  "exported_at": "2026-05-30 11:03:59",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -7759,11 +7759,95 @@
         "detail": "no such table: time_records\n__spt_log_uid=bc82113c4d444711a93875a2cc0c74c7",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 9,
+        "log_time": "2026-05-30 11:03:56",
+        "user_name": "SPT208",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：12 筆，active=9。",
+        "detail": "v235_cache_recover",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 8,
+        "log_time": "2026-05-30 11:03:56",
+        "user_name": "SPT208",
+        "action_type": "V235_0102_HISTORY_REPAIR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已從同源資料修復 01/02 顯示來源：161 筆。",
+        "detail": "__spt_log_uid=a0bb6c5a5d0a486fb0195376112ecb6c",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 7,
+        "log_time": "2026-05-30 11:03:56",
+        "user_name": "SPT208",
+        "action_type": "V235_0102_HISTORY_REPAIR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已從同源資料修復 01/02 顯示來源：161 筆。",
+        "detail": "__spt_log_uid=3cd9231cfcfd47a8a96fa29cb3f7ec04",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 6,
+        "log_time": "2026-05-30 11:03:55",
+        "user_name": "SPT208",
+        "action_type": "V235_DISABLE_BROAD_PRUNE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已停用非 tombstone 廣泛清除；避免有效工時被誤判為舊快取復活資料。",
+        "detail": "__spt_log_uid=432921e5b6e34243969fe3eabea912a9",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 5,
+        "log_time": "2026-05-30 11:03:55",
+        "user_name": "SPT208",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：12 筆，active=9。",
+        "detail": "v230_find_ids",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-30 11:03:55",
+        "user_name": "SPT208",
+        "action_type": "V224_START_DISPLAY_GUARD",
+        "target_table": "time_records",
+        "target_id": "462",
+        "message": "V224 已強制同步開始作業至 01/02 權威與前台快取，ID=462。",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 3,
+        "log_time": "2026-05-30 11:03:54",
+        "user_name": "SPT208",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "462",
+        "message": "邱珍娜 開始 26M0051-07 / 前置鈑金",
+        "detail": "V205_FAST_START",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 646
+    "system_logs": 653
   }
 }
