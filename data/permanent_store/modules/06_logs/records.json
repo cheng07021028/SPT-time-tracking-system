@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 11:23:39",
-  "exported_at": "2026-05-30 11:23:39",
+  "updated_at": "2026-05-30 11:24:06",
+  "exported_at": "2026-05-30 11:24:06",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -8035,11 +8035,23 @@
         "detail": "v235_cache_recover\n__spt_log_uid=8dbcc0edb4a94bb3aa9d47de14e192e7",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-30 11:24:02",
+        "user_name": "SPT244",
+        "action_type": "V212_SQLITE_SEQUENCE_GUARD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 工時 ID 序號已對齊權威檔 max_id=461，避免新增紀錄 ID 撞號。",
+        "detail": "start_work_v212_before_fast_insert\n__spt_log_uid=c9306a53c9734f52a765caa7a869d4f5",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 669
+    "system_logs": 670
   }
 }
