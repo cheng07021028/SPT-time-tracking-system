@@ -25670,3 +25670,499 @@ def audit_v242_delete_helper_nameerror_fix() -> dict:
     }
 
 # ================= END V242 DELETE HELPER COMPATIBILITY FIX =================
+
+
+# ================= V243 TODAY RECORDS ALL-USERS + DELETE VISIBILITY FIX｜2026-05-30 =================
+# Purpose:
+#   Fix regression after V241/V242 where V241 post-start/post-finish used _v231_write_rows(single_row),
+#   overwriting the fast display cache with only the current user's newly-created row. This made
+#   Today Records show only the user's own latest record. Delete also appeared ineffective because
+#   V241 in-memory Today cache was not invalidated after admin deletion.
+# Policy preserved:
+#   - V225/V230/V231/V232/V239/V240 data-safety rules remain.
+#   - System/background cannot auto-delete valid records.
+#   - Admin/manual delete is allowed and audited.
+#   - UI/CSS/theme/page files are untouched.
+
+_V243_VERSION = "V243_TODAY_RECORDS_ALL_USERS_DELETE_FIX_20260530"
+try:
+    _v243_prev_today_records = today_records  # type: ignore[name-defined]
+except Exception:
+    _v243_prev_today_records = None
+try:
+    _v243_prev_load_records = load_records  # type: ignore[name-defined]
+except Exception:
+    _v243_prev_load_records = None
+try:
+    _v243_prev_get_active_records = get_active_records  # type: ignore[name-defined]
+except Exception:
+    _v243_prev_get_active_records = None
+try:
+    _v243_prev_start_work = start_work  # type: ignore[name-defined]
+except Exception:
+    _v243_prev_start_work = None
+try:
+    _v243_prev_finish_work = finish_work  # type: ignore[name-defined]
+except Exception:
+    _v243_prev_finish_work = None
+try:
+    _v243_prev_delete_time_records = delete_time_records  # type: ignore[name-defined]
+except Exception:
+    _v243_prev_delete_time_records = None
+try:
+    _v243_prev_save_time_records = save_time_records  # type: ignore[name-defined]
+except Exception:
+    _v243_prev_save_time_records = None
+
+_V243_TODAY_ROWS_MEMORY = {"rows": None, "epoch": 0.0, "date": ""}
+_V243_TODAY_TTL_SECONDS = 25.0
+
+
+def _v243_epoch() -> float:
+    try:
+        return float(_v241_time.time())  # type: ignore[name-defined]
+    except Exception:
+        try:
+            import time as _t
+            return float(_t.time())
+        except Exception:
+            return 0.0
+
+
+def _v243_text(v) -> str:
+    try:
+        return _v241_text(v)  # type: ignore[name-defined]
+    except Exception:
+        if v is None:
+            return ""
+        try:
+            if pd.isna(v):  # type: ignore[name-defined]
+                return ""
+        except Exception:
+            pass
+        s = str(v).strip()
+        return "" if s.lower() in ("none", "nan", "nat", "null", "<na>") else s
+
+
+def _v243_int(v) -> int | None:
+    try:
+        if "_v239_int" in globals() and callable(_v239_int):  # type: ignore[name-defined]
+            return _v239_int(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    s = _v243_text(v)
+    if not s:
+        return None
+    try:
+        i = int(float(s))
+        return i if i > 0 else None
+    except Exception:
+        return None
+
+
+def _v243_date(v) -> str:
+    try:
+        if "_v241_date" in globals() and callable(_v241_date):  # type: ignore[name-defined]
+            d = _v241_date(v)  # type: ignore[name-defined]
+            if d:
+                return d
+    except Exception:
+        pass
+    s = _v243_text(v).replace("/", "-")
+    if " " in s:
+        s = s.split(" ", 1)[0]
+    if "T" in s:
+        s = s.split("T", 1)[0]
+    return s[:10] if len(s) >= 10 else ""
+
+
+def _v243_today() -> str:
+    try:
+        return _v241_today()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return _v236_today()  # type: ignore[name-defined]
+        except Exception:
+            try:
+                return today_date().strftime("%Y-%m-%d")  # type: ignore[name-defined]
+            except Exception:
+                try:
+                    from datetime import datetime
+                    return datetime.now().strftime("%Y-%m-%d")
+                except Exception:
+                    return ""
+
+
+def _v243_row_id(row: dict) -> int | None:
+    if not isinstance(row, dict):
+        return None
+    return _v243_int(row.get("id") or row.get("ID") or row.get("ID / ID") or row.get("record_id"))
+
+
+def _v243_row_key(row: dict) -> str:
+    if not isinstance(row, dict):
+        return ""
+    try:
+        if "_v239_row_key" in globals() and callable(_v239_row_key):  # type: ignore[name-defined]
+            return _v239_row_key(row)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    rid = _v243_row_id(row)
+    rk = _v243_text(row.get("record_key"))
+    if rk:
+        return "key:" + rk
+    if rid is not None:
+        return f"id:{rid}"
+    return "biz:" + "|".join([
+        _v243_text(row.get("employee_id")),
+        _v243_text(row.get("work_order")),
+        _v243_text(row.get("process_name")),
+        _v243_text(row.get("start_timestamp")),
+    ])
+
+
+def _v243_dedupe_rows(rows: list[dict]) -> list[dict]:
+    try:
+        if "_v239_dedupe_rows" in globals() and callable(_v239_dedupe_rows):  # type: ignore[name-defined]
+            return [dict(r) for r in _v239_dedupe_rows(rows) if isinstance(r, dict)]  # type: ignore[name-defined]
+    except Exception:
+        pass
+    by = {}
+    for r in rows or []:
+        if isinstance(r, dict):
+            by[_v243_row_key(r)] = dict(r)
+    return list(by.values())
+
+
+def _v243_visible_rows(rows: list[dict]) -> list[dict]:
+    out = [dict(r) for r in (rows or []) if isinstance(r, dict)]
+    try:
+        if "_v239_filter_deleted" in globals() and callable(_v239_filter_deleted):  # type: ignore[name-defined]
+            out = [dict(r) for r in _v239_filter_deleted(out) if isinstance(r, dict)]  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if "_v239_filter_visible_rows" in globals() and callable(_v239_filter_visible_rows):  # type: ignore[name-defined]
+            out = [dict(r) for r in _v239_filter_visible_rows(out) if isinstance(r, dict)]  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return out
+
+
+def _v243_is_active_row(row: dict) -> bool:
+    try:
+        if "_v241_is_active_row" in globals() and callable(_v241_is_active_row):  # type: ignore[name-defined]
+            return bool(_v241_is_active_row(row))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if "_v235_is_active_row" in globals() and callable(_v235_is_active_row):  # type: ignore[name-defined]
+            return bool(_v235_is_active_row(row))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if _v243_text(row.get("end_timestamp")):
+        return False
+    closed = {"下班", "暫停", "完工", "已結束", "結束", "完成", "off_duty", "paused", "finished", "end", "ended", "complete", "completed"}
+    return _v243_text(row.get("status")).lower() not in closed and _v243_text(row.get("end_action")).lower() not in closed
+
+
+def _v243_sort_rows(rows: list[dict]) -> list[dict]:
+    def key(r: dict):
+        ts = _v243_text(r.get("start_timestamp")) or (_v243_date(r.get("start_date")) + " " + _v243_text(r.get("start_time")))
+        rid = _v243_row_id(r) or 0
+        return (ts, rid)
+    try:
+        return sorted([dict(r) for r in rows if isinstance(r, dict)], key=key, reverse=True)
+    except Exception:
+        return [dict(r) for r in rows if isinstance(r, dict)]
+
+
+def _v243_collect_today_rows_full(reason: str = "v243_today_full") -> list[dict]:
+    """Collect all visible records for today from light, authoritative sources.
+
+    This intentionally does NOT replay full lossless/system logs in the 01 foreground,
+    but it does merge the fast cache with 01/02 authority + SQLite so the cache cannot
+    be overwritten to only the current user's newest row.
+    """
+    rows: list[dict] = []
+    try:
+        if "_v235_collect_rows" in globals() and callable(_v235_collect_rows):  # type: ignore[name-defined]
+            rows.extend([dict(r) for r in _v235_collect_rows(include_events=False, reason=reason) if isinstance(r, dict)])  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if "_v241_fast_display_rows" in globals() and callable(_v241_fast_display_rows):  # type: ignore[name-defined]
+            rows.extend([dict(r) for r in _v241_fast_display_rows(reason + "_fast") if isinstance(r, dict)])  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if not rows:
+        try:
+            if callable(_v243_prev_today_records):
+                df0 = _v243_prev_today_records(include_finished=True, unfinished_only=False)  # type: ignore[misc]
+                if isinstance(df0, pd.DataFrame) and not df0.empty:  # type: ignore[name-defined]
+                    rows.extend([dict(r) for _, r in df0.copy().where(pd.notna(df0), "").iterrows()])  # type: ignore[name-defined]
+        except Exception:
+            pass
+    rows = _v243_visible_rows(_v243_dedupe_rows(rows))
+    today = _v243_today()
+    today_rows = []
+    for r in rows:
+        d = _v243_date(r.get("start_date") or r.get("start_timestamp"))
+        if d == today:
+            today_rows.append(dict(r))
+    return _v243_sort_rows(_v243_dedupe_rows(today_rows))
+
+
+def _v243_rows_to_df(rows: list[dict]):
+    try:
+        if "_v241_rows_to_df" in globals() and callable(_v241_rows_to_df):  # type: ignore[name-defined]
+            return _v241_rows_to_df(rows)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        return pd.DataFrame(rows).copy().where(pd.notna(pd.DataFrame(rows)), "").reset_index(drop=True) if rows else pd.DataFrame()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return pd.DataFrame(rows or [])  # type: ignore[name-defined]
+        except Exception:
+            return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v243_filter_df(df, *, start_date=None, end_date=None, employee_id=None, employee_name=None, process_name=None, work_order=None, active_only=False):
+    try:
+        if "_v241_basic_filter" in globals() and callable(_v241_basic_filter):  # type: ignore[name-defined]
+            return _v241_basic_filter(df, start_date=start_date, end_date=end_date, employee_id=employee_id, employee_name=employee_name, process_name=process_name, work_order=work_order, active_only=active_only)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return pd.DataFrame()  # type: ignore[name-defined]
+    out = df.copy()
+    try:
+        if active_only:
+            out = out.loc[out.apply(lambda rr: _v243_is_active_row(dict(rr)), axis=1)].copy()
+        if employee_id and "employee_id" in out.columns:
+            out = out.loc[out["employee_id"].map(_v243_text) == _v243_text(employee_id)].copy()
+        if employee_name and not employee_id and "employee_name" in out.columns:
+            out = out.loc[out["employee_name"].map(_v243_text) == _v243_text(employee_name)].copy()
+        if process_name and "process_name" in out.columns:
+            out = out.loc[out["process_name"].map(_v243_text) == _v243_text(process_name)].copy()
+        if work_order and "work_order" in out.columns:
+            out = out.loc[out["work_order"].map(_v243_text) == _v243_text(work_order)].copy()
+        sd = _v243_date(start_date)
+        ed = _v243_date(end_date)
+        if sd or ed:
+            if "start_date" in out.columns:
+                ds = out["start_date"].map(_v243_date)
+            elif "start_timestamp" in out.columns:
+                ds = out["start_timestamp"].map(_v243_date)
+            else:
+                ds = pd.Series([""] * len(out), index=out.index)  # type: ignore[name-defined]
+            if sd:
+                out = out.loc[ds >= sd].copy()
+                ds = ds.loc[out.index] if len(out) else ds
+            if ed and len(out):
+                if "start_date" in out.columns:
+                    ds = out["start_date"].map(_v243_date)
+                elif "start_timestamp" in out.columns:
+                    ds = out["start_timestamp"].map(_v243_date)
+                out = out.loc[ds <= ed].copy()
+    except Exception:
+        pass
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v243_invalidate_memory(reason: str = "") -> None:
+    try:
+        _V243_TODAY_ROWS_MEMORY.update({"rows": None, "epoch": 0.0, "date": ""})
+    except Exception:
+        pass
+    for name in ("_V241_TODAY_CACHE", "_V241_HISTORY_CACHE", "_V236_HISTORY_MEMORY", "_V239_MEMORY"):
+        try:
+            obj = globals().get(name)
+            if isinstance(obj, dict):
+                if "df" in obj:
+                    obj["df"] = None
+                if "rows" in obj:
+                    obj["rows"] = None
+                if "epoch" in obj:
+                    obj["epoch"] = 0.0
+        except Exception:
+            pass
+
+
+def _v243_write_today_display_cache(rows: list[dict], reason: str = "v243_write_today") -> None:
+    rows = _v243_sort_rows(_v243_visible_rows(_v243_dedupe_rows(rows)))
+    try:
+        if "_v231_write_rows" in globals() and callable(_v231_write_rows):  # type: ignore[name-defined]
+            _v231_write_rows(rows, reason=reason)  # type: ignore[name-defined]
+        elif "_v230_write_display_rows" in globals() and callable(_v230_write_display_rows):  # type: ignore[name-defined]
+            _v230_write_display_rows(rows, reason=reason)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        _V243_TODAY_ROWS_MEMORY.update({"rows": [dict(r) for r in rows], "epoch": _v243_epoch(), "date": _v243_today()})
+    except Exception:
+        pass
+
+
+def _v243_refresh_today_cache(reason: str = "v243_refresh") -> list[dict]:
+    rows = _v243_collect_today_rows_full(reason)
+    _v243_write_today_display_cache(rows, reason=reason)
+    _v243_invalidate_memory(reason + "_post_write")
+    try:
+        _V243_TODAY_ROWS_MEMORY.update({"rows": [dict(r) for r in rows], "epoch": _v243_epoch(), "date": _v243_today()})
+    except Exception:
+        pass
+    return rows
+
+
+def _v243_get_today_rows(reason: str = "v243_get_today", *, force: bool = False) -> list[dict]:
+    today = _v243_today()
+    now = _v243_epoch()
+    try:
+        cached = _V243_TODAY_ROWS_MEMORY.get("rows")
+        epoch = float(_V243_TODAY_ROWS_MEMORY.get("epoch") or 0.0)
+        if (not force) and isinstance(cached, list) and _V243_TODAY_ROWS_MEMORY.get("date") == today and (now - epoch) <= _V243_TODAY_TTL_SECONDS:
+            return [dict(r) for r in cached if isinstance(r, dict)]
+    except Exception:
+        pass
+    return _v243_refresh_today_cache(reason)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False):  # type: ignore[override]
+    rows = _v243_get_today_rows("v243_today_records", force=False)
+    df = _v243_rows_to_df(rows)
+    df = _v243_filter_df(df, active_only=(unfinished_only or not include_finished))
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None):  # type: ignore[override]
+    try:
+        # Explicit today-only query keeps the repaired all-users fast lane.
+        today = _v243_today()
+        sd = _v243_date(start_date)
+        ed = _v243_date(end_date)
+        if sd == today and ed == today:
+            df = today_records(include_finished=True, unfinished_only=False)
+            return _v243_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+    except Exception:
+        pass
+    if callable(_v243_prev_load_records):
+        try:
+            return _v243_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[misc]
+        except Exception:
+            pass
+    return today_records(include_finished=True, unfinished_only=False)
+
+
+def get_active_records(employee_id: str | None = None, employee_name: str | None = None, process_name: str | None = None, start_date: str | None = None, work_order: str | None = None, **kwargs):  # type: ignore[override]
+    df = today_records(include_finished=False, unfinished_only=True)
+    out = _v243_filter_df(df, employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date, work_order=work_order, active_only=True)
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+        return dict(df.iloc[0].to_dict())
+    return None
+
+
+def _v243_upsert_rows_to_today_cache(rows: list[dict], reason: str = "v243_upsert") -> None:
+    incoming = [dict(r) for r in (rows or []) if isinstance(r, dict)]
+    if not incoming:
+        return
+    base = _v243_get_today_rows(reason + "_base", force=False)
+    today = _v243_today()
+    merged = []
+    for r in base + incoming:
+        d = _v243_date(r.get("start_date") or r.get("start_timestamp"))
+        if d == today:
+            merged.append(dict(r))
+    _v243_write_today_display_cache(merged, reason=reason)
+    _v243_invalidate_memory(reason + "_invalidate")
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v243_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    rid = int(_v243_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)  # type: ignore[misc]
+    if rid:
+        # V241 base may have overwritten fast cache with only this row. Repair by rebuilding all-users today cache.
+        rows = _v243_refresh_today_cache("v243_post_start_repair_all_users_today")
+        # If authority is delayed, ensure the just-created row is still visible without losing other rows.
+        if not any(_v243_row_id(r) == rid for r in rows):
+            try:
+                if "_v239_compose_start_row" in globals() and callable(_v239_compose_start_row):  # type: ignore[name-defined]
+                    _v243_upsert_rows_to_today_cache([_v239_compose_start_row(rid, employee or {}, work_order or {}, process_name, remark)], reason="v243_post_start_synthetic_upsert")  # type: ignore[name-defined]
+            except Exception:
+                pass
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v243_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    n = int(_v243_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)  # type: ignore[misc]
+    if n:
+        _v243_refresh_today_cache("v243_post_finish_repair_all_users_today")
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = [int(x) for x in (record_ids or []) if _v243_int(x) is not None]
+    if not ids:
+        return 0
+    n = 0
+    if callable(_v243_prev_delete_time_records):
+        try:
+            n = int(_v243_prev_delete_time_records(ids, reason=reason) or 0)  # type: ignore[misc]
+        except Exception as exc:
+            try:
+                write_log("V243_DELETE_BASE_WARN", f"V243 管理員刪除舊鏈失敗，將保留快取修復與稽核：{exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+            except Exception:
+                pass
+            n = 0
+    # Regardless of n, admin delete path may have written tombstones before older chain returns 0.
+    # Remove selected IDs from fast cache and invalidate V241 memory so Today Records reflects deletion immediately.
+    try:
+        if "_v231_remove_ids" in globals() and callable(_v231_remove_ids):  # type: ignore[name-defined]
+            _v231_remove_ids(ids, reason="v243_admin_delete_remove_fast_cache")  # type: ignore[name-defined]
+        elif "_v230_remove_cache_ids" in globals() and callable(_v230_remove_cache_ids):  # type: ignore[name-defined]
+            _v230_remove_cache_ids(ids, reason="v243_admin_delete_remove_fast_cache")  # type: ignore[name-defined]
+    except Exception:
+        pass
+    _v243_invalidate_memory("delete_time_records")
+    _v243_refresh_today_cache("v243_post_delete_refresh_all_users_today")
+    return int(n if n else len(ids))
+
+
+def save_time_records(df, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    if not callable(_v243_prev_save_time_records):
+        raise RuntimeError("save_time_records base function is unavailable")
+    n = int(_v243_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)  # type: ignore[misc]
+    if n:
+        _v243_invalidate_memory("save_time_records")
+        _v243_refresh_today_cache("v243_post_save_refresh_all_users_today")
+    return n
+
+
+def audit_v243_today_records_all_users_delete_fix() -> dict:
+    rows = _v243_get_today_rows("v243_audit", force=True)
+    active = [r for r in rows if _v243_is_active_row(r)]
+    emp_count = len({_v243_text(r.get("employee_id")) for r in rows if _v243_text(r.get("employee_id"))})
+    return {
+        "version": _V243_VERSION,
+        "today_rows": len(rows),
+        "active_rows": len(active),
+        "employee_count": emp_count,
+        "fixes": [
+            "Today Records cache is rebuilt from all-users 01/02 authority + SQLite + fast cache, not overwritten by one new row.",
+            "start_work/finish_work repair fast display cache after V241 base chain.",
+            "delete_time_records invalidates V241 memory and refreshes all-users Today Records immediately.",
+            "admin/manual delete remains allowed; system/background auto-delete remains blocked by V240 policy.",
+        ],
+        "scope": "services/time_record_service.py only; no UI/CSS/theme/page changes.",
+    }
+
+# ================= END V243 TODAY RECORDS ALL-USERS + DELETE VISIBILITY FIX =================
