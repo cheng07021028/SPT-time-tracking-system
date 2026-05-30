@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "settings",
-  "updated_at": "2026-05-30 12:42:50",
-  "exported_at": "2026-05-30 12:42:50",
-  "reason": "v369_save_column_order_v72_01.time_records.admin_maintenance",
+  "updated_at": "2026-05-30 12:43:15",
+  "exported_at": "2026-05-30 12:43:15",
+  "reason": "v369_save_widths_v72_01.time_records.admin_maintenance",
   "empty_authoritative": false,
   "tables": {},
   "settings": {
@@ -71,7 +71,6 @@
         "widths": {
           "刪除 / Delete": 140,
           "id": 70,
-          "record_key": 280,
           "status": 140,
           "work_order": 150,
           "part_no": 170,
@@ -95,6 +94,7 @@
           "source": 140,
           "created_at": 180,
           "updated_at": 180,
+          "record_key": 280,
           "v232_last_op": 140,
           "v239_first_seen_at": 140,
           "v239_saved_at": 140,
@@ -112,8 +112,8 @@
           "v238_enriched_at": 140,
           "v239_last_op": 140
         },
-        "updated_at": "2026-05-30 12:42:49",
-        "reason": "v369_save_column_order",
+        "updated_at": "2026-05-30 12:43:15",
+        "reason": "v369_save_widths",
         "order": [
           "刪除 / Delete",
           "id",
