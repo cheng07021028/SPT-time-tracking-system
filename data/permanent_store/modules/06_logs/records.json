@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 12:41:26",
-  "exported_at": "2026-05-30 12:41:26",
+  "updated_at": "2026-05-30 12:43:48",
+  "exported_at": "2026-05-30 12:43:48",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -8239,11 +8239,95 @@
         "detail": "__spt_log_uid=51234356e1a24bb1955beb8839144cbd",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 3,
+        "log_time": "2026-05-30 12:43:34",
+        "user_name": "admin",
+        "action_type": "V235_0102_HISTORY_REPAIR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已從同源資料修復 01/02 顯示來源：162 筆。",
+        "detail": "__spt_log_uid=2edca7df569f4f6d926fbde979f9d62e",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-30 12:43:34",
+        "user_name": "admin",
+        "action_type": "V235_0102_HISTORY_REPAIR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已從同源資料修復 01/02 顯示來源：162 筆。",
+        "detail": "__spt_log_uid=e12eb5663a3346aea6e6430e92acfcdf",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-30 12:43:34",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：13 筆，active=10。",
+        "detail": "v241_find_ids\n__spt_log_uid=3fc3f80d57324472950cccd0ffaf2124",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7,
+        "log_time": "2026-05-30 12:43:45",
+        "user_name": "admin",
+        "action_type": "V246_DELETE_0102_SYNC",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V246 管理員刪除已同步 01/02：ids=[463]；purge={'01_time_records': {'before': 12, 'after': 12, 'removed': 0}, '02_history': {'before': 12, 'after': 12, 'removed': 0}}",
+        "detail": "__spt_log_uid=1468341b31614859ad9d6fd27060b2bb",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6,
+        "log_time": "2026-05-30 12:43:44",
+        "user_name": "admin",
+        "action_type": "V235_DISABLE_BROAD_PRUNE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已停用非 tombstone 廣泛清除；避免有效工時被誤判為舊快取復活資料。",
+        "detail": "__spt_log_uid=c1b62df2d2544ed9ba602f0d78e57895",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 5,
+        "log_time": "2026-05-30 12:43:44",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V223",
+        "target_table": "time_records",
+        "target_id": "463",
+        "message": "01 工時紀錄管理員維護區刪除：V223 以 ID 精準刪除並同步 01/02 權威檔；deleted=1；remaining=12",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-30 12:43:44",
+        "user_name": "admin",
+        "action_type": "V222_DELETE_CACHE_SYNC",
+        "target_table": "time_records",
+        "target_id": "463",
+        "message": "V222 已同步移除前台快取刪除資料：Today 0 筆、Active 0 筆。",
+        "detail": "v223_delete_cache|01 工時紀錄管理員維護區刪除",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 686
+    "system_logs": 693
   }
 }
