@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 08:29:29",
-  "exported_at": "2026-05-30 08:29:29",
+  "updated_at": "2026-05-30 08:37:13",
+  "exported_at": "2026-05-30 08:37:13",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -5119,11 +5119,83 @@
         "detail": "start_work_v212_before_fast_insert\n__spt_log_uid=09a7e3a2cd544fce948d1568ce2d6822",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1752,
+        "log_time": "2026-05-30 08:37:09",
+        "user_name": "B126",
+        "action_type": "V232_PRUNE_STALE_RESURRECTION",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V232 已阻擋舊快取/舊 row shard 復活資料 2 筆。",
+        "detail": "__spt_log_uid=5ebdae0750d242d0b66a828ce97ecd2f",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1751,
+        "log_time": "2026-05-30 08:37:09",
+        "user_name": "B126",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：6 筆，active=6。",
+        "detail": "v230_find_ids",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1750,
+        "log_time": "2026-05-30 08:37:09",
+        "user_name": "B126",
+        "action_type": "V224_START_DISPLAY_GUARD",
+        "target_table": "time_records",
+        "target_id": "452",
+        "message": "V224 已強制同步開始作業至 01/02 權威與前台快取，ID=452。",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1749,
+        "log_time": "2026-05-30 08:37:08",
+        "user_name": "B126",
+        "action_type": "V212_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "452",
+        "message": "儲存工時逐筆紀錄：START_WORK，1 筆已寫入 01/02 權威檔與事件紀錄。",
+        "detail": "start_work_v212_restore_per_row_save",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1748,
+        "log_time": "2026-05-30 08:37:08",
+        "user_name": "B126",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "452",
+        "message": "戴鎰祥 開始 26M0051-09 / 配電",
+        "detail": "V205_FAST_START",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1747,
+        "log_time": "2026-05-30 08:37:08",
+        "user_name": "B126",
+        "action_type": "V212_SQLITE_SEQUENCE_GUARD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 工時 ID 序號已對齊權威檔 max_id=450，避免新增紀錄 ID 撞號。",
+        "detail": "start_work_v212_before_fast_insert",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 426
+    "system_logs": 432
   }
 }
