@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 09:37:25",
-  "exported_at": "2026-05-30 09:37:25",
+  "updated_at": "2026-05-30 09:38:12",
+  "exported_at": "2026-05-30 09:38:12",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -5851,11 +5851,83 @@
         "detail": "v235_cache_recover",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1772,
+        "log_time": "2026-05-30 09:38:07",
+        "user_name": "B246",
+        "action_type": "V235_DISABLE_BROAD_PRUNE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已停用非 tombstone 廣泛清除；避免有效工時被誤判為舊快取復活資料。",
+        "detail": "__spt_log_uid=98d4c69823e744a8b617667f01ce7dc3",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1771,
+        "log_time": "2026-05-30 09:38:07",
+        "user_name": "B246",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：9 筆，active=9。",
+        "detail": "v230_find_ids",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1770,
+        "log_time": "2026-05-30 09:38:07",
+        "user_name": "B246",
+        "action_type": "V224_START_DISPLAY_GUARD",
+        "target_table": "time_records",
+        "target_id": "457",
+        "message": "V224 已強制同步開始作業至 01/02 權威與前台快取，ID=457。",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1769,
+        "log_time": "2026-05-30 09:38:07",
+        "user_name": "B246",
+        "action_type": "V212_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "457",
+        "message": "儲存工時逐筆紀錄：START_WORK，1 筆已寫入 01/02 權威檔與事件紀錄。",
+        "detail": "start_work_v212_restore_per_row_save",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1768,
+        "log_time": "2026-05-30 09:38:07",
+        "user_name": "B246",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "457",
+        "message": "湯詠棋 開始 25MN0014-07 / 骨架組立",
+        "detail": "V205_FAST_START",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1767,
+        "log_time": "2026-05-30 09:38:07",
+        "user_name": "B246",
+        "action_type": "V212_SQLITE_SEQUENCE_GUARD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 工時 ID 序號已對齊權威檔 max_id=456，避免新增紀錄 ID 撞號。",
+        "detail": "start_work_v212_before_fast_insert",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 487
+    "system_logs": 493
   }
 }
