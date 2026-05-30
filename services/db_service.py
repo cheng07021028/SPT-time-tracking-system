@@ -1650,6 +1650,52 @@ def is_postgres_enabled() -> bool:
     return bool(dsn and not dsn.startswith("sqlite"))
 
 
+def _v25_truthy(value: Any) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on", "required"}
+
+
+def _v25_config_truthy(*keys: str) -> bool:
+    for key in keys:
+        if _v25_truthy(os.environ.get(key, "")):
+            return True
+    try:
+        import streamlit as _v25_st
+        secrets = getattr(_v25_st, "secrets", {}) or {}
+        for key in keys:
+            try:
+                if _v25_truthy(secrets.get(key, "")):
+                    return True
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False
+
+
+def _v25_running_on_streamlit_cloud() -> bool:
+    root = str(PROJECT_ROOT).replace("\\", "/").lower()
+    if root.startswith("/mount/src/") or root == "/mount/src":
+        return True
+    return bool(os.environ.get("STREAMLIT_SHARING_MODE") or os.environ.get("STREAMLIT_CLOUD"))
+
+
+def _v25_postgres_required() -> bool:
+    if _v25_config_truthy("SPT_REQUIRE_POSTGRES", "REQUIRE_POSTGRES"):
+        return True
+    if _v25_running_on_streamlit_cloud() and not _v25_config_truthy("SPT_ALLOW_SQLITE_ON_CLOUD", "ALLOW_SQLITE_ON_CLOUD"):
+        return True
+    return False
+
+
+def _v25_assert_postgres_configured() -> None:
+    if _v25_postgres_required() and not is_postgres_enabled():
+        raise RuntimeError(
+            "PostgreSQL is required for this cloud deployment. "
+            "Set DATABASE_URL or [connections.postgresql].url in Streamlit secrets. "
+            "Set SPT_ALLOW_SQLITE_ON_CLOUD=1 only for temporary testing."
+        )
+
+
 def get_database_backend() -> str:
     return "postgresql" if is_postgres_enabled() else "sqlite"
 
@@ -2205,6 +2251,7 @@ def _v25_pg_init_schema() -> None:
 def ensure_database() -> None:  # type: ignore[override]
     global _SCHEMA_READY
     if not is_postgres_enabled():
+        _v25_assert_postgres_configured()
         return _v25_sqlite_ensure_database()
     _v25_pg_init_schema()
     _SCHEMA_READY = True
@@ -2363,16 +2410,32 @@ def database_business_row_count() -> int:  # type: ignore[override]
 
 
 def audit_v25_postgresql_backend() -> dict:
-    source = ""
-    if _v25_postgres_dsn():
-        source = "configured"
+    dsn = _v25_postgres_dsn()
+    enabled = is_postgres_enabled()
+    source = "configured" if dsn else ""
+    connection_ok = False
+    connection_error = ""
+    business_rows = None
+    try:
+        if enabled:
+            business_rows = database_business_row_count()
+            connection_ok = True
+        elif not _v25_postgres_required():
+            business_rows = _v25_sqlite_database_business_row_count()
+    except Exception as exc:
+        connection_error = str(exc)
     return {
         "backend": get_database_backend(),
-        "postgres_enabled": is_postgres_enabled(),
-        "dsn_configured": bool(_v25_postgres_dsn()),
+        "postgres_enabled": enabled,
+        "dsn_configured": bool(dsn),
         "dsn_source": source,
-        "schema_ready": bool(_V25_PG_SCHEMA_READY) if is_postgres_enabled() else bool(_SCHEMA_READY),
-        "business_rows": database_business_row_count() if is_postgres_enabled() else _v25_sqlite_database_business_row_count(),
+        "postgres_required": _v25_postgres_required(),
+        "streamlit_cloud_detected": _v25_running_on_streamlit_cloud(),
+        "sqlite_cloud_allowed": _v25_config_truthy("SPT_ALLOW_SQLITE_ON_CLOUD", "ALLOW_SQLITE_ON_CLOUD"),
+        "schema_ready": bool(_V25_PG_SCHEMA_READY) if enabled else bool(_SCHEMA_READY),
+        "business_rows": business_rows,
+        "connection_ok": connection_ok,
+        "connection_error": connection_error,
         "sqlite_fallback_preserved": True,
     }
 
