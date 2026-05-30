@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 10:15:33",
-  "exported_at": "2026-05-30 10:15:33",
+  "updated_at": "2026-05-30 10:15:59",
+  "exported_at": "2026-05-30 10:15:59",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -6835,11 +6835,179 @@
         "detail": "v223_delete_cache|02 歷史紀錄啟動編輯後整列刪除\n__spt_log_uid=f7f5aa1f5057433ca1c0d1669802d9eb",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 17,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V235_DISABLE_BROAD_PRUNE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已停用非 tombstone 廣泛清除；避免有效工時被誤判為舊快取復活資料。",
+        "detail": "__spt_log_uid=592a3ba035e3445689928b9790f37ba0",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 16,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V200_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "447",
+        "message": "儲存工時逐筆紀錄｜ID=447｜SPT239 麥可 22M0162-91 / 包機",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"447\", \"record_key\": \"SPT239|22M0162-91|包機|2026-05-30 08:22:27|4c548410\", \"employee_id\": \"SPT239\", \"employee_name\": \"麥可\", \"work_order\": \"22M0162-91\", \"process_name\": \"包機\", \"start_timestamp\": \"2026-05-30 08:22:27\", \"end_timestamp\": \"2026-05-30 09:41:22\", \"status\": \"完工\", \"row_snapshot\": {\"id\": 447, \"employee_id\": \"SPT239\", \"status\": \"完工\", \"employee_name\": \"麥可\", \"work_order\": \"22M0162-91\", \"department\": \"製造一課\", \"title\": \"技術員\", \"part_no\": \"4TRSC020-004-02->4TRSC020-004-06\", \"type_name\": \"NTB 3 LP +快拆+EMO\", \"process_name\": \"包機\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-30 08:22:27\", \"end_action\": \"完工\", \"end_timestamp\": \"2026-05-30 09:41:22\", \"remark\": \"\", \"start_date\": \"2026-05-30\", \"start_time\": \"08:22:27\", \"end_date\": \"2026-05-30\", \"end_time\": \"09:41:22\", \"work_hours\": \"00:00:00\", \"assembly_location\": \"竹東\", \"group_key\": \"SPT239|包機|2026-05-30\", \"is_group_work\": false, \"source\": \"streamlit_v205_fast\", \"created_at\": \"2026-05-30 08:22:27\", \"updated_at\": \"2026-05-30 08:22:27\", \"record_key\": \"SPT239|22M0162-91|包機|2026-05-30 08:22:27|4c548410\", \"v232_last_op\": \"V235_RECOVER\", \"department_emp\": \"\", \"title_emp\": \"\", \"recovery_status\": \"V238_ENRICHED\", \"recovery_note\": \"V238補值:department=employee_master/consensus,title=employee_master/consensus\", \"is_deleted\": \"\", \"deleted_at\": \"\", \"work_hours_hms\": \"\", \"recovery_closed_at\": \"\", \"recovery_closed_source\": \"\", \"v238_enriched_at\": \"2026-05-30 10:13:05\", \"v239_first_seen_at\": \"2026-05-30 02:15:46\", \"v239_saved_at\": \"2026-05-30 02:15:46\"}}\n__spt_log_uid=255142eaa5ec44768b243b46bc26f609",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 15,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V200_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "448",
+        "message": "儲存工時逐筆紀錄｜ID=448｜SPT244 費南 22M0162-91 / 包機",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"448\", \"record_key\": \"SPT244|22M0162-91|包機|2026-05-30 08:23:19|8c311728\", \"employee_id\": \"SPT244\", \"employee_name\": \"費南\", \"work_order\": \"22M0162-91\", \"process_name\": \"包機\", \"start_timestamp\": \"2026-05-30 08:23:19\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 448, \"employee_id\": \"SPT244\", \"status\": \"作業中\", \"employee_name\": \"費南\", \"work_order\": \"22M0162-91\", \"department\": \"製造一課\", \"title\": \"技術員\", \"part_no\": \"4TRSC020-004-02->4TRSC020-004-06\", \"type_name\": \"NTB 3 LP +快拆+EMO\", \"process_name\": \"包機\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-30 08:23:19\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-30\", \"start_time\": \"08:23:19\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": \"00:00:00\", \"assembly_location\": \"竹東\", \"group_key\": \"SPT244|包機|2026-05-30\", \"is_group_work\": false, \"source\": \"streamlit_v205_fast\", \"created_at\": \"2026-05-30 08:23:19\", \"updated_at\": \"2026-05-30 08:23:19\", \"record_key\": \"SPT244|22M0162-91|包機|2026-05-30 08:23:19|8c311728\", \"v232_last_op\": \"V235_RECOVER\", \"department_emp\": \"\", \"title_emp\": \"\", \"recovery_status\": \"V238_ENRICHED\", \"recovery_note\": \"V238補值:department=employee_master/consensus,title=employee_master/consensus\", \"is_deleted\": \"\", \"deleted_at\": \"\", \"work_hours_hms\": \"\", \"recovery_closed_at\": \"\", \"recovery_closed_source\": \"\", \"v238_enriched_at\": \"2026-05-30 10:13:05\", \"v239_first_seen_at\": \"2026-05-30 02:15:46\", \"v239_saved_at\": \"2026-05-30 02:15:46\"}}\n__spt_log_uid=caccda2ecdd24cedb6f8dda354233f1f",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 14,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V200_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "449",
+        "message": "儲存工時逐筆紀錄｜ID=449｜SPT243 羅丹 26N4001-07 / 模組",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"449\", \"record_key\": \"SPT243|26N4001-07|模組|2026-05-30 08:26:51|13b1518f\", \"employee_id\": \"SPT243\", \"employee_name\": \"羅丹\", \"work_order\": \"26N4001-07\", \"process_name\": \"模組\", \"start_timestamp\": \"2026-05-30 08:26:51\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 449, \"employee_id\": \"SPT243\", \"status\": \"作業中\", \"employee_name\": \"羅丹\", \"work_order\": \"26N4001-07\", \"department\": \"製造一課\", \"title\": \"技術員\", \"part_no\": \"1SLP01S-FCA1-01\", \"type_name\": \"FCLP EFEM\", \"process_name\": \"模組\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-30 08:26:51\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-30\", \"start_time\": \"08:26:51\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": \"00:00:00\", \"assembly_location\": \"竹東\", \"group_key\": \"SPT243|模組|2026-05-30\", \"is_group_work\": false, \"source\": \"streamlit_v205_fast\", \"created_at\": \"2026-05-30 08:26:51\", \"updated_at\": \"2026-05-30 08:26:51\", \"record_key\": \"SPT243|26N4001-07|模組|2026-05-30 08:26:51|13b1518f\", \"v232_last_op\": \"V235_RECOVER\", \"department_emp\": \"\", \"title_emp\": \"\", \"recovery_status\": \"V238_ENRICHED\", \"recovery_note\": \"V238補值:department=employee_master/consensus,title=employee_master/consensus\", \"is_deleted\": \"\", \"deleted_at\": \"\", \"work_hours_hms\": \"\", \"recovery_closed_at\": \"\", \"recovery_closed_source\": \"\", \"v238_enriched_at\": \"2026-05-30 10:13:05\", \"v239_first_seen_at\": \"2026-05-30 02:15:46\", \"v239_saved_at\": \"2026-05-30 02:15:46\"}}\n__spt_log_uid=58776cb1b5d0422ab3d5648993c9eac7",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 13,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V200_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "450",
+        "message": "儲存工時逐筆紀錄｜ID=450｜SPT242 保羅 26N4001-06 / 模組",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"450\", \"record_key\": \"SPT242|26N4001-06|模組|2026-05-30 08:28:27|4ece7990\", \"employee_id\": \"SPT242\", \"employee_name\": \"保羅\", \"work_order\": \"26N4001-06\", \"process_name\": \"模組\", \"start_timestamp\": \"2026-05-30 08:28:27\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 450, \"employee_id\": \"SPT242\", \"status\": \"作業中\", \"employee_name\": \"保羅\", \"work_order\": \"26N4001-06\", \"department\": \"製造一課\", \"title\": \"技術員\", \"part_no\": \"1SLP01S-FCA1-01\", \"type_name\": \"FCLP EFEM\", \"process_name\": \"模組\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-30 08:28:27\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-30\", \"start_time\": \"08:28:27\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": \"00:00:00\", \"assembly_location\": \"竹東\", \"group_key\": \"SPT242|模組|2026-05-30\", \"is_group_work\": false, \"source\": \"streamlit_v205_fast\", \"created_at\": \"2026-05-30 08:28:27\", \"updated_at\": \"2026-05-30 08:28:27\", \"record_key\": \"SPT242|26N4001-06|模組|2026-05-30 08:28:27|4ece7990\", \"v232_last_op\": \"V235_RECOVER\", \"department_emp\": \"\", \"title_emp\": \"\", \"recovery_status\": \"V238_ENRICHED\", \"recovery_note\": \"V238補值:department=employee_master/consensus,title=employee_master/consensus\", \"is_deleted\": \"\", \"deleted_at\": \"\", \"work_hours_hms\": \"\", \"recovery_closed_at\": \"\", \"recovery_closed_source\": \"\", \"v238_enriched_at\": \"2026-05-30 10:13:05\", \"v239_first_seen_at\": \"2026-05-30 02:15:46\", \"v239_saved_at\": \"2026-05-30 02:15:46\"}}\n__spt_log_uid=3abf6f69aef84c68ad10f3a5e7217674",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 12,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V200_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "453",
+        "message": "儲存工時逐筆紀錄｜ID=453｜B211 張瑀榛 26M0021-04 / 骨架組立",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"453\", \"record_key\": \"B211|26M0021-04|骨架組立|2026-05-30 08:38:51|6057a51a\", \"employee_id\": \"B211\", \"employee_name\": \"張瑀榛\", \"work_order\": \"26M0021-04\", \"process_name\": \"骨架組立\", \"start_timestamp\": \"2026-05-30 08:38:51\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 453, \"employee_id\": \"B211\", \"status\": \"作業中\", \"employee_name\": \"張瑀榛\", \"work_order\": \"26M0021-04\", \"department\": \"製造一課\", \"title\": \"派遣 _晟銘\", \"part_no\": \"1GRSC150-003-04\", \"type_name\": \"4 Port Frame Long-type EFEM\", \"process_name\": \"骨架組立\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-30 08:38:51\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"FFu框架組立\", \"start_date\": \"2026-05-30\", \"start_time\": \"08:38:51\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": \"00:00:00\", \"assembly_location\": \"竹東\", \"group_key\": \"B211|骨架組立|2026-05-30\", \"is_group_work\": false, \"source\": \"streamlit_v205_fast\", \"created_at\": \"2026-05-30 08:38:51\", \"updated_at\": \"2026-05-30 08:38:51\", \"record_key\": \"B211|26M0021-04|骨架組立|2026-05-30 08:38:51|6057a51a\", \"v232_last_op\": \"V235_RECOVER\", \"department_emp\": \"\", \"title_emp\": \"\", \"recovery_status\": \"V238_ENRICHED\", \"recovery_note\": \"V238補值:department=employee_master/consensus,title=employee_master/consensus\", \"is_deleted\": \"\", \"deleted_at\": \"\", \"work_hours_hms\": \"\", \"recovery_closed_at\": \"\", \"recovery_closed_source\": \"\", \"v238_enriched_at\": \"2026-05-30 10:13:05\", \"v239_first_seen_at\": \"2026-05-30 02:15:46\", \"v239_saved_at\": \"2026-05-30 02:15:46\"}}\n__spt_log_uid=72b6952990344a7db0f33ce5d2c78d70",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 11,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V200_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "454",
+        "message": "儲存工時逐筆紀錄｜ID=454｜B235 徐聖淇 26M0051-09 / 配電",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"454\", \"record_key\": \"B235|26M0051-09|配電|2026-05-30 08:38:52|2db0956c\", \"employee_id\": \"B235\", \"employee_name\": \"徐聖淇\", \"work_order\": \"26M0051-09\", \"process_name\": \"配電\", \"start_timestamp\": \"2026-05-30 08:38:52\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 454, \"employee_id\": \"B235\", \"status\": \"作業中\", \"employee_name\": \"徐聖淇\", \"work_order\": \"26M0051-09\", \"department\": \"製造一課\", \"title\": \"派遣部 _晟銘\", \"part_no\": \"PSRSC151-SB4L-05\", \"type_name\": \"RSC151-SB4L+Argus\", \"process_name\": \"配電\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-30 08:38:52\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-30\", \"start_time\": \"08:38:52\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": \"00:00:00\", \"assembly_location\": \"竹東\", \"group_key\": \"B235|配電|2026-05-30\", \"is_group_work\": false, \"source\": \"streamlit_v205_fast\", \"created_at\": \"2026-05-30 08:38:52\", \"updated_at\": \"2026-05-30 08:38:52\", \"record_key\": \"B235|26M0051-09|配電|2026-05-30 08:38:52|2db0956c\", \"v232_last_op\": \"V235_RECOVER\", \"department_emp\": \"\", \"title_emp\": \"\", \"recovery_status\": \"V238_ENRICHED\", \"recovery_note\": \"V238補值:department=employee_master/consensus,title=employee_master/consensus\", \"is_deleted\": \"\", \"deleted_at\": \"\", \"work_hours_hms\": \"\", \"recovery_closed_at\": \"\", \"recovery_closed_source\": \"\", \"v238_enriched_at\": \"2026-05-30 10:13:05\", \"v239_first_seen_at\": \"2026-05-30 02:15:46\", \"v239_saved_at\": \"2026-05-30 02:15:46\"}}\n__spt_log_uid=518b7394a79e428bacefae7c50184f69",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 10,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V200_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "455",
+        "message": "儲存工時逐筆紀錄｜ID=455｜B164 陳宛廷 26A0230-09 / 其他",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"455\", \"record_key\": \"B164|26A0230-09|其他|2026-05-30 08:47:35|adf13164\", \"employee_id\": \"B164\", \"employee_name\": \"陳宛廷\", \"work_order\": \"26A0230-09\", \"process_name\": \"其他\", \"start_timestamp\": \"2026-05-30 08:47:35\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 455, \"employee_id\": \"B164\", \"status\": \"作業中\", \"employee_name\": \"陳宛廷\", \"work_order\": \"26A0230-09\", \"department\": \"製造一課\", \"title\": \"派遣 _晟銘\", \"part_no\": \"MZ8-26A0230\", \"type_name\": \"SORTER 加裝防拖片SENSOR\", \"process_name\": \"其他\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-30 08:47:35\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"加工\", \"start_date\": \"2026-05-30\", \"start_time\": \"08:47:35\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": \"00:00:00\", \"assembly_location\": \"竹東\", \"group_key\": \"B164|其他|2026-05-30\", \"is_group_work\": false, \"source\": \"streamlit_v205_fast\", \"created_at\": \"2026-05-30 08:47:35\", \"updated_at\": \"2026-05-30 08:47:35\", \"record_key\": \"B164|26A0230-09|其他|2026-05-30 08:47:35|adf13164\", \"v232_last_op\": \"V235_RECOVER\", \"department_emp\": \"\", \"title_emp\": \"\", \"recovery_status\": \"V238_ENRICHED\", \"recovery_note\": \"V238補值:department=employee_master/consensus,title=employee_master/consensus\", \"is_deleted\": \"\", \"deleted_at\": \"\", \"work_hours_hms\": \"\", \"recovery_closed_at\": \"\", \"recovery_closed_source\": \"\", \"v238_enriched_at\": \"2026-05-30 10:13:05\", \"v239_first_seen_at\": \"2026-05-30 02:15:46\", \"v239_saved_at\": \"2026-05-30 02:15:46\"}}\n__spt_log_uid=40ddd4270bf24cea8a71061bfc66a584",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 9,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V200_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "456",
+        "message": "儲存工時逐筆紀錄｜ID=456｜B177 羅章淳 26M0051-09 / 配電",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"456\", \"record_key\": \"B177|26M0051-09|配電|2026-05-30 08:49:08|16ecfe0f\", \"employee_id\": \"B177\", \"employee_name\": \"羅章淳\", \"work_order\": \"26M0051-09\", \"process_name\": \"配電\", \"start_timestamp\": \"2026-05-30 08:49:08\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 456, \"employee_id\": \"B177\", \"status\": \"作業中\", \"employee_name\": \"羅章淳\", \"work_order\": \"26M0051-09\", \"department\": \"製造一課\", \"title\": \"派遣部 _晟銘\", \"part_no\": \"PSRSC151-SB4L-05\", \"type_name\": \"RSC151-SB4L+Argus\", \"process_name\": \"配電\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-30 08:49:08\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-30\", \"start_time\": \"08:49:08\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": \"00:00:00\", \"assembly_location\": \"竹東\", \"group_key\": \"B177|配電|2026-05-30\", \"is_group_work\": false, \"source\": \"streamlit_v205_fast\", \"created_at\": \"2026-05-30 08:49:08\", \"updated_at\": \"2026-05-30 08:49:08\", \"record_key\": \"B177|26M0051-09|配電|2026-05-30 08:49:08|16ecfe0f\", \"v232_last_op\": \"V235_RECOVER\", \"department_emp\": \"\", \"title_emp\": \"\", \"recovery_status\": \"V238_ENRICHED\", \"recovery_note\": \"V238補值:department=employee_master/consensus,title=employee_master/consensus\", \"is_deleted\": \"\", \"deleted_at\": \"\", \"work_hours_hms\": \"\", \"recovery_closed_at\": \"\", \"recovery_closed_source\": \"\", \"v238_enriched_at\": \"2026-05-30 10:13:05\", \"v239_first_seen_at\": \"2026-05-30 02:15:46\", \"v239_saved_at\": \"2026-05-30 02:15:46\"}}\n__spt_log_uid=9d9a435e0fc741edb9689291874817a0",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 8,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V200_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "457",
+        "message": "儲存工時逐筆紀錄｜ID=457｜B246 湯詠棋 25MN0014-07 / 骨架組立",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"457\", \"record_key\": \"B246|25MN0014-07|骨架組立|2026-05-30 09:38:07|e3cbd5e3\", \"employee_id\": \"B246\", \"employee_name\": \"湯詠棋\", \"work_order\": \"25MN0014-07\", \"process_name\": \"骨架組立\", \"start_timestamp\": \"2026-05-30 09:38:07\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 457, \"employee_id\": \"B246\", \"status\": \"作業中\", \"employee_name\": \"湯詠棋\", \"work_order\": \"25MN0014-07\", \"department\": \"製造二課\", \"title\": \"派遣_微動\", \"part_no\": \"9MRSC2A2-BWN01-03\", \"type_name\": \"BWS3200\\nRSC2A2-BWN01-03\", \"process_name\": \"骨架組立\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-30 09:38:07\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-30\", \"start_time\": \"09:38:07\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": \"00:00:00\", \"assembly_location\": \"竹東\", \"group_key\": \"B246|骨架組立|2026-05-30\", \"is_group_work\": false, \"source\": \"streamlit_v205_fast\", \"created_at\": \"2026-05-30 09:38:07\", \"updated_at\": \"2026-05-30 09:38:07\", \"record_key\": \"B246|25MN0014-07|骨架組立|2026-05-30 09:38:07|e3cbd5e3\", \"v232_last_op\": \"V235_RECOVER\", \"department_emp\": \"\", \"title_emp\": \"\", \"recovery_status\": \"V238_ENRICHED\", \"recovery_note\": \"V238補值:department=employee_master/consensus,title=employee_master/consensus\", \"is_deleted\": \"\", \"deleted_at\": \"\", \"work_hours_hms\": \"\", \"recovery_closed_at\": \"\", \"recovery_closed_source\": \"\", \"v238_enriched_at\": \"2026-05-30 10:13:05\", \"v239_first_seen_at\": \"2026-05-30 02:15:46\", \"v239_saved_at\": \"2026-05-30 02:15:46\"}}\n__spt_log_uid=c527091090364780bfce6f6357069af0",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 7,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V200_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "458",
+        "message": "儲存工時逐筆紀錄｜ID=458｜SPT208 邱珍娜 22M0162-91 / 包機",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"458\", \"record_key\": \"SPT208|22M0162-91|包機|2026-05-30 09:39:08|d414adcf\", \"employee_id\": \"SPT208\", \"employee_name\": \"邱珍娜\", \"work_order\": \"22M0162-91\", \"process_name\": \"包機\", \"start_timestamp\": \"2026-05-30 09:39:08\", \"end_timestamp\": \"2026-05-30 09:39:25\", \"status\": \"完工\", \"row_snapshot\": {\"id\": 458, \"employee_id\": \"SPT208\", \"status\": \"完工\", \"employee_name\": \"邱珍娜\", \"work_order\": \"22M0162-91\", \"department\": \"製造一課\", \"title\": \"技術員\", \"part_no\": \"4TRSC020-004-02->4TRSC020-004-06\", \"type_name\": \"NTB 3 LP +快拆+EMO\", \"process_name\": \"包機\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-30 09:39:08\", \"end_action\": \"完工\", \"end_timestamp\": \"2026-05-30 09:39:25\", \"remark\": \"\", \"start_date\": \"2026-05-30\", \"start_time\": \"09:39:08\", \"end_date\": \"2026-05-30\", \"end_time\": \"09:39:25\", \"work_hours\": \"00:00:00\", \"assembly_location\": \"竹東\", \"group_key\": \"SPT208|包機|2026-05-30\", \"is_group_work\": false, \"source\": \"streamlit_v205_fast\", \"created_at\": \"2026-05-30 09:39:08\", \"updated_at\": \"2026-05-30 09:39:25\", \"record_key\": \"SPT208|22M0162-91|包機|2026-05-30 09:39:08|d414adcf\", \"v232_last_op\": \"V235_RECOVER\", \"department_emp\": \"\", \"title_emp\": \"\", \"recovery_status\": \"V238_ENRICHED\", \"recovery_note\": \"V238補值:department=employee_master/consensus,title=employee_master/consensus\", \"is_deleted\": \"\", \"deleted_at\": \"\", \"work_hours_hms\": \"\", \"recovery_closed_at\": \"\", \"recovery_closed_source\": \"\", \"v238_enriched_at\": \"2026-05-30 10:13:05\", \"v239_first_seen_at\": \"2026-05-30 02:15:46\", \"v239_saved_at\": \"2026-05-30 02:15:46\"}}\n__spt_log_uid=da8ced47676549938dbbb9c38fed83bc",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 6,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V200_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "459",
+        "message": "儲存工時逐筆紀錄｜ID=459｜SPT208 邱珍娜 22M0162-92 / 包機",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"459\", \"record_key\": \"SPT208|22M0162-92|包機|2026-05-30 09:39:54|c6dc72fa\", \"employee_id\": \"SPT208\", \"employee_name\": \"邱珍娜\", \"work_order\": \"22M0162-92\", \"process_name\": \"包機\", \"start_timestamp\": \"2026-05-30 09:39:54\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 459, \"employee_id\": \"SPT208\", \"status\": \"作業中\", \"employee_name\": \"邱珍娜\", \"work_order\": \"22M0162-92\", \"department\": \"製造一課\", \"title\": \"技術員\", \"part_no\": \"4TRSC020-004-02->4TRSC020-004-06\", \"type_name\": \"NTB 3 LP +快拆+EMO\", \"process_name\": \"包機\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-30 09:39:54\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-30\", \"start_time\": \"09:39:54\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": \"00:00:00\", \"assembly_location\": \"竹東\", \"group_key\": \"SPT208|包機|2026-05-30\", \"is_group_work\": false, \"source\": \"streamlit_v205_fast\", \"created_at\": \"2026-05-30 09:39:54\", \"updated_at\": \"2026-05-30 09:39:54\", \"record_key\": \"SPT208|22M0162-92|包機|2026-05-30 09:39:54|c6dc72fa\", \"v232_last_op\": \"V235_RECOVER\", \"department_emp\": \"\", \"title_emp\": \"\", \"recovery_status\": \"V238_ENRICHED\", \"recovery_note\": \"V238補值:department=employee_master/consensus,title=employee_master/consensus\", \"is_deleted\": \"\", \"deleted_at\": \"\", \"work_hours_hms\": \"\", \"recovery_closed_at\": \"\", \"recovery_closed_source\": \"\", \"v238_enriched_at\": \"2026-05-30 10:13:05\", \"v239_first_seen_at\": \"2026-05-30 02:15:46\", \"v239_saved_at\": \"2026-05-30 02:15:46\"}}\n__spt_log_uid=29c6c17125414816915acc6b61494d9b",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 5,
+        "log_time": "2026-05-30 10:15:56",
+        "user_name": "admin",
+        "action_type": "V200_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "460",
+        "message": "儲存工時逐筆紀錄｜ID=460｜SPT239 麥可 22M0162-92 / 包機",
+        "detail": "{\"schema_version\": \"V200_ROW_AUDIT\", \"before_after\": \"after\", \"record_id\": \"460\", \"record_key\": \"SPT239|22M0162-92|包機|2026-05-30 09:41:44|43b9ef05\", \"employee_id\": \"SPT239\", \"employee_name\": \"麥可\", \"work_order\": \"22M0162-92\", \"process_name\": \"包機\", \"start_timestamp\": \"2026-05-30 09:41:44\", \"end_timestamp\": \"\", \"status\": \"作業中\", \"row_snapshot\": {\"id\": 460, \"employee_id\": \"SPT239\", \"status\": \"作業中\", \"employee_name\": \"麥可\", \"work_order\": \"22M0162-92\", \"department\": \"製造一課\", \"title\": \"技術員\", \"part_no\": \"4TRSC020-004-02->4TRSC020-004-06\", \"type_name\": \"NTB 3 LP +快拆+EMO\", \"process_name\": \"包機\", \"start_action\": \"開始\", \"start_timestamp\": \"2026-05-30 09:41:44\", \"end_action\": \"\", \"end_timestamp\": \"\", \"remark\": \"\", \"start_date\": \"2026-05-30\", \"start_time\": \"09:41:44\", \"end_date\": \"\", \"end_time\": \"\", \"work_hours\": \"00:00:00\", \"assembly_location\": \"竹東\", \"group_key\": \"SPT239|包機|2026-05-30\", \"is_group_work\": false, \"source\": \"streamlit_v205_fast\", \"created_at\": \"2026-05-30 09:41:44\", \"updated_at\": \"2026-05-30 09:41:44\", \"record_key\": \"SPT239|22M0162-92|包機|2026-05-30 09:41:44|43b9ef05\", \"v232_last_op\": \"V235_RECOVER\", \"department_emp\": \"\", \"title_emp\": \"\", \"recovery_status\": \"V238_ENRICHED\", \"recovery_note\": \"V238補值:department=employee_master/consensus,title=employee_master/consensus\", \"is_deleted\": \"\", \"deleted_at\": \"\", \"work_hours_hms\": \"\", \"recovery_closed_at\": \"\", \"recovery_closed_source\": \"\", \"v238_enriched_at\": \"2026-05-30 10:13:05\", \"v239_first_seen_at\": \"2026-05-30 02:15:46\", \"v239_saved_at\": \"2026-05-30 02:15:46\"}}\n__spt_log_uid=9646b8aa59ff48d4a964e39967a8be86",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-30 10:15:55",
+        "user_name": "admin",
+        "action_type": "SAVE_TIME_RECORDS",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V194 本機快速儲存 12 筆；GitHub 背景發布。",
+        "detail": "__spt_log_uid=7ad5beae0f1045309adb4302fa3276a0",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 569
+    "system_logs": 583
   }
 }
