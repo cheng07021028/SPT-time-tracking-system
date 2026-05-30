@@ -23292,3 +23292,893 @@ def audit_v236_02_history_stable_source() -> dict:
         return {"version": _V236_VERSION, "ok": False, "error": str(exc)}
 
 # ================= END V236 02 HISTORY STABLE SOURCE =================
+
+
+# ================= V237 ROW SHARD HISTORY RECOVERY｜2026-05-30 =================
+# 目的：修正「01/02 仍可能有資料被隱藏或遺失」：
+#   現場稽核發現部分 START_WORK 已有 V212_ROW_SAVE_TIME_RECORD / V224_START_DISPLAY_GUARD LOG，
+#   但 01 Today Records / 02 History 匯出皆未出現。V236 stable source 已讀 01/02、SQLite、cache、event journal，
+#   但未直接讀 V151/V152/V176 row shard（time_record_rows）。若該筆只留在 row shard，就會被誤判遺失/隱藏。
+# 原則：
+#   - 保留 V225 正確讀寫、V230/V231 速度、V232 併發保護、V236 02穩定來源。
+#   - 不改 UI/CSS/theme/table/buttons。
+#   - 只把 row shard 納入同源顯示與 01/02 修復來源；刪除仍尊重精準 tombstone。
+try:
+    _v237_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v237_prev_load_records = None
+try:
+    _v237_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v237_prev_today_records = None
+try:
+    _v237_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v237_prev_start_work = None
+try:
+    _v237_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v237_prev_finish_work = None
+try:
+    _v237_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v237_prev_save_time_records = None
+try:
+    _v237_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v237_prev_delete_time_records = None
+
+import time as _v237_time
+
+_V237_VERSION = "V237_ROW_SHARD_HISTORY_RECOVERY"
+_V237_SHARD_MEMORY: dict = {"rows": None, "epoch": 0.0}
+_V237_HISTORY_MEMORY: dict = {"rows": None, "epoch": 0.0}
+_V237_SHARD_TTL_SECONDS = 30.0
+_V237_HISTORY_TTL_SECONDS = 45.0
+
+
+def _v237_invalidate_cache(reason: str = "") -> None:
+    try:
+        _V237_SHARD_MEMORY["rows"] = None
+        _V237_SHARD_MEMORY["epoch"] = 0.0
+        _V237_HISTORY_MEMORY["rows"] = None
+        _V237_HISTORY_MEMORY["epoch"] = 0.0
+    except Exception:
+        pass
+    try:
+        if "_v236_invalidate_history_cache" in globals() and callable(_v236_invalidate_history_cache):  # type: ignore[name-defined]
+            _v236_invalidate_history_cache("v237_" + str(reason))  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def _v237_is_time_row_dict(payload) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    keys = set(payload.keys())
+    return bool(
+        {"id", "record_key", "employee_id", "start_timestamp"} & keys
+        and ("employee_id" in keys or "record_key" in keys or "start_timestamp" in keys)
+    )
+
+
+def _v237_payload_rows(payload) -> list[dict]:
+    rows: list[dict] = []
+    try:
+        if _v237_is_time_row_dict(payload):
+            rows.append(dict(payload))
+        if "_v235_payload_rows" in globals() and callable(_v235_payload_rows):  # type: ignore[name-defined]
+            rows.extend(_v235_payload_rows(payload))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if "_v235_dedupe_rows" in globals() and callable(_v235_dedupe_rows):  # type: ignore[name-defined]
+            return _v235_dedupe_rows(rows)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return rows
+
+
+def _v237_safe_read_json(path):
+    try:
+        if "_v235_safe_read_json" in globals() and callable(_v235_safe_read_json):  # type: ignore[name-defined]
+            return _v235_safe_read_json(path, None)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if path.exists():
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            if text.strip():
+                return _v235_json.loads(text)  # type: ignore[name-defined]
+    except Exception:
+        return None
+    return None
+
+
+def _v237_row_shard_dirs() -> list:
+    try:
+        root = _V235_PROJECT_ROOT  # type: ignore[name-defined]
+    except Exception:
+        root = _v235_Path(__file__).resolve().parents[1]  # type: ignore[name-defined]
+    return [
+        root / "data" / "permanent_store" / "modules" / "01_time_records" / "time_record_rows",
+        root / "data" / "permanent_store" / "modules" / "02_history" / "time_record_rows",
+        root / "data" / "permanent_store" / "modules" / "time_records" / "time_record_rows",
+        root / "data" / "persistent_state" / "time_record_rows",
+    ]
+
+
+def _v237_recent_row_shard_files(limit: int = 8000) -> list:
+    files = []
+    for base in _v237_row_shard_dirs():
+        try:
+            if base.exists():
+                files.extend([p for p in base.rglob("*.json") if p.is_file()])
+        except Exception:
+            pass
+    try:
+        files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    except Exception:
+        try:
+            files.sort(reverse=True)
+        except Exception:
+            pass
+    return files[: int(limit)]
+
+
+def _v237_read_row_shard_rows(reason: str = "v237_shard_read") -> list[dict]:
+    now = _v237_time.time()
+    try:
+        cached = _V237_SHARD_MEMORY.get("rows")
+        epoch = float(_V237_SHARD_MEMORY.get("epoch") or 0.0)
+        if isinstance(cached, list) and (now - epoch) <= _V237_SHARD_TTL_SECONDS:
+            return [dict(r) for r in cached if isinstance(r, dict)]
+    except Exception:
+        pass
+
+    rows: list[dict] = []
+    for p in _v237_recent_row_shard_files():
+        try:
+            payload = _v237_safe_read_json(p)
+            rows.extend(_v237_payload_rows(payload))
+        except Exception:
+            pass
+
+    try:
+        if "_v235_dedupe_rows" in globals() and callable(_v235_dedupe_rows):  # type: ignore[name-defined]
+            rows = _v235_dedupe_rows(rows)  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+    try:
+        _V237_SHARD_MEMORY["rows"] = [dict(r) for r in rows if isinstance(r, dict)]
+        _V237_SHARD_MEMORY["epoch"] = now
+    except Exception:
+        pass
+    return rows
+
+
+def _v237_collect_rows(*, include_events: bool = False, include_shards: bool = True, reason: str = "v237_collect") -> list[dict]:
+    rows: list[dict] = []
+    try:
+        if "_v235_collect_rows" in globals() and callable(_v235_collect_rows):  # type: ignore[name-defined]
+            rows.extend(_v235_collect_rows(include_events=include_events, reason=reason + "_base"))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if include_shards:
+        try:
+            rows.extend(_v237_read_row_shard_rows(reason=reason + "_shards"))
+        except Exception:
+            pass
+    try:
+        if "_v235_dedupe_rows" in globals() and callable(_v235_dedupe_rows):  # type: ignore[name-defined]
+            rows = _v235_dedupe_rows(rows)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return rows
+
+
+def _v237_get_stable_history_rows(reason: str = "v237_history") -> list[dict]:
+    now = _v237_time.time()
+    try:
+        cached = _V237_HISTORY_MEMORY.get("rows")
+        epoch = float(_V237_HISTORY_MEMORY.get("epoch") or 0.0)
+        if isinstance(cached, list) and cached and (now - epoch) <= _V237_HISTORY_TTL_SECONDS:
+            return [dict(r) for r in cached if isinstance(r, dict)]
+    except Exception:
+        pass
+
+    rows = _v237_collect_rows(include_events=True, include_shards=True, reason=reason)
+    try:
+        if rows and "_v235_write_authority_rows_if_needed" in globals() and callable(_v235_write_authority_rows_if_needed):  # type: ignore[name-defined]
+            _v235_write_authority_rows_if_needed(rows, reason=reason + "_0102_repair")  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        _V237_HISTORY_MEMORY["rows"] = [dict(r) for r in rows if isinstance(r, dict)]
+        _V237_HISTORY_MEMORY["epoch"] = now
+    except Exception:
+        pass
+    return rows
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V237: stable full source for 02/history, including row shards.
+
+    Today-only queries still avoid event replay, but include row shards so rows saved by V151/V152/V176 are not hidden.
+    """
+    try:
+        if "_v236_is_today_only_range" in globals() and _v236_is_today_only_range(start_date, end_date):  # type: ignore[name-defined]
+            rows_today = _v237_collect_rows(include_events=False, include_shards=True, reason="v237_today_fast_with_shards")
+            df_today = _v235_filter_df(_v235_rows_to_df(rows_today), start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[name-defined]
+            if isinstance(df_today, pd.DataFrame) and not df_today.empty:  # type: ignore[name-defined]
+                return df_today.reset_index(drop=True)
+    except Exception:
+        pass
+
+    rows = _v237_get_stable_history_rows("v237_load_records_stable")
+    try:
+        df = _v235_rows_to_df(rows)  # type: ignore[name-defined]
+        return _v235_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[name-defined]
+    except Exception:
+        if callable(_v237_prev_load_records):
+            try:
+                return _v237_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[misc]
+            except Exception:
+                pass
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """V237: 01 Today Records stays fast, but includes row shards to prevent hidden today's starts."""
+    today = _v236_today() if "_v236_today" in globals() else _v235_today()  # type: ignore[name-defined]
+    try:
+        rows_fast = _v237_collect_rows(include_events=False, include_shards=True, reason="v237_today_records_fast_with_shards")
+        df = _v235_filter_df(_v235_rows_to_df(rows_fast), start_date=today, end_date=today)  # type: ignore[name-defined]
+        if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+            df = load_records(today, today, None, None)
+        if unfinished_only or not include_finished:
+            df = _v235_filter_df(df, active_only=True)  # type: ignore[name-defined]
+        return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) and not df.empty else pd.DataFrame()  # type: ignore[name-defined]
+    except Exception:
+        if callable(_v237_prev_today_records):
+            try:
+                return _v237_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)  # type: ignore[misc]
+            except Exception:
+                pass
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v237_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    rid = int(_v237_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        _v237_invalidate_cache("start_work")
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v237_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    n = int(_v237_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n:
+        _v237_invalidate_cache("finish_work")
+    return n
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    if not callable(_v237_prev_save_time_records):
+        raise RuntimeError("save_time_records base function is unavailable")
+    n = int(_v237_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    if n:
+        _v237_invalidate_cache("save_time_records")
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    if not callable(_v237_prev_delete_time_records):
+        raise RuntimeError("delete_time_records base function is unavailable")
+    n = int(_v237_prev_delete_time_records(record_ids, reason=reason) or 0)
+    if n:
+        _v237_invalidate_cache("delete_time_records")
+    return n
+
+
+def audit_v237_row_shard_history_recovery() -> dict:
+    try:
+        today = _v236_today() if "_v236_today" in globals() else _v235_today()  # type: ignore[name-defined]
+        base_rows = _v235_collect_rows(include_events=True, reason="v237_audit_base") if "_v235_collect_rows" in globals() else []  # type: ignore[name-defined]
+        shard_rows = _v237_read_row_shard_rows("v237_audit_shards")
+        merged_rows = _v237_collect_rows(include_events=True, include_shards=True, reason="v237_audit_merged")
+        today_df = today_records()
+        hist_df = load_records("2026-04-30", today, None, None)
+        base_keys = set()
+        for r in base_rows:
+            try:
+                base_keys.add(_v235_row_key(r))  # type: ignore[name-defined]
+            except Exception:
+                pass
+        shard_only = []
+        for r in shard_rows:
+            try:
+                if _v235_row_key(r) not in base_keys:  # type: ignore[name-defined]
+                    shard_only.append(r)
+            except Exception:
+                pass
+        return {
+            "version": _V237_VERSION,
+            "ok": True,
+            "ui_changed": False,
+            "base_rows_without_row_shards": len(base_rows),
+            "row_shard_rows": len(shard_rows),
+            "row_shard_only_rows": len(shard_only),
+            "merged_recoverable_rows": len(merged_rows),
+            "today_rows": int(len(today_df)) if isinstance(today_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+            "history_rows_since_2026_04_30": int(len(hist_df)) if isinstance(hist_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+            "rule": "02 history and 01 Today Records now include V151/V152/V176 row shards as recoverable source. Tombstones still block deleted rows. No UI/CSS/theme change.",
+        }
+    except Exception as exc:
+        return {"version": _V237_VERSION, "ok": False, "error": str(exc)[:500]}
+
+# ================= END V237 ROW SHARD HISTORY RECOVERY =================
+
+# ================= V238 02 HISTORY DEEP FIELD REPAIR｜2026-05-30 =================
+# 目標：修正 02.歷史紀錄中 LOG/recovery row 帶出的空白欄位。
+# 規則：不改 UI/CSS/theme/table/buttons；保留 V225 正確寫入、V230/V231 速度、V232 併發保護、V236/V237 穩定歷史來源。
+# 修正重點：
+# 1) 02 歷史紀錄輸出前，使用 03.製令管理主檔補 part_no/type_name/assembly_location。
+# 2) 使用 04.人員名單主檔補 department/title/employee_name。
+# 3) 同一製令/同一工號在歷史中已有完整資料時，使用一致值補空白。
+# 4) 對 NA / V 字頭等非正式製令，補上清楚標記，避免畫面大量空白。
+# 5) 僅補空白欄位，不覆蓋原本非空值；資料不足時標記「待補主檔」，不假裝為正確主檔資料。
+try:
+    _v238_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v238_prev_load_records = None
+try:
+    _v238_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v238_prev_today_records = None
+try:
+    _v238_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v238_prev_get_active_records = None
+try:
+    _v238_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v238_prev_get_active_record = None
+try:
+    _v238_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v238_prev_start_work = None
+try:
+    _v238_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v238_prev_finish_work = None
+try:
+    _v238_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v238_prev_save_time_records = None
+try:
+    _v238_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v238_prev_delete_time_records = None
+
+import json as _v238_json
+import re as _v238_re
+import time as _v238_time
+from collections import Counter as _v238_Counter
+from pathlib import Path as _v238_Path
+from datetime import datetime as _v238_datetime
+
+_V238_VERSION = "V238_02_HISTORY_DEEP_FIELD_REPAIR"
+try:
+    _V238_PROJECT_ROOT = _v238_Path(__file__).resolve().parents[1]
+except Exception:  # pragma: no cover
+    _V238_PROJECT_ROOT = _v238_Path(".").resolve()
+_V238_MASTER_CACHE: dict = {"epoch": 0.0, "work_orders": {}, "employees": {}, "ttl": 30.0}
+_V238_WRITE_BACK_SIG: dict = {"sig": "", "epoch": 0.0}
+
+
+def _v238_text(v) -> str:
+    try:
+        if "_v235_text" in globals() and callable(_v235_text):  # type: ignore[name-defined]
+            return _v235_text(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if v is None:
+        return ""
+    try:
+        if pd.isna(v):  # type: ignore[name-defined]
+            return ""
+    except Exception:
+        pass
+    s = str(v).strip()
+    return "" if s.lower() in ("none", "nan", "nat", "null", "<na>") else s
+
+
+def _v238_now() -> str:
+    try:
+        if "now_text" in globals() and callable(now_text):  # type: ignore[name-defined]
+            return now_text()  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return _v238_datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v238_safe_read_json(path: _v238_Path, default=None):
+    if default is None:
+        default = {}
+    try:
+        if path.exists():
+            txt = path.read_text(encoding="utf-8")
+            if txt.strip():
+                return _v238_json.loads(txt)
+    except Exception:
+        return default
+    return default
+
+
+def _v238_extract_rows(payload, depth: int = 0) -> list[dict]:
+    try:
+        if "_v235_extract_rows" in globals() and callable(_v235_extract_rows):  # type: ignore[name-defined]
+            out = _v235_extract_rows(payload)  # type: ignore[name-defined]
+            if isinstance(out, list) and out:
+                return [dict(x) for x in out if isinstance(x, dict)]
+    except Exception:
+        pass
+    if depth > 5:
+        return []
+    rows: list[dict] = []
+    if isinstance(payload, list):
+        return [dict(x) for x in payload if isinstance(x, dict)]
+    if not isinstance(payload, dict):
+        return rows
+    tables = payload.get("tables")
+    if isinstance(tables, dict):
+        for val in tables.values():
+            rows.extend(_v238_extract_rows(val, depth + 1))
+    for key in ("records", "rows", "data", "items", "best_rows", "authority_01_time_records", "authority_02_history"):
+        val = payload.get(key)
+        if isinstance(val, list):
+            rows.extend([dict(x) for x in val if isinstance(x, dict)])
+        elif isinstance(val, dict):
+            rows.extend(_v238_extract_rows(val, depth + 1))
+    if isinstance(payload.get("row"), dict):
+        rows.append(dict(payload["row"]))
+    return rows
+
+
+def _v238_module_rows(module_key: str) -> list[dict]:
+    p = _V238_PROJECT_ROOT / "data" / "permanent_store" / "modules" / module_key / "records.json"
+    return _v238_extract_rows(_v238_safe_read_json(p, {}))
+
+
+def _v238_norm_work_order_key(v) -> str:
+    s = _v238_text(v).upper().replace(" ", "")
+    if not s:
+        return ""
+    # 容錯：25M00541-02 這類多打一個 0 的製令，可比對到 25M0541-02 主檔，但不直接改原製令欄位。
+    m = _v238_re.match(r"^(\d{2}[A-Z])(\d+)(-.+)$", s)
+    if m and len(m.group(2)) > 4:
+        s = m.group(1) + m.group(2)[-4:] + m.group(3)
+    return s
+
+
+def _v238_norm_emp_key(v) -> str:
+    return _v238_text(v).upper().replace(" ", "")
+
+
+def _v238_load_master_indexes() -> tuple[dict, dict]:
+    now = _v238_time.time()
+    try:
+        if (now - float(_V238_MASTER_CACHE.get("epoch") or 0.0)) <= float(_V238_MASTER_CACHE.get("ttl") or 30.0):
+            wo = _V238_MASTER_CACHE.get("work_orders") or {}
+            emp = _V238_MASTER_CACHE.get("employees") or {}
+            if isinstance(wo, dict) and isinstance(emp, dict) and (wo or emp):
+                return wo, emp
+    except Exception:
+        pass
+
+    work_orders = {}
+    for r in _v238_module_rows("03_work_orders"):
+        if not isinstance(r, dict):
+            continue
+        wo = _v238_text(r.get("work_order") or r.get("製令") or r.get("製令單號"))
+        if not wo:
+            continue
+        keys = {wo.strip().upper(), _v238_norm_work_order_key(wo)}
+        for k in keys:
+            if k and k not in work_orders:
+                work_orders[k] = dict(r)
+
+    employees = {}
+    for r in _v238_module_rows("04_employees"):
+        if not isinstance(r, dict):
+            continue
+        emp_id = _v238_text(r.get("employee_id") or r.get("工號"))
+        if not emp_id:
+            continue
+        employees[_v238_norm_emp_key(emp_id)] = dict(r)
+
+    try:
+        _V238_MASTER_CACHE["work_orders"] = work_orders
+        _V238_MASTER_CACHE["employees"] = employees
+        _V238_MASTER_CACHE["epoch"] = now
+    except Exception:
+        pass
+    return work_orders, employees
+
+
+def _v238_build_consensus(rows: list[dict]) -> tuple[dict, dict]:
+    wo_values: dict[str, dict[str, _v238_Counter]] = {}
+    emp_values: dict[str, dict[str, _v238_Counter]] = {}
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        wo_key = _v238_norm_work_order_key(r.get("work_order"))
+        if wo_key:
+            d = wo_values.setdefault(wo_key, {"part_no": _v238_Counter(), "type_name": _v238_Counter(), "assembly_location": _v238_Counter()})
+            for f in ("part_no", "type_name", "assembly_location"):
+                v = _v238_text(r.get(f))
+                if v:
+                    d[f][v] += 1
+        emp_key = _v238_norm_emp_key(r.get("employee_id"))
+        if emp_key:
+            d2 = emp_values.setdefault(emp_key, {"employee_name": _v238_Counter(), "department": _v238_Counter(), "title": _v238_Counter()})
+            for f in ("employee_name", "department", "title"):
+                v = _v238_text(r.get(f) or r.get(f + "_emp"))
+                if v:
+                    d2[f][v] += 1
+    return wo_values, emp_values
+
+
+def _v238_counter_best(counter) -> str:
+    try:
+        if counter:
+            return counter.most_common(1)[0][0]
+    except Exception:
+        pass
+    return ""
+
+
+def _v238_master_value(row: dict, fields: tuple[str, ...]) -> str:
+    for f in fields:
+        v = _v238_text(row.get(f)) if isinstance(row, dict) else ""
+        if v:
+            return v
+    return ""
+
+
+def _v238_is_non_production_work_order(wo: str) -> bool:
+    s = _v238_text(wo).upper().replace(" ", "")
+    return (not s) or s in {"NA", "N/A", "NONE", "NULL", "無", "非製令"} or s.startswith("V")
+
+
+def _v238_enrich_rows(rows: list[dict], *, reason: str = "v238_enrich") -> tuple[list[dict], int]:
+    if not rows:
+        return [], 0
+    work_orders, employees = _v238_load_master_indexes()
+    wo_consensus, emp_consensus = _v238_build_consensus(rows)
+    enriched: list[dict] = []
+    changed = 0
+
+    for src in rows:
+        if not isinstance(src, dict):
+            continue
+        r = dict(src)
+        before = dict(r)
+        notes: list[str] = []
+
+        wo_text = _v238_text(r.get("work_order"))
+        wo_key = _v238_norm_work_order_key(wo_text)
+        wo_master = work_orders.get(wo_key) or work_orders.get(_v238_text(wo_text).upper()) or {}
+        wo_c = wo_consensus.get(wo_key, {})
+
+        # 製令主檔補值：只補空白，不覆蓋已存在資料。
+        for field, master_fields in {
+            "part_no": ("part_no", "料號", "pn", "P/N"),
+            "type_name": ("type_name", "機型", "model", "type"),
+            "assembly_location": ("assembly_location", "組立地點", "location"),
+        }.items():
+            if not _v238_text(r.get(field)):
+                val = _v238_master_value(wo_master, master_fields)
+                if not val and wo_c:
+                    val = _v238_counter_best(wo_c.get(field))
+                if val:
+                    r[field] = val
+                    notes.append(f"{field}=master/consensus")
+
+        # 非製令作業避免畫面大量空白；保留辨識，不偽裝為正式料號。
+        if _v238_is_non_production_work_order(wo_text):
+            if not _v238_text(r.get("part_no")):
+                r["part_no"] = "NA"
+                notes.append("part_no=non_production")
+            if not _v238_text(r.get("type_name")):
+                r["type_name"] = "非製令作業"
+                notes.append("type_name=non_production")
+            if not _v238_text(r.get("assembly_location")):
+                r["assembly_location"] = "竹東"
+                notes.append("assembly_location=default")
+
+        # 正式製令但主檔仍缺資料時，用「待補主檔」明確標記，而不是留白。
+        if wo_text and not _v238_is_non_production_work_order(wo_text):
+            if not _v238_text(r.get("part_no")):
+                r["part_no"] = "待補主檔"
+                notes.append("part_no=missing_master")
+            if not _v238_text(r.get("type_name")):
+                r["type_name"] = "待補主檔"
+                notes.append("type_name=missing_master")
+            if not _v238_text(r.get("assembly_location")):
+                r["assembly_location"] = "待補主檔"
+                notes.append("assembly_location=missing_master")
+
+        # 人員主檔補值。
+        emp_key = _v238_norm_emp_key(r.get("employee_id"))
+        emp_master = employees.get(emp_key) or {}
+        emp_c = emp_consensus.get(emp_key, {})
+        for field, master_fields in {
+            "employee_name": ("employee_name", "姓名", "name"),
+            "department": ("department", "department_emp", "單位", "部門"),
+            "title": ("title", "title_emp", "職稱"),
+        }.items():
+            if not _v238_text(r.get(field)):
+                val = _v238_master_value(emp_master, master_fields)
+                if not val and emp_c:
+                    val = _v238_counter_best(emp_c.get(field))
+                if val:
+                    r[field] = val
+                    notes.append(f"{field}=employee_master/consensus")
+
+        # 若只有 department_emp/title_emp，補到正式欄位。
+        if not _v238_text(r.get("department")) and _v238_text(r.get("department_emp")):
+            r["department"] = _v238_text(r.get("department_emp"))
+            notes.append("department=department_emp")
+        if not _v238_text(r.get("title")) and _v238_text(r.get("title_emp")):
+            r["title"] = _v238_text(r.get("title_emp"))
+            notes.append("title=title_emp")
+
+        # admin / 主檔沒有的人員不要留白，標記待補。
+        if _v238_text(r.get("employee_id")) and not _v238_text(r.get("department")):
+            r["department"] = "待補人員主檔"
+            notes.append("department=missing_employee_master")
+        if _v238_text(r.get("employee_id")) and not _v238_text(r.get("title")):
+            r["title"] = "待補人員主檔"
+            notes.append("title=missing_employee_master")
+
+        # 日期/時間基本欄位補值。
+        if not _v238_text(r.get("start_date")) and _v238_text(r.get("start_timestamp")):
+            r["start_date"] = _v238_text(r.get("start_timestamp"))[:10]
+            notes.append("start_date=start_timestamp")
+        if not _v238_text(r.get("start_time")) and _v238_text(r.get("start_timestamp")) and len(_v238_text(r.get("start_timestamp"))) >= 16:
+            r["start_time"] = _v238_text(r.get("start_timestamp"))[11:19]
+            notes.append("start_time=start_timestamp")
+        if _v238_text(r.get("end_timestamp")):
+            if not _v238_text(r.get("end_date")):
+                r["end_date"] = _v238_text(r.get("end_timestamp"))[:10]
+                notes.append("end_date=end_timestamp")
+            if not _v238_text(r.get("end_time")) and len(_v238_text(r.get("end_timestamp"))) >= 16:
+                r["end_time"] = _v238_text(r.get("end_timestamp"))[11:19]
+                notes.append("end_time=end_timestamp")
+
+        if notes:
+            old_note = _v238_text(r.get("recovery_note"))
+            add_note = "V238補值:" + ",".join(notes[:8])
+            r["recovery_note"] = (old_note + "；" + add_note) if old_note and add_note not in old_note else (old_note or add_note)
+            if not _v238_text(r.get("recovery_status")):
+                r["recovery_status"] = "V238_ENRICHED"
+            r["v238_enriched_at"] = _v238_now()
+            r["v232_last_op"] = _V238_VERSION
+
+        # 檢查是否真的有變更。
+        try:
+            if any(_v238_text(r.get(k)) != _v238_text(before.get(k)) for k in set(r.keys()) | set(before.keys())):
+                changed += 1
+        except Exception:
+            pass
+        enriched.append(r)
+
+    return enriched, changed
+
+
+def _v238_rows_to_df(rows: list[dict]) -> pd.DataFrame:  # type: ignore[name-defined]
+    try:
+        if "_v235_rows_to_df" in globals() and callable(_v235_rows_to_df):  # type: ignore[name-defined]
+            return _v235_rows_to_df(rows)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return pd.DataFrame(rows or [])  # type: ignore[name-defined]
+
+
+def _v238_enrich_df(df: pd.DataFrame, *, reason: str = "v238_enrich_df", write_back: bool = False) -> pd.DataFrame:  # type: ignore[name-defined]
+    try:
+        if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+            return df
+        original_cols = list(df.columns)
+        rows = df.to_dict("records")
+        enriched, changed = _v238_enrich_rows(rows, reason=reason)
+        out = _v238_rows_to_df(enriched)
+        if original_cols:
+            # 保留原欄位順序，新增修復欄位放後面，避免 02 頁面欄序跳動。
+            extras = [c for c in out.columns if c not in original_cols]
+            out = out[[c for c in original_cols if c in out.columns] + extras]
+        if changed and write_back:
+            _v238_maybe_write_back(out.to_dict("records"), reason=reason)
+        return out.reset_index(drop=True)
+    except Exception as exc:
+        try:
+            write_log("V238_ENRICH_WARN", f"V238 歷史補值失敗：{exc}", "02 歷史紀錄", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+        return df
+
+
+def _v238_missing_signature(rows: list[dict]) -> str:
+    total = len(rows or [])
+    fields = ("part_no", "type_name", "assembly_location", "department", "title", "employee_name", "start_date", "start_time")
+    counts = []
+    for f in fields:
+        counts.append(str(sum(1 for r in rows or [] if not _v238_text((r or {}).get(f)))))
+    try:
+        ids = sorted([int(float(_v238_text((r or {}).get("id")))) for r in rows or [] if _v238_text((r or {}).get("id"))])
+        span = f"{ids[0]}-{ids[-1]}" if ids else "noids"
+    except Exception:
+        span = "nosort"
+    return f"{total}|{span}|" + "|".join(counts)
+
+
+def _v238_maybe_write_back(rows: list[dict], *, reason: str = "v238_write_back") -> None:
+    if not rows:
+        return
+    try:
+        sig = _v238_missing_signature(rows)
+        now = _v238_time.time()
+        if _V238_WRITE_BACK_SIG.get("sig") == sig and (now - float(_V238_WRITE_BACK_SIG.get("epoch") or 0.0)) < 60.0:
+            return
+        _V238_WRITE_BACK_SIG["sig"] = sig
+        _V238_WRITE_BACK_SIG["epoch"] = now
+        if "_v235_write_authority_rows_if_needed" in globals() and callable(_v235_write_authority_rows_if_needed):  # type: ignore[name-defined]
+            _v235_write_authority_rows_if_needed(rows, reason=reason + "_0102_field_repair")  # type: ignore[name-defined]
+    except Exception as exc:
+        try:
+            write_log("V238_WRITE_BACK_WARN", f"V238 補值回寫 01/02 權威檔失敗：{exc}", "02 歷史紀錄", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+
+
+def _v238_invalidate_cache(reason: str = "v238_invalidate") -> None:
+    try:
+        _V238_MASTER_CACHE["epoch"] = 0.0
+    except Exception:
+        pass
+    try:
+        if "_v237_invalidate_cache" in globals() and callable(_v237_invalidate_cache):  # type: ignore[name-defined]
+            _v237_invalidate_cache(reason)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if "_v236_invalidate_history_cache" in globals() and callable(_v236_invalidate_history_cache):  # type: ignore[name-defined]
+            _v236_invalidate_history_cache(reason)  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V238: 02 歷史紀錄深層補值，避免 LOG/recovery row 顯示大量空白。"""
+    if not callable(_v238_prev_load_records):
+        return pd.DataFrame()  # type: ignore[name-defined]
+    df = _v238_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[misc]
+    # 02 / 跨日 / 歷史查詢回寫補值；今日單日則只補顯示，避免前台操作增加不必要負擔。
+    write_back = True
+    try:
+        if "_v236_is_today_only_range" in globals() and _v236_is_today_only_range(start_date, end_date):  # type: ignore[name-defined]
+            write_back = False
+    except Exception:
+        pass
+    return _v238_enrich_df(df, reason="v238_load_records", write_back=write_back)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    if not callable(_v238_prev_today_records):
+        return pd.DataFrame()  # type: ignore[name-defined]
+    df = _v238_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)  # type: ignore[misc]
+    return _v238_enrich_df(df, reason="v238_today_records", write_back=False)
+
+
+def get_active_records(employee_id: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    # 仍沿用 V237/V231 快速 active 查詢，但輸出補值，避免 Finish Work 明細空白。
+    try:
+        if callable(_v238_prev_get_active_records):
+            df = _v238_prev_get_active_records(employee_id=employee_id, employee_name=employee_name)  # type: ignore[misc]
+        else:
+            df = today_records(include_finished=False, unfinished_only=True)
+        return _v238_enrich_df(df, reason="v238_active_records", write_back=False)
+    except Exception:
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    try:
+        if callable(_v238_prev_get_active_record):
+            rec = _v238_prev_get_active_record(employee_id, employee_name=employee_name)  # type: ignore[misc]
+            if isinstance(rec, dict) and rec:
+                rows, _ = _v238_enrich_rows([rec], reason="v238_active_record")
+                return rows[0] if rows else rec
+        df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+        if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+            return df.iloc[0].to_dict()
+    except Exception:
+        pass
+    return None
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v238_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    rid = int(_v238_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)  # type: ignore[misc]
+    if rid:
+        _v238_invalidate_cache("start_work")
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v238_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    n = int(_v238_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)  # type: ignore[misc]
+    if n:
+        _v238_invalidate_cache("finish_work")
+    return n
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    if not callable(_v238_prev_save_time_records):
+        raise RuntimeError("save_time_records base function is unavailable")
+    # 存檔前先補值，避免管理員維護區把空白欄位重新寫回 01/02。
+    fixed_df = _v238_enrich_df(df, reason="v238_save_time_records_pre_enrich", write_back=False)
+    n = int(_v238_prev_save_time_records(fixed_df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)  # type: ignore[misc]
+    if n:
+        _v238_invalidate_cache("save_time_records")
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    if not callable(_v238_prev_delete_time_records):
+        raise RuntimeError("delete_time_records base function is unavailable")
+    n = int(_v238_prev_delete_time_records(record_ids, reason=reason) or 0)  # type: ignore[misc]
+    if n:
+        _v238_invalidate_cache("delete_time_records")
+    return n
+
+
+def audit_v238_02_history_field_integrity(start_date: str = "2026-04-30", end_date: str | None = None) -> dict:
+    try:
+        if not end_date:
+            try:
+                end_date = _v236_today()  # type: ignore[name-defined]
+            except Exception:
+                end_date = _v238_datetime.now().strftime("%Y-%m-%d")
+        base_df = _v238_prev_load_records(start_date=start_date, end_date=end_date, employee_id=None, work_order=None) if callable(_v238_prev_load_records) else pd.DataFrame()  # type: ignore[name-defined]
+        fixed_df = load_records(start_date, end_date, None, None)
+        fields = ["part_no", "type_name", "assembly_location", "department", "title", "employee_name", "start_date", "start_time"]
+        def blanks(df, f):
+            try:
+                return int((df[f].fillna("").astype(str).str.strip() == "").sum()) if f in df.columns else -1
+            except Exception:
+                return -1
+        return {
+            "version": _V238_VERSION,
+            "ok": True,
+            "ui_changed": False,
+            "start_date": start_date,
+            "end_date": end_date,
+            "base_rows": int(len(base_df)) if isinstance(base_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+            "fixed_rows": int(len(fixed_df)) if isinstance(fixed_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+            "blank_before": {f: blanks(base_df, f) for f in fields},
+            "blank_after": {f: blanks(fixed_df, f) for f in fields},
+            "rule": "02 history rows are enriched from 03 work order master, 04 employee master, and same-source consensus. Only blank fields are filled; existing non-empty values are not overwritten.",
+        }
+    except Exception as exc:
+        return {"version": _V238_VERSION, "ok": False, "error": str(exc)[:800]}
+
+# ================= END V238 02 HISTORY DEEP FIELD REPAIR =================
