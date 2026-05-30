@@ -25218,3 +25218,372 @@ def audit_v240_admin_delete_policy() -> dict:
     }
 
 # ================= END V240 ADMIN-ONLY DELETE POLICY =================
+
+# ================= V241 FOREGROUND FAST LANE RESTORE｜2026-05-30 =================
+# Purpose:
+#   V239/V240 correctly added lossless/audit/delete policy, but some heavy recovery work
+#   (lossless ledger scan, system log scan, enrichment, row shard replay) was still executed
+#   in foreground paths such as Today Records / Finish Work / Start Work.
+#   V241 keeps V225/V230/V231 correctness and V239/V240 audit guarantees, but restores
+#   the 01 foreground fast lane:
+#     - today_records()/get_active_records() use display-cache fast source first.
+#     - start_work()/finish_work() call the already-correct V238 base transaction and then
+#       write a minimal append-only lossless event without replaying all sources.
+#     - load_records() for history keeps the stable source but is TTL-memoized.
+#   No UI/CSS/theme/page changes.
+try:
+    _v241_prev_load_records = load_records
+except Exception:
+    _v241_prev_load_records = None
+try:
+    _v241_prev_today_records = today_records
+except Exception:
+    _v241_prev_today_records = None
+try:
+    _v241_prev_get_active_records = get_active_records
+except Exception:
+    _v241_prev_get_active_records = None
+try:
+    _v241_prev_get_active_record = get_active_record
+except Exception:
+    _v241_prev_get_active_record = None
+try:
+    _v241_prev_start_work = start_work
+except Exception:
+    _v241_prev_start_work = None
+try:
+    _v241_prev_finish_work = finish_work
+except Exception:
+    _v241_prev_finish_work = None
+
+_V241_VERSION = "V241_FOREGROUND_FAST_LANE_RESTORE"
+_V241_HISTORY_CACHE = {"key": None, "epoch": 0.0, "df": None}
+_V241_HISTORY_TTL_SECONDS = 45.0
+_V241_TODAY_TTL_SECONDS = 12.0
+_V241_TODAY_CACHE = {"epoch": 0.0, "include_finished": None, "unfinished_only": None, "df": None}
+
+
+def _v241_time_now() -> float:
+    try:
+        return float(_v239_time.time())  # type: ignore[name-defined]
+    except Exception:
+        try:
+            import time as _time
+            return float(_time.time())
+        except Exception:
+            return 0.0
+
+
+def _v241_text(v) -> str:
+    try:
+        return _v239_text(v)  # type: ignore[name-defined]
+    except Exception:
+        return "" if v is None else str(v).strip()
+
+
+def _v241_today() -> str:
+    try:
+        return _v239_today()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            from datetime import datetime
+            return datetime.now().strftime("%Y-%m-%d")
+        except Exception:
+            return ""
+
+
+def _v241_is_today_query(start_date=None, end_date=None, employee_id=None, work_order=None) -> bool:
+    today = _v241_today()
+    return (
+        _v241_text(start_date)[:10] == today
+        and _v241_text(end_date)[:10] == today
+        and not _v241_text(employee_id)
+        and not _v241_text(work_order)
+    )
+
+
+def _v241_fast_display_rows(reason: str = "v241_fast") -> list[dict]:
+    rows: list[dict] = []
+    try:
+        if "_v231_get_display_rows" in globals() and callable(_v231_get_display_rows):  # type: ignore[name-defined]
+            rows.extend([dict(r) for r in _v231_get_display_rows(reason) if isinstance(r, dict)])  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if not rows:
+        try:
+            if "_v230_get_display_rows" in globals() and callable(_v230_get_display_rows):  # type: ignore[name-defined]
+                rows.extend([dict(r) for r in _v230_get_display_rows(reason) if isinstance(r, dict)])  # type: ignore[name-defined]
+        except Exception:
+            pass
+    # Do not scan lossless/system logs here; this is the 01 foreground fast path.
+    try:
+        rows = _v239_filter_visible_rows(_v239_filter_deleted(_v239_dedupe_rows(rows)))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return rows
+
+
+def _v241_rows_to_df(rows: list[dict]):
+    try:
+        if not rows:
+            return pd.DataFrame()  # type: ignore[name-defined]
+        return pd.DataFrame(rows).copy().where(pd.notna(pd.DataFrame(rows)), "").reset_index(drop=True)  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return pd.DataFrame(rows or [])  # type: ignore[name-defined]
+        except Exception:
+            return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v241_basic_filter(df, *, start_date=None, end_date=None, employee_id=None, work_order=None, process_name=None, employee_name=None, active_only: bool = False):
+    try:
+        if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+            return pd.DataFrame()  # type: ignore[name-defined]
+        out = df.copy()
+        if start_date or end_date:
+            if "start_date" in out.columns:
+                ds = out["start_date"].map(lambda x: _v241_text(x)[:10])
+            elif "start_timestamp" in out.columns:
+                ds = out["start_timestamp"].map(lambda x: _v241_text(x)[:10])
+            else:
+                ds = pd.Series([""] * len(out), index=out.index)  # type: ignore[name-defined]
+            if start_date:
+                out = out.loc[ds >= _v241_text(start_date)[:10]].copy()
+                ds = ds.loc[out.index] if len(out) else ds
+            if end_date and len(out):
+                if "start_date" in out.columns:
+                    ds2 = out["start_date"].map(lambda x: _v241_text(x)[:10])
+                elif "start_timestamp" in out.columns:
+                    ds2 = out["start_timestamp"].map(lambda x: _v241_text(x)[:10])
+                else:
+                    ds2 = pd.Series([""] * len(out), index=out.index)  # type: ignore[name-defined]
+                out = out.loc[ds2 <= _v241_text(end_date)[:10]].copy()
+        if employee_id and "employee_id" in out.columns:
+            out = out.loc[out["employee_id"].map(_v241_text) == _v241_text(employee_id)].copy()
+        elif employee_name and "employee_name" in out.columns:
+            out = out.loc[out["employee_name"].map(_v241_text) == _v241_text(employee_name)].copy()
+        if work_order and "work_order" in out.columns:
+            out = out.loc[out["work_order"].map(_v241_text) == _v241_text(work_order)].copy()
+        if process_name and "process_name" in out.columns:
+            out = out.loc[out["process_name"].map(_v241_text) == _v241_text(process_name)].copy()
+        if active_only:
+            status_col = out["status"].map(_v241_text) if "status" in out.columns else pd.Series([""] * len(out), index=out.index)  # type: ignore[name-defined]
+            end_col = out["end_timestamp"].map(_v241_text) if "end_timestamp" in out.columns else pd.Series([""] * len(out), index=out.index)  # type: ignore[name-defined]
+            terminal = set()
+            try:
+                terminal = set(_V239_TERMINAL)  # type: ignore[name-defined]
+            except Exception:
+                terminal = {"下班", "暫停", "完成", "完工", "已結束", "結束"}
+            out = out.loc[(~status_col.isin(terminal)) & (end_col == "")].copy()
+        return out.reset_index(drop=True)
+    except Exception:
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v241_history_cache_key(start_date=None, end_date=None, employee_id=None, work_order=None):
+    return (_v241_text(start_date)[:10], _v241_text(end_date)[:10], _v241_text(employee_id), _v241_text(work_order))
+
+
+def _v241_invalidate_fast_memory(reason: str = "") -> None:
+    try:
+        _V241_TODAY_CACHE["epoch"] = 0.0
+        _V241_TODAY_CACHE["df"] = None
+        _V241_HISTORY_CACHE["epoch"] = 0.0
+        _V241_HISTORY_CACHE["df"] = None
+    except Exception:
+        pass
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None):  # type: ignore[override]
+    # 01 Today Records: never run full lossless/log recovery in foreground.
+    if _v241_is_today_query(start_date, end_date, employee_id, work_order):
+        return today_records(include_finished=True, unfinished_only=False)
+    # 02/history: stable source, but memoized for a short TTL to avoid rerun jumping/slowness.
+    key = _v241_history_cache_key(start_date, end_date, employee_id, work_order)
+    now = _v241_time_now()
+    try:
+        if _V241_HISTORY_CACHE.get("key") == key and (now - float(_V241_HISTORY_CACHE.get("epoch") or 0)) <= _V241_HISTORY_TTL_SECONDS:
+            cached = _V241_HISTORY_CACHE.get("df")
+            if isinstance(cached, pd.DataFrame):  # type: ignore[name-defined]
+                return cached.copy().reset_index(drop=True)
+    except Exception:
+        pass
+    try:
+        df = _v241_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order) if callable(_v241_prev_load_records) else pd.DataFrame()  # type: ignore[misc,name-defined]
+    except Exception as exc:
+        try:
+            write_log("V241_LOAD_RECORDS_WARN", f"V241 stable history load fallback failed: {exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+        df = pd.DataFrame()  # type: ignore[name-defined]
+    try:
+        if isinstance(df, pd.DataFrame):  # type: ignore[name-defined]
+            _V241_HISTORY_CACHE["key"] = key
+            _V241_HISTORY_CACHE["epoch"] = now
+            _V241_HISTORY_CACHE["df"] = df.copy().reset_index(drop=True)
+    except Exception:
+        pass
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False):  # type: ignore[override]
+    now = _v241_time_now()
+    try:
+        if (
+            _V241_TODAY_CACHE.get("include_finished") == bool(include_finished)
+            and _V241_TODAY_CACHE.get("unfinished_only") == bool(unfinished_only)
+            and (now - float(_V241_TODAY_CACHE.get("epoch") or 0)) <= _V241_TODAY_TTL_SECONDS
+        ):
+            cached = _V241_TODAY_CACHE.get("df")
+            if isinstance(cached, pd.DataFrame):  # type: ignore[name-defined]
+                return cached.copy().reset_index(drop=True)
+    except Exception:
+        pass
+    today = _v241_today()
+    rows = _v241_fast_display_rows("v241_today_records_fast")
+    rows_today = []
+    for r in rows:
+        try:
+            d = _v241_text(r.get("start_date"))[:10] or _v241_text(r.get("start_timestamp"))[:10]
+            if d == today:
+                rows_today.append(r)
+        except Exception:
+            pass
+    df = _v241_rows_to_df(rows_today)
+    df = _v241_basic_filter(df, active_only=(unfinished_only or not include_finished))
+    try:
+        _V241_TODAY_CACHE["include_finished"] = bool(include_finished)
+        _V241_TODAY_CACHE["unfinished_only"] = bool(unfinished_only)
+        _V241_TODAY_CACHE["epoch"] = now
+        _V241_TODAY_CACHE["df"] = df.copy().reset_index(drop=True)
+    except Exception:
+        pass
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_records(employee_id: str | None = None, employee_name: str | None = None, process_name: str | None = None, start_date: str | None = None, work_order: str | None = None, **kwargs):  # type: ignore[override]
+    df = today_records(include_finished=False, unfinished_only=True)
+    out = _v241_basic_filter(df, employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date, work_order=work_order, active_only=True)
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+        return dict(df.iloc[0].to_dict())
+    return None
+
+
+def _v241_find_rows_by_ids_fast(ids: list[int | str]) -> list[dict]:
+    wanted = set()
+    for x in ids or []:
+        try:
+            wanted.add(int(str(x).strip()))
+        except Exception:
+            pass
+    if not wanted:
+        return []
+    rows = []
+    try:
+        for r in _v241_fast_display_rows("v241_find_ids"):
+            try:
+                if int(str(r.get("id")).strip()) in wanted:
+                    rows.append(dict(r))
+            except Exception:
+                pass
+    except Exception:
+        pass
+    if rows:
+        return rows
+    try:
+        if "_v239_find_rows_by_ids" in globals() and callable(_v239_find_rows_by_ids):  # type: ignore[name-defined]
+            return [dict(r) for r in _v239_find_rows_by_ids(list(wanted)) if isinstance(r, dict)]  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return []
+
+
+def _v241_fast_lossless_event(op_type: str, rows: list[dict] | None = None, *, reason: str = "", extra: dict | None = None) -> None:
+    # Minimal append-only proof in foreground. Heavy replay/repair stays out of 01 foreground.
+    try:
+        if "_v239_append_lossless_event" in globals() and callable(_v239_append_lossless_event):  # type: ignore[name-defined]
+            _v239_append_lossless_event(op_type, rows or [], reason=reason or op_type, extra=extra or {"fast_lane": _V241_VERSION})  # type: ignore[name-defined]
+    except Exception as exc:
+        try:
+            write_log("V241_LOSSLESS_EVENT_WARN", f"V241 lossless event fast append failed: {exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    try:
+        if "_v230_enqueue_background_task" in globals() and callable(_v230_enqueue_background_task):  # type: ignore[name-defined]
+            _v230_enqueue_background_task("v241_deferred_heavy_reconcile", {"op_type": op_type, "reason": reason, "rows": len(rows or [])})  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    base = _v239_prev_start_work if "_v239_prev_start_work" in globals() and callable(_v239_prev_start_work) else _v241_prev_start_work  # type: ignore[name-defined]
+    if not callable(base):
+        raise RuntimeError("start_work base function is unavailable")
+    rid = int(base(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)  # type: ignore[misc]
+    if rid:
+        rows = _v241_find_rows_by_ids_fast([rid])
+        if not rows and "_v239_compose_start_row" in globals() and callable(_v239_compose_start_row):  # type: ignore[name-defined]
+            try:
+                rows = [_v239_compose_start_row(rid, employee or {}, work_order or {}, process_name, remark)]  # type: ignore[name-defined]
+            except Exception:
+                rows = []
+        try:
+            if rows and "_v231_write_rows" in globals() and callable(_v231_write_rows):  # type: ignore[name-defined]
+                _v231_write_rows(rows, reason="v241_post_start_fast_cache")  # type: ignore[name-defined]
+        except Exception:
+            pass
+        _v241_fast_lossless_event("START_WORK", rows, reason="v241_start_fast_lossless")
+        _v241_invalidate_fast_memory("start_work")
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    rid = int(record_id)
+    before_rows = _v241_find_rows_by_ids_fast([rid])
+    base = _v239_prev_finish_work if "_v239_prev_finish_work" in globals() and callable(_v239_prev_finish_work) else _v241_prev_finish_work  # type: ignore[name-defined]
+    if not callable(base):
+        raise RuntimeError("finish_work base function is unavailable")
+    n = int(base(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)  # type: ignore[misc]
+    if n:
+        rows = _v241_find_rows_by_ids_fast([rid])
+        if not rows and before_rows:
+            rows = []
+            try:
+                now_text_v = _v239_now() if "_v239_now" in globals() and callable(_v239_now) else ""  # type: ignore[name-defined]
+            except Exception:
+                now_text_v = ""
+            for r in before_rows:
+                rr = dict(r)
+                rr["status"] = end_action
+                rr["end_action"] = end_action
+                rr["end_timestamp"] = now_text_v
+                rr["end_date"] = now_text_v[:10]
+                rr["end_time"] = now_text_v[11:19]
+                if remark:
+                    old_remark = _v241_text(rr.get("remark"))
+                    rr["remark"] = (old_remark + "；" + remark).strip("；") if old_remark else remark
+                rows.append(rr)
+        try:
+            if rows and "_v231_write_rows" in globals() and callable(_v231_write_rows):  # type: ignore[name-defined]
+                _v231_write_rows(rows, reason="v241_post_finish_fast_cache")  # type: ignore[name-defined]
+        except Exception:
+            pass
+        _v241_fast_lossless_event("FINISH_WORK", rows or before_rows or [{"id": rid, "end_action": end_action, "remark": remark}], reason="v241_finish_fast_lossless", extra={"end_action": end_action})
+        _v241_invalidate_fast_memory("finish_work")
+    return n
+
+
+def audit_v241_foreground_speed_policy() -> dict:
+    return {
+        "version": _V241_VERSION,
+        "foreground_policy": "01 today_records/get_active_records use display-cache fast lane. Full lossless/system-log history recovery is not executed in 01 foreground paths.",
+        "background_policy": "Current app has queue markers, not a true always-running worker. Heavy reconciliation is deferred as queued markers and stable history TTL cache.",
+        "data_policy": "Start/finish still write 01/02 via the V238/V225 base chain and append a lossless event; cache is for speed, not the sole authority.",
+    }
+
+# ================= END V241 FOREGROUND FAST LANE RESTORE =================
