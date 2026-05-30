@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 09:29:05",
-  "exported_at": "2026-05-30 09:29:05",
+  "updated_at": "2026-05-30 09:32:39",
+  "exported_at": "2026-05-30 09:32:39",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -5695,11 +5695,35 @@
         "detail": "v235_cache_recover\n__spt_log_uid=e2f89491ead743bca4375e5fb9177e9f",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1748,
+        "log_time": "2026-05-30 09:32:35",
+        "user_name": "admin",
+        "action_type": "V235_0102_HISTORY_REPAIR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已從同源資料修復 01/02 顯示來源：156 筆。",
+        "detail": "__spt_log_uid=bfdd4d2ad2ca4afbbd2cfec2ef1ec240",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1747,
+        "log_time": "2026-05-30 09:32:34",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：8 筆，active=8。",
+        "detail": "v235_cache_recover\n__spt_log_uid=533a80dcd0f740a2a0debdb9365b2637",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 474
+    "system_logs": 476
   }
 }
