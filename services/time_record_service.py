@@ -27805,276 +27805,353 @@ def audit_v248_foreground_compute_offload() -> dict:
 # ================= END V248 FOREGROUND COMPUTE OFFLOAD =================
 
 
-# ================= V249 BACKEND DATA CONSISTENCY GUARD｜2026-05-30 =================
-# Purpose:
-# - Preserve the V248 foreground fast path and all existing UI/CSS/theme/table behavior.
-# - Prevent ordinary 02 history reads from writing back 01/02 authority files.
-# - After official admin/manual deletes, force a lightweight 01/02 authority purge using
-#   existing tombstone id / record_key / business-signature rules.
-# - Do not make cache, SQLite, row-shard, lossless, or recovery data the sole authority.
+# ================= V249 SQLITE ACTIVE HYDRATION FOR V248 FAST FINISH/START｜2026-05-30 =================
+# V248 intentionally reads the 01 foreground from the fast authority/cache lane, while the
+# lower-level start/finish transaction still updates SQLite first.  If SQLite is behind
+# authority after reboot or background isolation, Finish Work can see an active row in 01
+# but fail because the row id is missing from SQLite.  The same gap also breaks parallel
+# work detection because duplicate/conflict checks cannot see the active rows.
 
 try:
-    _v249_prev_load_records = load_records  # type: ignore[name-defined]
+    _v249_prev_start_work = start_work  # type: ignore[name-defined]
 except Exception:
-    _v249_prev_load_records = None
+    _v249_prev_start_work = None
 try:
-    _v249_prev_delete_time_records = delete_time_records  # type: ignore[name-defined]
+    _v249_prev_finish_work = finish_work  # type: ignore[name-defined]
 except Exception:
-    _v249_prev_delete_time_records = None
-try:
-    _v249_prev_audit_v248_foreground_compute_offload = audit_v248_foreground_compute_offload  # type: ignore[name-defined]
-except Exception:
-    _v249_prev_audit_v248_foreground_compute_offload = None
-try:
-    _v249_prev_v238_maybe_write_back = _v238_maybe_write_back  # type: ignore[name-defined]
-except Exception:
-    _v249_prev_v238_maybe_write_back = None
-try:
-    _v249_prev_v235_write_authority_rows_if_needed = _v235_write_authority_rows_if_needed  # type: ignore[name-defined]
-except Exception:
-    _v249_prev_v235_write_authority_rows_if_needed = None
+    _v249_prev_finish_work = None
 
-_V249_VERSION = "V249_BACKEND_DATA_CONSISTENCY_GUARD_20260530"
+_V249_VERSION = "V249_SQLITE_ACTIVE_HYDRATION_FOR_V248_20260530"
 
 
-def _v249_env_enabled(name: str, default: str = "0") -> bool:
-    try:
-        import os as _v249_os
-        val = str(_v249_os.environ.get(name, default)).strip().lower()
-        return val in {"1", "true", "yes", "y", "on", "enable", "enabled"}
-    except Exception:
-        return str(default).strip().lower() in {"1", "true", "yes", "y", "on", "enable", "enabled"}
-
-
-def _v249_admin_delete_reason(reason: str | None = "") -> bool:
-    try:
-        return bool(_v244_is_admin_delete_reason(reason))  # type: ignore[name-defined]
-    except Exception:
-        s = _v248_text(reason).lower() if "_v248_text" in globals() else str(reason or "").strip().lower()
-        if not s:
-            return False
-        system_tokens = ("prune", "repair", "cache", "sync", "rebuild", "auto", "background", "system", "cleanup", "resurrection")
-        admin_tokens = ("管理員", "人工", "維護", "admin", "manual", "editor")
-        if any(t in s for t in system_tokens) and not any(t in s for t in admin_tokens):
-            return False
-        return any(t in s for t in admin_tokens) or "刪除" in s or "delete" in s
-
-
-def _v249_collect_rows_for_ids(ids: list[int]) -> list[dict]:
-    clean_ids = []
-    for x in ids or []:
-        try:
-            i = _v248_int(x) if "_v248_int" in globals() and callable(_v248_int) else int(float(str(x).strip()))  # type: ignore[name-defined]
-        except Exception:
-            i = None
-        if i is not None and i not in clean_ids:
-            clean_ids.append(i)
-    if not clean_ids:
+def _v249_rows_from_df(df) -> list[dict]:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
         return []
-    for fname in ("_v246_collect_rows_for_ids", "_v244_collect_rows_for_ids", "_v239_collect_rows_for_ids", "_v239_find_rows_by_ids"):
+    try:
+        clean = df.copy().where(pd.notna(df), "")  # type: ignore[name-defined]
+        return [dict(r) for _, r in clean.iterrows()]
+    except Exception:
+        return []
+
+
+def _v249_authority_rows(reason: str = "v249_authority") -> list[dict]:
+    rows: list[dict] = []
+    try:
+        if "_v104_authority_df_for_active" in globals() and callable(_v104_authority_df_for_active):  # type: ignore[name-defined]
+            rows.extend(_v249_rows_from_df(_v104_authority_df_for_active()))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if "_v220_direct_authority_records" in globals() and callable(_v220_direct_authority_records):  # type: ignore[name-defined]
+            rows.extend([dict(r) for r in _v220_direct_authority_records() if isinstance(r, dict)])  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        rows.extend([dict(r) for r in _v248_collect_today_rows_fast(reason, force=False) if isinstance(r, dict)])
+    except Exception:
+        pass
+    return _v248_dedupe_rows(rows)
+
+
+def _v249_active_authority_rows(reason: str = "v249_active_authority") -> list[dict]:
+    return [dict(r) for r in _v249_authority_rows(reason) if isinstance(r, dict) and (not _v248_is_deleted(r)) and _v248_is_active_row(r)]
+
+
+def _v249_row_id_set(rows: list[dict]) -> set[int]:
+    out: set[int] = set()
+    for r in rows or []:
+        rid = _v248_row_id(r)
+        if rid is not None:
+            out.add(int(rid))
+    return out
+
+
+def _v249_same_employee(row: dict, employee: dict) -> bool:
+    emp_id = _v248_text((employee or {}).get("employee_id"))
+    emp_name = _v248_text((employee or {}).get("employee_name"))
+    row_id = _v248_text(row.get("employee_id"))
+    row_name = _v248_text(row.get("employee_name"))
+    if emp_id and row_id:
+        return emp_id == row_id
+    if emp_name and row_name:
+        return emp_name == row_name
+    return False
+
+
+def _v249_same_parallel_group(row: dict, seed: dict) -> bool:
+    seed_emp = _v248_text(seed.get("employee_id"))
+    row_emp = _v248_text(row.get("employee_id"))
+    if seed_emp and row_emp and seed_emp != row_emp:
+        return False
+    if (not seed_emp) and _v248_text(seed.get("employee_name")) != _v248_text(row.get("employee_name")):
+        return False
+    return (
+        _v248_text(row.get("process_name")) == _v248_text(seed.get("process_name"))
+        and _v248_date(row.get("start_date") or row.get("start_timestamp")) == _v248_date(seed.get("start_date") or seed.get("start_timestamp"))
+    )
+
+
+def _v249_sync_sqlite_sequence(rows: list[dict], reason: str = "v249_sequence") -> int:
+    max_id = 0
+    for r in rows or []:
+        rid = _v248_row_id(r)
+        if rid is not None:
+            max_id = max(max_id, int(rid))
+    if max_id <= 0:
+        return 0
+    try:
+        if "_v212_sync_sqlite_sequence_with_authority" in globals() and callable(_v212_sync_sqlite_sequence_with_authority):  # type: ignore[name-defined]
+            _v212_sync_sqlite_sequence_with_authority(reason)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('time_records', ?)", (max_id,))
+        execute("UPDATE sqlite_sequence SET seq=CASE WHEN seq < ? THEN ? ELSE seq END WHERE name='time_records'", (max_id, max_id))
+        return max_id
+    except Exception:
+        return 0
+
+
+def _v249_ensure_sqlite_table(reason: str = "v249") -> None:
+    try:
+        if "_v221_ensure_time_records_table" in globals() and callable(_v221_ensure_time_records_table):  # type: ignore[name-defined]
+            _v221_ensure_time_records_table(reason)  # type: ignore[name-defined]
+            return
+    except Exception:
+        pass
+    try:
+        from services.db_service import ensure_database as _ensure_database  # type: ignore
+        _ensure_database()
+    except Exception:
+        pass
+
+
+def _v249_hydrate_rows_to_sqlite(rows: list[dict], reason: str = "v249_hydrate") -> int:
+    clean = [dict(r) for r in _v248_dedupe_rows(rows or []) if isinstance(r, dict)]
+    if not clean:
+        return 0
+    for r in clean:
+        for c in ("end_action", "end_timestamp", "end_date", "end_time"):
+            if not _v248_text(r.get(c)):
+                r[c] = None
+    _v249_ensure_sqlite_table(reason)
+    _v249_sync_sqlite_sequence(clean, reason=reason + "_sequence")
+    df = _v248_rows_to_df(clean)
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return 0
+    n = 0
+    try:
+        if "_v104_upsert_rows_to_sqlite" in globals() and callable(_v104_upsert_rows_to_sqlite):  # type: ignore[name-defined]
+            n = int(_v104_upsert_rows_to_sqlite(df) or 0)  # type: ignore[name-defined]
+        elif "_v208_upsert_records_to_sqlite" in globals() and callable(_v208_upsert_records_to_sqlite):  # type: ignore[name-defined]
+            n = int(_v208_upsert_records_to_sqlite(df, reason=reason) or 0)  # type: ignore[name-defined]
+    except Exception as exc:
         try:
-            f = globals().get(fname)
-            if callable(f):
-                rows = [dict(r) for r in (f(clean_ids) or []) if isinstance(r, dict)]  # type: ignore[misc]
-                if rows:
-                    return rows
+            write_log("V249_SQLITE_HYDRATE_WARN", f"V249 回填 SQLite active rows 失敗：{exc}", "time_records", level="WARN")
         except Exception:
             pass
-    rows = []
     try:
-        wanted = set(clean_ids)
-        for module_key in ("01_time_records", "02_history"):
-            f = globals().get("_v246_authority_rows") or globals().get("_v244_authority_rows")
-            if not callable(f):
-                continue
-            for r in f(module_key) or []:  # type: ignore[misc]
-                if not isinstance(r, dict):
-                    continue
-                rid = _v248_row_id(r) if "_v248_row_id" in globals() and callable(_v248_row_id) else None  # type: ignore[name-defined]
-                if rid in wanted:
-                    rows.append(dict(r))
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(n or 0)
+
+
+def _v249_hydrate_for_start(employee: dict, reason: str = "v249_before_start") -> int:
+    active = _v249_active_authority_rows(reason)
+    rows = [r for r in active if _v249_same_employee(r, employee or {})]
+    # Keep the id allocator ahead of authority even when the selected employee has no active row.
+    _v249_sync_sqlite_sequence(_v249_authority_rows(reason + "_all_rows"), reason=reason + "_sequence")
+    return _v249_hydrate_rows_to_sqlite(rows, reason=reason) if rows else 0
+
+
+def _v249_hydrate_for_finish(record_id: int, finish_parallel_group: bool = True, reason: str = "v249_before_finish") -> list[dict]:
+    rid = _v248_int(record_id)
+    if rid is None:
+        return []
+    rows = [dict(r) for r in _v249_authority_rows(reason) if isinstance(r, dict) and not _v248_is_deleted(r)]
+    target = [dict(r) for r in rows if _v248_row_id(r) == rid]
+    if not target:
+        target = _v248_find_rows_by_ids_fast([rid])
+    if not target:
+        return []
+    seed = dict(target[0])
+    if finish_parallel_group:
+        group = [dict(r) for r in rows if _v248_is_active_row(r) and _v249_same_parallel_group(dict(r), seed)]
+        if not group:
+            group = target
+    else:
+        group = target
+    _v249_hydrate_rows_to_sqlite(group, reason=reason)
+    return group
+
+
+def _v249_query_rows_by_ids(ids: set[int] | list[int]) -> list[dict]:
+    wanted = sorted({int(x) for x in ids or [] if _v248_int(x) is not None})
+    if not wanted:
+        return []
+    try:
+        if "_v96_query_rows_by_ids" in globals() and callable(_v96_query_rows_by_ids):  # type: ignore[name-defined]
+            return _v249_rows_from_df(_v96_query_rows_by_ids(wanted))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        ph = ",".join(["?"] * len(wanted))
+        df = query_df(f"SELECT * FROM time_records WHERE id IN ({ph})", tuple(wanted))
+        return _v249_rows_from_df(df)
+    except Exception:
+        return []
+
+
+def _v249_merge_finished_rows_to_today_cache(ids: set[int], reason: str = "v249_post_finish_cache") -> None:
+    if not ids:
+        return
+    rows = _v249_query_rows_by_ids(ids)
+    if not rows:
+        return
+    try:
+        current = _v248_collect_today_rows_fast(reason + "_base", force=False)
+        merged = [dict(r) for r in current if _v248_row_id(r) not in ids] + rows
+        _v248_write_today_rows(merged, reason=reason)
+    except Exception:
+        pass
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v249_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    _v249_hydrate_for_start(employee or {}, reason="start_work_v249_pre_hydrate")
+    rid = int(_v249_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        _v249_sync_sqlite_sequence(_v249_authority_rows("start_work_v249_post_sequence"), reason="start_work_v249_post_sequence")
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v249_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    hydrated = _v249_hydrate_for_finish(record_id, finish_parallel_group=finish_parallel_group, reason="finish_work_v249_pre_hydrate")
+    affected_ids = _v249_row_id_set(hydrated) or {int(record_id)}
+    n = int(_v249_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n:
+        try:
+            rows = _v249_query_rows_by_ids(affected_ids)
+            if rows and "_v96_upsert_rows_to_authority" in globals() and callable(_v96_upsert_rows_to_authority):  # type: ignore[name-defined]
+                _v96_upsert_rows_to_authority(_v248_rows_to_df(rows), "finish_work_v249_authority_upsert", github=False)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        _v249_merge_finished_rows_to_today_cache(affected_ids, reason="finish_work_v249_group_cache_merge")
+    return n
+
+
+def audit_v249_sqlite_active_hydration() -> dict:
+    active = _v249_active_authority_rows("v249_audit")
+    try:
+        db_count = int((query_one("SELECT COUNT(*) AS n FROM time_records") or {}).get("n") or 0)
+    except Exception:
+        db_count = 0
+    return {
+        "version": _V249_VERSION,
+        "authority_active_rows": len(active),
+        "sqlite_time_records_count": db_count,
+        "finish_work_hydrates_authority_rows_before_sqlite_update": True,
+        "start_work_hydrates_employee_active_rows_for_parallel_detection": True,
+        "sqlite_sequence_guard": True,
+        "ui_changed": False,
+    }
+
+# ================= END V249 SQLITE ACTIVE HYDRATION FOR V248 FAST FINISH/START =================
+
+
+# ================= V249B TODAY DISPLAY AUTHORITY MERGE｜2026-05-30 =================
+# Keep the V248 fast lane, but merge today's local authority rows into the display result.
+# This repairs stale foreground caches that miss a row already present in 01/02 authority.
+
+try:
+    _v249b_prev_today_records = today_records  # type: ignore[name-defined]
+except Exception:
+    _v249b_prev_today_records = None
+try:
+    _v249b_prev_load_records = load_records  # type: ignore[name-defined]
+except Exception:
+    _v249b_prev_load_records = None
+
+
+def _v249b_today_rows(reason: str = "v249b_today") -> list[dict]:
+    rows: list[dict] = []
+    try:
+        if callable(_v249b_prev_today_records):
+            df = _v249b_prev_today_records(include_finished=True, unfinished_only=False)  # type: ignore[misc]
+            rows.extend(_v249_rows_from_df(df))
+    except Exception:
+        pass
+    rows.extend(_v249_authority_rows(reason + "_authority"))
+    rows = _v248_filter_visible_rows(rows)
+    try:
+        _v248_write_today_rows(rows, reason=reason + "_write_cache")
     except Exception:
         pass
     return rows
 
 
-def _v249_force_0102_purge(ids: list[int], rows: list[dict], reason: str) -> dict:
+def today_records(include_finished: bool = True, unfinished_only: bool = False):  # type: ignore[override]
+    rows = _v249b_today_rows("v249b_today_records")
+    if unfinished_only or not include_finished:
+        rows = [dict(r) for r in rows if _v248_is_active_row(r)]
+    return _v248_rows_to_df(rows).reset_index(drop=True)
+
+
+def get_active_records(employee_id: str | None = None, employee_name: str | None = None, process_name: str | None = None, start_date: str | None = None, work_order: str | None = None, **kwargs):  # type: ignore[override]
+    df = today_records(include_finished=False, unfinished_only=True)
+    return _v248_basic_filter_df(df, employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date, work_order=work_order, active_only=True)
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+        return dict(df.iloc[0].to_dict())
+    return None
+
+
+def _v249b_filter_records_df(df, *, start_date=None, end_date=None, employee_id=None, work_order=None):
     try:
-        if "_v246_purge_admin_deleted_from_0102" in globals() and callable(_v246_purge_admin_deleted_from_0102):  # type: ignore[name-defined]
-            return dict(_v246_purge_admin_deleted_from_0102(ids, rows or [], reason=reason) or {})  # type: ignore[name-defined]
+        if "_v243_filter_df" in globals() and callable(_v243_filter_df):  # type: ignore[name-defined]
+            return _v243_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order, active_only=False)  # type: ignore[name-defined]
     except Exception:
         pass
-    result = {"01_time_records": 0, "02_history": 0, "fallback": True}
-    try:
-        if "_v246_target_sets_from_tombstones" in globals() and callable(_v246_target_sets_from_tombstones):  # type: ignore[name-defined]
-            t_ids, t_keys, t_sigs = _v246_target_sets_from_tombstones()  # type: ignore[name-defined]
-        else:
-            t_ids, t_keys, t_sigs = set(), set(), set()
-        target_ids = set(t_ids or set()) | {i for i in ids if i is not None}
-        target_keys = set(t_keys or set())
-        target_sigs = set(t_sigs or set())
-        for r in rows or []:
-            if not isinstance(r, dict):
-                continue
-            try:
-                rid = _v248_row_id(r)  # type: ignore[name-defined]
-                if rid is not None:
-                    target_ids.add(rid)
-            except Exception:
-                pass
-            try:
-                rk = _v248_record_key(r)  # type: ignore[name-defined]
-                if rk:
-                    target_keys.add(rk)
-            except Exception:
-                pass
-            try:
-                sig = _v248_row_signature(r)  # type: ignore[name-defined]
-                if sig:
-                    target_sigs.add(sig)
-            except Exception:
-                pass
-        for module_key in ("01_time_records", "02_history"):
-            rows0 = []
-            try:
-                f = globals().get("_v246_authority_rows") or globals().get("_v244_authority_rows")
-                if callable(f):
-                    rows0 = [dict(r) for r in (f(module_key) or []) if isinstance(r, dict)]  # type: ignore[misc]
-            except Exception:
-                rows0 = []
-            kept = []
-            removed = 0
-            for r in rows0:
-                hit = False
-                try:
-                    rid = _v248_row_id(r)  # type: ignore[name-defined]
-                    hit = hit or (rid is not None and rid in target_ids)
-                except Exception:
-                    pass
-                try:
-                    rk = _v248_record_key(r)  # type: ignore[name-defined]
-                    hit = hit or bool(rk and rk in target_keys)
-                except Exception:
-                    pass
-                try:
-                    sig = _v248_row_signature(r)  # type: ignore[name-defined]
-                    hit = hit or bool(sig and sig in target_sigs)
-                except Exception:
-                    pass
-                if hit:
-                    removed += 1
-                else:
-                    kept.append(r)
-            if removed:
-                save_f = globals().get("_v246_save_authority_rows") or globals().get("_v244_save_authority_rows")
-                if callable(save_f):
-                    save_f(module_key, kept, reason=reason)  # type: ignore[misc]
-            result[module_key] = removed
-    except Exception as exc:
-        result["error"] = str(exc)[:500]
-    return result
-
-
-def _v249_noop_v238_write_back(rows: list[dict], *, reason: str = "v249_suppressed_v238_write_back") -> None:
-    try:
-        if "_v230_enqueue_background_task" in globals() and callable(_v230_enqueue_background_task):  # type: ignore[name-defined]
-            _v230_enqueue_background_task("v249_suppressed_read_writeback", {"reason": reason, "rows": len(rows or [])})  # type: ignore[name-defined]
-    except Exception:
-        pass
-
-
-def _v249_noop_authority_writeback(rows: list[dict], *args, reason: str = "v249_suppressed_authority_writeback", **kwargs) -> int:
-    try:
-        if "_v230_enqueue_background_task" in globals() and callable(_v230_enqueue_background_task):  # type: ignore[name-defined]
-            _v230_enqueue_background_task("v249_suppressed_authority_writeback", {"reason": reason, "rows": len(rows or [])})  # type: ignore[name-defined]
-    except Exception:
-        pass
-    return 0
+    return _v248_basic_filter_df(df, start_date=start_date, employee_id=employee_id, work_order=work_order, active_only=False)
 
 
 def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None):  # type: ignore[override]
-    if not callable(_v249_prev_load_records):
-        return pd.DataFrame()  # type: ignore[name-defined]
-    allow_writeback = _v249_env_enabled("SPT_ALLOW_HISTORY_READ_WRITEBACK", "0")
-    if allow_writeback:
-        return _v249_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[misc]
-    old_write_back = globals().get("_v238_maybe_write_back")
-    old_authority_writeback = globals().get("_v235_write_authority_rows_if_needed")
-    try:
-        if callable(_v249_prev_v238_maybe_write_back):
-            globals()["_v238_maybe_write_back"] = _v249_noop_v238_write_back
-        if callable(_v249_prev_v235_write_authority_rows_if_needed):
-            globals()["_v235_write_authority_rows_if_needed"] = _v249_noop_authority_writeback
-        return _v249_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[misc]
-    finally:
-        try:
-            globals()["_v238_maybe_write_back"] = old_write_back if callable(old_write_back) else _v249_prev_v238_maybe_write_back
-        except Exception:
-            pass
-        try:
-            globals()["_v235_write_authority_rows_if_needed"] = old_authority_writeback if callable(old_authority_writeback) else _v249_prev_v235_write_authority_rows_if_needed
-        except Exception:
-            pass
+    today = _v248_today()
+    sd = _v248_date(start_date)
+    ed = _v248_date(end_date)
+    if sd == today and ed == today:
+        return _v249b_filter_records_df(today_records(include_finished=True, unfinished_only=False), start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+    if callable(_v249b_prev_load_records):
+        base = _v249b_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[misc]
+        if (not sd or sd <= today) and (not ed or today <= ed):
+            today_df = _v249b_filter_records_df(today_records(include_finished=True, unfinished_only=False), start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+            try:
+                if isinstance(base, pd.DataFrame) and not base.empty and isinstance(today_df, pd.DataFrame) and not today_df.empty:  # type: ignore[name-defined]
+                    return _v248_rows_to_df(_v248_dedupe_rows(_v249_rows_from_df(base) + _v249_rows_from_df(today_df))).reset_index(drop=True)
+                if isinstance(today_df, pd.DataFrame) and not today_df.empty:  # type: ignore[name-defined]
+                    return today_df
+            except Exception:
+                pass
+        return base
+    return pd.DataFrame()  # type: ignore[name-defined]
 
 
-def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
-    ids = []
-    for x in record_ids or []:
-        try:
-            i = _v248_int(x) if "_v248_int" in globals() and callable(_v248_int) else int(float(str(x).strip()))  # type: ignore[name-defined]
-        except Exception:
-            i = None
-        if i is not None and i not in ids:
-            ids.append(i)
-    if not ids:
-        return 0
-    rows_before = _v249_collect_rows_for_ids(ids)
-    n = int(_v249_prev_delete_time_records(ids, reason=reason) or 0) if callable(_v249_prev_delete_time_records) else 0  # type: ignore[misc]
-    if _v249_admin_delete_reason(reason):
-        try:
-            if "_v246_persist_admin_tombstones" in globals() and callable(_v246_persist_admin_tombstones):  # type: ignore[name-defined]
-                _v246_persist_admin_tombstones(ids, rows_before, reason)  # type: ignore[name-defined]
-        except Exception:
-            pass
-        purge_result = _v249_force_0102_purge(ids, rows_before, reason="v249_post_delete_force_0102_purge")
-        try:
-            if "_V248_TOMBSTONE_CACHE" in globals() and isinstance(_V248_TOMBSTONE_CACHE, dict):  # type: ignore[name-defined]
-                _V248_TOMBSTONE_CACHE["epoch"] = 0.0  # type: ignore[name-defined]
-        except Exception:
-            pass
-        try:
-            if "_v248_invalidate_foreground" in globals() and callable(_v248_invalidate_foreground):  # type: ignore[name-defined]
-                _v248_invalidate_foreground("v249_delete_time_records")  # type: ignore[name-defined]
-        except Exception:
-            pass
-        try:
-            if "_v239_append_lossless_event" in globals() and callable(_v239_append_lossless_event):  # type: ignore[name-defined]
-                _v239_append_lossless_event("V249_ADMIN_DELETE_PURGE_CONFIRMED", rows_before or [{"id": i} for i in ids], reason=reason, extra={"ids": ids, "deleted_count": n, "purge_result": purge_result, "policy": _V249_VERSION})  # type: ignore[name-defined]
-        except Exception:
-            pass
-        try:
-            return int(max(n, int(purge_result.get("01_time_records") or 0), int(purge_result.get("02_history") or 0), len(ids) if rows_before else 0))
-        except Exception:
-            return int(n or (len(ids) if rows_before else 0))
-    return int(n or 0)
-
-
-def audit_v249_backend_data_consistency_guard() -> dict:
-    base = {}
-    try:
-        if callable(_v249_prev_audit_v248_foreground_compute_offload):
-            base = dict(_v249_prev_audit_v248_foreground_compute_offload() or {})  # type: ignore[misc]
-    except Exception:
-        base = {}
-    base.update({
-        "version": _V249_VERSION,
-        "history_read_writeback_default": "suppressed",
-        "history_read_writeback_env_override": "SPT_ALLOW_HISTORY_READ_WRITEBACK=1",
-        "post_delete_0102_force_purge": True,
+def audit_v249b_today_display_authority_merge() -> dict:
+    rows = _v249b_today_rows("v249b_audit")
+    active = [r for r in rows if _v248_is_active_row(r)]
+    return {
+        "version": "V249B_TODAY_DISPLAY_AUTHORITY_MERGE_20260530",
+        "today_rows": len(rows),
+        "today_active_rows": len(active),
+        "merges_local_01_02_authority_into_v248_fast_display": True,
         "ui_changed": False,
-        "css_theme_changed": False,
-        "service_only": True,
-    })
-    return base
+    }
 
-# ================= END V249 BACKEND DATA CONSISTENCY GUARD =================
+# ================= END V249B TODAY DISPLAY AUTHORITY MERGE =================
