@@ -2,9 +2,9 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "01_time_records",
   "kind": "settings",
-  "updated_at": "2026-05-30 12:43:19",
-  "exported_at": "2026-05-30 12:43:19",
-  "reason": "v369_save_column_order_v72_01.time_records.admin_maintenance",
+  "updated_at": "2026-05-30 12:43:42",
+  "exported_at": "2026-05-30 12:43:42",
+  "reason": "V196 hard delete guard",
   "empty_authoritative": false,
   "tables": {},
   "settings": {
@@ -162,6 +162,15 @@
     },
     "column_settings": {},
     "v196_hard_deleted_time_records": [
+      {
+        "id": 463,
+        "identities": [
+          "id:463"
+        ],
+        "deleted_at": "2026-05-30 12:43:40",
+        "source": "V196",
+        "reason": "01 工時紀錄管理員維護區刪除"
+      },
       {
         "row": {
           "id": 462,
@@ -496,7 +505,8 @@
           "id:436",
           "id:437",
           "id:438",
-          "id:461"
+          "id:461",
+          "id:463"
         ]
       },
       {
@@ -12640,7 +12650,7 @@
         "log_id": 144
       }
     ],
-    "v196_hard_delete_updated_at": "2026-05-30 10:41:47"
+    "v196_hard_delete_updated_at": "2026-05-30 12:43:42"
   },
   "table_counts": {}
 }
