@@ -2661,9 +2661,12 @@ _V26_BOOTSTRAP_PLAN: list[tuple[str, str, str, tuple[str, ...]]] = [
 ]
 
 
+_V26_BOOTSTRAP_MARKER_KEY = "postgres_core_authority_import_v27_completed"
+
+
 def _v26_pg_bootstrap_marker(cur) -> bool:
     try:
-        cur.execute("SELECT setting_value FROM app_settings WHERE setting_key='postgres_core_authority_import_v26_completed'")
+        cur.execute("SELECT setting_value FROM app_settings WHERE setting_key=%s", (_V26_BOOTSTRAP_MARKER_KEY,))
         row = cur.fetchone()
         return str((row or {}).get("setting_value") or "").strip() == "1"
     except Exception:
@@ -2675,11 +2678,11 @@ def _v26_pg_set_bootstrap_marker(cur, imported: int) -> None:
     cur.execute(
         """
         INSERT INTO app_settings(setting_key, setting_value, note, updated_at)
-        VALUES ('postgres_core_authority_import_v26_completed', '1', %s, %s)
+        VALUES (%s, '1', %s, %s)
         ON CONFLICT (setting_key) DO UPDATE
         SET setting_value=EXCLUDED.setting_value, note=EXCLUDED.note, updated_at=EXCLUDED.updated_at
         """,
-        (f"Imported {int(imported)} rows from bundled authority JSON", now),
+        (_V26_BOOTSTRAP_MARKER_KEY, f"Imported {int(imported)} rows from bundled authority JSON", now),
     )
 
 
