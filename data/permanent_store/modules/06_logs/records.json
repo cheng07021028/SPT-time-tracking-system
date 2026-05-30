@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 13:14:33",
-  "exported_at": "2026-05-30 13:14:33",
+  "updated_at": "2026-05-30 13:14:52",
+  "exported_at": "2026-05-30 13:14:52",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -8683,11 +8683,59 @@
         "detail": "v230_find_ids\n__spt_log_uid=c96e3fee18214eaab571fdf1e137b6e6",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1750,
+        "log_time": "2026-05-30 13:14:49",
+        "user_name": "admin",
+        "action_type": "V246_DELETE_0102_SYNC",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V246 管理員刪除已同步 01/02：ids=[330, 331, 332, 333, 341, 346, 347, 348, 349, 350, 351, 353, 354, 355, 356, 359, 360, 364, 366, 373, 374, 377, 378, 379, 380, 385, 386, 387, 388, 389, 390, 391, 392, 393, 395, 396, 397, 398, 400, 401, 404, 413, 421, 422, 423]；purge={'01_time_records': {'before': 14, 'after': 14, 'removed': 0}, '02_history': {'before': 14, 'after': 14, 'removed': 0}}",
+        "detail": "__spt_log_uid=46651ed6a19e4513ab7d0ca476468ede",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1749,
+        "log_time": "2026-05-30 13:14:48",
+        "user_name": "admin",
+        "action_type": "V235_DISABLE_BROAD_PRUNE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已停用非 tombstone 廣泛清除；避免有效工時被誤判為舊快取復活資料。",
+        "detail": "__spt_log_uid=859a59e47c834a74b7978fc51562cad5",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1748,
+        "log_time": "2026-05-30 13:14:48",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V223",
+        "target_table": "time_records",
+        "target_id": "330,331,332,333,341,346,347,348,349,350,351,353,354,355,356,359,360,364,366,373,374,377,378,379,380,385,386,387,388,389,390,391,392,393,395,396,397,398,400,401,404,413,421,422,423",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：V223 以 ID 精準刪除並同步 01/02 權威檔；deleted=45；remaining=14",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1747,
+        "log_time": "2026-05-30 13:14:48",
+        "user_name": "admin",
+        "action_type": "V222_DELETE_CACHE_SYNC",
+        "target_table": "time_records",
+        "target_id": "330,331,332,333,341,346,347,348,349,350,351,353,354,355,356,359,360,364,366,373,374,377,378,379,380,385,386,387,388,389,390,391,392,393,395,396,397,398,400,401,404,413,421,422,423",
+        "message": "V222 已同步移除前台快取刪除資料：Today 0 筆、Active 0 筆。",
+        "detail": "v223_delete_cache|02 歷史紀錄啟動編輯後整列刪除",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 723
+    "system_logs": 727
   }
 }
