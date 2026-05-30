@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 14:29:09",
-  "exported_at": "2026-05-30 14:29:09",
+  "updated_at": "2026-05-30 14:29:30",
+  "exported_at": "2026-05-30 14:29:30",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -9271,11 +9271,23 @@
         "detail": "__spt_log_uid=aa0338d9954c4467ac2f07549db38b44",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1747,
+        "log_time": "2026-05-30 14:29:26",
+        "user_name": "SPT239",
+        "action_type": "V235_DISABLE_BROAD_PRUNE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已停用非 tombstone 廣泛清除；避免有效工時被誤判為舊快取復活資料。",
+        "detail": "__spt_log_uid=d29840b083c041c4ae1b9e680447fbb5",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 772
+    "system_logs": 773
   }
 }
