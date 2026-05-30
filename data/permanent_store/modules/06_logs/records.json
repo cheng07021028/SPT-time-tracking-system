@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 10:15:59",
-  "exported_at": "2026-05-30 10:15:59",
+  "updated_at": "2026-05-30 10:20:51",
+  "exported_at": "2026-05-30 10:20:51",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -7003,11 +7003,119 @@
         "detail": "__spt_log_uid=7ad5beae0f1045309adb4302fa3276a0",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1755,
+        "log_time": "2026-05-30 10:20:47",
+        "user_name": "admin",
+        "action_type": "V235_DISABLE_BROAD_PRUNE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已停用非 tombstone 廣泛清除；避免有效工時被誤判為舊快取復活資料。",
+        "detail": "__spt_log_uid=9197cf2941674b0287da7518f01d78e6",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1754,
+        "log_time": "2026-05-30 10:20:46",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：13 筆，active=11。",
+        "detail": "v230_find_ids",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1753,
+        "log_time": "2026-05-30 10:20:46",
+        "user_name": "admin",
+        "action_type": "V224_START_DISPLAY_GUARD",
+        "target_table": "time_records",
+        "target_id": "461",
+        "message": "V224 已強制同步開始作業至 01/02 權威與前台快取，ID=461。",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1752,
+        "log_time": "2026-05-30 10:20:46",
+        "user_name": "admin",
+        "action_type": "V212_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "461",
+        "message": "儲存工時逐筆紀錄：START_WORK，1 筆已寫入 01/02 權威檔與事件紀錄。",
+        "detail": "start_work_v212_restore_per_row_save",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1751,
+        "log_time": "2026-05-30 10:20:46",
+        "user_name": "admin",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "461",
+        "message": "SSS 開始 21M0241-01 / 前置鈑金",
+        "detail": "V205_FAST_START",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1750,
+        "log_time": "2026-05-30 10:20:46",
+        "user_name": "admin",
+        "action_type": "V212_SQLITE_SEQUENCE_GUARD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 工時 ID 序號已對齊權威檔 max_id=460，避免新增紀錄 ID 撞號。",
+        "detail": "start_work_v212_before_fast_insert",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1749,
+        "log_time": "2026-05-30 10:20:23",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：12 筆，active=10。",
+        "detail": "v235_cache_recover",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1748,
+        "log_time": "2026-05-30 10:18:21",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：12 筆，active=10。",
+        "detail": "v241_today_records_fast",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1747,
+        "log_time": "2026-05-30 10:16:56",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：12 筆，active=10。",
+        "detail": "v241_today_records_fast",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 583
+    "system_logs": 592
   }
 }
