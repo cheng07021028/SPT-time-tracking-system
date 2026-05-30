@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 10:14:52",
-  "exported_at": "2026-05-30 10:14:52",
+  "updated_at": "2026-05-30 10:15:06",
+  "exported_at": "2026-05-30 10:15:06",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -6775,11 +6775,35 @@
         "detail": "__spt_log_uid=caa989a48a42484f9e5b609cc95b46a1",
         "level": "WARN",
         "source": "sqlite"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-30 10:15:02",
+        "user_name": "admin",
+        "action_type": "V235_0102_HISTORY_REPAIR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已從同源資料修復 01/02 顯示來源：160 筆。",
+        "detail": "__spt_log_uid=2fb4f5e06de34642adad18adf618164b",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-30 10:15:02",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：12 筆，active=10。",
+        "detail": "v241_find_ids\n__spt_log_uid=e0d7a5dc0cfd451daf6d59c2ce32e198",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 564
+    "system_logs": 566
   }
 }
