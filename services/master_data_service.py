@@ -746,3 +746,24 @@ def has_master_data_for_time_record_fast(employees=None, work_orders=None):  # t
         return {"has_employees_master": has_emp, "has_work_orders_master": has_wo, "employees_count": len(emp_df) if emp_df is not None else 0, "work_orders_count": len(wo_df) if wo_df is not None else 0}
     return has_emp, has_wo
 # =================== END V127 MULTI-USER EMPLOYEE FAST CACHE ISOLATION ===================
+
+
+# ================= V128 01 MASTER DATA LONGER HOT CACHE =================
+# 03/04 master data rarely changes during operator clock-in/out, but 01 reruns
+# after every button. Keep the existing per-user employee isolation while letting
+# master-data reads stay hot longer. Save/import paths already call
+# clear_time_record_master_fast_cache(), so real 03/04 edits still refresh.
+try:
+    _V86_MD_CACHE_SECONDS = max(float(globals().get("_V86_MD_CACHE_SECONDS", 15.0)), 300.0)
+except Exception:
+    _V86_MD_CACHE_SECONDS = 300.0
+
+
+def audit_v128_master_data_hot_cache() -> dict:
+    return {
+        "version": "V128_01_MASTER_DATA_LONGER_HOT_CACHE_20260531",
+        "cache_seconds": float(globals().get("_V86_MD_CACHE_SECONDS", 0.0) or 0.0),
+        "employee_cache_still_isolated_by_login": True,
+    }
+
+# ================= END V128 01 MASTER DATA LONGER HOT CACHE =================

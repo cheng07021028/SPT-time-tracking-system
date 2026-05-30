@@ -4175,3 +4175,35 @@ def delete_process_categories(ids: Iterable[int]) -> int:  # type: ignore[overri
     return len(removed_names)
 
 # ===================== END V88 13 SYSTEM SETTINGS SPEED + DELETE COMMON CATEGORY FIX =====================
+
+
+# ================= V89 01 PROCESS SETTINGS ENSURE FAST PATH =================
+# The 01 page calls category/process option helpers on every Streamlit rerun.
+# The table-creation/seed routine only needs to run once per app process; repeated
+# DDL/INSERT OR IGNORE writes were adding latency to every button click.
+try:
+    _v89_prev_ensure_process_category_options_table = _ensure_process_category_options_table
+except Exception:  # pragma: no cover
+    _v89_prev_ensure_process_category_options_table = None
+
+_V89_PROCESS_CATEGORY_OPTIONS_READY = False
+
+
+def _ensure_process_category_options_table() -> None:  # type: ignore[override]
+    global _V89_PROCESS_CATEGORY_OPTIONS_READY
+    if _V89_PROCESS_CATEGORY_OPTIONS_READY:
+        return None
+    if callable(_v89_prev_ensure_process_category_options_table):
+        _v89_prev_ensure_process_category_options_table()
+    _V89_PROCESS_CATEGORY_OPTIONS_READY = True
+    return None
+
+
+def audit_v89_process_settings_ensure_fast_path() -> dict[str, Any]:
+    return {
+        "version": "V89_01_PROCESS_SETTINGS_ENSURE_FAST_PATH_20260531",
+        "ensure_already_ran": bool(_V89_PROCESS_CATEGORY_OPTIONS_READY),
+        "repeated_01_reruns_skip_table_creation_and_seed_writes": True,
+    }
+
+# ================= END V89 01 PROCESS SETTINGS ENSURE FAST PATH =================

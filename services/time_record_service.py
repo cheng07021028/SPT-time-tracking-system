@@ -28868,3 +28868,248 @@ def audit_v251_runtime_postgresql_time_records() -> dict:
     return out
 
 # ================= END V251 RUNTIME POSTGRESQL TIME RECORD SWITCH =================
+
+
+# ================= V252 POSTGRESQL BUTTON FAST PATH｜2026-05-31 =================
+# V251 already moved core 01/02 work to PostgreSQL, but each button still used
+# multiple small round trips and then called clear_query_cache(), which evicted
+# master/settings queries needed by the next Streamlit rerun. V252 keeps the same
+# behavior while making Start/Finish use a compact transaction and targeted cache
+# invalidation from db_service V30.
+
+try:
+    from services.db_service import execute_transaction as _v252_execute_transaction
+except Exception:  # pragma: no cover
+    _v252_execute_transaction = None  # type: ignore
+
+_v252_prev_start_work = start_work
+_v252_prev_finish_work = finish_work
+
+
+def _v252_active_rows_for_employee(employee_id: str, employee_name: str = "") -> pd.DataFrame:
+    where = [_v251_active_where()]
+    params: list = []
+    if _v251_text(employee_id):
+        where.append("employee_id=?")
+        params.append(_v251_text(employee_id))
+    elif _v251_text(employee_name):
+        where.append("employee_name=?")
+        params.append(_v251_text(employee_name))
+    return _v251_df(f"SELECT * FROM time_records WHERE {' AND '.join(where)} {_v251_order(desc=True)}", params)
+
+
+def _v252_duplicate_from_active(active: pd.DataFrame, wo_no: str, process: str, start_date: str) -> dict | None:
+    if active is None or active.empty:
+        return None
+    mask = (
+        active.get("work_order", "").astype(str).str.strip().eq(_v251_text(wo_no))
+        & active.get("process_name", "").astype(str).str.strip().eq(_v251_text(process))
+        & active.get("start_date", "").astype(str).str.strip().eq(_v251_text(start_date))
+    )
+    rows = active.loc[mask]
+    return dict(rows.iloc[0].to_dict()) if not rows.empty else None
+
+
+def _v252_conflicts_from_active(active: pd.DataFrame, process: str, start_date: str) -> pd.DataFrame:
+    if active is None or active.empty:
+        return pd.DataFrame()
+    proc = _v251_text(process)
+    sd = _v251_text(start_date)
+    mask = (
+        active.get("process_name", "").astype(str).str.strip().ne(proc)
+        | active.get("start_date", "").astype(str).str.strip().ne(sd)
+    )
+    return active.loc[mask].copy().reset_index(drop=True)
+
+
+def _v252_group_rows_for_record(record_id: int, rec: dict, finish_parallel_group: bool) -> pd.DataFrame:
+    if not finish_parallel_group:
+        return pd.DataFrame([rec])
+    employee_id = _v251_text(rec.get("employee_id"))
+    employee_name = _v251_text(rec.get("employee_name"))
+    process = _v251_text(rec.get("process_name"))
+    start_date = _v251_text(rec.get("start_date") or _v251_text(rec.get("start_timestamp"))[:10])
+    where = [_v251_active_where(), "process_name=?", "start_date=?"]
+    params: list = [process, start_date]
+    if employee_id:
+        where.append("employee_id=?")
+        params.append(employee_id)
+    elif employee_name:
+        where.append("employee_name=?")
+        params.append(employee_name)
+    df = _v251_df(f"SELECT * FROM time_records WHERE {' AND '.join(where)} {_v251_order(desc=False)}", params)
+    if df is None or df.empty:
+        return pd.DataFrame([rec])
+    return df
+
+
+def _v252_parallel_flag_update_sql() -> str:
+    return f"""
+        UPDATE time_records
+        SET group_key=?,
+            is_group_work=CASE
+                WHEN (
+                    SELECT COUNT(*) FROM time_records
+                    WHERE employee_id=? AND process_name=? AND start_date=? AND {_v251_active_where()}
+                ) > 1 THEN 1 ELSE 0 END,
+            updated_at=?
+        WHERE employee_id=? AND process_name=? AND start_date=? AND {_v251_active_where()}
+    """
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not _v251_pg() or not callable(_v252_execute_transaction):
+        return _v252_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old)
+
+    employee = employee or {}
+    work_order = work_order or {}
+    now = _now()
+    start_date, start_time = split_timestamp(now)
+    employee_id = _v251_text(employee.get("employee_id"))
+    employee_name = _v251_text(employee.get("employee_name"))
+    wo_no = _v251_text(work_order.get("work_order"))
+    process = _v251_text(process_name)
+    if not employee_id or not wo_no or not process:
+        raise ValueError("工號、製令、工段名稱不可空白。")
+
+    active = _v252_active_rows_for_employee(employee_id, employee_name)
+    duplicate = _v252_duplicate_from_active(active, wo_no, process, start_date)
+    if duplicate:
+        raise ValueError(f"此人員已有相同製令與工段正在計時，禁止重複紀錄：{wo_no} / {process}")
+    conflicts = _v252_conflicts_from_active(active, process, start_date)
+    if isinstance(conflicts, pd.DataFrame) and not conflicts.empty and not auto_pause_old:
+        raise ValueError("此人員已有不同工段正在計時，請先確認暫停前一筆作業後再開始新紀錄。")
+
+    record_key = make_record_key(employee_id, wo_no, process, now)
+    group_key = f"{employee_id}|{process}|{start_date}"
+    ops: list[tuple[str, tuple]] = []
+
+    if isinstance(conflicts, pd.DataFrame) and not conflicts.empty:
+        for _, row in conflicts.iterrows():
+            try:
+                rid = int(float(row.get("id")))
+            except Exception:
+                continue
+            start_ts = _v251_text(row.get("start_timestamp") or now)
+            hours = calculate_work_hours(start_ts, now)
+            old_remark = _v251_text(row.get("remark"))
+            pause_note = "系統自動暫停：同一人員切換不同工段或不同日期作業"
+            new_remark = (old_remark + "；" if old_remark else "") + pause_note
+            ops.append((
+                f"""
+                UPDATE time_records
+                SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                    work_hours=?, remark=?, updated_at=?
+                WHERE id=? AND {_v251_active_where()}
+                """,
+                ("暫停", "暫停", now, start_date, start_time, round(float(hours or 0), 2), new_remark, now, rid),
+            ))
+
+    ops.append((
+        """
+        INSERT INTO time_records(
+            record_key, status, work_order, part_no, type_name, process_name,
+            employee_id, employee_name, start_action, start_timestamp,
+            remark, start_date, start_time, assembly_location,
+            group_key, is_group_work, source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            record_key, "作業中", wo_no, work_order.get("part_no", ""), work_order.get("type_name", ""),
+            process, employee_id, employee_name, "開始", now, remark, start_date, start_time,
+            work_order.get("assembly_location", ""), group_key, 0, "postgresql_v252", now, now,
+        ),
+    ))
+    ops.append((
+        _v252_parallel_flag_update_sql(),
+        (group_key, employee_id, process, start_date, now, employee_id, process, start_date),
+    ))
+
+    ids = _v252_execute_transaction(ops, mark_changed=True, reason="start_work_v252_postgresql_fast_path", source_sql="INSERT INTO time_records")  # type: ignore[misc]
+    rid = int(ids[len(ops) - 2] or 0) if ids and len(ids) >= 2 else 0
+    try:
+        write_log("START_WORK", f"{employee_name} 開始 {wo_no} / {process}", "time_records", rid)
+    except Exception:
+        pass
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not _v251_pg() or not callable(_v252_execute_transaction):
+        return _v252_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group)
+    try:
+        rid0 = int(float(str(record_id).strip()))
+    except Exception:
+        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (rid0,))
+    if not rec:
+        raise ValueError("找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。")
+    if _v251_text(rec.get("end_timestamp")) or _v251_text(rec.get("status")) in _V251_TERMINAL:
+        return 0
+
+    group = _v252_group_rows_for_record(rid0, rec, finish_parallel_group)
+    if group is None or group.empty:
+        group = pd.DataFrame([rec])
+    group_ids = [int(float(x)) for x in group.get("id", pd.Series(dtype=object)).tolist() if _v251_text(x)]
+    if not group_ids:
+        return 0
+
+    now = _now()
+    end_date, end_time = split_timestamp(now)
+    starts = [_v251_text(x) for x in group.get("start_timestamp", pd.Series([rec.get("start_timestamp")])).tolist() if _v251_text(x)]
+    earliest_start = min(starts) if starts else _v251_text(rec.get("start_timestamp") or now)
+    total_hours = calculate_work_hours(earliest_start, now)
+    avg_hours = round(float(total_hours or 0) / max(len(group_ids), 1), 2)
+    status = end_action if end_action in ("下班", "暫停", "完工") else "已結束"
+    group_key = _v251_text(rec.get("group_key")) or f"{rec.get('employee_id')}|{rec.get('process_name')}|{rec.get('start_date')}"
+
+    summary = ""
+    if len(group_ids) > 1:
+        try:
+            summary = _v138_parallel_summary_text(len(group_ids), total_hours, avg_hours)  # type: ignore[name-defined]
+        except Exception:
+            summary = f"同時作業 {len(group_ids)} 筆，總工時 {total_hours:.2f} 小時，平均 {avg_hours:.2f} 小時"
+
+    ops: list[tuple[str, tuple]] = []
+    for _, row in group.iterrows():
+        try:
+            rid = int(float(row.get("id")))
+        except Exception:
+            continue
+        old_remark = _v251_text(row.get("remark"))
+        append = _v251_text(remark)
+        if summary:
+            append = (append + "；" if append else "") + summary
+        new_remark = (old_remark + "；" if old_remark and append else old_remark) + append
+        ops.append((
+            f"""
+            UPDATE time_records
+            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
+            WHERE id=? AND {_v251_active_where()}
+            """,
+            (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, 1 if len(group_ids) > 1 else int(rec.get("is_group_work") or 0), now, rid),
+        ))
+
+    if not ops:
+        return 0
+    _v252_execute_transaction(ops, mark_changed=True, reason="finish_work_v252_postgresql_fast_path", source_sql="UPDATE time_records")  # type: ignore[misc]
+    try:
+        write_log("END_WORK_GROUP" if len(group_ids) > 1 else "END_WORK", f"PostgreSQL 快速結束工時紀錄 #{rid0}，同步結束={len(group_ids)}筆，狀態={status}", "time_records", rid0, detail=",".join(str(x) for x in group_ids))
+    except Exception:
+        pass
+    return int(len(group_ids))
+
+
+def audit_v252_postgresql_button_fast_path() -> dict:
+    return {
+        "version": "V252_POSTGRESQL_BUTTON_FAST_PATH_20260531",
+        "postgres_enabled_now": _v251_pg(),
+        "start_finish_use_batched_transaction": True,
+        "start_reuses_one_active_query_for_duplicate_and_conflict_checks": True,
+        "finish_uses_group_dataframe_without_per_row_remark_queries": True,
+        "avoids_full_clear_query_cache_on_button_path": True,
+    }
+
+# ================= END V252 POSTGRESQL BUTTON FAST PATH =================
