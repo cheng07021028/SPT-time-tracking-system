@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 10:23:49",
-  "exported_at": "2026-05-30 10:23:49",
+  "updated_at": "2026-05-30 10:27:48",
+  "exported_at": "2026-05-30 10:27:48",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -7159,11 +7159,35 @@
         "detail": "INSERT INTO app_settings(setting_key, setting_value, note, updated_at)\n        VALUES (?, ?, ?, ?)\n        ON CONFLICT(setting_key) DO UPDATE SET\n            setting_value=excluded.setting_value,\n            note=excluded.note,\n            updated_at=excluded.updated_at",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-30 10:27:44",
+        "user_name": "admin",
+        "action_type": "V235_0102_HISTORY_REPAIR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已從同源資料修復 01/02 顯示來源：161 筆。",
+        "detail": "__spt_log_uid=36ae555373564dc09a69a8dcf1de7817",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-30 10:27:44",
+        "user_name": "admin",
+        "action_type": "V235_0102_HISTORY_REPAIR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已從同源資料修復 01/02 顯示來源：161 筆。",
+        "detail": "__spt_log_uid=09c1d5dbf9654ee4b83599059814b86a",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 596
+    "system_logs": 598
   }
 }
