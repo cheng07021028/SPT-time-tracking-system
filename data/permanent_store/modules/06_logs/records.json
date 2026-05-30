@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 21:55:38",
-  "exported_at": "2026-05-30 21:55:38",
+  "updated_at": "2026-05-30 21:55:59",
+  "exported_at": "2026-05-30 21:55:59",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -9511,11 +9511,47 @@
         "detail": "v225_finish_work_sqlite_best_effort",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 3,
+        "log_time": "2026-05-30 21:55:55",
+        "user_name": "admin",
+        "action_type": "V235_DISABLE_BROAD_PRUNE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已停用非 tombstone 廣泛清除；避免有效工時被誤判為舊快取復活資料。",
+        "detail": "__spt_log_uid=7cca8e8b9cad40888a6b9383f825ada1",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-30 21:55:55",
+        "user_name": "admin",
+        "action_type": "END_WORK_GROUP",
+        "target_table": "time_records",
+        "target_id": "469",
+        "message": "V225 權威檔優先結束工時紀錄 #469，同步結束=2筆，狀態=暫停。",
+        "detail": "469,468;V225_AUTHORITY_FIRST_FINISH",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-30 21:55:55",
+        "user_name": "admin",
+        "action_type": "V208_DISPLAY_AUTHORITY_HYDRATE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite time_records 顯示快取空白，已由 01/02 權威檔回填 2 筆。",
+        "detail": "v225_finish_work_sqlite_best_effort\n__spt_log_uid=52504ecafa1a4ed5acd58ff0ef999faf",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 792
+    "system_logs": 795
   }
 }
