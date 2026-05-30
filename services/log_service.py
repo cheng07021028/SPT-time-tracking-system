@@ -1610,3 +1610,111 @@ def audit_v211_postgresql_fast_log_path() -> dict[str, Any]:
 
 
 # ================= END V211 POSTGRESQL FAST LOG PATH =================
+
+
+# =================== V212 ASYNC POSTGRESQL LOG WRITES ===================
+# Keep foreground button actions focused on the business write. In PostgreSQL
+# mode, operation logs are still written to 06/system_logs, but by a background
+# worker so Start/Finish/Save/Delete buttons do not wait on audit I/O.
+try:
+    import queue as _v212_queue
+    import threading as _v212_threading
+    import time as _v212_time
+except Exception:  # pragma: no cover
+    _v212_queue = None  # type: ignore
+    _v212_threading = None  # type: ignore
+    _v212_time = None  # type: ignore
+
+try:
+    _v212_prev_write_log = write_log
+except Exception:  # pragma: no cover
+    _v212_prev_write_log = None
+
+_V212_LOG_QUEUE = _v212_queue.Queue(maxsize=20000) if _v212_queue is not None else None
+_V212_LOG_WORKER_STARTED = False
+_V212_LOG_LOCK = _v212_threading.Lock() if _v212_threading is not None else None
+_V212_LOG_STATS = {"queued": 0, "written": 0, "failed": 0, "sync_fallback": 0}
+
+
+def _v212_log_sql() -> str:
+    return """
+        INSERT INTO system_logs
+        (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """
+
+
+def _v212_write_log_row(row: tuple[Any, ...]) -> None:
+    from services.db_service import execute as _db_execute
+    _db_execute(_v212_log_sql(), row)
+
+
+def _v212_worker() -> None:
+    if _V212_LOG_QUEUE is None:
+        return
+    while True:
+        row = _V212_LOG_QUEUE.get()
+        try:
+            _v212_write_log_row(row)
+            _V212_LOG_STATS["written"] = int(_V212_LOG_STATS.get("written", 0)) + 1
+        except Exception:
+            _V212_LOG_STATS["failed"] = int(_V212_LOG_STATS.get("failed", 0)) + 1
+            try:
+                if _v212_time is not None:
+                    _v212_time.sleep(0.2)
+                _v212_write_log_row(row)
+                _V212_LOG_STATS["written"] = int(_V212_LOG_STATS.get("written", 0)) + 1
+            except Exception:
+                pass
+        finally:
+            try:
+                _V212_LOG_QUEUE.task_done()
+            except Exception:
+                pass
+
+
+def _v212_start_worker_once() -> None:
+    global _V212_LOG_WORKER_STARTED
+    if _V212_LOG_WORKER_STARTED or _v212_threading is None or _V212_LOG_QUEUE is None:
+        return
+    lock = _V212_LOG_LOCK
+    if lock is None:
+        return
+    with lock:
+        if _V212_LOG_WORKER_STARTED:
+            return
+        _v212_threading.Thread(target=_v212_worker, name="SPT-Async-PostgreSQL-Log", daemon=True).start()
+        _V212_LOG_WORKER_STARTED = True
+
+
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    if _v211_pg_enabled() and _V212_LOG_QUEUE is not None:
+        row = (now_text(), user_name or _current_log_user(), action_type, target_table, str(target_id or ""), message, detail, level)
+        _v212_start_worker_once()
+        try:
+            _V212_LOG_QUEUE.put_nowait(row)
+            _V212_LOG_STATS["queued"] = int(_V212_LOG_STATS.get("queued", 0)) + 1
+            return None
+        except Exception:
+            _V212_LOG_STATS["sync_fallback"] = int(_V212_LOG_STATS.get("sync_fallback", 0)) + 1
+            try:
+                _v212_write_log_row(row)
+            except Exception:
+                _V212_LOG_STATS["failed"] = int(_V212_LOG_STATS.get("failed", 0)) + 1
+            return None
+    if callable(_v212_prev_write_log):
+        return _v212_prev_write_log(action_type, message, target_table, target_id, detail, level, user_name)
+    return None
+
+
+def audit_v212_async_postgresql_log_writes() -> dict[str, Any]:
+    return {
+        "version": "V212_ASYNC_POSTGRESQL_LOG_WRITES",
+        "postgres_enabled": _v211_pg_enabled(),
+        "worker_started": bool(_V212_LOG_WORKER_STARTED),
+        "queue_size": int(_V212_LOG_QUEUE.qsize()) if _V212_LOG_QUEUE is not None else 0,
+        **dict(_V212_LOG_STATS),
+    }
+
+
+# ================= END V212 ASYNC POSTGRESQL LOG WRITES =================
