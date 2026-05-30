@@ -22293,3 +22293,771 @@ def audit_v232_concurrent_write_safety() -> dict:
     }
 
 # ================= END V232 MULTI-USER CONCURRENT WRITE SAFETY LAYER =================
+
+# ================= V235 01/02 SAME-SOURCE HISTORY REPAIR + SAFE NO-PRUNE｜2026-05-30 =================
+# 目的：修正 01 今日紀錄可見但 02 歷史紀錄空白 / 搜不到，以及 V232 prune stale resurrection 過度清除資料的風險。
+# 原則：保留 V225 正確讀寫 + V230/V231 快速顯示 + V232 併發事件；不改 UI/CSS/theme/table/buttons。
+# 關鍵修正：
+# 1) 停用 V232 的「非 tombstone」廣泛 prune。刪除防復活只靠精準 tombstone，不再把快取/row shard 的其他人資料當舊資料清掉。
+# 2) 02 歷史紀錄 load_records 使用 01/02 權威 + 前台快取 + SQLite + append-only event journal 同源合併。
+# 3) 若 02_history 被洗空，會從 01/快取/事件紀錄安全回補；因此 01 有資料時 02 不應空白。
+try:
+    _v235_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v235_prev_load_records = None
+try:
+    _v235_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v235_prev_today_records = None
+try:
+    _v235_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v235_prev_get_active_records = None
+try:
+    _v235_prev_get_active_record = get_active_record
+except Exception:  # pragma: no cover
+    _v235_prev_get_active_record = None
+try:
+    _v235_prev_get_active_group = get_active_group
+except Exception:  # pragma: no cover
+    _v235_prev_get_active_group = None
+try:
+    _v235_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v235_prev_start_work = None
+try:
+    _v235_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v235_prev_finish_work = None
+try:
+    _v235_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v235_prev_delete_time_records = None
+try:
+    _v235_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v235_prev_save_time_records = None
+
+import json as _v235_json
+import sqlite3 as _v235_sqlite3
+from pathlib import Path as _v235_Path
+from datetime import datetime as _v235_datetime
+
+_V235_VERSION = "V235_0102_SAME_SOURCE_HISTORY_REPAIR"
+try:
+    _V235_PROJECT_ROOT = _v235_Path(__file__).resolve().parents[1]
+except Exception:  # pragma: no cover
+    _V235_PROJECT_ROOT = _v235_Path(".").resolve()
+_V235_MEMORY: dict = {"rows": None, "epoch": 0.0, "sig": ""}
+_V235_MEMORY_TTL_SECONDS = 20.0
+
+
+def _v235_now() -> str:
+    try:
+        return now_text()  # type: ignore[name-defined]
+    except Exception:
+        return _v235_datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v235_text(v) -> str:
+    try:
+        if "_v232_text" in globals() and callable(_v232_text):  # type: ignore[name-defined]
+            return _v232_text(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if v is None:
+        return ""
+    try:
+        if pd.isna(v):  # type: ignore[name-defined]
+            return ""
+    except Exception:
+        pass
+    s = str(v).strip()
+    return "" if s.lower() in ("none", "nan", "nat", "null", "<na>") else s
+
+
+def _v235_int(v) -> int | None:
+    try:
+        if "_v232_int" in globals() and callable(_v232_int):  # type: ignore[name-defined]
+            return _v232_int(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    s = _v235_text(v)
+    if not s:
+        return None
+    try:
+        i = int(float(s))
+        return i if i > 0 else None
+    except Exception:
+        return None
+
+
+def _v235_date(v) -> str:
+    try:
+        if "_v232_date" in globals() and callable(_v232_date):  # type: ignore[name-defined]
+            return _v232_date(v)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    s = _v235_text(v).replace("/", "-")
+    if " " in s:
+        s = s.split(" ", 1)[0]
+    if "T" in s:
+        s = s.split("T", 1)[0]
+    return s[:10] if len(s) >= 10 else ""
+
+
+def _v235_today() -> str:
+    try:
+        return _v235_date(today_date())  # type: ignore[name-defined]
+    except Exception:
+        return _v235_datetime.now().strftime("%Y-%m-%d")
+
+
+def _v235_json_default(v):
+    try:
+        if pd.isna(v):  # type: ignore[name-defined]
+            return ""
+    except Exception:
+        pass
+    try:
+        if hasattr(v, "item"):
+            return v.item()
+    except Exception:
+        pass
+    return str(v)
+
+
+def _v235_safe_read_json(path: _v235_Path, default):
+    try:
+        if path.exists():
+            text = path.read_text(encoding="utf-8")
+            if text.strip():
+                return _v235_json.loads(text)
+    except Exception:
+        return default
+    return default
+
+
+def _v235_safe_write_json(path: _v235_Path, payload) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(_v235_json.dumps(payload, ensure_ascii=False, indent=2, default=_v235_json_default), encoding="utf-8")
+        _v235_json.loads(tmp.read_text(encoding="utf-8"))
+        tmp.replace(path)
+    except Exception as exc:
+        try:
+            write_log("V235_SAFE_WRITE_WARN", f"V235 安全寫入失敗：{exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+
+
+def _v235_row_id(row: dict) -> int | None:
+    if not isinstance(row, dict):
+        return None
+    return _v235_int(row.get("id") or row.get("ID") or row.get("ID / ID"))
+
+
+def _v235_row_key(row: dict) -> str:
+    if not isinstance(row, dict):
+        return ""
+    try:
+        if "_v232_row_merge_key" in globals() and callable(_v232_row_merge_key):  # type: ignore[name-defined]
+            return _v232_row_merge_key(row)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    rid = _v235_row_id(row)
+    rk = _v235_text(row.get("record_key"))
+    if rk:
+        return "record_key:" + rk
+    if rid is not None:
+        return f"id:{rid}"
+    return "biz:" + "|".join([
+        _v235_text(row.get("employee_id")),
+        _v235_text(row.get("work_order")),
+        _v235_text(row.get("process_name")),
+        _v235_text(row.get("start_timestamp")),
+    ])
+
+
+def _v235_is_active_row(row: dict) -> bool:
+    try:
+        if "_v232_is_active_row" in globals() and callable(_v232_is_active_row):  # type: ignore[name-defined]
+            return bool(_v232_is_active_row(row))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    end_ts = _v235_text(row.get("end_timestamp") if isinstance(row, dict) else "")
+    if end_ts:
+        return False
+    status = _v235_text(row.get("status") if isinstance(row, dict) else "").lower()
+    end_action = _v235_text(row.get("end_action") if isinstance(row, dict) else "").lower()
+    closed = {"下班", "暫停", "完工", "已結束", "結束", "完成", "off_duty", "paused", "finished", "end", "ended", "complete", "completed"}
+    return status not in closed and end_action not in closed
+
+
+def _v235_normalize_row(row: dict) -> dict:
+    r = dict(row or {})
+    try:
+        if "_v232_normalize_row" in globals() and callable(_v232_normalize_row):  # type: ignore[name-defined]
+            r = _v232_normalize_row(r, ensure_record_key=True, op_type="V235_RECOVER")  # type: ignore[name-defined]
+    except Exception:
+        pass
+    rid = _v235_row_id(r)
+    if rid is not None:
+        r["id"] = rid
+    if not _v235_text(r.get("start_date")):
+        sd = _v235_date(r.get("start_timestamp"))
+        if sd:
+            r["start_date"] = sd
+    if not _v235_text(r.get("end_date")):
+        ed = _v235_date(r.get("end_timestamp"))
+        if ed:
+            r["end_date"] = ed
+    if not _v235_text(r.get("status")):
+        r["status"] = "作業中" if _v235_is_active_row(r) else "下班"
+    if not _v235_text(r.get("updated_at")):
+        r["updated_at"] = _v235_text(r.get("end_timestamp")) or _v235_text(r.get("start_timestamp")) or _v235_now()
+    return r
+
+
+def _v235_extract_rows(payload, depth: int = 0) -> list[dict]:
+    if depth > 4:
+        return []
+    rows: list[dict] = []
+    if isinstance(payload, list):
+        for item in payload:
+            rows.extend(_v235_extract_rows(item, depth + 1))
+        return rows
+    if not isinstance(payload, dict):
+        return rows
+    # Direct event row.
+    if isinstance(payload.get("row"), dict):
+        rows.append(dict(payload["row"]))
+    # V232 event rows or generic records.
+    for key in ("records", "rows", "data", "items", "best_rows", "sqlite_time_records", "authority_01_time_records", "authority_02_history"):
+        val = payload.get(key)
+        if isinstance(val, list):
+            rows.extend([dict(x) for x in val if isinstance(x, dict)])
+        elif isinstance(val, dict):
+            rows.extend(_v235_extract_rows(val, depth + 1))
+    # V166 snapshot nested rows object.
+    if isinstance(payload.get("rows"), dict):
+        rows.extend(_v235_extract_rows(payload.get("rows"), depth + 1))
+    return rows
+
+
+def _v235_dedupe_rows(rows: list[dict]) -> list[dict]:
+    clean: list[dict] = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        nr = _v235_normalize_row(r)
+        # skip records that are not time records at all
+        if not (_v235_row_id(nr) or _v235_text(nr.get("record_key")) or (_v235_text(nr.get("employee_id")) and _v235_text(nr.get("start_timestamp")))):
+            continue
+        clean.append(nr)
+    try:
+        if "_v232_filter_deleted_rows" in globals() and callable(_v232_filter_deleted_rows):  # type: ignore[name-defined]
+            clean = _v232_filter_deleted_rows(clean)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    by: dict[str, dict] = {}
+    order: list[str] = []
+    for r in clean:
+        k = _v235_row_key(r)
+        if not k:
+            continue
+        if k not in by:
+            by[k] = dict(r)
+            order.append(k)
+        else:
+            old = dict(by[k])
+            # prefer newer / richer row; do not erase existing non-empty values with blanks
+            merged = dict(old)
+            for kk, vv in r.items():
+                if _v235_text(vv) or kk not in merged:
+                    merged[kk] = vv
+            # row with end_timestamp is more complete for the same key
+            if _v235_text(r.get("end_timestamp")) and not _v235_text(old.get("end_timestamp")):
+                merged.update({kk: vv for kk, vv in r.items() if _v235_text(vv) or kk not in merged})
+            by[k] = merged
+    out = [by[k] for k in order if k in by]
+    try:
+        out.sort(key=lambda r: (_v235_text(r.get("start_timestamp")) or _v235_text(r.get("created_at")), _v235_row_id(r) or 0), reverse=True)
+    except Exception:
+        pass
+    return out
+
+
+def _v235_payload_rows(payload) -> list[dict]:
+    rows = []
+    try:
+        rows = _v235_extract_rows(payload)
+    except Exception:
+        rows = []
+    return _v235_dedupe_rows(rows)
+
+
+def _v235_read_file_rows(path: _v235_Path) -> list[dict]:
+    return _v235_payload_rows(_v235_safe_read_json(path, []))
+
+
+def _v235_read_authority_rows() -> list[dict]:
+    rows: list[dict] = []
+    # Current canonical 01/02 modules.
+    for module_key in ("01_time_records", "02_history"):
+        try:
+            if "_v232_read_module_rows" in globals() and callable(_v232_read_module_rows):  # type: ignore[name-defined]
+                _, rr = _v232_read_module_rows(module_key)  # type: ignore[name-defined]
+                rows.extend([dict(r) for r in rr if isinstance(r, dict)])
+                continue
+        except Exception:
+            pass
+        rows.extend(_v235_read_file_rows(_V235_PROJECT_ROOT / "data" / "permanent_store" / "modules" / module_key / "records.json"))
+    return _v235_dedupe_rows(rows)
+
+
+def _v235_read_fast_cache_rows() -> list[dict]:
+    rows: list[dict] = []
+    for fn_name in ("_v231_get_display_rows", "_v230_get_display_rows"):
+        try:
+            fn = globals().get(fn_name)
+            if callable(fn):
+                rows.extend([dict(r) for r in fn("v235_cache_recover") if isinstance(r, dict)])
+        except Exception:
+            pass
+    for p in [
+        _V235_PROJECT_ROOT / "data" / "persistent_state" / "frontend_cache" / "01_display_records_fast_cache.json",
+        _V235_PROJECT_ROOT / "data" / "persistent_state" / "frontend_cache" / "01_today_records_cache.json",
+        _V235_PROJECT_ROOT / "data" / "persistent_state" / "frontend_cache" / "01_active_records_index.json",
+    ]:
+        rows.extend(_v235_read_file_rows(p))
+    return _v235_dedupe_rows(rows)
+
+
+def _v235_read_sqlite_rows(limit: int = 10000) -> list[dict]:
+    rows: list[dict] = []
+    db_path = _V235_PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
+    if not db_path.exists():
+        return []
+    try:
+        conn = _v235_sqlite3.connect(str(db_path), timeout=1.0)
+        conn.row_factory = _v235_sqlite3.Row
+        try:
+            cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='time_records'")
+            if not cur.fetchone():
+                return []
+            cur = conn.execute(f"SELECT * FROM time_records ORDER BY COALESCE(updated_at, start_timestamp, created_at) DESC LIMIT {int(limit)}")
+            rows = [dict(r) for r in cur.fetchall()]
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    except Exception:
+        return []
+    return _v235_dedupe_rows(rows)
+
+
+def _v235_recent_event_files() -> list[_v235_Path]:
+    bases = [
+        _V235_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "02_history" / "time_record_events",
+        _V235_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "01_time_records" / "time_record_events",
+        _V235_PROJECT_ROOT / "data" / "permanent_store" / "modules" / "time_record_operation_events" / "events",
+    ]
+    files: list[_v235_Path] = []
+    for base in bases:
+        try:
+            if base.exists():
+                files.extend([p for p in base.rglob("*.json") if p.is_file()])
+        except Exception:
+            pass
+    try:
+        files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    except Exception:
+        files.sort(reverse=True)
+    return files[:3000]
+
+
+def _v235_read_event_rows() -> list[dict]:
+    rows: list[dict] = []
+    for p in _v235_recent_event_files():
+        try:
+            rows.extend(_v235_read_file_rows(p))
+        except Exception:
+            pass
+    # V232 jsonl journal contains rows too.
+    for p in [
+        _V235_PROJECT_ROOT / "data" / "persistent_state" / "concurrency_journal" / "time_record_operations.jsonl",
+        _V235_PROJECT_ROOT / "data" / "persistent_state" / "frontend_cache" / "01_background_queue.jsonl",
+    ]:
+        try:
+            if p.exists():
+                for line in p.read_text(encoding="utf-8", errors="ignore").splitlines()[-5000:]:
+                    line = line.strip()
+                    if line.startswith("{"):
+                        rows.extend(_v235_payload_rows(_v235_json.loads(line)))
+        except Exception:
+            pass
+    return _v235_dedupe_rows(rows)
+
+
+def _v235_collect_rows(*, include_events: bool = False, reason: str = "v235_collect") -> list[dict]:
+    rows: list[dict] = []
+    rows.extend(_v235_read_fast_cache_rows())
+    rows.extend(_v235_read_authority_rows())
+    rows.extend(_v235_read_sqlite_rows())
+    if include_events:
+        rows.extend(_v235_read_event_rows())
+    out = _v235_dedupe_rows(rows)
+    return out
+
+
+def _v235_min_authority_count() -> int:
+    counts = []
+    for module_key in ("01_time_records", "02_history"):
+        try:
+            if "_v232_read_module_rows" in globals() and callable(_v232_read_module_rows):  # type: ignore[name-defined]
+                _, rr = _v232_read_module_rows(module_key)  # type: ignore[name-defined]
+                counts.append(len([r for r in rr if isinstance(r, dict)]))
+                continue
+        except Exception:
+            pass
+        counts.append(len(_v235_read_file_rows(_V235_PROJECT_ROOT / "data" / "permanent_store" / "modules" / module_key / "records.json")))
+    return min(counts) if counts else 0
+
+
+def _v235_write_authority_rows_if_needed(rows: list[dict], reason: str = "v235_repair") -> None:
+    rows = _v235_dedupe_rows(rows)
+    if not rows:
+        return
+    try:
+        min_count = _v235_min_authority_count()
+        # Repair only when one authority side is empty or clearly behind. Avoid rewriting on every read.
+        if min_count > 0 and min_count >= max(1, len(rows) - 2):
+            return
+    except Exception:
+        pass
+    try:
+        if "_v232_merge_authority_rows" in globals() and callable(_v232_merge_authority_rows):  # type: ignore[name-defined]
+            _v232_merge_authority_rows(rows, reason=reason)  # type: ignore[name-defined]
+        else:
+            for module_key in ("01_time_records", "02_history"):
+                p = _V235_PROJECT_ROOT / "data" / "permanent_store" / "modules" / module_key / "records.json"
+                _v235_safe_write_json(p, {"version": _V235_VERSION, "updated_at": _v235_now(), "records": rows})
+        try:
+            if "_v231_write_rows" in globals() and callable(_v231_write_rows):  # type: ignore[name-defined]
+                _v231_write_rows(rows, reason=reason + "_cache")  # type: ignore[name-defined]
+            elif "_v230_write_display_rows" in globals() and callable(_v230_write_display_rows):  # type: ignore[name-defined]
+                _v230_write_display_rows(rows, reason=reason + "_cache")  # type: ignore[name-defined]
+        except Exception:
+            pass
+        try:
+            write_log("V235_0102_HISTORY_REPAIR", f"V235 已從同源資料修復 01/02 顯示來源：{len(rows)} 筆。", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    except Exception as exc:
+        try:
+            write_log("V235_0102_HISTORY_REPAIR_WARN", f"V235 修復 01/02 顯示來源失敗：{exc}", "time_records", level="WARN")  # type: ignore[name-defined]
+        except Exception:
+            pass
+
+
+def _v235_filter_df(df, start_date=None, end_date=None, employee_id=None, work_order=None, process_name=None, employee_name=None, *, active_only=False):
+    try:
+        if "_v231_filter_df" in globals() and callable(_v231_filter_df):  # type: ignore[name-defined]
+            return _v231_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order, process_name=process_name, employee_name=employee_name, active_only=active_only)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return pd.DataFrame()  # type: ignore[name-defined]
+    out = df.copy()
+    try:
+        if active_only:
+            out = out.loc[out.apply(lambda r: _v235_is_active_row(dict(r)), axis=1)].copy()
+        emp = _v235_text(employee_id)
+        if emp and "employee_id" in out.columns:
+            out = out.loc[out["employee_id"].map(_v235_text) == emp].copy()
+        name = _v235_text(employee_name)
+        if name and not emp and "employee_name" in out.columns:
+            out = out.loc[out["employee_name"].map(_v235_text) == name].copy()
+        wo = _v235_text(work_order)
+        if wo and "work_order" in out.columns:
+            out = out.loc[out["work_order"].map(_v235_text) == wo].copy()
+        proc = _v235_text(process_name)
+        if proc and "process_name" in out.columns:
+            out = out.loc[out["process_name"].map(_v235_text) == proc].copy()
+        sd = _v235_date(start_date)
+        ed = _v235_date(end_date)
+        if sd or ed:
+            if "start_date" in out.columns:
+                ds = out["start_date"].map(_v235_date)
+            elif "start_timestamp" in out.columns:
+                ds = out["start_timestamp"].map(_v235_date)
+            else:
+                ds = pd.Series([""] * len(out), index=out.index)  # type: ignore[name-defined]
+            if sd:
+                out = out.loc[ds >= sd].copy()
+            if ed:
+                out = out.loc[ds <= ed].copy()
+        return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+    except Exception:
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def _v235_rows_to_df(rows: list[dict]):
+    try:
+        if "_v231_rows_to_df" in globals() and callable(_v231_rows_to_df):  # type: ignore[name-defined]
+            return _v231_rows_to_df(rows)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        return pd.DataFrame(rows).reset_index(drop=True) if rows else pd.DataFrame()  # type: ignore[name-defined]
+    except Exception:
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+# Disable V232 broad prune. It was intended to block stale resurrection, but in production it can erase valid rows
+# when 01/02 authority is empty or when multiple users write from different cached views. Tombstones remain authoritative.
+def _v232_prune_unexpected_new_rows(before_keys: set[str] | None, allowed_rows_or_ids=None, reason: str = "v235_disable_broad_prune") -> int:  # type: ignore[override]
+    try:
+        write_log("V235_DISABLE_BROAD_PRUNE", "V235 已停用非 tombstone 廣泛清除；避免有效工時被誤判為舊快取復活資料。", "time_records", level="INFO")  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return 0
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    rows = _v235_collect_rows(include_events=False, reason="v235_load_fast")
+    # If 02/authority is empty or the requested range is not represented by cache/sqlite, replay append-only events.
+    need_events = False
+    try:
+        if not rows or _v235_min_authority_count() == 0:
+            need_events = True
+        elif start_date or end_date:
+            df_fast = _v235_filter_df(_v235_rows_to_df(rows), start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+            if not isinstance(df_fast, pd.DataFrame) or df_fast.empty:  # type: ignore[name-defined]
+                need_events = True
+    except Exception:
+        need_events = True
+    if need_events:
+        rows = _v235_collect_rows(include_events=True, reason="v235_load_with_events")
+    if rows:
+        _v235_write_authority_rows_if_needed(rows, reason="v235_load_records_0102_repair")
+    df = _v235_rows_to_df(rows)
+    return _v235_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    today = _v235_today()
+    df = load_records(today, today, None, None)
+    if unfinished_only or not include_finished:
+        df = _v235_filter_df(df, active_only=True)
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) and not df.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = today_records(include_finished=False, unfinished_only=True)
+    out = _v235_filter_df(df, employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name, active_only=True)
+    return out.reset_index(drop=True) if isinstance(out, pd.DataFrame) and not out.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+        return None
+    return dict(df.iloc[0].to_dict())
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    rid = _v235_int(record_id)
+    rows = [r for r in _v235_collect_rows(include_events=False, reason="v235_active_group") if _v235_row_id(r) == rid]
+    if not rows:
+        try:
+            if callable(_v235_prev_get_active_group):
+                return _v235_prev_get_active_group(record_id)
+        except Exception:
+            pass
+        return pd.DataFrame()  # type: ignore[name-defined]
+    seed = rows[0]
+    return get_active_records(
+        employee_id=_v235_text(seed.get("employee_id")),
+        process_name=_v235_text(seed.get("process_name")),
+        start_date=_v235_date(seed.get("start_date") or seed.get("start_timestamp")),
+    )
+
+
+def _v235_sync_rows_by_ids(ids: list[int | str], reason: str) -> list[dict]:
+    wanted = {i for i in (_v235_int(x) for x in ids or []) if i is not None}
+    if not wanted:
+        return []
+    rows = [r for r in _v235_collect_rows(include_events=True, reason=reason) if _v235_row_id(r) in wanted]
+    if rows:
+        _v235_write_authority_rows_if_needed(rows, reason=reason)
+        try:
+            if "_v231_upsert_rows" in globals() and callable(_v231_upsert_rows):  # type: ignore[name-defined]
+                _v231_upsert_rows(rows, reason=reason + "_cache")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return rows
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v235_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    rid = int(_v235_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        _v235_sync_rows_by_ids([rid], reason="v235_start_force_0102_sync")
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v235_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    ids: list[int] = []
+    try:
+        g = get_active_group(record_id) if finish_parallel_group else pd.DataFrame()  # type: ignore[name-defined]
+        if isinstance(g, pd.DataFrame) and not g.empty and "id" in g.columns:  # type: ignore[name-defined]
+            ids.extend([i for i in (_v235_int(x) for x in g["id"].tolist()) if i is not None])
+    except Exception:
+        pass
+    rid = _v235_int(record_id)
+    if rid is not None:
+        ids.append(rid)
+    n = int(_v235_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)
+    if ids:
+        _v235_sync_rows_by_ids(sorted(set(ids)), reason="v235_finish_force_0102_sync")
+    return n
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    if not callable(_v235_prev_save_time_records):
+        raise RuntimeError("save_time_records base function is unavailable")
+    n = int(_v235_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    try:
+        rows = []
+        if isinstance(df, pd.DataFrame) and not df.empty:  # type: ignore[name-defined]
+            rows = [dict(r) for _, r in df.copy().where(pd.notna(df), "").iterrows()]  # type: ignore[name-defined]
+        if rows:
+            _v235_write_authority_rows_if_needed(rows, reason="v235_save_force_0102_sync")
+    except Exception:
+        pass
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    if not callable(_v235_prev_delete_time_records):
+        raise RuntimeError("delete_time_records base function is unavailable")
+    n = int(_v235_prev_delete_time_records(record_ids, reason=reason) or 0)
+    # No broad prune. Ensure display cache removes precise ids only.
+    try:
+        ids = sorted({i for i in (_v235_int(x) for x in (record_ids or [])) if i is not None})
+        if ids and "_v231_remove_ids" in globals() and callable(_v231_remove_ids):  # type: ignore[name-defined]
+            _v231_remove_ids(ids, reason="v235_delete_precise_cache_remove")  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return n
+
+
+def audit_v235_0102_history_repair() -> dict:
+    try:
+        authority_rows = _v235_read_authority_rows()
+        cache_rows = _v235_read_fast_cache_rows()
+        sqlite_rows = _v235_read_sqlite_rows()
+        event_rows = _v235_read_event_rows()
+        all_rows = _v235_collect_rows(include_events=True, reason="v235_audit")
+        today_df = today_records()
+        active_df = today_records(include_finished=False, unfinished_only=True)
+    except Exception as exc:
+        return {"version": _V235_VERSION, "ok": False, "error": str(exc)}
+    return {
+        "version": _V235_VERSION,
+        "base_preserved": "V225 correctness + V230/V231 speed + V232 concurrency events",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "broad_prune_disabled": True,
+        "delete_guard": "precise tombstone only",
+        "authority_rows": len(authority_rows),
+        "cache_rows": len(cache_rows),
+        "sqlite_rows": len(sqlite_rows),
+        "event_rows": len(event_rows),
+        "merged_rows": len(all_rows),
+        "today_rows": int(len(today_df)) if isinstance(today_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+        "active_rows": int(len(active_df)) if isinstance(active_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+        "rule": "02 history and 01 today now read the same merged recoverable source. If 02 authority is empty, records are restored from cache/sqlite/append-only events; V232 broad prune is disabled to prevent valid rows from being erased.",
+    }
+
+# ================= END V235 01/02 SAME-SOURCE HISTORY REPAIR + SAFE NO-PRUNE =================
+
+# ================= V235R FAST-KEEPING LOAD OVERRIDE｜2026-05-30 =================
+# 微調 V235：若 01/02 同源快取/SQLite 已能取得當前篩選資料，前台直接回傳，不掃 event journal；
+# 只有篩選結果仍為空時才重播 append-only events。避免修復 02 的同時拖慢 01 今日顯示。
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    rows_fast = _v235_collect_rows(include_events=False, reason="v235r_load_fast")
+    df_fast_all = _v235_rows_to_df(rows_fast)
+    df_fast = _v235_filter_df(df_fast_all, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+    if isinstance(df_fast, pd.DataFrame) and not df_fast.empty:  # type: ignore[name-defined]
+        # If 02/01 authority was washed empty, repair it from currently visible fast source only.
+        # This keeps 01 fast and immediately makes 02 use the same source.
+        try:
+            if _v235_min_authority_count() == 0:
+                _v235_write_authority_rows_if_needed(rows_fast, reason="v235r_fast_source_0102_repair")
+        except Exception:
+            pass
+        return df_fast.reset_index(drop=True)
+
+    # No visible row from fast lane for this filter/range. Only now replay durable append-only events.
+    rows_full = _v235_collect_rows(include_events=True, reason="v235r_load_with_events")
+    if rows_full:
+        _v235_write_authority_rows_if_needed(rows_full, reason="v235r_event_replay_0102_repair")
+    df_full = _v235_rows_to_df(rows_full)
+    return _v235_filter_df(df_full, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    today = _v235_today()
+    # Today's page must stay fast: first try fast lane for today, event replay only if no today data exists.
+    df = load_records(today, today, None, None)
+    if unfinished_only or not include_finished:
+        df = _v235_filter_df(df, active_only=True)
+    return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) and not df.empty else pd.DataFrame()  # type: ignore[name-defined]
+
+
+def audit_v235_0102_history_repair() -> dict:  # type: ignore[override]
+    try:
+        authority_rows = _v235_read_authority_rows()
+        cache_rows = _v235_read_fast_cache_rows()
+        sqlite_rows = _v235_read_sqlite_rows()
+        # Do not always scan event rows in normal page flow; audit scans them explicitly.
+        event_rows = _v235_read_event_rows()
+        fast_rows = _v235_collect_rows(include_events=False, reason="v235r_audit_fast")
+        full_rows = _v235_dedupe_rows(fast_rows + event_rows)
+        today_df = today_records()
+        active_df = today_records(include_finished=False, unfinished_only=True)
+    except Exception as exc:
+        return {"version": _V235_VERSION + "R", "ok": False, "error": str(exc)}
+    return {
+        "version": _V235_VERSION + "R",
+        "base_preserved": "V225 correctness + V230/V231 speed + V232 concurrency events",
+        "ui_changed": False,
+        "css_changed": False,
+        "theme_service_changed": False,
+        "table_rendering_changed": False,
+        "buttons_changed": False,
+        "broad_prune_disabled": True,
+        "delete_guard": "precise tombstone only",
+        "authority_rows": len(authority_rows),
+        "cache_rows": len(cache_rows),
+        "sqlite_rows": len(sqlite_rows),
+        "event_rows_available_for_repair": len(event_rows),
+        "fast_merged_rows": len(fast_rows),
+        "full_recoverable_rows": len(full_rows),
+        "today_rows": int(len(today_df)) if isinstance(today_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+        "active_rows": int(len(active_df)) if isinstance(active_df, pd.DataFrame) else 0,  # type: ignore[name-defined]
+        "rule": "01/02 use the same fast source first. Event journal replay is used only when the requested rows are not present in fast/cache/authority/SQLite, preserving 01 speed while repairing empty 02 history.",
+    }
+
+# ================= END V235R FAST-KEEPING LOAD OVERRIDE =================
