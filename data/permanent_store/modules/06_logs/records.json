@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 09:35:53",
-  "exported_at": "2026-05-30 09:35:53",
+  "updated_at": "2026-05-30 09:35:55",
+  "exported_at": "2026-05-30 09:35:55",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -5755,11 +5755,71 @@
         "detail": "v230_find_ids\n__spt_log_uid=190de19e27084f8eb7b0c17106df5e30",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 6,
+        "log_time": "2026-05-30 09:35:54",
+        "user_name": "admin",
+        "action_type": "V235_0102_HISTORY_REPAIR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已從同源資料修復 01/02 顯示來源：149 筆。",
+        "detail": "__spt_log_uid=3f122d6d965d41ccb5d78ccf78d62f06",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 5,
+        "log_time": "2026-05-30 09:35:53",
+        "user_name": "admin",
+        "action_type": "V235_DISABLE_BROAD_PRUNE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已停用非 tombstone 廣泛清除；避免有效工時被誤判為舊快取復活資料。",
+        "detail": "__spt_log_uid=571415b7b14543a7914b8f0b3690f235",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-30 09:35:53",
+        "user_name": "admin",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：8 筆，active=8。",
+        "detail": "v230_delete_cache_remove_base",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 3,
+        "log_time": "2026-05-30 09:35:53",
+        "user_name": "admin",
+        "action_type": "DELETE_TIME_RECORDS_V223",
+        "target_table": "time_records",
+        "target_id": "263,271,273,319,320",
+        "message": "02 歷史紀錄啟動編輯後整列刪除：V223 以 ID 精準刪除並同步 01/02 權威檔；deleted=5；remaining=8",
+        "detail": "",
+        "level": "WARN",
+        "source": "sqlite"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-30 09:35:53",
+        "user_name": "admin",
+        "action_type": "V222_DELETE_CACHE_SYNC",
+        "target_table": "time_records",
+        "target_id": "263,271,273,319,320",
+        "message": "V222 已同步移除前台快取刪除資料：Today 0 筆、Active 0 筆。",
+        "detail": "v223_delete_cache|02 歷史紀錄啟動編輯後整列刪除",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 479
+    "system_logs": 484
   }
 }
