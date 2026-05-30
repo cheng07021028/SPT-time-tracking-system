@@ -1198,3 +1198,51 @@ def get_authority_write_status() -> dict[str, dict[str, Any]]:
         return {}
 
 # =================== END V123 CONCURRENT AUTHORITY WRITE LOCK ===================
+
+
+# ===================== V124 CLOUD RUNTIME GITHUB WRITE GUARD =====================
+# PostgreSQL is now the cloud data store. Runtime writes to GitHub authority JSON can
+# create commits such as 06_logs/11_login_logs during app startup/login. Streamlit
+# Cloud then sees a new GitHub commit and redeploys, which looks like "always running".
+# Keep GitHub writes available only when explicitly enabled.
+
+try:
+    _v124_prev_github_put_file = github_put_file
+except Exception:  # pragma: no cover
+    _v124_prev_github_put_file = None
+
+
+def _v124_truthy(value: Any) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on", "enabled"}
+
+
+def _v124_streamlit_cloud() -> bool:
+    root = str(PROJECT_ROOT).replace("\\", "/").lower()
+    return root.startswith("/mount/src") or bool(os.environ.get("STREAMLIT_SHARING_MODE") or os.environ.get("STREAMLIT_CLOUD"))
+
+
+def _v124_runtime_github_writes_enabled() -> bool:
+    if _v124_truthy(_read_secret("SPT_ENABLE_RUNTIME_GITHUB_WRITES")):
+        return True
+    if _v124_truthy(_read_secret("SPT_DISABLE_RUNTIME_GITHUB_WRITES")):
+        return False
+    if _v124_streamlit_cloud():
+        return False
+    return True
+
+
+def github_put_file(path: Path, content: str, message: str) -> dict[str, Any]:  # type: ignore[override]
+    if not _v124_runtime_github_writes_enabled():
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "runtime_github_write_disabled_v124",
+            "path": _remote_path(path),
+            "message": str(message or "")[:180],
+        }
+    if callable(_v124_prev_github_put_file):
+        return _v124_prev_github_put_file(path, content, message)
+    return {"ok": False, "error": "previous_github_put_file_missing", "path": _remote_path(path)}
+
+
+# =================== END V124 CLOUD RUNTIME GITHUB WRITE GUARD ===================
