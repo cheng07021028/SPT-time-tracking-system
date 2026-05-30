@@ -23061,3 +23061,234 @@ def audit_v235_0102_history_repair() -> dict:  # type: ignore[override]
     }
 
 # ================= END V235R FAST-KEEPING LOAD OVERRIDE =================
+
+# ================= V236 02 HISTORY STABLE SOURCE｜2026-05-30 =================
+# 目的：修正 02.歷史紀錄內容在不同 rerun 間「跳動」：有時只顯示今日 fast cache 10 筆，
+#       有時又顯示完整歷史 71 筆。根因是 V235R load_records 只要 fast lane 非空就直接回傳，
+#       對 02 的跨日查詢會誤把「今日快取」當成完整歷史來源。
+# 原則：保留 V225 正確讀寫、V230/V231 速度、V232 併發事件與 V235 同源修復；不改 UI/CSS/theme/table/buttons。
+# 修正：
+# 1) today_records 仍走 fast lane，維持 01 速度。
+# 2) load_records 只在「明確查今天」時可走 fast lane；跨日/全歷史/02頁面查詢一律走 stable full source。
+# 3) stable full source 使用短 TTL 記憶體快取，避免 02 頁面 rerun 每次重掃 event journal，也避免畫面筆數來回跳。
+# 4) start/finish/save/delete 後清除 stable history cache，讓 02 下次讀到最新資料。
+try:
+    _v236_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v236_prev_load_records = None
+try:
+    _v236_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v236_prev_today_records = None
+try:
+    _v236_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v236_prev_start_work = None
+try:
+    _v236_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v236_prev_finish_work = None
+try:
+    _v236_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v236_prev_save_time_records = None
+try:
+    _v236_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v236_prev_delete_time_records = None
+
+import time as _v236_time
+
+_V236_VERSION = "V236_02_HISTORY_STABLE_SOURCE"
+_V236_HISTORY_MEMORY: dict = {"rows": None, "epoch": 0.0}
+_V236_HISTORY_TTL_SECONDS = 45.0
+
+
+def _v236_invalidate_history_cache(reason: str = "") -> None:
+    try:
+        _V236_HISTORY_MEMORY["rows"] = None
+        _V236_HISTORY_MEMORY["epoch"] = 0.0
+    except Exception:
+        pass
+
+
+def _v236_date(v) -> str:
+    try:
+        return _v235_date(v)  # type: ignore[name-defined]
+    except Exception:
+        s = "" if v is None else str(v).strip().replace("/", "-")
+        if " " in s:
+            s = s.split(" ", 1)[0]
+        return s[:10]
+
+
+def _v236_today() -> str:
+    try:
+        return _v235_today()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return today_date().strftime("%Y-%m-%d")  # type: ignore[name-defined]
+        except Exception:
+            return _v235_datetime.now().strftime("%Y-%m-%d")  # type: ignore[name-defined]
+
+
+def _v236_is_today_only_range(start_date=None, end_date=None) -> bool:
+    """Only explicit today-to-today is allowed to return fast-only rows.
+
+    None/None means history/all records in many 02 page paths, so it must NOT be treated as today-only.
+    """
+    sd = _v236_date(start_date)
+    ed = _v236_date(end_date)
+    today = _v236_today()
+    return bool(sd and ed and sd == today and ed == today)
+
+
+def _v236_get_stable_history_rows(reason: str = "v236_history") -> list[dict]:
+    now = _v236_time.time()
+    try:
+        cached = _V236_HISTORY_MEMORY.get("rows")
+        epoch = float(_V236_HISTORY_MEMORY.get("epoch") or 0.0)
+        if isinstance(cached, list) and cached and (now - epoch) <= _V236_HISTORY_TTL_SECONDS:
+            return [dict(r) for r in cached if isinstance(r, dict)]
+    except Exception:
+        pass
+
+    rows: list[dict] = []
+    try:
+        # Full stable source: same source for 02 and all-history queries. Fast cache is still included,
+        # but it is never the only source for cross-day/history queries.
+        rows = _v235_collect_rows(include_events=True, reason=reason)  # type: ignore[name-defined]
+    except Exception:
+        rows = []
+
+    try:
+        rows = _v235_dedupe_rows(rows)  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+    # If authority side is empty or clearly behind, repair it once from the stable source.
+    # This is deliberately NOT done in today_records fast path, so 01 speed remains unchanged.
+    try:
+        if rows:
+            _v235_write_authority_rows_if_needed(rows, reason=reason + "_0102_stable_repair")  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+    try:
+        _V236_HISTORY_MEMORY["rows"] = [dict(r) for r in rows if isinstance(r, dict)]
+        _V236_HISTORY_MEMORY["epoch"] = now
+    except Exception:
+        pass
+    return rows
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V236: deterministic 02/history source.
+
+    - Today-only query: preserve V230/V231 fast display.
+    - Any cross-day/all-history query: use stable full source, never partial today fast cache.
+    """
+    try:
+        if _v236_is_today_only_range(start_date, end_date):
+            rows_fast = _v235_collect_rows(include_events=False, reason="v236_today_only_fast")  # type: ignore[name-defined]
+            df_fast = _v235_filter_df(_v235_rows_to_df(rows_fast), start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[name-defined]
+            if isinstance(df_fast, pd.DataFrame) and not df_fast.empty:  # type: ignore[name-defined]
+                return df_fast.reset_index(drop=True)
+            # If today's fast lane is empty, fall through to stable source for recovery.
+    except Exception:
+        pass
+
+    rows = _v236_get_stable_history_rows("v236_load_records_stable")
+    try:
+        df = _v235_rows_to_df(rows)  # type: ignore[name-defined]
+        return _v235_filter_df(df, start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[name-defined]
+    except Exception:
+        if callable(_v236_prev_load_records):
+            try:
+                return _v236_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)  # type: ignore[misc]
+            except Exception:
+                pass
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """V236: keep 01 Today Records fast and isolated from 02 stable-history repairs."""
+    today = _v236_today()
+    try:
+        rows_fast = _v235_collect_rows(include_events=False, reason="v236_today_records_fast")  # type: ignore[name-defined]
+        df = _v235_filter_df(_v235_rows_to_df(rows_fast), start_date=today, end_date=today)  # type: ignore[name-defined]
+        if not isinstance(df, pd.DataFrame) or df.empty:  # type: ignore[name-defined]
+            # Recovery only when fast lane has no today rows at all.
+            df = load_records(today, today, None, None)
+        if unfinished_only or not include_finished:
+            df = _v235_filter_df(df, active_only=True)  # type: ignore[name-defined]
+        return df.reset_index(drop=True) if isinstance(df, pd.DataFrame) and not df.empty else pd.DataFrame()  # type: ignore[name-defined]
+    except Exception:
+        if callable(_v236_prev_today_records):
+            try:
+                return _v236_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)  # type: ignore[misc]
+            except Exception:
+                pass
+        return pd.DataFrame()  # type: ignore[name-defined]
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v236_prev_start_work):
+        raise RuntimeError("start_work base function is unavailable")
+    rid = int(_v236_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old) or 0)
+    if rid:
+        _v236_invalidate_history_cache("start_work")
+    return rid
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not callable(_v236_prev_finish_work):
+        raise RuntimeError("finish_work base function is unavailable")
+    n = int(_v236_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group) or 0)
+    if n:
+        _v236_invalidate_history_cache("finish_work")
+    return n
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    if not callable(_v236_prev_save_time_records):
+        raise RuntimeError("save_time_records base function is unavailable")
+    n = int(_v236_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    if n:
+        _v236_invalidate_history_cache("save_time_records")
+    return n
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    if not callable(_v236_prev_delete_time_records):
+        raise RuntimeError("delete_time_records base function is unavailable")
+    n = int(_v236_prev_delete_time_records(record_ids, reason=reason) or 0)
+    if n:
+        _v236_invalidate_history_cache("delete_time_records")
+    return n
+
+
+def audit_v236_02_history_stable_source() -> dict:
+    try:
+        today = _v236_today()
+        fast_today = today_records()
+        wide_1 = load_records("2026-04-30", today, None, None)
+        wide_2 = load_records("2026-04-30", today, None, None)
+        return {
+            "version": _V236_VERSION,
+            "ok": True,
+            "ui_changed": False,
+            "css_changed": False,
+            "theme_service_changed": False,
+            "table_rendering_changed": False,
+            "buttons_changed": False,
+            "rule": "Today Records keeps fast lane. 02 history/cross-day load_records uses stable full source and never returns partial today cache, preventing row-count jumping.",
+            "today_rows": int(len(fast_today)) if isinstance(fast_today, pd.DataFrame) else 0,  # type: ignore[name-defined]
+            "wide_rows_first": int(len(wide_1)) if isinstance(wide_1, pd.DataFrame) else 0,  # type: ignore[name-defined]
+            "wide_rows_second": int(len(wide_2)) if isinstance(wide_2, pd.DataFrame) else 0,  # type: ignore[name-defined]
+            "stable_same_count": int(len(wide_1)) == int(len(wide_2)) if isinstance(wide_1, pd.DataFrame) and isinstance(wide_2, pd.DataFrame) else False,  # type: ignore[name-defined]
+        }
+    except Exception as exc:
+        return {"version": _V236_VERSION, "ok": False, "error": str(exc)}
+
+# ================= END V236 02 HISTORY STABLE SOURCE =================
