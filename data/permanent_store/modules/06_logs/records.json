@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 12:51:37",
-  "exported_at": "2026-05-30 12:51:37",
+  "updated_at": "2026-05-30 12:53:18",
+  "exported_at": "2026-05-30 12:53:18",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -8383,11 +8383,83 @@
         "detail": "v248_today_records\n__spt_log_uid=46749cc2a5694c6695c23ba8f21eb8cc",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 6,
+        "log_time": "2026-05-30 12:53:15",
+        "user_name": "SPT240",
+        "action_type": "V235_DISABLE_BROAD_PRUNE",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已停用非 tombstone 廣泛清除；避免有效工時被誤判為舊快取復活資料。",
+        "detail": "__spt_log_uid=834774b0124c4953b3cca6f52b7402a2",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 5,
+        "log_time": "2026-05-30 12:53:14",
+        "user_name": "SPT240",
+        "action_type": "V230_FRONT_CACHE_REBUILD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V230 前台快取低頻重建完成：13 筆，active=11。",
+        "detail": "v230_find_ids",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 4,
+        "log_time": "2026-05-30 12:53:14",
+        "user_name": "SPT240",
+        "action_type": "V224_START_DISPLAY_GUARD",
+        "target_table": "time_records",
+        "target_id": "464",
+        "message": "V224 已強制同步開始作業至 01/02 權威與前台快取，ID=464。",
+        "detail": "",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 3,
+        "log_time": "2026-05-30 12:53:14",
+        "user_name": "SPT240",
+        "action_type": "V212_ROW_SAVE_TIME_RECORD",
+        "target_table": "time_records",
+        "target_id": "464",
+        "message": "儲存工時逐筆紀錄：START_WORK，1 筆已寫入 01/02 權威檔與事件紀錄。",
+        "detail": "start_work_v212_restore_per_row_save",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 2,
+        "log_time": "2026-05-30 12:53:14",
+        "user_name": "SPT240",
+        "action_type": "START_WORK",
+        "target_table": "time_records",
+        "target_id": "464",
+        "message": "吉爾 開始 26M0051-07 / 前置鈑金",
+        "detail": "V205_FAST_START",
+        "level": "INFO",
+        "source": "sqlite"
+      },
+      {
+        "id": 1,
+        "log_time": "2026-05-30 12:53:14",
+        "user_name": "SPT240",
+        "action_type": "V212_SQLITE_SEQUENCE_GUARD",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "SQLite 工時 ID 序號已對齊權威檔 max_id=461，避免新增紀錄 ID 撞號。",
+        "detail": "start_work_v212_before_fast_insert\n__spt_log_uid=d0dda835a55c447186b1dbcfaaf115b4",
+        "level": "INFO",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 698
+    "system_logs": 704
   }
 }
