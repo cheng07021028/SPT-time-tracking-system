@@ -2,10 +2,51 @@
 from __future__ import annotations
 
 import re
+import time
 
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
+
+try:
+    from services.performance_profiler_service import record_event as _spt_perf_record_event
+except Exception:  # pragma: no cover
+    _spt_perf_record_event = None  # type: ignore
+
+try:
+    from services.log_service import write_log as _spt_perf_write_log
+except Exception:  # pragma: no cover
+    _spt_perf_write_log = None  # type: ignore
+
+_SPT_01_PAGE_T0 = time.perf_counter()
+
+
+def _spt_perf_tick(name: str, start: float, *, threshold_ms: float = 300.0, detail: dict | None = None) -> float:
+    duration_ms = (time.perf_counter() - start) * 1000.0
+    if callable(_spt_perf_record_event):
+        try:
+            _spt_perf_record_event(
+                category="01_page",
+                name=name,
+                duration_ms=duration_ms,
+                ok=True,
+                threshold_ms=threshold_ms,
+                detail=detail or {},
+            )
+        except Exception:
+            pass
+    if duration_ms >= 3000 and callable(_spt_perf_write_log):
+        try:
+            _spt_perf_write_log(
+                "PERF_01_SLOW",
+                f"01 工時紀錄慢動作：{name} = {duration_ms:.0f} ms",
+                "performance",
+                detail=str(detail or {}),
+                level="WARN",
+            )
+        except Exception:
+            pass
+    return time.perf_counter()
 
 
 # ===== V95 RAW DATA EDITOR HELPER =====
@@ -69,6 +110,7 @@ apply_dropdown_menu_size_only(560)
 require_module_access("01_time_record")
 render_header("01｜工時紀錄", "快速開始、同步作業、暫停、下班、完工｜自動記錄時間與扣除休息")
 render_post_record_continue_prompt()
+_spt_perf_after_header = _spt_perf_tick("01_header_auth_theme", _SPT_01_PAGE_T0, threshold_ms=500.0)
 
 
 # ===== V100 WORK ORDER MANUAL INPUT + FUZZY SEARCH FIX =====
@@ -712,13 +754,21 @@ def _v148_load_today_finished_records_for_employee(employee_id: str, employee_na
 # ===== END V148 TODAY FINISHED RECORDS READ-ONLY PANEL =====
 
 # V13: 01 opens from latest memory files/SQLite without doing heavy master restore inline.
+_spt_perf_t = time.perf_counter()
 employees = load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
 work_orders = load_work_orders_for_time_record_fast(active_only=True)
+_spt_perf_t = _spt_perf_tick(
+    "01_load_master_data_employees_work_orders",
+    _spt_perf_t,
+    threshold_ms=500.0,
+    detail={"employees": len(employees) if isinstance(employees, pd.DataFrame) else 0, "work_orders": len(work_orders) if isinstance(work_orders, pd.DataFrame) else 0},
+)
 
 # V11: master-data existence must be checked before employee account filtering.
 # A normal operator may only see one employee, or zero if not bound.  That should
 # not be treated as missing 03/04 master data.
 has_employees_master, has_work_orders_master = has_master_data_for_time_record_fast(employees, work_orders)
+_spt_perf_t = _spt_perf_tick("01_check_master_data_available", _spt_perf_t, threshold_ms=300.0)
 
 if employees.empty or work_orders.empty:
     if st.session_state.get("_spt_employee_binding_required"):
@@ -765,8 +815,15 @@ with left:
         matched_count = len([x for x in _wo_options if not str(x).startswith("＋ 使用手動輸入：")])
         st.caption(f"已依『{_wo_query}』篩選出 {matched_count} 筆相關製令，目前使用：{wo_no}")
 
+    _spt_perf_t = time.perf_counter()
     category_choices = load_process_category_choices(include_common=True)
     default_category = get_default_process_category()
+    _spt_perf_t = _spt_perf_tick(
+        "01_load_process_categories_default",
+        _spt_perf_t,
+        threshold_ms=500.0,
+        detail={"category_count": len(category_choices)},
+    )
     if default_category not in category_choices:
         category_choices.append(default_category)
     selected_category = st.selectbox(
@@ -775,7 +832,14 @@ with left:
         index=category_choices.index(default_category) if default_category in category_choices else 0,
         key="time_record_process_category_v333",
     )
+    _spt_perf_t = time.perf_counter()
     PROCESS_OPTIONS = get_process_options_by_category_exact(selected_category)
+    _spt_perf_t = _spt_perf_tick(
+        "01_load_process_options_for_category",
+        _spt_perf_t,
+        threshold_ms=500.0,
+        detail={"category": selected_category, "process_count": len(PROCESS_OPTIONS)},
+    )
     st.caption(f"目前工段類別 / Current Category：{selected_category or '全部 / 通用'}")
     if PROCESS_OPTIONS:
         process = st.selectbox("工段名稱｜Process", PROCESS_OPTIONS)
@@ -789,6 +853,7 @@ with left:
     remark = st.text_area("備註｜Remark", height=90)
     auto_pause = st.checkbox("切換不同工段時，自動暫停同人員其他未結束作業｜Auto pause different process", value=True)
 
+    _spt_perf_t = time.perf_counter()
     try:
         refresh_active_records_for_employee(emp_id, str(employee.get("employee_name") or "").strip(), reason="01_start_active_visible_v133")
     except Exception:
@@ -796,6 +861,12 @@ with left:
     active = get_active_record(emp_id)
     duplicate = None if no_process_options else get_active_same_work(emp_id, wo_no, process, employee_name=str(employee.get("employee_name") or "").strip())
     conflicts = pd.DataFrame() if no_process_options else get_conflicting_active_records(emp_id, process, employee_name=str(employee.get("employee_name") or "").strip())
+    _spt_perf_t = _spt_perf_tick(
+        "01_start_panel_active_duplicate_conflict_queries",
+        _spt_perf_t,
+        threshold_ms=500.0,
+        detail={"has_active": bool(active), "has_duplicate": bool(duplicate), "conflicts": len(conflicts) if isinstance(conflicts, pd.DataFrame) else 0},
+    )
     if active:
         group = get_active_group(int(active["id"]))
         st.info(f"目前作業中：{active['process_name']}，同步計時 {len(group)} 筆。同工段不同製令可同步作業；不同工段需先暫停舊紀錄。")
@@ -812,7 +883,9 @@ with left:
             st.error("權限不足：你沒有新增工時紀錄權限。")
         else:
             try:
+                _spt_button_t = time.perf_counter()
                 rid = start_work(employee, work_order, process, remark, auto_pause_old=(confirm_pause if not conflicts.empty else auto_pause))
+                _spt_perf_tick("01_button_start_work_action", _spt_button_t, threshold_ms=200.0, detail={"record_id": rid, "employee_id": emp_id, "work_order": wo_no, "process": process})
                 trigger_post_record_continue_prompt(
                     f"已開始作業，紀錄編號：{rid}。請確認是否繼續操作下一筆紀錄；若不繼續，系統會立即登出帳號。",
                     title="已開始計時",
@@ -825,6 +898,7 @@ with right:
     st.subheader("結束目前作業 / Finish Work")
     emp_label2 = st.selectbox("選擇人員｜Employee", _employee_options_v126, index=_login_employee_index_v126, key=_v127_employee_select_key("end_emp_v127"))
     emp_id2, _emp2_name, _emp2_row = _v141_selected_employee(emp_label2, employees)
+    _spt_perf_t = time.perf_counter()
     try:
         refresh_active_records_for_employee(emp_id2, _emp2_name, reason="01_finish_active_visible_v141")
     except Exception:
@@ -833,6 +907,7 @@ with right:
         active2 = get_active_record(emp_id2, employee_name=_emp2_name)
     except TypeError:
         active2 = get_active_record(emp_id2)
+    _spt_perf_t = _spt_perf_tick("01_finish_panel_active_query", _spt_perf_t, threshold_ms=500.0, detail={"employee_id": emp_id2, "has_active": bool(active2)})
     _v207_admin_finish_bypass = _v207_current_user_is_admin()
     if (not _v207_admin_finish_bypass) and active2 and (not _v141_active_matches_employee(active2, emp_id2, _emp2_name) or not _v143_ui_row_matches_selected(active2, emp_id2, _emp2_name)):
         st.error(
@@ -844,8 +919,15 @@ with right:
     if not active2:
         st.success("此人員目前沒有未結束作業。")
     else:
+        _spt_perf_t = time.perf_counter()
         raw_group_df = get_active_group(int(active2["id"]))
         group_df = raw_group_df.copy().reset_index(drop=True) if _v207_admin_finish_bypass and isinstance(raw_group_df, pd.DataFrame) else _v143_ui_filter_group_for_selected(raw_group_df, emp_id2, _emp2_name)
+        _spt_perf_t = _spt_perf_tick(
+            "01_finish_panel_group_query_and_filter",
+            _spt_perf_t,
+            threshold_ms=500.0,
+            detail={"active_id": active2.get("id"), "group_rows": len(group_df) if isinstance(group_df, pd.DataFrame) else 0},
+        )
         _v208_force_single_finish = False
         if group_df.empty and active2 and _v143_ui_row_matches_selected(active2, emp_id2, _emp2_name):
             # Same selected employee, but group rows contain stale identity fields.
@@ -877,26 +959,39 @@ with right:
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
+                _spt_button_t = time.perf_counter()
                 n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=_v208_finish_parallel_group)
+                _spt_perf_tick("01_button_finish_pause_action", _spt_button_t, threshold_ms=200.0, detail={"active_id": active2.get("id"), "rows": n})
                 trigger_post_record_continue_prompt(f"已同步暫停 {n} 筆並平均計算工時。", title="工時已暫停")
                 st.rerun()
         if c2.button("⟡ 完工 / Complete", use_container_width=True):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
+                _spt_button_t = time.perf_counter()
                 n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=_v208_finish_parallel_group)
+                _spt_perf_tick("01_button_finish_complete_action", _spt_button_t, threshold_ms=200.0, detail={"active_id": active2.get("id"), "rows": n})
                 trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。", title="工時已完工")
                 st.rerun()
         if c3.button("◐ 下班 / Off Duty", use_container_width=True, disabled=group_df.empty):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
+                _spt_button_t = time.perf_counter()
                 n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=_v208_finish_parallel_group)
+                _spt_perf_tick("01_button_finish_off_duty_action", _spt_button_t, threshold_ms=200.0, detail={"active_id": active2.get("id"), "rows": n})
                 trigger_post_record_continue_prompt(f"已同步下班 {n} 筆並平均計算工時。", title="工時已結束")
                 st.rerun()
 
     st.markdown("#### 今日已結束紀錄 / Today Finished Records")
+    _spt_perf_t = time.perf_counter()
     finished_today_df = _v148_load_today_finished_records_for_employee(emp_id2, _emp2_name)
+    _spt_perf_t = _spt_perf_tick(
+        "01_load_finished_today_for_employee",
+        _spt_perf_t,
+        threshold_ms=500.0,
+        detail={"employee_id": emp_id2, "rows": len(finished_today_df) if isinstance(finished_today_df, pd.DataFrame) else 0},
+    )
     if finished_today_df.empty:
         st.info("此人員今天尚無已結束紀錄。")
     else:
@@ -926,12 +1021,26 @@ if is_admin:
                 pass
             st.success(f"已重新整理 01 頁顯示；02 歷史紀錄不受影響。已隱藏目前已結束筆數：{n}")
             st.rerun()
+_spt_perf_t = time.perf_counter()
 df = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
+_spt_perf_t = _spt_perf_tick(
+    "01_load_today_records_main_table_data",
+    _spt_perf_t,
+    threshold_ms=500.0,
+    detail={"rows": len(df) if isinstance(df, pd.DataFrame) else 0, "unfinished_only": bool(show_unfinished_only)},
+)
 if is_admin and not df.empty:
     with st.expander("▤ 01 工時紀錄表格欄位位置順序調整 / Admin Column Order Settings", expanded=False):
         st.caption("此區僅系統管理員可見。可調整今日工時紀錄表格的欄位寬度與欄位位置順序；設定會永久保存。")
         render_width_settings("01.time_records.main", df, title="01 工時紀錄欄位順序與欄寬設定 / Column Order and Width")
+_spt_perf_t = time.perf_counter()
 render_table(df, "01.time_records.main", editable=False, height=420)
+_spt_perf_t = _spt_perf_tick(
+    "01_render_today_records_main_table",
+    _spt_perf_t,
+    threshold_ms=500.0,
+    detail={"rows": len(df) if isinstance(df, pd.DataFrame) else 0},
+)
 
 # V1.81 + V92：修改、刪除、存檔功能只允許管理員看見與操作。
 # V92：所有維護區按鈕改成「同一次 rerun 立即生效」，不再依賴先 st.rerun 再期待 data_editor 狀態更新。
@@ -1218,3 +1327,4 @@ if is_admin:
                             st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                             st.rerun()
 
+_spt_perf_tick("01_full_page_total_runtime", _SPT_01_PAGE_T0, threshold_ms=1500.0, detail={"is_admin": bool(is_admin)})
