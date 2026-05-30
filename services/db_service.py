@@ -2630,3 +2630,140 @@ def audit_v25_postgresql_backend() -> dict:
     }
 
 # ===== END V25 POSTGRESQL BACKEND FOR CLOUD DEPLOYMENT =====
+
+
+# ===== V26 BACKGROUND POSTGRESQL AUTHORITY BOOTSTRAP =====
+# The PostgreSQL database may already contain a few new rows created after the
+# migration, while older records still live in bundled authority JSON files.
+# Import in a background thread after login so the login page stays responsive.
+
+_V26_BOOTSTRAP_STATE: dict[str, Any] = {
+    "running": False,
+    "started": False,
+    "completed": False,
+    "last_error": "",
+    "imported": 0,
+}
+
+_V26_BOOTSTRAP_PLAN: list[tuple[str, str, str, tuple[str, ...]]] = [
+    ("03_work_orders", "work_orders", "work_orders", ("work_order",)),
+    ("04_employees", "employees", "employees", ("employee_id",)),
+    ("01_time_records", "time_records", "time_records", ("record_key",)),
+    ("02_history", "time_records", "time_records", ("record_key",)),
+    ("10_permissions", "auth_users", "auth_users", ("username",)),
+    ("10_permissions", "auth_account_permissions", "auth_account_permissions", ("username", "module_code")),
+    ("10_permissions", "auth_security_settings", "auth_security_settings", ("setting_key",)),
+    ("13_system_settings", "process_categories", "process_categories", ("category_name",)),
+    ("13_system_settings", "process_category_options", "process_category_options", ("category_name", "process_name")),
+    ("13_system_settings", "process_options", "process_options", ("process_name",)),
+    ("13_system_settings", "rest_periods", "rest_periods", ("id",)),
+    ("13_system_settings", "app_settings", "app_settings", ("setting_key",)),
+]
+
+
+def _v26_pg_bootstrap_marker(cur) -> bool:
+    try:
+        cur.execute("SELECT setting_value FROM app_settings WHERE setting_key='postgres_core_authority_import_v26_completed'")
+        row = cur.fetchone()
+        return str((row or {}).get("setting_value") or "").strip() == "1"
+    except Exception:
+        return False
+
+
+def _v26_pg_set_bootstrap_marker(cur, imported: int) -> None:
+    now = _now()
+    cur.execute(
+        """
+        INSERT INTO app_settings(setting_key, setting_value, note, updated_at)
+        VALUES ('postgres_core_authority_import_v26_completed', '1', %s, %s)
+        ON CONFLICT (setting_key) DO UPDATE
+        SET setting_value=EXCLUDED.setting_value, note=EXCLUDED.note, updated_at=EXCLUDED.updated_at
+        """,
+        (f"Imported {int(imported)} rows from bundled authority JSON", now),
+    )
+
+
+def _v26_pg_import_authority_rows(cur) -> int:
+    imported = 0
+    for module_key, source_table, target_table, conflict_cols in _V26_BOOTSTRAP_PLAN:
+        rows = _v25_pg_load_module_rows(module_key, source_table)
+        if not rows:
+            continue
+        columns = _v25_pg_table_columns(cur, target_table)
+        if not columns:
+            continue
+        for raw in rows:
+            row = _v25_pg_prepare_import_row(raw, columns)
+            conflict = _v25_pg_choose_conflict(row, conflict_cols)
+            if not row or not conflict:
+                continue
+            # Avoid primary-key collisions with rows already created in the new
+            # PostgreSQL database. Natural keys are the durable merge keys here.
+            if conflict != ("id",):
+                row.pop("id", None)
+            cols = [c for c in columns if c in row]
+            if not cols:
+                continue
+            placeholders = ", ".join(["%s"] * len(cols))
+            update_cols = [c for c in cols if c not in conflict]
+            if update_cols:
+                update_sql = ", ".join([f"{c}=EXCLUDED.{c}" for c in update_cols])
+                sql = f"INSERT INTO {target_table} ({', '.join(cols)}) VALUES ({placeholders}) ON CONFLICT ({', '.join(conflict)}) DO UPDATE SET {update_sql}"
+            else:
+                sql = f"INSERT INTO {target_table} ({', '.join(cols)}) VALUES ({placeholders}) ON CONFLICT ({', '.join(conflict)}) DO NOTHING"
+            try:
+                cur.execute("SAVEPOINT v26_import_row")
+                cur.execute(sql, tuple(row.get(c) for c in cols))
+                cur.execute("RELEASE SAVEPOINT v26_import_row")
+                imported += 1
+            except Exception:
+                try:
+                    cur.execute("ROLLBACK TO SAVEPOINT v26_import_row")
+                    cur.execute("RELEASE SAVEPOINT v26_import_row")
+                except Exception:
+                    pass
+        _v25_pg_sync_identity(cur, target_table)
+    return imported
+
+
+def _v26_pg_bootstrap_worker() -> None:
+    _V26_BOOTSTRAP_STATE.update({"running": True, "started": True, "last_error": ""})
+    try:
+        ensure_database()
+        with _v25_pg_connect() as conn:
+            with conn.cursor() as cur:
+                if _v26_pg_bootstrap_marker(cur):
+                    _V26_BOOTSTRAP_STATE.update({"completed": True, "imported": 0})
+                    return
+                imported = _v26_pg_import_authority_rows(cur)
+                _v26_pg_set_bootstrap_marker(cur, imported)
+                _V26_BOOTSTRAP_STATE.update({"completed": True, "imported": int(imported)})
+            conn.commit()
+        clear_query_cache()
+    except Exception as exc:
+        _V26_BOOTSTRAP_STATE["last_error"] = str(exc)[:500]
+    finally:
+        _V26_BOOTSTRAP_STATE["running"] = False
+
+
+def start_postgres_authority_bootstrap_import_background() -> dict[str, Any]:
+    if not is_postgres_enabled():
+        return {"ok": True, "skipped": True, "reason": "postgres_disabled"}
+    if _v25_config_truthy("SPT_DISABLE_PG_BACKGROUND_IMPORT"):
+        return {"ok": True, "skipped": True, "reason": "disabled_by_config"}
+    if _V26_BOOTSTRAP_STATE.get("running") or _V26_BOOTSTRAP_STATE.get("completed"):
+        return {"ok": True, **dict(_V26_BOOTSTRAP_STATE)}
+    try:
+        import threading
+        threading.Thread(target=_v26_pg_bootstrap_worker, name="SPT-PG-Authority-Bootstrap", daemon=True).start()
+        return {"ok": True, "started": True, **dict(_V26_BOOTSTRAP_STATE)}
+    except Exception as exc:
+        _V26_BOOTSTRAP_STATE["last_error"] = str(exc)[:500]
+        return {"ok": False, **dict(_V26_BOOTSTRAP_STATE)}
+
+
+def audit_v26_postgres_bootstrap_import() -> dict[str, Any]:
+    return dict(_V26_BOOTSTRAP_STATE)
+
+
+# ===== END V26 BACKGROUND POSTGRESQL AUTHORITY BOOTSTRAP =====
