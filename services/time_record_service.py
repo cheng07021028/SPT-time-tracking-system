@@ -28155,3 +28155,716 @@ def audit_v249b_today_display_authority_merge() -> dict:
     }
 
 # ================= END V249B TODAY DISPLAY AUTHORITY MERGE =================
+
+
+# ================= V250 POSTGRESQL-NATIVE TIME RECORD PATH｜2026-05-30 =================
+# When DATABASE_URL/POSTGRES_URL is configured, bypass the older SQLite cache patch
+# chain for the core 01/02 time-record operations.  SQLite remains the local fallback.
+
+try:
+    from services.db_service import is_postgres_enabled as _v250_is_postgres_enabled
+except Exception:
+    def _v250_is_postgres_enabled() -> bool:
+        return False
+
+
+if _v250_is_postgres_enabled():
+    _V250_TERMINAL_STATUSES = {"下班", "暫停", "完工", "已結束", "結束", "完成", "補登結束"}
+    _V250_TIME_RECORD_COLS = [
+        "id", "record_key", "status", "work_order", "part_no", "type_name", "process_name",
+        "employee_id", "employee_name", "start_action", "start_timestamp", "end_action", "end_timestamp",
+        "remark", "start_date", "start_time", "end_date", "end_time", "work_hours", "assembly_location",
+        "group_key", "is_group_work", "source", "created_at", "updated_at",
+    ]
+
+    def _v250_text(value) -> str:
+        try:
+            if pd.isna(value):
+                return ""
+        except Exception:
+            pass
+        if value is None:
+            return ""
+        text = str(value).strip()
+        return "" if text.lower() in {"none", "nan", "nat", "null", "<na>"} else text
+
+    def _v250_blank(value) -> bool:
+        return _v250_text(value) == ""
+
+    def _v250_active_where(alias: str = "") -> str:
+        p = f"{alias}." if alias else ""
+        terminal = "', '".join(sorted(_V250_TERMINAL_STATUSES))
+        return (
+            f"(COALESCE({p}status,'') NOT IN ('{terminal}') "
+            f"AND (COALESCE(TRIM({p}end_timestamp),'')='' OR LOWER(COALESCE(TRIM({p}end_timestamp),'')) IN ('none','nan','nat','null')))"
+        )
+
+    def _v250_records_df(sql: str, params: list | tuple | None = None) -> pd.DataFrame:
+        df = query_df(sql, tuple(params or ()))
+        return df.copy().where(pd.notna(df), "").reset_index(drop=True) if isinstance(df, pd.DataFrame) and not df.empty else pd.DataFrame()
+
+    def _v250_record_by_id(record_id: int) -> dict | None:
+        return query_one("SELECT * FROM time_records WHERE id=?", (int(record_id),))
+
+    def _v250_split_now() -> tuple[str, str, str]:
+        now = _now()
+        end_date, end_time = split_timestamp(now)
+        return now, end_date, end_time
+
+    def _v250_order_clause(desc: bool = True) -> str:
+        return "ORDER BY COALESCE(start_timestamp, created_at, updated_at, '') DESC, id DESC" if desc else "ORDER BY COALESCE(start_timestamp, created_at, updated_at, '') ASC, id ASC"
+
+    def get_active_records(employee_id: str | None = None, employee_name: str | None = None, process_name: str | None = None, start_date: str | None = None, work_order: str | None = None, **kwargs):  # type: ignore[override]
+        where = [_v250_active_where()]
+        params: list = []
+        if _v250_text(employee_id):
+            where.append("employee_id=?")
+            params.append(_v250_text(employee_id))
+        elif _v250_text(employee_name):
+            where.append("employee_name=?")
+            params.append(_v250_text(employee_name))
+        if _v250_text(process_name):
+            where.append("process_name=?")
+            params.append(_v250_text(process_name))
+        if _v250_text(start_date):
+            where.append("start_date=?")
+            params.append(_v250_text(start_date))
+        if _v250_text(work_order):
+            where.append("work_order=?")
+            params.append(_v250_text(work_order))
+        return _v250_records_df(f"SELECT * FROM time_records WHERE {' AND '.join(where)} {_v250_order_clause(desc=True)}", params)
+
+    def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+        df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return dict(df.iloc[0].to_dict())
+        return None
+
+    def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+        df = get_active_records(
+            employee_id=employee_id,
+            employee_name=employee_name,
+            process_name=process_name,
+            start_date=start_date or today_text(),
+            work_order=work_order,
+        )
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return dict(df.iloc[0].to_dict())
+        return None
+
+    def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+        active = get_active_records(employee_id=employee_id, employee_name=employee_name)
+        if not isinstance(active, pd.DataFrame) or active.empty:
+            return pd.DataFrame()
+        sd = _v250_text(start_date or today_text())
+        proc = _v250_text(process_name)
+        mask = (active.get("process_name", "").astype(str).str.strip() != proc) | (active.get("start_date", "").astype(str).str.strip() != sd)
+        return active.loc[mask].copy().reset_index(drop=True)
+
+    def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+        try:
+            rid = int(float(str(record_id).strip()))
+        except Exception:
+            return pd.DataFrame()
+        rec = _v250_record_by_id(rid)
+        if not rec:
+            return pd.DataFrame()
+        return get_active_records(
+            employee_id=_v250_text(rec.get("employee_id")),
+            employee_name=_v250_text(rec.get("employee_name")),
+            process_name=_v250_text(rec.get("process_name")),
+            start_date=_v250_text(rec.get("start_date") or _v250_text(rec.get("start_timestamp"))[:10]),
+        )
+
+    def today_records(include_finished: bool = True, unfinished_only: bool = False):  # type: ignore[override]
+        today = today_text()
+        active_sql = _v250_active_where()
+        if unfinished_only or not include_finished:
+            return _v250_records_df(f"SELECT * FROM time_records WHERE {active_sql} {_v250_order_clause(desc=True)}")
+        return _v250_records_df(
+            f"SELECT * FROM time_records WHERE start_date=? OR {active_sql} {_v250_order_clause(desc=True)}",
+            [today],
+        )
+
+    def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None):  # type: ignore[override]
+        where = ["1=1"]
+        params: list = []
+        if _v250_text(start_date):
+            where.append("start_date>=?")
+            params.append(_v250_text(start_date))
+        if _v250_text(end_date):
+            where.append("start_date<=?")
+            params.append(_v250_text(end_date))
+        if _v250_text(employee_id):
+            where.append("employee_id=?")
+            params.append(_v250_text(employee_id))
+        if _v250_text(work_order):
+            where.append("work_order=?")
+            params.append(_v250_text(work_order))
+        return _v250_records_df(f"SELECT * FROM time_records WHERE {' AND '.join(where)} ORDER BY id DESC", params)
+
+    def _v250_update_parallel_flags(employee_id: str, employee_name: str, process_name: str, start_date: str, group_key: str) -> None:
+        group = get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date)
+        if isinstance(group, pd.DataFrame) and len(group) > 1:
+            execute(
+                f"UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND process_name=? AND start_date=? AND {_v250_active_where()}",
+                (group_key, _now(), employee_id, process_name, start_date),
+            )
+
+    def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+        employee = employee or {}
+        work_order = work_order or {}
+        now = _now()
+        start_date, start_time = split_timestamp(now)
+        employee_id = _v250_text(employee.get("employee_id"))
+        employee_name = _v250_text(employee.get("employee_name"))
+        wo_no = _v250_text(work_order.get("work_order"))
+        process = _v250_text(process_name)
+        if not employee_id or not wo_no or not process:
+            raise ValueError("工號、製令、工段名稱不可空白。")
+        duplicate = get_active_same_work(employee_id, wo_no, process, start_date=start_date, employee_name=employee_name)
+        if duplicate:
+            raise ValueError(f"此人員已有相同製令與工段正在計時，禁止重複紀錄：{wo_no} / {process}")
+        conflicts = get_conflicting_active_records(employee_id, process, start_date=start_date, employee_name=employee_name)
+        if isinstance(conflicts, pd.DataFrame) and not conflicts.empty:
+            if not auto_pause_old:
+                raise ValueError("此人員已有不同工段正在計時，請先確認暫停前一筆作業後再開始新紀錄。")
+            for _, row in conflicts.iterrows():
+                try:
+                    finish_work(int(row.get("id")), "暫停", "系統自動暫停：同一人員切換不同工段或不同日期作業", finish_parallel_group=True)
+                except Exception:
+                    pass
+        record_key = make_record_key(employee_id, wo_no, process, now)
+        group_key = f"{employee_id}|{process}|{start_date}"
+        rid = execute(
+            """
+            INSERT INTO time_records(
+                record_key, status, work_order, part_no, type_name, process_name,
+                employee_id, employee_name, start_action, start_timestamp,
+                remark, start_date, start_time, assembly_location,
+                group_key, is_group_work, source, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record_key, "作業中", wo_no, work_order.get("part_no", ""), work_order.get("type_name", ""),
+                process, employee_id, employee_name, "開始", now, remark, start_date, start_time,
+                work_order.get("assembly_location", ""), group_key, 0, "postgresql", now, now,
+            ),
+        )
+        _v250_update_parallel_flags(employee_id, employee_name, process, start_date, group_key)
+        clear_query_cache()
+        try:
+            write_log("START_WORK", f"{employee_name} 開始 {wo_no} / {process}", "time_records", rid)
+        except Exception:
+            pass
+        return int(rid or 0)
+
+    def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+        try:
+            rid0 = int(float(str(record_id).strip()))
+        except Exception:
+            raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+        rec = _v250_record_by_id(rid0)
+        if not rec:
+            raise ValueError("找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。")
+        if _v250_text(rec.get("end_timestamp")) or _v250_text(rec.get("status")) in _V250_TERMINAL_STATUSES:
+            return 0
+        group = get_active_group(rid0) if finish_parallel_group else pd.DataFrame([rec])
+        if group is None or group.empty:
+            group = pd.DataFrame([rec])
+        group_ids = [int(float(x)) for x in group["id"].tolist() if _v250_text(x)]
+        now, end_date, end_time = _v250_split_now()
+        starts = [_v250_text(x) for x in group.get("start_timestamp", pd.Series([rec.get("start_timestamp")])).tolist() if _v250_text(x)]
+        earliest_start = min(starts) if starts else _v250_text(rec.get("start_timestamp") or now)
+        total_hours = calculate_work_hours(earliest_start, now)
+        avg_hours = round(total_hours / max(len(group_ids), 1), 2)
+        status = end_action if end_action in ("下班", "暫停", "完工") else "已結束"
+        group_key = _v250_text(rec.get("group_key")) or f"{rec.get('employee_id')}|{rec.get('process_name')}|{rec.get('start_date')}"
+        summary = ""
+        try:
+            if len(group_ids) > 1 and "_v138_parallel_summary_text" in globals():
+                summary = _v138_parallel_summary_text(len(group_ids), total_hours, avg_hours)  # type: ignore[name-defined]
+        except Exception:
+            summary = f"同時作業 {len(group_ids)} 筆，總工時 {total_hours:.2f} 小時，平均 {avg_hours:.2f} 小時"
+        for rid in group_ids:
+            old = query_one("SELECT remark FROM time_records WHERE id=?", (rid,)) or {}
+            old_remark = _v250_text(old.get("remark"))
+            append = _v250_text(remark)
+            if summary:
+                append = (append + "；" if append else "") + summary
+            new_remark = (old_remark + "；" if old_remark and append else old_remark) + append
+            execute(
+                f"""
+                UPDATE time_records
+                SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                    work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
+                WHERE id=? AND {_v250_active_where()}
+                """,
+                (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, 1 if len(group_ids) > 1 else int(rec.get("is_group_work") or 0), now, rid),
+            )
+        clear_query_cache()
+        try:
+            write_log("END_WORK_GROUP" if len(group_ids) > 1 else "END_WORK", f"PostgreSQL 結束工時紀錄 #{rid0}，同步結束={len(group_ids)}筆，狀態={status}", "time_records", rid0, detail=",".join(str(x) for x in group_ids))
+        except Exception:
+            pass
+        return int(len(group_ids))
+
+    def _v250_upsert_records_df(df: pd.DataFrame, reason: str = "postgresql_upsert") -> int:
+        if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+            return 0
+        count = 0
+        clean = df.copy().where(pd.notna(df), None)
+        for _, row in clean.iterrows():
+            payload = {c: row.get(c) for c in _V250_TIME_RECORD_COLS if c in clean.columns}
+            if _v250_blank(payload.get("id")):
+                payload.pop("id", None)
+            else:
+                try:
+                    payload["id"] = int(float(payload.get("id")))
+                except Exception:
+                    payload.pop("id", None)
+            if "work_hours" in payload:
+                try:
+                    payload["work_hours"] = float(payload.get("work_hours") or 0)
+                except Exception:
+                    payload["work_hours"] = 0.0
+            if "is_group_work" in payload:
+                try:
+                    payload["is_group_work"] = int(float(payload.get("is_group_work") or 0))
+                except Exception:
+                    payload["is_group_work"] = 0
+            cols = [c for c in _V250_TIME_RECORD_COLS if c in payload]
+            if not cols:
+                continue
+            conflict = "record_key" if _v250_text(payload.get("record_key")) else ("id" if "id" in payload else "")
+            placeholders = ", ".join(["?"] * len(cols))
+            col_sql = ", ".join(cols)
+            vals = tuple(payload.get(c) for c in cols)
+            if conflict:
+                updates = [c for c in cols if c != conflict]
+                update_sql = ", ".join([f"{c}=EXCLUDED.{c}" for c in updates]) or f"{conflict}=EXCLUDED.{conflict}"
+                sql = f"INSERT INTO time_records ({col_sql}) VALUES ({placeholders}) ON CONFLICT ({conflict}) DO UPDATE SET {update_sql}"
+            else:
+                sql = f"INSERT INTO time_records ({col_sql}) VALUES ({placeholders})"
+            execute(sql, vals)
+            count += 1
+        clear_query_cache()
+        return count
+
+    def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+        return _v250_upsert_records_df(df, reason="save_time_records_postgresql")
+
+    def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+        n = _v250_upsert_records_df(df, reason="import_time_records_postgresql")
+        return {"inserted": n, "updated": 0}
+
+    def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+        ids = sorted({int(float(x)) for x in (record_ids or []) if _v250_text(x)})
+        if not ids:
+            return 0
+        placeholders = ",".join(["?"] * len(ids))
+        execute(f"DELETE FROM time_records WHERE id IN ({placeholders})", tuple(ids))
+        clear_query_cache()
+        try:
+            write_log("DELETE", f"PostgreSQL 刪除工時紀錄 {len(ids)} 筆", "time_records", ",".join(map(str, ids)), detail=reason)
+        except Exception:
+            pass
+        return len(ids)
+
+    def sync_time_records_01_02_now(reason: str = "postgresql_noop", *, github: bool = False) -> int:  # type: ignore[override]
+        return int((query_one("SELECT COUNT(*) AS n FROM time_records") or {}).get("n") or 0)
+
+    def repair_time_record_active_cache_now(reason: str = "postgresql_noop") -> int:  # type: ignore[override]
+        return sync_time_records_01_02_now(reason=reason)
+
+    def audit_v250_postgresql_time_record_backend() -> dict:
+        return {
+            "version": "V250_POSTGRESQL_NATIVE_TIME_RECORD_PATH_20260530",
+            "postgres_enabled": True,
+            "time_records": int((query_one("SELECT COUNT(*) AS n FROM time_records") or {}).get("n") or 0),
+            "active_records": int(len(get_active_records())),
+            "start_finish_delete_save_use_postgresql": True,
+            "sqlite_fallback_preserved_when_database_url_absent": True,
+        }
+
+# ================= END V250 POSTGRESQL-NATIVE TIME RECORD PATH =================
+
+
+# ================= V251 RUNTIME POSTGRESQL TIME RECORD SWITCH｜2026-05-30 =================
+# V250 selected PostgreSQL only at import time.  On Streamlit Cloud, secrets can be
+# represented in several shapes, and a missed detection silently falls back to local
+# SQLite.  Local SQLite is disposable after reboot, so active time records appear to
+# disappear.  V251 wraps the final public functions and decides at call time.
+
+try:
+    from services.db_service import is_postgres_enabled as _v251_is_postgres_enabled
+except Exception:
+    def _v251_is_postgres_enabled() -> bool:
+        return False
+
+_v251_prev_today_records = today_records
+_v251_prev_load_records = load_records
+_v251_prev_get_active_records = get_active_records
+_v251_prev_get_active_record = get_active_record
+_v251_prev_get_active_same_work = get_active_same_work
+_v251_prev_get_conflicting_active_records = get_conflicting_active_records
+_v251_prev_get_active_group = get_active_group
+_v251_prev_start_work = start_work
+_v251_prev_finish_work = finish_work
+_v251_prev_save_time_records = save_time_records
+_v251_prev_import_time_records = globals().get("import_time_records")
+_v251_prev_delete_time_records = delete_time_records
+
+_V251_TERMINAL = {"下班", "暫停", "完工", "已結束", "結束", "完成", "補登結束"}
+_V251_COLS = [
+    "id", "record_key", "status", "work_order", "part_no", "type_name", "process_name",
+    "employee_id", "employee_name", "start_action", "start_timestamp", "end_action", "end_timestamp",
+    "remark", "start_date", "start_time", "end_date", "end_time", "work_hours", "assembly_location",
+    "group_key", "is_group_work", "source", "created_at", "updated_at",
+]
+
+
+def _v251_pg() -> bool:
+    try:
+        return bool(_v251_is_postgres_enabled())
+    except Exception:
+        return False
+
+
+def _v251_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    text = str(value).strip()
+    return "" if text.lower() in {"none", "nan", "nat", "null", "<na>"} else text
+
+
+def _v251_active_where() -> str:
+    terminal = "', '".join(sorted(_V251_TERMINAL))
+    return (
+        f"(COALESCE(status,'') NOT IN ('{terminal}') "
+        "AND (COALESCE(TRIM(end_timestamp),'')='' "
+        "OR LOWER(COALESCE(TRIM(end_timestamp),'')) IN ('none','nan','nat','null')))"
+    )
+
+
+def _v251_df(sql: str, params: list | tuple | None = None) -> pd.DataFrame:
+    df = query_df(sql, tuple(params or ()))
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df.copy().where(pd.notna(df), "").reset_index(drop=True)
+    return pd.DataFrame()
+
+
+def _v251_order(desc: bool = True) -> str:
+    return "ORDER BY COALESCE(start_timestamp, created_at, updated_at, '') DESC, id DESC" if desc else "ORDER BY COALESCE(start_timestamp, created_at, updated_at, '') ASC, id ASC"
+
+
+def get_active_records(employee_id: str | None = None, employee_name: str | None = None, process_name: str | None = None, start_date: str | None = None, work_order: str | None = None, **kwargs):  # type: ignore[override]
+    if not _v251_pg():
+        return _v251_prev_get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date, work_order=work_order, **kwargs)
+    where = [_v251_active_where()]
+    params: list = []
+    if _v251_text(employee_id):
+        where.append("employee_id=?")
+        params.append(_v251_text(employee_id))
+    elif _v251_text(employee_name):
+        where.append("employee_name=?")
+        params.append(_v251_text(employee_name))
+    if _v251_text(process_name):
+        where.append("process_name=?")
+        params.append(_v251_text(process_name))
+    if _v251_text(start_date):
+        where.append("start_date=?")
+        params.append(_v251_text(start_date))
+    if _v251_text(work_order):
+        where.append("work_order=?")
+        params.append(_v251_text(work_order))
+    return _v251_df(f"SELECT * FROM time_records WHERE {' AND '.join(where)} {_v251_order(desc=True)}", params)
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    if not _v251_pg():
+        try:
+            return _v251_prev_get_active_record(employee_id, employee_name=employee_name)
+        except TypeError:
+            return _v251_prev_get_active_record(employee_id)
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    return dict(df.iloc[0].to_dict()) if isinstance(df, pd.DataFrame) and not df.empty else None
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    if not _v251_pg():
+        return _v251_prev_get_active_same_work(employee_id, work_order, process_name, start_date=start_date, employee_name=employee_name)
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date or today_text(), work_order=work_order)
+    return dict(df.iloc[0].to_dict()) if isinstance(df, pd.DataFrame) and not df.empty else None
+
+
+def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    if not _v251_pg():
+        return _v251_prev_get_conflicting_active_records(employee_id, process_name, start_date=start_date, employee_name=employee_name)
+    active = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if not isinstance(active, pd.DataFrame) or active.empty:
+        return pd.DataFrame()
+    sd = _v251_text(start_date or today_text())
+    proc = _v251_text(process_name)
+    mask = (active.get("process_name", "").astype(str).str.strip() != proc) | (active.get("start_date", "").astype(str).str.strip() != sd)
+    return active.loc[mask].copy().reset_index(drop=True)
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    if not _v251_pg():
+        return _v251_prev_get_active_group(record_id)
+    try:
+        rid = int(float(str(record_id).strip()))
+    except Exception:
+        return pd.DataFrame()
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (rid,))
+    if not rec:
+        return pd.DataFrame()
+    return get_active_records(
+        employee_id=_v251_text(rec.get("employee_id")),
+        employee_name=_v251_text(rec.get("employee_name")),
+        process_name=_v251_text(rec.get("process_name")),
+        start_date=_v251_text(rec.get("start_date") or _v251_text(rec.get("start_timestamp"))[:10]),
+    )
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False):  # type: ignore[override]
+    if not _v251_pg():
+        return _v251_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+    active_sql = _v251_active_where()
+    if unfinished_only or not include_finished:
+        return _v251_df(f"SELECT * FROM time_records WHERE {active_sql} {_v251_order(desc=True)}")
+    return _v251_df(f"SELECT * FROM time_records WHERE start_date=? OR {active_sql} {_v251_order(desc=True)}", [today_text()])
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None):  # type: ignore[override]
+    if not _v251_pg():
+        return _v251_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+    where = ["1=1"]
+    params: list = []
+    if _v251_text(start_date):
+        where.append("start_date>=?")
+        params.append(_v251_text(start_date))
+    if _v251_text(end_date):
+        where.append("start_date<=?")
+        params.append(_v251_text(end_date))
+    if _v251_text(employee_id):
+        where.append("employee_id=?")
+        params.append(_v251_text(employee_id))
+    if _v251_text(work_order):
+        where.append("work_order=?")
+        params.append(_v251_text(work_order))
+    return _v251_df(f"SELECT * FROM time_records WHERE {' AND '.join(where)} ORDER BY id DESC", params)
+
+
+def _v251_update_parallel(employee_id: str, employee_name: str, process_name: str, start_date: str, group_key: str) -> None:
+    group = get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date)
+    if isinstance(group, pd.DataFrame) and len(group) > 1:
+        execute(
+            f"UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND process_name=? AND start_date=? AND {_v251_active_where()}",
+            (group_key, _now(), employee_id, process_name, start_date),
+        )
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not _v251_pg():
+        return _v251_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=auto_pause_old)
+    employee = employee or {}
+    work_order = work_order or {}
+    now = _now()
+    start_date, start_time = split_timestamp(now)
+    employee_id = _v251_text(employee.get("employee_id"))
+    employee_name = _v251_text(employee.get("employee_name"))
+    wo_no = _v251_text(work_order.get("work_order"))
+    process = _v251_text(process_name)
+    if not employee_id or not wo_no or not process:
+        raise ValueError("工號、製令、工段名稱不可空白。")
+    duplicate = get_active_same_work(employee_id, wo_no, process, start_date=start_date, employee_name=employee_name)
+    if duplicate:
+        raise ValueError(f"此人員已有相同製令與工段正在計時，禁止重複紀錄：{wo_no} / {process}")
+    conflicts = get_conflicting_active_records(employee_id, process, start_date=start_date, employee_name=employee_name)
+    if isinstance(conflicts, pd.DataFrame) and not conflicts.empty:
+        if not auto_pause_old:
+            raise ValueError("此人員已有不同工段正在計時，請先確認暫停前一筆作業後再開始新紀錄。")
+        for _, row in conflicts.iterrows():
+            try:
+                finish_work(int(row.get("id")), "暫停", "系統自動暫停：同一人員切換不同工段或不同日期作業", finish_parallel_group=True)
+            except Exception:
+                pass
+    record_key = make_record_key(employee_id, wo_no, process, now)
+    group_key = f"{employee_id}|{process}|{start_date}"
+    rid = execute(
+        """
+        INSERT INTO time_records(
+            record_key, status, work_order, part_no, type_name, process_name,
+            employee_id, employee_name, start_action, start_timestamp,
+            remark, start_date, start_time, assembly_location,
+            group_key, is_group_work, source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            record_key, "作業中", wo_no, work_order.get("part_no", ""), work_order.get("type_name", ""),
+            process, employee_id, employee_name, "開始", now, remark, start_date, start_time,
+            work_order.get("assembly_location", ""), group_key, 0, "postgresql_v251", now, now,
+        ),
+    )
+    _v251_update_parallel(employee_id, employee_name, process, start_date, group_key)
+    clear_query_cache()
+    try:
+        write_log("START_WORK", f"{employee_name} 開始 {wo_no} / {process}", "time_records", rid)
+    except Exception:
+        pass
+    return int(rid or 0)
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not _v251_pg():
+        return _v251_prev_finish_work(record_id, end_action, remark=remark, finish_parallel_group=finish_parallel_group)
+    try:
+        rid0 = int(float(str(record_id).strip()))
+    except Exception:
+        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (rid0,))
+    if not rec:
+        raise ValueError("找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。")
+    if _v251_text(rec.get("end_timestamp")) or _v251_text(rec.get("status")) in _V251_TERMINAL:
+        return 0
+    group = get_active_group(rid0) if finish_parallel_group else pd.DataFrame([rec])
+    if group is None or group.empty:
+        group = pd.DataFrame([rec])
+    group_ids = [int(float(x)) for x in group["id"].tolist() if _v251_text(x)]
+    now = _now()
+    end_date, end_time = split_timestamp(now)
+    starts = [_v251_text(x) for x in group.get("start_timestamp", pd.Series([rec.get("start_timestamp")])).tolist() if _v251_text(x)]
+    earliest_start = min(starts) if starts else _v251_text(rec.get("start_timestamp") or now)
+    total_hours = calculate_work_hours(earliest_start, now)
+    avg_hours = round(total_hours / max(len(group_ids), 1), 2)
+    status = end_action if end_action in ("下班", "暫停", "完工") else "已結束"
+    group_key = _v251_text(rec.get("group_key")) or f"{rec.get('employee_id')}|{rec.get('process_name')}|{rec.get('start_date')}"
+    summary = ""
+    if len(group_ids) > 1:
+        try:
+            summary = _v138_parallel_summary_text(len(group_ids), total_hours, avg_hours)  # type: ignore[name-defined]
+        except Exception:
+            summary = f"同時作業 {len(group_ids)} 筆，總工時 {total_hours:.2f} 小時，平均 {avg_hours:.2f} 小時"
+    for rid in group_ids:
+        old = query_one("SELECT remark FROM time_records WHERE id=?", (rid,)) or {}
+        old_remark = _v251_text(old.get("remark"))
+        append = _v251_text(remark)
+        if summary:
+            append = (append + "；" if append else "") + summary
+        new_remark = (old_remark + "；" if old_remark and append else old_remark) + append
+        execute(
+            f"""
+            UPDATE time_records
+            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
+            WHERE id=? AND {_v251_active_where()}
+            """,
+            (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, 1 if len(group_ids) > 1 else int(rec.get("is_group_work") or 0), now, rid),
+        )
+    clear_query_cache()
+    try:
+        write_log("END_WORK_GROUP" if len(group_ids) > 1 else "END_WORK", f"PostgreSQL 結束工時紀錄 #{rid0}，同步結束={len(group_ids)}筆，狀態={status}", "time_records", rid0, detail=",".join(str(x) for x in group_ids))
+    except Exception:
+        pass
+    return int(len(group_ids))
+
+
+def _v251_upsert_df(df: pd.DataFrame) -> int:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return 0
+    clean = df.copy().where(pd.notna(df), None)
+    count = 0
+    for _, row in clean.iterrows():
+        payload = {c: row.get(c) for c in _V251_COLS if c in clean.columns}
+        if not payload:
+            continue
+        if _v251_text(payload.get("id")):
+            try:
+                payload["id"] = int(float(payload.get("id")))
+            except Exception:
+                payload.pop("id", None)
+        else:
+            payload.pop("id", None)
+        for c in ("is_group_work",):
+            if c in payload:
+                try:
+                    payload[c] = int(float(payload.get(c) or 0))
+                except Exception:
+                    payload[c] = 0
+        if "work_hours" in payload:
+            try:
+                payload["work_hours"] = float(payload.get("work_hours") or 0)
+            except Exception:
+                payload["work_hours"] = 0.0
+        cols = [c for c in _V251_COLS if c in payload]
+        conflict = "record_key" if _v251_text(payload.get("record_key")) else ("id" if "id" in payload else "")
+        placeholders = ", ".join(["?"] * len(cols))
+        updates = [c for c in cols if c != conflict]
+        if conflict:
+            update_sql = ", ".join([f"{c}=EXCLUDED.{c}" for c in updates]) or f"{conflict}=EXCLUDED.{conflict}"
+            sql = f"INSERT INTO time_records ({', '.join(cols)}) VALUES ({placeholders}) ON CONFLICT ({conflict}) DO UPDATE SET {update_sql}"
+        else:
+            sql = f"INSERT INTO time_records ({', '.join(cols)}) VALUES ({placeholders})"
+        execute(sql, tuple(payload.get(c) for c in cols))
+        count += 1
+    clear_query_cache()
+    return count
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    if not _v251_pg():
+        return _v251_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps)
+    return _v251_upsert_df(df)
+
+
+def import_time_records(df: pd.DataFrame, recalc: bool = True, source: str = "history_import") -> dict:  # type: ignore[override]
+    if not _v251_pg() and callable(_v251_prev_import_time_records):
+        return _v251_prev_import_time_records(df, recalc=recalc, source=source)  # type: ignore[misc]
+    n = _v251_upsert_df(df)
+    return {"inserted": n, "updated": 0}
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    if not _v251_pg():
+        return _v251_prev_delete_time_records(record_ids, reason=reason)
+    ids = sorted({int(float(x)) for x in (record_ids or []) if _v251_text(x)})
+    if not ids:
+        return 0
+    execute(f"DELETE FROM time_records WHERE id IN ({','.join(['?'] * len(ids))})", tuple(ids))
+    clear_query_cache()
+    return len(ids)
+
+
+def sync_time_records_01_02_now(reason: str = "postgresql_runtime_noop", *, github: bool = False) -> int:  # type: ignore[override]
+    if not _v251_pg():
+        try:
+            return globals().get("_v250_prev_sync_time_records_01_02_now", lambda **_: 0)(reason=reason, github=github)  # type: ignore[misc]
+        except Exception:
+            return 0
+    return int((query_one("SELECT COUNT(*) AS n FROM time_records") or {}).get("n") or 0)
+
+
+def repair_time_record_active_cache_now(reason: str = "postgresql_runtime_noop") -> int:  # type: ignore[override]
+    return sync_time_records_01_02_now(reason=reason)
+
+
+def audit_v251_runtime_postgresql_time_records() -> dict:
+    out = {
+        "version": "V251_RUNTIME_POSTGRESQL_TIME_RECORD_SWITCH_20260530",
+        "postgres_enabled_now": _v251_pg(),
+        "runtime_switch": True,
+        "sqlite_fallback_preserved": True,
+    }
+    if _v251_pg():
+        out["time_records"] = int((query_one("SELECT COUNT(*) AS n FROM time_records") or {}).get("n") or 0)
+        out["active_records"] = int(len(get_active_records()))
+    return out
+
+# ================= END V251 RUNTIME POSTGRESQL TIME RECORD SWITCH =================
