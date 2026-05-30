@@ -2,8 +2,8 @@
   "authority_schema": "SPT-PermanentAuthority-V29",
   "module_key": "06_logs",
   "kind": "records",
-  "updated_at": "2026-05-30 09:15:53",
-  "exported_at": "2026-05-30 09:15:53",
+  "updated_at": "2026-05-30 09:15:55",
+  "exported_at": "2026-05-30 09:15:55",
   "reason": "v147_batched_write_log_authority",
   "empty_authoritative": false,
   "tables": {
@@ -5491,11 +5491,23 @@
         "detail": "v235_cache_recover\n__spt_log_uid=b2ac28ca84af41d9bedfbc8729ddb7a2",
         "level": "INFO",
         "source": "sqlite"
+      },
+      {
+        "id": 1748,
+        "log_time": "2026-05-30 09:15:53",
+        "user_name": "admin",
+        "action_type": "V235_0102_HISTORY_REPAIR",
+        "target_table": "time_records",
+        "target_id": "",
+        "message": "V235 已從同源資料修復 01/02 顯示來源：156 筆。",
+        "detail": "__spt_log_uid=cd52a02afcd94cbeadd0a2ab42adb2a3",
+        "level": "WARN",
+        "source": "sqlite"
       }
     ]
   },
   "settings": {},
   "table_counts": {
-    "system_logs": 457
+    "system_logs": 458
   }
 }
