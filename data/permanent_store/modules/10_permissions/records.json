@@ -1,10 +1,10 @@
 {
-  "authority_schema": "SPT-PermanentAuthority-V29",
+  "authority_schema": "SPT-10-Permissions-SingleAuthority-V96",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-05-30 11:26:51",
+  "updated_at": "2026-05-31 18:16:09",
   "exported_at": "2026-05-30 11:26:51",
-  "reason": "v106_force_password_change",
+  "reason": "v125_get_permissions_repair",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -23908,5 +23908,8 @@
     "security_settings": 0,
     "security_users": 0,
     "security_user_roles": 0
-  }
+  },
+  "deleted_usernames": [],
+  "version": "V96-direct-authority",
+  "authority_file": "data/permanent_store/modules/10_permissions/records.json"
 }
