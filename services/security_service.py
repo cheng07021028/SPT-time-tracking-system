@@ -4369,3 +4369,26 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:  # typ
         return False
 
 # =================== END V256 LOGIN HOT PATH BYPASS ===================
+
+# ===== V257 SPEED DIAGNOSTIC WRAPPERS｜2026-05-31 =====
+# Timing only. No permission/login behavior changes.
+try:
+    from services.spt_speed_diagnostic_service import wrap as _v257_diag_wrap
+    _v257_names = [
+        ("ensure_security_schema", "security.ensure_security_schema", 500.0),
+        ("seed_security_defaults", "security.seed_security_defaults", 500.0),
+        ("authenticate", "security.authenticate", 200.0),
+        ("require_login", "security.require_login", 200.0),
+        ("require_module_access", "security.require_module_access", 200.0),
+        ("check_permission", "security.check_permission", 100.0),
+        ("load_users_df", "security.load_users_df", 250.0),
+        ("load_permissions_df", "security.load_permissions_df", 250.0),
+        ("log_security_event", "security.log_security_event", 250.0),
+        ("get_current_user", "security.get_current_user", 50.0),
+    ]
+    for _v257_func_name, _v257_label, _v257_threshold in _v257_names:
+        if _v257_func_name in globals() and callable(globals().get(_v257_func_name)):
+            globals()[_v257_func_name] = _v257_diag_wrap(globals()[_v257_func_name], category="security", name=_v257_label, threshold_ms=_v257_threshold)
+except Exception:
+    pass
+# ===== END V257 SPEED DIAGNOSTIC WRAPPERS =====

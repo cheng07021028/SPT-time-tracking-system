@@ -29374,3 +29374,29 @@ def audit_v256_frontend_click_isolation() -> dict:
     }
 
 # =================== END V256 01 FRONTEND CLICK ISOLATION ===================
+
+# ===== V257 SPEED DIAGNOSTIC WRAPPERS｜2026-05-31 =====
+# Timing only. No time-record behavior changes.
+try:
+    from services.spt_speed_diagnostic_service import wrap as _v257_diag_wrap
+    _v257_time_record_targets = [
+        ("today_records", "time_record.today_records", 300.0),
+        ("load_records", "time_record.load_records", 500.0),
+        ("start_work", "time_record.start_work", 500.0),
+        ("finish_work", "time_record.finish_work", 500.0),
+        ("save_time_records", "time_record.save_time_records", 800.0),
+        ("recalculate_time_records", "time_record.recalculate_time_records", 1000.0),
+        ("delete_time_records", "time_record.delete_time_records", 800.0),
+        ("get_active_record", "time_record.get_active_record", 250.0),
+        ("get_active_group", "time_record.get_active_group", 250.0),
+        ("get_conflicting_active_records", "time_record.get_conflicting_active_records", 250.0),
+        ("refresh_active_records_for_employee", "time_record.refresh_active_records_for_employee", 250.0),
+        ("clear_today_records_fast_cache", "time_record.clear_today_records_fast_cache", 100.0),
+        ("clear_today_finished_from_work_page", "time_record.clear_today_finished_from_work_page", 100.0),
+    ]
+    for _v257_func_name, _v257_label, _v257_threshold in _v257_time_record_targets:
+        if _v257_func_name in globals() and callable(globals().get(_v257_func_name)):
+            globals()[_v257_func_name] = _v257_diag_wrap(globals()[_v257_func_name], category="01_time_record", name=_v257_label, threshold_ms=_v257_threshold)
+except Exception:
+    pass
+# ===== END V257 SPEED DIAGNOSTIC WRAPPERS =====

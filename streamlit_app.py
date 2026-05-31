@@ -1,6 +1,15 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+# ===== V257 SPEED DIAGNOSTIC START =====
+import time as _spt_v257_time
+try:
+    from services.spt_speed_diagnostic_service import tick as _spt_v257_tick
+except Exception:  # pragma: no cover
+    _spt_v257_tick = None  # type: ignore
+_SPT_V257_HOME_T0 = _spt_v257_time.perf_counter()
+# ===== END V257 SPEED DIAGNOSTIC START =====
+
 # === V-PERSIST-ROOT: single permanent store bootstrap ===
 try:
     from services.permanent_store_service import ensure_permanent_store
@@ -24,7 +33,11 @@ st.set_page_config(
 )
 
 apply_theme()
+if callable(_spt_v257_tick):
+    _SPT_V257_HOME_T0 = _spt_v257_tick("home", "home.apply_theme", _SPT_V257_HOME_T0, threshold_ms=200.0)
 require_login("home")
+if callable(_spt_v257_tick):
+    _SPT_V257_HOME_T0 = _spt_v257_tick("home", "home.require_login", _SPT_V257_HOME_T0, threshold_ms=200.0)
 # V256: keep home/login hot path clean. PostgreSQL authority bootstrap is not
 # started from home/login; 09/14/manual maintenance can run heavy sync explicitly.
 # V3.64: login/home must stay fast.
@@ -33,8 +46,12 @@ require_login("home")
 if not st.session_state.get("_spt_v364_login_fast_path_ready"):
     st.session_state["_spt_v364_login_fast_path_ready"] = True
 _global_ui_settings = load_global_ui_settings()
+if callable(_spt_v257_tick):
+    _SPT_V257_HOME_T0 = _spt_v257_tick("home", "home.load_global_ui_settings", _SPT_V257_HOME_T0, threshold_ms=200.0)
 inject_global_font_scale(_global_ui_settings.get("global_font_scale_percent", 100))
 render_home_header()
+if callable(_spt_v257_tick):
+    _SPT_V257_HOME_T0 = _spt_v257_tick("home", "home.render_home_header", _SPT_V257_HOME_T0, threshold_ms=200.0)
 
 _current_user = st.session_state.get("username") or st.session_state.get("current_user") or "SYSTEM"
 render_global_font_controls(username=str(_current_user))
@@ -66,7 +83,18 @@ all_modules = [
     ("13", "系統設定", "工段名稱、休息時間與跨模組共用設定", "13_system_settings"),
 ]
 modules = [(no, name, desc) for no, name, desc, code in all_modules if check_permission(code, "can_view")]
+if callable(_spt_v257_tick):
+    _SPT_V257_HOME_T0 = _spt_v257_tick("home", "home.check_permission_all_modules", _SPT_V257_HOME_T0, threshold_ms=200.0, detail={"module_count": len(all_modules)})
 if modules:
     render_module_cards(modules)
 else:
     st.warning("你的帳號目前沒有任何模組瀏覽權限，請聯絡系統管理員。")
+
+
+# ===== V257 SPEED DIAGNOSTIC END =====
+try:
+    if callable(_spt_v257_tick):
+        _spt_v257_tick("home", "home.total_render", _SPT_V257_HOME_T0, threshold_ms=500.0)
+except Exception:
+    pass
+# ===== END V257 SPEED DIAGNOSTIC END =====

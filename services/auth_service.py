@@ -149,3 +149,17 @@ def require_module(module_key: str, action: str = "view") -> None:
         log_login(current_user(), "權限不足", f"{module_key}:{action}")
         st.error("目前帳號沒有此模組權限，請聯絡系統管理員。")
         st.stop()
+
+# ===== V257 SPEED DIAGNOSTIC WRAPPERS｜2026-05-31 =====
+# Timing only. No authentication behavior changes.
+try:
+    from services.spt_speed_diagnostic_service import wrap as _v257_diag_wrap
+    if "load_users" in globals():
+        load_users = _v257_diag_wrap(load_users, category="login", name="auth.load_users", threshold_ms=100.0)  # type: ignore[assignment]
+    if "log_login" in globals():
+        log_login = _v257_diag_wrap(log_login, category="login", name="auth.log_login", threshold_ms=100.0)  # type: ignore[assignment]
+    if "authenticate" in globals():
+        authenticate = _v257_diag_wrap(authenticate, category="login", name="auth.authenticate", threshold_ms=200.0)  # type: ignore[assignment]
+except Exception:
+    pass
+# ===== END V257 SPEED DIAGNOSTIC WRAPPERS =====
