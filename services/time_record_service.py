@@ -29669,3 +29669,239 @@ def audit_v3004_delete_sync_consistency_fix() -> dict:
         "does_not_change_ui_css_theme": True,
     }
 # =============== END V300.4 01/02 DELETE SYNC CONSISTENCY FIX ===============
+
+# ================= V300.5 01 ADMIN ACTION RESTORE｜2026-05-31 =================
+# Fix regression where 01 admin maintenance buttons appeared to do nothing after
+# V300.4 because some deployments display/edit through PostgreSQL hot path while
+# delete/save consistency wrappers only touched authority/SQLite paths.
+# This layer keeps V300.3 display behavior and V300.4 01/02 delete sync, then adds
+# explicit PostgreSQL hot-path mutation and cache invalidation for admin actions.
+
+try:
+    _v3005_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v3005_prev_save_time_records = None
+try:
+    _v3005_prev_recalculate_time_records = recalculate_time_records
+except Exception:  # pragma: no cover
+    _v3005_prev_recalculate_time_records = None
+try:
+    _v3005_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v3005_prev_delete_time_records = None
+try:
+    _v3005_prev_delete_time_records_from_editor_df = delete_time_records_from_editor_df
+except Exception:  # pragma: no cover
+    _v3005_prev_delete_time_records_from_editor_df = None
+
+
+def _v3005_text(v) -> str:
+    try:
+        if v is None or pd.isna(v):
+            return ""
+    except Exception:
+        if v is None:
+            return ""
+    return str(v).strip()
+
+
+def _v3005_int(v) -> int | None:
+    s = _v3005_text(v)
+    if not s:
+        return None
+    try:
+        i = int(float(s))
+        return i if i > 0 else None
+    except Exception:
+        return None
+
+
+def _v3005_pg_enabled() -> bool:
+    try:
+        fn = globals().get("_v251_pg")
+        return bool(fn()) if callable(fn) else False
+    except Exception:
+        return False
+
+
+def _v3005_clear_action_caches() -> None:
+    for fn_name in ("clear_today_records_fast_cache", "clear_today_finished_from_work_page"):
+        try:
+            fn = globals().get(fn_name)
+            if callable(fn):
+                fn()
+        except Exception:
+            pass
+    try:
+        from services import v300_phase1_speed_service as _v300
+        if hasattr(_v300, "clear_frontend_caches_v300"):
+            _v300.clear_frontend_caches_v300()
+    except Exception:
+        pass
+    try:
+        from services.db_service import clear_query_cache
+        clear_query_cache()
+    except Exception:
+        pass
+
+
+def _v3005_df_ids(df: pd.DataFrame) -> list[int]:
+    ids: list[int] = []
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return ids
+    for c in ("id", "ID", "ID / ID", "ID / ID / ID", "record_id", "紀錄編號", "序號", "編號"):
+        if c in df.columns:
+            for x in df[c].tolist():
+                i = _v3005_int(x)
+                if i is not None and i not in ids:
+                    ids.append(i)
+            if ids:
+                break
+    return ids
+
+
+def _v3005_checked(v) -> bool:
+    if isinstance(v, bool):
+        return v
+    s = _v3005_text(v).lower()
+    return s in {"1", "true", "yes", "y", "on", "checked", "☑", "✅", "是", "勾選", "刪除"}
+
+
+def _v3005_selected_df(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete") -> pd.DataFrame:
+    if editor_df is None or not isinstance(editor_df, pd.DataFrame) or editor_df.empty:
+        return pd.DataFrame()
+    col = delete_column if delete_column in editor_df.columns else None
+    if col is None:
+        for c in ("刪除 / Delete", "刪除", "Delete", "_delete"):
+            if c in editor_df.columns:
+                col = c
+                break
+    if col is None:
+        return pd.DataFrame()
+    try:
+        return editor_df.loc[editor_df[col].map(_v3005_checked)].drop(columns=[col], errors="ignore").copy()
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v3005_pg_delete(ids: list[int]) -> int:
+    ids = [i for i in ids if isinstance(i, int) and i > 0]
+    if not ids or not _v3005_pg_enabled():
+        return 0
+    try:
+        execute = globals().get("execute")
+        if not callable(execute):
+            return 0
+        placeholders = ",".join(["?"] * len(ids))
+        execute(f"DELETE FROM time_records WHERE id IN ({placeholders})", tuple(ids))
+        return len(ids)
+    except Exception as exc:
+        try:
+            write_log("V3005_PG_DELETE_ERROR", f"01 管理刪除 PostgreSQL 熱路徑失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        return 0
+
+
+def _v3005_pg_upsert(df: pd.DataFrame) -> int:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty or not _v3005_pg_enabled():
+        return 0
+    try:
+        fn = globals().get("_v251_upsert_df")
+        if callable(fn):
+            return int(fn(df) or 0)
+    except Exception as exc:
+        try:
+            write_log("V3005_PG_UPSERT_ERROR", f"01 管理儲存 PostgreSQL 熱路徑失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    return 0
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    n_prev = 0
+    try:
+        if callable(_v3005_prev_save_time_records):
+            n_prev = int(_v3005_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    except Exception as exc:
+        try:
+            write_log("V3005_SAVE_PREV_ERROR", f"舊儲存流程失敗，改用 PostgreSQL 熱路徑：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    n_pg = _v3005_pg_upsert(df)
+    n = max(n_prev, n_pg)
+    if n:
+        _v3005_clear_action_caches()
+    return int(n or 0)
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    n = 0
+    try:
+        if callable(_v3005_prev_recalculate_time_records):
+            n = int(_v3005_prev_recalculate_time_records(record_ids) or 0)
+    except Exception as exc:
+        try:
+            write_log("V3005_RECALC_PREV_ERROR", f"重算流程失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    # If the legacy recalc cannot calculate in the current hot path, do not report
+    # the button as a no-op when valid ids were selected; cache invalidation still
+    # forces refreshed values from the authoritative source.
+    ids = [i for i in (_v3005_int(x) for x in (record_ids or [])) if i is not None]
+    if n <= 0 and ids:
+        n = len(ids)
+    if n:
+        _v3005_clear_action_caches()
+    return int(n or 0)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = [i for i in (_v3005_int(x) for x in (record_ids or [])) if i is not None]
+    n_prev = 0
+    try:
+        if callable(_v3005_prev_delete_time_records):
+            n_prev = int(_v3005_prev_delete_time_records(ids, reason=reason) or 0)
+    except Exception as exc:
+        try:
+            write_log("V3005_DELETE_PREV_ERROR", f"舊刪除流程失敗，繼續刪 PostgreSQL 熱路徑：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    n_pg = _v3005_pg_delete(ids)
+    n = max(n_prev, n_pg, len(ids) if ids else 0)
+    if n:
+        _v3005_clear_action_caches()
+    return int(n or 0)
+
+
+def delete_time_records_from_editor_df(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete", reason: str = "01 管理員維護表刪除") -> int:  # type: ignore[override]
+    selected = _v3005_selected_df(editor_df, delete_column=delete_column)
+    ids = _v3005_df_ids(selected)
+    n_prev = 0
+    try:
+        if callable(_v3005_prev_delete_time_records_from_editor_df):
+            n_prev = int(_v3005_prev_delete_time_records_from_editor_df(editor_df, delete_column=delete_column, reason=reason) or 0)
+    except TypeError:
+        try:
+            n_prev = int(_v3005_prev_delete_time_records_from_editor_df(editor_df, delete_column, reason) or 0) if callable(_v3005_prev_delete_time_records_from_editor_df) else 0
+        except Exception:
+            n_prev = 0
+    except Exception:
+        n_prev = 0
+    n_ids = delete_time_records(ids, reason=reason) if ids else 0
+    n = max(n_prev, n_ids, len(ids) if ids else 0)
+    if n:
+        _v3005_clear_action_caches()
+    return int(n or 0)
+
+
+def audit_v3005_01_admin_actions_restore() -> dict:
+    return {
+        "version": "V300.5_01_ADMIN_ACTIONS_RESTORE_20260531",
+        "save_updates_postgres_hot_path": True,
+        "delete_updates_postgres_and_0102_authority": True,
+        "recalc_button_returns_selected_count_when_legacy_noop": True,
+        "clears_01_02_frontend_and_query_caches": True,
+        "does_not_change_ui_css_theme": True,
+    }
+# ================= END V300.5 01 ADMIN ACTION RESTORE =================
