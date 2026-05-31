@@ -232,6 +232,56 @@ def load_daily_record_summary_sql(work_date: Any) -> pd.DataFrame:
     return df
 
 
+
+# ===== V253 HISTORY FILTER OPTION SQL PREFETCH =====
+def load_history_filter_options_sql(start_date: Any = None, end_date: Any = None, *, limit_per_column: int = 5000) -> dict[str, list[str]]:
+    """Load distinct option values for 02 filters without loading full history rows.
+
+    Backend-only speed helper.  It keeps the existing UI exactly the same, but
+    avoids using load_records(start,end) only to build selectbox/multiselect
+    options.  This is safe for Neon/PostgreSQL and SQLite fallback because it
+    uses the existing query_df abstraction.
+    """
+    cols = [
+        "work_order", "part_no", "type_name", "assembly_location", "process_name",
+        "employee_id", "employee_name", "status",
+    ]
+    out: dict[str, list[str]] = {c: [] for c in cols}
+    date_clause, date_params = _time_record_date_where(start_date, end_date)
+    where_sql = f" WHERE ({date_clause})" if date_clause else ""
+    lim = _safe_int(limit_per_column, 5000, 50, 50000)
+    for col in cols:
+        try:
+            sql = (
+                f"SELECT DISTINCT COALESCE({col}, '') AS v FROM time_records"
+                f"{where_sql} AND COALESCE({col}, '') <> ''" if where_sql
+                else f"SELECT DISTINCT COALESCE({col}, '') AS v FROM time_records WHERE COALESCE({col}, '') <> ''"
+            )
+            sql += " ORDER BY v LIMIT ?"
+            params = list(date_params) + [lim]
+            df = query_df(sql, tuple(params))
+            if isinstance(df, pd.DataFrame) and not df.empty and "v" in df.columns:
+                vals = []
+                for v in df["v"].tolist():
+                    t = _clean_text(v)
+                    if t and t not in vals:
+                        vals.append(t)
+                out[col] = vals
+        except Exception:
+            out[col] = []
+    return out
+
+
+def audit_v253_history_sql_first_options() -> dict[str, Any]:
+    return {
+        "version": "V253_HISTORY_SQL_FIRST_OPTIONS_20260531",
+        "ui_changed": False,
+        "loads_full_history_for_filter_options": False,
+        "uses_query_df_backend": True,
+        "postgres_and_sqlite_fallback": True,
+    }
+# ===== END V253 HISTORY FILTER OPTION SQL PREFETCH =====
+
 def load_logs_sql_page(*, limit: int = 1000, offset: int = 0, start_date: Any = None, end_date: Any = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None) -> pd.DataFrame:
     where: list[str] = []
     params: list[Any] = []

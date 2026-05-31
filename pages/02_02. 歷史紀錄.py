@@ -23,9 +23,10 @@ from services.time_record_delete_unifier_service import delete_selected_time_rec
 from services.duration_service import hours_to_hms
 from services.history_filter_service import load_history_filters, save_history_filters, reset_history_filters
 try:
-    from services.large_table_query_service import load_history_records_sql_filtered
+    from services.large_table_query_service import load_history_records_sql_filtered, load_history_filter_options_sql
 except Exception:
     load_history_records_sql_filtered = None
+    load_history_filter_options_sql = None
 
 # === V180B_HISTORY_TOTAL_TIME_TYPE_FIX_BEGIN ===
 def _v180b_parse_work_hours_to_decimal_hours(value):
@@ -1180,7 +1181,7 @@ def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     return out
 
 
-def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame, work_orders: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame, work_orders: pd.DataFrame, option_values: dict | None = None) -> tuple[pd.DataFrame, dict]:
     stored = load_history_filters()
     if "history_filters_applied_v216" not in st.session_state:
         st.session_state["history_filters_applied_v216"] = stored
@@ -1204,17 +1205,18 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
             end_input = r1c3.date_input("結束日期", value=end_default)
             detail_limit = r1c4.number_input("明細讀取上限", min_value=50, max_value=50000, value=int(applied.get("detail_limit") or 1000), step=50)
 
-            # Build options from current broad query + master data.
-            wo_options = _merge_options(_safe_unique(work_orders, "work_order"), _safe_unique(base_df, "work_order"))
-            pn_options = _merge_options(_safe_unique(work_orders, "part_no"), _safe_unique(base_df, "part_no"))
-            type_options = _merge_options(_safe_unique(work_orders, "type_name"), _safe_unique(base_df, "type_name"))
-            loc_options = _merge_options(_safe_unique(work_orders, "assembly_location"), _safe_unique(base_df, "assembly_location"))
-            process_options = _safe_unique(base_df, "process_name")
-            emp_id_options = _merge_options(_safe_unique(employees, "employee_id"), _safe_unique(base_df, "employee_id"))
-            emp_name_options = _merge_options(_safe_unique(employees, "employee_name"), _safe_unique(base_df, "employee_name"))
+            # V253: build options from SQL DISTINCT values when available, not full history rows.
+            _opt = option_values or {}
+            wo_options = _merge_options(_safe_unique(work_orders, "work_order"), list(_opt.get("work_order", [])) or _safe_unique(base_df, "work_order"))
+            pn_options = _merge_options(_safe_unique(work_orders, "part_no"), list(_opt.get("part_no", [])) or _safe_unique(base_df, "part_no"))
+            type_options = _merge_options(_safe_unique(work_orders, "type_name"), list(_opt.get("type_name", [])) or _safe_unique(base_df, "type_name"))
+            loc_options = _merge_options(_safe_unique(work_orders, "assembly_location"), list(_opt.get("assembly_location", [])) or _safe_unique(base_df, "assembly_location"))
+            process_options = list(_opt.get("process_name", [])) or _safe_unique(base_df, "process_name")
+            emp_id_options = _merge_options(_safe_unique(employees, "employee_id"), list(_opt.get("employee_id", [])) or _safe_unique(base_df, "employee_id"))
+            emp_name_options = _merge_options(_safe_unique(employees, "employee_name"), list(_opt.get("employee_name", [])) or _safe_unique(base_df, "employee_name"))
             dept_options = _safe_unique(employees, "department")
             title_options = _safe_unique(employees, "title")
-            status_options = _safe_unique(base_df, "status")
+            status_options = list(_opt.get("status", [])) or _safe_unique(base_df, "status")
 
             r2c1, r2c2, r2c3 = st.columns(3)
             work_orders_selected = r2c1.multiselect("製令", wo_options, default=[x for x in applied.get("work_orders", []) if x in wo_options])
@@ -1295,8 +1297,21 @@ _seed_start, _seed_end = _date_range_from_preset(
     _history_filter_seed.get("start_date"),
     _history_filter_seed.get("end_date"),
 )
-base_df = load_records(str(_seed_start), str(_seed_end), None, None)
-_panel_df, history_filters = _render_history_filter_panel(base_df, employees, work_orders)
+# V253: do not load full 02 history merely to render filter options.
+# SQL DISTINCT options keep the same UI but avoid expensive foreground work on Neon.
+_history_option_values = {}
+if callable(load_history_filter_options_sql):
+    try:
+        _history_option_values = load_history_filter_options_sql(str(_seed_start), str(_seed_end), limit_per_column=5000)
+    except Exception:
+        _history_option_values = {}
+
+if _history_option_values:
+    base_df = pd.DataFrame()
+else:
+    # Fallback for environments without the large-table SQL helper.
+    base_df = load_records(str(_seed_start), str(_seed_end), None, None)
+_panel_df, history_filters = _render_history_filter_panel(base_df, employees, work_orders, _history_option_values)
 
 df = _panel_df
 if callable(load_history_records_sql_filtered):
