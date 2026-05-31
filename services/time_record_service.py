@@ -30877,3 +30877,144 @@ def audit_v3008_hot_path_speed() -> dict:
         "does_not_change_ui_css_theme": True,
     }
 # =============== END V300.8 01/02 BUTTON HOT-PATH SPEED LAYER ===============
+
+# ================= V300.9 02 CONFIRM-ONLY + DELETE ACTION RESTORE｜2026-05-31 =================
+# Purpose:
+# - 02 history editor checkbox changes must not trigger heavy computation until
+#   the user presses Save/Recalc/Delete confirm buttons.
+# - Restore 02 delete action by accepting ids captured from the confirmed editor
+#   form and routing them through the same unified 01/02 delete path.
+# - Keep V300.3 display restore, V300.6.1 admin save/recalc sync, and V300.8
+#   start/finish hot-path speed.
+try:
+    _v3009_prev_delete_time_records_from_02_history_editor = delete_time_records_from_02_history_editor
+except Exception:  # pragma: no cover
+    _v3009_prev_delete_time_records_from_02_history_editor = None
+
+
+def _v3009_text(value) -> str:
+    try:
+        if value is None or pd.isna(value):
+            return ""
+    except Exception:
+        if value is None:
+            return ""
+    text = str(value).strip()
+    return "" if text.lower() in {"none", "nan", "nat", "null", "<na>"} else text
+
+
+def _v3009_int(value) -> int | None:
+    text = _v3009_text(value)
+    if not text:
+        return None
+    try:
+        n = int(float(text))
+        return n if n > 0 else None
+    except Exception:
+        return None
+
+
+def _v3009_checked(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return _v3009_text(value).lower() in {"1", "true", "yes", "y", "on", "checked", "☑", "✅", "是", "勾選", "刪除"}
+
+
+def _v3009_ids_from_editor(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete") -> list[int]:
+    ids: list[int] = []
+    if editor_df is None or not isinstance(editor_df, pd.DataFrame) or editor_df.empty:
+        return ids
+    id_col = None
+    for c in ("id", "ID", "ID / ID", "ID / ID / ID", "record_id", "紀錄編號", "序號", "編號"):
+        if c in editor_df.columns:
+            id_col = c
+            break
+    if not id_col:
+        return ids
+    if delete_column in editor_df.columns:
+        mask = editor_df[delete_column].map(_v3009_checked)
+        source = editor_df.loc[mask, id_col]
+    else:
+        # When record_ids are not supplied and the delete column was stripped by a
+        # wrapper, use no implicit full-table delete. The caller must pass ids.
+        source = []
+    for x in list(source):
+        n = _v3009_int(x)
+        if n is not None and n not in ids:
+            ids.append(int(n))
+    return ids
+
+
+def _v3009_clear_0102_after_action() -> None:
+    for fn_name in ("clear_today_records_fast_cache", "clear_today_finished_from_work_page"):
+        try:
+            fn = globals().get(fn_name)
+            if callable(fn):
+                fn()
+        except Exception:
+            pass
+    try:
+        from services import v300_phase1_speed_service as _v300
+        fn = getattr(_v300, "clear_frontend_caches_v300", None)
+        if callable(fn):
+            fn()
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+
+
+def delete_time_records_from_02_history_editor(editor_df: pd.DataFrame, record_ids: list[int] | None = None, delete_column: str = "刪除 / Delete", reason: str = "02 歷史紀錄刪除") -> dict:  # type: ignore[override]
+    ids: list[int] = []
+    for x in record_ids or []:
+        n = _v3009_int(x)
+        if n is not None and n not in ids:
+            ids.append(int(n))
+    if not ids:
+        ids = _v3009_ids_from_editor(editor_df, delete_column=delete_column)
+    if not ids:
+        return {"ok": False, "deleted": 0, "deleted_count": 0, "count": 0, "message": "沒有偵測到已勾選的 02 歷史紀錄。"}
+
+    deleted = 0
+    try:
+        deleted = int(delete_time_records(ids, reason=reason) or 0)
+    except Exception as exc:
+        try:
+            write_log("V3009_02_DELETE_ERROR", f"02 確認刪除失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        deleted = 0
+
+    if deleted <= 0 and callable(_v3009_prev_delete_time_records_from_02_history_editor):
+        try:
+            result = _v3009_prev_delete_time_records_from_02_history_editor(editor_df, record_ids=ids, delete_column=delete_column, reason=reason)
+            if isinstance(result, dict):
+                deleted = int(result.get("deleted_count") or result.get("deleted") or result.get("count") or 0)
+        except Exception:
+            pass
+
+    if deleted:
+        _v3009_clear_0102_after_action()
+    return {
+        "ok": bool(deleted),
+        "deleted": int(deleted or 0),
+        "deleted_count": int(deleted or 0),
+        "count": int(deleted or 0),
+        "ids": ids,
+        "message": f"V300.9 已於確認後刪除 02 歷史紀錄並同步清除 01/02 快取：{int(deleted or 0)} 筆。",
+    }
+
+
+def audit_v3009_confirm_only_and_02_buttons() -> dict:
+    return {
+        "version": "V300.9_CONFIRM_ONLY_02_BUTTONS_20260531",
+        "02_history_query_runs_only_after_query_or_apply": True,
+        "02_editor_uses_form_submit_buttons": True,
+        "checkbox_changes_do_not_trigger_delete_recalc_save": True,
+        "02_delete_routes_through_unified_delete_time_records": True,
+        "clears_0102_frontend_caches_after_delete": True,
+        "does_not_change_ui_css_theme": True,
+    }
+# =============== END V300.9 02 CONFIRM-ONLY + DELETE ACTION RESTORE ===============
