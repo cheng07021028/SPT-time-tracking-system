@@ -6645,3 +6645,354 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
 
 check_permission = has_permission
 # ======================= V300.12 PERMISSION REBOOT SINGLE-AUTHORITY FIX END =======================
+
+# ======================= V300.12.1 PERMISSION COMPLETE-AUTHORITY REPAIR START =======================
+# Purpose:
+#   Fix V300.12 over-strict single-authority behavior that could leave 10. 權限管理
+#   with only role/default rows after Reboot.  This patch keeps the canonical file as
+#   the write target, but repairs an incomplete canonical payload by merging the most
+#   complete existing authority snapshots.  It never touches 01/02 work-hour data.
+# Rules:
+#   1) Canonical file remains data/permanent_store/modules/10_permissions/records.json.
+#   2) If canonical is complete, it wins.
+#   3) If canonical lost users/matrix/security settings, repair missing pieces from
+#      permanent_store snapshots and current DB cache, then write back to canonical.
+#   4) deleted_usernames in canonical are honored, so deliberately deleted users are
+#      not resurrected.
+#   5) Security settings, including idle_timeout_minutes, are stored in the same payload.
+
+try:
+    _v300121_prev_authority_payload = _v30012_authority_payload  # type: ignore[name-defined]
+except Exception:
+    _v300121_prev_authority_payload = None
+try:
+    _v300121_prev_payload_with_fallback = _v30012_payload_with_fallback  # type: ignore[name-defined]
+except Exception:
+    _v300121_prev_payload_with_fallback = None
+try:
+    _v300121_prev_write_authority = _v30012_write_authority  # type: ignore[name-defined]
+except Exception:
+    _v300121_prev_write_authority = None
+
+
+def _v300121_table_counts(payload: dict) -> dict:
+    tables = payload.get("tables") if isinstance(payload, dict) and isinstance(payload.get("tables"), dict) else {}
+    return {k: len(v) for k, v in tables.items() if isinstance(v, list)}
+
+
+def _v300121_payload_score(payload: dict) -> int:
+    c = _v300121_table_counts(payload)
+    # Users matter most, then permission matrix, then security settings.
+    return c.get("auth_users", 0) * 10000 + c.get("auth_account_permissions", 0) * 10 + c.get("auth_security_settings", 0) + c.get("security_settings", 0)
+
+
+def _v300121_candidate_paths() -> list[Path]:
+    base = PROJECT_ROOT / "data"
+    paths: list[Path] = [
+        _V30012_PERMISSION_AUTHORITY_FILE,  # type: ignore[name-defined]
+        base / "permanent_store" / "modules" / "10_permissions" / "records.json",
+        base / "permanent_store" / "modules" / "10_permissions" / "settings.json",
+        base / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+        base / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        base / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+        base / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        base / "permanent_store" / "persistent_state" / "spt_permission_settings.json",
+        base / "permanent_store" / "persistent_state" / "spt_security_settings.json",
+        base / "permanent_store" / "config" / "security_settings.json",
+        base / "permanent_store" / "system" / "security_settings.json",
+        base / "permanent_store" / "system" / "permissions.json",
+    ]
+    for d in [
+        base / "permanent_store" / "persistent_modules" / "10_permissions" / "history",
+        base / "permanent_store" / "persistent_state" / "history",
+        base / "permanent_store" / "config" / "history",
+    ]:
+        try:
+            if d.exists():
+                paths.extend(sorted(d.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:20])
+        except Exception:
+            pass
+    # Deduplicate while preserving order.
+    out: list[Path] = []
+    seen: set[str] = set()
+    for p in paths:
+        try:
+            s = str(p.resolve())
+        except Exception:
+            s = str(p)
+        if s not in seen:
+            seen.add(s); out.append(p)
+    return out
+
+
+def _v300121_read_payload_file(path: Path) -> dict:
+    try:
+        if not path.exists() or not path.is_file() or path.stat().st_size <= 2:
+            return {}
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        return {}
+    return {}
+
+
+def _v300121_extract_tables(payload: dict) -> dict:
+    tables = payload.get("tables") if isinstance(payload, dict) and isinstance(payload.get("tables"), dict) else {}
+    out = _v30012_empty_tables()  # type: ignore[name-defined]
+    if isinstance(tables, dict):
+        for t in out.keys():
+            rows = tables.get(t, [])
+            if isinstance(rows, list):
+                out[t] = [dict(r) for r in rows if isinstance(r, dict)]
+    # Some legacy settings files are a flat dict rather than a tables payload.
+    if not out.get("auth_security_settings") and isinstance(payload, dict):
+        sec_rows = []
+        for k, v in payload.items():
+            if str(k) in {"idle_timeout_minutes", "ask_continue_after_record"} or str(k).startswith("security_"):
+                sec_rows.append({"setting_key": str(k), "setting_value": str(v), "note": "recovered from legacy flat settings", "updated_at": _v30012_now()})  # type: ignore[name-defined]
+        if sec_rows:
+            out["auth_security_settings"] = sec_rows
+            out["security_settings"] = list(sec_rows)
+    return out
+
+
+def _v300121_row_key(table: str, row: dict):
+    if table in {"auth_users", "security_users"}:
+        return _v30012_clean_username(row).lower()  # type: ignore[name-defined]
+    if table == "auth_account_permissions":
+        return (_v30012_clean_username(row).lower(), _v30012_normalize_module_no(row.get("module_code")))  # type: ignore[name-defined]
+    if table == "auth_security_settings" or table == "security_settings":
+        return str(row.get("setting_key") or row.get("key") or "").strip()
+    if table == "security_user_roles":
+        return (_v30012_clean_username(row).lower(), str(row.get("role_code") or row.get("role") or "").strip().lower())  # type: ignore[name-defined]
+    return json.dumps(row, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def _v300121_merge_row(base: dict, incoming: dict) -> dict:
+    # Canonical value wins. Fill only missing/blank values from incoming.
+    out = dict(incoming)
+    out.update({k: v for k, v in base.items() if v not in (None, "")})
+    for k, v in incoming.items():
+        if k not in out or out.get(k) in (None, ""):
+            out[k] = v
+    return out
+
+
+def _v300121_collect_candidates() -> list[dict]:
+    payloads: list[dict] = []
+    for p in _v300121_candidate_paths():
+        payload = _v300121_read_payload_file(p)
+        if not payload:
+            continue
+        if isinstance(payload.get("tables"), dict) or any(k in payload for k in ("idle_timeout_minutes", "ask_continue_after_record")):
+            payloads.append(payload)
+    # Add current DB cache as last-resort candidate only.
+    try:
+        payloads.append({"tables": _v30012_db_fallback_tables(), "source": "sqlite_cache_candidate"})  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return payloads
+
+
+def _v300121_is_incomplete(payload: dict, candidates: list[dict]) -> bool:
+    c = _v300121_table_counts(payload)
+    best = max((_v300121_table_counts(x).get("auth_users", 0) for x in candidates), default=0)
+    best_matrix = max((_v300121_table_counts(x).get("auth_account_permissions", 0) for x in candidates), default=0)
+    # Incomplete when users/settings clearly collapsed.  This catches the V300.12 regression
+    # but does not rewrite a complete authority file unnecessarily.
+    if c.get("auth_users", 0) == 0:
+        return True
+    if best >= 3 and c.get("auth_users", 0) < best:
+        return True
+    if best_matrix >= 1 and c.get("auth_account_permissions", 0) < min(best_matrix, max(1, c.get("auth_users", 0) * 5)):
+        return True
+    if c.get("auth_security_settings", 0) == 0 and c.get("security_settings", 0) == 0:
+        if any((_v300121_table_counts(x).get("auth_security_settings", 0) or _v300121_table_counts(x).get("security_settings", 0)) for x in candidates):
+            return True
+    return False
+
+
+def _v300121_merge_authority_payload(current: dict, reason: str = "v30012_1_repair") -> dict:
+    candidates = _v300121_collect_candidates()
+    deleted = _v30012_deleted(current)  # type: ignore[name-defined]
+    for p in candidates:
+        try:
+            deleted |= _v30012_deleted(p)  # type: ignore[name-defined]
+        except Exception:
+            pass
+    # Start from candidates sorted by score so the fullest backup supplies missing rows,
+    # then overlay canonical current so recent complete values win.
+    sorted_candidates = sorted(candidates, key=_v300121_payload_score, reverse=True)
+    all_payloads = sorted_candidates + [current]
+    merged_tables = _v30012_empty_tables()  # type: ignore[name-defined]
+    for payload in all_payloads:
+        tables = _v300121_extract_tables(payload)
+        for table in _V30012_AUTH_TABLES:  # type: ignore[name-defined]
+            by_key = {_v300121_row_key(table, r): dict(r) for r in merged_tables.get(table, []) if isinstance(r, dict) and _v300121_row_key(table, r)}
+            for row in tables.get(table, []) if isinstance(tables.get(table), list) else []:
+                if not isinstance(row, dict):
+                    continue
+                key = _v300121_row_key(table, row)
+                if not key:
+                    continue
+                uname = ""
+                if table in {"auth_users", "security_users", "auth_account_permissions", "security_user_roles"}:
+                    uname = _v30012_clean_username(row).lower()  # type: ignore[name-defined]
+                if uname and uname in deleted:
+                    continue
+                if key in by_key:
+                    by_key[key] = _v300121_merge_row(by_key[key], row)
+                else:
+                    x = dict(row); x.pop("id", None); by_key[key] = x
+            merged_tables[table] = list(by_key.values())
+    # Keep admin account if all candidates are unexpectedly empty.
+    if not merged_tables.get("auth_users"):
+        try:
+            merged_tables["auth_users"] = [{
+                "username": "admin", "password_hash": hash_password("Admin@1234"), "password_hint": "default emergency admin",
+                "display_name": "系統管理員", "role_code": "admin", "is_active": 1,
+                "force_password_change": 0, "created_at": _v30012_now(), "updated_at": _v30012_now(),
+            }]
+        except Exception:
+            pass
+    repaired = dict(current if isinstance(current, dict) else {})
+    repaired["tables"] = _v30012_filter_deleted_tables(merged_tables, deleted)  # type: ignore[name-defined]
+    repaired["deleted_usernames"] = sorted(deleted)
+    repaired["authority_schema"] = "SPT-10-Permissions-CompleteAuthority-V30012.1"
+    repaired["version"] = "V300.12.1-complete-authority-repair"
+    repaired["module_key"] = "10_permissions"
+    repaired["kind"] = "records"
+    repaired["authority_file"] = "data/permanent_store/modules/10_permissions/records.json"
+    repaired["reason"] = reason
+    repaired["updated_at"] = _v30012_now()  # type: ignore[name-defined]
+    repaired["table_counts"] = {k: len(v) for k, v in repaired.get("tables", {}).items() if isinstance(v, list)}
+    repaired["note"] = "V300.12.1: merge-repairs incomplete 10_permissions authority; canonical remains the write target; deleted_usernames are honored."
+    return repaired
+
+
+def _v30012_authority_payload() -> dict:  # type: ignore[override]
+    current = _v300121_read_payload_file(_V30012_PERMISSION_AUTHORITY_FILE)  # type: ignore[name-defined]
+    current = current if isinstance(current, dict) else {}
+    current.setdefault("tables", _v30012_empty_tables())  # type: ignore[name-defined]
+    candidates = _v300121_collect_candidates()
+    if _v300121_is_incomplete(current, candidates):
+        repaired = _v300121_merge_authority_payload(current, reason="v30012_1_auto_repair_incomplete_authority")
+        try:
+            if callable(_v300121_prev_write_authority):
+                _v300121_prev_write_authority(repaired, reason="v30012_1_auto_repair_incomplete_authority", mirror_compat=True, github=True)
+            else:
+                _v30012_write_json(_V30012_PERMISSION_AUTHORITY_FILE, repaired)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        return repaired
+    return _v30012_filter_deleted_tables(current.get("tables", {}), _v30012_deleted(current)) and current  # type: ignore[name-defined]
+
+
+def _v30012_payload_with_fallback() -> dict:  # type: ignore[override]
+    payload = _v30012_authority_payload()
+    if not isinstance(payload, dict):
+        payload = {}
+    if _v300121_table_counts(payload).get("auth_users", 0) == 0:
+        payload = _v300121_merge_authority_payload(payload, reason="v30012_1_empty_authority_fallback_repair")
+    return payload
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    payload = _v300121_merge_authority_payload(_v300121_read_payload_file(_V30012_PERMISSION_AUTHORITY_FILE), reason="v30012_1_manual_restore_merge")  # type: ignore[name-defined]
+    if callable(_v300121_prev_write_authority):
+        wr = _v300121_prev_write_authority(payload, reason="v30012_1_manual_restore_merge", mirror_compat=True, github=True)
+    else:
+        _v30012_write_json(_V30012_PERMISSION_AUTHORITY_FILE, payload)  # type: ignore[name-defined]
+        wr = {"ok": True}
+    try:
+        _v30012_sync_sqlite_cache(payload)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return {"ok": bool(wr.get("ok", True)), "mode": "v30012_1_complete_authority_restore", "table_counts": payload.get("table_counts", {})}
+
+
+def _v300121_setting_aliases(settings: dict) -> dict:
+    out = dict(settings or {})
+    alias_idle = [
+        "idle_timeout_minutes",
+        "閒置自動登出分鐘數 / Idle Auto Logout Minutes",
+        "閒置自動登出分鐘數 / Idle Auto Logout Minutes1",
+        "Idle Auto Logout Minutes",
+        "idle_auto_logout_minutes",
+    ]
+    for k in alias_idle:
+        if k in out:
+            out["idle_timeout_minutes"] = str(out.get(k))
+            break
+    alias_ask = ["ask_continue_after_record", "紀錄後詢問是否繼續 / Ask Continue After Record", "Ask Continue After Record"]
+    for k in alias_ask:
+        if k in out:
+            out["ask_continue_after_record"] = str(out.get(k))
+            break
+    return out
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    out = dict(DEFAULT_SECURITY_SETTINGS)
+    payload = _v30012_payload_with_fallback()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    for table in ("auth_security_settings", "security_settings"):
+        for r in tables.get(table, []) if isinstance(tables.get(table), list) else []:
+            if not isinstance(r, dict):
+                continue
+            k = str(r.get("setting_key") or r.get("key") or "").strip()
+            if k:
+                out[k] = str(r.get("setting_value") if r.get("setting_value") is not None else out.get(k, ""))
+    out = _v300121_setting_aliases(out)
+    try:
+        idle = max(1, int(float(out.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    out["idle_timeout_minutes"] = str(idle)
+    out["ask_continue_after_record"] = "0" if str(out.get("ask_continue_after_record", "1")).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    return out
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    payload = _v30012_payload_with_fallback()
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else _v30012_empty_tables()  # type: ignore[name-defined]
+    merged = get_security_settings()
+    merged.update(_v300121_setting_aliases({str(k): str(v) for k, v in (settings or {}).items()}))
+    try:
+        idle = max(1, int(float(merged.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    ask = "0" if str(merged.get("ask_continue_after_record", "1")).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    merged["idle_timeout_minutes"] = str(idle)
+    merged["ask_continue_after_record"] = ask
+    now = _v30012_now()  # type: ignore[name-defined]
+    rows = []
+    for k, v in merged.items():
+        if not str(k).strip():
+            continue
+        rows.append({"setting_key": str(k), "setting_value": str(v), "note": "V300.12.1 complete authority security setting", "updated_at": now})
+    # Ensure canonical keys exist exactly once at the front.
+    by_key = {str(r["setting_key"]): r for r in rows}
+    by_key["idle_timeout_minutes"] = {"setting_key": "idle_timeout_minutes", "setting_value": str(idle), "note": "V300.12.1 complete authority security setting", "updated_at": now}
+    by_key["ask_continue_after_record"] = {"setting_key": "ask_continue_after_record", "setting_value": ask, "note": "V300.12.1 complete authority security setting", "updated_at": now}
+    final_rows = [by_key.pop("idle_timeout_minutes"), by_key.pop("ask_continue_after_record")] + list(by_key.values())
+    tables["auth_security_settings"] = final_rows
+    tables["security_settings"] = list(final_rows)
+    payload["tables"] = tables
+    if callable(_v300121_prev_write_authority):
+        _v300121_prev_write_authority(payload, reason="save_security_settings_v30012_1", mirror_compat=True, github=True)
+    else:
+        _v30012_write_json(_V30012_PERMISSION_AUTHORITY_FILE, payload)  # type: ignore[name-defined]
+    try:
+        _v30012_sync_sqlite_cache(payload)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    if st is not None:
+        try:
+            st.session_state["_spt_idle_timeout_cache"] = {"minutes": idle, "ts": 0}
+            st.session_state["spt_security_settings"] = dict(merged)
+        except Exception:
+            pass
+
+# ======================= V300.12.1 PERMISSION COMPLETE-AUTHORITY REPAIR END =======================
