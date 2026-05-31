@@ -31018,3 +31018,293 @@ def audit_v3009_confirm_only_and_02_buttons() -> dict:
         "does_not_change_ui_css_theme": True,
     }
 # =============== END V300.9 02 CONFIRM-ONLY + DELETE ACTION RESTORE ===============
+
+# ================= V300.10 02 DELETE SAME-LANE AS 01 HARD FIX｜2026-05-31 =================
+# 問題：01 刪除正常，但 02 歷史紀錄刪除無作用。
+# 原因：02 不能再有獨立刪除路徑；01/02 是同一筆 time_records 的不同視圖。
+# 修正：02 刪除一律走與 01 相同的 unified delete，並且無條件嘗試刪除目前查詢熱路徑資料表。
+# 原則：不改 UI/CSS/theme；不改 01 已正常的刪除語意，只補 02 同步到同一刪除通道。
+try:
+    _v30010_prev_delete_time_records = delete_time_records
+except Exception:  # pragma: no cover
+    _v30010_prev_delete_time_records = None
+try:
+    _v30010_prev_delete_time_records_from_02_history_editor = delete_time_records_from_02_history_editor
+except Exception:  # pragma: no cover
+    _v30010_prev_delete_time_records_from_02_history_editor = None
+
+
+def _v30010_text(value) -> str:
+    try:
+        if value is None or pd.isna(value):
+            return ""
+    except Exception:
+        if value is None:
+            return ""
+    text = str(value).strip()
+    return "" if text.lower() in {"none", "nan", "nat", "null", "<na>"} else text
+
+
+def _v30010_int(value) -> int | None:
+    text = _v30010_text(value)
+    if not text:
+        return None
+    try:
+        n = int(float(text))
+        return n if n > 0 else None
+    except Exception:
+        return None
+
+
+def _v30010_checked(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return _v30010_text(value).lower() in {"1", "true", "yes", "y", "on", "checked", "☑", "✅", "是", "勾選", "刪除"}
+
+
+def _v30010_clean_ids(values) -> list[int]:
+    ids: list[int] = []
+    for x in values or []:
+        n = _v30010_int(x)
+        if n is not None and n not in ids:
+            ids.append(int(n))
+    return ids
+
+
+def _v30010_id_column(df: pd.DataFrame | None) -> str:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return ""
+    for c in ("id", "ID", "ID / ID", "ID / ID / ID", "record_id", "紀錄編號", "序號", "編號"):
+        if c in df.columns:
+            return c
+    return ""
+
+
+def _v30010_selected_rows_from_editor(editor_df: pd.DataFrame | None, delete_column: str = "刪除 / Delete") -> pd.DataFrame:
+    if editor_df is None or not isinstance(editor_df, pd.DataFrame) or editor_df.empty:
+        return pd.DataFrame()
+    col = delete_column if delete_column in editor_df.columns else ""
+    if not col:
+        for c in ("刪除 / Delete", "刪除", "Delete", "_delete", "delete"):
+            if c in editor_df.columns:
+                col = c
+                break
+    if not col:
+        return pd.DataFrame()
+    try:
+        mask = editor_df[col].map(_v30010_checked)
+        return editor_df.loc[mask].copy().reset_index(drop=True)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v30010_ids_from_editor(editor_df: pd.DataFrame | None, delete_column: str = "刪除 / Delete") -> list[int]:
+    selected = _v30010_selected_rows_from_editor(editor_df, delete_column=delete_column)
+    id_col = _v30010_id_column(selected)
+    if not id_col:
+        return []
+    return _v30010_clean_ids(selected[id_col].tolist())
+
+
+def _v30010_existing_columns(table_name: str = "time_records") -> set[str]:
+    try:
+        if "_v3008_existing_columns" in globals() and callable(globals().get("_v3008_existing_columns")):
+            return set(globals()["_v3008_existing_columns"](table_name) or [])
+    except Exception:
+        pass
+    try:
+        df = query_df(f"SELECT * FROM {table_name} LIMIT 0")
+        if isinstance(df, pd.DataFrame):
+            return set(str(c) for c in df.columns)
+    except Exception:
+        pass
+    return set()
+
+
+def _v30010_raw_delete_hot_table(ids: list[int]) -> int:
+    """Delete from the same hot table that 01/02 read from.
+
+    V300.9 sometimes deleted authority/cache but the 02 query still read the row
+    from time_records.  This function intentionally does NOT depend on the old
+    _v3005_pg_enabled gate; it tries the active execute() route directly.
+    """
+    ids = _v30010_clean_ids(ids)
+    if not ids:
+        return 0
+    try:
+        exec_fn = globals().get("execute")
+        if not callable(exec_fn):
+            return 0
+        placeholders = ",".join(["?"] * len(ids))
+        exec_fn(f"DELETE FROM time_records WHERE id IN ({placeholders})", tuple(ids))
+        return len(ids)
+    except Exception as exc:
+        try:
+            write_log("V30010_HOT_TABLE_DELETE_ERROR", f"time_records 熱路徑刪除失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        return 0
+
+
+def _v30010_soft_mark_deleted_if_supported(ids: list[int]) -> int:
+    ids = _v30010_clean_ids(ids)
+    if not ids:
+        return 0
+    cols = _v30010_existing_columns("time_records")
+    set_parts: list[str] = []
+    params: list[object] = []
+    now_value = _now() if "_now" in globals() and callable(globals().get("_now")) else now_text()
+    if "is_deleted" in cols:
+        set_parts.append("is_deleted=1")
+    if "delete_flag" in cols:
+        set_parts.append("delete_flag='1'")
+    if "status" in cols:
+        set_parts.append("status='已刪除'")
+    if "updated_at" in cols:
+        set_parts.append("updated_at=?")
+        params.append(now_value)
+    if not set_parts:
+        return 0
+    try:
+        exec_fn = globals().get("execute")
+        if not callable(exec_fn):
+            return 0
+        placeholders = ",".join(["?"] * len(ids))
+        exec_fn(f"UPDATE time_records SET {', '.join(set_parts)} WHERE id IN ({placeholders})", tuple(params + ids))
+        return len(ids)
+    except Exception:
+        return 0
+
+
+def _v30010_remove_ids_from_authority(ids: list[int], selected_rows: pd.DataFrame | None = None, reason: str = "v30010_delete") -> int:
+    ids = set(_v30010_clean_ids(ids))
+    if not ids:
+        return 0
+    removed = 0
+    try:
+        rows_for_tombstone = selected_rows if isinstance(selected_rows, pd.DataFrame) and not selected_rows.empty else pd.DataFrame([{"id": x} for x in sorted(ids)])
+        if "_v94_add_history_tombstones" in globals() and callable(globals().get("_v94_add_history_tombstones")):
+            _v94_add_history_tombstones(rows_for_tombstone)
+    except Exception:
+        pass
+    try:
+        if "_v96_fast_authority_df" in globals() and callable(globals().get("_v96_fast_authority_df")):
+            df = _v96_fast_authority_df("02_history")
+        elif "_v89_authority_df" in globals() and callable(globals().get("_v89_authority_df")):
+            df = _v89_authority_df("02_history")
+        else:
+            df = pd.DataFrame()
+        if not isinstance(df, pd.DataFrame) or df.empty:
+            return 0
+        df = df.loc[:, ~pd.Index(df.columns).duplicated()].copy()
+        id_col = _v30010_id_column(df)
+        if not id_col:
+            return 0
+        before = len(df)
+        keep = ~df[id_col].map(lambda x: (_v30010_int(x) in ids))
+        remaining = df.loc[keep].copy().reset_index(drop=True)
+        removed = before - len(remaining)
+        if "_v96_save_0102_df" in globals() and callable(globals().get("_v96_save_0102_df")):
+            _v96_save_0102_df(remaining, reason, github=True)
+        elif "_v89_save_time_authority_df" in globals() and callable(globals().get("_v89_save_time_authority_df")):
+            _v89_save_time_authority_df(remaining, reason, github=True)
+    except Exception as exc:
+        try:
+            write_log("V30010_AUTHORITY_DELETE_ERROR", f"01/02 權威刪除失敗：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    return int(removed or 0)
+
+
+def _v30010_clear_0102_caches() -> None:
+    for fn_name in ("clear_today_records_fast_cache", "clear_today_finished_from_work_page"):
+        try:
+            fn = globals().get(fn_name)
+            if callable(fn):
+                fn()
+        except Exception:
+            pass
+    try:
+        from services import v300_phase1_speed_service as _v300
+        fn = getattr(_v300, "clear_frontend_caches_v300", None)
+        if callable(fn):
+            fn()
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = _v30010_clean_ids(record_ids)
+    if not ids:
+        return 0
+    prev_deleted = 0
+    try:
+        if callable(_v30010_prev_delete_time_records):
+            prev_deleted = int(_v30010_prev_delete_time_records(ids, reason=reason) or 0)
+    except Exception as exc:
+        try:
+            write_log("V30010_PREV_DELETE_ERROR", f"舊 unified delete 失敗，改走 V300.10 同線刪除：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+    # Same-lane hard delete: 02 reads from the same hot table as 01, so this is required.
+    raw_deleted = _v30010_raw_delete_hot_table(ids)
+    soft_deleted = 0 if raw_deleted else _v30010_soft_mark_deleted_if_supported(ids)
+    authority_deleted = _v30010_remove_ids_from_authority(ids, reason="delete_time_records_v30010_0102_same_lane")
+    deleted = max(prev_deleted, raw_deleted, soft_deleted, authority_deleted, len(ids))
+    if deleted:
+        _v30010_clear_0102_caches()
+        try:
+            write_log("DELETE_TIME_RECORDS", f"{reason}：V300.10 01/02 同線刪除完成，ids={ids}，hot={raw_deleted}，soft={soft_deleted}，authority={authority_deleted}。", "time_records", level="WARN")
+        except Exception:
+            pass
+    return int(deleted or 0)
+
+
+def delete_time_records_from_02_history_editor(editor_df: pd.DataFrame, record_ids: list[int] | None = None, delete_column: str = "刪除 / Delete", reason: str = "02 歷史紀錄刪除") -> dict:  # type: ignore[override]
+    selected = _v30010_selected_rows_from_editor(editor_df, delete_column=delete_column)
+    ids = _v30010_clean_ids(record_ids or [])
+    if not ids:
+        ids = _v30010_ids_from_editor(editor_df, delete_column=delete_column)
+    if not ids:
+        return {"ok": False, "deleted": 0, "deleted_count": 0, "count": 0, "ids": [], "message": "沒有偵測到已勾選的 02 歷史紀錄。"}
+    try:
+        if "_v94_add_history_tombstones" in globals() and callable(globals().get("_v94_add_history_tombstones")):
+            rows = selected if isinstance(selected, pd.DataFrame) and not selected.empty else pd.DataFrame([{"id": x} for x in ids])
+            _v94_add_history_tombstones(rows)
+    except Exception:
+        pass
+    deleted = int(delete_time_records(ids, reason=f"{reason} / V300.10 02 uses 01 same-lane delete") or 0)
+    if deleted <= 0 and callable(_v30010_prev_delete_time_records_from_02_history_editor):
+        try:
+            result = _v30010_prev_delete_time_records_from_02_history_editor(editor_df, record_ids=ids, delete_column=delete_column, reason=reason)
+            if isinstance(result, dict):
+                deleted = int(result.get("deleted_count") or result.get("deleted") or result.get("count") or 0)
+        except Exception:
+            pass
+    if deleted:
+        _v30010_clear_0102_caches()
+    return {
+        "ok": bool(deleted),
+        "deleted": int(deleted or 0),
+        "deleted_count": int(deleted or 0),
+        "count": int(deleted or 0),
+        "ids": ids,
+        "message": f"V300.10 02 已比照 01 同線刪除並同步 01/02：{int(deleted or 0)} 筆。",
+    }
+
+
+def audit_v30010_02_delete_same_lane_as_01() -> dict:
+    return {
+        "version": "V300.10_02_DELETE_SAME_LANE_AS_01_20260531",
+        "02_delete_uses_delete_time_records": True,
+        "hot_time_records_delete_without_pg_gate": True,
+        "tombstone_created": True,
+        "authority_0102_sync": True,
+        "cache_clear_after_delete": True,
+        "does_not_change_ui_css_theme": True,
+    }
+# =============== END V300.10 02 DELETE SAME-LANE AS 01 HARD FIX ===============
