@@ -12,10 +12,29 @@ from services.security_service import require_login, get_current_user
 from services.spt_speed_diagnostic_service import build_summary, write_report
 from services.performance_profiler_service import read_events
 
+
+def _safe_table(rows, *, max_rows: int = 200):
+    """Render diagnostics without using st.dataframe.
+
+    The project globally wraps st.dataframe/st.data_editor for column settings.
+    The diagnostics page may show several tables in one run, which can trigger
+    duplicate Streamlit element keys inside that wrapper.  HTML rendering avoids
+    the wrapper and keeps this page read-only.
+    """
+    if not rows:
+        st.caption("目前尚無資料。")
+        return
+    df = pd.DataFrame(rows).head(max_rows)
+    html = df.to_html(index=False, escape=True)
+    st.markdown(
+        '<div style="overflow-x:auto; width:100%;">' + html + '</div>',
+        unsafe_allow_html=True,
+    )
+
 st.set_page_config(page_title="99. 效能診斷", page_icon="⏱", layout="wide")
 apply_theme()
 require_login("99_speed_diagnostic")
-render_header("99｜效能診斷", "V257 自動測速紀錄：登入、首頁、01工時紀錄、Neon/SQL、按鈕交易耗時")
+render_header("99｜效能診斷", "V257.1 自動測速紀錄：登入、首頁、01工時紀錄、Neon/SQL、按鈕交易耗時")
 
 st.info("請先正常操作一次：登入 → 進入 01 → 按開始/暫停/完工。再回到本頁按重新整理，即可下載測速報告。")
 
@@ -44,7 +63,7 @@ for title, key in [("依函式/動作統計", "by_name"), ("依類別統計", "b
     rows = summary.get(key) or []
     st.subheader(title)
     if rows:
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        _safe_table(rows)
     else:
         st.caption("目前尚無資料。")
 
@@ -65,15 +84,15 @@ if top_events:
             "錯誤": ev.get("error", ""),
             "摘要": detail.get("sql_preview") or detail.get("arg0") or "",
         })
-    st.dataframe(pd.DataFrame(slim), use_container_width=True, hide_index=True)
+    _safe_table(slim, max_rows=80)
 else:
     st.caption("目前尚無慢事件。")
 
 json_text = json.dumps(summary, ensure_ascii=False, indent=2)
 st.download_button(
-    "下載 V257 測速報告 JSON",
+    "下載 V257.1 測速報告 JSON",
     data=json_text.encode("utf-8"),
-    file_name="SPT_V257_speed_report.json",
+    file_name="SPT_V257_1_speed_report.json",
     mime="application/json",
     use_container_width=True,
 )
@@ -84,7 +103,7 @@ try:
         st.download_button(
             "下載原始測速事件 JSONL",
             data=event_path.read_bytes(),
-            file_name="SPT_V257_performance_events.jsonl",
+            file_name="SPT_V257_1_performance_events.jsonl",
             mime="application/jsonl",
             use_container_width=True,
         )
