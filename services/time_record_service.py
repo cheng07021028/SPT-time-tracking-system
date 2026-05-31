@@ -30402,3 +30402,478 @@ def audit_v30061_01_admin_authority_sync() -> dict:
         "does_not_change_ui_css_theme": True,
     }
 # ============= END V300.6.1 01/02 AUTHORITY SYNC AFTER ADMIN WRITE =============
+
+# ================= V300.8 01/02 BUTTON HOT-PATH SPEED LAYER｜2026-05-31 =================
+# Purpose:
+# - Keep V300.3/V300.6 display/delete/save correctness.
+# - Improve 01 start/finish button speed and 02 date/filter query speed.
+# - Do not call full 01/02 authority merge or GitHub backup in the foreground.
+# - Foreground writes the transactional DB row(s) and upserts only changed rows to
+#   01/02 authority. Full backup remains a manual/background concern.
+try:
+    _v3008_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v3008_prev_start_work = None
+try:
+    _v3008_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v3008_prev_finish_work = None
+try:
+    _v3008_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v3008_prev_today_records = None
+try:
+    _v3008_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v3008_prev_load_records = None
+
+_V3008_INDEX_DONE = False
+
+
+def _v3008_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    text = str(value).strip()
+    return "" if text.lower() in {"none", "nan", "nat", "null", "<na>"} else text
+
+
+def _v3008_blank(value) -> bool:
+    return _v3008_text(value) == ""
+
+
+def _v3008_int(value) -> int | None:
+    text = _v3008_text(value)
+    if not text:
+        return None
+    try:
+        n = int(float(text))
+        return n if n > 0 else None
+    except Exception:
+        return None
+
+
+def _v3008_existing_columns(table: str = "time_records") -> set[str]:
+    try:
+        df0 = query_df(f"SELECT * FROM {table} LIMIT 0")
+        if isinstance(df0, pd.DataFrame):
+            return {str(c) for c in df0.columns}
+    except Exception:
+        pass
+    return set()
+
+
+def _v3008_not_deleted_sql(cols: set[str]) -> str:
+    parts = []
+    if "is_deleted" in cols:
+        parts.append("COALESCE(is_deleted,0)=0")
+    if "delete_flag" in cols:
+        parts.append("LOWER(TRIM(COALESCE(delete_flag,''))) NOT IN ('1','true','yes','y')")
+    if "status" in cols:
+        parts.append("LOWER(TRIM(COALESCE(status,''))) NOT IN ('deleted','delete','刪除','已刪除')")
+    return " AND " + " AND ".join(parts) if parts else ""
+
+
+def _v3008_unfinished_sql(cols: set[str]) -> str:
+    status_part = "(COALESCE(status,'')='' OR COALESCE(status,'')='作業中')" if "status" in cols else "1=1"
+    end_part = "(end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='' OR LOWER(TRIM(COALESCE(end_timestamp,''))) IN ('none','nan','nat','null'))" if "end_timestamp" in cols else "1=1"
+    return f"({status_part} AND {end_part})"
+
+
+def _v3008_ensure_indexes_once() -> None:
+    global _V3008_INDEX_DONE
+    if _V3008_INDEX_DONE:
+        return
+    _V3008_INDEX_DONE = True
+    # Safe on SQLite and PostgreSQL. All failures are ignored because this must
+    # never block normal shop-floor operations.
+    stmts = [
+        "CREATE INDEX IF NOT EXISTS idx_time_records_v3008_emp_date ON time_records(employee_id, start_date)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_v3008_emp_status_end ON time_records(employee_id, status, end_timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_v3008_date_id ON time_records(start_date, id)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_v3008_work_order ON time_records(work_order)",
+        "CREATE INDEX IF NOT EXISTS idx_time_records_v3008_group ON time_records(employee_id, employee_name, process_name, start_date)",
+    ]
+    for sql in stmts:
+        try:
+            execute(sql)
+        except Exception:
+            pass
+
+
+def _v3008_query_records_direct(
+    *,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    employee_id: str | None = None,
+    work_order: str | None = None,
+    include_finished: bool = True,
+    unfinished_only: bool = False,
+    limit: int | None = None,
+) -> pd.DataFrame:
+    _v3008_ensure_indexes_once()
+    cols = _v3008_existing_columns("time_records")
+    if not cols:
+        return pd.DataFrame()
+    where = ["1=1"]
+    params: list[object] = []
+    date_expr = "COALESCE(NULLIF(start_date,''), SUBSTR(COALESCE(start_timestamp,''),1,10))"
+    if start_date:
+        where.append(f"{date_expr} >= ?")
+        params.append(str(start_date))
+    if end_date:
+        where.append(f"{date_expr} <= ?")
+        params.append(str(end_date))
+    if employee_id and "employee_id" in cols:
+        where.append("employee_id = ?")
+        params.append(str(employee_id))
+    if work_order and "work_order" in cols:
+        where.append("work_order = ?")
+        params.append(str(work_order))
+    where_sql = " AND ".join(where) + _v3008_not_deleted_sql(cols)
+    if unfinished_only:
+        where_sql += " AND " + _v3008_unfinished_sql(cols)
+    elif not include_finished:
+        where_sql += " AND " + _v3008_unfinished_sql(cols)
+    order_sql = " ORDER BY id DESC" if "id" in cols else ""
+    limit_sql = ""
+    if isinstance(limit, int) and limit > 0:
+        limit_sql = f" LIMIT {int(limit)}"
+    sql = f"SELECT * FROM time_records WHERE {where_sql}{order_sql}{limit_sql}"
+    try:
+        df = query_df(sql, tuple(params))
+        try:
+            if isinstance(df, pd.DataFrame):
+                df.attrs["v3008_query_ok"] = True
+        except Exception:
+            pass
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v3008_fetch_rows_by_ids(ids: list[int]) -> pd.DataFrame:
+    clean = [int(x) for x in ids if _v3008_int(x) is not None]
+    if not clean:
+        return pd.DataFrame()
+    placeholders = ",".join(["?"] * len(clean))
+    try:
+        return query_df(f"SELECT * FROM time_records WHERE id IN ({placeholders}) ORDER BY id DESC", tuple(clean))
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v3008_sync_changed_rows(ids: list[int], reason: str) -> int:
+    rows = _v3008_fetch_rows_by_ids(ids)
+    if rows is None or not isinstance(rows, pd.DataFrame) or rows.empty:
+        return 0
+    # Prefer the latest V300.6.1 row-level authority sync. It updates 01/02 but
+    # avoids full history rebuild and GitHub backup.
+    try:
+        fn = globals().get("_v30061_sync_authority_rows")
+        if callable(fn):
+            return int(fn(rows, reason) or 0)
+    except Exception:
+        pass
+    try:
+        fn2 = globals().get("_v137_upsert_rows")
+        if callable(fn2):
+            return int(fn2(rows, reason, github=False) or 0)
+    except Exception:
+        pass
+    return 0
+
+
+def _v3008_after_hot_write(reason: str, ids: list[int]) -> None:
+    try:
+        _v3008_sync_changed_rows(ids, reason)
+    except Exception:
+        pass
+    try:
+        clear_today_records_fast_cache()  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        from services import v300_phase1_speed_service as _v300
+        fn = getattr(_v300, "clear_frontend_caches_v300", None)
+        if callable(fn):
+            fn()
+    except Exception:
+        pass
+    try:
+        mark_data_changed(f"{reason}；GitHub/權威備份已移出前台熱路徑。", "V3008_HOT_WRITE")
+    except Exception:
+        pass
+
+
+def _v3008_active_rows(employee_id: str, employee_name: str | None = None, process_name: str | None = None, start_date: str | None = None, work_order: str | None = None) -> pd.DataFrame:
+    cols = _v3008_existing_columns("time_records")
+    if not cols:
+        return pd.DataFrame()
+    where = ["employee_id = ?", _v3008_unfinished_sql(cols)]
+    params: list[object] = [str(employee_id)]
+    if employee_name and "employee_name" in cols:
+        where.append("COALESCE(employee_name,'') = ?")
+        params.append(str(employee_name))
+    if process_name and "process_name" in cols:
+        where.append("process_name = ?")
+        params.append(str(process_name))
+    if start_date and "start_date" in cols:
+        where.append("start_date = ?")
+        params.append(str(start_date))
+    if work_order and "work_order" in cols:
+        where.append("work_order = ?")
+        params.append(str(work_order))
+    sql = "SELECT * FROM time_records WHERE " + " AND ".join(where) + _v3008_not_deleted_sql(cols) + " ORDER BY id DESC"
+    try:
+        return query_df(sql, tuple(params))
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v3008_pause_conflicts(conflicts: pd.DataFrame, remark: str = "") -> int:
+    if conflicts is None or not isinstance(conflicts, pd.DataFrame) or conflicts.empty or "id" not in conflicts.columns:
+        return 0
+    count = 0
+    for rid in conflicts["id"].tolist():
+        rid_int = _v3008_int(rid)
+        if rid_int is None:
+            continue
+        try:
+            count += int(_v3008_finish_direct(rid_int, "暫停", remark, finish_parallel_group=True) or 0)
+        except Exception:
+            pass
+    return count
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V300.8 fast foreground start.
+
+    Writes only the new DB row in the foreground, validates duplicate/conflict,
+    upserts the changed row to 01/02 authority, and defers full backup.
+    """
+    try:
+        _v3008_ensure_indexes_once()
+        now = _now()
+        start_date, start_time = split_timestamp(now)
+        employee_id = _v3008_text((employee or {}).get("employee_id"))
+        employee_name = _v3008_text((employee or {}).get("employee_name"))
+        wo_no = _v3008_text((work_order or {}).get("work_order"))
+        process_name = _v3008_text(process_name)
+        if not employee_id or not wo_no or not process_name:
+            raise ValueError("工號、製令、工段名稱不可空白。")
+
+        dup = _v3008_active_rows(employee_id, employee_name, process_name, start_date, wo_no)
+        if isinstance(dup, pd.DataFrame) and not dup.empty:
+            raise ValueError(f"此人員已有相同製令與工段正在計時，禁止重複紀錄：{wo_no} / {process_name}")
+
+        active_same_day = _v3008_active_rows(employee_id, employee_name, None, start_date, None)
+        conflicts = pd.DataFrame()
+        if isinstance(active_same_day, pd.DataFrame) and not active_same_day.empty and "process_name" in active_same_day.columns:
+            conflicts = active_same_day.loc[active_same_day["process_name"].astype(str).str.strip() != process_name].copy()
+        if isinstance(conflicts, pd.DataFrame) and not conflicts.empty:
+            if not auto_pause_old:
+                raise ValueError("此人員已有不同工段正在計時，請先確認暫停前一筆作業後再開始新紀錄。")
+            _v3008_pause_conflicts(conflicts, remark="自動暫停：開始新工段")
+
+        record_key = make_record_key(employee_id, wo_no, process_name, now)
+        group_key = f"{employee_id}|{process_name}|{start_date}"
+        rid = execute(
+            """
+            INSERT INTO time_records(
+                record_key, status, work_order, part_no, type_name, process_name,
+                employee_id, employee_name, start_action, start_timestamp,
+                remark, start_date, start_time, assembly_location,
+                group_key, is_group_work, source, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record_key, "作業中", wo_no,
+                (work_order or {}).get("part_no", ""), (work_order or {}).get("type_name", ""), process_name,
+                employee_id, employee_name, "開始", now, remark, start_date, start_time,
+                (work_order or {}).get("assembly_location", ""), group_key, 0, "streamlit", now, now,
+            ),
+        )
+        rid_int = int(rid or 0)
+        parallel = _v3008_active_rows(employee_id, employee_name, process_name, start_date, None)
+        changed_ids = [rid_int]
+        if isinstance(parallel, pd.DataFrame) and len(parallel) > 1:
+            execute(
+                "UPDATE time_records SET is_group_work=1, group_key=?, updated_at=? WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')",
+                (group_key, now, employee_id, employee_name, process_name, start_date),
+            )
+            if "id" in parallel.columns:
+                changed_ids = [int(x) for x in parallel["id"].map(_v3008_int).dropna().tolist()]
+        try:
+            write_log("START_WORK_FAST", f"{employee_name} 開始 {wo_no} / {process_name}", "time_records", rid_int)
+        except Exception:
+            pass
+        _v3008_after_hot_write("V300.8 start_work fast path", changed_ids)
+        return rid_int
+    except Exception:
+        if callable(_v3008_prev_start_work):
+            return int(_v3008_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+        raise
+
+
+def _v3008_finish_direct(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:
+    _v3008_ensure_indexes_once()
+    rid0 = _v3008_int(record_id)
+    if rid0 is None:
+        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+    rec = query_one("SELECT * FROM time_records WHERE id=?", (rid0,))
+    if not rec:
+        raise ValueError("找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。")
+    if not _v3008_blank(rec.get("end_timestamp")):
+        return 0
+
+    emp_id = _v3008_text(rec.get("employee_id"))
+    emp_name = _v3008_text(rec.get("employee_name"))
+    proc = _v3008_text(rec.get("process_name"))
+    sdate = _v3008_text(rec.get("start_date"))
+    if finish_parallel_group and emp_id and proc and sdate:
+        group_df = _v3008_active_rows(emp_id, emp_name, proc, sdate, None)
+    else:
+        group_df = pd.DataFrame([rec])
+    if group_df is None or not isinstance(group_df, pd.DataFrame) or group_df.empty:
+        group_df = pd.DataFrame([rec])
+    ids = []
+    if "id" in group_df.columns:
+        ids = [int(x) for x in group_df["id"].map(_v3008_int).dropna().tolist()]
+    if not ids:
+        ids = [rid0]
+        group_df = pd.DataFrame([rec])
+
+    now = _now()
+    end_date, end_time = split_timestamp(now)
+    status = end_action if end_action in ("下班", "暫停", "完工") else "已結束"
+    starts = []
+    if "start_timestamp" in group_df.columns:
+        starts = [_v3008_text(x) for x in group_df["start_timestamp"].tolist() if _v3008_text(x)]
+    earliest_start = min(starts) if starts else (_v3008_text(rec.get("start_timestamp")) or now)
+    try:
+        total_hours = float(calculate_work_hours(earliest_start, now))
+    except Exception:
+        total_hours = 0.0
+    avg_hours = round(total_hours / max(len(ids), 1), 2)
+    is_group = 1 if len(ids) > 1 else int(float(rec.get("is_group_work") or 0))
+    group_key = rec.get("group_key") or f"{emp_id}|{proc}|{sdate}"
+
+    changed: list[int] = []
+    for rid in ids:
+        old = query_one("SELECT remark FROM time_records WHERE id=?", (int(rid),)) or {}
+        old_remark = _v3008_text(old.get("remark"))
+        append = _v3008_text(remark)
+        if len(ids) > 1:
+            try:
+                parallel_text = _v138_parallel_summary_text(len(ids), total_hours, avg_hours)  # type: ignore[name-defined]
+            except Exception:
+                parallel_text = f"同步結束 {len(ids)} 筆；平均工時 {avg_hours}"
+            append = (append + "；" if append else "") + parallel_text
+        new_remark = old_remark
+        if append:
+            new_remark = (new_remark + "；" if new_remark else "") + append
+        execute(
+            """
+            UPDATE time_records
+            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
+            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='' OR LOWER(TRIM(COALESCE(end_timestamp,''))) IN ('none','nan','nat','null'))
+            """,
+            (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, is_group, now, int(rid)),
+        )
+        changed.append(int(rid))
+    try:
+        write_log("END_WORK_FAST", f"V300.8 結束工時 #{rid0}；同步={len(changed)}；狀態={status}", "time_records", rid0, detail=",".join(str(x) for x in changed))
+    except Exception:
+        pass
+    _v3008_after_hot_write("V300.8 finish_work fast path", changed)
+    return int(len(changed))
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    try:
+        return int(_v3008_finish_direct(int(record_id), end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+    except Exception:
+        if callable(_v3008_prev_finish_work):
+            return int(_v3008_prev_finish_work(record_id, end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+        raise
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    try:
+        cycle_start = _business_cycle_start_date() if "_business_cycle_start_date" in globals() else today_text()
+    except Exception:
+        cycle_start = today_text()
+    df = _v3008_query_records_direct(
+        start_date=str(cycle_start),
+        end_date=None,
+        include_finished=bool(include_finished),
+        unfinished_only=bool(unfinished_only),
+        limit=500,
+    )
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df.reset_index(drop=True)
+    if callable(_v3008_prev_today_records):
+        try:
+            return _v3008_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+        except Exception:
+            pass
+    return pd.DataFrame()
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    # 02 history and 01 finished-record refresh always pass at least a date or filter.
+    # Serve those through indexed SQL, without repairing/syncing full authority files.
+    if start_date or end_date or employee_id or work_order:
+        df = _v3008_query_records_direct(
+            start_date=start_date,
+            end_date=end_date,
+            employee_id=employee_id,
+            work_order=work_order,
+            include_finished=True,
+            unfinished_only=False,
+            limit=None,
+        )
+        if isinstance(df, pd.DataFrame):
+            if not df.empty:
+                return df.reset_index(drop=True)
+            if bool(getattr(df, "attrs", {}).get("v3008_query_ok")):
+                return pd.DataFrame()
+        # Direct query failed; fallback to the previous V300.3 visibility-safe path
+        # instead of hiding records.
+        if callable(_v3008_prev_load_records):
+            try:
+                return _v3008_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+            except Exception:
+                pass
+        return pd.DataFrame()
+    if callable(_v3008_prev_load_records):
+        try:
+            return _v3008_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+        except Exception:
+            pass
+    return pd.DataFrame()
+
+
+def audit_v3008_hot_path_speed() -> dict:
+    return {
+        "version": "V300.8_01_02_BUTTON_HOT_PATH_SPEED_20260531",
+        "start_work_direct_sql": True,
+        "finish_work_direct_sql": True,
+        "syncs_only_changed_rows_to_0102_authority": True,
+        "no_github_backup_in_foreground": True,
+        "today_records_indexed_query": True,
+        "history_filtered_load_records_indexed_query": True,
+        "keeps_v3003_delete_visibility_logic": True,
+        "does_not_change_ui_css_theme": True,
+    }
+# =============== END V300.8 01/02 BUTTON HOT-PATH SPEED LAYER ===============
