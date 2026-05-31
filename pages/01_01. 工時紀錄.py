@@ -67,6 +67,56 @@ def _v95_raw_data_editor(data=None, *args, **kwargs):
     return st.data_editor(data, *args, **kwargs)
 # ===== V95 RAW DATA EDITOR HELPER END =====
 
+
+# ===== V259 FOREGROUND DISPLAY ISOLATION =====
+# Goal: keep the operation panels usable immediately. Heavy read-only tables are
+# loaded only when the user asks for them, and cached in session state so every
+# button/rerun does not rebuild the entire page.
+V259_TODAY_TABLE_KEY = "v259_01_today_records_df"
+V259_TODAY_TABLE_TS_KEY = "v259_01_today_records_loaded_at"
+V259_FINISHED_KEY_PREFIX = "v259_01_finished_today_df_"
+V259_FINISHED_TS_PREFIX = "v259_01_finished_today_loaded_at_"
+
+
+def _v259_now_label() -> str:
+    try:
+        from services.timezone_service import now_text
+        return str(now_text())
+    except Exception:
+        try:
+            from datetime import datetime
+            return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return ""
+
+
+def _v259_finish_key(employee_id: str, employee_name: str) -> tuple[str, str]:
+    safe = re.sub(r"[^0-9A-Za-z_\-]+", "_", f"{employee_id}_{employee_name}")[:80]
+    return V259_FINISHED_KEY_PREFIX + safe, V259_FINISHED_TS_PREFIX + safe
+
+
+def _v259_clear_display_cache() -> None:
+    for key in list(st.session_state.keys()):
+        if str(key).startswith(V259_FINISHED_KEY_PREFIX) or str(key).startswith(V259_FINISHED_TS_PREFIX):
+            try:
+                del st.session_state[key]
+            except Exception:
+                pass
+    for key in [V259_TODAY_TABLE_KEY, V259_TODAY_TABLE_TS_KEY]:
+        try:
+            st.session_state.pop(key, None)
+        except Exception:
+            pass
+
+
+def _v259_notice_cached(label: str, ts_key: str) -> None:
+    ts = st.session_state.get(ts_key)
+    if ts:
+        st.caption(f"{label}：顯示快取資料，最後刷新 {ts}。若需最新資料請按重新整理。")
+    else:
+        st.caption(f"{label}：為避免每次操作卡住，預設不自動載入重表格；請按重新整理載入。")
+# ===== V259 FOREGROUND DISPLAY ISOLATION END =====
+
 from services.theme_service import apply_theme, render_header
 from services.ui_size_service import apply_dropdown_menu_size_only
 from services.security_service import (
@@ -853,41 +903,37 @@ with left:
     remark = st.text_area("備註｜Remark", height=90)
     auto_pause = st.checkbox("切換不同工段時，自動暫停同人員其他未結束作業｜Auto pause different process", value=True)
 
-    _spt_perf_t = time.perf_counter()
-    try:
-        refresh_active_records_for_employee(emp_id, str(employee.get("employee_name") or "").strip(), reason="01_start_active_visible_v133")
-    except Exception:
-        pass
-    active = get_active_record(emp_id)
-    duplicate = None if no_process_options else get_active_same_work(emp_id, wo_no, process, employee_name=str(employee.get("employee_name") or "").strip())
-    conflicts = pd.DataFrame() if no_process_options else get_conflicting_active_records(emp_id, process, employee_name=str(employee.get("employee_name") or "").strip())
-    _spt_perf_t = _spt_perf_tick(
-        "01_start_panel_active_duplicate_conflict_queries",
-        _spt_perf_t,
-        threshold_ms=500.0,
-        detail={"has_active": bool(active), "has_duplicate": bool(duplicate), "conflicts": len(conflicts) if isinstance(conflicts, pd.DataFrame) else 0},
-    )
-    if active:
-        group = get_active_group(int(active["id"]))
-        st.info(f"目前作業中：{active['process_name']}，同步計時 {len(group)} 筆。同工段不同製令可同步作業；不同工段需先暫停舊紀錄。")
-    if duplicate:
-        st.error(f"禁止重複紀錄：此人員已有相同製令與工段正在計時：{wo_no} / {process}")
+    # V259: do not run active/duplicate/conflict SQL on every page paint.
+    # Those checks are executed only after the operator presses Start, so page
+    # display stays fast while the write path still validates correctness.
+    st.caption("V259：開始前檢查會在按下『開始作業』後執行，避免每次輸入/選單變更都重查資料庫。")
     confirm_pause = True
-    if not conflicts.empty:
-        st.warning(f"此人員目前有 {len(conflicts)} 筆不同工段正在計時。若要開始新工段，系統會先暫停前一工段紀錄，請確認。")
-        render_table(conflicts, "start_conflicting_active_records", editable=False, height=180)
-        confirm_pause = st.checkbox("我確認先暫停前一個不同工段紀錄，再開始新紀錄", value=False, key="confirm_pause_before_start")
 
-    if st.button("⏱ 開始作業 / Start", use_container_width=True, disabled=no_process_options or bool(duplicate) or (not confirm_pause)):
+    if st.button("⏱ 開始作業 / Start", use_container_width=True, disabled=no_process_options):
         if not check_permission("01_time_record", "can_create"):
             st.error("權限不足：你沒有新增工時紀錄權限。")
         else:
             try:
                 _spt_button_t = time.perf_counter()
-                rid = start_work(employee, work_order, process, remark, auto_pause_old=(confirm_pause if not conflicts.empty else auto_pause))
+                _emp_name_for_check = str(employee.get("employee_name") or "").strip()
+                try:
+                    active = get_active_record(emp_id)
+                except Exception:
+                    active = None
+                duplicate = None if no_process_options else get_active_same_work(emp_id, wo_no, process, employee_name=_emp_name_for_check)
+                conflicts = pd.DataFrame() if no_process_options else get_conflicting_active_records(emp_id, process, employee_name=_emp_name_for_check)
+                if duplicate:
+                    st.error(f"禁止重複紀錄：此人員已有相同製令與工段正在計時：{wo_no} / {process}")
+                    st.stop()
+                if isinstance(conflicts, pd.DataFrame) and not conflicts.empty and not auto_pause:
+                    st.warning(f"此人員目前有 {len(conflicts)} 筆不同工段正在計時；請勾選自動暫停或先結束舊作業。")
+                    render_table(conflicts, "start_conflicting_active_records", editable=False, height=180)
+                    st.stop()
+                rid = start_work(employee, work_order, process, remark, auto_pause_old=auto_pause)
+                _v259_clear_display_cache()
                 _spt_perf_tick("01_button_start_work_action", _spt_button_t, threshold_ms=200.0, detail={"record_id": rid, "employee_id": emp_id, "work_order": wo_no, "process": process})
                 trigger_post_record_continue_prompt(
-                    f"已開始作業，紀錄編號：{rid}。請確認是否繼續操作下一筆紀錄；若不繼續，系統會立即登出帳號。",
+                    f"已開始作業，紀錄編號：{rid}。重表格已改為手動刷新，避免按鈕後整頁卡住。",
                     title="已開始計時",
                 )
                 st.rerun()
@@ -899,10 +945,7 @@ with right:
     emp_label2 = st.selectbox("選擇人員｜Employee", _employee_options_v126, index=_login_employee_index_v126, key=_v127_employee_select_key("end_emp_v127"))
     emp_id2, _emp2_name, _emp2_row = _v141_selected_employee(emp_label2, employees)
     _spt_perf_t = time.perf_counter()
-    try:
-        refresh_active_records_for_employee(emp_id2, _emp2_name, reason="01_finish_active_visible_v141")
-    except Exception:
-        pass
+    # V259: avoid heavy active-record refresh on every render; direct active lookup is enough for display.
     try:
         active2 = get_active_record(emp_id2, employee_name=_emp2_name)
     except TypeError:
@@ -961,6 +1004,7 @@ with right:
             else:
                 _spt_button_t = time.perf_counter()
                 n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=_v208_finish_parallel_group)
+                _v259_clear_display_cache()
                 _spt_perf_tick("01_button_finish_pause_action", _spt_button_t, threshold_ms=200.0, detail={"active_id": active2.get("id"), "rows": n})
                 trigger_post_record_continue_prompt(f"已同步暫停 {n} 筆並平均計算工時。", title="工時已暫停")
                 st.rerun()
@@ -970,6 +1014,7 @@ with right:
             else:
                 _spt_button_t = time.perf_counter()
                 n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=_v208_finish_parallel_group)
+                _v259_clear_display_cache()
                 _spt_perf_tick("01_button_finish_complete_action", _spt_button_t, threshold_ms=200.0, detail={"active_id": active2.get("id"), "rows": n})
                 trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。", title="工時已完工")
                 st.rerun()
@@ -979,24 +1024,33 @@ with right:
             else:
                 _spt_button_t = time.perf_counter()
                 n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=_v208_finish_parallel_group)
+                _v259_clear_display_cache()
                 _spt_perf_tick("01_button_finish_off_duty_action", _spt_button_t, threshold_ms=200.0, detail={"active_id": active2.get("id"), "rows": n})
                 trigger_post_record_continue_prompt(f"已同步下班 {n} 筆並平均計算工時。", title="工時已結束")
                 st.rerun()
 
     st.markdown("#### 今日已結束紀錄 / Today Finished Records")
-    _spt_perf_t = time.perf_counter()
-    finished_today_df = _v148_load_today_finished_records_for_employee(emp_id2, _emp2_name)
-    _spt_perf_t = _spt_perf_tick(
-        "01_load_finished_today_for_employee",
-        _spt_perf_t,
-        threshold_ms=500.0,
-        detail={"employee_id": emp_id2, "rows": len(finished_today_df) if isinstance(finished_today_df, pd.DataFrame) else 0},
-    )
-    if finished_today_df.empty:
-        st.info("此人員今天尚無已結束紀錄。")
-    else:
+    _finished_key, _finished_ts_key = _v259_finish_key(emp_id2, _emp2_name)
+    fc1, fc2 = st.columns([1, 3])
+    load_finished_clicked = fc1.button("重新整理已結束紀錄", use_container_width=True, key=f"v259_load_finished_{emp_id2}")
+    _v259_notice_cached("今日已結束紀錄", _finished_ts_key)
+    if load_finished_clicked:
+        _spt_perf_t = time.perf_counter()
+        finished_today_df = _v148_load_today_finished_records_for_employee(emp_id2, _emp2_name)
+        st.session_state[_finished_key] = finished_today_df
+        st.session_state[_finished_ts_key] = _v259_now_label()
+        _spt_perf_t = _spt_perf_tick(
+            "01_load_finished_today_for_employee",
+            _spt_perf_t,
+            threshold_ms=500.0,
+            detail={"employee_id": emp_id2, "rows": len(finished_today_df) if isinstance(finished_today_df, pd.DataFrame) else 0},
+        )
+    finished_today_df = st.session_state.get(_finished_key, pd.DataFrame())
+    if isinstance(finished_today_df, pd.DataFrame) and not finished_today_df.empty:
         st.caption("只顯示目前選擇人員今日已下班、暫停或完工的紀錄；此區為唯讀查閱，不會寫入、覆蓋或刪除資料。")
         render_table(finished_today_df, "today_finished_records_for_selected_employee_v148", editable=False, height=260)
+    else:
+        st.info("此區已改為手動刷新，避免整頁顯示完成被已結束紀錄查詢拖慢。")
 
 st.divider()
 st.subheader("今日工時紀錄 / Today Records")
@@ -1021,26 +1075,47 @@ if is_admin:
                 pass
             st.success(f"已重新整理 01 頁顯示；02 歷史紀錄不受影響。已隱藏目前已結束筆數：{n}")
             st.rerun()
-_spt_perf_t = time.perf_counter()
-df = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
-_spt_perf_t = _spt_perf_tick(
-    "01_load_today_records_main_table_data",
-    _spt_perf_t,
-    threshold_ms=500.0,
-    detail={"rows": len(df) if isinstance(df, pd.DataFrame) else 0, "unfinished_only": bool(show_unfinished_only)},
-)
-if is_admin and not df.empty:
-    with st.expander("▤ 01 工時紀錄表格欄位位置順序調整 / Admin Column Order Settings", expanded=False):
-        st.caption("此區僅系統管理員可見。可調整今日工時紀錄表格的欄位寬度與欄位位置順序；設定會永久保存。")
-        render_width_settings("01.time_records.main", df, title="01 工時紀錄欄位順序與欄寬設定 / Column Order and Width")
-_spt_perf_t = time.perf_counter()
-render_table(df, "01.time_records.main", editable=False, height=420)
-_spt_perf_t = _spt_perf_tick(
-    "01_render_today_records_main_table",
-    _spt_perf_t,
-    threshold_ms=500.0,
-    detail={"rows": len(df) if isinstance(df, pd.DataFrame) else 0},
-)
+tc1, tc2, tc3 = st.columns([1.2, 1.2, 2.6])
+load_today_clicked = tc1.button("重新整理今日明細", use_container_width=True, key="v259_load_today_records")
+clear_today_cache_clicked = tc2.button("清除今日明細快取", use_container_width=True, key="v259_clear_today_records_cache")
+with tc3:
+    _v259_notice_cached("今日工時紀錄", V259_TODAY_TABLE_TS_KEY)
+if clear_today_cache_clicked:
+    st.session_state.pop(V259_TODAY_TABLE_KEY, None)
+    st.session_state.pop(V259_TODAY_TABLE_TS_KEY, None)
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+    st.success("已清除今日明細快取；需要時請按『重新整理今日明細』。")
+    st.rerun()
+if load_today_clicked:
+    _spt_perf_t = time.perf_counter()
+    df_loaded = today_records(include_finished=not show_unfinished_only, unfinished_only=show_unfinished_only)
+    st.session_state[V259_TODAY_TABLE_KEY] = df_loaded
+    st.session_state[V259_TODAY_TABLE_TS_KEY] = _v259_now_label()
+    _spt_perf_t = _spt_perf_tick(
+        "01_load_today_records_main_table_data",
+        _spt_perf_t,
+        threshold_ms=500.0,
+        detail={"rows": len(df_loaded) if isinstance(df_loaded, pd.DataFrame) else 0, "unfinished_only": bool(show_unfinished_only)},
+    )
+df = st.session_state.get(V259_TODAY_TABLE_KEY, pd.DataFrame())
+if isinstance(df, pd.DataFrame) and not df.empty:
+    if is_admin:
+        with st.expander("▤ 01 工時紀錄表格欄位位置順序調整 / Admin Column Order Settings", expanded=False):
+            st.caption("此區僅系統管理員可見。可調整今日工時紀錄表格的欄位寬度與欄位位置順序；設定會永久保存。")
+            render_width_settings("01.time_records.main", df, title="01 工時紀錄欄位順序與欄寬設定 / Column Order and Width")
+    _spt_perf_t = time.perf_counter()
+    render_table(df, "01.time_records.main", editable=False, height=420)
+    _spt_perf_t = _spt_perf_tick(
+        "01_render_today_records_main_table",
+        _spt_perf_t,
+        threshold_ms=500.0,
+        detail={"rows": len(df) if isinstance(df, pd.DataFrame) else 0},
+    )
+else:
+    st.info("今日明細表格已改為手動刷新。開始/暫停/完工可先操作；需要看完整表格時再按『重新整理今日明細』。")
 
 # V1.81 + V92：修改、刪除、存檔功能只允許管理員看見與操作。
 # V92：所有維護區按鈕改成「同一次 rerun 立即生效」，不再依賴先 st.rerun 再期待 data_editor 狀態更新。
