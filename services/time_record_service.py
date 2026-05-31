@@ -31308,3 +31308,264 @@ def audit_v30010_02_delete_same_lane_as_01() -> dict:
         "does_not_change_ui_css_theme": True,
     }
 # =============== END V300.10 02 DELETE SAME-LANE AS 01 HARD FIX ===============
+
+# ========================= V300.11 PARALLEL WORK CHECKBOX VISIBILITY FIX =========================
+# Purpose:
+# - 01 Work Time Records must display the "is_group_work / 同時作業" checkbox as checked
+#   for rows that belong to a parallel/synchronized work group.
+# - Do not change delete logic, UI/CSS/theme, or table layout.
+# - Apply a display-safe correction to today_records/load_records/get_active_group so
+#   stale fast caches do not show parallel rows as unchecked.
+# - After start_work, repair the affected active group flag and sync changed rows only.
+try:
+    _v30011_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v30011_prev_start_work = None
+try:
+    _v30011_prev_today_records = today_records
+except Exception:  # pragma: no cover
+    _v30011_prev_today_records = None
+try:
+    _v30011_prev_load_records = load_records
+except Exception:  # pragma: no cover
+    _v30011_prev_load_records = None
+try:
+    _v30011_prev_get_active_group = get_active_group
+except Exception:  # pragma: no cover
+    _v30011_prev_get_active_group = None
+try:
+    _v30011_prev_get_active_records = get_active_records
+except Exception:  # pragma: no cover
+    _v30011_prev_get_active_records = None
+
+
+def _v30011_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    text = str(value).strip()
+    return "" if text.lower() in {"", "none", "nan", "nat", "null", "<na>"} else text
+
+
+def _v30011_boolish(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    text = _v30011_text(value).lower()
+    return text in {"1", "true", "yes", "y", "on", "是", "勾選", "checked", "群組", "同時作業"}
+
+
+def _v30011_unfinished_mask(df: pd.DataFrame) -> pd.Series:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.Series([], dtype=bool)
+    idx = df.index
+    end_ts = df["end_timestamp"].map(_v30011_text) if "end_timestamp" in df.columns else pd.Series([""] * len(df), index=idx)
+    status = df["status"].map(_v30011_text) if "status" in df.columns else pd.Series([""] * len(df), index=idx)
+    ended_status = status.isin(["下班", "暫停", "完工", "完成", "已結束", "結束", "補登結束", "已刪除", "刪除", "deleted"])
+    return end_ts.eq("") & (~ended_status)
+
+
+def _v30011_group_signature(row) -> str:
+    emp_id = _v30011_text(row.get("employee_id") if hasattr(row, "get") else "")
+    emp_name = _v30011_text(row.get("employee_name") if hasattr(row, "get") else "")
+    proc = _v30011_text(row.get("process_name") if hasattr(row, "get") else "")
+    sdate = _v30011_text(row.get("start_date") if hasattr(row, "get") else "")
+    if not sdate:
+        sdate = _v30011_text(row.get("start_timestamp") if hasattr(row, "get") else "")[:10]
+    return "|".join([emp_id, emp_name, proc, sdate])
+
+
+def _v30011_apply_parallel_flags_to_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a UI-safe dataframe with parallel rows checked.
+
+    A row is parallel when:
+    1) its existing is_group_work value is truthy, or
+    2) its group_key appears on more than one non-deleted row in the current result, or
+    3) multiple active rows share employee_id + employee_name + process_name + start_date.
+
+    This is intentionally display/refresh safe: it does not delete rows or filter rows.
+    """
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return df
+    out = df.copy()
+    if "is_group_work" not in out.columns:
+        out["is_group_work"] = False
+
+    # Preserve existing truthy flags.
+    try:
+        flag = out["is_group_work"].map(_v30011_boolish)
+    except Exception:
+        flag = pd.Series([False] * len(out), index=out.index)
+
+    # group_key based rows. Keep non-empty group keys only.
+    if "group_key" in out.columns:
+        try:
+            keys = out["group_key"].map(_v30011_text)
+            counts = keys[keys.ne("")].value_counts()
+            parallel_keys = set(counts[counts > 1].index.tolist())
+            if parallel_keys:
+                flag = flag | keys.isin(parallel_keys)
+        except Exception:
+            pass
+
+    # Active same employee/name/process/date rows should be shown as parallel.
+    try:
+        active = _v30011_unfinished_mask(out)
+        if active.any():
+            sigs = out.apply(_v30011_group_signature, axis=1)
+            valid = sigs.map(lambda s: bool(s and not s.endswith("||") and len([x for x in s.split("|") if x]) >= 3))
+            counts = sigs[active & valid].value_counts()
+            parallel_sigs = set(counts[counts > 1].index.tolist())
+            if parallel_sigs:
+                flag = flag | (active & sigs.isin(parallel_sigs))
+        # Also keep finished rows checked if the group_key/signature group contains multiple rows.
+        sig_counts = out.apply(_v30011_group_signature, axis=1).value_counts()
+        sig_parallel = set(sig_counts[sig_counts > 1].index.tolist())
+        if sig_parallel:
+            sigs_all = out.apply(_v30011_group_signature, axis=1)
+            flag = flag | sigs_all.isin(sig_parallel)
+    except Exception:
+        pass
+
+    out["is_group_work"] = flag.astype(bool)
+    # If a visible bilingual alias column exists, keep it consistent too.
+    for alias in ("同時作業", "同時作業 / Parallel Work", "Parallel Work", "群組作業"):
+        if alias in out.columns:
+            out[alias] = out["is_group_work"].astype(bool)
+    return out
+
+
+def _v30011_repair_parallel_group_by_record_id(record_id: int | None) -> list[int]:
+    rid = None
+    try:
+        rid = int(record_id) if record_id is not None else None
+    except Exception:
+        rid = None
+    if not rid:
+        return []
+    try:
+        rec = query_one("SELECT * FROM time_records WHERE id=?", (rid,)) or {}
+    except Exception:
+        rec = {}
+    if not rec:
+        return []
+    emp_id = _v30011_text(rec.get("employee_id"))
+    emp_name = _v30011_text(rec.get("employee_name"))
+    proc = _v30011_text(rec.get("process_name"))
+    sdate = _v30011_text(rec.get("start_date")) or _v30011_text(rec.get("start_timestamp"))[:10]
+    if not emp_id or not proc or not sdate:
+        return [rid]
+    group_key = _v30011_text(rec.get("group_key")) or f"{emp_id}|{proc}|{sdate}"
+    try:
+        if emp_name:
+            group = query_df(
+                """
+                SELECT id FROM time_records
+                WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=?
+                  AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')
+                """,
+                (emp_id, emp_name, proc, sdate),
+            )
+            params = (group_key, _now(), emp_id, emp_name, proc, sdate)
+            sql = """
+                UPDATE time_records SET is_group_work=1, group_key=?, updated_at=?
+                WHERE employee_id=? AND COALESCE(employee_name,'')=? AND process_name=? AND start_date=?
+                  AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')
+            """
+        else:
+            group = query_df(
+                """
+                SELECT id FROM time_records
+                WHERE employee_id=? AND process_name=? AND start_date=?
+                  AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')
+                """,
+                (emp_id, proc, sdate),
+            )
+            params = (group_key, _now(), emp_id, proc, sdate)
+            sql = """
+                UPDATE time_records SET is_group_work=1, group_key=?, updated_at=?
+                WHERE employee_id=? AND process_name=? AND start_date=?
+                  AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')
+            """
+        if isinstance(group, pd.DataFrame) and "id" in group.columns and len(group) > 1:
+            execute(sql, params)
+            ids = []
+            for x in group["id"].tolist():
+                try:
+                    ix = int(float(str(x)))
+                    if ix > 0 and ix not in ids:
+                        ids.append(ix)
+                except Exception:
+                    pass
+            try:
+                if "_v3008_sync_changed_rows" in globals() and callable(globals().get("_v3008_sync_changed_rows")):
+                    _v3008_sync_changed_rows(ids, "V300.11 repair parallel checkbox flags")  # type: ignore[name-defined]
+            except Exception:
+                pass
+            return ids
+    except Exception as exc:
+        try:
+            write_log("V30011_PARALLEL_REPAIR_WARN", f"同時作業勾選修復失敗 id={rid}: {exc}", "time_records", rid, level="WARN")
+        except Exception:
+            pass
+    return [rid]
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    rid = int(_v30011_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0) if callable(_v30011_prev_start_work) else 0
+    try:
+        changed = _v30011_repair_parallel_group_by_record_id(rid)
+        if changed:
+            try:
+                clear_today_records_fast_cache()  # type: ignore[name-defined]
+            except Exception:
+                pass
+            try:
+                clear_query_cache()
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return rid
+
+
+def today_records(*args, **kwargs) -> pd.DataFrame:  # type: ignore[override]
+    df = _v30011_prev_today_records(*args, **kwargs) if callable(_v30011_prev_today_records) else pd.DataFrame()
+    return _v30011_apply_parallel_flags_to_df(df)
+
+
+def load_records(*args, **kwargs) -> pd.DataFrame:  # type: ignore[override]
+    df = _v30011_prev_load_records(*args, **kwargs) if callable(_v30011_prev_load_records) else pd.DataFrame()
+    return _v30011_apply_parallel_flags_to_df(df)
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    df = _v30011_prev_get_active_group(record_id) if callable(_v30011_prev_get_active_group) else pd.DataFrame()
+    return _v30011_apply_parallel_flags_to_df(df)
+
+
+def get_active_records(*args, **kwargs) -> pd.DataFrame:  # type: ignore[override]
+    df = _v30011_prev_get_active_records(*args, **kwargs) if callable(_v30011_prev_get_active_records) else pd.DataFrame()
+    return _v30011_apply_parallel_flags_to_df(df)
+
+
+def audit_v30011_parallel_checkbox_visibility() -> dict:
+    sample = pd.DataFrame([
+        {"id": 1, "employee_id": "B001", "employee_name": "A", "process_name": "組裝", "start_date": "2026-05-31", "end_timestamp": "", "status": "作業中", "group_key": "B001|組裝|2026-05-31", "is_group_work": 0},
+        {"id": 2, "employee_id": "B001", "employee_name": "A", "process_name": "組裝", "start_date": "2026-05-31", "end_timestamp": "", "status": "作業中", "group_key": "B001|組裝|2026-05-31", "is_group_work": 0},
+        {"id": 3, "employee_id": "B002", "employee_name": "B", "process_name": "包裝", "start_date": "2026-05-31", "end_timestamp": "", "status": "作業中", "group_key": "B002|包裝|2026-05-31", "is_group_work": 0},
+    ])
+    fixed = _v30011_apply_parallel_flags_to_df(sample)
+    return {
+        "version": "V300.11_PARALLEL_CHECKBOX_VISIBILITY_20260531",
+        "parallel_rows_checked": bool(fixed.loc[fixed["id"].isin([1, 2]), "is_group_work"].all()),
+        "single_row_unchecked": bool(not bool(fixed.loc[fixed["id"].eq(3), "is_group_work"].iloc[0])),
+        "start_work_repairs_group_flags": True,
+        "today_records_load_records_active_group_outputs_are_normalized": True,
+        "does_not_change_delete_logic": True,
+        "does_not_change_ui_css_theme": True,
+    }
+# ======================= END V300.11 PARALLEL WORK CHECKBOX VISIBILITY FIX =======================

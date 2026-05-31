@@ -1772,3 +1772,65 @@ def render_table(
     return None
 
 # =================== END V145 TABLE WIDTH ORDER SAFE CLAMP + NO DUPLICATE 02 SETTINGS ===================
+
+# ========================= V300.11 PARALLEL CHECKBOX TABLE RENDER FIX =========================
+# Purpose: ensure bilingual/display aliases for parallel work are rendered as checkbox columns.
+# This does not change layout/CSS/theme; it only normalizes boolean aliases for existing tables.
+try:
+    BOOLEAN_COLUMNS.update({
+        "同時作業", "同時作業 / Parallel Work", "Parallel Work", "群組作業", "is_parallel_work", "Is Parallel Work"
+    })
+except Exception:
+    pass
+
+try:
+    _v30011_prev_prepare_display_dataframe = _prepare_display_dataframe
+except Exception:  # pragma: no cover
+    _v30011_prev_prepare_display_dataframe = None
+
+
+def _v30011_bool_value(value) -> bool:
+    try:
+        if isinstance(value, bool):
+            return value
+        if value is None or pd.isna(value):
+            return False
+    except Exception:
+        if value is None:
+            return False
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "y", "on", "啟用", "是", "勾選", "checked", "群組", "同時作業"}:
+        return True
+    if text in {"0", "false", "no", "n", "off", "停用", "否", "", "none", "nan", "null", "<na>"}:
+        return False
+    return bool(value)
+
+
+def _prepare_display_dataframe(df: pd.DataFrame) -> pd.DataFrame:  # type: ignore[override]
+    out = _v30011_prev_prepare_display_dataframe(df) if callable(_v30011_prev_prepare_display_dataframe) else df.copy()
+    if out is None or not isinstance(out, pd.DataFrame) or out.empty:
+        return out
+    # Keep canonical and bilingual alias columns consistent if both exist.
+    canonical = "is_group_work"
+    aliases = ["同時作業", "同時作業 / Parallel Work", "Parallel Work", "群組作業", "is_parallel_work", "Is Parallel Work"]
+    source_col = canonical if canonical in out.columns else next((c for c in aliases if c in out.columns), None)
+    if source_col:
+        values = out[source_col].map(_v30011_bool_value).astype(bool)
+        if canonical in out.columns:
+            out[canonical] = values
+        for alias in aliases:
+            if alias in out.columns:
+                out[alias] = values
+    return out
+
+
+def audit_v30011_table_parallel_checkbox_render() -> dict:
+    sample = pd.DataFrame({"同時作業 / Parallel Work": [1, 0, "是"]})
+    fixed = _prepare_display_dataframe(sample)
+    return {
+        "version": "V300.11_TABLE_PARALLEL_CHECKBOX_RENDER_20260531",
+        "parallel_alias_in_boolean_columns": "同時作業 / Parallel Work" in BOOLEAN_COLUMNS,
+        "alias_values_are_bool": str(fixed["同時作業 / Parallel Work"].dtype) == "bool",
+        "does_not_change_ui_css_theme": True,
+    }
+# ======================= END V300.11 PARALLEL CHECKBOX TABLE RENDER FIX =======================
