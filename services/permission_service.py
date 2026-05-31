@@ -7582,3 +7582,200 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
             pass
 
 # ======================= V300.12.3 IDLE AUTO LOGOUT PERSISTENCE FIX END =======================
+
+# ======================= V300.12.4 IDLE TIMEOUT GITHUB AUTHORITY FIX START =======================
+# Problem fixed:
+# 10. 權限管理 could display/save idle_timeout_minutes locally, but Streamlit Cloud Reboot
+# loaded the old GitHub authority file again, so the value returned to 15 minutes.
+# This override writes the value to the canonical records.json, settings.json and forces the
+# authority upload path when available. It does not touch 01/02 work-time logic.
+
+def _v300124_normalize_security_input(settings: dict) -> dict:
+    try:
+        base = dict(DEFAULT_SECURITY_SETTINGS)
+    except Exception:
+        base = {"idle_timeout_minutes": "15", "ask_continue_after_record": "1"}
+    try:
+        if callable(globals().get("_v300123_alias_security_settings")):
+            base.update(_v300123_alias_security_settings(settings or {}))  # type: ignore[name-defined]
+        else:
+            base.update(settings or {})
+    except Exception:
+        base.update(settings or {})
+    aliases = [
+        "idle_timeout_minutes",
+        "閒置自動登出分鐘數 / Idle Auto Logout Minutes",
+        "閒置自動登出分鐘數 / Idle Auto Logout Minutes1",
+        "Idle Auto Logout Minutes",
+        "Idle Auto Logout Minutes1",
+        "idle_auto_logout_minutes",
+        "idle_auto_logout_minutes1",
+    ]
+    for k in aliases:
+        if (settings or {}).get(k) not in (None, ""):
+            base["idle_timeout_minutes"] = str((settings or {}).get(k))
+            break
+    try:
+        idle = max(1, int(float(str(base.get("idle_timeout_minutes", "15") or 15).strip())))
+    except Exception:
+        idle = 15
+    ask_raw = str(base.get("ask_continue_after_record", "1")).strip().lower()
+    ask = "0" if ask_raw in {"0", "false", "no", "n", "否"} else "1"
+    return {"idle_timeout_minutes": str(idle), "ask_continue_after_record": ask}
+
+
+def _v300124_current_authority_payload() -> dict:
+    # Prefer the recovered/single-authority payload if available, because it preserves the ~100 accounts.
+    for fn_name in ("_v30012_payload_with_fallback", "_v300121_merge_authority_payload"):
+        fn = globals().get(fn_name)
+        if callable(fn):
+            try:
+                payload = fn() if fn_name == "_v30012_payload_with_fallback" else fn(_v300123_json_read(_V30012_PERMISSION_AUTHORITY_FILE), reason="v30012_4_idle_read")  # type: ignore[name-defined]
+                if isinstance(payload, dict):
+                    return payload
+            except Exception:
+                pass
+    try:
+        payload = _v300123_json_read(_V30012_PERMISSION_AUTHORITY_FILE)  # type: ignore[name-defined]
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
+
+
+def _v300124_write_local_idle_mirrors(sec: dict, reason: str = "v30012_4_idle_timeout_persistence") -> None:
+    try:
+        if callable(globals().get("_v300123_write_idle_mirror_files")):
+            _v300123_write_idle_mirror_files(sec)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        minutes = int(sec.get("idle_timeout_minutes", "15"))
+        ask = str(sec.get("ask_continue_after_record", "1"))
+        now = _v30012_now() if callable(globals().get("_v30012_now")) else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        simple = {"idle_timeout_minutes": minutes, "ask_continue_after_record": ask, "updated_at": now, "reason": reason}
+        for p in [
+            PROJECT_ROOT / "data" / "permanent_store" / "config" / "idle_timeout_settings.json",
+            PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_idle_timeout_settings.json",
+            PROJECT_ROOT / "data" / "config" / "idle_timeout_settings.json",
+            PROJECT_ROOT / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+            PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+        ]:
+            try:
+                _v300123_json_write(p, simple)  # type: ignore[name-defined]
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    # records.json is canonical; settings.json and legacy files are fallback only.
+    merged = dict(DEFAULT_SECURITY_SETTINGS)
+    try:
+        if callable(globals().get("_v300123_security_from_settings_file")):
+            merged.update(_v300123_security_from_settings_file())  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if callable(globals().get("_v300123_security_from_records")):
+            record_settings = _v300123_security_from_records()  # type: ignore[name-defined]
+            if record_settings:
+                merged.update(record_settings)
+    except Exception:
+        pass
+    try:
+        return _v300124_normalize_security_input(merged)
+    except Exception:
+        return {"idle_timeout_minutes": "15", "ask_continue_after_record": "1"}
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    sec = _v300124_normalize_security_input(settings or {})
+    idle = int(sec["idle_timeout_minutes"])
+    ask = sec["ask_continue_after_record"]
+    now = _v30012_now() if callable(globals().get("_v30012_now")) else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    payload = _v300124_current_authority_payload()
+    if not isinstance(payload, dict):
+        payload = {}
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else _v30012_empty_tables()  # type: ignore[name-defined]
+
+    rows = [
+        {"setting_key": "idle_timeout_minutes", "setting_value": str(idle), "note": "V300.12.4 canonical idle timeout", "updated_at": now},
+        {"setting_key": "ask_continue_after_record", "setting_value": ask, "note": "V300.12.4 canonical ask continue setting", "updated_at": now},
+    ]
+    seen = {"idle_timeout_minutes", "ask_continue_after_record"}
+    for table_name in ("auth_security_settings", "security_settings"):
+        for row in tables.get(table_name, []) if isinstance(tables.get(table_name), list) else []:
+            if not isinstance(row, dict):
+                continue
+            key = str(row.get("setting_key") or row.get("key") or "").strip()
+            if not key or key in seen:
+                continue
+            old = dict(row)
+            old.setdefault("updated_at", now)
+            rows.append(old)
+            seen.add(key)
+    tables["auth_security_settings"] = [dict(r) for r in rows]
+    tables["security_settings"] = [dict(r) for r in rows]
+
+    settings_payload = {
+        "idle_timeout_minutes": str(idle),
+        "ask_continue_after_record": ask,
+        "security_settings": {"idle_timeout_minutes": str(idle), "ask_continue_after_record": ask},
+        "settings": {"idle_timeout_minutes": str(idle), "ask_continue_after_record": ask, "security_settings": {"idle_timeout_minutes": str(idle), "ask_continue_after_record": ask}},
+        "updated_at": now,
+        "reason": "v30012_4_idle_timeout_persistence",
+    }
+
+    # Write through the official permanent authority service so Streamlit Cloud Reboot reads the new value from GitHub.
+    wrote_authority = False
+    try:
+        from services.permanent_authority_service import save_authority as _pa_save_authority, save_settings as _pa_save_settings, force_upload_authority_file as _pa_force_upload
+        _pa_save_authority("10_permissions", records=tables, settings=settings_payload, reason="v30012_4_save_security_settings", github=True)
+        _pa_save_settings("10_permissions", settings_payload, reason="v30012_4_save_idle_settings", github=True)
+        try:
+            _pa_force_upload("10_permissions", "records", reason="v30012_4_force_upload_records")
+            _pa_force_upload("10_permissions", "settings", reason="v30012_4_force_upload_settings")
+        except Exception:
+            pass
+        wrote_authority = True
+    except Exception:
+        wrote_authority = False
+
+    # Always write local authority too, even if GitHub connector is unavailable.
+    try:
+        payload["tables"] = tables
+        payload.setdefault("module_key", "10_permissions")
+        payload.setdefault("kind", "records")
+        payload["authority_schema"] = "SPT-10-Permissions-Authority-V30012.4"
+        payload["version"] = "V300.12.4-idle-timeout-github-authority"
+        payload["updated_at"] = now
+        payload["reason"] = "save_security_settings_v30012_4"
+        payload["settings"] = dict(payload.get("settings") if isinstance(payload.get("settings"), dict) else {})
+        payload["settings"].update(settings_payload)
+        _v300123_json_write(_V30012_PERMISSION_AUTHORITY_FILE, payload)  # type: ignore[name-defined]
+        try:
+            _v300123_json_write(_V300123_SETTINGS_FILE, settings_payload)  # type: ignore[name-defined]
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    _v300124_write_local_idle_mirrors(sec)
+    try:
+        _v30012_sync_sqlite_cache(payload)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": idle, "ts": 0}
+        st.session_state["spt_security_settings"] = dict(sec)
+        st.session_state["_v300124_idle_authority_uploaded"] = bool(wrote_authority)
+    except Exception:
+        pass
+
+# ======================= V300.12.4 IDLE TIMEOUT GITHUB AUTHORITY FIX END =======================

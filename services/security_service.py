@@ -4288,3 +4288,88 @@ def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
         pass
 
 # ======================= V300.12.3 IDLE TIMEOUT RECORDS-FIRST RUNTIME FIX END =======================
+
+# ======================= V300.12.4 IDLE TIMEOUT GITHUB AUTHORITY RUNTIME FIX START =======================
+# Security runtime must use the same records.json-first authority as 10. 權限管理.
+# set_idle_timeout_minutes() also delegates to permission_service.save_security_settings(), which writes GitHub authority.
+
+def _v300124_read_idle_records_first() -> int | None:
+    try:
+        for path in _v300123_idle_paths_records_first():  # type: ignore[name-defined]
+            minutes = _v300123_extract_idle_from_payload(_v300123_json_read(path))  # type: ignore[name-defined]
+            if minutes is not None:
+                return minutes
+    except Exception:
+        pass
+    try:
+        from services.permission_service import get_security_settings as _perm_get_security
+        sec = _perm_get_security()
+        if sec.get("idle_timeout_minutes") not in (None, ""):
+            n = int(float(sec.get("idle_timeout_minutes")))
+            if n >= 1:
+                return n
+    except Exception:
+        pass
+    return None
+
+
+def get_idle_timeout_minutes() -> int:  # type: ignore[override]
+    try:
+        cache = st.session_state.get("_spt_idle_timeout_cache")
+        if isinstance(cache, dict):
+            minutes = int(float(cache.get("minutes", 0)))
+            if minutes >= 1:
+                return minutes
+    except Exception:
+        pass
+    minutes = _v300124_read_idle_records_first()
+    if minutes is None:
+        try:
+            ensure_security_schema()
+            for table in ("auth_security_settings", "security_settings"):
+                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
+                if row and row.get("setting_value") not in (None, ""):
+                    minutes = int(float(row.get("setting_value")))
+                    break
+        except Exception:
+            minutes = None
+    if minutes is None:
+        minutes = DEFAULT_IDLE_MINUTES
+    minutes = max(1, int(minutes))
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+    except Exception:
+        pass
+    return minutes
+
+
+def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
+    minutes = max(1, int(minutes))
+    ask = "1"
+    try:
+        ss = st.session_state.get("spt_security_settings", {})
+        if isinstance(ss, dict) and ss.get("ask_continue_after_record") is not None:
+            ask = str(ss.get("ask_continue_after_record"))
+    except Exception:
+        pass
+    ask = "0" if str(ask).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    try:
+        from services.permission_service import save_security_settings as _perm_save_security
+        _perm_save_security({"idle_timeout_minutes": str(minutes), "ask_continue_after_record": ask})
+    except Exception:
+        try:
+            _v300123_write_idle_to_authority(minutes, ask)  # type: ignore[name-defined]
+        except Exception:
+            pass
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+        sec = st.session_state.get("spt_security_settings", {})
+        if not isinstance(sec, dict):
+            sec = {}
+        sec["idle_timeout_minutes"] = str(minutes)
+        sec["ask_continue_after_record"] = ask
+        st.session_state["spt_security_settings"] = sec
+    except Exception:
+        pass
+
+# ======================= V300.12.4 IDLE TIMEOUT GITHUB AUTHORITY RUNTIME FIX END =======================
