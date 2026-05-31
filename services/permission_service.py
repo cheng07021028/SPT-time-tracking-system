@@ -7779,3 +7779,261 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
         pass
 
 # ======================= V300.12.4 IDLE TIMEOUT GITHUB AUTHORITY FIX END =======================
+
+# ======================= V300.12.5 IDLE TIMEOUT INDEPENDENT AUTHORITY FILE START =======================
+# Purpose:
+#   Previous fixes wrote idle_auto_logout_minutes into multiple mixed authority files
+#   (records/settings/legacy/session). In the live app the value could still be overwritten
+#   back to 15 by permissions/account recovery or legacy settings merge.
+# New rule:
+#   idle_auto_logout_minutes has its own independent authority file and is read first.
+#   This block intentionally does not change accounts, role permissions, 01/02 work records,
+#   table UI, CSS, or deletion logic.
+
+try:
+    _v300125_prev_get_security_settings = get_security_settings  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v300125_prev_get_security_settings = None
+try:
+    _v300125_prev_save_security_settings = save_security_settings  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v300125_prev_save_security_settings = None
+
+_V300125_RUNTIME_SETTINGS_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "security_runtime_settings.json"
+
+
+def _v300125_now_text() -> str:
+    try:
+        return _v30012_now()  # type: ignore[name-defined]
+    except Exception:
+        try:
+            return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return ""
+
+
+def _v300125_read_json(path: Path) -> dict:
+    try:
+        if path.exists() and path.is_file() and path.stat().st_size > 0:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        pass
+    return {}
+
+
+def _v300125_write_json(path: Path, payload: dict) -> bool:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(payload if isinstance(payload, dict) else {}, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        tmp.replace(path)
+        return True
+    except Exception:
+        return False
+
+
+def _v300125_extract_minutes(value, default: int | None = None) -> int | None:
+    try:
+        if value in (None, ""):
+            return default
+        n = int(float(str(value).strip()))
+        if n < 1:
+            return default
+        return n
+    except Exception:
+        return default
+
+
+def _v300125_normalize_security_input(settings: dict | None) -> dict:
+    settings = settings if isinstance(settings, dict) else {}
+    idle_aliases = [
+        "idle_auto_logout_minutes",
+        "idle_timeout_minutes",
+        "Idle Auto Logout Minutes",
+        "Idle Auto Logout Minutes1",
+        "idle_auto_logout_minutes1",
+        "閒置自動登出分鐘數 / Idle Auto Logout Minutes",
+        "閒置自動登出分鐘數 / Idle Auto Logout Minutes1",
+    ]
+    minutes = None
+    for key in idle_aliases:
+        if key in settings and settings.get(key) not in (None, ""):
+            minutes = _v300125_extract_minutes(settings.get(key), None)
+            if minutes is not None:
+                break
+    ask = settings.get("ask_continue_after_record", None)
+    if ask is None:
+        ask = settings.get("Ask Continue After Record", None)
+    ask_raw = str(ask if ask is not None else "1").strip().lower()
+    ask_val = "0" if ask_raw in {"0", "false", "no", "n", "否", "停用", "disabled"} else "1"
+    out = {"ask_continue_after_record": ask_val}
+    if minutes is not None:
+        out["idle_timeout_minutes"] = str(minutes)
+        out["idle_auto_logout_minutes"] = str(minutes)
+    return out
+
+
+def _v300125_read_runtime_settings() -> dict:
+    payload = _v300125_read_json(_V300125_RUNTIME_SETTINGS_FILE)
+    out = {}
+    minutes = _v300125_extract_minutes(payload.get("idle_auto_logout_minutes"), None)
+    if minutes is None:
+        minutes = _v300125_extract_minutes(payload.get("idle_timeout_minutes"), None)
+    if minutes is None and isinstance(payload.get("security_settings"), dict):
+        minutes = _v300125_extract_minutes(payload["security_settings"].get("idle_auto_logout_minutes"), None)
+        if minutes is None:
+            minutes = _v300125_extract_minutes(payload["security_settings"].get("idle_timeout_minutes"), None)
+    if minutes is not None:
+        out["idle_timeout_minutes"] = str(minutes)
+        out["idle_auto_logout_minutes"] = str(minutes)
+    ask = payload.get("ask_continue_after_record")
+    if ask is None and isinstance(payload.get("security_settings"), dict):
+        ask = payload["security_settings"].get("ask_continue_after_record")
+    if ask is not None:
+        out["ask_continue_after_record"] = "0" if str(ask).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    return out
+
+
+def _v300125_upload_runtime_settings_to_github(payload: dict) -> bool:
+    """Best-effort direct GitHub write for the independent idle timeout file.
+
+    This does not affect local correctness. It only prevents Streamlit Cloud Reboot
+    from falling back to the old repo file when a token is configured.
+    """
+    try:
+        token = ""
+        repo = ""
+        branch = ""
+        try:
+            if st is not None:
+                token = str(st.secrets.get("GITHUB_TOKEN", "") or "").strip()  # type: ignore[attr-defined]
+                repo = str(st.secrets.get("GITHUB_REPOSITORY", "") or "").strip()  # type: ignore[attr-defined]
+                branch = str(st.secrets.get("GITHUB_BRANCH", "") or "").strip()  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        token = token or os.environ.get("GITHUB_TOKEN", "").strip()
+        repo = repo or os.environ.get("GITHUB_REPOSITORY", "cheng07021028/SPT-time-tracking-system").strip()
+        branch = branch or os.environ.get("GITHUB_BRANCH", "main").strip()
+        if not token or not repo:
+            return False
+        import base64 as _b64
+        import urllib.parse as _urlparse
+        import urllib.request as _urlreq
+        rel = str(_V300125_RUNTIME_SETTINGS_FILE.relative_to(PROJECT_ROOT)).replace("\\", "/")
+        api = f"https://api.github.com/repos/{repo}/contents/{_urlparse.quote(rel)}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "User-Agent": "SPT-V30012-5-idle-timeout-authority",
+        }
+        sha = ""
+        try:
+            req = _urlreq.Request(api + f"?ref={_urlparse.quote(branch)}", headers=headers, method="GET")
+            with _urlreq.urlopen(req, timeout=10) as resp:  # nosec - controlled GitHub API
+                current = json.loads(resp.read().decode("utf-8"))
+                sha = str(current.get("sha", "") or "") if isinstance(current, dict) else ""
+        except Exception:
+            sha = ""
+        body = {
+            "message": f"V300.12.5 update idle timeout independent authority ({_v300125_now_text()})",
+            "content": _b64.b64encode(json.dumps(payload, ensure_ascii=False, indent=2, default=str).encode("utf-8")).decode("ascii"),
+            "branch": branch,
+        }
+        if sha:
+            body["sha"] = sha
+        req = _urlreq.Request(api, data=json.dumps(body).encode("utf-8"), headers=headers, method="PUT")
+        with _urlreq.urlopen(req, timeout=15) as resp:  # nosec - controlled GitHub API
+            return 200 <= int(getattr(resp, "status", 200)) < 300
+    except Exception:
+        return False
+
+
+def _v300125_write_runtime_settings(minutes: int, ask_continue_after_record: str = "1", *, updated_by: str = "", reason: str = "v30012_5_idle_timeout_independent_authority") -> dict:
+    minutes = max(1, int(minutes))
+    ask = "0" if str(ask_continue_after_record).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    payload = {
+        "authority_schema": "SPT-10-Permissions-SecurityRuntimeSettings-V30012.5",
+        "version": "V300.12.5-idle-timeout-independent-authority",
+        "idle_auto_logout_minutes": minutes,
+        "idle_timeout_minutes": minutes,
+        "ask_continue_after_record": ask,
+        "security_settings": {
+            "idle_auto_logout_minutes": minutes,
+            "idle_timeout_minutes": minutes,
+            "ask_continue_after_record": ask,
+        },
+        "updated_at": _v300125_now_text(),
+        "updated_by": str(updated_by or ""),
+        "reason": reason,
+        "note": "Independent authority file for idle auto logout minutes. Account/permission recovery must not overwrite this file.",
+    }
+    local_ok = _v300125_write_json(_V300125_RUNTIME_SETTINGS_FILE, payload)
+    github_ok = _v300125_upload_runtime_settings_to_github(payload)
+    try:
+        payload["local_write_ok"] = bool(local_ok)
+        payload["github_write_ok"] = bool(github_ok)
+        # Write status locally after upload attempt without recursively uploading the status-only change.
+        _v300125_write_json(_V300125_RUNTIME_SETTINGS_FILE, payload)
+    except Exception:
+        pass
+    return payload
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    base = {}
+    try:
+        if callable(_v300125_prev_get_security_settings):
+            base = dict(_v300125_prev_get_security_settings() or {})
+    except Exception:
+        base = {}
+    runtime = _v300125_read_runtime_settings()
+    if runtime.get("idle_timeout_minutes"):
+        base["idle_timeout_minutes"] = str(runtime["idle_timeout_minutes"])
+        base["idle_auto_logout_minutes"] = str(runtime["idle_timeout_minutes"])
+    if runtime.get("ask_continue_after_record") is not None:
+        base["ask_continue_after_record"] = str(runtime.get("ask_continue_after_record", "1"))
+    if not base.get("idle_timeout_minutes"):
+        base["idle_timeout_minutes"] = "15"
+        base["idle_auto_logout_minutes"] = "15"
+    base.setdefault("ask_continue_after_record", "1")
+    return {str(k): str(v) for k, v in base.items() if v is not None}
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    normalized = _v300125_normalize_security_input(settings or {})
+    if not normalized.get("idle_timeout_minutes"):
+        current = get_security_settings()
+        normalized["idle_timeout_minutes"] = str(current.get("idle_timeout_minutes", "15"))
+        normalized["idle_auto_logout_minutes"] = str(current.get("idle_timeout_minutes", "15"))
+    normalized.setdefault("ask_continue_after_record", str(get_security_settings().get("ask_continue_after_record", "1")))
+    minutes = max(1, int(float(str(normalized.get("idle_timeout_minutes", "15")))))
+    ask = normalized.get("ask_continue_after_record", "1")
+    user = ""
+    try:
+        user = str(st.session_state.get("auth_username", "") or st.session_state.get("username", "") or "")
+    except Exception:
+        user = ""
+
+    # Keep previous mixed-file behavior for compatibility, but the independent file below is authoritative.
+    try:
+        if callable(_v300125_prev_save_security_settings):
+            _v300125_prev_save_security_settings({"idle_timeout_minutes": str(minutes), "ask_continue_after_record": str(ask)})
+    except Exception:
+        pass
+
+    payload = _v300125_write_runtime_settings(minutes, str(ask), updated_by=user, reason="save_security_settings_v30012_5")
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": 0}
+        st.session_state["spt_security_settings"] = {"idle_timeout_minutes": str(minutes), "idle_auto_logout_minutes": str(minutes), "ask_continue_after_record": str(ask)}
+        st.session_state["_v300125_idle_runtime_file"] = str(_V300125_RUNTIME_SETTINGS_FILE)
+        st.session_state["_v300125_idle_github_write_ok"] = bool(payload.get("github_write_ok"))
+    except Exception:
+        pass
+
+# ======================= V300.12.5 IDLE TIMEOUT INDEPENDENT AUTHORITY FILE END =======================
