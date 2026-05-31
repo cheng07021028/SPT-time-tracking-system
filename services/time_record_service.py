@@ -29905,3 +29905,500 @@ def audit_v3005_01_admin_actions_restore() -> dict:
         "does_not_change_ui_css_theme": True,
     }
 # ================= END V300.5 01 ADMIN ACTION RESTORE =================
+
+# ================= V300.6 ADMIN SAVE + RECALC AUTHORITATIVE WRITEBACK FIX =================
+# Purpose:
+# 1) 01 admin table buttons must not be no-ops.
+# 2) Data editor bilingual/display column names are normalized back to canonical
+#    time_records columns before DB writes.
+# 3) "Save" writes edited values to the authoritative time_records table.
+# 4) "Recalc selected" first uses the already-saved timestamps, recalculates
+#    work_hours, and clears 01/02 query/display caches so 02 reads the new value.
+# 5) Do not alter UI/CSS/theme/table layout.
+try:
+    _v3006_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v3006_prev_save_time_records = None
+try:
+    _v3006_prev_recalculate_time_records = recalculate_time_records
+except Exception:  # pragma: no cover
+    _v3006_prev_recalculate_time_records = None
+
+_V3006_SAVE_COLS = [
+    "record_key", "status", "work_order", "part_no", "type_name", "process_name",
+    "employee_id", "employee_name", "start_action", "start_timestamp", "end_action", "end_timestamp",
+    "remark", "start_date", "start_time", "end_date", "end_time", "work_hours", "assembly_location",
+    "group_key", "is_group_work", "source", "created_at", "updated_at",
+]
+
+_V3006_ACTION_COLS = {
+    "刪除 / Delete", "刪除", "Delete", "delete", "_delete",
+    "重算 / Recalc", "重算", "Recalc", "recalc", "_recalc",
+    "跨日提醒", "跨日區間", "Cross Day", "Cross Day Range",
+}
+
+_V3006_FIELD_ALIASES = {
+    "id": ["id", "ID", "ID / ID", "ID/ID", "ID / ID / ID", "record_id", "紀錄編號", "編號", "序號"],
+    "record_key": ["record_key", "紀錄鍵", "紀錄鍵 / Record Key", "Record Key"],
+    "status": ["status", "狀態", "狀態 / Status", "Status"],
+    "work_order": ["work_order", "製令", "製令 / Work Order", "Work Order"],
+    "part_no": ["part_no", "P/N", "P/N / Part No.", "Part No.", "料號"],
+    "type_name": ["type_name", "機型", "機型 / Type", "Type"],
+    "process_name": ["process_name", "工段", "工段名稱", "工段名稱 / Process", "製程", "Process"],
+    "employee_id": ["employee_id", "工號", "工號 / Employee ID", "Employee ID", "員工編號"],
+    "employee_name": ["employee_name", "姓名", "姓名 / Name", "Name", "員工姓名"],
+    "start_action": ["start_action", "開始動作", "開始動作 / Start Action", "Start Action"],
+    "start_timestamp": ["start_timestamp", "開始時間戳", "開始時間戳 / Start Timestamp", "Start Timestamp"],
+    "end_action": ["end_action", "結束動作", "結束動作 / End Action", "End Action"],
+    "end_timestamp": ["end_timestamp", "結束時間戳", "結束時間戳 / End Timestamp", "End Timestamp"],
+    "remark": ["remark", "備註", "備註 / Remark", "Remark"],
+    "start_date": ["start_date", "開始日期", "開始日期 / Start Date", "Start Date", "work_date", "Work Date"],
+    "start_time": ["start_time", "開始時間", "開始時間 / Start Time", "Start Time"],
+    "end_date": ["end_date", "結束日期", "結束日期 / End Date", "End Date"],
+    "end_time": ["end_time", "結束時間", "結束時間 / End Time", "End Time"],
+    "work_hours": ["work_hours", "工時小計", "工時小計 / Work Time", "Work Time", "工時", "總工時"],
+    "assembly_location": ["assembly_location", "組立地點", "組立地點 / Assembly Location", "Assembly Location"],
+    "group_key": ["group_key", "群組鍵", "群組鍵 / Group Key", "Group Key"],
+    "is_group_work": ["is_group_work", "同時作業", "同時作業 / Parallel Work", "Parallel Work"],
+    "source": ["source", "來源", "來源 / Source", "Source"],
+    "created_at": ["created_at", "建立時間", "建立時間 / Created At", "Created At"],
+    "updated_at": ["updated_at", "更新時間", "更新時間 / Updated At", "Updated At"],
+}
+
+
+def _v3006_norm_col_name(value) -> str:
+    text = str(value or "").strip()
+    return " ".join(text.replace("／", "/").split()).casefold()
+
+
+def _v3006_alias_lookup() -> dict[str, str]:
+    out: dict[str, str] = {}
+    try:
+        for canonical, aliases in _V141_FIELD_ALIASES.items():  # type: ignore[name-defined]
+            for alias in aliases:
+                out[_v3006_norm_col_name(alias)] = canonical
+    except Exception:
+        pass
+    for canonical, aliases in _V3006_FIELD_ALIASES.items():
+        out[_v3006_norm_col_name(canonical)] = canonical
+        for alias in aliases:
+            out[_v3006_norm_col_name(alias)] = canonical
+    try:
+        from services.table_ui_service import COLUMN_LABELS  # local import avoids table UI dependency during tests
+        for canonical, label in dict(COLUMN_LABELS).items():
+            if canonical in _V3006_FIELD_ALIASES or canonical in _V3006_SAVE_COLS or canonical == "id":
+                out[_v3006_norm_col_name(label)] = canonical
+    except Exception:
+        pass
+    return out
+
+
+def _v3006_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    text = str(value).strip()
+    return "" if text.lower() in {"none", "nan", "nat", "null", "<na>"} else text
+
+
+def _v3006_clean_value(value):
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, (datetime, date)):
+        if isinstance(value, datetime):
+            return value.strftime("%Y-%m-%d %H:%M:%S")
+        return value.strftime("%Y-%m-%d")
+    text = str(value).strip()
+    if text.lower() in {"", "none", "nan", "nat", "null", "<na>"}:
+        return None
+    return text
+
+
+def _v3006_int(value) -> int | None:
+    text = _v3006_text(value)
+    if not text:
+        return None
+    try:
+        n = int(float(text))
+        return n if n > 0 else None
+    except Exception:
+        return None
+
+
+def _v3006_canonicalize_df(df: pd.DataFrame, *, recalc_edited_timestamps: bool = False) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    alias = _v3006_alias_lookup()
+    out = pd.DataFrame(index=df.index)
+
+    # Merge duplicate/display columns into canonical columns. Later aliases fill
+    # blanks but do not blindly erase an already populated canonical value.
+    for col in df.columns:
+        col_text = str(col)
+        if col_text in _V3006_ACTION_COLS:
+            continue
+        canonical = alias.get(_v3006_norm_col_name(col_text), col_text if col_text in (["id"] + _V3006_SAVE_COLS) else "")
+        if not canonical:
+            continue
+        values = df[col]
+        if canonical not in out.columns:
+            out[canonical] = values
+        else:
+            try:
+                mask = out[canonical].map(lambda x: _v3006_text(x) == "")
+                out.loc[mask, canonical] = values.loc[mask]
+            except Exception:
+                pass
+
+    if out.empty:
+        return pd.DataFrame()
+
+    # Normalize IDs.
+    if "id" in out.columns:
+        out["id"] = out["id"].map(_v3006_int)
+
+    # Confirm date/time/timestamp consistency. Only apply derived fields when the
+    # editor actually carries related fields, so hidden columns are not wiped.
+    time_related = {"start_timestamp", "start_date", "start_time", "end_timestamp", "end_date", "end_time"}
+    has_time_related = bool(time_related.intersection(set(out.columns)))
+    if has_time_related:
+        for idx, row in out.iterrows():
+            try:
+                normalized = normalize_record_datetime_fields(row, recalc_work_hours=bool(recalc_edited_timestamps))
+                for key, value in normalized.items():
+                    if key in time_related or (key == "work_hours" and recalc_edited_timestamps):
+                        out.loc[idx, key] = value
+            except Exception:
+                pass
+
+    if "work_hours" in out.columns:
+        def _hours(v):
+            if _v3006_text(v) == "":
+                return None
+            try:
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    return float(v)
+                return float(hms_to_hours(v))
+            except Exception:
+                try:
+                    return float(v)
+                except Exception:
+                    return None
+        out["work_hours"] = out["work_hours"].map(_hours)
+
+    if "is_group_work" in out.columns:
+        out["is_group_work"] = out["is_group_work"].map(lambda v: 1 if str(v).strip().lower() in {"1", "true", "yes", "y", "on", "是", "勾選"} or v is True else 0)
+
+    now = _now()
+    out["updated_at"] = now
+
+    # Keep only rows that can address an existing record.
+    if "id" in out.columns:
+        mask_id = out["id"].map(lambda x: isinstance(x, int) and x > 0)
+    else:
+        mask_id = pd.Series([False] * len(out), index=out.index)
+    if "record_key" in out.columns:
+        mask_key = out["record_key"].map(lambda x: _v3006_text(x) != "")
+    else:
+        mask_key = pd.Series([False] * len(out), index=out.index)
+    out = out.loc[mask_id | mask_key].copy()
+
+    # Remove columns outside the actual time_records write surface.
+    keep = [c for c in (["id"] + _V3006_SAVE_COLS) if c in out.columns]
+    return out[keep].reset_index(drop=True)
+
+
+def _v3006_update_rows(canonical_df: pd.DataFrame) -> int:
+    if canonical_df is None or not isinstance(canonical_df, pd.DataFrame) or canonical_df.empty:
+        return 0
+    count = 0
+    for _, row in canonical_df.iterrows():
+        rid = _v3006_int(row.get("id")) if "id" in canonical_df.columns else None
+        record_key = _v3006_text(row.get("record_key")) if "record_key" in canonical_df.columns else ""
+        cols = [c for c in _V3006_SAVE_COLS if c in canonical_df.columns and c not in {"created_at"}]
+        if rid is not None:
+            # record_key is useful as a value but should not be required for locating the row.
+            update_cols = [c for c in cols if c != "created_at"]
+            if not update_cols:
+                continue
+            sql = "UPDATE time_records SET " + ", ".join([f"{c}=?" for c in update_cols]) + " WHERE id=?"
+            params = tuple(_v3006_clean_value(row.get(c)) for c in update_cols) + (rid,)
+        elif record_key:
+            update_cols = [c for c in cols if c not in {"created_at", "record_key"}]
+            if not update_cols:
+                continue
+            sql = "UPDATE time_records SET " + ", ".join([f"{c}=?" for c in update_cols]) + " WHERE record_key=?"
+            params = tuple(_v3006_clean_value(row.get(c)) for c in update_cols) + (record_key,)
+        else:
+            continue
+        try:
+            execute(sql, params)
+            count += 1
+        except Exception as exc:
+            try:
+                write_log("V3006_ADMIN_SAVE_ROW_ERROR", f"管理員維護表寫回失敗：{exc}", "time_records", level="ERROR")
+            except Exception:
+                pass
+    return count
+
+
+def _v3006_fetch_records_by_ids(record_ids: list[int]) -> pd.DataFrame:
+    ids = [i for i in (_v3006_int(x) for x in (record_ids or [])) if i is not None]
+    if not ids:
+        return pd.DataFrame()
+    placeholders = ",".join(["?"] * len(ids))
+    try:
+        return query_df(f"SELECT * FROM time_records WHERE id IN ({placeholders}) ORDER BY id", tuple(ids))
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v3006_recalc_ids(record_ids: list[int]) -> int:
+    df = _v3006_fetch_records_by_ids(record_ids)
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return 0
+    work = _v3006_canonicalize_df(df, recalc_edited_timestamps=True)
+    if work.empty:
+        return 0
+    # Only rows with a real start and end can be recalculated.
+    if "start_timestamp" in work.columns and "end_timestamp" in work.columns:
+        work = work.loc[
+            work["start_timestamp"].map(lambda x: _v3006_text(x) != "")
+            & work["end_timestamp"].map(lambda x: _v3006_text(x) != "")
+        ].copy()
+    if work.empty:
+        return 0
+    return _v3006_update_rows(work)
+
+
+def _v3006_after_admin_write(reason: str) -> None:
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    for fn_name in ("clear_today_records_fast_cache", "clear_today_finished_from_work_page"):
+        try:
+            fn = globals().get(fn_name)
+            if callable(fn):
+                fn()
+        except Exception:
+            pass
+    try:
+        from services import v300_phase1_speed_service as _v300
+        fn = getattr(_v300, "clear_frontend_caches_v300", None)
+        if callable(fn):
+            fn()
+    except Exception:
+        pass
+    try:
+        sync_fn = globals().get("sync_time_records_01_02_now")
+        if callable(sync_fn):
+            sync_fn(reason=reason, github=False)
+    except Exception:
+        pass
+    try:
+        mark_data_changed(f"{reason}，待手動永久備份。", "V3006_ADMIN_WRITEBACK")
+    except Exception:
+        pass
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    canonical = _v3006_canonicalize_df(df, recalc_edited_timestamps=bool(recalc_edited_timestamps))
+    n = _v3006_update_rows(canonical)
+    if n <= 0:
+        try:
+            if callable(_v3006_prev_save_time_records):
+                n = int(_v3006_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+        except Exception as exc:
+            try:
+                write_log("V3006_SAVE_FALLBACK_ERROR", f"管理員維護表舊儲存流程也失敗：{exc}", "time_records", level="ERROR")
+            except Exception:
+                pass
+    if n:
+        _v3006_after_admin_write("V300.6 管理員維護表儲存修改已寫回 01/02 權威資料")
+    return int(n or 0)
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    ids = [i for i in (_v3006_int(x) for x in (record_ids or [])) if i is not None]
+    n = _v3006_recalc_ids(ids) if ids else 0
+    if n <= 0:
+        try:
+            if callable(_v3006_prev_recalculate_time_records):
+                n = int(_v3006_prev_recalculate_time_records(record_ids) or 0)
+        except Exception as exc:
+            try:
+                write_log("V3006_RECALC_FALLBACK_ERROR", f"管理員維護表舊重算流程也失敗：{exc}", "time_records", level="ERROR")
+            except Exception:
+                pass
+    if n:
+        _v3006_after_admin_write("V300.6 管理員維護表重算工時已同步 01/02 權威資料")
+    return int(n or 0)
+
+
+def audit_v3006_admin_save_recalc_writeback() -> dict:
+    return {
+        "version": "V300.6_ADMIN_SAVE_RECALC_WRITEBACK_20260531",
+        "normalizes_bilingual_editor_columns": True,
+        "save_updates_time_records_by_id_or_record_key": True,
+        "recalc_reads_saved_values_then_updates_work_hours": True,
+        "clears_01_02_query_and_frontend_caches": True,
+        "does_not_change_ui_css_theme": True,
+    }
+# ================= END V300.6 ADMIN SAVE + RECALC AUTHORITATIVE WRITEBACK FIX =================
+
+# =============== V300.6.1 01/02 AUTHORITY SYNC AFTER ADMIN WRITE｜2026-05-31 ===============
+# V300.6 made the admin buttons write to the runtime time_records table. This layer
+# adds the missing durable 01/02 authority merge, because some 02/history views still
+# read authority files instead of the PostgreSQL hot path in certain deployments.
+try:
+    _v30061_prev_save_time_records = save_time_records
+except Exception:  # pragma: no cover
+    _v30061_prev_save_time_records = None
+try:
+    _v30061_prev_recalculate_time_records = recalculate_time_records
+except Exception:  # pragma: no cover
+    _v30061_prev_recalculate_time_records = None
+
+
+def _v30061_ids_from_df(df: pd.DataFrame) -> list[int]:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty or "id" not in df.columns:
+        return []
+    out: list[int] = []
+    for value in df["id"].tolist():
+        rid = _v3006_int(value) if "_v3006_int" in globals() else None
+        if rid is not None and rid not in out:
+            out.append(int(rid))
+    return out
+
+
+def _v30061_merge_by_id(base: pd.DataFrame, updates: pd.DataFrame) -> pd.DataFrame:
+    if updates is None or not isinstance(updates, pd.DataFrame) or updates.empty:
+        return base.copy() if isinstance(base, pd.DataFrame) else pd.DataFrame()
+    if base is None or not isinstance(base, pd.DataFrame) or base.empty:
+        return updates.copy().reset_index(drop=True)
+    out = base.copy()
+    if "id" not in out.columns:
+        out["id"] = ""
+    for _, row in updates.iterrows():
+        rid = _v3006_int(row.get("id")) if "_v3006_int" in globals() else None
+        if rid is None:
+            continue
+        ids = out["id"].map(_v3006_int)
+        mask = ids.eq(rid)
+        if bool(mask.any()):
+            idx = out.loc[mask].index[-1]
+            for col, val in row.to_dict().items():
+                if col not in out.columns:
+                    out[col] = ""
+                out.at[idx, col] = val
+        else:
+            add = {col: row.get(col) for col in updates.columns}
+            out = pd.concat([out, pd.DataFrame([add])], ignore_index=True, sort=False)
+    return out.reset_index(drop=True)
+
+
+def _v30061_sync_authority_rows(rows_df: pd.DataFrame, reason: str) -> int:
+    if rows_df is None or not isinstance(rows_df, pd.DataFrame) or rows_df.empty:
+        return 0
+    try:
+        from services.permanent_authority_service import df_from_table, save_authority, table_from_df
+    except Exception:
+        return 0
+    total = 0
+    for module_key in ("01_time_records", "02_history"):
+        try:
+            base = df_from_table(module_key, "time_records")
+            base = base.copy() if isinstance(base, pd.DataFrame) else pd.DataFrame()
+            merged = _v30061_merge_by_id(base, rows_df)
+            clean = merged.copy().where(pd.notna(merged), None)
+            try:
+                records = table_from_df(clean)
+            except Exception:
+                records = [dict(r) for _, r in clean.iterrows()]
+            save_authority(module_key, records={"time_records": records}, reason=reason, github=False)
+            total += len(rows_df)
+        except Exception as exc:
+            try:
+                write_log("V30061_AUTHORITY_SYNC_ERROR", f"{module_key} 權威資料同步失敗：{exc}", "time_records", level="ERROR")
+            except Exception:
+                pass
+    return int(total or 0)
+
+
+def _v30061_rows_for_ids_or_df(ids: list[int], fallback_df: pd.DataFrame) -> pd.DataFrame:
+    rows = pd.DataFrame()
+    try:
+        if ids and callable(globals().get("_v3006_fetch_records_by_ids")):
+            rows = _v3006_fetch_records_by_ids(ids)  # type: ignore[name-defined]
+    except Exception:
+        rows = pd.DataFrame()
+    if isinstance(rows, pd.DataFrame) and not rows.empty:
+        return rows
+    return fallback_df.copy() if isinstance(fallback_df, pd.DataFrame) else pd.DataFrame()
+
+
+def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:  # type: ignore[override]
+    canonical = pd.DataFrame()
+    try:
+        canonical = _v3006_canonicalize_df(df, recalc_edited_timestamps=bool(recalc_edited_timestamps))  # type: ignore[name-defined]
+    except Exception:
+        canonical = pd.DataFrame()
+    n = 0
+    if callable(_v30061_prev_save_time_records):
+        n = int(_v30061_prev_save_time_records(df, recalc_edited_timestamps=recalc_edited_timestamps) or 0)
+    ids = _v30061_ids_from_df(canonical)
+    rows = _v30061_rows_for_ids_or_df(ids, canonical)
+    synced = _v30061_sync_authority_rows(rows, "v30061_save_time_records_authority_sync")
+    if n or synced:
+        try:
+            _v3006_after_admin_write("V300.6.1 管理員維護表儲存修改已同步 01/02 權威資料")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return int(max(n, len(canonical) if synced else 0) or 0)
+
+
+def recalculate_time_records(record_ids: list[int] | None = None) -> int:  # type: ignore[override]
+    ids = []
+    for value in record_ids or []:
+        try:
+            rid = _v3006_int(value)  # type: ignore[name-defined]
+        except Exception:
+            rid = None
+        if rid is not None and rid not in ids:
+            ids.append(int(rid))
+    n = 0
+    if callable(_v30061_prev_recalculate_time_records):
+        n = int(_v30061_prev_recalculate_time_records(ids) or 0)
+    rows = _v30061_rows_for_ids_or_df(ids, pd.DataFrame())
+    synced = _v30061_sync_authority_rows(rows, "v30061_recalculate_time_records_authority_sync")
+    if n or synced:
+        try:
+            _v3006_after_admin_write("V300.6.1 管理員維護表重算工時已同步 01/02 權威資料")  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return int(max(n, len(ids) if synced else 0) or 0)
+
+
+def audit_v30061_01_admin_authority_sync() -> dict:
+    return {
+        "version": "V300.6.1_01_ADMIN_AUTHORITY_SYNC_20260531",
+        "wraps_v3006_save_recalc": True,
+        "syncs_runtime_rows_to_01_and_02_authority": True,
+        "keeps_delete_logic_unchanged": True,
+        "does_not_change_ui_css_theme": True,
+    }
+# ============= END V300.6.1 01/02 AUTHORITY SYNC AFTER ADMIN WRITE =============
