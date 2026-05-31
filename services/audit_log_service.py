@@ -2396,3 +2396,133 @@ get_login_log_permanent_status = get_audit_permanent_status
 restore_login_logs_from_permanent_file = restore_audit_logs_from_permanent_file
 restore_login_logs_from_state = restore_audit_logs_from_permanent_file
 # =================== END V135 LOGIN LOG AUTHORITY + DELETE-RANGE HARD FIX ===================
+
+
+# ===================== V254 FAST LOGIN AUDIT WRITE =====================
+# Problem: record_login_log originally inserted a row, then synchronously called
+# export_audit_logs_to_permanent_file().  Later V135 overrode that export to read up to
+# 100000 login rows and save authority with github=True.  That made every successful
+# login wait for a large authority/GitHub path, commonly around 15 seconds.
+# Fix: login/logout/security events stay durable in SQLite immediately, and the
+# canonical 11_login_logs authority refresh is queued in a daemon thread with github=False.
+# UI/CSS/table/button behavior is untouched.
+import threading as _v254_threading
+import time as _v254_time
+
+_V254_LOGIN_EXPORT_STATE = {"running": False, "last_run_ts": 0.0, "last_error": ""}
+_V254_LOGIN_EXPORT_LOCK = _v254_threading.RLock()
+_V254_LOGIN_EXPORT_MIN_SECONDS = 10.0
+
+
+def _v254_refresh_login_authority_worker(reason: str = "v254_fast_login_audit") -> None:
+    with _V254_LOGIN_EXPORT_LOCK:
+        if _V254_LOGIN_EXPORT_STATE.get("running"):
+            return
+        _V254_LOGIN_EXPORT_STATE["running"] = True
+    try:
+        now_ts = _v254_time.time()
+        last_ts = float(_V254_LOGIN_EXPORT_STATE.get("last_run_ts") or 0.0)
+        if last_ts and now_ts - last_ts < _V254_LOGIN_EXPORT_MIN_SECONDS:
+            return
+        records = []
+        try:
+            records = _to_records(load_login_logs(limit=100000, include_legacy=True))
+        except TypeError:
+            records = _to_records(load_login_logs())
+        if "_v135_write_authority_and_cache" in globals():
+            _v135_write_authority_and_cache(records, reason=reason, github=False)  # type: ignore[name-defined]
+        else:
+            try:
+                payload = {
+                    "authority_schema": "SPT-PermanentAuthority-V254-FastLogin",
+                    "module_key": "11_login_logs",
+                    "kind": "records",
+                    "updated_at": _now(),
+                    "tables": {"login_logs": records, "auth_login_logs": [], "security_login_logs": []},
+                    "records": records,
+                    "count": len(records),
+                }
+                for path in (AUDIT_STATE_PATH, MODULE_RECORDS_PATH):
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    tmp = path.with_suffix(path.suffix + ".tmp")
+                    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+                    tmp.replace(path)
+            except Exception:
+                pass
+        _V254_LOGIN_EXPORT_STATE["last_run_ts"] = _v254_time.time()
+        _V254_LOGIN_EXPORT_STATE["last_error"] = ""
+    except Exception as exc:
+        _V254_LOGIN_EXPORT_STATE["last_error"] = str(exc)[:500]
+    finally:
+        with _V254_LOGIN_EXPORT_LOCK:
+            _V254_LOGIN_EXPORT_STATE["running"] = False
+
+
+def _v254_queue_login_authority_refresh(reason: str = "v254_fast_login_audit") -> None:
+    try:
+        if _V254_LOGIN_EXPORT_STATE.get("running"):
+            return
+        t = _v254_threading.Thread(
+            target=_v254_refresh_login_authority_worker,
+            args=(reason,),
+            name="SPT-V254-LoginAuditAuthorityRefresh",
+            daemon=True,
+        )
+        t.start()
+    except Exception:
+        pass
+
+
+def record_login_log(
+    username: str = "",
+    display_name: str = "",
+    event_type: str = "LOGIN",
+    result: str = "SUCCESS",
+    message: str = "",
+    module_code: str = "",
+    login_time: Optional[str] = None,
+    logout_time: Optional[str] = None,
+    idle_minutes: Optional[float] = None,
+    ip_address: str = "",
+    user_agent: str = "",
+    **kwargs: Any,
+) -> int:  # type: ignore[override]
+    """V254: durable immediate SQLite insert; non-blocking authority refresh."""
+    try:
+        ensure_login_logs_table()
+    except Exception:
+        pass
+    login_time = login_time or _now()
+    created_at = kwargs.get("created_at") or _now()
+    new_id = 0
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT INTO login_logs (
+            username, display_name, event_type, result, message, module_code,
+            login_time, logout_time, idle_minutes, ip_address, user_agent, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (username, display_name, event_type, result, message, module_code,
+              login_time, logout_time, idle_minutes, ip_address, user_agent, created_at))
+        new_id = int(cur.lastrowid or 0)
+        conn.commit()
+    finally:
+        try:
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
+    _v254_queue_login_authority_refresh("v254_login_audit_async_refresh")
+    return new_id
+
+
+write_login_log = record_login_log
+add_login_log = record_login_log
+append_login_log = record_login_log
+write_audit_log = record_login_log
+record_audit_log = record_login_log
+log_login_event = record_login_log
+save_login_log = record_login_log
+# =================== END V254 FAST LOGIN AUDIT WRITE ===================
