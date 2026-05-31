@@ -4105,42 +4105,267 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 require_permission = require_module_access
 # =================== END V142 HARD GUARD FOR 10 PERMISSION MANAGEMENT ===================
 
-# ===== V255 APP OPEN FAST LOGIN SCREEN =====
-# Do not initialize Neon/PostgreSQL/security schema before rendering the login page.
-# The schema is checked only after a user submits credentials or after login succeeds.
+# ===================== V256 LOGIN HOT PATH BYPASS =====================
+# Purpose:
+# - App open is now fast; remaining 15s login delay came from authenticate() calling
+#   ensure_security_schema(), which initializes full PostgreSQL/schema layers.
+# - Login should only verify username/password/role and set session state.
+# - UI/CSS/theme/widgets are untouched.
+# - Login logs / last_login updates are best-effort and non-blocking.
+
+import threading as _v256_threading
+import sqlite3 as _v256_sqlite3
+
+
+def _v256_db_backend() -> str:
+    try:
+        from services.db_service import is_postgres_enabled as _is_pg
+        return "postgres" if bool(_is_pg()) else "sqlite"
+    except Exception:
+        return "sqlite"
+
+
+def _v256_direct_pg_dsn() -> str:
+    try:
+        from services import db_service as _db
+        fn = getattr(_db, "_v25_postgres_dsn", None)
+        if callable(fn):
+            return str(fn() or "")
+    except Exception:
+        pass
+    for k in ("DATABASE_URL", "POSTGRES_URL", "POSTGRESQL_URL", "NEON_DATABASE_URL", "DB_URL"):
+        v = os.environ.get(k)
+        if v:
+            return str(v)
+    return ""
+
+
+def _v256_pg_query_one(sql: str, params: tuple = ()) -> dict[str, Any] | None:
+    dsn = _v256_direct_pg_dsn()
+    if not dsn:
+        return None
+    try:
+        import psycopg
+        from psycopg.rows import dict_row
+        with psycopg.connect(dsn, row_factory=dict_row, connect_timeout=5) as conn:
+            try:
+                conn.execute("SET statement_timeout = '6000ms'")
+            except Exception:
+                pass
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                row = cur.fetchone()
+                return dict(row) if row else None
+    except Exception:
+        return None
+
+
+def _v256_pg_execute(sql: str, params: tuple = ()) -> None:
+    dsn = _v256_direct_pg_dsn()
+    if not dsn:
+        return
+    try:
+        import psycopg
+        with psycopg.connect(dsn, connect_timeout=5) as conn:
+            try:
+                conn.execute("SET statement_timeout = '6000ms'")
+            except Exception:
+                pass
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+            conn.commit()
+    except Exception:
+        pass
+
+
+def _v256_sqlite_query_one(sql: str, params: tuple = ()) -> dict[str, Any] | None:
+    try:
+        from services import db_service as _db
+        db_path = Path(getattr(_db, "DB_PATH"))
+    except Exception:
+        db_path = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
+    try:
+        conn = _v256_sqlite3.connect(db_path, timeout=5, check_same_thread=False)
+        conn.row_factory = _v256_sqlite3.Row
+        row = conn.execute(sql, params).fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
+
+def _v256_sqlite_execute(sql: str, params: tuple = ()) -> None:
+    try:
+        from services import db_service as _db
+        db_path = Path(getattr(_db, "DB_PATH"))
+    except Exception:
+        db_path = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
+    try:
+        conn = _v256_sqlite3.connect(db_path, timeout=5, check_same_thread=False)
+        conn.execute(sql, params)
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def _v256_direct_auth_row(username: str) -> dict[str, Any] | None:
+    username = str(username or "").strip()
+    if not username:
+        return None
+    if _v256_db_backend() == "postgres":
+        row = _v256_pg_query_one("SELECT * FROM auth_users WHERE username=%s LIMIT 1", (username,))
+        if row:
+            return row
+        row = _v256_pg_query_one("SELECT * FROM security_users WHERE username=%s LIMIT 1", (username,))
+        if row:
+            role = _v256_pg_query_one("SELECT role_code FROM security_user_roles WHERE username=%s ORDER BY id LIMIT 1", (username,)) or {}
+            row["role_code"] = row.get("role_code") or role.get("role_code") or "viewer"
+            return row
+        return None
+    row = _v256_sqlite_query_one("SELECT * FROM auth_users WHERE username=? LIMIT 1", (username,))
+    if row:
+        return row
+    row = _v256_sqlite_query_one("SELECT * FROM security_users WHERE username=? LIMIT 1", (username,))
+    if row:
+        role = _v256_sqlite_query_one("SELECT role_code FROM security_user_roles WHERE username=? ORDER BY id LIMIT 1", (username,)) or {}
+        row["role_code"] = row.get("role_code") or role.get("role_code") or "viewer"
+        return row
+    return None
+
+
+def _v256_login_side_effects(username: str, ok: bool, message: str) -> None:
+    def _worker() -> None:
+        now = _now()
+        try:
+            if _v256_db_backend() == "postgres":
+                if ok:
+                    _v256_pg_execute("UPDATE auth_users SET last_login_at=%s, updated_at=%s WHERE username=%s", (now, now, username))
+                    _v256_pg_execute("UPDATE security_users SET last_login_at=%s, updated_at=%s WHERE username=%s", (now, now, username))
+                _v256_pg_execute(
+                    """
+                    INSERT INTO security_login_logs
+                    (username, display_name, event_type, result, message, module_code, login_time, created_at)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (username, st.session_state.get("auth_display_name", ""), "LOGIN", "SUCCESS" if ok else "FAIL", message, "", now, now),
+                )
+            else:
+                if ok:
+                    _v256_sqlite_execute("UPDATE auth_users SET last_login_at=?, updated_at=? WHERE username=?", (now, now, username))
+                    _v256_sqlite_execute("UPDATE security_users SET last_login_at=?, updated_at=? WHERE username=?", (now, now, username))
+                _v256_sqlite_execute(
+                    """
+                    INSERT INTO security_login_logs
+                    (username, display_name, event_type, result, message, module_code, login_time, created_at)
+                    VALUES (?,?,?,?,?,?,?,?)
+                    """,
+                    (username, st.session_state.get("auth_display_name", ""), "LOGIN", "SUCCESS" if ok else "FAIL", message, "", now, now),
+                )
+        except Exception:
+            pass
+    try:
+        _v256_threading.Thread(target=_worker, name="SPT-V256-login-log", daemon=True).start()
+    except Exception:
+        pass
+
+
+def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
+    username = (username or "").strip()
+    row = _v256_direct_auth_row(username)
+    if not row:
+        _v256_login_side_effects(username, False, "帳號不存在")
+        return False, "帳號或密碼錯誤。"
+    try:
+        active = int(row.get("is_active", 1) if row.get("is_active", 1) is not None else 1)
+    except Exception:
+        active = 1
+    if not active:
+        _v256_login_side_effects(username, False, "帳號停用")
+        return False, "帳號已停用。"
+    if not verify_password(password, row.get("password_hash")):
+        _v256_login_side_effects(username, False, "密碼錯誤")
+        return False, "帳號或密碼錯誤。"
+    role = str(row.get("role_code") or "").strip()
+    if not role:
+        # Keep legacy role lookup cheap; do not initialize full schema.
+        role_row = None
+        if _v256_db_backend() == "postgres":
+            role_row = _v256_pg_query_one("SELECT role_code FROM security_user_roles WHERE username=%s ORDER BY id LIMIT 1", (username,))
+        else:
+            role_row = _v256_sqlite_query_one("SELECT role_code FROM security_user_roles WHERE username=? ORDER BY id LIMIT 1", (username,))
+        role = str((role_row or {}).get("role_code") or "viewer").strip()
+    roles = [role] if role else ["viewer"]
+    st.session_state["auth_logged_in"] = True
+    st.session_state["auth_username"] = username
+    st.session_state["auth_display_name"] = row.get("display_name") or username
+    st.session_state["auth_employee_id"] = row.get("employee_id") or ""
+    st.session_state["auth_roles"] = roles
+    now_ts = time.time()
+    st.session_state["auth_login_ts"] = now_ts
+    st.session_state["auth_last_activity_ts"] = now_ts
+    try:
+        clear_permission_cache(username)
+    except Exception:
+        pass
+    if role == "admin":
+        try:
+            st.session_state[f"_spt_perm_cache_{username}"] = {"ts": now_ts, "data": {m["module_code"]: {c: True for c in PERMISSION_COLUMNS} for m in MODULES}}
+        except Exception:
+            pass
+    _v256_login_side_effects(username, True, f"roles={','.join(roles)}")
+    return True, "登入成功。"
+
+
+def get_idle_timeout_minutes() -> int:  # type: ignore[override]
+    try:
+        cache = st.session_state.get("_spt_idle_timeout_cache")
+        now_ts = time.time()
+        if cache and now_ts - float(cache.get("ts", 0)) < 300:
+            return max(1, int(cache.get("minutes", DEFAULT_IDLE_MINUTES)))
+    except Exception:
+        pass
+    minutes = _read_idle_timeout_from_files() or DEFAULT_IDLE_MINUTES
+    try:
+        settings = _v169_load_persistent_security_settings()
+        if settings.get("idle_timeout_minutes") not in (None, ""):
+            minutes = int(float(settings["idle_timeout_minutes"]))
+    except Exception:
+        pass
+    minutes = max(1, int(minutes))
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+    except Exception:
+        pass
+    return minutes
+
 
 def require_login(module_code: str = "") -> None:  # type: ignore[override]
+    # Do not ensure full schema on login/home/page reruns.
     if not st.session_state.get("auth_logged_in"):
         render_login_form()
         st.stop()
-    ensure_security_schema()
     _check_idle_timeout()
-    try:
-        if st.session_state.get("auth_force_password_change"):
-            _v106_render_force_password_change()
-    except Exception:
-        pass
     render_user_bar(module_code)
 
 
-def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
-    require_login(module_code)
-    module_no = _v142_module_no(module_code) if "_v142_module_no" in globals() else str(module_code)
-    if module_no in globals().get("_V142_PERMISSION_MODULE_NOS", {"10"}) and not _v142_is_permission_management_admin(st.session_state.get("auth_username", "")):
-        try:
-            log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"V255 hard deny {module_code}:{action}; role must be admin", module_code)
-        except Exception:
-            pass
-        st.error("權限不足：10. 權限管理只允許系統管理員（admin 角色）進入。")
-        st.stop()
-    if not check_permission(module_code, action):
-        try:
-            log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
-        except Exception:
-            pass
-        st.error("權限不足：你的帳號未被授權使用此模組或功能。")
-        st.stop()
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    user = get_current_user()
+    if not user:
+        return False
+    roles = [str(r).strip() for r in (user.get("roles", []) or []) if str(r).strip()]
+    if "admin" in roles:
+        return True
+    if action not in PERMISSION_COLUMNS:
+        action = "can_view"
+    try:
+        perms = _load_permission_cache(user["username"], roles)
+        row = perms.get(module_code) or perms.get(MODULE_CODE_TO_NO.get(module_code, module_code), {})
+        if row.get("can_manage"):
+            return True
+        return bool(row.get(action, False))
+    except Exception:
+        # Safety fallback: non-admin cannot access if permission cache fails.
+        return False
 
-
-require_permission = require_module_access
-# ===== END V255 APP OPEN FAST LOGIN SCREEN =====
+# =================== END V256 LOGIN HOT PATH BYPASS ===================

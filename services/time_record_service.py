@@ -29113,3 +29113,264 @@ def audit_v252_postgresql_button_fast_path() -> dict:
     }
 
 # ================= END V252 POSTGRESQL BUTTON FAST PATH =================
+
+# ===================== V256 01 FRONTEND CLICK ISOLATION =====================
+# Purpose:
+# - User measured 01 button confirmation at ~60s. The slow part is not the SQL
+#   Start/Finish transaction itself; it is synchronous durable-layer work after the
+#   button: full authority JSON merge, row-shard scan, event-journal flush / backup.
+# - Keep Neon/PostgreSQL or SQLite write as the immediate source of truth.
+# - Move JSON/shard/event backup after the response in a daemon worker.
+# - 01/02 display becomes SQL-first, so entering 01 does not scan authority JSON.
+# - UI/CSS/theme/table/buttons are untouched.
+
+import threading as _v256_threading
+import queue as _v256_queue
+import os as _v256_os
+
+_V256_DURABLE_QUEUE: "_v256_queue.Queue[dict]" = _v256_queue.Queue(maxsize=200)
+_V256_DURABLE_WORKER_STARTED = False
+_V256_DURABLE_DROP_COUNT = 0
+
+
+def _v256_db_is_pg() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled as _is_pg
+        return bool(_is_pg())
+    except Exception:
+        return False
+
+
+def _v256_sql_params(n: int) -> str:
+    return ",".join(["?"] * int(n))
+
+
+def _v256_row_date_expr() -> str:
+    return "COALESCE(NULLIF(start_date,''), SUBSTR(COALESCE(start_timestamp,''),1,10))"
+
+
+def _v256_clean_records_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    try:
+        out = out.loc[:, ~pd.Index(out.columns).duplicated()].copy()
+    except Exception:
+        pass
+    try:
+        out = out.where(pd.notna(out), "")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v256_sort_records(df: pd.DataFrame) -> pd.DataFrame:
+    out = _v256_clean_records_df(df)
+    if out.empty:
+        return out
+    try:
+        if "id" in out.columns:
+            out["_v256_sort_id"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values("_v256_sort_id", ascending=False, kind="stable").drop(columns=["_v256_sort_id"], errors="ignore")
+        elif "start_timestamp" in out.columns:
+            out["_v256_sort_ts"] = pd.to_datetime(out["start_timestamp"], errors="coerce")
+            out = out.sort_values("_v256_sort_ts", ascending=False, kind="stable").drop(columns=["_v256_sort_ts"], errors="ignore")
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def _v256_filter_deleted_sql() -> str:
+    # Keep compatible with earlier tombstone/delete markers without hard-deleting valid rows.
+    return """
+      AND COALESCE(is_deleted,0)=0
+      AND LOWER(TRIM(COALESCE(status,''))) NOT IN ('deleted','刪除','已刪除')
+      AND LOWER(TRIM(COALESCE(delete_flag,''))) NOT IN ('1','true','yes','y')
+    """
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V256 SQL-first 02/history load.
+
+    Normal filters go directly to time_records. This avoids full JSON authority
+    scans on every 01/02 rerun. Full recovery/merge remains available through
+    manual maintenance functions; normal display is read-only SQL.
+    """
+    started = _v176_time.perf_counter() if "_v176_time" in globals() else time.perf_counter()
+    try:
+        where = ["1=1"]
+        params: list = []
+        date_expr = _v256_row_date_expr()
+        if start_date:
+            where.append(f"{date_expr} >= ?")
+            params.append(str(start_date)[:10])
+        if end_date:
+            where.append(f"{date_expr} <= ?")
+            params.append(str(end_date)[:10])
+        if employee_id:
+            where.append("COALESCE(employee_id,'') = ?")
+            params.append(str(employee_id).strip())
+        if work_order:
+            where.append("COALESCE(work_order,'') = ?")
+            params.append(str(work_order).strip())
+        sql = "SELECT * FROM time_records WHERE " + " AND ".join(where) + _v256_filter_deleted_sql() + " ORDER BY id DESC"
+        # Protect accidental no-filter huge scans from freezing UI. 02 can still
+        # pass dates/filters for precise export/query.
+        if not any([start_date, end_date, employee_id, work_order]):
+            sql += " LIMIT 1500"
+        df = query_df(sql, tuple(params))
+        return _v256_sort_records(df)
+    except Exception:
+        try:
+            if callable(globals().get("_v175_prev_load_records")):
+                return _v175_prev_load_records(start_date, end_date, employee_id, work_order)  # type: ignore[misc]
+        except Exception:
+            pass
+        return pd.DataFrame()
+    finally:
+        try:
+            _v176_perf("v256_load_records_sql_first", started, "filtered")
+        except Exception:
+            pass
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """V256 SQL-first 01 Today Records.
+
+    Query only active rows plus current business-cycle finished rows. No authority
+    JSON merge, no shard scan, no event rebuild during normal page display.
+    """
+    started = _v176_time.perf_counter() if "_v176_time" in globals() else time.perf_counter()
+    try:
+        try:
+            cycle_start = _business_cycle_start_date() if "_business_cycle_start_date" in globals() else today_text()
+        except Exception:
+            cycle_start = today_text()
+        active_cond = "((end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='' OR LOWER(TRIM(COALESCE(end_timestamp,''))) IN ('none','nan','nat')) AND (COALESCE(status,'')='' OR status='作業中'))"
+        date_expr = _v256_row_date_expr()
+        if unfinished_only or not include_finished:
+            sql = "SELECT * FROM time_records WHERE " + active_cond + _v256_filter_deleted_sql() + " ORDER BY id DESC LIMIT 800"
+            df = query_df(sql, ())
+        else:
+            sql = "SELECT * FROM time_records WHERE (" + active_cond + f" OR {date_expr} >= ?)" + _v256_filter_deleted_sql() + " ORDER BY id DESC LIMIT 1200"
+            df = query_df(sql, (str(cycle_start)[:10],))
+        return _v256_sort_records(df)
+    except Exception:
+        try:
+            if callable(globals().get("_v175_prev_today_records")):
+                return _v175_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)  # type: ignore[misc]
+        except Exception:
+            pass
+        return pd.DataFrame()
+    finally:
+        try:
+            _v176_perf("v256_today_records_sql_first", started, f"include_finished={include_finished};unfinished={unfinished_only}")
+        except Exception:
+            pass
+
+
+def _v256_durable_worker() -> None:
+    while True:
+        try:
+            job = _V256_DURABLE_QUEUE.get()
+            if not isinstance(job, dict):
+                continue
+            rows = job.get("rows") or []
+            reason = str(job.get("reason") or "v256_deferred_durable")
+            event_type = str(job.get("event_type") or "TIME_RECORD_CHANGE")
+            extra = job.get("extra") if isinstance(job.get("extra"), dict) else {}
+            df = pd.DataFrame(rows) if rows else pd.DataFrame()
+            if df.empty:
+                continue
+            try:
+                # Keep local authority/shard/event as backup, but never on the button path.
+                if "_v176_upsert_authority_rows" in globals() and callable(_v176_upsert_authority_rows):
+                    _v176_upsert_authority_rows(df, reason + "_deferred")
+            except Exception:
+                pass
+            try:
+                if "_v151_write_row_shards" in globals() and callable(_v151_write_row_shards):
+                    _v151_write_row_shards(df, reason + "_deferred_row_shard", github=False)
+            except Exception:
+                pass
+            try:
+                from services.time_record_event_journal_service import append_time_record_event  # type: ignore
+                append_time_record_event(event_type, df, reason=reason + "_deferred", payload_extra=extra, schedule_upload=True)
+            except Exception:
+                pass
+        except Exception:
+            pass
+        finally:
+            try:
+                _V256_DURABLE_QUEUE.task_done()
+            except Exception:
+                pass
+
+
+def _v256_start_durable_worker_once() -> None:
+    global _V256_DURABLE_WORKER_STARTED
+    if _V256_DURABLE_WORKER_STARTED:
+        return
+    _V256_DURABLE_WORKER_STARTED = True
+    try:
+        _v256_threading.Thread(target=_v256_durable_worker, name="SPT-V256-time-record-durable", daemon=True).start()
+    except Exception:
+        _V256_DURABLE_WORKER_STARTED = False
+
+
+def _v176_write_durable_layers(rows_df: pd.DataFrame, reason: str, event_type: str, extra: dict | None = None) -> None:  # type: ignore[override]
+    """V256 replacement for V176 durable layers.
+
+    Start/Finish SQL has already committed before this function is called.  This
+    function must return in milliseconds, not do full JSON/shard/event work.
+    """
+    global _V256_DURABLE_DROP_COUNT
+    started = _v176_time.perf_counter() if "_v176_time" in globals() else time.perf_counter()
+    try:
+        if rows_df is None or not isinstance(rows_df, pd.DataFrame) or rows_df.empty:
+            return
+        # SQL is the immediate truth; clear only display caches so UI refresh sees the row.
+        try:
+            if "clear_today_records_fast_cache" in globals():
+                clear_today_records_fast_cache()
+        except Exception:
+            pass
+        try:
+            from services.db_service import _v30_clear_cache_for_tables as _clear_tables  # type: ignore
+            _clear_tables({"time_records"})
+        except Exception:
+            try:
+                clear_query_cache()
+            except Exception:
+                pass
+        # Queue backup work after response. Never block if queue is full.
+        try:
+            _v256_start_durable_worker_once()
+            clean = rows_df.copy().where(pd.notna(rows_df), "")
+            _V256_DURABLE_QUEUE.put_nowait({
+                "rows": [dict(r) for _, r in clean.iterrows()],
+                "reason": reason,
+                "event_type": event_type,
+                "extra": extra or {},
+            })
+        except Exception:
+            _V256_DURABLE_DROP_COUNT += 1
+    finally:
+        try:
+            _v176_perf("v256_defer_durable_layers", started, f"event={event_type};queue={_V256_DURABLE_QUEUE.qsize()};dropped={_V256_DURABLE_DROP_COUNT}")
+        except Exception:
+            pass
+
+
+def audit_v256_frontend_click_isolation() -> dict:
+    return {
+        "version": "V256_FRONTEND_CLICK_ISOLATION",
+        "sql_first_today_records": True,
+        "sql_first_load_records": True,
+        "button_durable_layers_deferred": True,
+        "queue_size": _V256_DURABLE_QUEUE.qsize(),
+        "queue_dropped": _V256_DURABLE_DROP_COUNT,
+        "postgres_enabled": _v256_db_is_pg(),
+    }
+
+# =================== END V256 01 FRONTEND CLICK ISOLATION ===================
