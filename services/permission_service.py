@@ -6996,3 +6996,353 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
             pass
 
 # ======================= V300.12.1 PERMISSION COMPLETE-AUTHORITY REPAIR END =======================
+
+# ======================= V300.12.2 PERMISSION ACCOUNT-COLLAPSE RECOVERY START =======================
+# 目的：修正 V300.12 / V300.12.1 權限權威檔修復過頭，導致原本約 100 個啟用帳號只剩 35 個。
+# 原則：
+#   1) 不再把疑似錯誤的 deleted_usernames 全部當真，避免有效帳號被誤濾掉。
+#   2) 若目前權威檔帳號數明顯少於可靠候選來源，視為「帳號坍縮」，自動合併恢復。
+#   3) 未坍縮時不自動復活帳號，後續正常刪除仍保留 tombstone。
+#   4) 修復前會保留備份檔到 recovery_backups。
+
+_V300122_RECOVERY_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "recovery" / "V30012_2_records_recovery_104.json"
+_V300122_BACKUP_DIR = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "recovery_backups"
+_V300122_COLLAPSE_RATIO = 0.80
+_V300122_MIN_BEST_USERS = 50
+
+
+def _v300122_user_active(row: dict) -> bool:
+    try:
+        return _v30012_bool(row.get("is_active", 1), True) == 1  # type: ignore[name-defined]
+    except Exception:
+        v = row.get("is_active", 1) if isinstance(row, dict) else 1
+        return str(v).strip().lower() not in {"0", "false", "no", "n", "停用", "否"}
+
+
+def _v300122_tables(payload: dict) -> dict:
+    try:
+        return _v300121_extract_tables(payload)  # type: ignore[name-defined]
+    except Exception:
+        tables = payload.get("tables") if isinstance(payload, dict) and isinstance(payload.get("tables"), dict) else {}
+        out = _v30012_empty_tables()  # type: ignore[name-defined]
+        if isinstance(tables, dict):
+            for t in out:
+                if isinstance(tables.get(t), list):
+                    out[t] = [dict(r) for r in tables.get(t, []) if isinstance(r, dict)]
+        return out
+
+
+def _v300122_count_users(payload: dict) -> tuple[int, int]:
+    tables = _v300122_tables(payload if isinstance(payload, dict) else {})
+    rows = tables.get("auth_users", []) if isinstance(tables.get("auth_users"), list) else []
+    total = 0
+    active = 0
+    seen = set()
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        u = _v30012_clean_username(r).lower()  # type: ignore[name-defined]
+        if not u or u in seen or u == "admin__invalid__":
+            continue
+        seen.add(u)
+        total += 1
+        if _v300122_user_active(r):
+            active += 1
+    return total, active
+
+
+def _v300122_read_payload(path: Path) -> dict:
+    try:
+        if path.exists() and path.is_file() and path.stat().st_size > 2:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _v300122_candidate_paths() -> list[Path]:
+    base = PROJECT_ROOT / "data"
+    paths: list[Path] = []
+    # Recovery snapshot bundled with this patch first, then current authority and legacy backups.
+    paths.append(_V300122_RECOVERY_FILE)
+    try:
+        paths.extend(_v300121_candidate_paths())  # type: ignore[name-defined]
+    except Exception:
+        pass
+    extra = [
+        base / "permanent_store" / "modules" / "10_permissions" / "records.json",
+        base / "permanent_store" / "modules" / "10_permissions" / "settings.json",
+        base / "persistent_state" / "spt_module_settings.json",
+        base / "persistent_state" / "spt_permission_settings.json",
+        base / "permanent_store" / "persistent_state" / "spt_module_settings.json",
+        base / "permanent_store" / "persistent_state" / "spt_permission_settings.json",
+        base / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+        base / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+        base / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_records.json",
+        base / "permanent_store" / "persistent_modules" / "10_permissions" / "10_permissions_settings.json",
+    ]
+    paths.extend(extra)
+    for d in [
+        base / "permanent_store" / "modules" / "10_permissions" / "history",
+        base / "permanent_store" / "modules" / "10_permissions" / "recovery",
+        base / "permanent_store" / "persistent_modules" / "10_permissions" / "history",
+        base / "persistent_modules" / "10_permissions" / "history",
+        base / "permanent_store" / "persistent_state" / "history",
+        base / "persistent_state" / "history",
+    ]:
+        try:
+            if d.exists():
+                paths.extend(sorted(d.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:40])
+        except Exception:
+            pass
+    out: list[Path] = []
+    seen: set[str] = set()
+    for p in paths:
+        try:
+            s = str(p.resolve())
+        except Exception:
+            s = str(p)
+        if s not in seen:
+            seen.add(s)
+            out.append(p)
+    return out
+
+
+def _v300122_collect_candidates() -> list[dict]:
+    payloads: list[dict] = []
+    for p in _v300122_candidate_paths():
+        payload = _v300122_read_payload(p)
+        if not payload:
+            continue
+        tables = _v300122_tables(payload)
+        total, active = _v300122_count_users(payload)
+        if total or active or tables.get("auth_account_permissions") or tables.get("auth_security_settings") or tables.get("security_settings"):
+            payload = dict(payload)
+            payload["_v300122_source"] = str(p)
+            payload["_v300122_user_total"] = total
+            payload["_v300122_user_active"] = active
+            payloads.append(payload)
+    try:
+        dbp = {"tables": _v30012_db_fallback_tables(), "_v300122_source": "sqlite_cache"}  # type: ignore[name-defined]
+        total, active = _v300122_count_users(dbp)
+        dbp["_v300122_user_total"] = total
+        dbp["_v300122_user_active"] = active
+        if total or active:
+            payloads.append(dbp)
+    except Exception:
+        pass
+    return payloads
+
+
+def _v300122_best_candidate(candidates: list[dict]) -> dict:
+    if not candidates:
+        return {}
+    return max(candidates, key=lambda p: (_v300122_count_users(p)[1], _v300122_count_users(p)[0], len(_v300122_tables(p).get("auth_account_permissions", []))))
+
+
+def _v300122_is_collapsed(current: dict, best: dict) -> bool:
+    cur_total, cur_active = _v300122_count_users(current)
+    best_total, best_active = _v300122_count_users(best)
+    if best_total < _V300122_MIN_BEST_USERS and best_active < _V300122_MIN_BEST_USERS:
+        return False
+    # Large active-account loss is treated as regression, not intentional deletion.
+    if best_active >= _V300122_MIN_BEST_USERS and cur_active < max(1, int(best_active * _V300122_COLLAPSE_RATIO)):
+        return True
+    if best_total >= _V300122_MIN_BEST_USERS and cur_total < max(1, int(best_total * _V300122_COLLAPSE_RATIO)):
+        return True
+    return False
+
+
+def _v300122_high_confidence_usernames(candidates: list[dict], best: dict) -> set[str]:
+    best_total, best_active = _v300122_count_users(best)
+    protected: set[str] = set()
+    threshold = max(_V300122_MIN_BEST_USERS, int(max(best_total, best_active) * 0.80))
+    for p in candidates:
+        total, active = _v300122_count_users(p)
+        if max(total, active) < threshold:
+            continue
+        for r in _v300122_tables(p).get("auth_users", []):
+            if not isinstance(r, dict):
+                continue
+            if not _v300122_user_active(r):
+                continue
+            u = _v30012_clean_username(r).lower()  # type: ignore[name-defined]
+            if u and u != "admin":
+                protected.add(u)
+    return protected
+
+
+def _v300122_backup_current_authority(current: dict, reason: str) -> None:
+    try:
+        _V300122_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup = _V300122_BACKUP_DIR / f"records_before_{reason}_{stamp}.json"
+        backup.write_text(json.dumps(current if isinstance(current, dict) else {}, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _v300122_merge_candidates(current: dict, candidates: list[dict], *, collapsed: bool, reason: str) -> dict:
+    best = _v300122_best_candidate(candidates)
+    protected = _v300122_high_confidence_usernames(candidates, best) if collapsed else set()
+    deleted = set()
+    try:
+        deleted = _v30012_deleted(current)  # type: ignore[name-defined]
+    except Exception:
+        deleted = set()
+    if collapsed:
+        # Do not let a bad V300.12 deleted_usernames list hide high-confidence active users.
+        deleted = {u for u in deleted if u not in protected}
+    ordered = sorted(candidates, key=lambda p: (_v300122_count_users(p)[1], _v300122_count_users(p)[0], len(_v300122_tables(p).get("auth_account_permissions", []))), reverse=True)
+    # Current last overlays values for accounts that still exist, without dropping missing accounts from full backups.
+    ordered.append(current if isinstance(current, dict) else {})
+    merged = _v30012_empty_tables()  # type: ignore[name-defined]
+    for payload in ordered:
+        tables = _v300122_tables(payload)
+        for table in _V30012_AUTH_TABLES:  # type: ignore[name-defined]
+            by_key = {_v300121_row_key(table, r): dict(r) for r in merged.get(table, []) if isinstance(r, dict) and _v300121_row_key(table, r)}  # type: ignore[name-defined]
+            for row in tables.get(table, []) if isinstance(tables.get(table), list) else []:
+                if not isinstance(row, dict):
+                    continue
+                key = _v300121_row_key(table, row)  # type: ignore[name-defined]
+                if not key:
+                    continue
+                uname = ""
+                if table in {"auth_users", "security_users", "auth_account_permissions", "security_user_roles"}:
+                    uname = _v30012_clean_username(row).lower()  # type: ignore[name-defined]
+                if uname and uname in deleted:
+                    continue
+                x = dict(row)
+                x.pop("id", None)
+                if key in by_key:
+                    try:
+                        by_key[key] = _v300121_merge_row(by_key[key], x)  # type: ignore[name-defined]
+                    except Exception:
+                        z = dict(x); z.update({k: v for k, v in by_key[key].items() if v not in (None, "")}); by_key[key] = z
+                else:
+                    by_key[key] = x
+            merged[table] = list(by_key.values())
+    # If security_users is empty, mirror auth_users for runtime login compatibility.
+    if not merged.get("security_users") and merged.get("auth_users"):
+        sec = []
+        roles = []
+        for r in merged.get("auth_users", []):
+            if not isinstance(r, dict):
+                continue
+            u = _v30012_clean_username(r)  # type: ignore[name-defined]
+            if not u:
+                continue
+            sec.append({
+                "username": u,
+                "password_hash": r.get("password_hash", ""),
+                "employee_id": r.get("employee_id", ""),
+                "display_name": r.get("display_name", ""),
+                "email": r.get("email", ""),
+                "is_active": r.get("is_active", 1),
+                "force_password_change": r.get("force_password_change", 0),
+                "last_login_at": r.get("last_login_at", ""),
+                "created_at": r.get("created_at", _v30012_now()),  # type: ignore[name-defined]
+                "updated_at": r.get("updated_at", _v30012_now()),  # type: ignore[name-defined]
+            })
+            role = str(r.get("role_code") or "operator").strip()
+            if role:
+                roles.append({"username": u, "role_code": role, "created_at": _v30012_now()})  # type: ignore[name-defined]
+        merged["security_users"] = sec
+        if not merged.get("security_user_roles"):
+            merged["security_user_roles"] = roles
+    out = dict(current if isinstance(current, dict) else {})
+    out["tables"] = _v30012_filter_deleted_tables(merged, deleted)  # type: ignore[name-defined]
+    out["deleted_usernames"] = sorted(deleted)
+    out["authority_schema"] = "SPT-10-Permissions-Authority-V30012.2"
+    out["version"] = "V300.12.2-account-collapse-recovery"
+    out["module_key"] = "10_permissions"
+    out["kind"] = "records"
+    out["authority_file"] = "data/permanent_store/modules/10_permissions/records.json"
+    out["reason"] = reason
+    out["updated_at"] = _v30012_now()  # type: ignore[name-defined]
+    out["table_counts"] = {k: len(v) for k, v in out.get("tables", {}).items() if isinstance(v, list)}
+    out["v30012_2_recovery"] = {
+        "collapsed_detected": bool(collapsed),
+        "best_source": best.get("_v300122_source", ""),
+        "best_user_counts": {"total": _v300122_count_users(best)[0], "active": _v300122_count_users(best)[1]},
+        "current_user_counts_before": {"total": _v300122_count_users(current)[0], "active": _v300122_count_users(current)[1]},
+        "protected_active_usernames_count": len(protected),
+        "note": "If current authority collapsed below 80% of the best high-confidence backup, active users from that backup are protected from erroneous tombstones.",
+    }
+    return out
+
+
+_v300122_prev_payload_with_fallback = globals().get("_v30012_payload_with_fallback")
+_v300122_prev_restore = globals().get("restore_permission_settings_from_permanent_files")
+
+
+def _v30012_payload_with_fallback() -> dict:  # type: ignore[override]
+    current = _v300122_read_payload(_V30012_PERMISSION_AUTHORITY_FILE)  # type: ignore[name-defined]
+    if not isinstance(current, dict):
+        current = {}
+    candidates = _v300122_collect_candidates()
+    best = _v300122_best_candidate(candidates)
+    collapsed = _v300122_is_collapsed(current, best)
+    if collapsed:
+        repaired = _v300122_merge_candidates(current, candidates, collapsed=True, reason="v30012_2_auto_recover_collapsed_accounts")
+        _v300122_backup_current_authority(current, "v30012_2_auto_recover_collapsed_accounts")
+        try:
+            if callable(_v300121_prev_write_authority):  # type: ignore[name-defined]
+                _v300121_prev_write_authority(repaired, reason="v30012_2_auto_recover_collapsed_accounts", mirror_compat=True, github=True)  # type: ignore[name-defined]
+            else:
+                _v30012_write_json(_V30012_PERMISSION_AUTHORITY_FILE, repaired)  # type: ignore[name-defined]
+        except Exception:
+            try:
+                _v30012_write_json(_V30012_PERMISSION_AUTHORITY_FILE, repaired)  # type: ignore[name-defined]
+            except Exception:
+                pass
+        try:
+            _v30012_sync_sqlite_cache(repaired)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        clear_permission_runtime_cache()
+        return repaired
+    # No collapse: keep V300.12.1 behavior, but do not return fewer than the current authority.
+    if callable(_v300122_prev_payload_with_fallback):
+        return _v300122_prev_payload_with_fallback()  # type: ignore[misc]
+    return current
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    current = _v300122_read_payload(_V30012_PERMISSION_AUTHORITY_FILE)  # type: ignore[name-defined]
+    candidates = _v300122_collect_candidates()
+    best = _v300122_best_candidate(candidates)
+    collapsed = force or _v300122_is_collapsed(current, best)
+    payload = _v300122_merge_candidates(current, candidates, collapsed=collapsed, reason="v30012_2_manual_restore_merge")
+    _v300122_backup_current_authority(current, "v30012_2_manual_restore_merge")
+    try:
+        if callable(_v300121_prev_write_authority):  # type: ignore[name-defined]
+            wr = _v300121_prev_write_authority(payload, reason="v30012_2_manual_restore_merge", mirror_compat=True, github=True)  # type: ignore[name-defined]
+        else:
+            _v30012_write_json(_V30012_PERMISSION_AUTHORITY_FILE, payload)  # type: ignore[name-defined]
+            wr = {"ok": True}
+    except Exception as exc:
+        wr = {"ok": False, "error": str(exc)}
+    try:
+        _v30012_sync_sqlite_cache(payload)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    clear_permission_runtime_cache()
+    return {"ok": bool(wr.get("ok", True)), "mode": "v30012_2_account_collapse_recovery", "table_counts": payload.get("table_counts", {}), "recovery": payload.get("v30012_2_recovery", {})}
+
+
+def permission_recovery_diagnostic() -> dict:
+    """Admin diagnostic helper for 10｜權限管理 account-count recovery."""
+    current = _v300122_read_payload(_V30012_PERMISSION_AUTHORITY_FILE)  # type: ignore[name-defined]
+    candidates = _v300122_collect_candidates()
+    best = _v300122_best_candidate(candidates)
+    return {
+        "current_counts": {"total": _v300122_count_users(current)[0], "active": _v300122_count_users(current)[1]},
+        "best_counts": {"total": _v300122_count_users(best)[0], "active": _v300122_count_users(best)[1]},
+        "best_source": best.get("_v300122_source", ""),
+        "collapsed_detected": _v300122_is_collapsed(current, best),
+        "candidate_count": len(candidates),
+    }
+
+# ======================= V300.12.2 PERMISSION ACCOUNT-COLLAPSE RECOVERY END =======================
