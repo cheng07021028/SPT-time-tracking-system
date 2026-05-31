@@ -29,6 +29,7 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("11_login_logs", "11", "登入紀錄", "Login Logs", "登入、登出、權限不足與安全事件查詢", "11_11. 登入紀錄.py"),
     ModuleInfo("12_module_persistence", "12", "模組永久紀錄中心", "Module Persistence Center", "每個模組的 records/settings/backups 檢查", "12_12. 模組永久紀錄中心.py"),
     ModuleInfo("13_system_settings", "13", "系統設定", "System Settings", "工段、作業項目、休息時間、共用參數", "13_13. 系統設定.py"),
+    ModuleInfo("99_speed_diagnostic", "99", "效能診斷", "Performance Diagnostic", "效能測速、慢查詢與錯誤事件診斷；限系統管理員", "99_99. 效能診斷.py"),
 ]
 MODULE_BY_KEY = {m.key: m for m in MODULES}
 

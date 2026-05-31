@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from services.theme_service import apply_theme, render_header
-from services.security_service import require_login, get_current_user
+from services.security_service import require_module_access, get_current_user
 from services.spt_speed_diagnostic_service import build_summary, write_report
 from services.performance_profiler_service import read_events
 
@@ -52,15 +52,75 @@ def _safe_table(rows, *, max_rows: int = 200):
         unsafe_allow_html=True,
     )
 
+
+def _clear_performance_records() -> dict:
+    """Clear only 99. 效能診斷 performance files.
+
+    This does not touch time records, history records, login logs, permissions,
+    backups, or business data.  The JSONL event file is truncated instead of
+    deleting the directory, so the profiler can keep writing after the clear.
+    """
+    try:
+        from services.performance_profiler_service import EVENT_PATH, PERF_DIR
+    except Exception:
+        EVENT_PATH = Path("data/performance/performance_events.jsonl")
+        PERF_DIR = EVENT_PATH.parent
+
+    cleared: list[str] = []
+    errors: list[str] = []
+    try:
+        PERF_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception as exc:
+        errors.append(f"mkdir: {exc}")
+
+    targets: set[Path] = set()
+    try:
+        targets.add(Path(EVENT_PATH))
+        targets.add(Path(EVENT_PATH).with_suffix(".jsonl.1"))
+    except Exception:
+        pass
+    for pattern in ("performance_events*.jsonl*", "spt_v*_speed_summary.json", "SPT_V*_speed_report.json"):
+        try:
+            targets.update(Path(PERF_DIR).glob(pattern))
+        except Exception as exc:
+            errors.append(f"glob {pattern}: {exc}")
+
+    for path in sorted(targets, key=lambda x: str(x)):
+        try:
+            path = Path(path)
+            if path.name == "performance_events.jsonl":
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("", encoding="utf-8")
+                cleared.append(str(path))
+            elif path.exists():
+                path.unlink()
+                cleared.append(str(path))
+        except Exception as exc:
+            errors.append(f"{path}: {exc}")
+    return {"ok": not errors, "cleared": cleared, "errors": errors}
+
 st.set_page_config(page_title="99. 效能診斷", page_icon="⏱", layout="wide")
 apply_theme()
-require_login("99_speed_diagnostic")
+require_module_access("99_speed_diagnostic", "can_view")
 if not _is_system_admin():
     st.error("權限不足：99. 效能診斷只允許系統管理員進入。")
     st.stop()
 render_header("99｜效能診斷", "V258 自動測速紀錄：登入、首頁、01工時紀錄、Neon/SQL、按鈕交易耗時｜限系統管理員")
 
 st.info("請先正常操作一次：登入 → 進入 01 → 按開始/暫停/完工。再回到本頁按重新整理，即可下載測速報告。")
+
+with st.expander("清除效能紀錄 / Clear Performance Records", expanded=False):
+    st.warning("此功能只會清除 99. 效能診斷的測速 JSON/JSONL 檔，不會刪除 01/02 工時資料、登入紀錄或權限設定。")
+    confirm_clear = st.checkbox("我確認要清除效能診斷紀錄", key="v3007_confirm_clear_performance_records")
+    if st.button("清除效能紀錄", type="secondary", disabled=not confirm_clear, use_container_width=True):
+        result = _clear_performance_records()
+        if result.get("ok"):
+            st.success(f"已清除效能紀錄：{len(result.get('cleared', []))} 個檔案。")
+            st.rerun()
+        else:
+            st.error("清除效能紀錄時發生錯誤。")
+            st.json(result)
+
 
 col1, col2, col3 = st.columns(3)
 with col1:

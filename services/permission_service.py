@@ -5824,3 +5824,85 @@ def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[overr
 check_permission = has_permission
 # ======================= END V125 ACCOUNT MASTER PERMISSION RECONCILIATION =======================
 
+
+
+# ===== V300.7 99 PERFORMANCE DIAGNOSTIC PERMISSION MATRIX =====
+# 目的：讓 99. 效能診斷正式出現在 10. 權限管理的「帳號模組權限」矩陣。
+# 規則：只有 admin role 預設具備 99 權限；非 admin 即使被誤勾，security_service 仍會 hard deny。
+_V3007_PERMISSION_MODULE_99 = {
+    "module_code": "99",
+    "module_name_zh": "效能診斷",
+    "module_name_en": "Performance Diagnostic",
+}
+try:
+    if not any(str(m.get("module_code", "")).zfill(2) == "99" for m in MODULES):
+        MODULES.append(dict(_V3007_PERMISSION_MODULE_99))
+except Exception:
+    pass
+
+try:
+    _v3007_prev_v125_normalize_module_no = _v125_normalize_module_no
+except Exception:
+    _v3007_prev_v125_normalize_module_no = None
+
+
+def _v125_normalize_module_no(v) -> str:  # type: ignore[override]
+    s = str(v or "").strip()
+    if s in {"99", "99_speed_diagnostic", "99_diagnostic", "performance_diagnostic", "效能診斷", "99. 效能診斷"}:
+        return "99"
+    if callable(_v3007_prev_v125_normalize_module_no):
+        return _v3007_prev_v125_normalize_module_no(v)
+    digits = "".join(ch for ch in s[:2] if ch.isdigit())
+    return digits.zfill(2) if digits else s.zfill(2)
+
+try:
+    _v3007_prev_v96_role_preset = _v96_role_preset
+except Exception:
+    _v3007_prev_v96_role_preset = None
+
+
+def _v3007_admin_only_preset(role: str, module_code: str) -> dict | None:
+    module_no = _v125_normalize_module_no(module_code)
+    if module_no != "99":
+        return None
+    if str(role or "").strip().lower() == "admin":
+        return {k: 1 for k, _, _ in ACTIONS}
+    return {k: 0 for k, _, _ in ACTIONS}
+
+
+def _v96_role_preset(role: str, module_code: str) -> dict:  # type: ignore[override]
+    fixed = _v3007_admin_only_preset(role, module_code)
+    if fixed is not None:
+        return fixed
+    if callable(_v3007_prev_v96_role_preset):
+        return _v3007_prev_v96_role_preset(role, module_code)
+    return {k: 0 for k, _, _ in ACTIONS}
+
+try:
+    _v3007_prev_v125_role_preset = _v125_role_preset
+except Exception:
+    _v3007_prev_v125_role_preset = None
+
+
+def _v125_role_preset(role: str, module_code: str) -> dict:  # type: ignore[override]
+    fixed = _v3007_admin_only_preset(role, module_code)
+    if fixed is not None:
+        return fixed
+    if callable(_v3007_prev_v125_role_preset):
+        return _v3007_prev_v125_role_preset(role, module_code)
+    return {k: 0 for k, _, _ in ACTIONS}
+
+try:
+    _v3007_prev_reconcile_account_module_permissions_v125 = reconcile_account_module_permissions_v125
+except Exception:
+    _v3007_prev_reconcile_account_module_permissions_v125 = None
+
+
+def reconcile_account_module_permissions_v125(*, reason: str = "v3007_reconcile", write: bool = True) -> dict:  # type: ignore[override]
+    if callable(_v3007_prev_reconcile_account_module_permissions_v125):
+        return _v3007_prev_reconcile_account_module_permissions_v125(reason=reason, write=write)
+    return {"ok": False, "error": "previous reconcile unavailable"}
+
+# 確保 check_permission 對外名稱仍指向既有 has_permission；本段只補矩陣，不改登入判斷。
+check_permission = has_permission
+# ===== END V300.7 99 PERFORMANCE DIAGNOSTIC PERMISSION MATRIX =====

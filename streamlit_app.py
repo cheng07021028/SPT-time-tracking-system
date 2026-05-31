@@ -59,7 +59,7 @@ render_global_font_controls(username=str(_current_user))
 st.success("系統初始化成功。請從左側選單進入各功能頁。")
 
 render_kpi_cards([
-    ("核心模組 / Modules", "14"),
+    ("核心模組 / Modules", "15"),
     ("資料庫 / Database", "SQLite"),
     ("雲端保存 / GitHub", "Ready"),
     ("權限系統 / Permission", "Enabled"),
@@ -81,6 +81,7 @@ all_modules = [
     ("11", "登入紀錄", "登入、登出、權限不足與安全事件查詢", "11_login_logs"),
     ("12", "模組永久紀錄中心", "每個模組獨立 records、settings、audit 與 history 時間戳備份", "12_module_persistence"),
     ("13", "系統設定", "工段名稱、休息時間與跨模組共用設定", "13_system_settings"),
+    ("99", "效能診斷", "效能測速、慢查詢與錯誤事件診斷；限系統管理員", "99_speed_diagnostic"),
 ]
 modules = [(no, name, desc) for no, name, desc, code in all_modules if check_permission(code, "can_view")]
 if callable(_spt_v257_tick):

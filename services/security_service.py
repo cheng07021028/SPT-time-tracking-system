@@ -4392,3 +4392,106 @@ try:
 except Exception:
     pass
 # ===== END V257 SPEED DIAGNOSTIC WRAPPERS =====
+
+
+# ===== V300.7 99 PERFORMANCE DIAGNOSTIC PERMISSION INTEGRATION =====
+# 目的：99. 效能診斷必須納入 10. 權限管理的模組清單，且與 10. 權限管理一樣採硬性 admin 限制。
+# 注意：即使權限矩陣被誤勾給非 admin，99 仍會由 hard guard 擋下。
+_V3007_DIAGNOSTIC_MODULE = {
+    "module_code": "99_speed_diagnostic",
+    "module_no": "99",
+    "module_name": "效能診斷",
+    "module_name_en": "Performance Diagnostic",
+}
+try:
+    if not any(str(m.get("module_no")) == "99" or str(m.get("module_code")) == "99_speed_diagnostic" for m in MODULES):
+        MODULES.append(dict(_V3007_DIAGNOSTIC_MODULE))
+    MODULE_CODE_TO_NO = {m["module_code"]: m["module_no"] for m in MODULES}
+    MODULE_NO_TO_CODE = {m["module_no"]: m["module_code"] for m in MODULES}
+except Exception:
+    pass
+
+try:
+    _V142_PERMISSION_MODULE_NOS.add("99")
+except Exception:
+    _V142_PERMISSION_MODULE_NOS = {"10", "99"}
+
+try:
+    _v3007_prev_role_perm_template = _role_perm_template
+except Exception:
+    _v3007_prev_role_perm_template = None
+
+
+def _role_perm_template(role_code: str, module_code: str) -> dict[str, int]:  # type: ignore[override]
+    module_s = str(module_code or "").strip()
+    if module_s in {"99", "99_speed_diagnostic"}:
+        if str(role_code or "").strip().lower() == "admin":
+            return {c: 1 for c in PERMISSION_COLUMNS}
+        return {c: 0 for c in PERMISSION_COLUMNS}
+    if callable(_v3007_prev_role_perm_template):
+        return _v3007_prev_role_perm_template(role_code, module_code)
+    return {c: 0 for c in PERMISSION_COLUMNS}
+
+try:
+    _v3007_prev_v142_module_no = _v142_module_no
+except Exception:
+    _v3007_prev_v142_module_no = None
+
+
+def _v142_module_no(module_code: str) -> str:  # type: ignore[override]
+    s = _v142_clean_text(module_code) if "_v142_clean_text" in globals() else str(module_code or "").strip()
+    if s in {"99", "99_speed_diagnostic", "99_diagnostic", "performance_diagnostic", "效能診斷", "99. 效能診斷"}:
+        return "99"
+    if callable(_v3007_prev_v142_module_no):
+        return _v3007_prev_v142_module_no(module_code)
+    if len(s) >= 2 and s[:2].isdigit():
+        return s[:2]
+    return s.zfill(2)
+
+try:
+    _v3007_prev_check_permission = check_permission
+except Exception:
+    _v3007_prev_check_permission = None
+
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    module_no = _v142_module_no(module_code) if "_v142_module_no" in globals() else str(module_code or "")[:2]
+    if module_no in {"10", "99"}:
+        # 10 權限管理與 99 效能診斷：只允許權威帳號角色 admin。
+        try:
+            return bool(_v142_is_permission_management_admin(st.session_state.get("auth_username", "")))
+        except Exception:
+            return False
+    if callable(_v3007_prev_check_permission):
+        return bool(_v3007_prev_check_permission(module_code, action))
+    return False
+
+try:
+    _v3007_prev_require_module_access = require_module_access
+except Exception:
+    _v3007_prev_require_module_access = None
+
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    require_login(module_code)
+    module_no = _v142_module_no(module_code) if "_v142_module_no" in globals() else str(module_code or "")[:2]
+    if module_no in {"10", "99"} and not check_permission(module_code, action):
+        try:
+            log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"V300.7 hard deny {module_code}:{action}; role must be admin", module_code)
+        except Exception:
+            pass
+        if module_no == "99":
+            st.error("權限不足：99. 效能診斷只允許系統管理員（admin 角色）進入。")
+        else:
+            st.error("權限不足：10. 權限管理只允許系統管理員（admin 角色）進入。")
+        st.stop()
+    if not check_permission(module_code, action):
+        try:
+            log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
+        except Exception:
+            pass
+        st.error("權限不足：你的帳號未被授權使用此模組或功能。")
+        st.stop()
+
+require_permission = require_module_access
+# ===== END V300.7 99 PERFORMANCE DIAGNOSTIC PERMISSION INTEGRATION =====
