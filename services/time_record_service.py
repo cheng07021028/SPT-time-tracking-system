@@ -29521,3 +29521,151 @@ def audit_v3003_01_refresh_display_restore_fix() -> dict:
         "business_key_tombstone_ignored_for_display": True,
     }
 # ================= END V300.3 01 REFRESH DISPLAY RESTORE FIX =================
+
+# ================= V300.4 01/02 DELETE SYNC CONSISTENCY FIX =================
+# 修正：01.工時紀錄刪除後，02.歷史紀錄仍殘留。
+# 原因：部分 01 刪除流程只傳 id，舊 delete_time_records 可能只更新單一路徑，
+# 或只讓 01 顯示層被 tombstone 過濾，沒有用 01 的完整列身分同步移除 02。
+# 規則：所有 01/02 工時刪除都統一走 time_record_delete_unifier_service，
+# 以 id + record_key + business_key 同步刪除 01 authority、02 authority、SQLite cache，
+# 並寫入 tombstone；不修改 UI/CSS/theme。
+try:
+    _v3004_prev_delete_time_records = delete_time_records
+except Exception:
+    _v3004_prev_delete_time_records = None
+try:
+    _v3004_prev_delete_time_records_from_editor_df = delete_time_records_from_editor_df
+except Exception:
+    _v3004_prev_delete_time_records_from_editor_df = None
+try:
+    _v3004_prev_delete_time_records_from_02_history_editor = delete_time_records_from_02_history_editor
+except Exception:
+    _v3004_prev_delete_time_records_from_02_history_editor = None
+
+
+def _v3004_clear_after_delete() -> None:
+    try:
+        clear_today_records_fast_cache()  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        if _v300 is not None and hasattr(_v300, "clear_frontend_caches_v300"):
+            _v300.clear_frontend_caches_v300()  # type: ignore[attr-defined]
+    except Exception:
+        pass
+    try:
+        from services.db_service import clear_query_cache
+        clear_query_cache()
+    except Exception:
+        pass
+
+
+def _v3004_unified_delete(record_ids=None, selected_rows=None, reason: str = "V300.4 unified delete", github: bool = False) -> int:
+    try:
+        from services.time_record_delete_unifier_service import force_delete_time_records
+        deleted = int(force_delete_time_records(record_ids or [], selected_rows=selected_rows, reason=reason, github=bool(github)) or 0)
+        _v3004_clear_after_delete()
+        return deleted
+    except Exception as exc:
+        try:
+            write_log("V3004_UNIFIED_DELETE_ERROR", f"統一刪除通道失敗，改用舊流程：{exc}", "time_records", level="ERROR")
+        except Exception:
+            pass
+        return 0
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    """V300.4: delete from 01 and 02 through the same authoritative delete lane.
+
+    Important compatibility rule: callers may pass only ids. The unified delete
+    service will look up matching rows from 01/02/SQLite and expand deletion to
+    record_key/business_key, so 02 will not keep a row after 01 deleted it.
+    """
+    deleted = _v3004_unified_delete(record_ids, selected_rows=None, reason=reason, github=False)
+    if deleted <= 0 and callable(_v3004_prev_delete_time_records):
+        try:
+            deleted = int(_v3004_prev_delete_time_records(record_ids, reason=reason) or 0)
+        except Exception:
+            deleted = 0
+    _v3004_clear_after_delete()
+    return int(deleted or 0)
+
+
+def _v3004_selected_rows_from_editor(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete") -> pd.DataFrame:
+    if editor_df is None or not isinstance(editor_df, pd.DataFrame) or editor_df.empty:
+        return pd.DataFrame()
+    col = delete_column if delete_column in editor_df.columns else None
+    if col is None:
+        for c in ("刪除 / Delete", "刪除", "Delete", "_delete"):
+            if c in editor_df.columns:
+                col = c
+                break
+    if col is None:
+        return pd.DataFrame()
+    try:
+        mask = editor_df[col].map(lambda v: bool(v) or str(v).strip().lower() in {"1", "true", "yes", "y", "on", "checked", "刪除"})
+        return editor_df.loc[mask].drop(columns=[col], errors="ignore").copy()
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v3004_ids_from_df(df: pd.DataFrame) -> list[int]:
+    ids: list[int] = []
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return ids
+    for c in ("id", "ID", "ID / ID", "序號", "編號"):
+        if c in df.columns:
+            for x in df[c].tolist():
+                try:
+                    rid = int(float(str(x).strip()))
+                    if rid > 0 and rid not in ids:
+                        ids.append(rid)
+                except Exception:
+                    pass
+            if ids:
+                break
+    return ids
+
+
+def delete_time_records_from_editor_df(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete", reason: str = "01 管理員維護表刪除") -> int:  # type: ignore[override]
+    """V300.4: 01 editor delete uses selected full rows, not ids only."""
+    selected = _v3004_selected_rows_from_editor(editor_df, delete_column=delete_column)
+    ids = _v3004_ids_from_df(selected)
+    deleted = _v3004_unified_delete(ids, selected_rows=selected, reason=reason, github=False)
+    if deleted <= 0 and callable(_v3004_prev_delete_time_records_from_editor_df):
+        try:
+            deleted = int(_v3004_prev_delete_time_records_from_editor_df(editor_df, delete_column=delete_column, reason=reason) or 0)
+        except TypeError:
+            try:
+                deleted = int(_v3004_prev_delete_time_records_from_editor_df(editor_df, delete_column, reason) or 0)
+            except Exception:
+                deleted = 0
+        except Exception:
+            deleted = 0
+    _v3004_clear_after_delete()
+    return int(deleted or 0)
+
+
+def delete_time_records_from_02_history_editor(editor_df: pd.DataFrame, record_ids: list[int] | None = None, delete_column: str = "刪除 / Delete", reason: str = "02 歷史紀錄刪除") -> dict:  # type: ignore[override]
+    """V300.4: 02 editor delete also removes 01 remnants and SQLite cache."""
+    selected = _v3004_selected_rows_from_editor(editor_df, delete_column=delete_column)
+    ids = list(record_ids or []) or _v3004_ids_from_df(selected)
+    deleted = _v3004_unified_delete(ids, selected_rows=selected, reason=reason, github=False)
+    if deleted <= 0 and callable(_v3004_prev_delete_time_records_from_02_history_editor):
+        try:
+            return _v3004_prev_delete_time_records_from_02_history_editor(editor_df, record_ids=record_ids, delete_column=delete_column, reason=reason)
+        except Exception:
+            pass
+    return {"ok": True, "deleted": int(deleted or 0), "count": int(deleted or 0), "message": f"V300.4 已同步刪除 01/02 工時紀錄 {int(deleted or 0)} 筆。"}
+
+
+def audit_v3004_delete_sync_consistency_fix() -> dict:
+    return {
+        "version": "V300.4_DELETE_SYNC_CONSISTENCY_20260531",
+        "delete_time_records_uses_unified_delete": True,
+        "editor_delete_passes_selected_rows": True,
+        "sync_targets": ["01_time_records", "02_history", "sqlite_cache", "tombstone"],
+        "does_not_change_display_filter": True,
+        "does_not_change_ui_css_theme": True,
+    }
+# =============== END V300.4 01/02 DELETE SYNC CONSISTENCY FIX ===============
