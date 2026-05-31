@@ -28,6 +28,30 @@ except Exception:
     load_history_records_sql_filtered = None
     load_history_filter_options_sql = None
 
+# ===== V260 CROSS-PAGE CACHE INVALIDATION =====
+def _v260_mark_time_records_changed(reason: str = "") -> None:
+    """Tell 01 工時紀錄 to drop cached today/finished tables after 02 edits/deletes."""
+    try:
+        from services.timezone_service import now_text
+        token = str(now_text())
+    except Exception:
+        try:
+            from datetime import datetime
+            token = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        except Exception:
+            token = "changed"
+    try:
+        st.session_state["_v260_time_records_changed_token"] = token
+        st.session_state["_v260_time_records_changed_reason"] = str(reason or "")[:120]
+    except Exception:
+        pass
+    try:
+        from services.time_record_service import clear_today_records_fast_cache
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+# ===== V260 CROSS-PAGE CACHE INVALIDATION END =====
+
 # === V180B_HISTORY_TOTAL_TIME_TYPE_FIX_BEGIN ===
 def _v180b_parse_work_hours_to_decimal_hours(value):
     """Safely convert mixed work_hours values to decimal hours.
@@ -1606,7 +1630,8 @@ with tab1:
                             count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
                         st.session_state[delete_select_key] = []
                         st.session_state[recalc_select_key] = []
-                        _add_history_result("success", f"已刪除 {count} 筆歷史紀錄。", append=False)
+                        _v260_mark_time_records_changed("02_delete")
+                        _add_history_result("success", f"已刪除 {count} 筆歷史紀錄。01 工時紀錄快取已同步失效，返回 01 後請重新整理今日明細。", append=False)
                         _history_refresh_editor()
                         rerun()
 

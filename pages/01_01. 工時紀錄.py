@@ -109,6 +109,33 @@ def _v259_clear_display_cache() -> None:
             pass
 
 
+def _v260_mark_time_records_changed(reason: str = "") -> None:
+    """Cross-page cache invalidation for 01/02 deletes and edits.
+
+    V259 intentionally cached the heavy 01 today table to keep operations fast.
+    After deleting from 02 history, that session cache can otherwise keep showing
+    rows that are already deleted from the authority data.  This token lets 02
+    tell 01 to drop all read-only display caches on the next render.
+    """
+    try:
+        st.session_state["_v260_time_records_changed_token"] = _v259_now_label()
+        st.session_state["_v260_time_records_changed_reason"] = str(reason or "")[:120]
+    except Exception:
+        pass
+
+
+def _v260_apply_cross_page_invalidation() -> None:
+    token = str(st.session_state.get("_v260_time_records_changed_token") or "")
+    seen = str(st.session_state.get("_v260_01_seen_time_records_changed_token") or "")
+    if token and token != seen:
+        _v259_clear_display_cache()
+        try:
+            clear_today_records_fast_cache()
+        except Exception:
+            pass
+        st.session_state["_v260_01_seen_time_records_changed_token"] = token
+
+
 def _v259_notice_cached(label: str, ts_key: str) -> None:
     ts = st.session_state.get(ts_key)
     if ts:
@@ -158,6 +185,7 @@ st.set_page_config(page_title="01. 工時紀錄", page_icon="⏱", layout="wide"
 apply_theme()
 apply_dropdown_menu_size_only(560)
 require_module_access("01_time_record")
+_v260_apply_cross_page_invalidation()
 render_header("01｜工時紀錄", "快速開始、同步作業、暫停、下班、完工｜自動記錄時間與扣除休息")
 render_post_record_continue_prompt()
 _spt_perf_after_header = _spt_perf_tick("01_header_auth_theme", _SPT_01_PAGE_T0, threshold_ms=500.0)
@@ -1366,6 +1394,8 @@ if is_admin:
                             clear_today_records_fast_cache()
                         except Exception:
                             pass
+                        _v259_clear_display_cache()
+                        _v260_mark_time_records_changed("01_save")
                         st.success(f"已由管理員存檔修改 {count} 筆今日工時紀錄。")
                         st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                         st.rerun()
@@ -1380,6 +1410,8 @@ if is_admin:
                                 clear_today_records_fast_cache()
                             except Exception:
                                 pass
+                            _v259_clear_display_cache()
+                            _v260_mark_time_records_changed("01_recalc")
                             st.success(f"已先同步修改後的開始/結束日期時間，並重新計算 {count} 筆工時，同步更新到 02 歷史紀錄。")
                             st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                             st.rerun()
@@ -1398,6 +1430,10 @@ if is_admin:
                                 clear_today_records_fast_cache()
                             except Exception:
                                 pass
+                            _v259_clear_display_cache()
+                            _v260_mark_time_records_changed("01_delete")
+                            # Keep the maintenance table loaded, but force it to rebuild with a new key and fresh query.
+                            st.session_state[admin_load_key] = True
                             st.success(f"已由管理員刪除 {count} 筆今日工時紀錄。")
                             st.session_state[editor_version_key] = int(st.session_state.get(editor_version_key, 0)) + 1
                             st.rerun()
