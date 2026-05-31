@@ -29333,3 +29333,191 @@ def audit_v3002_today_records_regression_fix() -> dict:
         "purpose": "Fix 01 Today Records showing no rows after refresh while preserving delete tombstone filtering.",
     }
 # ================= END V300.2 01 TODAY DISPLAY SAFETY REGRESSION FIX =================
+
+# =================== V300.3 01 REFRESH DISPLAY RESTORE FIX ===================
+# 修正 V300.2 不完整：
+# - 01 今日明細走 today_records()
+# - 01 已結束紀錄走 load_records(start_date=today, end_date=today)
+# 前版只修 today_records，load_records 仍可能走 V300 history reconcile，造成刷新 0 筆。
+# V300.3 規則：01/02 顯示查詢只排除「明確刪除標記」與「明確 tombstone id/record_key」，
+# 不再因 02 history 暫時查不到、不同步、查詢條件限制，而隱藏 01 正常資料。
+try:
+    _v3003_prev_today_records = today_records
+except Exception:
+    _v3003_prev_today_records = None
+try:
+    _v3003_prev_load_records = load_records
+except Exception:
+    _v3003_prev_load_records = None
+try:
+    _v3003_prev_get_active_records = get_active_records
+except Exception:
+    _v3003_prev_get_active_records = None
+
+
+def _v3003_text(value) -> str:
+    try:
+        if value is None or pd.isna(value):
+            return ""
+    except Exception:
+        if value is None:
+            return ""
+    return str(value).strip()
+
+
+def _v3003_row_get(row, col: str):
+    try:
+        if isinstance(row, dict):
+            return row.get(col)
+        return row.get(col)
+    except Exception:
+        return None
+
+
+def _v3003_norm_id(value):
+    s = _v3003_text(value)
+    if not s:
+        return None
+    try:
+        i = int(float(s))
+        return i if i > 0 else None
+    except Exception:
+        return None
+
+
+def _v3003_row_id(row):
+    for c in ("id", "ID", "ID / ID", "序號", "編號"):
+        rid = _v3003_norm_id(_v3003_row_get(row, c))
+        if rid is not None:
+            return rid
+    return None
+
+
+def _v3003_record_key(row) -> str:
+    for c in ("record_key", "紀錄鍵 / Record Key", "Record Key"):
+        s = _v3003_text(_v3003_row_get(row, c))
+        if s:
+            return s
+    return ""
+
+
+def _v3003_explicit_deleted(row) -> bool:
+    # 只判定資料列自身明確刪除，不使用 business key / history absence。
+    for c in ("is_deleted", "delete_flag", "deleted", "已刪除", "刪除"):
+        v = _v3003_text(_v3003_row_get(row, c)).lower()
+        if v in {"1", "true", "yes", "y", "on", "deleted", "delete", "刪除", "已刪除"}:
+            return True
+    status = _v3003_text(_v3003_row_get(row, "status")).lower()
+    if status in {"deleted", "delete", "刪除", "已刪除"}:
+        return True
+    return False
+
+
+def _v3003_tombstone_id_key_sets():
+    ids = set()
+    keys = set()
+    # 優先沿用 V300 service 既有 tombstone 讀取，但刻意忽略 business keys，避免誤殺正常資料。
+    try:
+        if _v300 is not None and hasattr(_v300, "_tombstone_sets"):
+            got_ids, got_keys, _got_biz = _v300._tombstone_sets()  # type: ignore[attr-defined]
+            ids = {int(x) for x in got_ids if _v3003_norm_id(x) is not None}
+            keys = {_v3003_text(x) for x in got_keys if _v3003_text(x)}
+    except Exception:
+        ids, keys = set(), set()
+    return ids, keys
+
+
+def _v3003_display_safe_filter(df):
+    if df is None:
+        return pd.DataFrame()
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return df
+    ids, keys = _v3003_tombstone_id_key_sets()
+    keep = []
+    for _, row in df.iterrows():
+        if _v3003_explicit_deleted(row):
+            keep.append(False)
+            continue
+        rid = _v3003_row_id(row)
+        if rid is not None and rid in ids:
+            keep.append(False)
+            continue
+        rk = _v3003_record_key(row)
+        if rk and rk in keys:
+            keep.append(False)
+            continue
+        keep.append(True)
+    try:
+        return df.loc[keep].copy().reset_index(drop=True)
+    except Exception:
+        return df
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    # 直接使用 V300 前資料源，避開 history reconcile。
+    source_fn = globals().get("_v300_prev_today_records")
+    if callable(source_fn):
+        df = source_fn(include_finished=include_finished, unfinished_only=unfinished_only)
+    elif callable(_v3003_prev_today_records):
+        df = _v3003_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+    else:
+        df = pd.DataFrame()
+    return _v3003_display_safe_filter(df)
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    # 01 已結束紀錄與 02 查詢都會用 load_records；同樣只套明確刪除/tombstone id/key 過濾。
+    source_fn = globals().get("_v300_prev_load_records")
+    if callable(source_fn):
+        df = source_fn(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+    elif callable(_v3003_prev_load_records):
+        df = _v3003_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order)
+    else:
+        df = pd.DataFrame()
+    return _v3003_display_safe_filter(df)
+
+
+def get_active_records(
+    employee_id: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+    work_order: str | None = None,
+    **kwargs,
+) -> pd.DataFrame:  # type: ignore[override]
+    source_fn = globals().get("_v300_prev_get_active_records")
+    if callable(source_fn):
+        try:
+            df = source_fn(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name, work_order=work_order, **kwargs)
+        except TypeError:
+            try:
+                df = source_fn(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name)
+            except TypeError:
+                df = source_fn(employee_id=employee_id)
+    elif callable(_v3003_prev_get_active_records):
+        try:
+            df = _v3003_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name, work_order=work_order, **kwargs)
+        except TypeError:
+            df = _v3003_prev_get_active_records(employee_id=employee_id)
+    else:
+        df = pd.DataFrame()
+    try:
+        if work_order and df is not None and not getattr(df, "empty", True) and "work_order" in df.columns:
+            wo = str(work_order).strip()
+            if wo:
+                df = df[df["work_order"].astype(str).str.strip().eq(wo)].copy()
+    except Exception:
+        pass
+    return _v3003_display_safe_filter(df)
+
+
+def audit_v3003_01_refresh_display_restore_fix() -> dict:
+    return {
+        "version": "V300.3_01_REFRESH_DISPLAY_RESTORE_20260531",
+        "today_records_bypasses_history_reconcile": True,
+        "load_records_bypasses_history_reconcile": True,
+        "active_records_accepts_work_order_kwargs": True,
+        "filter_uses_only_explicit_delete_or_tombstone_id_key": True,
+        "business_key_tombstone_ignored_for_display": True,
+    }
+# ================= END V300.3 01 REFRESH DISPLAY RESTORE FIX =================
