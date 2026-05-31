@@ -1,0 +1,16 @@
+{
+  "authority_schema": "SPT-10-Permissions-SecurityRuntimeSettings-V30012.5",
+  "version": "V300.12.5-idle-timeout-independent-authority",
+  "idle_auto_logout_minutes": 6,
+  "idle_timeout_minutes": 6,
+  "ask_continue_after_record": "1",
+  "security_settings": {
+    "idle_auto_logout_minutes": 6,
+    "idle_timeout_minutes": 6,
+    "ask_continue_after_record": "1"
+  },
+  "updated_at": "2026-05-31 22:54:59",
+  "updated_by": "admin",
+  "reason": "save_security_settings_v30012_5",
+  "note": "Independent authority file for idle auto logout minutes. Account/permission recovery must not overwrite this file."
+}
