@@ -29187,8 +29187,51 @@ def load_records(start_date: str | None = None, end_date: str | None = None, emp
     return _v300_filter(df, reconcile_with_history=True)
 
 
-def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
-    df = _v300_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name) if callable(_v300_prev_get_active_records) else pd.DataFrame()
+def get_active_records(
+    employee_id: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    employee_name: str | None = None,
+    work_order: str | None = None,
+    **kwargs,
+) -> pd.DataFrame:  # type: ignore[override]
+    # V300.1 compatibility: keep the legacy public signature flexible.
+    # Other pages/repositories may call get_active_records(work_order=...),
+    # and future callers may pass harmless filters. Never break the hot path
+    # because a wrapper forgot one optional argument.
+    if callable(_v300_prev_get_active_records):
+        try:
+            df = _v300_prev_get_active_records(
+                employee_id=employee_id,
+                process_name=process_name,
+                start_date=start_date,
+                employee_name=employee_name,
+                work_order=work_order,
+                **kwargs,
+            )
+        except TypeError:
+            # Older layers did not always support work_order/extra kwargs.
+            try:
+                df = _v300_prev_get_active_records(
+                    employee_id=employee_id,
+                    process_name=process_name,
+                    start_date=start_date,
+                    employee_name=employee_name,
+                )
+            except TypeError:
+                df = _v300_prev_get_active_records(employee_id=employee_id)
+    else:
+        df = pd.DataFrame()
+
+    # Apply work_order filtering locally if the delegated implementation ignored it.
+    try:
+        if work_order and df is not None and not getattr(df, "empty", True):
+            wo = str(work_order).strip()
+            if wo and "work_order" in df.columns:
+                df = df[df["work_order"].astype(str).str.strip().eq(wo)].copy()
+    except Exception:
+        pass
+
     # Active rows are not required to exist in 02 yet, so only tombstone/filter explicit delete markers.
     return _v300_filter(df, reconcile_with_history=False)
 
