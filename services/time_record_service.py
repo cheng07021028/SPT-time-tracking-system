@@ -29290,3 +29290,46 @@ try:
 except Exception:
     pass
 # =================== END V300 PHASE 1 ARCHITECTURE SPEED + DELETE RESURRECTION GUARD ===================
+
+# =================== V300.2 01 TODAY DISPLAY SAFETY REGRESSION FIX ===================
+# 修正 V300 Phase 1 過度防復活：
+# - 01 今日明細不可因 02_history 目前查不到/尚未同步，就把正常今日資料全部隱藏。
+# - 01 顯示只排除明確 tombstone / delete marker。
+# - 02 歷史紀錄仍維持 tombstone 過濾。
+# 背景：V300 Phase 1 曾用「完成紀錄不在 02 就從 01 隱藏」來防刪除復活，
+#       但在 02 尚未同步或被查詢條件限制時，會造成 01 重新整理完全無資料。
+try:
+    _v3002_prev_today_records = today_records
+except Exception:
+    _v3002_prev_today_records = None
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    """V300.2: 01 今日明細顯示安全修正。
+
+    只套用明確刪除/tombstone 過濾，不再用 02_history 缺席狀態判定 01 資料應消失。
+    這樣可保留刪除防復活，同時避免 01 正常資料被整批濾掉。
+    """
+    # 優先繞過 V300.0/V300.1 那層 reconcile_with_history=True 的 wrapper，
+    # 直接使用 V300 前一版的 today_records 作為資料來源。
+    source_fn = globals().get("_v300_prev_today_records")
+    if callable(source_fn):
+        df = source_fn(include_finished=include_finished, unfinished_only=unfinished_only)
+    elif callable(_v3002_prev_today_records):
+        df = _v3002_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only)
+    else:
+        df = pd.DataFrame()
+
+    # 01 只依明確 tombstone/delete marker 過濾，不用 02 absence 過濾。
+    return _v300_filter(df, reconcile_with_history=False) if "_v300_filter" in globals() else df
+
+
+def audit_v3002_today_records_regression_fix() -> dict:
+    return {
+        "version": "V300.2_01_TODAY_DISPLAY_SAFETY_20260531",
+        "today_records_uses_pre_v300_source": callable(globals().get("_v300_prev_today_records")),
+        "today_records_reconcile_with_history": False,
+        "keeps_explicit_tombstone_filter": "_v300_filter" in globals(),
+        "purpose": "Fix 01 Today Records showing no rows after refresh while preserving delete tombstone filtering.",
+    }
+# ================= END V300.2 01 TODAY DISPLAY SAFETY REGRESSION FIX =================
