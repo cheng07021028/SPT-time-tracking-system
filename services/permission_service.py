@@ -7346,3 +7346,239 @@ def permission_recovery_diagnostic() -> dict:
     }
 
 # ======================= V300.12.2 PERMISSION ACCOUNT-COLLAPSE RECOVERY END =======================
+
+
+# ======================= V300.12.3 IDLE AUTO LOGOUT PERSISTENCE FIX START =======================
+# 問題：V300.12.2 已恢復帳號，但「閒置自動登出分鐘數 / Idle Auto Logout Minutes」
+#       儲存後仍可能被 data/permanent_store/modules/10_permissions/settings.json
+#       或舊 idle_timeout_settings.json 的 15 分鐘覆蓋。
+# 原則：不碰 01/02；只修 10 權限管理安全設定持久化。
+#       records.json 與 settings.json 必須同時寫入同一個 idle_timeout_minutes。
+
+_V300123_SETTINGS_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "settings.json"
+_V300123_IDLE_MIRROR_FILES = [
+    PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "settings.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "config" / "idle_timeout_settings.json",
+    PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_idle_timeout_settings.json",
+    PROJECT_ROOT / "data" / "config" / "idle_timeout_settings.json",
+    PROJECT_ROOT / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
+    PROJECT_ROOT / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
+]
+
+
+def _v300123_json_read(path: Path) -> dict:
+    try:
+        if path.exists() and path.is_file() and path.stat().st_size > 0:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        pass
+    return {}
+
+
+def _v300123_json_write(path: Path, payload: dict) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload if isinstance(payload, dict) else {}, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _v300123_alias_security_settings(settings: dict) -> dict:
+    out = dict(settings or {})
+    idle_aliases = [
+        "idle_timeout_minutes",
+        "閒置自動登出分鐘數 / Idle Auto Logout Minutes",
+        "閒置自動登出分鐘數 / Idle Auto Logout Minutes1",
+        "Idle Auto Logout Minutes",
+        "Idle Auto Logout Minutes1",
+        "idle_auto_logout_minutes",
+        "idle_auto_logout_minutes1",
+    ]
+    for key in idle_aliases:
+        if key in out and out.get(key) not in (None, ""):
+            out["idle_timeout_minutes"] = str(out.get(key))
+            break
+    ask_aliases = [
+        "ask_continue_after_record",
+        "紀錄後詢問是否繼續 / Ask Continue After Record",
+        "Ask Continue After Record",
+    ]
+    for key in ask_aliases:
+        if key in out and out.get(key) not in (None, ""):
+            out["ask_continue_after_record"] = str(out.get(key))
+            break
+    return out
+
+
+def _v300123_rows_to_security(rows: list) -> dict:
+    out = {}
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        key = str(row.get("setting_key") or row.get("key") or "").strip()
+        if not key:
+            continue
+        value = row.get("setting_value") if row.get("setting_value") is not None else row.get("value")
+        out[key] = "" if value is None else str(value)
+    return _v300123_alias_security_settings(out)
+
+
+def _v300123_security_from_records() -> dict:
+    payload = _v300123_json_read(_V30012_PERMISSION_AUTHORITY_FILE)  # type: ignore[name-defined]
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    out = {}
+    for table_name in ("auth_security_settings", "security_settings"):
+        rows = tables.get(table_name, []) if isinstance(tables, dict) else []
+        sec = _v300123_rows_to_security(rows)
+        if sec:
+            out.update(sec)
+    # Support nested settings inside records.json without letting it override explicit security rows.
+    nested = payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
+    if isinstance(nested, dict):
+        flat = _v300123_alias_security_settings(nested)
+        inner = nested.get("security_settings") if isinstance(nested.get("security_settings"), dict) else {}
+        flat.update(_v300123_alias_security_settings(inner))
+        for k, v in flat.items():
+            out.setdefault(k, v)
+    return _v300123_alias_security_settings(out)
+
+
+def _v300123_security_from_settings_file() -> dict:
+    payload = _v300123_json_read(_V300123_SETTINGS_FILE)
+    out = _v300123_alias_security_settings(payload)
+    settings = payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
+    if isinstance(settings, dict):
+        out.update(_v300123_alias_security_settings(settings))
+        inner = settings.get("security_settings") if isinstance(settings.get("security_settings"), dict) else {}
+        if isinstance(inner, dict):
+            out.update(_v300123_alias_security_settings(inner))
+    sec = payload.get("security_settings") if isinstance(payload.get("security_settings"), dict) else {}
+    if isinstance(sec, dict):
+        out.update(_v300123_alias_security_settings(sec))
+    return _v300123_alias_security_settings(out)
+
+
+def _v300123_normalize_final_security(settings: dict) -> dict:
+    merged = dict(DEFAULT_SECURITY_SETTINGS)
+    merged.update(_v300123_alias_security_settings(settings or {}))
+    try:
+        idle = max(1, int(float(str(merged.get("idle_timeout_minutes", "15") or 15).strip())))
+    except Exception:
+        idle = 15
+    ask_raw = str(merged.get("ask_continue_after_record", "1")).strip().lower()
+    ask = "0" if ask_raw in {"0", "false", "no", "n", "否"} else "1"
+    merged["idle_timeout_minutes"] = str(idle)
+    merged["ask_continue_after_record"] = ask
+    return merged
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    # Highest priority: canonical records.json security rows written by 10 權限管理.
+    merged = dict(DEFAULT_SECURITY_SETTINGS)
+    record_settings = _v300123_security_from_records()
+    file_settings = _v300123_security_from_settings_file()
+    # settings.json is fallback only; it must not overwrite records.json after the user saves in 10.
+    merged.update(file_settings)
+    merged.update(record_settings)
+    return _v300123_normalize_final_security(merged)
+
+
+def _v300123_write_idle_mirror_files(security: dict) -> None:
+    sec = _v300123_normalize_final_security(security)
+    minutes = int(sec.get("idle_timeout_minutes", "15"))
+    ask = str(sec.get("ask_continue_after_record", "1"))
+    now = _v30012_now() if "_v30012_now" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    settings_payload = {
+        "idle_timeout_minutes": str(minutes),
+        "ask_continue_after_record": ask,
+        "security_settings": {
+            "idle_timeout_minutes": str(minutes),
+            "ask_continue_after_record": ask,
+        },
+        "settings": {
+            "idle_timeout_minutes": str(minutes),
+            "ask_continue_after_record": ask,
+            "security_settings": {
+                "idle_timeout_minutes": str(minutes),
+                "ask_continue_after_record": ask,
+            },
+        },
+        "updated_at": now,
+        "reason": "v30012_3_idle_timeout_persistence",
+    }
+    simple_payload = {
+        "idle_timeout_minutes": minutes,
+        "ask_continue_after_record": ask,
+        "updated_at": now,
+        "reason": "v30012_3_idle_timeout_persistence",
+    }
+    for path in _V300123_IDLE_MIRROR_FILES:
+        try:
+            _v300123_json_write(path, settings_payload if path.name == "settings.json" else simple_payload)
+        except Exception:
+            pass
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    current = _v300123_json_read(_V30012_PERMISSION_AUTHORITY_FILE)  # type: ignore[name-defined]
+    if not isinstance(current, dict):
+        current = {}
+    tables = current.get("tables") if isinstance(current.get("tables"), dict) else _v30012_empty_tables()  # type: ignore[name-defined]
+    merged = get_security_settings()
+    merged.update(_v300123_alias_security_settings({str(k): str(v) for k, v in (settings or {}).items()}))
+    merged = _v300123_normalize_final_security(merged)
+    now = _v30012_now() if "_v30012_now" in globals() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    rows = [
+        {"setting_key": "idle_timeout_minutes", "setting_value": str(merged["idle_timeout_minutes"]), "note": "V300.12.3 canonical idle timeout", "updated_at": now},
+        {"setting_key": "ask_continue_after_record", "setting_value": str(merged["ask_continue_after_record"]), "note": "V300.12.3 canonical ask continue setting", "updated_at": now},
+    ]
+    # Keep any other custom security rows, but canonical keys above win.
+    old_rows = []
+    for table_name in ("auth_security_settings", "security_settings"):
+        old_rows.extend(tables.get(table_name, []) if isinstance(tables.get(table_name), list) else [])
+    seen = {"idle_timeout_minutes", "ask_continue_after_record"}
+    for row in old_rows:
+        if not isinstance(row, dict):
+            continue
+        key = str(row.get("setting_key") or row.get("key") or "").strip()
+        if not key or key in seen:
+            continue
+        x = dict(row)
+        x.setdefault("updated_at", now)
+        rows.append(x)
+        seen.add(key)
+    tables["auth_security_settings"] = [dict(r) for r in rows]
+    tables["security_settings"] = [dict(r) for r in rows]
+    current["tables"] = tables
+    current.setdefault("module_key", "10_permissions")
+    current.setdefault("kind", "records")
+    current["authority_schema"] = "SPT-10-Permissions-Authority-V30012.3"
+    current["version"] = "V300.12.3-idle-timeout-persistence"
+    current["updated_at"] = now
+    current["reason"] = "save_security_settings_v30012_3"
+    current["settings"] = dict(current.get("settings") if isinstance(current.get("settings"), dict) else {})
+    current["settings"]["idle_timeout_minutes"] = str(merged["idle_timeout_minutes"])
+    current["settings"]["ask_continue_after_record"] = str(merged["ask_continue_after_record"])
+    current["settings"]["security_settings"] = {
+        "idle_timeout_minutes": str(merged["idle_timeout_minutes"]),
+        "ask_continue_after_record": str(merged["ask_continue_after_record"]),
+    }
+    _v300123_json_write(_V30012_PERMISSION_AUTHORITY_FILE, current)  # type: ignore[name-defined]
+    _v300123_write_idle_mirror_files(merged)
+    try:
+        _v30012_sync_sqlite_cache(current)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    if st is not None:
+        try:
+            st.session_state["_spt_idle_timeout_cache"] = {"minutes": int(merged["idle_timeout_minutes"]), "ts": 0}
+            st.session_state["spt_security_settings"] = dict(merged)
+        except Exception:
+            pass
+
+# ======================= V300.12.3 IDLE AUTO LOGOUT PERSISTENCE FIX END =======================
