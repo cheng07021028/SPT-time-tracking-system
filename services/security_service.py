@@ -4104,3 +4104,43 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 
 require_permission = require_module_access
 # =================== END V142 HARD GUARD FOR 10 PERMISSION MANAGEMENT ===================
+
+# ===== V255 APP OPEN FAST LOGIN SCREEN =====
+# Do not initialize Neon/PostgreSQL/security schema before rendering the login page.
+# The schema is checked only after a user submits credentials or after login succeeds.
+
+def require_login(module_code: str = "") -> None:  # type: ignore[override]
+    if not st.session_state.get("auth_logged_in"):
+        render_login_form()
+        st.stop()
+    ensure_security_schema()
+    _check_idle_timeout()
+    try:
+        if st.session_state.get("auth_force_password_change"):
+            _v106_render_force_password_change()
+    except Exception:
+        pass
+    render_user_bar(module_code)
+
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    require_login(module_code)
+    module_no = _v142_module_no(module_code) if "_v142_module_no" in globals() else str(module_code)
+    if module_no in globals().get("_V142_PERMISSION_MODULE_NOS", {"10"}) and not _v142_is_permission_management_admin(st.session_state.get("auth_username", "")):
+        try:
+            log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"V255 hard deny {module_code}:{action}; role must be admin", module_code)
+        except Exception:
+            pass
+        st.error("權限不足：10. 權限管理只允許系統管理員（admin 角色）進入。")
+        st.stop()
+    if not check_permission(module_code, action):
+        try:
+            log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
+        except Exception:
+            pass
+        st.error("權限不足：你的帳號未被授權使用此模組或功能。")
+        st.stop()
+
+
+require_permission = require_module_access
+# ===== END V255 APP OPEN FAST LOGIN SCREEN =====

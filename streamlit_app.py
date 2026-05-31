@@ -25,9 +25,8 @@ st.set_page_config(
 
 apply_theme()
 require_login("home")
-# V254: login/home must stay fast.
-# Do not start Neon/PostgreSQL authority bootstrap on every home rerun.
-# 01/02 pages or admin maintenance pages may trigger backend sync when actually needed.
+# V255: Do not start Neon/PostgreSQL authority bootstrap on home/login rerun.
+# Heavy import/bootstrap must be triggered from maintenance or 01/02 pages only.
 # V3.64: login/home must stay fast.
 # Do NOT run restore/export/GitHub/persistence migration immediately after login.
 # Each module loads its own lightweight settings when opened; this prevents login spinning.
