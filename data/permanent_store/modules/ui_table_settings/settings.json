@@ -1,0 +1,5433 @@
+{
+  "authority_schema": "SPT-PermanentAuthority-V29",
+  "module_key": "ui_table_settings",
+  "kind": "settings",
+  "updated_at": "2026-05-30 12:43:21",
+  "exported_at": "2026-05-30 12:43:21",
+  "reason": "v116_v369_save_column_order_01.time_records.admin_maintenance",
+  "empty_authoritative": false,
+  "tables": {},
+  "settings": {
+    "version": "V116-table-settings-authority",
+    "source": "services.table_persistence_service",
+    "table_settings": {
+      "01.time_records.main": {
+        "widths": {
+          "id": 60,
+          "record_key": 100,
+          "status": 100,
+          "work_order": 120,
+          "part_no": 170,
+          "type_name": 230,
+          "process_name": 140,
+          "employee_id": 120,
+          "employee_name": 130,
+          "start_action": 140,
+          "start_timestamp": 190,
+          "end_action": 140,
+          "end_timestamp": 140,
+          "remark": 250,
+          "start_date": 140,
+          "start_time": 140,
+          "end_date": 140,
+          "end_time": 160,
+          "work_hours": 140,
+          "assembly_location": 160,
+          "group_key": 60,
+          "is_group_work": 140,
+          "source": 60,
+          "created_at": 60,
+          "updated_at": 180
+        },
+        "updated_at": "2026-05-27 22:08:39",
+        "reason": "v369_save_column_order",
+        "order": [
+          "id",
+          "employee_id",
+          "employee_name",
+          "status",
+          "work_order",
+          "part_no",
+          "is_group_work",
+          "type_name",
+          "process_name",
+          "start_action",
+          "start_timestamp",
+          "end_action",
+          "end_timestamp",
+          "remark",
+          "start_date",
+          "start_time",
+          "end_date",
+          "end_time",
+          "work_hours",
+          "assembly_location",
+          "group_key",
+          "source",
+          "created_at",
+          "record_key",
+          "updated_at"
+        ]
+      },
+      "02.history.records": {
+        "widths": {
+          "刪除 / Delete": 100,
+          "重算 / Recalc": 100,
+          "跨日提醒 / Cross Day Alert": 80,
+          "跨日日期 / Cross Day Date": 140,
+          "id": 70,
+          "record_key": 280,
+          "status": 140,
+          "work_order": 150,
+          "part_no": 170,
+          "type_name": 230,
+          "process_name": 140,
+          "employee_id": 120,
+          "employee_name": 130,
+          "start_action": 140,
+          "start_timestamp": 190,
+          "end_action": 140,
+          "end_timestamp": 190,
+          "remark": 260,
+          "start_date": 140,
+          "start_time": 140,
+          "end_date": 140,
+          "end_time": 140,
+          "work_hours": 140,
+          "assembly_location": 140,
+          "group_key": 140,
+          "is_group_work": 140,
+          "source": 140,
+          "created_at": 180,
+          "updated_at": 180,
+          "department": 140,
+          "title": 140
+        },
+        "updated_at": "2026-05-26 17:31:51",
+        "reason": "v369_save_column_order",
+        "order": [
+          "id",
+          "跨日提醒 / Cross Day Alert",
+          "刪除 / Delete",
+          "重算 / Recalc",
+          "employee_id",
+          "status",
+          "employee_name",
+          "work_order",
+          "department",
+          "title",
+          "part_no",
+          "type_name",
+          "process_name",
+          "start_action",
+          "start_timestamp",
+          "end_action",
+          "end_timestamp",
+          "remark",
+          "start_date",
+          "start_time",
+          "end_date",
+          "end_time",
+          "work_hours",
+          "assembly_location",
+          "group_key",
+          "跨日日期 / Cross Day Date",
+          "is_group_work",
+          "source",
+          "created_at",
+          "updated_at",
+          "record_key"
+        ]
+      },
+      "today_finished_records_for_selected_employee_v148": {
+        "widths": {
+          "id": 70,
+          "record_key": 280,
+          "status": 140,
+          "work_order": 150,
+          "part_no": 170,
+          "type_name": 230,
+          "process_name": 140,
+          "employee_id": 120,
+          "employee_name": 130,
+          "start_action": 140,
+          "start_timestamp": 190,
+          "end_action": 140,
+          "end_timestamp": 190,
+          "remark": 260,
+          "start_date": 140,
+          "start_time": 140,
+          "end_date": 140,
+          "end_time": 140,
+          "work_hours": 140,
+          "assembly_location": 140,
+          "group_key": 140,
+          "is_group_work": 140,
+          "source": 140,
+          "created_at": 180,
+          "updated_at": 180
+        },
+        "updated_at": "2026-05-28 10:36:24",
+        "reason": "v369_save_column_order",
+        "order": [
+          "id",
+          "employee_id",
+          "employee_name",
+          "status",
+          "work_order",
+          "part_no",
+          "type_name",
+          "process_name",
+          "start_action",
+          "start_timestamp",
+          "end_action",
+          "end_timestamp",
+          "remark",
+          "start_date",
+          "start_time",
+          "end_date",
+          "end_time",
+          "work_hours",
+          "assembly_location",
+          "group_key",
+          "is_group_work",
+          "source",
+          "created_at",
+          "record_key",
+          "updated_at"
+        ]
+      },
+      "01.time_records.admin_maintenance": {
+        "widths": {
+          "刪除 / Delete": 140,
+          "id": 70,
+          "status": 140,
+          "work_order": 150,
+          "part_no": 170,
+          "type_name": 230,
+          "process_name": 140,
+          "employee_id": 120,
+          "employee_name": 130,
+          "start_action": 140,
+          "start_timestamp": 190,
+          "end_action": 140,
+          "end_timestamp": 190,
+          "remark": 260,
+          "start_date": 140,
+          "start_time": 140,
+          "end_date": 140,
+          "end_time": 140,
+          "work_hours": 140,
+          "assembly_location": 140,
+          "group_key": 140,
+          "is_group_work": 140,
+          "source": 140,
+          "created_at": 180,
+          "updated_at": 180,
+          "record_key": 280,
+          "v232_last_op": 140,
+          "v239_first_seen_at": 140,
+          "v239_saved_at": 140,
+          "department": 140,
+          "title": 140,
+          "department_emp": 140,
+          "title_emp": 140,
+          "recovery_status": 140,
+          "recovery_note": 140,
+          "is_deleted": 140,
+          "deleted_at": 140,
+          "work_hours_hms": 140,
+          "recovery_closed_at": 140,
+          "recovery_closed_source": 140,
+          "v238_enriched_at": 140,
+          "v239_last_op": 140
+        },
+        "updated_at": "2026-05-30 12:43:19",
+        "reason": "v369_save_column_order",
+        "order": [
+          "刪除 / Delete",
+          "id",
+          "status",
+          "work_order",
+          "part_no",
+          "type_name",
+          "process_name",
+          "employee_id",
+          "employee_name",
+          "start_action",
+          "start_timestamp",
+          "end_action",
+          "end_timestamp",
+          "remark",
+          "start_date",
+          "start_time",
+          "end_date",
+          "end_time",
+          "work_hours",
+          "assembly_location",
+          "group_key",
+          "is_group_work",
+          "source",
+          "created_at",
+          "updated_at",
+          "record_key",
+          "v232_last_op",
+          "v239_first_seen_at",
+          "v239_saved_at",
+          "department",
+          "title",
+          "department_emp",
+          "title_emp",
+          "recovery_status",
+          "recovery_note",
+          "is_deleted",
+          "deleted_at",
+          "work_hours_hms",
+          "recovery_closed_at",
+          "recovery_closed_source",
+          "v238_enriched_at",
+          "v239_last_op"
+        ]
+      }
+    },
+    "column_settings": {
+      "13_13._系統設定_13_13._系統設定_456_dataframe": {
+        "columns": {
+          "label": {
+            "source": "label",
+            "label": "label / label",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "path": {
+            "source": "path",
+            "label": "path / path",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "exists": {
+            "source": "exists",
+            "label": "exists / exists",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "json_readable": {
+            "source": "json_readable",
+            "label": "json_readable / json_readable",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "size": {
+            "source": "size",
+            "label": "size / size",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "modified": {
+            "source": "modified",
+            "label": "modified / modified",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "detail": {
+            "source": "detail",
+            "label": "詳細 / Detail",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "top_keys": {
+            "source": "top_keys",
+            "label": "top_keys / top_keys",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          }
+        },
+        "updated_at": "2026-05-30 10:23:52",
+        "reason": "v367_column_settings_saved"
+      },
+      "80435544260397582": {
+        "columns": {
+          "項目 / Item": {
+            "source": "項目 / Item",
+            "label": "項目 / Item / 項目 / Item",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "狀態 / Status": {
+            "source": "狀態 / Status",
+            "label": "狀態 / Status / 狀態 / Status",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "路徑 / Path": {
+            "source": "路徑 / Path",
+            "label": "路徑 / Path / 路徑 / Path",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "存在 / Exists": {
+            "source": "存在 / Exists",
+            "label": "存在 / Exists / 存在 / Exists",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "大小 / Size": {
+            "source": "大小 / Size",
+            "label": "大小 / Size / 大小 / Size",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "最後修改 / Modified": {
+            "source": "最後修改 / Modified",
+            "label": "最後修改 / Modified / 最後修改 / Modified",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "說明 / Detail": {
+            "source": "說明 / Detail",
+            "label": "說明 / Detail / 說明 / Detail",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          }
+        },
+        "updated_at": "2026-05-21 21:44:00",
+        "reason": "v367_column_settings_saved"
+      },
+      "2863204226532495066": {
+        "columns": {
+          "label": {
+            "source": "label",
+            "label": "label / label",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "path": {
+            "source": "path",
+            "label": "path / path",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "exists": {
+            "source": "exists",
+            "label": "exists / exists",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "json_readable": {
+            "source": "json_readable",
+            "label": "json_readable / json_readable",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "size": {
+            "source": "size",
+            "label": "size / size",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "modified": {
+            "source": "modified",
+            "label": "modified / modified",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "detail": {
+            "source": "detail",
+            "label": "詳細 / Detail",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "top_keys": {
+            "source": "top_keys",
+            "label": "top_keys / top_keys",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          }
+        },
+        "updated_at": "2026-05-21 21:44:00",
+        "reason": "v367_column_settings_saved"
+      },
+      "frame_12_module_persistence_status": {
+        "columns": {
+          "模組代碼 / Module Code": {
+            "source": "模組代碼 / Module Code",
+            "label": "模組代碼 / Module Code / 模組代碼 / Module Code",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "模組 / Module": {
+            "source": "模組 / Module",
+            "label": "模組 / Module / 模組 / Module",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "紀錄檔 / Records Exists": {
+            "source": "紀錄檔 / Records Exists",
+            "label": "紀錄檔 / Records Exists / 紀錄檔 / Records Exists",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "設定檔 / Settings Exists": {
+            "source": "設定檔 / Settings Exists",
+            "label": "設定檔 / Settings Exists / 設定檔 / Settings Exists",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "紀錄時間 / Exported At": {
+            "source": "紀錄時間 / Exported At",
+            "label": "紀錄時間 / Exported At / 紀錄時間 / Exported At",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "設定時間 / Settings At": {
+            "source": "設定時間 / Settings At",
+            "label": "設定時間 / Settings At / 設定時間 / Settings At",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "資料筆數 / Counts": {
+            "source": "資料筆數 / Counts",
+            "label": "資料筆數 / Counts / 資料筆數 / Counts",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "路徑 / Path": {
+            "source": "路徑 / Path",
+            "label": "路徑 / Path / 路徑 / Path",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "檢查說明 / Health Note": {
+            "source": "檢查說明 / Health Note",
+            "label": "檢查說明 / Health Note / 檢查說明 / Health Note",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "設定路徑 / Settings Path": {
+            "source": "設定路徑 / Settings Path",
+            "label": "設定路徑 / Settings Path / 設定路徑 / Settings Path",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          }
+        },
+        "updated_at": "2026-05-21 21:44:00",
+        "reason": "v367_column_settings_saved"
+      },
+      "01.time_records.conflicts": {
+        "columns": {
+          "id": {
+            "source": "id",
+            "label": "ID / ID",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "record_key": {
+            "source": "record_key",
+            "label": "紀錄鍵 / Record Key",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "status": {
+            "source": "status",
+            "label": "狀態 / Status",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "work_order": {
+            "source": "work_order",
+            "label": "製令 / Work Order",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "part_no": {
+            "source": "part_no",
+            "label": "P/N / Part No.",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "type_name": {
+            "source": "type_name",
+            "label": "機型 / Type",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "process_name": {
+            "source": "process_name",
+            "label": "工段 / Process",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "employee_id": {
+            "source": "employee_id",
+            "label": "工號 / Employee ID",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "employee_name": {
+            "source": "employee_name",
+            "label": "姓名 / Name",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "start_action": {
+            "source": "start_action",
+            "label": "開始動作 / Start Action",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          },
+          "start_timestamp": {
+            "source": "start_timestamp",
+            "label": "開始時間戳 / Start Timestamp",
+            "visible": true,
+            "width": "medium",
+            "order": 10
+          },
+          "end_action": {
+            "source": "end_action",
+            "label": "結束動作 / End Action",
+            "visible": true,
+            "width": "medium",
+            "order": 11
+          },
+          "end_timestamp": {
+            "source": "end_timestamp",
+            "label": "結束時間戳 / End Timestamp",
+            "visible": true,
+            "width": "medium",
+            "order": 12
+          },
+          "remark": {
+            "source": "remark",
+            "label": "備註 / Note",
+            "visible": true,
+            "width": "medium",
+            "order": 13
+          },
+          "start_date": {
+            "source": "start_date",
+            "label": "開始日期 / Start Date",
+            "visible": true,
+            "width": "medium",
+            "order": 14
+          },
+          "start_time": {
+            "source": "start_time",
+            "label": "開始時間 / Start Time",
+            "visible": true,
+            "width": "medium",
+            "order": 15
+          },
+          "end_date": {
+            "source": "end_date",
+            "label": "結束日期 / End Date",
+            "visible": true,
+            "width": "medium",
+            "order": 16
+          },
+          "end_time": {
+            "source": "end_time",
+            "label": "結束時間 / End Time",
+            "visible": true,
+            "width": "medium",
+            "order": 17
+          },
+          "work_hours": {
+            "source": "work_hours",
+            "label": "工時小計 / Work Hours",
+            "visible": true,
+            "width": "medium",
+            "order": 18
+          },
+          "assembly_location": {
+            "source": "assembly_location",
+            "label": "組立地點 / Assembly Location",
+            "visible": true,
+            "width": "medium",
+            "order": 19
+          },
+          "group_key": {
+            "source": "group_key",
+            "label": "同時作業鍵 / Parallel Key",
+            "visible": true,
+            "width": "medium",
+            "order": 20
+          },
+          "is_group_work": {
+            "source": "is_group_work",
+            "label": "同時作業 / Parallel Work",
+            "visible": true,
+            "width": "medium",
+            "order": 21
+          },
+          "source": {
+            "source": "source",
+            "label": "來源 / Source",
+            "visible": true,
+            "width": "medium",
+            "order": 22
+          },
+          "created_at": {
+            "source": "created_at",
+            "label": "建立時間 / Created At",
+            "visible": true,
+            "width": "medium",
+            "order": 23
+          },
+          "updated_at": {
+            "source": "updated_at",
+            "label": "更新時間 / Updated At",
+            "visible": true,
+            "width": "medium",
+            "order": 24
+          }
+        },
+        "updated_at": "2026-05-21 21:44:00",
+        "reason": "v367_column_settings_saved"
+      },
+      "01.time_records.main": {
+        "columns": {
+          "刪除 / Delete": {
+            "source": "刪除 / Delete",
+            "label": "刪除 / Delete / 刪除 / Delete",
+            "visible": true,
+            "width": "medium",
+            "order": -999
+          },
+          "id": {
+            "source": "id",
+            "label": "ID / ID",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "employee_id": {
+            "source": "employee_id",
+            "label": "工號 / Employee ID",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "status": {
+            "source": "status",
+            "label": "狀態 / Status",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "employee_name": {
+            "source": "employee_name",
+            "label": "姓名 / Name",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "work_order": {
+            "source": "work_order",
+            "label": "製令 / Work Order",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "department": {
+            "source": "department",
+            "label": "單位 / Department",
+            "visible": true,
+            "width": "medium",
+            "order": 28
+          },
+          "title": {
+            "source": "title",
+            "label": "職稱 / Title",
+            "visible": true,
+            "width": "medium",
+            "order": 29
+          },
+          "part_no": {
+            "source": "part_no",
+            "label": "P/N / Part No.",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "type_name": {
+            "source": "type_name",
+            "label": "機型 / Type",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "process_name": {
+            "source": "process_name",
+            "label": "工段 / Process",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "start_action": {
+            "source": "start_action",
+            "label": "開始動作 / Start Action",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          },
+          "start_timestamp": {
+            "source": "start_timestamp",
+            "label": "開始時間戳 / Start Timestamp",
+            "visible": true,
+            "width": "medium",
+            "order": 10
+          },
+          "end_action": {
+            "source": "end_action",
+            "label": "結束動作 / End Action",
+            "visible": true,
+            "width": "medium",
+            "order": 11
+          },
+          "end_timestamp": {
+            "source": "end_timestamp",
+            "label": "結束時間戳 / End Timestamp",
+            "visible": true,
+            "width": "medium",
+            "order": 12
+          },
+          "remark": {
+            "source": "remark",
+            "label": "備註 / Note",
+            "visible": true,
+            "width": "medium",
+            "order": 13
+          },
+          "start_date": {
+            "source": "start_date",
+            "label": "開始日期 / Start Date",
+            "visible": true,
+            "width": "medium",
+            "order": 14
+          },
+          "start_time": {
+            "source": "start_time",
+            "label": "開始時間 / Start Time",
+            "visible": true,
+            "width": "medium",
+            "order": 15
+          },
+          "end_date": {
+            "source": "end_date",
+            "label": "結束日期 / End Date",
+            "visible": true,
+            "width": "medium",
+            "order": 16
+          },
+          "end_time": {
+            "source": "end_time",
+            "label": "結束時間 / End Time",
+            "visible": true,
+            "width": "medium",
+            "order": 17
+          },
+          "work_hours": {
+            "source": "work_hours",
+            "label": "工時小計 / Work Hours",
+            "visible": true,
+            "width": "medium",
+            "order": 18
+          },
+          "assembly_location": {
+            "source": "assembly_location",
+            "label": "組立地點 / Assembly Location",
+            "visible": true,
+            "width": "medium",
+            "order": 19
+          },
+          "group_key": {
+            "source": "group_key",
+            "label": "同時作業鍵 / Parallel Key",
+            "visible": true,
+            "width": "medium",
+            "order": 20
+          },
+          "is_group_work": {
+            "source": "is_group_work",
+            "label": "同時作業 / Parallel Work",
+            "visible": true,
+            "width": "medium",
+            "order": 21
+          },
+          "source": {
+            "source": "source",
+            "label": "來源 / Source",
+            "visible": true,
+            "width": "medium",
+            "order": 22
+          },
+          "created_at": {
+            "source": "created_at",
+            "label": "建立時間 / Created At",
+            "visible": true,
+            "width": "medium",
+            "order": 23
+          },
+          "updated_at": {
+            "source": "updated_at",
+            "label": "更新時間 / Updated At",
+            "visible": true,
+            "width": "medium",
+            "order": 24
+          },
+          "record_key": {
+            "source": "record_key",
+            "label": "紀錄鍵 / Record Key",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "v232_last_op": {
+            "source": "v232_last_op",
+            "label": "v232_last_op / v232_last_op",
+            "visible": true,
+            "width": "medium",
+            "order": 25
+          },
+          "department_emp": {
+            "source": "department_emp",
+            "label": "department_emp / department_emp",
+            "visible": true,
+            "width": "medium",
+            "order": 30
+          },
+          "title_emp": {
+            "source": "title_emp",
+            "label": "title_emp / title_emp",
+            "visible": true,
+            "width": "medium",
+            "order": 31
+          },
+          "recovery_status": {
+            "source": "recovery_status",
+            "label": "recovery_status / recovery_status",
+            "visible": true,
+            "width": "medium",
+            "order": 32
+          },
+          "recovery_note": {
+            "source": "recovery_note",
+            "label": "recovery_note / recovery_note",
+            "visible": true,
+            "width": "medium",
+            "order": 33
+          },
+          "is_deleted": {
+            "source": "is_deleted",
+            "label": "is_deleted / is_deleted",
+            "visible": true,
+            "width": "medium",
+            "order": 35
+          },
+          "deleted_at": {
+            "source": "deleted_at",
+            "label": "deleted_at / deleted_at",
+            "visible": true,
+            "width": "medium",
+            "order": 37
+          },
+          "work_hours_hms": {
+            "source": "work_hours_hms",
+            "label": "工時小計 / Work Hours",
+            "visible": true,
+            "width": "medium",
+            "order": 38
+          },
+          "recovery_closed_at": {
+            "source": "recovery_closed_at",
+            "label": "recovery_closed_at / recovery_closed_at",
+            "visible": true,
+            "width": "medium",
+            "order": 39
+          },
+          "recovery_closed_source": {
+            "source": "recovery_closed_source",
+            "label": "recovery_closed_source / recovery_closed_source",
+            "visible": true,
+            "width": "medium",
+            "order": 40
+          },
+          "v238_enriched_at": {
+            "source": "v238_enriched_at",
+            "label": "v238_enriched_at / v238_enriched_at",
+            "visible": true,
+            "width": "medium",
+            "order": 34
+          },
+          "v239_first_seen_at": {
+            "source": "v239_first_seen_at",
+            "label": "v239_first_seen_at / v239_first_seen_at",
+            "visible": true,
+            "width": "medium",
+            "order": 26
+          },
+          "v239_saved_at": {
+            "source": "v239_saved_at",
+            "label": "v239_saved_at / v239_saved_at",
+            "visible": true,
+            "width": "medium",
+            "order": 27
+          },
+          "v239_last_op": {
+            "source": "v239_last_op",
+            "label": "v239_last_op / v239_last_op",
+            "visible": true,
+            "width": "medium",
+            "order": 36
+          }
+        },
+        "updated_at": "2026-05-21 21:44:00",
+        "reason": "v367_column_settings_saved"
+      },
+      "6950080309495434487": {
+        "columns": {
+          "項目 / Item": {
+            "source": "項目 / Item",
+            "label": "項目 / Item / 項目 / Item",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "狀態 / Status": {
+            "source": "狀態 / Status",
+            "label": "狀態 / Status / 狀態 / Status",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "路徑 / Path": {
+            "source": "路徑 / Path",
+            "label": "路徑 / Path / 路徑 / Path",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "存在 / Exists": {
+            "source": "存在 / Exists",
+            "label": "存在 / Exists / 存在 / Exists",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "大小 / Size": {
+            "source": "大小 / Size",
+            "label": "大小 / Size / 大小 / Size",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "最後修改 / Modified": {
+            "source": "最後修改 / Modified",
+            "label": "最後修改 / Modified / 最後修改 / Modified",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "說明 / Detail": {
+            "source": "說明 / Detail",
+            "label": "說明 / Detail / 說明 / Detail",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          }
+        },
+        "updated_at": "2026-05-21 21:44:00",
+        "reason": "v367_column_settings_saved"
+      },
+      "7390060110366569782": {
+        "columns": {
+          "label": {
+            "source": "label",
+            "label": "label / label",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "path": {
+            "source": "path",
+            "label": "path / path",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "exists": {
+            "source": "exists",
+            "label": "exists / exists",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "json_readable": {
+            "source": "json_readable",
+            "label": "json_readable / json_readable",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "size": {
+            "source": "size",
+            "label": "size / size",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "modified": {
+            "source": "modified",
+            "label": "modified / modified",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "detail": {
+            "source": "detail",
+            "label": "詳細 / Detail",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "top_keys": {
+            "source": "top_keys",
+            "label": "top_keys / top_keys",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          }
+        },
+        "updated_at": "2026-05-21 21:44:00",
+        "reason": "v367_column_settings_saved"
+      },
+      "5257968983138316932": {
+        "columns": {
+          "項目 / Item": {
+            "source": "項目 / Item",
+            "label": "項目 / Item / 項目 / Item",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "狀態 / Status": {
+            "source": "狀態 / Status",
+            "label": "狀態 / Status / 狀態 / Status",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "路徑 / Path": {
+            "source": "路徑 / Path",
+            "label": "路徑 / Path / 路徑 / Path",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "存在 / Exists": {
+            "source": "存在 / Exists",
+            "label": "存在 / Exists / 存在 / Exists",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "大小 / Size": {
+            "source": "大小 / Size",
+            "label": "大小 / Size / 大小 / Size",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "最後修改 / Modified": {
+            "source": "最後修改 / Modified",
+            "label": "最後修改 / Modified / 最後修改 / Modified",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "說明 / Detail": {
+            "source": "說明 / Detail",
+            "label": "說明 / Detail / 說明 / Detail",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          }
+        },
+        "updated_at": "2026-05-21 21:44:00",
+        "reason": "v367_column_settings_saved"
+      },
+      "4907734016268996834": {
+        "columns": {
+          "label": {
+            "source": "label",
+            "label": "label / label",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "path": {
+            "source": "path",
+            "label": "path / path",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "exists": {
+            "source": "exists",
+            "label": "exists / exists",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "json_readable": {
+            "source": "json_readable",
+            "label": "json_readable / json_readable",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "size": {
+            "source": "size",
+            "label": "size / size",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "modified": {
+            "source": "modified",
+            "label": "modified / modified",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "detail": {
+            "source": "detail",
+            "label": "詳細 / Detail",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "top_keys": {
+            "source": "top_keys",
+            "label": "top_keys / top_keys",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          }
+        },
+        "updated_at": "2026-05-21 21:44:00",
+        "reason": "v367_column_settings_saved"
+      },
+      "10.permissions.account_master": {
+        "columns": {
+          "刪除 / Delete": {
+            "source": "刪除 / Delete",
+            "label": "刪除 / Delete / 刪除 / Delete",
+            "visible": true,
+            "width": "medium",
+            "order": -999
+          },
+          "帳號 / Username": {
+            "source": "帳號 / Username",
+            "label": "帳號 / Username / 帳號 / Username",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "密碼狀態 / Password Status": {
+            "source": "密碼狀態 / Password Status",
+            "label": "密碼狀態 / Password Status / 密碼狀態 / Password Status",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "新密碼 / New Password": {
+            "source": "新密碼 / New Password",
+            "label": "新密碼 / New Password / 新密碼 / New Password",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "工號 / Employee ID": {
+            "source": "工號 / Employee ID",
+            "label": "工號 / Employee ID / 工號 / Employee ID",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "姓名 / Display Name": {
+            "source": "姓名 / Display Name",
+            "label": "姓名 / Display Name / 姓名 / Display Name",
+            "visible": true,
+            "width": "medium",
+            "order": 10
+          },
+          "Email": {
+            "source": "Email",
+            "label": "Email / Email",
+            "visible": true,
+            "width": "medium",
+            "order": 11
+          },
+          "角色 / Role": {
+            "source": "角色 / Role",
+            "label": "角色 / Role / 角色 / Role",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "啟用 / Active": {
+            "source": "啟用 / Active",
+            "label": "啟用 / Active / 啟用 / Active",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "強制改密碼 / Force Change": {
+            "source": "強制改密碼 / Force Change",
+            "label": "強制改密碼 / Force Change / 強制改密碼 / Force Change",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "備註 / Note": {
+            "source": "備註 / Note",
+            "label": "備註 / Note / 備註 / Note",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "最後登入 / Last Login": {
+            "source": "最後登入 / Last Login",
+            "label": "最後登入 / Last Login / 最後登入 / Last Login",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "更新時間 / Updated At": {
+            "source": "更新時間 / Updated At",
+            "label": "更新時間 / Updated At / 更新時間 / Updated At",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          }
+        },
+        "updated_at": "2026-05-21 21:44:00",
+        "reason": "v367_column_settings_saved"
+      },
+      "employees_data_editor_v253": {
+        "columns": {
+          "刪除 / Delete": {
+            "source": "刪除 / Delete",
+            "label": "刪除 / Delete / 刪除 / Delete",
+            "visible": true,
+            "width": "medium",
+            "order": -999
+          },
+          "ID / ID": {
+            "source": "ID / ID",
+            "label": "ID / ID / ID / ID",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "工號 / Employee ID": {
+            "source": "工號 / Employee ID",
+            "label": "工號 / Employee ID / 工號 / Employee ID",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "姓名 / Name": {
+            "source": "姓名 / Name",
+            "label": "姓名 / Name / 姓名 / Name",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "單位 / Department": {
+            "source": "單位 / Department",
+            "label": "單位 / Department / 單位 / Department",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "職稱 / Title": {
+            "source": "職稱 / Title",
+            "label": "職稱 / Title / 職稱 / Title",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "啟用 / Active": {
+            "source": "啟用 / Active",
+            "label": "啟用 / Active / 啟用 / Active",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "在廠 / In Factory": {
+            "source": "在廠 / In Factory",
+            "label": "在廠 / In Factory / 在廠 / In Factory",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "今日出勤 / Today Attendance": {
+            "source": "今日出勤 / Today Attendance",
+            "label": "今日出勤 / Today Attendance / 今日出勤 / Today Attendance",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "備註 / Note": {
+            "source": "備註 / Note",
+            "label": "備註 / Note / 備註 / Note",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "建立時間 / Created At": {
+            "source": "建立時間 / Created At",
+            "label": "建立時間 / Created At / 建立時間 / Created At",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          },
+          "更新時間 / Updated At": {
+            "source": "更新時間 / Updated At",
+            "label": "更新時間 / Updated At / 更新時間 / Updated At",
+            "visible": true,
+            "width": "medium",
+            "order": 10
+          }
+        },
+        "updated_at": "2026-05-21 21:47:09",
+        "reason": "v367_column_settings_saved"
+      },
+      "work_orders_data_editor_v253": {
+        "columns": {
+          "刪除 / Delete": {
+            "source": "刪除 / Delete",
+            "label": "刪除 / Delete / 刪除 / Delete",
+            "visible": true,
+            "width": "medium",
+            "order": -999
+          },
+          "ID / ID": {
+            "source": "ID / ID",
+            "label": "ID / ID / ID / ID",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "製令 / Work Order": {
+            "source": "製令 / Work Order",
+            "label": "製令 / Work Order / 製令 / Work Order",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "P/N / Part No.": {
+            "source": "P/N / Part No.",
+            "label": "P/N / Part No. / P/N / Part No.",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "機型 / Type": {
+            "source": "機型 / Type",
+            "label": "機型 / Type / 機型 / Type",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "組立地點 / Assembly Location": {
+            "source": "組立地點 / Assembly Location",
+            "label": "組立地點 / Assembly Location / 組立地點 / Assembly Location",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "客戶 / Customer": {
+            "source": "客戶 / Customer",
+            "label": "客戶 / Customer / 客戶 / Customer",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "備註 / Note": {
+            "source": "備註 / Note",
+            "label": "備註 / Note / 備註 / Note",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "啟用 / Active": {
+            "source": "啟用 / Active",
+            "label": "啟用 / Active / 啟用 / Active",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "建立時間 / Created At": {
+            "source": "建立時間 / Created At",
+            "label": "建立時間 / Created At / 建立時間 / Created At",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "更新時間 / Updated At": {
+            "source": "更新時間 / Updated At",
+            "label": "更新時間 / Updated At / 更新時間 / Updated At",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          }
+        },
+        "updated_at": "2026-05-21 21:47:19",
+        "reason": "v367_column_settings_saved"
+      },
+      "wo_onedrive_source_preview_v246_看板": {
+        "columns": {
+          "欄位1": {
+            "source": "欄位1",
+            "label": "欄位1 / 欄位1",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "欄位2": {
+            "source": "欄位2",
+            "label": "欄位2 / 欄位2",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "欄位3": {
+            "source": "欄位3",
+            "label": "欄位3 / 欄位3",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "欄位4": {
+            "source": "欄位4",
+            "label": "欄位4 / 欄位4",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "欄位5": {
+            "source": "欄位5",
+            "label": "欄位5 / 欄位5",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "欄位6": {
+            "source": "欄位6",
+            "label": "欄位6 / 欄位6",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "欄位7": {
+            "source": "欄位7",
+            "label": "欄位7 / 欄位7",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "欄位8": {
+            "source": "欄位8",
+            "label": "欄位8 / 欄位8",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "欄位9": {
+            "source": "欄位9",
+            "label": "欄位9 / 欄位9",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "欄位10": {
+            "source": "欄位10",
+            "label": "欄位10 / 欄位10",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          },
+          "欄位11": {
+            "source": "欄位11",
+            "label": "欄位11 / 欄位11",
+            "visible": true,
+            "width": "medium",
+            "order": 10
+          },
+          "欄位12": {
+            "source": "欄位12",
+            "label": "欄位12 / 欄位12",
+            "visible": true,
+            "width": "medium",
+            "order": 11
+          },
+          "欄位13": {
+            "source": "欄位13",
+            "label": "欄位13 / 欄位13",
+            "visible": true,
+            "width": "medium",
+            "order": 12
+          },
+          "欄位14": {
+            "source": "欄位14",
+            "label": "欄位14 / 欄位14",
+            "visible": true,
+            "width": "medium",
+            "order": 13
+          },
+          "欄位15": {
+            "source": "欄位15",
+            "label": "欄位15 / 欄位15",
+            "visible": true,
+            "width": "medium",
+            "order": 14
+          },
+          "欄位16": {
+            "source": "欄位16",
+            "label": "欄位16 / 欄位16",
+            "visible": true,
+            "width": "medium",
+            "order": 15
+          },
+          "欄位17": {
+            "source": "欄位17",
+            "label": "欄位17 / 欄位17",
+            "visible": true,
+            "width": "medium",
+            "order": 16
+          },
+          "欄位18": {
+            "source": "欄位18",
+            "label": "欄位18 / 欄位18",
+            "visible": true,
+            "width": "medium",
+            "order": 17
+          },
+          "欄位19": {
+            "source": "欄位19",
+            "label": "欄位19 / 欄位19",
+            "visible": true,
+            "width": "medium",
+            "order": 18
+          },
+          "欄位20": {
+            "source": "欄位20",
+            "label": "欄位20 / 欄位20",
+            "visible": true,
+            "width": "medium",
+            "order": 19
+          },
+          "欄位21": {
+            "source": "欄位21",
+            "label": "欄位21 / 欄位21",
+            "visible": true,
+            "width": "medium",
+            "order": 20
+          },
+          "欄位22": {
+            "source": "欄位22",
+            "label": "欄位22 / 欄位22",
+            "visible": true,
+            "width": "medium",
+            "order": 21
+          },
+          "欄位23": {
+            "source": "欄位23",
+            "label": "欄位23 / 欄位23",
+            "visible": true,
+            "width": "medium",
+            "order": 22
+          },
+          "欄位24": {
+            "source": "欄位24",
+            "label": "欄位24 / 欄位24",
+            "visible": true,
+            "width": "medium",
+            "order": 23
+          },
+          "欄位25": {
+            "source": "欄位25",
+            "label": "欄位25 / 欄位25",
+            "visible": true,
+            "width": "medium",
+            "order": 24
+          },
+          "欄位26": {
+            "source": "欄位26",
+            "label": "欄位26 / 欄位26",
+            "visible": true,
+            "width": "medium",
+            "order": 25
+          },
+          "欄位27": {
+            "source": "欄位27",
+            "label": "欄位27 / 欄位27",
+            "visible": true,
+            "width": "medium",
+            "order": 26
+          },
+          "欄位28": {
+            "source": "欄位28",
+            "label": "欄位28 / 欄位28",
+            "visible": true,
+            "width": "medium",
+            "order": 27
+          },
+          "欄位29": {
+            "source": "欄位29",
+            "label": "欄位29 / 欄位29",
+            "visible": true,
+            "width": "medium",
+            "order": 28
+          },
+          "欄位30": {
+            "source": "欄位30",
+            "label": "欄位30 / 欄位30",
+            "visible": true,
+            "width": "medium",
+            "order": 29
+          },
+          "欄位31": {
+            "source": "欄位31",
+            "label": "欄位31 / 欄位31",
+            "visible": true,
+            "width": "medium",
+            "order": 30
+          },
+          "欄位32": {
+            "source": "欄位32",
+            "label": "欄位32 / 欄位32",
+            "visible": true,
+            "width": "medium",
+            "order": 31
+          },
+          "欄位33": {
+            "source": "欄位33",
+            "label": "欄位33 / 欄位33",
+            "visible": true,
+            "width": "medium",
+            "order": 32
+          },
+          "欄位34": {
+            "source": "欄位34",
+            "label": "欄位34 / 欄位34",
+            "visible": true,
+            "width": "medium",
+            "order": 33
+          },
+          "欄位35": {
+            "source": "欄位35",
+            "label": "欄位35 / 欄位35",
+            "visible": true,
+            "width": "medium",
+            "order": 34
+          },
+          "欄位36": {
+            "source": "欄位36",
+            "label": "欄位36 / 欄位36",
+            "visible": true,
+            "width": "medium",
+            "order": 35
+          },
+          "欄位37": {
+            "source": "欄位37",
+            "label": "欄位37 / 欄位37",
+            "visible": true,
+            "width": "medium",
+            "order": 36
+          },
+          "欄位38": {
+            "source": "欄位38",
+            "label": "欄位38 / 欄位38",
+            "visible": true,
+            "width": "medium",
+            "order": 37
+          },
+          "欄位39": {
+            "source": "欄位39",
+            "label": "欄位39 / 欄位39",
+            "visible": true,
+            "width": "medium",
+            "order": 38
+          },
+          "欄位40": {
+            "source": "欄位40",
+            "label": "欄位40 / 欄位40",
+            "visible": true,
+            "width": "medium",
+            "order": 39
+          },
+          "欄位41": {
+            "source": "欄位41",
+            "label": "欄位41 / 欄位41",
+            "visible": true,
+            "width": "medium",
+            "order": 40
+          },
+          "欄位42": {
+            "source": "欄位42",
+            "label": "欄位42 / 欄位42",
+            "visible": true,
+            "width": "medium",
+            "order": 41
+          },
+          "欄位43": {
+            "source": "欄位43",
+            "label": "欄位43 / 欄位43",
+            "visible": true,
+            "width": "medium",
+            "order": 42
+          },
+          "欄位44": {
+            "source": "欄位44",
+            "label": "欄位44 / 欄位44",
+            "visible": true,
+            "width": "medium",
+            "order": 43
+          },
+          "欄位45": {
+            "source": "欄位45",
+            "label": "欄位45 / 欄位45",
+            "visible": true,
+            "width": "medium",
+            "order": 44
+          },
+          "欄位46": {
+            "source": "欄位46",
+            "label": "欄位46 / 欄位46",
+            "visible": true,
+            "width": "medium",
+            "order": 45
+          },
+          "欄位47": {
+            "source": "欄位47",
+            "label": "欄位47 / 欄位47",
+            "visible": true,
+            "width": "medium",
+            "order": 46
+          },
+          "欄位48": {
+            "source": "欄位48",
+            "label": "欄位48 / 欄位48",
+            "visible": true,
+            "width": "medium",
+            "order": 47
+          },
+          "欄位49": {
+            "source": "欄位49",
+            "label": "欄位49 / 欄位49",
+            "visible": true,
+            "width": "medium",
+            "order": 48
+          },
+          "欄位50": {
+            "source": "欄位50",
+            "label": "欄位50 / 欄位50",
+            "visible": true,
+            "width": "medium",
+            "order": 49
+          },
+          "欄位51": {
+            "source": "欄位51",
+            "label": "欄位51 / 欄位51",
+            "visible": true,
+            "width": "medium",
+            "order": 50
+          },
+          "欄位52": {
+            "source": "欄位52",
+            "label": "欄位52 / 欄位52",
+            "visible": true,
+            "width": "medium",
+            "order": 51
+          },
+          "欄位53": {
+            "source": "欄位53",
+            "label": "欄位53 / 欄位53",
+            "visible": true,
+            "width": "medium",
+            "order": 52
+          },
+          "欄位54": {
+            "source": "欄位54",
+            "label": "欄位54 / 欄位54",
+            "visible": true,
+            "width": "medium",
+            "order": 53
+          },
+          "欄位55": {
+            "source": "欄位55",
+            "label": "欄位55 / 欄位55",
+            "visible": true,
+            "width": "medium",
+            "order": 54
+          },
+          "欄位56": {
+            "source": "欄位56",
+            "label": "欄位56 / 欄位56",
+            "visible": true,
+            "width": "medium",
+            "order": 55
+          },
+          "欄位57": {
+            "source": "欄位57",
+            "label": "欄位57 / 欄位57",
+            "visible": true,
+            "width": "medium",
+            "order": 56
+          },
+          "欄位58": {
+            "source": "欄位58",
+            "label": "欄位58 / 欄位58",
+            "visible": true,
+            "width": "medium",
+            "order": 57
+          },
+          "欄位59": {
+            "source": "欄位59",
+            "label": "欄位59 / 欄位59",
+            "visible": true,
+            "width": "medium",
+            "order": 58
+          },
+          "欄位60": {
+            "source": "欄位60",
+            "label": "欄位60 / 欄位60",
+            "visible": true,
+            "width": "medium",
+            "order": 59
+          },
+          "欄位61": {
+            "source": "欄位61",
+            "label": "欄位61 / 欄位61",
+            "visible": true,
+            "width": "medium",
+            "order": 60
+          },
+          "欄位62": {
+            "source": "欄位62",
+            "label": "欄位62 / 欄位62",
+            "visible": true,
+            "width": "medium",
+            "order": 61
+          },
+          "欄位63": {
+            "source": "欄位63",
+            "label": "欄位63 / 欄位63",
+            "visible": true,
+            "width": "medium",
+            "order": 62
+          },
+          "欄位64": {
+            "source": "欄位64",
+            "label": "欄位64 / 欄位64",
+            "visible": true,
+            "width": "medium",
+            "order": 63
+          },
+          "欄位65": {
+            "source": "欄位65",
+            "label": "欄位65 / 欄位65",
+            "visible": true,
+            "width": "medium",
+            "order": 64
+          },
+          "欄位66": {
+            "source": "欄位66",
+            "label": "欄位66 / 欄位66",
+            "visible": true,
+            "width": "medium",
+            "order": 65
+          },
+          "欄位67": {
+            "source": "欄位67",
+            "label": "欄位67 / 欄位67",
+            "visible": true,
+            "width": "medium",
+            "order": 66
+          },
+          "欄位68": {
+            "source": "欄位68",
+            "label": "欄位68 / 欄位68",
+            "visible": true,
+            "width": "medium",
+            "order": 67
+          },
+          "欄位69": {
+            "source": "欄位69",
+            "label": "欄位69 / 欄位69",
+            "visible": true,
+            "width": "medium",
+            "order": 68
+          },
+          "欄位70": {
+            "source": "欄位70",
+            "label": "欄位70 / 欄位70",
+            "visible": true,
+            "width": "medium",
+            "order": 69
+          },
+          "欄位71": {
+            "source": "欄位71",
+            "label": "欄位71 / 欄位71",
+            "visible": true,
+            "width": "medium",
+            "order": 70
+          },
+          "欄位72": {
+            "source": "欄位72",
+            "label": "欄位72 / 欄位72",
+            "visible": true,
+            "width": "medium",
+            "order": 71
+          },
+          "欄位73": {
+            "source": "欄位73",
+            "label": "欄位73 / 欄位73",
+            "visible": true,
+            "width": "medium",
+            "order": 72
+          },
+          "欄位74": {
+            "source": "欄位74",
+            "label": "欄位74 / 欄位74",
+            "visible": true,
+            "width": "medium",
+            "order": 73
+          },
+          "欄位75": {
+            "source": "欄位75",
+            "label": "欄位75 / 欄位75",
+            "visible": true,
+            "width": "medium",
+            "order": 74
+          },
+          "欄位76": {
+            "source": "欄位76",
+            "label": "欄位76 / 欄位76",
+            "visible": true,
+            "width": "medium",
+            "order": 75
+          },
+          "欄位77": {
+            "source": "欄位77",
+            "label": "欄位77 / 欄位77",
+            "visible": true,
+            "width": "medium",
+            "order": 76
+          },
+          "欄位78": {
+            "source": "欄位78",
+            "label": "欄位78 / 欄位78",
+            "visible": true,
+            "width": "medium",
+            "order": 77
+          },
+          "欄位79": {
+            "source": "欄位79",
+            "label": "欄位79 / 欄位79",
+            "visible": true,
+            "width": "medium",
+            "order": 78
+          },
+          "欄位80": {
+            "source": "欄位80",
+            "label": "欄位80 / 欄位80",
+            "visible": true,
+            "width": "medium",
+            "order": 79
+          },
+          "欄位81": {
+            "source": "欄位81",
+            "label": "欄位81 / 欄位81",
+            "visible": true,
+            "width": "medium",
+            "order": 80
+          },
+          "欄位82": {
+            "source": "欄位82",
+            "label": "欄位82 / 欄位82",
+            "visible": true,
+            "width": "medium",
+            "order": 81
+          },
+          "欄位83": {
+            "source": "欄位83",
+            "label": "欄位83 / 欄位83",
+            "visible": true,
+            "width": "medium",
+            "order": 82
+          },
+          "欄位84": {
+            "source": "欄位84",
+            "label": "欄位84 / 欄位84",
+            "visible": true,
+            "width": "medium",
+            "order": 83
+          },
+          "欄位85": {
+            "source": "欄位85",
+            "label": "欄位85 / 欄位85",
+            "visible": true,
+            "width": "medium",
+            "order": 84
+          },
+          "欄位86": {
+            "source": "欄位86",
+            "label": "欄位86 / 欄位86",
+            "visible": true,
+            "width": "medium",
+            "order": 85
+          },
+          "欄位87": {
+            "source": "欄位87",
+            "label": "欄位87 / 欄位87",
+            "visible": true,
+            "width": "medium",
+            "order": 86
+          },
+          "欄位88": {
+            "source": "欄位88",
+            "label": "欄位88 / 欄位88",
+            "visible": true,
+            "width": "medium",
+            "order": 87
+          },
+          "欄位89": {
+            "source": "欄位89",
+            "label": "欄位89 / 欄位89",
+            "visible": true,
+            "width": "medium",
+            "order": 88
+          },
+          "欄位90": {
+            "source": "欄位90",
+            "label": "欄位90 / 欄位90",
+            "visible": true,
+            "width": "medium",
+            "order": 89
+          },
+          "欄位91": {
+            "source": "欄位91",
+            "label": "欄位91 / 欄位91",
+            "visible": true,
+            "width": "medium",
+            "order": 90
+          },
+          "欄位92": {
+            "source": "欄位92",
+            "label": "欄位92 / 欄位92",
+            "visible": true,
+            "width": "medium",
+            "order": 91
+          },
+          "欄位93": {
+            "source": "欄位93",
+            "label": "欄位93 / 欄位93",
+            "visible": true,
+            "width": "medium",
+            "order": 92
+          },
+          "欄位94": {
+            "source": "欄位94",
+            "label": "欄位94 / 欄位94",
+            "visible": true,
+            "width": "medium",
+            "order": 93
+          },
+          "欄位95": {
+            "source": "欄位95",
+            "label": "欄位95 / 欄位95",
+            "visible": true,
+            "width": "medium",
+            "order": 94
+          },
+          "欄位96": {
+            "source": "欄位96",
+            "label": "欄位96 / 欄位96",
+            "visible": true,
+            "width": "medium",
+            "order": 95
+          },
+          "欄位97": {
+            "source": "欄位97",
+            "label": "欄位97 / 欄位97",
+            "visible": true,
+            "width": "medium",
+            "order": 96
+          },
+          "欄位98": {
+            "source": "欄位98",
+            "label": "欄位98 / 欄位98",
+            "visible": true,
+            "width": "medium",
+            "order": 97
+          },
+          "欄位99": {
+            "source": "欄位99",
+            "label": "欄位99 / 欄位99",
+            "visible": true,
+            "width": "medium",
+            "order": 98
+          },
+          "欄位100": {
+            "source": "欄位100",
+            "label": "欄位100 / 欄位100",
+            "visible": true,
+            "width": "medium",
+            "order": 99
+          },
+          "欄位101": {
+            "source": "欄位101",
+            "label": "欄位101 / 欄位101",
+            "visible": true,
+            "width": "medium",
+            "order": 100
+          },
+          "2026-": {
+            "source": "2026-",
+            "label": "2026- / 2026-",
+            "visible": true,
+            "width": "medium",
+            "order": 102
+          },
+          "欄位103": {
+            "source": "欄位103",
+            "label": "欄位103 / 欄位103",
+            "visible": true,
+            "width": "medium",
+            "order": 101
+          },
+          "05-29": {
+            "source": "05-29",
+            "label": "05-29 / 05-29",
+            "visible": true,
+            "width": "medium",
+            "order": 103
+          },
+          "欄位105": {
+            "source": "欄位105",
+            "label": "欄位105 / 欄位105",
+            "visible": true,
+            "width": "medium",
+            "order": 105
+          },
+          "欄位106": {
+            "source": "欄位106",
+            "label": "欄位106 / 欄位106",
+            "visible": true,
+            "width": "medium",
+            "order": 106
+          },
+          "欄位107": {
+            "source": "欄位107",
+            "label": "欄位107 / 欄位107",
+            "visible": true,
+            "width": "medium",
+            "order": 104
+          },
+          "欄位108": {
+            "source": "欄位108",
+            "label": "欄位108 / 欄位108",
+            "visible": true,
+            "width": "medium",
+            "order": 107
+          },
+          "欄位109": {
+            "source": "欄位109",
+            "label": "欄位109 / 欄位109",
+            "visible": true,
+            "width": "medium",
+            "order": 108
+          },
+          "欄位110": {
+            "source": "欄位110",
+            "label": "欄位110 / 欄位110",
+            "visible": true,
+            "width": "medium",
+            "order": 109
+          },
+          "欄位111": {
+            "source": "欄位111",
+            "label": "欄位111 / 欄位111",
+            "visible": true,
+            "width": "medium",
+            "order": 110
+          },
+          "欄位112": {
+            "source": "欄位112",
+            "label": "欄位112 / 欄位112",
+            "visible": true,
+            "width": "medium",
+            "order": 111
+          },
+          "欄位113": {
+            "source": "欄位113",
+            "label": "欄位113 / 欄位113",
+            "visible": true,
+            "width": "medium",
+            "order": 112
+          },
+          "欄位114": {
+            "source": "欄位114",
+            "label": "欄位114 / 欄位114",
+            "visible": true,
+            "width": "medium",
+            "order": 113
+          },
+          "欄位115": {
+            "source": "欄位115",
+            "label": "欄位115 / 欄位115",
+            "visible": true,
+            "width": "medium",
+            "order": 114
+          },
+          "欄位116": {
+            "source": "欄位116",
+            "label": "欄位116 / 欄位116",
+            "visible": true,
+            "width": "medium",
+            "order": 115
+          }
+        },
+        "updated_at": "2026-05-25 22:07:02",
+        "reason": "v367_column_settings_saved"
+      },
+      "wo_onedrive_source_preview_v246_排程": {
+        "columns": {
+          "製令&時間": {
+            "source": "製令&時間",
+            "label": "製令&時間 / 製令&時間",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "製令&出現次數": {
+            "source": "製令&出現次數",
+            "label": "製令&出現次數 / 製令&出現次數",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "製令": {
+            "source": "製令",
+            "label": "製令 / 製令",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "客戶": {
+            "source": "客戶",
+            "label": "客戶 / 客戶",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "P/N": {
+            "source": "P/N",
+            "label": "P/N / P/N",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "Type": {
+            "source": "Type",
+            "label": "Type / Type",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "Category": {
+            "source": "Category",
+            "label": "Category / Category",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "組立\n地點": {
+            "source": "組立\n地點",
+            "label": "組立\n地點 / 組立\n地點",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "組立\n進度": {
+            "source": "組立\n進度",
+            "label": "組立\n進度 / 組立\n進度",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "備註": {
+            "source": "備註",
+            "label": "備註 / 備註",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          },
+          "開工日": {
+            "source": "開工日",
+            "label": "開工日 / 開工日",
+            "visible": true,
+            "width": "medium",
+            "order": 10
+          },
+          "入庫日": {
+            "source": "入庫日",
+            "label": "入庫日 / 入庫日",
+            "visible": true,
+            "width": "medium",
+            "order": 11
+          },
+          "釘箱日": {
+            "source": "釘箱日",
+            "label": "釘箱日 / 釘箱日",
+            "visible": true,
+            "width": "medium",
+            "order": 12
+          },
+          "move in": {
+            "source": "move in",
+            "label": "move in / move in",
+            "visible": true,
+            "width": "medium",
+            "order": 13
+          },
+          "剩餘\n上班天數": {
+            "source": "剩餘\n上班天數",
+            "label": "剩餘\n上班天數 / 剩餘\n上班天數",
+            "visible": true,
+            "width": "medium",
+            "order": 14
+          },
+          "工期": {
+            "source": "工期",
+            "label": "工期 / 工期",
+            "visible": true,
+            "width": "medium",
+            "order": 15
+          },
+          "*發*": {
+            "source": "*發*",
+            "label": "*發* / *發*",
+            "visible": true,
+            "width": "medium",
+            "order": 16
+          },
+          "*配*": {
+            "source": "*配*",
+            "label": "*配* / *配*",
+            "visible": true,
+            "width": "medium",
+            "order": 17
+          },
+          "*通*": {
+            "source": "*通*",
+            "label": "*通* / *通*",
+            "visible": true,
+            "width": "medium",
+            "order": 18
+          },
+          "*T*": {
+            "source": "*T*",
+            "label": "*T* / *T*",
+            "visible": true,
+            "width": "medium",
+            "order": 19
+          },
+          "*D*": {
+            "source": "*D*",
+            "label": "*D* / *D*",
+            "visible": true,
+            "width": "medium",
+            "order": 20
+          },
+          "*W*": {
+            "source": "*W*",
+            "label": "*W* / *W*",
+            "visible": true,
+            "width": "medium",
+            "order": 21
+          },
+          "*Q*": {
+            "source": "*Q*",
+            "label": "*Q* / *Q*",
+            "visible": true,
+            "width": "medium",
+            "order": 22
+          },
+          "*B*": {
+            "source": "*B*",
+            "label": "*B* / *B*",
+            "visible": true,
+            "width": "medium",
+            "order": 23
+          },
+          "03-09": {
+            "source": "03-09",
+            "label": "03-09 / 03-09",
+            "visible": true,
+            "width": "medium",
+            "order": 24
+          },
+          "03-10": {
+            "source": "03-10",
+            "label": "03-10 / 03-10",
+            "visible": true,
+            "width": "medium",
+            "order": 25
+          },
+          "03-11": {
+            "source": "03-11",
+            "label": "03-11 / 03-11",
+            "visible": true,
+            "width": "medium",
+            "order": 26
+          },
+          "03-12": {
+            "source": "03-12",
+            "label": "03-12 / 03-12",
+            "visible": true,
+            "width": "medium",
+            "order": 27
+          },
+          "03-13": {
+            "source": "03-13",
+            "label": "03-13 / 03-13",
+            "visible": true,
+            "width": "medium",
+            "order": 28
+          },
+          "03-14": {
+            "source": "03-14",
+            "label": "03-14 / 03-14",
+            "visible": true,
+            "width": "medium",
+            "order": 29
+          },
+          "03-15": {
+            "source": "03-15",
+            "label": "03-15 / 03-15",
+            "visible": true,
+            "width": "medium",
+            "order": 30
+          },
+          "03-16": {
+            "source": "03-16",
+            "label": "03-16 / 03-16",
+            "visible": true,
+            "width": "medium",
+            "order": 31
+          },
+          "03-17": {
+            "source": "03-17",
+            "label": "03-17 / 03-17",
+            "visible": true,
+            "width": "medium",
+            "order": 32
+          },
+          "03-18": {
+            "source": "03-18",
+            "label": "03-18 / 03-18",
+            "visible": true,
+            "width": "medium",
+            "order": 33
+          },
+          "03-19": {
+            "source": "03-19",
+            "label": "03-19 / 03-19",
+            "visible": true,
+            "width": "medium",
+            "order": 34
+          },
+          "03-20": {
+            "source": "03-20",
+            "label": "03-20 / 03-20",
+            "visible": true,
+            "width": "medium",
+            "order": 35
+          },
+          "03-21": {
+            "source": "03-21",
+            "label": "03-21 / 03-21",
+            "visible": true,
+            "width": "medium",
+            "order": 36
+          },
+          "03-22": {
+            "source": "03-22",
+            "label": "03-22 / 03-22",
+            "visible": true,
+            "width": "medium",
+            "order": 37
+          },
+          "03-23": {
+            "source": "03-23",
+            "label": "03-23 / 03-23",
+            "visible": true,
+            "width": "medium",
+            "order": 38
+          },
+          "03-24": {
+            "source": "03-24",
+            "label": "03-24 / 03-24",
+            "visible": true,
+            "width": "medium",
+            "order": 39
+          },
+          "03-25": {
+            "source": "03-25",
+            "label": "03-25 / 03-25",
+            "visible": true,
+            "width": "medium",
+            "order": 40
+          },
+          "03-26": {
+            "source": "03-26",
+            "label": "03-26 / 03-26",
+            "visible": true,
+            "width": "medium",
+            "order": 41
+          },
+          "03-27": {
+            "source": "03-27",
+            "label": "03-27 / 03-27",
+            "visible": true,
+            "width": "medium",
+            "order": 42
+          },
+          "03-28": {
+            "source": "03-28",
+            "label": "03-28 / 03-28",
+            "visible": true,
+            "width": "medium",
+            "order": 43
+          },
+          "03-29": {
+            "source": "03-29",
+            "label": "03-29 / 03-29",
+            "visible": true,
+            "width": "medium",
+            "order": 44
+          },
+          "03-30": {
+            "source": "03-30",
+            "label": "03-30 / 03-30",
+            "visible": true,
+            "width": "medium",
+            "order": 45
+          },
+          "03-31": {
+            "source": "03-31",
+            "label": "03-31 / 03-31",
+            "visible": true,
+            "width": "medium",
+            "order": 46
+          },
+          "04-01": {
+            "source": "04-01",
+            "label": "04-01 / 04-01",
+            "visible": true,
+            "width": "medium",
+            "order": 47
+          },
+          "04-02": {
+            "source": "04-02",
+            "label": "04-02 / 04-02",
+            "visible": true,
+            "width": "medium",
+            "order": 48
+          },
+          "04-03": {
+            "source": "04-03",
+            "label": "04-03 / 04-03",
+            "visible": true,
+            "width": "medium",
+            "order": 49
+          },
+          "04-04": {
+            "source": "04-04",
+            "label": "04-04 / 04-04",
+            "visible": true,
+            "width": "medium",
+            "order": 50
+          },
+          "04-05": {
+            "source": "04-05",
+            "label": "04-05 / 04-05",
+            "visible": true,
+            "width": "medium",
+            "order": 51
+          },
+          "04-06": {
+            "source": "04-06",
+            "label": "04-06 / 04-06",
+            "visible": true,
+            "width": "medium",
+            "order": 52
+          },
+          "04-07": {
+            "source": "04-07",
+            "label": "04-07 / 04-07",
+            "visible": true,
+            "width": "medium",
+            "order": 53
+          },
+          "04-08": {
+            "source": "04-08",
+            "label": "04-08 / 04-08",
+            "visible": true,
+            "width": "medium",
+            "order": 54
+          },
+          "04-09": {
+            "source": "04-09",
+            "label": "04-09 / 04-09",
+            "visible": true,
+            "width": "medium",
+            "order": 55
+          },
+          "04-10": {
+            "source": "04-10",
+            "label": "04-10 / 04-10",
+            "visible": true,
+            "width": "medium",
+            "order": 56
+          },
+          "04-11": {
+            "source": "04-11",
+            "label": "04-11 / 04-11",
+            "visible": true,
+            "width": "medium",
+            "order": 57
+          },
+          "04-12": {
+            "source": "04-12",
+            "label": "04-12 / 04-12",
+            "visible": true,
+            "width": "medium",
+            "order": 58
+          },
+          "04-13": {
+            "source": "04-13",
+            "label": "04-13 / 04-13",
+            "visible": true,
+            "width": "medium",
+            "order": 59
+          },
+          "04-14": {
+            "source": "04-14",
+            "label": "04-14 / 04-14",
+            "visible": true,
+            "width": "medium",
+            "order": 60
+          },
+          "04-15": {
+            "source": "04-15",
+            "label": "04-15 / 04-15",
+            "visible": true,
+            "width": "medium",
+            "order": 61
+          },
+          "04-16": {
+            "source": "04-16",
+            "label": "04-16 / 04-16",
+            "visible": true,
+            "width": "medium",
+            "order": 62
+          },
+          "04-17": {
+            "source": "04-17",
+            "label": "04-17 / 04-17",
+            "visible": true,
+            "width": "medium",
+            "order": 63
+          },
+          "04-18": {
+            "source": "04-18",
+            "label": "04-18 / 04-18",
+            "visible": true,
+            "width": "medium",
+            "order": 64
+          },
+          "04-19": {
+            "source": "04-19",
+            "label": "04-19 / 04-19",
+            "visible": true,
+            "width": "medium",
+            "order": 65
+          },
+          "04-20": {
+            "source": "04-20",
+            "label": "04-20 / 04-20",
+            "visible": true,
+            "width": "medium",
+            "order": 66
+          },
+          "04-21": {
+            "source": "04-21",
+            "label": "04-21 / 04-21",
+            "visible": true,
+            "width": "medium",
+            "order": 67
+          },
+          "04-22": {
+            "source": "04-22",
+            "label": "04-22 / 04-22",
+            "visible": true,
+            "width": "medium",
+            "order": 68
+          },
+          "04-23": {
+            "source": "04-23",
+            "label": "04-23 / 04-23",
+            "visible": true,
+            "width": "medium",
+            "order": 69
+          },
+          "04-24": {
+            "source": "04-24",
+            "label": "04-24 / 04-24",
+            "visible": true,
+            "width": "medium",
+            "order": 70
+          },
+          "04-25": {
+            "source": "04-25",
+            "label": "04-25 / 04-25",
+            "visible": true,
+            "width": "medium",
+            "order": 71
+          },
+          "04-26": {
+            "source": "04-26",
+            "label": "04-26 / 04-26",
+            "visible": true,
+            "width": "medium",
+            "order": 72
+          },
+          "04-27": {
+            "source": "04-27",
+            "label": "04-27 / 04-27",
+            "visible": true,
+            "width": "medium",
+            "order": 73
+          },
+          "04-28": {
+            "source": "04-28",
+            "label": "04-28 / 04-28",
+            "visible": true,
+            "width": "medium",
+            "order": 74
+          },
+          "04-29": {
+            "source": "04-29",
+            "label": "04-29 / 04-29",
+            "visible": true,
+            "width": "medium",
+            "order": 75
+          },
+          "04-30": {
+            "source": "04-30",
+            "label": "04-30 / 04-30",
+            "visible": true,
+            "width": "medium",
+            "order": 76
+          },
+          "05-01": {
+            "source": "05-01",
+            "label": "05-01 / 05-01",
+            "visible": true,
+            "width": "medium",
+            "order": 77
+          },
+          "05-02": {
+            "source": "05-02",
+            "label": "05-02 / 05-02",
+            "visible": true,
+            "width": "medium",
+            "order": 78
+          },
+          "05-03": {
+            "source": "05-03",
+            "label": "05-03 / 05-03",
+            "visible": true,
+            "width": "medium",
+            "order": 79
+          },
+          "05-04": {
+            "source": "05-04",
+            "label": "05-04 / 05-04",
+            "visible": true,
+            "width": "medium",
+            "order": 80
+          },
+          "05-05": {
+            "source": "05-05",
+            "label": "05-05 / 05-05",
+            "visible": true,
+            "width": "medium",
+            "order": 81
+          },
+          "05-06": {
+            "source": "05-06",
+            "label": "05-06 / 05-06",
+            "visible": true,
+            "width": "medium",
+            "order": 82
+          },
+          "05-07": {
+            "source": "05-07",
+            "label": "05-07 / 05-07",
+            "visible": true,
+            "width": "medium",
+            "order": 83
+          },
+          "05-08": {
+            "source": "05-08",
+            "label": "05-08 / 05-08",
+            "visible": true,
+            "width": "medium",
+            "order": 84
+          },
+          "05-09": {
+            "source": "05-09",
+            "label": "05-09 / 05-09",
+            "visible": true,
+            "width": "medium",
+            "order": 85
+          },
+          "05-10": {
+            "source": "05-10",
+            "label": "05-10 / 05-10",
+            "visible": true,
+            "width": "medium",
+            "order": 86
+          },
+          "05-11": {
+            "source": "05-11",
+            "label": "05-11 / 05-11",
+            "visible": true,
+            "width": "medium",
+            "order": 87
+          },
+          "05-12": {
+            "source": "05-12",
+            "label": "05-12 / 05-12",
+            "visible": true,
+            "width": "medium",
+            "order": 88
+          },
+          "05-13": {
+            "source": "05-13",
+            "label": "05-13 / 05-13",
+            "visible": true,
+            "width": "medium",
+            "order": 89
+          },
+          "05-14": {
+            "source": "05-14",
+            "label": "05-14 / 05-14",
+            "visible": true,
+            "width": "medium",
+            "order": 90
+          },
+          "05-15": {
+            "source": "05-15",
+            "label": "05-15 / 05-15",
+            "visible": true,
+            "width": "medium",
+            "order": 91
+          },
+          "05-16": {
+            "source": "05-16",
+            "label": "05-16 / 05-16",
+            "visible": true,
+            "width": "medium",
+            "order": 92
+          },
+          "05-17": {
+            "source": "05-17",
+            "label": "05-17 / 05-17",
+            "visible": true,
+            "width": "medium",
+            "order": 93
+          },
+          "05-18": {
+            "source": "05-18",
+            "label": "05-18 / 05-18",
+            "visible": true,
+            "width": "medium",
+            "order": 94
+          },
+          "05-19": {
+            "source": "05-19",
+            "label": "05-19 / 05-19",
+            "visible": true,
+            "width": "medium",
+            "order": 95
+          },
+          "05-20": {
+            "source": "05-20",
+            "label": "05-20 / 05-20",
+            "visible": true,
+            "width": "medium",
+            "order": 96
+          },
+          "05-21": {
+            "source": "05-21",
+            "label": "05-21 / 05-21",
+            "visible": true,
+            "width": "medium",
+            "order": 97
+          },
+          "05-22": {
+            "source": "05-22",
+            "label": "05-22 / 05-22",
+            "visible": true,
+            "width": "medium",
+            "order": 98
+          },
+          "05-23": {
+            "source": "05-23",
+            "label": "05-23 / 05-23",
+            "visible": true,
+            "width": "medium",
+            "order": 99
+          },
+          "05-24": {
+            "source": "05-24",
+            "label": "05-24 / 05-24",
+            "visible": true,
+            "width": "medium",
+            "order": 100
+          },
+          "05-25": {
+            "source": "05-25",
+            "label": "05-25 / 05-25",
+            "visible": true,
+            "width": "medium",
+            "order": 101
+          },
+          "05-26": {
+            "source": "05-26",
+            "label": "05-26 / 05-26",
+            "visible": true,
+            "width": "medium",
+            "order": 102
+          },
+          "05-27": {
+            "source": "05-27",
+            "label": "05-27 / 05-27",
+            "visible": true,
+            "width": "medium",
+            "order": 103
+          },
+          "05-28": {
+            "source": "05-28",
+            "label": "05-28 / 05-28",
+            "visible": true,
+            "width": "medium",
+            "order": 104
+          },
+          "05-29": {
+            "source": "05-29",
+            "label": "05-29 / 05-29",
+            "visible": true,
+            "width": "medium",
+            "order": 105
+          },
+          "05-30": {
+            "source": "05-30",
+            "label": "05-30 / 05-30",
+            "visible": true,
+            "width": "medium",
+            "order": 106
+          },
+          "05-31": {
+            "source": "05-31",
+            "label": "05-31 / 05-31",
+            "visible": true,
+            "width": "medium",
+            "order": 107
+          },
+          "06-01": {
+            "source": "06-01",
+            "label": "06-01 / 06-01",
+            "visible": true,
+            "width": "medium",
+            "order": 108
+          },
+          "06-02": {
+            "source": "06-02",
+            "label": "06-02 / 06-02",
+            "visible": true,
+            "width": "medium",
+            "order": 109
+          },
+          "06-03": {
+            "source": "06-03",
+            "label": "06-03 / 06-03",
+            "visible": true,
+            "width": "medium",
+            "order": 110
+          },
+          "06-04": {
+            "source": "06-04",
+            "label": "06-04 / 06-04",
+            "visible": true,
+            "width": "medium",
+            "order": 111
+          },
+          "06-05": {
+            "source": "06-05",
+            "label": "06-05 / 06-05",
+            "visible": true,
+            "width": "medium",
+            "order": 112
+          },
+          "06-06": {
+            "source": "06-06",
+            "label": "06-06 / 06-06",
+            "visible": true,
+            "width": "medium",
+            "order": 113
+          },
+          "06-07": {
+            "source": "06-07",
+            "label": "06-07 / 06-07",
+            "visible": true,
+            "width": "medium",
+            "order": 114
+          },
+          "06-08": {
+            "source": "06-08",
+            "label": "06-08 / 06-08",
+            "visible": true,
+            "width": "medium",
+            "order": 115
+          },
+          "06-09": {
+            "source": "06-09",
+            "label": "06-09 / 06-09",
+            "visible": true,
+            "width": "medium",
+            "order": 116
+          },
+          "06-10": {
+            "source": "06-10",
+            "label": "06-10 / 06-10",
+            "visible": true,
+            "width": "medium",
+            "order": 117
+          },
+          "06-11": {
+            "source": "06-11",
+            "label": "06-11 / 06-11",
+            "visible": true,
+            "width": "medium",
+            "order": 118
+          },
+          "06-12": {
+            "source": "06-12",
+            "label": "06-12 / 06-12",
+            "visible": true,
+            "width": "medium",
+            "order": 119
+          },
+          "06-13": {
+            "source": "06-13",
+            "label": "06-13 / 06-13",
+            "visible": true,
+            "width": "medium",
+            "order": 120
+          },
+          "06-14": {
+            "source": "06-14",
+            "label": "06-14 / 06-14",
+            "visible": true,
+            "width": "medium",
+            "order": 121
+          },
+          "06-15": {
+            "source": "06-15",
+            "label": "06-15 / 06-15",
+            "visible": true,
+            "width": "medium",
+            "order": 122
+          },
+          "06-16": {
+            "source": "06-16",
+            "label": "06-16 / 06-16",
+            "visible": true,
+            "width": "medium",
+            "order": 123
+          },
+          "06-17": {
+            "source": "06-17",
+            "label": "06-17 / 06-17",
+            "visible": true,
+            "width": "medium",
+            "order": 124
+          },
+          "06-18": {
+            "source": "06-18",
+            "label": "06-18 / 06-18",
+            "visible": true,
+            "width": "medium",
+            "order": 125
+          },
+          "06-19": {
+            "source": "06-19",
+            "label": "06-19 / 06-19",
+            "visible": true,
+            "width": "medium",
+            "order": 126
+          },
+          "06-20": {
+            "source": "06-20",
+            "label": "06-20 / 06-20",
+            "visible": true,
+            "width": "medium",
+            "order": 127
+          },
+          "06-21": {
+            "source": "06-21",
+            "label": "06-21 / 06-21",
+            "visible": true,
+            "width": "medium",
+            "order": 128
+          },
+          "06-22": {
+            "source": "06-22",
+            "label": "06-22 / 06-22",
+            "visible": true,
+            "width": "medium",
+            "order": 129
+          },
+          "06-23": {
+            "source": "06-23",
+            "label": "06-23 / 06-23",
+            "visible": true,
+            "width": "medium",
+            "order": 130
+          },
+          "06-24": {
+            "source": "06-24",
+            "label": "06-24 / 06-24",
+            "visible": true,
+            "width": "medium",
+            "order": 131
+          },
+          "06-25": {
+            "source": "06-25",
+            "label": "06-25 / 06-25",
+            "visible": true,
+            "width": "medium",
+            "order": 132
+          },
+          "06-26": {
+            "source": "06-26",
+            "label": "06-26 / 06-26",
+            "visible": true,
+            "width": "medium",
+            "order": 133
+          },
+          "06-27": {
+            "source": "06-27",
+            "label": "06-27 / 06-27",
+            "visible": true,
+            "width": "medium",
+            "order": 134
+          },
+          "06-28": {
+            "source": "06-28",
+            "label": "06-28 / 06-28",
+            "visible": true,
+            "width": "medium",
+            "order": 135
+          },
+          "06-29": {
+            "source": "06-29",
+            "label": "06-29 / 06-29",
+            "visible": true,
+            "width": "medium",
+            "order": 136
+          },
+          "06-30": {
+            "source": "06-30",
+            "label": "06-30 / 06-30",
+            "visible": true,
+            "width": "medium",
+            "order": 137
+          },
+          "07-01": {
+            "source": "07-01",
+            "label": "07-01 / 07-01",
+            "visible": true,
+            "width": "medium",
+            "order": 138
+          },
+          "07-02": {
+            "source": "07-02",
+            "label": "07-02 / 07-02",
+            "visible": true,
+            "width": "medium",
+            "order": 139
+          },
+          "07-03": {
+            "source": "07-03",
+            "label": "07-03 / 07-03",
+            "visible": true,
+            "width": "medium",
+            "order": 140
+          },
+          "07-04": {
+            "source": "07-04",
+            "label": "07-04 / 07-04",
+            "visible": true,
+            "width": "medium",
+            "order": 141
+          },
+          "07-05": {
+            "source": "07-05",
+            "label": "07-05 / 07-05",
+            "visible": true,
+            "width": "medium",
+            "order": 142
+          },
+          "07-06": {
+            "source": "07-06",
+            "label": "07-06 / 07-06",
+            "visible": true,
+            "width": "medium",
+            "order": 143
+          },
+          "07-07": {
+            "source": "07-07",
+            "label": "07-07 / 07-07",
+            "visible": true,
+            "width": "medium",
+            "order": 144
+          },
+          "07-08": {
+            "source": "07-08",
+            "label": "07-08 / 07-08",
+            "visible": true,
+            "width": "medium",
+            "order": 145
+          },
+          "07-09": {
+            "source": "07-09",
+            "label": "07-09 / 07-09",
+            "visible": true,
+            "width": "medium",
+            "order": 146
+          },
+          "07-10": {
+            "source": "07-10",
+            "label": "07-10 / 07-10",
+            "visible": true,
+            "width": "medium",
+            "order": 147
+          },
+          "07-11": {
+            "source": "07-11",
+            "label": "07-11 / 07-11",
+            "visible": true,
+            "width": "medium",
+            "order": 148
+          },
+          "07-12": {
+            "source": "07-12",
+            "label": "07-12 / 07-12",
+            "visible": true,
+            "width": "medium",
+            "order": 149
+          },
+          "07-13": {
+            "source": "07-13",
+            "label": "07-13 / 07-13",
+            "visible": true,
+            "width": "medium",
+            "order": 150
+          },
+          "07-14": {
+            "source": "07-14",
+            "label": "07-14 / 07-14",
+            "visible": true,
+            "width": "medium",
+            "order": 151
+          },
+          "07-15": {
+            "source": "07-15",
+            "label": "07-15 / 07-15",
+            "visible": true,
+            "width": "medium",
+            "order": 152
+          },
+          "07-16": {
+            "source": "07-16",
+            "label": "07-16 / 07-16",
+            "visible": true,
+            "width": "medium",
+            "order": 153
+          },
+          "07-17": {
+            "source": "07-17",
+            "label": "07-17 / 07-17",
+            "visible": true,
+            "width": "medium",
+            "order": 154
+          },
+          "07-18": {
+            "source": "07-18",
+            "label": "07-18 / 07-18",
+            "visible": true,
+            "width": "medium",
+            "order": 155
+          },
+          "07-19": {
+            "source": "07-19",
+            "label": "07-19 / 07-19",
+            "visible": true,
+            "width": "medium",
+            "order": 156
+          },
+          "07-20": {
+            "source": "07-20",
+            "label": "07-20 / 07-20",
+            "visible": true,
+            "width": "medium",
+            "order": 157
+          },
+          "07-21": {
+            "source": "07-21",
+            "label": "07-21 / 07-21",
+            "visible": true,
+            "width": "medium",
+            "order": 158
+          },
+          "07-22": {
+            "source": "07-22",
+            "label": "07-22 / 07-22",
+            "visible": true,
+            "width": "medium",
+            "order": 159
+          },
+          "07-23": {
+            "source": "07-23",
+            "label": "07-23 / 07-23",
+            "visible": true,
+            "width": "medium",
+            "order": 160
+          },
+          "07-24": {
+            "source": "07-24",
+            "label": "07-24 / 07-24",
+            "visible": true,
+            "width": "medium",
+            "order": 161
+          },
+          "07-25": {
+            "source": "07-25",
+            "label": "07-25 / 07-25",
+            "visible": true,
+            "width": "medium",
+            "order": 162
+          },
+          "07-26": {
+            "source": "07-26",
+            "label": "07-26 / 07-26",
+            "visible": true,
+            "width": "medium",
+            "order": 163
+          },
+          "07-27": {
+            "source": "07-27",
+            "label": "07-27 / 07-27",
+            "visible": true,
+            "width": "medium",
+            "order": 164
+          },
+          "07-28": {
+            "source": "07-28",
+            "label": "07-28 / 07-28",
+            "visible": true,
+            "width": "medium",
+            "order": 165
+          },
+          "07-29": {
+            "source": "07-29",
+            "label": "07-29 / 07-29",
+            "visible": true,
+            "width": "medium",
+            "order": 166
+          },
+          "07-30": {
+            "source": "07-30",
+            "label": "07-30 / 07-30",
+            "visible": true,
+            "width": "medium",
+            "order": 167
+          },
+          "07-31": {
+            "source": "07-31",
+            "label": "07-31 / 07-31",
+            "visible": true,
+            "width": "medium",
+            "order": 168
+          },
+          "08-01": {
+            "source": "08-01",
+            "label": "08-01 / 08-01",
+            "visible": true,
+            "width": "medium",
+            "order": 169
+          },
+          "08-02": {
+            "source": "08-02",
+            "label": "08-02 / 08-02",
+            "visible": true,
+            "width": "medium",
+            "order": 170
+          },
+          "08-03": {
+            "source": "08-03",
+            "label": "08-03 / 08-03",
+            "visible": true,
+            "width": "medium",
+            "order": 171
+          },
+          "08-04": {
+            "source": "08-04",
+            "label": "08-04 / 08-04",
+            "visible": true,
+            "width": "medium",
+            "order": 172
+          },
+          "08-05": {
+            "source": "08-05",
+            "label": "08-05 / 08-05",
+            "visible": true,
+            "width": "medium",
+            "order": 173
+          },
+          "08-06": {
+            "source": "08-06",
+            "label": "08-06 / 08-06",
+            "visible": true,
+            "width": "medium",
+            "order": 174
+          },
+          "08-07": {
+            "source": "08-07",
+            "label": "08-07 / 08-07",
+            "visible": true,
+            "width": "medium",
+            "order": 175
+          },
+          "08-08": {
+            "source": "08-08",
+            "label": "08-08 / 08-08",
+            "visible": true,
+            "width": "medium",
+            "order": 176
+          },
+          "08-09": {
+            "source": "08-09",
+            "label": "08-09 / 08-09",
+            "visible": true,
+            "width": "medium",
+            "order": 177
+          },
+          "08-10": {
+            "source": "08-10",
+            "label": "08-10 / 08-10",
+            "visible": true,
+            "width": "medium",
+            "order": 178
+          },
+          "08-11": {
+            "source": "08-11",
+            "label": "08-11 / 08-11",
+            "visible": true,
+            "width": "medium",
+            "order": 179
+          },
+          "08-12": {
+            "source": "08-12",
+            "label": "08-12 / 08-12",
+            "visible": true,
+            "width": "medium",
+            "order": 180
+          },
+          "08-13": {
+            "source": "08-13",
+            "label": "08-13 / 08-13",
+            "visible": true,
+            "width": "medium",
+            "order": 181
+          },
+          "08-14": {
+            "source": "08-14",
+            "label": "08-14 / 08-14",
+            "visible": true,
+            "width": "medium",
+            "order": 182
+          },
+          "08-15": {
+            "source": "08-15",
+            "label": "08-15 / 08-15",
+            "visible": true,
+            "width": "medium",
+            "order": 183
+          },
+          "08-16": {
+            "source": "08-16",
+            "label": "08-16 / 08-16",
+            "visible": true,
+            "width": "medium",
+            "order": 184
+          },
+          "08-17": {
+            "source": "08-17",
+            "label": "08-17 / 08-17",
+            "visible": true,
+            "width": "medium",
+            "order": 185
+          },
+          "08-18": {
+            "source": "08-18",
+            "label": "08-18 / 08-18",
+            "visible": true,
+            "width": "medium",
+            "order": 186
+          },
+          "08-19": {
+            "source": "08-19",
+            "label": "08-19 / 08-19",
+            "visible": true,
+            "width": "medium",
+            "order": 187
+          },
+          "08-20": {
+            "source": "08-20",
+            "label": "08-20 / 08-20",
+            "visible": true,
+            "width": "medium",
+            "order": 188
+          },
+          "08-21": {
+            "source": "08-21",
+            "label": "08-21 / 08-21",
+            "visible": true,
+            "width": "medium",
+            "order": 189
+          },
+          "08-22": {
+            "source": "08-22",
+            "label": "08-22 / 08-22",
+            "visible": true,
+            "width": "medium",
+            "order": 190
+          },
+          "08-23": {
+            "source": "08-23",
+            "label": "08-23 / 08-23",
+            "visible": true,
+            "width": "medium",
+            "order": 191
+          },
+          "08-24": {
+            "source": "08-24",
+            "label": "08-24 / 08-24",
+            "visible": true,
+            "width": "medium",
+            "order": 192
+          },
+          "08-25": {
+            "source": "08-25",
+            "label": "08-25 / 08-25",
+            "visible": true,
+            "width": "medium",
+            "order": 193
+          },
+          "08-26": {
+            "source": "08-26",
+            "label": "08-26 / 08-26",
+            "visible": true,
+            "width": "medium",
+            "order": 194
+          },
+          "08-27": {
+            "source": "08-27",
+            "label": "08-27 / 08-27",
+            "visible": true,
+            "width": "medium",
+            "order": 195
+          },
+          "08-28": {
+            "source": "08-28",
+            "label": "08-28 / 08-28",
+            "visible": true,
+            "width": "medium",
+            "order": 196
+          },
+          "08-29": {
+            "source": "08-29",
+            "label": "08-29 / 08-29",
+            "visible": true,
+            "width": "medium",
+            "order": 197
+          },
+          "08-30": {
+            "source": "08-30",
+            "label": "08-30 / 08-30",
+            "visible": true,
+            "width": "medium",
+            "order": 198
+          },
+          "08-31": {
+            "source": "08-31",
+            "label": "08-31 / 08-31",
+            "visible": true,
+            "width": "medium",
+            "order": 199
+          },
+          "09-01": {
+            "source": "09-01",
+            "label": "09-01 / 09-01",
+            "visible": true,
+            "width": "medium",
+            "order": 200
+          },
+          "09-02": {
+            "source": "09-02",
+            "label": "09-02 / 09-02",
+            "visible": true,
+            "width": "medium",
+            "order": 201
+          },
+          "09-03": {
+            "source": "09-03",
+            "label": "09-03 / 09-03",
+            "visible": true,
+            "width": "medium",
+            "order": 202
+          },
+          "09-04": {
+            "source": "09-04",
+            "label": "09-04 / 09-04",
+            "visible": true,
+            "width": "medium",
+            "order": 203
+          },
+          "09-05": {
+            "source": "09-05",
+            "label": "09-05 / 09-05",
+            "visible": true,
+            "width": "medium",
+            "order": 204
+          },
+          "09-06": {
+            "source": "09-06",
+            "label": "09-06 / 09-06",
+            "visible": true,
+            "width": "medium",
+            "order": 205
+          },
+          "09-07": {
+            "source": "09-07",
+            "label": "09-07 / 09-07",
+            "visible": true,
+            "width": "medium",
+            "order": 206
+          },
+          "09-08": {
+            "source": "09-08",
+            "label": "09-08 / 09-08",
+            "visible": true,
+            "width": "medium",
+            "order": 207
+          },
+          "09-09": {
+            "source": "09-09",
+            "label": "09-09 / 09-09",
+            "visible": true,
+            "width": "medium",
+            "order": 208
+          },
+          "09-10": {
+            "source": "09-10",
+            "label": "09-10 / 09-10",
+            "visible": true,
+            "width": "medium",
+            "order": 209
+          },
+          "09-11": {
+            "source": "09-11",
+            "label": "09-11 / 09-11",
+            "visible": true,
+            "width": "medium",
+            "order": 210
+          },
+          "09-12": {
+            "source": "09-12",
+            "label": "09-12 / 09-12",
+            "visible": true,
+            "width": "medium",
+            "order": 211
+          },
+          "09-13": {
+            "source": "09-13",
+            "label": "09-13 / 09-13",
+            "visible": true,
+            "width": "medium",
+            "order": 212
+          },
+          "09-14": {
+            "source": "09-14",
+            "label": "09-14 / 09-14",
+            "visible": true,
+            "width": "medium",
+            "order": 213
+          },
+          "09-15": {
+            "source": "09-15",
+            "label": "09-15 / 09-15",
+            "visible": true,
+            "width": "medium",
+            "order": 214
+          },
+          "09-16": {
+            "source": "09-16",
+            "label": "09-16 / 09-16",
+            "visible": true,
+            "width": "medium",
+            "order": 215
+          },
+          "09-17": {
+            "source": "09-17",
+            "label": "09-17 / 09-17",
+            "visible": true,
+            "width": "medium",
+            "order": 216
+          },
+          "09-18": {
+            "source": "09-18",
+            "label": "09-18 / 09-18",
+            "visible": true,
+            "width": "medium",
+            "order": 217
+          },
+          "09-19": {
+            "source": "09-19",
+            "label": "09-19 / 09-19",
+            "visible": true,
+            "width": "medium",
+            "order": 218
+          },
+          "09-20": {
+            "source": "09-20",
+            "label": "09-20 / 09-20",
+            "visible": true,
+            "width": "medium",
+            "order": 219
+          },
+          "09-21": {
+            "source": "09-21",
+            "label": "09-21 / 09-21",
+            "visible": true,
+            "width": "medium",
+            "order": 220
+          },
+          "09-22": {
+            "source": "09-22",
+            "label": "09-22 / 09-22",
+            "visible": true,
+            "width": "medium",
+            "order": 221
+          },
+          "09-23": {
+            "source": "09-23",
+            "label": "09-23 / 09-23",
+            "visible": true,
+            "width": "medium",
+            "order": 222
+          },
+          "09-24": {
+            "source": "09-24",
+            "label": "09-24 / 09-24",
+            "visible": true,
+            "width": "medium",
+            "order": 223
+          },
+          "09-25": {
+            "source": "09-25",
+            "label": "09-25 / 09-25",
+            "visible": true,
+            "width": "medium",
+            "order": 224
+          },
+          "09-26": {
+            "source": "09-26",
+            "label": "09-26 / 09-26",
+            "visible": true,
+            "width": "medium",
+            "order": 225
+          },
+          "09-27": {
+            "source": "09-27",
+            "label": "09-27 / 09-27",
+            "visible": true,
+            "width": "medium",
+            "order": 226
+          },
+          "09-28": {
+            "source": "09-28",
+            "label": "09-28 / 09-28",
+            "visible": true,
+            "width": "medium",
+            "order": 227
+          },
+          "09-29": {
+            "source": "09-29",
+            "label": "09-29 / 09-29",
+            "visible": true,
+            "width": "medium",
+            "order": 228
+          },
+          "09-30": {
+            "source": "09-30",
+            "label": "09-30 / 09-30",
+            "visible": true,
+            "width": "medium",
+            "order": 229
+          },
+          "10-01": {
+            "source": "10-01",
+            "label": "10-01 / 10-01",
+            "visible": true,
+            "width": "medium",
+            "order": 230
+          },
+          "10-02": {
+            "source": "10-02",
+            "label": "10-02 / 10-02",
+            "visible": true,
+            "width": "medium",
+            "order": 231
+          },
+          "10-03": {
+            "source": "10-03",
+            "label": "10-03 / 10-03",
+            "visible": true,
+            "width": "medium",
+            "order": 232
+          },
+          "10-04": {
+            "source": "10-04",
+            "label": "10-04 / 10-04",
+            "visible": true,
+            "width": "medium",
+            "order": 233
+          },
+          "10-05": {
+            "source": "10-05",
+            "label": "10-05 / 10-05",
+            "visible": true,
+            "width": "medium",
+            "order": 234
+          },
+          "10-06": {
+            "source": "10-06",
+            "label": "10-06 / 10-06",
+            "visible": true,
+            "width": "medium",
+            "order": 235
+          },
+          "10-07": {
+            "source": "10-07",
+            "label": "10-07 / 10-07",
+            "visible": true,
+            "width": "medium",
+            "order": 236
+          },
+          "10-08": {
+            "source": "10-08",
+            "label": "10-08 / 10-08",
+            "visible": true,
+            "width": "medium",
+            "order": 237
+          },
+          "10-09": {
+            "source": "10-09",
+            "label": "10-09 / 10-09",
+            "visible": true,
+            "width": "medium",
+            "order": 238
+          },
+          "10-10": {
+            "source": "10-10",
+            "label": "10-10 / 10-10",
+            "visible": true,
+            "width": "medium",
+            "order": 239
+          },
+          "10-11": {
+            "source": "10-11",
+            "label": "10-11 / 10-11",
+            "visible": true,
+            "width": "medium",
+            "order": 240
+          },
+          "10-12": {
+            "source": "10-12",
+            "label": "10-12 / 10-12",
+            "visible": true,
+            "width": "medium",
+            "order": 241
+          },
+          "10-13": {
+            "source": "10-13",
+            "label": "10-13 / 10-13",
+            "visible": true,
+            "width": "medium",
+            "order": 242
+          },
+          "10-14": {
+            "source": "10-14",
+            "label": "10-14 / 10-14",
+            "visible": true,
+            "width": "medium",
+            "order": 243
+          },
+          "10-15": {
+            "source": "10-15",
+            "label": "10-15 / 10-15",
+            "visible": true,
+            "width": "medium",
+            "order": 244
+          },
+          "10-16": {
+            "source": "10-16",
+            "label": "10-16 / 10-16",
+            "visible": true,
+            "width": "medium",
+            "order": 245
+          },
+          "10-17": {
+            "source": "10-17",
+            "label": "10-17 / 10-17",
+            "visible": true,
+            "width": "medium",
+            "order": 246
+          },
+          "10-18": {
+            "source": "10-18",
+            "label": "10-18 / 10-18",
+            "visible": true,
+            "width": "medium",
+            "order": 247
+          },
+          "10-19": {
+            "source": "10-19",
+            "label": "10-19 / 10-19",
+            "visible": true,
+            "width": "medium",
+            "order": 248
+          },
+          "10-20": {
+            "source": "10-20",
+            "label": "10-20 / 10-20",
+            "visible": true,
+            "width": "medium",
+            "order": 249
+          },
+          "10-21": {
+            "source": "10-21",
+            "label": "10-21 / 10-21",
+            "visible": true,
+            "width": "medium",
+            "order": 250
+          },
+          "10-22": {
+            "source": "10-22",
+            "label": "10-22 / 10-22",
+            "visible": true,
+            "width": "medium",
+            "order": 251
+          },
+          "10-23": {
+            "source": "10-23",
+            "label": "10-23 / 10-23",
+            "visible": true,
+            "width": "medium",
+            "order": 252
+          },
+          "10-24": {
+            "source": "10-24",
+            "label": "10-24 / 10-24",
+            "visible": true,
+            "width": "medium",
+            "order": 253
+          },
+          "10-25": {
+            "source": "10-25",
+            "label": "10-25 / 10-25",
+            "visible": true,
+            "width": "medium",
+            "order": 254
+          },
+          "10-26": {
+            "source": "10-26",
+            "label": "10-26 / 10-26",
+            "visible": true,
+            "width": "medium",
+            "order": 255
+          },
+          "10-27": {
+            "source": "10-27",
+            "label": "10-27 / 10-27",
+            "visible": true,
+            "width": "medium",
+            "order": 256
+          },
+          "10-28": {
+            "source": "10-28",
+            "label": "10-28 / 10-28",
+            "visible": true,
+            "width": "medium",
+            "order": 257
+          },
+          "10-29": {
+            "source": "10-29",
+            "label": "10-29 / 10-29",
+            "visible": true,
+            "width": "medium",
+            "order": 258
+          },
+          "10-30": {
+            "source": "10-30",
+            "label": "10-30 / 10-30",
+            "visible": true,
+            "width": "medium",
+            "order": 259
+          },
+          "10-31": {
+            "source": "10-31",
+            "label": "10-31 / 10-31",
+            "visible": true,
+            "width": "medium",
+            "order": 260
+          },
+          "11-01": {
+            "source": "11-01",
+            "label": "11-01 / 11-01",
+            "visible": true,
+            "width": "medium",
+            "order": 261
+          },
+          "11-02": {
+            "source": "11-02",
+            "label": "11-02 / 11-02",
+            "visible": true,
+            "width": "medium",
+            "order": 262
+          },
+          "11-03": {
+            "source": "11-03",
+            "label": "11-03 / 11-03",
+            "visible": true,
+            "width": "medium",
+            "order": 263
+          },
+          "11-04": {
+            "source": "11-04",
+            "label": "11-04 / 11-04",
+            "visible": true,
+            "width": "medium",
+            "order": 264
+          },
+          "11-05": {
+            "source": "11-05",
+            "label": "11-05 / 11-05",
+            "visible": true,
+            "width": "medium",
+            "order": 265
+          },
+          "11-06": {
+            "source": "11-06",
+            "label": "11-06 / 11-06",
+            "visible": true,
+            "width": "medium",
+            "order": 266
+          },
+          "11-07": {
+            "source": "11-07",
+            "label": "11-07 / 11-07",
+            "visible": true,
+            "width": "medium",
+            "order": 267
+          },
+          "11-08": {
+            "source": "11-08",
+            "label": "11-08 / 11-08",
+            "visible": true,
+            "width": "medium",
+            "order": 268
+          },
+          "11-09": {
+            "source": "11-09",
+            "label": "11-09 / 11-09",
+            "visible": true,
+            "width": "medium",
+            "order": 269
+          },
+          "11-10": {
+            "source": "11-10",
+            "label": "11-10 / 11-10",
+            "visible": true,
+            "width": "medium",
+            "order": 270
+          },
+          "11-11": {
+            "source": "11-11",
+            "label": "11-11 / 11-11",
+            "visible": true,
+            "width": "medium",
+            "order": 271
+          },
+          "11-12": {
+            "source": "11-12",
+            "label": "11-12 / 11-12",
+            "visible": true,
+            "width": "medium",
+            "order": 272
+          },
+          "11-13": {
+            "source": "11-13",
+            "label": "11-13 / 11-13",
+            "visible": true,
+            "width": "medium",
+            "order": 273
+          },
+          "11-14": {
+            "source": "11-14",
+            "label": "11-14 / 11-14",
+            "visible": true,
+            "width": "medium",
+            "order": 274
+          },
+          "11-15": {
+            "source": "11-15",
+            "label": "11-15 / 11-15",
+            "visible": true,
+            "width": "medium",
+            "order": 275
+          },
+          "11-16": {
+            "source": "11-16",
+            "label": "11-16 / 11-16",
+            "visible": true,
+            "width": "medium",
+            "order": 276
+          },
+          "11-17": {
+            "source": "11-17",
+            "label": "11-17 / 11-17",
+            "visible": true,
+            "width": "medium",
+            "order": 277
+          },
+          "11-18": {
+            "source": "11-18",
+            "label": "11-18 / 11-18",
+            "visible": true,
+            "width": "medium",
+            "order": 278
+          },
+          "11-19": {
+            "source": "11-19",
+            "label": "11-19 / 11-19",
+            "visible": true,
+            "width": "medium",
+            "order": 279
+          },
+          "11-20": {
+            "source": "11-20",
+            "label": "11-20 / 11-20",
+            "visible": true,
+            "width": "medium",
+            "order": 280
+          },
+          "11-21": {
+            "source": "11-21",
+            "label": "11-21 / 11-21",
+            "visible": true,
+            "width": "medium",
+            "order": 281
+          },
+          "11-22": {
+            "source": "11-22",
+            "label": "11-22 / 11-22",
+            "visible": true,
+            "width": "medium",
+            "order": 282
+          },
+          "11-23": {
+            "source": "11-23",
+            "label": "11-23 / 11-23",
+            "visible": true,
+            "width": "medium",
+            "order": 283
+          },
+          "11-24": {
+            "source": "11-24",
+            "label": "11-24 / 11-24",
+            "visible": true,
+            "width": "medium",
+            "order": 284
+          },
+          "11-25": {
+            "source": "11-25",
+            "label": "11-25 / 11-25",
+            "visible": true,
+            "width": "medium",
+            "order": 285
+          },
+          "11-26": {
+            "source": "11-26",
+            "label": "11-26 / 11-26",
+            "visible": true,
+            "width": "medium",
+            "order": 286
+          },
+          "11-27": {
+            "source": "11-27",
+            "label": "11-27 / 11-27",
+            "visible": true,
+            "width": "medium",
+            "order": 287
+          },
+          "11-28": {
+            "source": "11-28",
+            "label": "11-28 / 11-28",
+            "visible": true,
+            "width": "medium",
+            "order": 288
+          },
+          "11-29": {
+            "source": "11-29",
+            "label": "11-29 / 11-29",
+            "visible": true,
+            "width": "medium",
+            "order": 289
+          },
+          "11-30": {
+            "source": "11-30",
+            "label": "11-30 / 11-30",
+            "visible": true,
+            "width": "medium",
+            "order": 290
+          },
+          "12-01": {
+            "source": "12-01",
+            "label": "12-01 / 12-01",
+            "visible": true,
+            "width": "medium",
+            "order": 291
+          },
+          "12-02": {
+            "source": "12-02",
+            "label": "12-02 / 12-02",
+            "visible": true,
+            "width": "medium",
+            "order": 292
+          },
+          "12-03": {
+            "source": "12-03",
+            "label": "12-03 / 12-03",
+            "visible": true,
+            "width": "medium",
+            "order": 293
+          },
+          "12-04": {
+            "source": "12-04",
+            "label": "12-04 / 12-04",
+            "visible": true,
+            "width": "medium",
+            "order": 294
+          },
+          "12-05": {
+            "source": "12-05",
+            "label": "12-05 / 12-05",
+            "visible": true,
+            "width": "medium",
+            "order": 295
+          },
+          "12-06": {
+            "source": "12-06",
+            "label": "12-06 / 12-06",
+            "visible": true,
+            "width": "medium",
+            "order": 296
+          },
+          "12-07": {
+            "source": "12-07",
+            "label": "12-07 / 12-07",
+            "visible": true,
+            "width": "medium",
+            "order": 297
+          },
+          "12-08": {
+            "source": "12-08",
+            "label": "12-08 / 12-08",
+            "visible": true,
+            "width": "medium",
+            "order": 298
+          },
+          "12-09": {
+            "source": "12-09",
+            "label": "12-09 / 12-09",
+            "visible": true,
+            "width": "medium",
+            "order": 299
+          },
+          "12-10": {
+            "source": "12-10",
+            "label": "12-10 / 12-10",
+            "visible": true,
+            "width": "medium",
+            "order": 300
+          },
+          "12-11": {
+            "source": "12-11",
+            "label": "12-11 / 12-11",
+            "visible": true,
+            "width": "medium",
+            "order": 301
+          },
+          "12-12": {
+            "source": "12-12",
+            "label": "12-12 / 12-12",
+            "visible": true,
+            "width": "medium",
+            "order": 302
+          },
+          "12-13": {
+            "source": "12-13",
+            "label": "12-13 / 12-13",
+            "visible": true,
+            "width": "medium",
+            "order": 303
+          },
+          "12-14": {
+            "source": "12-14",
+            "label": "12-14 / 12-14",
+            "visible": true,
+            "width": "medium",
+            "order": 304
+          },
+          "12-15": {
+            "source": "12-15",
+            "label": "12-15 / 12-15",
+            "visible": true,
+            "width": "medium",
+            "order": 305
+          },
+          "12-16": {
+            "source": "12-16",
+            "label": "12-16 / 12-16",
+            "visible": true,
+            "width": "medium",
+            "order": 306
+          },
+          "12-17": {
+            "source": "12-17",
+            "label": "12-17 / 12-17",
+            "visible": true,
+            "width": "medium",
+            "order": 307
+          },
+          "12-18": {
+            "source": "12-18",
+            "label": "12-18 / 12-18",
+            "visible": true,
+            "width": "medium",
+            "order": 308
+          },
+          "12-19": {
+            "source": "12-19",
+            "label": "12-19 / 12-19",
+            "visible": true,
+            "width": "medium",
+            "order": 309
+          },
+          "12-20": {
+            "source": "12-20",
+            "label": "12-20 / 12-20",
+            "visible": true,
+            "width": "medium",
+            "order": 310
+          },
+          "12-21": {
+            "source": "12-21",
+            "label": "12-21 / 12-21",
+            "visible": true,
+            "width": "medium",
+            "order": 311
+          },
+          "12-22": {
+            "source": "12-22",
+            "label": "12-22 / 12-22",
+            "visible": true,
+            "width": "medium",
+            "order": 312
+          },
+          "12-23": {
+            "source": "12-23",
+            "label": "12-23 / 12-23",
+            "visible": true,
+            "width": "medium",
+            "order": 313
+          },
+          "12-24": {
+            "source": "12-24",
+            "label": "12-24 / 12-24",
+            "visible": true,
+            "width": "medium",
+            "order": 314
+          },
+          "12-25": {
+            "source": "12-25",
+            "label": "12-25 / 12-25",
+            "visible": true,
+            "width": "medium",
+            "order": 315
+          },
+          "12-26": {
+            "source": "12-26",
+            "label": "12-26 / 12-26",
+            "visible": true,
+            "width": "medium",
+            "order": 316
+          },
+          "12-27": {
+            "source": "12-27",
+            "label": "12-27 / 12-27",
+            "visible": true,
+            "width": "medium",
+            "order": 317
+          },
+          "12-28": {
+            "source": "12-28",
+            "label": "12-28 / 12-28",
+            "visible": true,
+            "width": "medium",
+            "order": 318
+          },
+          "12-29": {
+            "source": "12-29",
+            "label": "12-29 / 12-29",
+            "visible": true,
+            "width": "medium",
+            "order": 319
+          },
+          "12-30": {
+            "source": "12-30",
+            "label": "12-30 / 12-30",
+            "visible": true,
+            "width": "medium",
+            "order": 320
+          },
+          "12-31": {
+            "source": "12-31",
+            "label": "12-31 / 12-31",
+            "visible": true,
+            "width": "medium",
+            "order": 321
+          },
+          "01-01": {
+            "source": "01-01",
+            "label": "01-01 / 01-01",
+            "visible": true,
+            "width": "medium",
+            "order": 322
+          },
+          "01-02": {
+            "source": "01-02",
+            "label": "01-02 / 01-02",
+            "visible": true,
+            "width": "medium",
+            "order": 323
+          },
+          "01-03": {
+            "source": "01-03",
+            "label": "01-03 / 01-03",
+            "visible": true,
+            "width": "medium",
+            "order": 324
+          },
+          "01-04": {
+            "source": "01-04",
+            "label": "01-04 / 01-04",
+            "visible": true,
+            "width": "medium",
+            "order": 325
+          },
+          "01-05": {
+            "source": "01-05",
+            "label": "01-05 / 01-05",
+            "visible": true,
+            "width": "medium",
+            "order": 326
+          },
+          "01-06": {
+            "source": "01-06",
+            "label": "01-06 / 01-06",
+            "visible": true,
+            "width": "medium",
+            "order": 327
+          },
+          "01-07": {
+            "source": "01-07",
+            "label": "01-07 / 01-07",
+            "visible": true,
+            "width": "medium",
+            "order": 328
+          },
+          "01-08": {
+            "source": "01-08",
+            "label": "01-08 / 01-08",
+            "visible": true,
+            "width": "medium",
+            "order": 329
+          },
+          "01-09": {
+            "source": "01-09",
+            "label": "01-09 / 01-09",
+            "visible": true,
+            "width": "medium",
+            "order": 330
+          },
+          "01-10": {
+            "source": "01-10",
+            "label": "01-10 / 01-10",
+            "visible": true,
+            "width": "medium",
+            "order": 331
+          },
+          "01-11": {
+            "source": "01-11",
+            "label": "01-11 / 01-11",
+            "visible": true,
+            "width": "medium",
+            "order": 332
+          },
+          "01-12": {
+            "source": "01-12",
+            "label": "01-12 / 01-12",
+            "visible": true,
+            "width": "medium",
+            "order": 333
+          },
+          "01-13": {
+            "source": "01-13",
+            "label": "01-13 / 01-13",
+            "visible": true,
+            "width": "medium",
+            "order": 334
+          },
+          "01-14": {
+            "source": "01-14",
+            "label": "01-14 / 01-14",
+            "visible": true,
+            "width": "medium",
+            "order": 335
+          },
+          "01-15": {
+            "source": "01-15",
+            "label": "01-15 / 01-15",
+            "visible": true,
+            "width": "medium",
+            "order": 336
+          },
+          "01-16": {
+            "source": "01-16",
+            "label": "01-16 / 01-16",
+            "visible": true,
+            "width": "medium",
+            "order": 337
+          },
+          "01-17": {
+            "source": "01-17",
+            "label": "01-17 / 01-17",
+            "visible": true,
+            "width": "medium",
+            "order": 338
+          },
+          "01-18": {
+            "source": "01-18",
+            "label": "01-18 / 01-18",
+            "visible": true,
+            "width": "medium",
+            "order": 339
+          },
+          "01-19": {
+            "source": "01-19",
+            "label": "01-19 / 01-19",
+            "visible": true,
+            "width": "medium",
+            "order": 340
+          },
+          "01-20": {
+            "source": "01-20",
+            "label": "01-20 / 01-20",
+            "visible": true,
+            "width": "medium",
+            "order": 341
+          },
+          "01-21": {
+            "source": "01-21",
+            "label": "01-21 / 01-21",
+            "visible": true,
+            "width": "medium",
+            "order": 342
+          },
+          "01-22": {
+            "source": "01-22",
+            "label": "01-22 / 01-22",
+            "visible": true,
+            "width": "medium",
+            "order": 343
+          },
+          "01-23": {
+            "source": "01-23",
+            "label": "01-23 / 01-23",
+            "visible": true,
+            "width": "medium",
+            "order": 344
+          },
+          "01-24": {
+            "source": "01-24",
+            "label": "01-24 / 01-24",
+            "visible": true,
+            "width": "medium",
+            "order": 345
+          },
+          "01-25": {
+            "source": "01-25",
+            "label": "01-25 / 01-25",
+            "visible": true,
+            "width": "medium",
+            "order": 346
+          },
+          "01-26": {
+            "source": "01-26",
+            "label": "01-26 / 01-26",
+            "visible": true,
+            "width": "medium",
+            "order": 347
+          },
+          "01-27": {
+            "source": "01-27",
+            "label": "01-27 / 01-27",
+            "visible": true,
+            "width": "medium",
+            "order": 348
+          },
+          "01-28": {
+            "source": "01-28",
+            "label": "01-28 / 01-28",
+            "visible": true,
+            "width": "medium",
+            "order": 349
+          },
+          "01-29": {
+            "source": "01-29",
+            "label": "01-29 / 01-29",
+            "visible": true,
+            "width": "medium",
+            "order": 350
+          },
+          "01-30": {
+            "source": "01-30",
+            "label": "01-30 / 01-30",
+            "visible": true,
+            "width": "medium",
+            "order": 351
+          },
+          "01-31": {
+            "source": "01-31",
+            "label": "01-31 / 01-31",
+            "visible": true,
+            "width": "medium",
+            "order": 352
+          },
+          "02-01": {
+            "source": "02-01",
+            "label": "02-01 / 02-01",
+            "visible": true,
+            "width": "medium",
+            "order": 353
+          },
+          "02-02": {
+            "source": "02-02",
+            "label": "02-02 / 02-02",
+            "visible": true,
+            "width": "medium",
+            "order": 354
+          },
+          "02-03": {
+            "source": "02-03",
+            "label": "02-03 / 02-03",
+            "visible": true,
+            "width": "medium",
+            "order": 355
+          },
+          "02-04": {
+            "source": "02-04",
+            "label": "02-04 / 02-04",
+            "visible": true,
+            "width": "medium",
+            "order": 356
+          },
+          "02-05": {
+            "source": "02-05",
+            "label": "02-05 / 02-05",
+            "visible": true,
+            "width": "medium",
+            "order": 357
+          },
+          "02-06": {
+            "source": "02-06",
+            "label": "02-06 / 02-06",
+            "visible": true,
+            "width": "medium",
+            "order": 358
+          },
+          "02-07": {
+            "source": "02-07",
+            "label": "02-07 / 02-07",
+            "visible": true,
+            "width": "medium",
+            "order": 359
+          },
+          "02-08": {
+            "source": "02-08",
+            "label": "02-08 / 02-08",
+            "visible": true,
+            "width": "medium",
+            "order": 360
+          },
+          "02-09": {
+            "source": "02-09",
+            "label": "02-09 / 02-09",
+            "visible": true,
+            "width": "medium",
+            "order": 361
+          },
+          "02-10": {
+            "source": "02-10",
+            "label": "02-10 / 02-10",
+            "visible": true,
+            "width": "medium",
+            "order": 362
+          },
+          "02-11": {
+            "source": "02-11",
+            "label": "02-11 / 02-11",
+            "visible": true,
+            "width": "medium",
+            "order": 363
+          },
+          "02-12": {
+            "source": "02-12",
+            "label": "02-12 / 02-12",
+            "visible": true,
+            "width": "medium",
+            "order": 364
+          },
+          "02-13": {
+            "source": "02-13",
+            "label": "02-13 / 02-13",
+            "visible": true,
+            "width": "medium",
+            "order": 365
+          },
+          "02-14": {
+            "source": "02-14",
+            "label": "02-14 / 02-14",
+            "visible": true,
+            "width": "medium",
+            "order": 366
+          },
+          "02-15": {
+            "source": "02-15",
+            "label": "02-15 / 02-15",
+            "visible": true,
+            "width": "medium",
+            "order": 367
+          },
+          "02-16": {
+            "source": "02-16",
+            "label": "02-16 / 02-16",
+            "visible": true,
+            "width": "medium",
+            "order": 368
+          },
+          "02-17": {
+            "source": "02-17",
+            "label": "02-17 / 02-17",
+            "visible": true,
+            "width": "medium",
+            "order": 369
+          },
+          "02-18": {
+            "source": "02-18",
+            "label": "02-18 / 02-18",
+            "visible": true,
+            "width": "medium",
+            "order": 370
+          },
+          "02-19": {
+            "source": "02-19",
+            "label": "02-19 / 02-19",
+            "visible": true,
+            "width": "medium",
+            "order": 371
+          },
+          "02-20": {
+            "source": "02-20",
+            "label": "02-20 / 02-20",
+            "visible": true,
+            "width": "medium",
+            "order": 372
+          },
+          "02-21": {
+            "source": "02-21",
+            "label": "02-21 / 02-21",
+            "visible": true,
+            "width": "medium",
+            "order": 373
+          },
+          "02-22": {
+            "source": "02-22",
+            "label": "02-22 / 02-22",
+            "visible": true,
+            "width": "medium",
+            "order": 374
+          },
+          "02-23": {
+            "source": "02-23",
+            "label": "02-23 / 02-23",
+            "visible": true,
+            "width": "medium",
+            "order": 375
+          },
+          "02-24": {
+            "source": "02-24",
+            "label": "02-24 / 02-24",
+            "visible": true,
+            "width": "medium",
+            "order": 376
+          },
+          "02-25": {
+            "source": "02-25",
+            "label": "02-25 / 02-25",
+            "visible": true,
+            "width": "medium",
+            "order": 377
+          },
+          "02-26": {
+            "source": "02-26",
+            "label": "02-26 / 02-26",
+            "visible": true,
+            "width": "medium",
+            "order": 378
+          },
+          "02-27": {
+            "source": "02-27",
+            "label": "02-27 / 02-27",
+            "visible": true,
+            "width": "medium",
+            "order": 379
+          },
+          "02-28": {
+            "source": "02-28",
+            "label": "02-28 / 02-28",
+            "visible": true,
+            "width": "medium",
+            "order": 380
+          },
+          "03-01": {
+            "source": "03-01",
+            "label": "03-01 / 03-01",
+            "visible": true,
+            "width": "medium",
+            "order": 381
+          },
+          "03-02": {
+            "source": "03-02",
+            "label": "03-02 / 03-02",
+            "visible": true,
+            "width": "medium",
+            "order": 382
+          },
+          "03-03": {
+            "source": "03-03",
+            "label": "03-03 / 03-03",
+            "visible": true,
+            "width": "medium",
+            "order": 383
+          },
+          "03-04": {
+            "source": "03-04",
+            "label": "03-04 / 03-04",
+            "visible": true,
+            "width": "medium",
+            "order": 384
+          },
+          "03-05": {
+            "source": "03-05",
+            "label": "03-05 / 03-05",
+            "visible": true,
+            "width": "medium",
+            "order": 385
+          },
+          "03-06": {
+            "source": "03-06",
+            "label": "03-06 / 03-06",
+            "visible": true,
+            "width": "medium",
+            "order": 386
+          },
+          "03-07": {
+            "source": "03-07",
+            "label": "03-07 / 03-07",
+            "visible": true,
+            "width": "medium",
+            "order": 387
+          },
+          "03-08": {
+            "source": "03-08",
+            "label": "03-08 / 03-08",
+            "visible": true,
+            "width": "medium",
+            "order": 388
+          }
+        },
+        "updated_at": "2026-05-25 22:07:02",
+        "reason": "v367_column_settings_saved"
+      },
+      "14_14._資料健康檢查中心_14_14._資料健康檢查中心_178_dataframe": {
+        "columns": {
+          "id": {
+            "source": "id",
+            "label": "ID / ID",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "record_key": {
+            "source": "record_key",
+            "label": "紀錄鍵 / Record Key",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "status": {
+            "source": "status",
+            "label": "狀態 / Status",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "work_order": {
+            "source": "work_order",
+            "label": "製令 / Work Order",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "part_no": {
+            "source": "part_no",
+            "label": "P/N / Part No.",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "type_name": {
+            "source": "type_name",
+            "label": "機型 / Type",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "process_name": {
+            "source": "process_name",
+            "label": "工段 / Process",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "employee_id": {
+            "source": "employee_id",
+            "label": "工號 / Employee ID",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "employee_name": {
+            "source": "employee_name",
+            "label": "姓名 / Name",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "start_action": {
+            "source": "start_action",
+            "label": "開始動作 / Start Action",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          },
+          "start_timestamp": {
+            "source": "start_timestamp",
+            "label": "開始時間戳 / Start Timestamp",
+            "visible": true,
+            "width": "medium",
+            "order": 10
+          },
+          "end_action": {
+            "source": "end_action",
+            "label": "結束動作 / End Action",
+            "visible": true,
+            "width": "medium",
+            "order": 11
+          },
+          "end_timestamp": {
+            "source": "end_timestamp",
+            "label": "結束時間戳 / End Timestamp",
+            "visible": true,
+            "width": "medium",
+            "order": 12
+          },
+          "remark": {
+            "source": "remark",
+            "label": "備註 / Note",
+            "visible": true,
+            "width": "medium",
+            "order": 13
+          },
+          "start_date": {
+            "source": "start_date",
+            "label": "開始日期 / Start Date",
+            "visible": true,
+            "width": "medium",
+            "order": 14
+          },
+          "start_time": {
+            "source": "start_time",
+            "label": "開始時間 / Start Time",
+            "visible": true,
+            "width": "medium",
+            "order": 15
+          },
+          "end_date": {
+            "source": "end_date",
+            "label": "結束日期 / End Date",
+            "visible": true,
+            "width": "medium",
+            "order": 16
+          },
+          "end_time": {
+            "source": "end_time",
+            "label": "結束時間 / End Time",
+            "visible": true,
+            "width": "medium",
+            "order": 17
+          },
+          "work_hours": {
+            "source": "work_hours",
+            "label": "工時小計 / Work Hours",
+            "visible": true,
+            "width": "medium",
+            "order": 18
+          },
+          "assembly_location": {
+            "source": "assembly_location",
+            "label": "組立地點 / Assembly Location",
+            "visible": true,
+            "width": "medium",
+            "order": 19
+          },
+          "group_key": {
+            "source": "group_key",
+            "label": "同時作業鍵 / Parallel Key",
+            "visible": true,
+            "width": "medium",
+            "order": 20
+          },
+          "is_group_work": {
+            "source": "is_group_work",
+            "label": "同時作業 / Parallel Work",
+            "visible": true,
+            "width": "medium",
+            "order": 21
+          },
+          "source": {
+            "source": "source",
+            "label": "來源 / Source",
+            "visible": true,
+            "width": "medium",
+            "order": 22
+          },
+          "created_at": {
+            "source": "created_at",
+            "label": "建立時間 / Created At",
+            "visible": true,
+            "width": "medium",
+            "order": 23
+          },
+          "updated_at": {
+            "source": "updated_at",
+            "label": "更新時間 / Updated At",
+            "visible": true,
+            "width": "medium",
+            "order": 24
+          },
+          "recovery_status": {
+            "source": "recovery_status",
+            "label": "recovery_status / recovery_status",
+            "visible": true,
+            "width": "medium",
+            "order": 29
+          },
+          "recovery_note": {
+            "source": "recovery_note",
+            "label": "recovery_note / recovery_note",
+            "visible": true,
+            "width": "medium",
+            "order": 30
+          },
+          "department": {
+            "source": "department",
+            "label": "單位 / Department",
+            "visible": true,
+            "width": "medium",
+            "order": 25
+          },
+          "title": {
+            "source": "title",
+            "label": "職稱 / Title",
+            "visible": true,
+            "width": "medium",
+            "order": 26
+          },
+          "department_emp": {
+            "source": "department_emp",
+            "label": "department_emp / department_emp",
+            "visible": true,
+            "width": "medium",
+            "order": 27
+          },
+          "title_emp": {
+            "source": "title_emp",
+            "label": "title_emp / title_emp",
+            "visible": true,
+            "width": "medium",
+            "order": 28
+          }
+        },
+        "updated_at": "2026-05-28 15:46:21",
+        "reason": "v367_column_settings_saved"
+      },
+      "v234_daily_attendance_editor_2026-05-30": {
+        "columns": {
+          "刪除 / Delete": {
+            "source": "刪除 / Delete",
+            "label": "刪除 / Delete / 刪除 / Delete",
+            "visible": true,
+            "width": "medium",
+            "order": -999
+          },
+          "序號 / No.": {
+            "source": "序號 / No.",
+            "label": "序號 / No. / 序號 / No.",
+            "visible": true,
+            "width": "medium",
+            "order": 0
+          },
+          "工號 / Employee ID": {
+            "source": "工號 / Employee ID",
+            "label": "工號 / Employee ID / 工號 / Employee ID",
+            "visible": true,
+            "width": "medium",
+            "order": 1
+          },
+          "姓名 / Name": {
+            "source": "姓名 / Name",
+            "label": "姓名 / Name / 姓名 / Name",
+            "visible": true,
+            "width": "medium",
+            "order": 2
+          },
+          "單位 / Department": {
+            "source": "單位 / Department",
+            "label": "單位 / Department / 單位 / Department",
+            "visible": true,
+            "width": "medium",
+            "order": 3
+          },
+          "職稱 / Title": {
+            "source": "職稱 / Title",
+            "label": "職稱 / Title / 職稱 / Title",
+            "visible": true,
+            "width": "medium",
+            "order": 4
+          },
+          "出勤狀態 / Attendance Status": {
+            "source": "出勤狀態 / Attendance Status",
+            "label": "出勤狀態 / Attendance Status / 出勤狀態 / Attendance Status",
+            "visible": true,
+            "width": "medium",
+            "order": 5
+          },
+          "在廠 / In Factory": {
+            "source": "在廠 / In Factory",
+            "label": "在廠 / In Factory / 在廠 / In Factory",
+            "visible": true,
+            "width": "medium",
+            "order": 6
+          },
+          "出勤 / Attendance": {
+            "source": "出勤 / Attendance",
+            "label": "出勤 / Attendance / 出勤 / Attendance",
+            "visible": true,
+            "width": "medium",
+            "order": 7
+          },
+          "到廠時間 / Check In": {
+            "source": "到廠時間 / Check In",
+            "label": "到廠時間 / Check In / 到廠時間 / Check In",
+            "visible": true,
+            "width": "medium",
+            "order": 8
+          },
+          "離廠時間 / Check Out": {
+            "source": "離廠時間 / Check Out",
+            "label": "離廠時間 / Check Out / 離廠時間 / Check Out",
+            "visible": true,
+            "width": "medium",
+            "order": 9
+          },
+          "備註 / Note": {
+            "source": "備註 / Note",
+            "label": "備註 / Note / 備註 / Note",
+            "visible": true,
+            "width": "medium",
+            "order": 10
+          },
+          "紀錄ID / Record ID": {
+            "source": "紀錄ID / Record ID",
+            "label": "紀錄ID / Record ID / 紀錄ID / Record ID",
+            "visible": true,
+            "width": "medium",
+            "order": 11
+          },
+          "日期 / Date": {
+            "source": "日期 / Date",
+            "label": "日期 / Date / 日期 / Date",
+            "visible": true,
+            "width": "medium",
+            "order": 12
+          },
+          "建立時間 / Created At": {
+            "source": "建立時間 / Created At",
+            "label": "建立時間 / Created At / 建立時間 / Created At",
+            "visible": true,
+            "width": "medium",
+            "order": 13
+          },
+          "更新時間 / Updated At": {
+            "source": "更新時間 / Updated At",
+            "label": "更新時間 / Updated At / 更新時間 / Updated At",
+            "visible": true,
+            "width": "medium",
+            "order": 14
+          },
+          "更新者 / Updated By": {
+            "source": "更新者 / Updated By",
+            "label": "更新者 / Updated By / 更新者 / Updated By",
+            "visible": true,
+            "width": "medium",
+            "order": 15
+          }
+        },
+        "updated_at": "2026-05-30 00:32:03",
+        "reason": "v367_column_settings_saved"
+      }
+    },
+    "updated_at": "2026-05-30 12:43:21"
+  },
+  "table_counts": {}
+}
