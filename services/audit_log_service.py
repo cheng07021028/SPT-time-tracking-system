@@ -2526,3 +2526,442 @@ record_audit_log = record_login_log
 log_login_event = record_login_log
 save_login_log = record_login_log
 # =================== END V254 FAST LOGIN AUDIT WRITE ===================
+
+# ================= V300.42 11 LOGIN RECORDS CANONICAL JSONL AUTHORITY =================
+# 2026-06-01
+# Problem fixed:
+# - Older login audit code used 11_login_logs / records.json / persistent_state.
+# - V300 authority inventory expects 11_login_records/records.jsonl.
+# - Delete state kept only in local files can disappear after Streamlit Cloud reboot,
+#   allowing old login rows to reappear from SQLite/legacy files.
+# Rule:
+# - records.jsonl in module 11_login_records is the canonical append-only authority.
+# - DELETE_LOGIN_LOG_RANGE markers in that JSONL are always applied to all sources.
+
+_V30042_LOGIN_TERMINAL_DELETE_ACTION = "DELETE_LOGIN_LOG_RANGE"
+
+
+def _v30042_login_now() -> str:
+    try:
+        return str(now_text())
+    except Exception:
+        return _now()
+
+
+def _v30042_date_text(value: Any) -> str:
+    text = str(value or "").strip().replace("/", "-")
+    if not text:
+        return ""
+    return text[:10]
+
+
+def _v30042_login_row_time(row: dict[str, Any]) -> str:
+    return str(row.get("login_time") or row.get("created_at") or row.get("timestamp") or row.get("time") or row.get("authority_written_at") or "")
+
+
+def _v30042_login_row_date(row: dict[str, Any]) -> str:
+    return _v30042_date_text(_v30042_login_row_time(row))
+
+
+def _v30042_read_11_jsonl(limit: int | None = None) -> list[dict[str, Any]]:
+    try:
+        from services.authority_consistency_service import read_jsonl  # type: ignore
+        return [dict(r) for r in read_jsonl("11_login_records", limit=limit) if isinstance(r, dict)]
+    except Exception:
+        return []
+
+
+def _v30042_append_11_jsonl(row: dict[str, Any], *, github: bool = False, reason: str = "v30042_11_append") -> dict[str, Any]:
+    try:
+        from services.authority_consistency_service import append_jsonl  # type: ignore
+        return dict(append_jsonl(
+            "11_login_records",
+            dict(row or {}),
+            identity_fields=("login_time", "username", "event_type", "result", "message", "module_code"),
+            github=github,
+            reason=reason,
+        ) or {})
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300]}
+
+
+def _v30042_login_delete_ranges() -> list[dict[str, str]]:
+    ranges: list[dict[str, str]] = []
+    for r in _v30042_read_11_jsonl(None):
+        action = str(r.get("event_type") or r.get("action_type") or "").upper().strip()
+        if action != _V30042_LOGIN_TERMINAL_DELETE_ACTION and not (r.get("delete_range_start") or r.get("delete_range_end")):
+            continue
+        s = _v30042_date_text(r.get("delete_range_start") or r.get("start_date") or "")
+        e = _v30042_date_text(r.get("delete_range_end") or r.get("end_date") or "")
+        target = str(r.get("target_id") or "")
+        if "~" in target and (not s or not e):
+            a, b = target.split("~", 1)
+            s = s or _v30042_date_text(a)
+            e = e or _v30042_date_text(b)
+        deleted_at = str(r.get("deleted_at") or r.get("login_time") or r.get("created_at") or r.get("authority_written_at") or "")
+        if s and not e:
+            e = s
+        if e and not s:
+            s = e
+        if s and e:
+            if s > e:
+                s, e = e, s
+            ranges.append({"start": s, "end": e, "deleted_at": deleted_at})
+    ranges.sort(key=lambda x: (x.get("start", ""), x.get("end", ""), x.get("deleted_at", "")))
+    return ranges
+
+
+def _v30042_is_login_delete_marker(row: dict[str, Any]) -> bool:
+    action = str(row.get("event_type") or row.get("action_type") or "").upper().strip()
+    return action == _V30042_LOGIN_TERMINAL_DELETE_ACTION or bool(row.get("delete_range_start") or row.get("delete_range_end"))
+
+
+def _v30042_login_visible(row: dict[str, Any], ranges: list[dict[str, str]] | None = None) -> bool:
+    if _v30042_is_login_delete_marker(row):
+        return False
+    d = _v30042_login_row_date(row)
+    if not d:
+        return True
+    t = _v30042_login_row_time(row)
+    for r in ranges if ranges is not None else _v30042_login_delete_ranges():
+        s, e = r.get("start", ""), r.get("end", "")
+        deleted_at = r.get("deleted_at", "")
+        if s <= d <= e:
+            # Preserve login rows created after a delete marker, so clearing today's old
+            # records does not hide future logins for the rest of the day.
+            if deleted_at and t and str(t) > str(deleted_at):
+                continue
+            return False
+    return True
+
+
+def _v30042_db_login_rows(limit: int | None = None) -> list[dict[str, Any]]:
+    try:
+        ensure_login_logs_table()
+        with get_connection() as conn:
+            sql = "SELECT * FROM login_logs ORDER BY COALESCE(login_time, created_at, '') DESC, id DESC"
+            if limit and int(limit) > 0:
+                sql += " LIMIT " + str(int(limit))
+            rows = conn.execute(sql).fetchall()
+            return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+
+def _v30042_merge_login_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for r in rows or []:
+        if not isinstance(r, dict) or _v30042_is_login_delete_marker(r):
+            continue
+        key = str(r.get("authority_event_id") or "").strip()
+        if not key:
+            key = "|".join(str(r.get(k, "") or "") for k in ("login_time", "username", "event_type", "result", "message", "module_code"))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(dict(r))
+    out.sort(key=lambda x: (_v30042_login_row_time(x), str(x.get("id") or "")), reverse=True)
+    return out
+
+
+def record_login_log(
+    username: str = "",
+    display_name: str = "",
+    event_type: str = "LOGIN",
+    result: str = "SUCCESS",
+    message: str = "",
+    module_code: str = "",
+    login_time: Optional[str] = None,
+    logout_time: Optional[str] = None,
+    idle_minutes: Optional[float] = None,
+    ip_address: str = "",
+    user_agent: str = "",
+    **kwargs: Any,
+) -> int:  # type: ignore[override]
+    """V300.42: quick SQLite insert plus canonical 11_login_records JSONL append."""
+    try:
+        ensure_login_logs_table()
+    except Exception:
+        pass
+    login_time = login_time or _v30042_login_now()
+    created_at = str(kwargs.get("created_at") or _v30042_login_now())
+    new_id = 0
+    try:
+        with get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO login_logs (
+                    username, display_name, event_type, result, message, module_code,
+                    login_time, logout_time, idle_minutes, ip_address, user_agent, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (username, display_name, event_type, result, message, module_code,
+                 login_time, logout_time, idle_minutes, ip_address, user_agent, created_at),
+            )
+            new_id = int(cur.lastrowid or 0)
+            conn.commit()
+    except Exception:
+        new_id = 0
+    row = {
+        "id": new_id,
+        "username": username,
+        "display_name": display_name,
+        "event_type": event_type,
+        "result": result,
+        "message": message,
+        "module_code": module_code,
+        "login_time": login_time,
+        "logout_time": logout_time or "",
+        "idle_minutes": idle_minutes if idle_minutes is not None else "",
+        "ip_address": ip_address,
+        "user_agent": user_agent,
+        "created_at": created_at,
+        "source": "v30042_11_login_records_canonical_jsonl",
+    }
+    _v30042_append_11_jsonl(row, github=False, reason="v30042_record_login_log")
+    return new_id
+
+
+def load_login_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "", limit: int = 1000, event_types=None, results=None, include_legacy: bool = True, **kwargs: Any):  # type: ignore[override]
+    ranges = _v30042_login_delete_ranges()
+    rows = _v30042_read_11_jsonl(None)
+    if include_legacy:
+        rows.extend(_v30042_db_login_rows(None))
+    rows = [r for r in _v30042_merge_login_rows(rows) if _v30042_login_visible(r, ranges)]
+    s = _v30042_date_text(start_date)
+    e = _v30042_date_text(end_date)
+    kw = str(keyword or "").strip().lower()
+    ev_set = {str(x).strip().upper() for x in (event_types or []) if str(x).strip()} if event_types else set()
+    res_set = {str(x).strip().upper() for x in (results or []) if str(x).strip()} if results else set()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        d = _v30042_login_row_date(r)
+        if s and (not d or d < s):
+            continue
+        if e and (not d or d > e):
+            continue
+        if ev_set and str(r.get("event_type") or "").strip().upper() not in ev_set:
+            continue
+        if res_set and str(r.get("result") or "").strip().upper() not in res_set:
+            continue
+        if kw:
+            blob = " ".join(str(r.get(k, "") or "") for k in ("username", "display_name", "event_type", "result", "message", "module_code", "ip_address")).lower()
+            if kw not in blob:
+                continue
+        out.append(r)
+    if limit and int(limit) > 0:
+        out = out[: int(limit)]
+    if pd is not None:
+        return pd.DataFrame(out)
+    return out
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    before = load_login_logs(start_date=start_date, end_date=end_date, keyword="", limit=100000, include_legacy=True)
+    try:
+        deleted = int(len(before))
+    except Exception:
+        deleted = 0
+    deleted_at = _v30042_login_now()
+    marker = {
+        "login_time": deleted_at,
+        "created_at": deleted_at,
+        "username": "system",
+        "display_name": "系統",
+        "event_type": _V30042_LOGIN_TERMINAL_DELETE_ACTION,
+        "result": "DELETE",
+        "message": f"刪除登入紀錄日期區間：{_v30042_date_text(start_date)} ~ {_v30042_date_text(end_date)}，刪除筆數：{deleted}",
+        "module_code": "11_login_records",
+        "target_table": "login_logs",
+        "target_id": f"{_v30042_date_text(start_date)}~{_v30042_date_text(end_date)}",
+        "delete_range_start": _v30042_date_text(start_date),
+        "delete_range_end": _v30042_date_text(end_date),
+        "deleted_at": deleted_at,
+        "deleted_count": deleted,
+        "source": "v30042_11_login_records_delete_range_tombstone",
+    }
+    _v30042_append_11_jsonl(marker, github=True, reason="v30042_delete_login_log_range")
+    return deleted
+
+
+# Alias all older entry points to the canonical V300.42 implementation.
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+delete_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+get_login_logs = load_login_logs
+query_login_logs = load_login_logs
+load_audit_logs = load_login_logs
+write_login_log = record_login_log
+add_login_log = record_login_log
+append_login_log = record_login_log
+write_audit_log = record_login_log
+record_audit_log = record_login_log
+log_login_event = record_login_log
+save_login_log = record_login_log
+
+
+def audit_v30042_11_login_records_authority() -> Dict[str, Any]:
+    rows = _v30042_read_11_jsonl(None)
+    ranges = _v30042_login_delete_ranges()
+    visible = [r for r in rows if _v30042_login_visible(r, ranges)]
+    try:
+        from services.authority_consistency_service import records_jsonl_path  # type: ignore
+        path = records_jsonl_path("11_login_records")
+    except Exception:
+        path = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_records" / "records.jsonl"
+    return {
+        "version": "V300.42_11_LOGIN_RECORDS_CANONICAL_JSONL_AUTHORITY",
+        "authority_file": str(path),
+        "authority_rows": len(rows),
+        "visible_rows_after_tombstone": len(visible),
+        "delete_ranges": ranges,
+        "legacy_11_login_logs_not_authoritative": True,
+    }
+# ================= END V300.42 11 LOGIN RECORDS CANONICAL JSONL AUTHORITY =================
+
+# ================= BEGIN V300.42.2 11 DELETE RANGE DATE-SAFE VISIBILITY =================
+# Preserve only login rows created after a same-day delete marker.  A delete made today
+# for another date range must not accidentally make those rows visible again.
+def _v30042_login_visible(row: dict[str, Any], ranges: list[dict[str, str]] | None = None) -> bool:  # type: ignore[override]
+    if _v30042_is_login_delete_marker(row):
+        return False
+    d = _v30042_login_row_date(row)
+    if not d:
+        return True
+    t = str(_v30042_login_row_time(row) or "")
+    for r in ranges if ranges is not None else _v30042_login_delete_ranges():
+        s, e = r.get("start", ""), r.get("end", "")
+        deleted_at = str(r.get("deleted_at") or "")
+        deleted_date = deleted_at[:10] if len(deleted_at) >= 10 else ""
+        if s <= d <= e:
+            if deleted_at and deleted_date and d == deleted_date and t and t > deleted_at:
+                continue
+            return False
+    return True
+
+
+def audit_v300422_11_delete_range_date_safe_visibility() -> Dict[str, Any]:
+    return {
+        "version": "V300.42.2_11_DELETE_RANGE_DATE_SAFE_VISIBILITY",
+        "delete_ranges": _v30042_login_delete_ranges(),
+        "same_day_post_delete_rows_visible": True,
+        "non_same_day_rows_inside_deleted_range_hidden": True,
+    }
+# ================= END V300.42.2 11 DELETE RANGE DATE-SAFE VISIBILITY =================
+
+# ================= BEGIN V300.42.3 11 DELETE RANGE AUTHORITY-WRITTEN VISIBILITY =================
+def _v300423_login_after_delete_marker(row: dict[str, Any], deleted_at: str, row_date: str) -> bool:
+    if not deleted_at:
+        return False
+    written_at = str(row.get("authority_written_at") or "")
+    if written_at and written_at > deleted_at:
+        return True
+    deleted_date = deleted_at[:10] if len(deleted_at) >= 10 else ""
+    t = str(_v30042_login_row_time(row) or "")
+    return bool(deleted_date and row_date == deleted_date and t and t > deleted_at)
+
+
+def _v30042_login_visible(row: dict[str, Any], ranges: list[dict[str, str]] | None = None) -> bool:  # type: ignore[override]
+    if _v30042_is_login_delete_marker(row):
+        return False
+    d = _v30042_login_row_date(row)
+    if not d:
+        return True
+    for r in ranges if ranges is not None else _v30042_login_delete_ranges():
+        s, e = r.get("start", ""), r.get("end", "")
+        deleted_at = str(r.get("deleted_at") or "")
+        if s <= d <= e:
+            if _v300423_login_after_delete_marker(row, deleted_at, d):
+                continue
+            return False
+    return True
+
+
+def audit_v300423_11_delete_range_authority_written_visibility() -> Dict[str, Any]:
+    return {
+        "version": "V300.42.3_11_DELETE_RANGE_AUTHORITY_WRITTEN_VISIBILITY",
+        "delete_ranges": _v30042_login_delete_ranges(),
+        "new_rows_after_delete_marker_visible_by_authority_written_at": True,
+        "old_rows_inside_deleted_range_hidden": True,
+    }
+# ================= END V300.42.3 11 DELETE RANGE AUTHORITY-WRITTEN VISIBILITY =================
+
+# ================= BEGIN V300.42.4 11 DELETE RANGE JSONL SEQUENCE VISIBILITY =================
+def _v30042_read_11_jsonl(limit: int | None = None) -> list[dict[str, Any]]:  # type: ignore[override]
+    try:
+        from services.authority_consistency_service import read_jsonl  # type: ignore
+        raw = [dict(r) for r in read_jsonl("11_login_records", limit=None) if isinstance(r, dict)]
+        rows: list[dict[str, Any]] = []
+        for i, r in enumerate(raw, 1):
+            r.setdefault("__authority_seq", i)
+            rows.append(r)
+        if limit and int(limit) > 0:
+            return rows[-int(limit):]
+        return rows
+    except Exception:
+        return []
+
+
+def _v30042_login_delete_ranges() -> list[dict[str, str]]:  # type: ignore[override]
+    ranges: list[dict[str, str]] = []
+    for r in _v30042_read_11_jsonl(None):
+        action = str(r.get("event_type") or r.get("action_type") or "").upper().strip()
+        if action != _V30042_LOGIN_TERMINAL_DELETE_ACTION and not (r.get("delete_range_start") or r.get("delete_range_end")):
+            continue
+        s = _v30042_date_text(r.get("delete_range_start") or r.get("start_date") or "")
+        e = _v30042_date_text(r.get("delete_range_end") or r.get("end_date") or "")
+        target = str(r.get("target_id") or "")
+        if "~" in target and (not s or not e):
+            a, b = target.split("~", 1)
+            s = s or _v30042_date_text(a)
+            e = e or _v30042_date_text(b)
+        deleted_at = str(r.get("deleted_at") or r.get("login_time") or r.get("created_at") or r.get("authority_written_at") or "")
+        if s and not e:
+            e = s
+        if e and not s:
+            s = e
+        if s and e:
+            if s > e:
+                s, e = e, s
+            ranges.append({"start": s, "end": e, "deleted_at": deleted_at, "seq": str(r.get("__authority_seq") or "")})
+    ranges.sort(key=lambda x: (x.get("start", ""), x.get("end", ""), x.get("deleted_at", ""), x.get("seq", "")))
+    return ranges
+
+
+def _v30042_login_visible(row: dict[str, Any], ranges: list[dict[str, str]] | None = None) -> bool:  # type: ignore[override]
+    if _v30042_is_login_delete_marker(row):
+        return False
+    d = _v30042_login_row_date(row)
+    if not d:
+        return True
+    try:
+        row_seq = int(str(row.get("__authority_seq") or "0"))
+    except Exception:
+        row_seq = 0
+    for r in ranges if ranges is not None else _v30042_login_delete_ranges():
+        s, e = r.get("start", ""), r.get("end", "")
+        deleted_at = str(r.get("deleted_at") or "")
+        try:
+            marker_seq = int(str(r.get("seq") or "0"))
+        except Exception:
+            marker_seq = 0
+        if s <= d <= e:
+            if row_seq and marker_seq and row_seq > marker_seq:
+                continue
+            if _v300423_login_after_delete_marker(row, deleted_at, d):
+                continue
+            return False
+    return True
+
+
+def audit_v300424_11_delete_range_sequence_visibility() -> Dict[str, Any]:
+    return {
+        "version": "V300.42.4_11_DELETE_RANGE_JSONL_SEQUENCE_VISIBILITY",
+        "sequence_tag_added_to_authority_rows": True,
+        "same_second_after_delete_rows_visible_by_sequence": True,
+    }
+# ================= END V300.42.4 11 DELETE RANGE JSONL SEQUENCE VISIBILITY =================

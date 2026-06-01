@@ -2383,3 +2383,430 @@ def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit:
 def audit_v30036_06_log_delete_authority() -> dict[str, Any]:
     return {"version": "V300.36_06_LOG_UNIQUE_AUTHORITY_DELETE_TOMBSTONE", "delete_ranges": _v30036_log_delete_ranges(), "authority_rows": len(_v30036_read_log_authority_rows(None)), "deleted_rows_never_return_from_legacy_sources": True}
 # ===== V300.36 06 LOG UNIQUE AUTHORITY DELETE TOMBSTONE END =====
+
+# ================= V300.42 06 LOG HOT-PATH FLATTEN + AUTHORITY DELETE GUARD =================
+# 2026-06-01
+# Purpose:
+# - 01 工時紀錄 page/button paths call write_log frequently.  Older append-only
+#   wrappers chained through multiple previous write_log implementations and could
+#   trigger foreground GitHub/JSONL work.  This final override writes only one
+#   SQLite log row and one local 06_log_query records.jsonl row.
+# - Explicit 06 delete still uses delete_logs_by_date_range(), which writes a
+#   DELETE_LOG_RANGE authority tombstone and uploads that small JSONL authority file.
+try:
+    _v30042_prev_delete_logs_by_date_range = delete_logs_by_date_range  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30042_prev_delete_logs_by_date_range = None
+
+
+def _v30042_log_now() -> str:
+    try:
+        return str(now_text())  # type: ignore[name-defined]
+    except Exception:
+        try:
+            from datetime import datetime as _dt
+            return _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return ""
+
+
+def _v30042_current_log_user() -> str:
+    try:
+        u = _current_log_user()  # type: ignore[name-defined]
+        if u:
+            return str(u)
+    except Exception:
+        pass
+    try:
+        import streamlit as _st  # type: ignore
+        return str(_st.session_state.get("auth_username") or _st.session_state.get("username") or "system")
+    except Exception:
+        return "system"
+
+
+def _v30042_sqlite_write_log_row(row: dict[str, Any]) -> None:
+    try:
+        from services.db_service import execute as _exec  # type: ignore
+        _exec(
+            """
+            INSERT INTO system_logs(log_time, user_name, action_type, target_table, target_id, message, detail, level)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                row.get("log_time"), row.get("user_name"), row.get("action_type"),
+                row.get("target_table"), row.get("target_id"), row.get("message"),
+                row.get("detail"), row.get("level"),
+            ),
+        )
+    except Exception:
+        # LOG must never break business buttons.
+        pass
+
+
+def _v30042_append_06_authority_row(row: dict[str, Any]) -> None:
+    try:
+        from services.authority_consistency_service import append_jsonl  # type: ignore
+        append_jsonl(
+            "06_log_query",
+            row,
+            identity_fields=("log_time", "user_name", "action_type", "target_table", "target_id", "message"),
+            github=False,
+            reason="v30042_write_log_hot_path_flatten",
+        )
+    except Exception:
+        pass
+
+
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    """V300.42 final LOG writer: one SQLite row + one local authority JSONL row.
+
+    This intentionally bypasses previous write_log wrapper chains.  It does not
+    upload GitHub, scan legacy logs, or call recursive LOG code on foreground UI.
+    """
+    row = {
+        "log_time": _v30042_log_now(),
+        "user_name": user_name or _v30042_current_log_user(),
+        "action_type": str(action_type or ""),
+        "target_table": str(target_table or ""),
+        "target_id": str(target_id or ""),
+        "message": str(message or ""),
+        "detail": str(detail or ""),
+        "level": str(level or "INFO"),
+        "source": "v30042_log_hot_path_flatten",
+    }
+    _v30042_sqlite_write_log_row(row)
+    _v30042_append_06_authority_row(row)
+    return None
+
+
+def audit_v30042_06_log_hot_path() -> dict[str, Any]:
+    return {
+        "version": "V300.42_06_LOG_HOT_PATH_FLATTEN",
+        "write_log_foreground_github_upload": False,
+        "write_log_legacy_wrapper_chain_bypassed": True,
+        "delete_range_authority_tombstone_function_available": callable(globals().get("delete_logs_by_date_range")),
+    }
+# ================= END V300.42 06 LOG HOT-PATH FLATTEN + AUTHORITY DELETE GUARD =================
+
+# ================= V300.42.1 06 DELETE RANGE WITH AFTER-DELETE VISIBILITY =================
+# Preserve new LOG rows created after a same-day delete marker while keeping older rows hidden.
+
+def _v300421_log_delete_ranges_with_deleted_at() -> list[dict[str, str]]:
+    out: list[dict[str, str]] = []
+    try:
+        rows = _v30036_read_log_authority_rows(None) if callable(globals().get("_v30036_read_log_authority_rows")) else []
+    except Exception:
+        rows = []
+    for r in rows or []:
+        action = str(r.get("action_type") or r.get("event_type") or "").upper().strip()
+        if action != "DELETE_LOG_RANGE" and not (r.get("delete_range_start") or r.get("delete_range_end")):
+            continue
+        s = _v30036_date_text(r.get("delete_range_start") or r.get("start_date") or "")
+        e = _v30036_date_text(r.get("delete_range_end") or r.get("end_date") or "")
+        target = str(r.get("target_id") or "")
+        if "~" in target and (not s or not e):
+            a, b = target.split("~", 1)
+            s = s or _v30036_date_text(a)
+            e = e or _v30036_date_text(b)
+        if s and not e:
+            e = s
+        if e and not s:
+            s = e
+        if s and e:
+            if s > e:
+                s, e = e, s
+            out.append({"start": s, "end": e, "deleted_at": str(r.get("deleted_at") or r.get("log_time") or r.get("created_at") or r.get("authority_written_at") or "")})
+    out.sort(key=lambda x: (x.get("start", ""), x.get("end", ""), x.get("deleted_at", "")))
+    return out
+
+
+def _v300421_log_visible_after_tombstone(row: dict[str, Any], ranges: list[dict[str, str]] | None = None) -> bool:
+    try:
+        if _v30036_is_delete_marker(row):
+            return True
+    except Exception:
+        pass
+    d = _v30036_log_row_date(row) if callable(globals().get("_v30036_log_row_date")) else str(row.get("log_time") or "")[:10]
+    if not d:
+        return True
+    row_time = str(row.get("log_time") or row.get("created_at") or row.get("timestamp") or row.get("authority_written_at") or "")
+    for r in ranges if ranges is not None else _v300421_log_delete_ranges_with_deleted_at():
+        s, e = r.get("start", ""), r.get("end", "")
+        deleted_at = r.get("deleted_at", "")
+        if s <= d <= e:
+            if deleted_at and row_time and row_time > deleted_at:
+                continue
+            return False
+    return True
+
+
+def load_logs(limit: int = 500, start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None):  # type: ignore[override]
+    # Read previous visible rows plus local authority rows, then apply V300.42.1 tombstone rule.
+    rows: list[dict[str, Any]] = []
+    try:
+        if callable(globals().get("_v30036_prev_load_logs")):
+            df0 = _v30036_prev_load_logs(limit=100000, start_date=None, end_date=None, action_type=None, level=None, keyword=None)  # type: ignore[name-defined]
+            if isinstance(df0, pd.DataFrame):
+                rows.extend(df0.where(pd.notna(df0), "").to_dict(orient="records"))
+    except Exception:
+        pass
+    try:
+        rows.extend(_v30036_read_log_authority_rows(None))
+    except Exception:
+        pass
+    # Dedupe by authority_event_id or business fields.
+    seen: set[str] = set()
+    merged: list[dict[str, Any]] = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        key = str(r.get("authority_event_id") or "").strip() or "|".join(str(r.get(k, "") or "") for k in ("log_time", "user_name", "action_type", "target_table", "target_id", "message"))
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(r)
+    ranges = _v300421_log_delete_ranges_with_deleted_at()
+    s = _v30036_date_text(start_date)
+    e = _v30036_date_text(end_date)
+    kw = str(keyword or "").strip().lower()
+    out: list[dict[str, Any]] = []
+    for r in merged:
+        if not _v300421_log_visible_after_tombstone(r, ranges):
+            continue
+        d = _v30036_log_row_date(r)
+        if s and (not d or d < s):
+            continue
+        if e and (not d or d > e):
+            continue
+        if action_type and str(r.get("action_type") or "") != str(action_type):
+            continue
+        if level and str(level).upper() != "ALL" and str(r.get("level") or "") != str(level):
+            continue
+        if kw:
+            blob = " ".join(str(r.get(k, "") or "") for k in ("user_name", "action_type", "target_table", "target_id", "message", "detail", "level")).lower()
+            if kw not in blob:
+                continue
+        out.append(r)
+    out.sort(key=lambda x: str(x.get("log_time") or x.get("created_at") or x.get("authority_written_at") or ""), reverse=True)
+    if limit:
+        out = out[: int(limit)]
+    return pd.DataFrame(out)
+
+
+def load_logs_page(start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None, page: int = 1, page_size: int = 500) -> dict[str, Any]:  # type: ignore[override]
+    p = max(1, int(page or 1)); size = max(1, int(page_size or 500))
+    df = load_logs(limit=max(p * size, size), start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword)
+    rows = df.where(pd.notna(df), "").to_dict(orient="records") if isinstance(df, pd.DataFrame) else []
+    start = (p - 1) * size
+    page_rows = rows[start:start + size]
+    return {"ok": True, "rows": page_rows, "data": page_rows, "df": pd.DataFrame(page_rows), "total_rows": len(rows), "page": p, "page_size": size, "total_pages": max(1, (len(rows) + size - 1)//size), "elapsed_seconds": 0, "source": "v30042_06_log_delete_range_after_delete_visibility"}
+
+
+def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit: bool = True, user_name: str | None = None) -> int:  # type: ignore[override]
+    before = load_logs(limit=100000, start_date=start_date, end_date=end_date)
+    deleted = int(len(before)) if isinstance(before, pd.DataFrame) else 0
+    deleted_at = _v30042_log_now()
+    marker = {
+        "log_time": deleted_at,
+        "created_at": deleted_at,
+        "user_name": user_name or _v30042_current_log_user(),
+        "action_type": "DELETE_LOG_RANGE",
+        "target_table": "system_logs",
+        "target_id": f"{_v30036_date_text(start_date)}~{_v30036_date_text(end_date)}",
+        "message": f"刪除 LOG 日期區間：{_v30036_date_text(start_date)} ~ {_v30036_date_text(end_date)}，刪除筆數：{deleted}",
+        "detail": f"deleted_count={deleted};authority=06_log_query.records.jsonl;v30042=1",
+        "level": "WARN",
+        "source": "06_log_query_delete_tombstone_v30042_unique_authority",
+        "delete_range_start": _v30036_date_text(start_date),
+        "delete_range_end": _v30036_date_text(end_date),
+        "deleted_at": deleted_at,
+    }
+    try:
+        from services.authority_consistency_service import append_jsonl, upload_authority_file  # type: ignore
+        append_jsonl("06_log_query", marker, identity_fields=("action_type", "delete_range_start", "delete_range_end", "deleted_at"), github=False, reason="delete_logs_range_v30042")
+        try:
+            upload_authority_file("06_log_query", "records.jsonl", reason="delete_logs_range_v30042")
+        except Exception:
+            pass
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return deleted
+
+
+def audit_v300421_06_delete_range_visibility() -> dict[str, Any]:
+    return {
+        "version": "V300.42.1_06_DELETE_RANGE_AFTER_DELETE_VISIBILITY",
+        "delete_ranges": _v300421_log_delete_ranges_with_deleted_at(),
+        "new_same_day_logs_after_delete_marker_visible": True,
+        "old_deleted_range_rows_hidden_from_legacy_sources": True,
+    }
+# ================= END V300.42.1 06 DELETE RANGE WITH AFTER-DELETE VISIBILITY =================
+
+# ================= BEGIN V300.42.2 06 DELETE RANGE DATE-SAFE VISIBILITY =================
+# Preserve only records written after a same-day delete marker.  A delete made today
+# for a historical/future date range must still hide every older record in that range.
+def _v300421_log_visible_after_tombstone(row: dict[str, Any], ranges: list[dict[str, str]] | None = None) -> bool:  # type: ignore[override]
+    try:
+        if _v30036_is_delete_marker(row):
+            return True
+    except Exception:
+        pass
+    d = _v30036_log_row_date(row) if callable(globals().get("_v30036_log_row_date")) else str(row.get("log_time") or "")[:10]
+    if not d:
+        return True
+    row_time = str(row.get("log_time") or row.get("created_at") or row.get("timestamp") or row.get("authority_written_at") or "")
+    for r in ranges if ranges is not None else _v300421_log_delete_ranges_with_deleted_at():
+        s, e = r.get("start", ""), r.get("end", "")
+        deleted_at = str(r.get("deleted_at") or "")
+        deleted_date = deleted_at[:10] if len(deleted_at) >= 10 else ""
+        if s <= d <= e:
+            if deleted_at and deleted_date and d == deleted_date and row_time and row_time > deleted_at:
+                # New log events after clearing today's logs must remain visible.
+                continue
+            return False
+    return True
+
+
+def audit_v300422_06_delete_range_date_safe_visibility() -> dict[str, Any]:
+    return {
+        "version": "V300.42.2_06_DELETE_RANGE_DATE_SAFE_VISIBILITY",
+        "delete_ranges": _v300421_log_delete_ranges_with_deleted_at(),
+        "same_day_post_delete_rows_visible": True,
+        "non_same_day_rows_inside_deleted_range_hidden": True,
+    }
+# ================= END V300.42.2 06 DELETE RANGE DATE-SAFE VISIBILITY =================
+
+# ================= BEGIN V300.42.3 06 DELETE RANGE AUTHORITY-WRITTEN VISIBILITY =================
+# Range deletion is based on when a row was written to the authority file, not only
+# the business log_time.  This lets new rows for a cleared date remain visible after
+# the delete action while old rows in that same date range stay hidden after reboot.
+def _v300423_after_delete_marker(row: dict[str, Any], deleted_at: str, row_date: str) -> bool:
+    if not deleted_at:
+        return False
+    written_at = str(row.get("authority_written_at") or "")
+    if written_at and written_at > deleted_at:
+        return True
+    # Fallback for legacy rows that do not have authority_written_at: only compare
+    # business time on the actual delete date.
+    deleted_date = deleted_at[:10] if len(deleted_at) >= 10 else ""
+    row_time = str(row.get("log_time") or row.get("created_at") or row.get("timestamp") or "")
+    return bool(deleted_date and row_date == deleted_date and row_time and row_time > deleted_at)
+
+
+def _v300421_log_visible_after_tombstone(row: dict[str, Any], ranges: list[dict[str, str]] | None = None) -> bool:  # type: ignore[override]
+    try:
+        if _v30036_is_delete_marker(row):
+            return True
+    except Exception:
+        pass
+    d = _v30036_log_row_date(row) if callable(globals().get("_v30036_log_row_date")) else str(row.get("log_time") or "")[:10]
+    if not d:
+        return True
+    for r in ranges if ranges is not None else _v300421_log_delete_ranges_with_deleted_at():
+        s, e = r.get("start", ""), r.get("end", "")
+        deleted_at = str(r.get("deleted_at") or "")
+        if s <= d <= e:
+            if _v300423_after_delete_marker(row, deleted_at, d):
+                continue
+            return False
+    return True
+
+
+def audit_v300423_06_delete_range_authority_written_visibility() -> dict[str, Any]:
+    return {
+        "version": "V300.42.3_06_DELETE_RANGE_AUTHORITY_WRITTEN_VISIBILITY",
+        "delete_ranges": _v300421_log_delete_ranges_with_deleted_at(),
+        "new_rows_after_delete_marker_visible_by_authority_written_at": True,
+        "old_rows_inside_deleted_range_hidden": True,
+    }
+# ================= END V300.42.3 06 DELETE RANGE AUTHORITY-WRITTEN VISIBILITY =================
+
+# ================= BEGIN V300.42.4 06 DELETE RANGE JSONL SEQUENCE VISIBILITY =================
+# If delete marker and a later row are written within the same second, timestamp-only
+# comparison is ambiguous.  Tag authority rows with their JSONL sequence number and
+# use it as the primary visibility rule.
+def _v30036_read_log_authority_rows(limit: int | None = None) -> list[dict[str, Any]]:  # type: ignore[override]
+    try:
+        from services.authority_consistency_service import read_jsonl  # type: ignore
+        raw = [dict(r) for r in read_jsonl("06_log_query", limit=None) if isinstance(r, dict)]
+        rows: list[dict[str, Any]] = []
+        for i, r in enumerate(raw, 1):
+            r.setdefault("__authority_seq", i)
+            rows.append(r)
+        if limit and int(limit) > 0:
+            return rows[-int(limit):]
+        return rows
+    except Exception:
+        return []
+
+
+def _v300421_log_delete_ranges_with_deleted_at() -> list[dict[str, str]]:  # type: ignore[override]
+    out: list[dict[str, str]] = []
+    for r in _v30036_read_log_authority_rows(None):
+        action = str(r.get("action_type") or r.get("event_type") or "").upper().strip()
+        if action != "DELETE_LOG_RANGE" and not (r.get("delete_range_start") or r.get("delete_range_end")):
+            continue
+        s = _v30036_date_text(r.get("delete_range_start") or r.get("start_date") or "")
+        e = _v30036_date_text(r.get("delete_range_end") or r.get("end_date") or "")
+        target = str(r.get("target_id") or "")
+        if "~" in target and (not s or not e):
+            a, b = target.split("~", 1)
+            s = s or _v30036_date_text(a)
+            e = e or _v30036_date_text(b)
+        if s and not e:
+            e = s
+        if e and not s:
+            s = e
+        if s and e:
+            if s > e:
+                s, e = e, s
+            out.append({
+                "start": s,
+                "end": e,
+                "deleted_at": str(r.get("deleted_at") or r.get("log_time") or r.get("created_at") or r.get("authority_written_at") or ""),
+                "seq": str(r.get("__authority_seq") or ""),
+            })
+    out.sort(key=lambda x: (x.get("start", ""), x.get("end", ""), x.get("deleted_at", ""), x.get("seq", "")))
+    return out
+
+
+def _v300421_log_visible_after_tombstone(row: dict[str, Any], ranges: list[dict[str, str]] | None = None) -> bool:  # type: ignore[override]
+    try:
+        if _v30036_is_delete_marker(row):
+            return True
+    except Exception:
+        pass
+    d = _v30036_log_row_date(row) if callable(globals().get("_v30036_log_row_date")) else str(row.get("log_time") or "")[:10]
+    if not d:
+        return True
+    try:
+        row_seq = int(str(row.get("__authority_seq") or "0"))
+    except Exception:
+        row_seq = 0
+    for r in ranges if ranges is not None else _v300421_log_delete_ranges_with_deleted_at():
+        s, e = r.get("start", ""), r.get("end", "")
+        deleted_at = str(r.get("deleted_at") or "")
+        try:
+            marker_seq = int(str(r.get("seq") or "0"))
+        except Exception:
+            marker_seq = 0
+        if s <= d <= e:
+            if row_seq and marker_seq and row_seq > marker_seq:
+                continue
+            if _v300423_after_delete_marker(row, deleted_at, d):
+                continue
+            return False
+    return True
+
+
+def audit_v300424_06_delete_range_sequence_visibility() -> dict[str, Any]:
+    return {
+        "version": "V300.42.4_06_DELETE_RANGE_JSONL_SEQUENCE_VISIBILITY",
+        "sequence_tag_added_to_authority_rows": True,
+        "same_second_after_delete_rows_visible_by_sequence": True,
+    }
+# ================= END V300.42.4 06 DELETE RANGE JSONL SEQUENCE VISIBILITY =================

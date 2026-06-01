@@ -1654,3 +1654,110 @@ def audit_v30038_authority_background_queue_status() -> dict[str, Any]:
         "status": get_authority_upload_queue_status(),
     }
 # ===== V300.38 AUTHORITY BACKGROUND QUEUE STATUS COMPATIBILITY END =====
+
+# ================= V300.42 CRITICAL MASTER AUTHORITY DIRECT GITHUB DURABILITY =================
+# 2026-06-01
+# Problem fixed:
+# - V124 disabled runtime GitHub writes on Streamlit Cloud to prevent redeploy loops.
+# - Later V300 critical exceptions for 03/04/13 called the normal github_put_file path,
+#   which could still be skipped by V124; local authority edits then disappeared after reboot.
+# Rule:
+# - 03_work_orders / 04_employees / 13_system_settings explicit admin saves are small and must
+#   upload the same authority file immediately when GitHub credentials exist.
+# - 01/02 hot work records, 06 logs, and 11 login hot paths are not changed here.
+try:
+    _v30042_prev_save_authority = save_authority  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30042_prev_save_authority = None
+try:
+    _v30042_prev_force_upload_authority_file = force_upload_authority_file  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30042_prev_force_upload_authority_file = None
+
+_V30042_CRITICAL_MASTER_MODULES = {"03_work_orders", "04_employees", "13_system_settings", "10_permissions", "10_permissions_live"}
+
+
+def _v30042_is_critical_master_module(module_key: str) -> bool:
+    return str(module_key or "").strip() in _V30042_CRITICAL_MASTER_MODULES
+
+
+def _v30042_kind_filename(kind: str) -> str:
+    return "settings.json" if str(kind).lower().startswith("set") else "records.json"
+
+
+def _v30042_direct_upload_authority_path(path: Path, reason: str) -> dict[str, Any]:
+    """Bypass V124 runtime skip only for critical master authority files."""
+    try:
+        if not path.exists():
+            return {"ok": False, "error": "local_file_missing", "path": str(path)}
+        # _v124_prev_github_put_file is the pre-cloud-guard uploader captured before V124.
+        if callable(globals().get("_v124_prev_github_put_file")):
+            return dict(_v124_prev_github_put_file(path, path.read_text(encoding="utf-8"), f"SPT critical authority {path.name}: {reason}") or {})  # type: ignore[name-defined]
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300], "path": str(path), "mode": "v124_prev"}
+    try:
+        return dict(github_put_file(path, path.read_text(encoding="utf-8"), f"SPT critical authority {path.name}: {reason}") or {})
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300], "path": str(path), "mode": "fallback_github_put_file"}
+
+
+def _v30042_upload_critical_files(module_key: str, *, records_written: bool, settings_written: bool, reason: str) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    if not _v30042_is_critical_master_module(module_key):
+        return results
+    for kind, needed in (("records", records_written), ("settings", settings_written)):
+        if not needed:
+            continue
+        try:
+            p = canonical_path(module_key, kind)  # type: ignore[name-defined]
+        except Exception:
+            try:
+                p = ROOT / "data" / "permanent_store" / "modules" / str(module_key) / _v30042_kind_filename(kind)  # type: ignore[name-defined]
+            except Exception:
+                continue
+        res = _v30042_direct_upload_authority_path(p, reason)
+        res["module_key"] = str(module_key)
+        res["kind"] = kind
+        res["critical_master_upload_v30042"] = True
+        results.append(res)
+    return results
+
+
+def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    if callable(_v30042_prev_save_authority):
+        res = dict(_v30042_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=github) or {})
+    else:
+        res = {"ok": False, "error": "previous_save_authority_missing", "module_key": str(module_key)}
+    if github and _v30042_is_critical_master_module(module_key):
+        uploads = _v30042_upload_critical_files(str(module_key), records_written=records is not None, settings_written=settings is not None, reason=f"v30042_{reason}")
+        res = dict(res)
+        res["v30042_critical_master_direct_upload"] = uploads
+        res["v30042_critical_master_module"] = str(module_key)
+    return res
+
+
+def force_upload_authority_file(module_key: str, kind: str = "records", reason: str = "force_authority_upload_v98") -> dict[str, Any]:  # type: ignore[override]
+    if _v30042_is_critical_master_module(module_key):
+        try:
+            p = canonical_path(str(module_key), "settings" if str(kind).lower().startswith("set") else "records")  # type: ignore[name-defined]
+        except Exception:
+            p = ROOT / "data" / "permanent_store" / "modules" / str(module_key) / _v30042_kind_filename(kind)  # type: ignore[name-defined]
+        res = _v30042_direct_upload_authority_path(p, f"v30042_force_{reason}")
+        res["module_key"] = str(module_key)
+        res["kind"] = str(kind)
+        res["v30042_critical_master_direct_upload"] = True
+        return res
+    if callable(_v30042_prev_force_upload_authority_file):
+        return dict(_v30042_prev_force_upload_authority_file(module_key, kind, reason) or {})
+    return {"ok": False, "error": "previous_force_upload_missing", "module_key": str(module_key), "kind": str(kind)}
+
+
+def audit_v30042_critical_master_authority_upload() -> dict[str, Any]:
+    return {
+        "version": "V300.42_CRITICAL_MASTER_AUTHORITY_DIRECT_GITHUB_DURABILITY",
+        "critical_master_modules": sorted(_V30042_CRITICAL_MASTER_MODULES),
+        "bypasses_v124_skip_for_critical_master_only": True,
+        "does_not_change_01_02_hot_paths": True,
+        "does_not_change_06_11_hot_login_log_paths": True,
+    }
+# ================= END V300.42 CRITICAL MASTER AUTHORITY DIRECT GITHUB DURABILITY =================
