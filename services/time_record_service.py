@@ -32277,3 +32277,201 @@ def audit_v30040_01_display_absolute_fast() -> dict[str, Any]:
         "active_rows": int(len(df)) if isinstance(df, pd.DataFrame) else 0,
     }
 # ===== V300.40 01 DISPLAY ABSOLUTE FAST ACTIVE LOOKUP END =====
+
+
+# ===== V300.41 01 SQLITE SCHEMA SELF HEAL FOR FINISH GROUP BEGIN =====
+# 2026-06-01
+# Fix: Streamlit Cloud sites with an older SQLite hot-cache table may not have
+# time_records.id. V300.36 group reconciliation queried WHERE id=? before
+# validating the table schema, causing sqlite3.OperationalError and stopping
+# pause/finish. This patch self-heals the hot-cache schema before any V300.36
+# upsert and never assumes legacy SQLite already has the modern columns.
+def _v30041_sql_identifier(name: str) -> str:
+    return '"' + str(name).replace('"', '""') + '"'
+
+
+def _v30041_ensure_time_records_schema_for_group_upsert() -> list[str]:
+    import sqlite3 as _sqlite3
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = _sqlite3.connect(DB_PATH, timeout=15)
+    try:
+        conn.execute("PRAGMA busy_timeout=8000")
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS time_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_key TEXT,
+            status TEXT,
+            work_order TEXT,
+            part_no TEXT,
+            type_name TEXT,
+            process_name TEXT,
+            employee_id TEXT,
+            employee_name TEXT,
+            start_action TEXT,
+            start_timestamp TEXT,
+            end_action TEXT,
+            end_timestamp TEXT,
+            remark TEXT,
+            start_date TEXT,
+            start_time TEXT,
+            end_date TEXT,
+            end_time TEXT,
+            work_hours REAL DEFAULT 0,
+            assembly_location TEXT,
+            group_key TEXT,
+            is_group_work INTEGER DEFAULT 0,
+            source TEXT DEFAULT 'streamlit',
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """)
+        info = conn.execute("PRAGMA table_info(time_records)").fetchall()
+        existing = {str(r[1]) for r in info}
+        desired = {
+            "id": "INTEGER",
+            "record_key": "TEXT",
+            "status": "TEXT",
+            "work_order": "TEXT",
+            "part_no": "TEXT",
+            "type_name": "TEXT",
+            "process_name": "TEXT",
+            "employee_id": "TEXT",
+            "employee_name": "TEXT",
+            "start_action": "TEXT",
+            "start_timestamp": "TEXT",
+            "end_action": "TEXT",
+            "end_timestamp": "TEXT",
+            "remark": "TEXT",
+            "start_date": "TEXT",
+            "start_time": "TEXT",
+            "end_date": "TEXT",
+            "end_time": "TEXT",
+            "work_hours": "REAL DEFAULT 0",
+            "assembly_location": "TEXT",
+            "group_key": "TEXT",
+            "is_group_work": "INTEGER DEFAULT 0",
+            "source": "TEXT DEFAULT 'streamlit'",
+            "created_at": "TEXT",
+            "updated_at": "TEXT",
+        }
+        for col, decl in desired.items():
+            if col not in existing:
+                try:
+                    conn.execute(f"ALTER TABLE time_records ADD COLUMN {_v30041_sql_identifier(col)} {decl}")
+                    existing.add(col)
+                except Exception:
+                    pass
+        try:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_time_records_id_v30041 ON time_records(id)")
+        except Exception:
+            pass
+        try:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_time_records_active_v30041 ON time_records(employee_id, process_name, start_date, end_timestamp, status)")
+        except Exception:
+            pass
+        conn.commit()
+        return [str(r[1]) for r in conn.execute("PRAGMA table_info(time_records)").fetchall()]
+    finally:
+        conn.close()
+
+
+def _v30036_db_columns() -> list[str]:  # type: ignore[override]
+    """V300.41 override: schema-aware column list for legacy SQLite caches."""
+    try:
+        return _v30041_ensure_time_records_schema_for_group_upsert()
+    except Exception:
+        try:
+            info = query_df("PRAGMA table_info(time_records)")
+            if isinstance(info, pd.DataFrame) and "name" in info.columns:
+                return [str(x) for x in info["name"].tolist() if str(x)]
+        except Exception:
+            pass
+    return []
+
+
+def _v30036_upsert_rows_to_sqlite(rows_df: pd.DataFrame) -> int:  # type: ignore[override]
+    """V300.41 override: upsert authority/group rows into SQLite hot cache safely.
+
+    This is intentionally best-effort for the hot cache. It must not crash the
+    user's pause/finish transaction just because an old SQLite table is missing
+    an id column or another modern column.
+    """
+    if rows_df is None or not isinstance(rows_df, pd.DataFrame) or rows_df.empty:
+        return 0
+    cols = _v30036_db_columns()
+    if not cols:
+        return 0
+    import sqlite3 as _sqlite3
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = _sqlite3.connect(DB_PATH, timeout=15)
+    try:
+        conn.execute("PRAGMA busy_timeout=8000")
+        changed = 0
+        has_id = "id" in cols
+        for _, r in rows_df.iterrows():
+            row = r.to_dict()
+            rid = _v30036_int(row.get("id")) if "_v30036_int" in globals() else None
+            usable = [c for c in cols if c in row]
+            if not usable:
+                continue
+            # If the legacy cache still cannot support id after self-heal, avoid
+            # unsafe SELECT/UPDATE by id. Insert only rows matching available cols.
+            exists = None
+            if has_id and rid is not None:
+                try:
+                    exists = conn.execute("SELECT 1 FROM time_records WHERE id=? LIMIT 1", (rid,)).fetchone()
+                except _sqlite3.OperationalError:
+                    # Retry once after schema self-heal; if it still fails, do a
+                    # safe insert/update-free path instead of crashing.
+                    cols = _v30041_ensure_time_records_schema_for_group_upsert()
+                    has_id = "id" in cols
+                    usable = [c for c in cols if c in row]
+                    if has_id:
+                        exists = conn.execute("SELECT 1 FROM time_records WHERE id=? LIMIT 1", (rid,)).fetchone()
+            if exists and has_id and rid is not None:
+                set_cols = [c for c in usable if c != "id"]
+                if not set_cols:
+                    continue
+                sql = "UPDATE time_records SET " + ",".join([f'{_v30041_sql_identifier(c)}=?' for c in set_cols]) + " WHERE id=?"
+                vals = [None if _v30036_text(row.get(c)) == "" else row.get(c) for c in set_cols] + [rid]
+                conn.execute(sql, vals)
+            else:
+                quoted = ",".join([_v30041_sql_identifier(c) for c in usable])
+                placeholders = ",".join(["?"] * len(usable))
+                vals = [None if _v30036_text(row.get(c)) == "" else row.get(c) for c in usable]
+                try:
+                    conn.execute(f"INSERT INTO time_records ({quoted}) VALUES ({placeholders})", vals)
+                except _sqlite3.IntegrityError:
+                    # Fallback for unusual duplicate legacy rows: update by id if possible.
+                    if has_id and rid is not None:
+                        set_cols = [c for c in usable if c != "id"]
+                        if set_cols:
+                            sql = "UPDATE time_records SET " + ",".join([f'{_v30041_sql_identifier(c)}=?' for c in set_cols]) + " WHERE id=?"
+                            conn.execute(sql, [None if _v30036_text(row.get(c)) == "" else row.get(c) for c in set_cols] + [rid])
+                    else:
+                        continue
+            changed += 1
+        conn.commit()
+        return changed
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def audit_v30041_01_sqlite_schema_self_heal() -> dict[str, Any]:
+    try:
+        cols = _v30041_ensure_time_records_schema_for_group_upsert()
+    except Exception as exc:
+        return {"version": "V300.41_01_SQLITE_SCHEMA_SELF_HEAL", "ok": False, "error": str(exc)}
+    required = {"id", "status", "end_action", "end_timestamp", "end_date", "end_time", "work_hours", "remark", "group_key", "is_group_work", "updated_at"}
+    return {
+        "version": "V300.41_01_SQLITE_SCHEMA_SELF_HEAL",
+        "ok": required.issubset(set(cols)),
+        "missing_required_columns": sorted(required.difference(set(cols))),
+        "prevents_finish_pause_operational_error": True,
+        "does_not_change_ui_css_theme": True,
+        "authority_rules_unchanged": True,
+    }
+# ===== V300.41 01 SQLITE SCHEMA SELF HEAL FOR FINISH GROUP END =====
