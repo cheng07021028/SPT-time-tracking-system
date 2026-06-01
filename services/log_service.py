@@ -2220,317 +2220,127 @@ def audit_v30023_06_log_direct_github_sync() -> dict[str, Any]:
 
 # ================= END V300.23 06 LOG DIRECT AUTHORITY GITHUB SYNC =================
 
-# =================== V300.31 06 LOG DELETE RANGE AUTHORITY FIX ===================
-# Scope: 06. LOG查詢 only. No UI/CSS/theme/table-rendering changes.
-# Purpose:
-# - Deleting LOG rows must hide records from every source used by 06:
-#   SQLite system_logs, legacy 06_logs records/shards, and 06_log_query records.jsonl.
-# - The previous V300.23 layer could append a delete marker but return 0 or still let
-#   rows from another source appear after Reboot/query refresh. This final wrapper makes
-#   the delete marker the single authority for display filtering.
-try:
-    _v30031_prev_load_logs = load_logs  # type: ignore[name-defined]
-except Exception:  # pragma: no cover
-    _v30031_prev_load_logs = None
-try:
-    _v30031_prev_load_logs_page = load_logs_page  # type: ignore[name-defined]
-except Exception:  # pragma: no cover
-    _v30031_prev_load_logs_page = None
-try:
-    _v30031_prev_count_logs_by_date_range = count_logs_by_date_range  # type: ignore[name-defined]
-except Exception:  # pragma: no cover
-    _v30031_prev_count_logs_by_date_range = None
-try:
-    _v30031_prev_delete_logs_by_date_range = delete_logs_by_date_range  # type: ignore[name-defined]
-except Exception:  # pragma: no cover
-    _v30031_prev_delete_logs_by_date_range = None
-try:
-    _v30031_prev_get_system_log_authority_status = get_system_log_authority_status  # type: ignore[name-defined]
-except Exception:  # pragma: no cover
-    _v30031_prev_get_system_log_authority_status = None
+# =================== V300.32 06 LOG HOT-PATH FLATTEN PATCH｜2026-06-01 ===================
+# Root cause fixed:
+#   Older V300.23 layers wrapped write_log repeatedly. A single 01 Start/Finish
+#   call could append/upload 900+ LOG rows before returning, making every button
+#   look like it spins forever and blocking 01 calculation/sync feedback.
+# Principles:
+#   - Do not call previous write_log wrappers.
+#   - Write one SQLite log row best-effort.
+#   - Append one JSONL authority row locally without GitHub/network in foreground.
+#   - Keep 06 LOG query/delete authority behavior readable through existing loaders.
+#   - No UI/CSS/theme/table changes.
+import json as _v30032_json
+import uuid as _v30032_uuid
+from pathlib import Path as _v30032_Path
+
+_V30032_LOG_VERSION = "V300.32_LOG_HOT_PATH_FLATTEN_20260601"
 
 
-def _v30031_safe_int(value: Any, default: int = 0) -> int:
+def _v30032_log_path() -> _v30032_Path:
     try:
-        return int(float(str(value).strip()))
+        from services.authority_consistency_service import records_jsonl_path
+        return records_jsonl_path("06_log_query")
     except Exception:
-        return default
-
-
-def _v30031_row_date(row: dict[str, Any]) -> str:
-    return _date_text(row.get("log_time") or row.get("created_at") or row.get("authority_written_at") or "") or ""
-
-
-def _v30031_row_time_text(row: dict[str, Any]) -> str:
-    return str(row.get("log_time") or row.get("created_at") or row.get("authority_written_at") or "")
-
-
-def _v30031_read_authority_jsonl_rows(limit: int | None = None) -> list[dict[str, Any]]:
-    try:
-        from services.authority_consistency_service import read_jsonl
-        rows = read_jsonl("06_log_query", limit=limit)
-        return [dict(r) for r in rows if isinstance(r, dict)]
-    except Exception:
-        return []
-
-
-def _v30031_delete_ranges_from_rows(rows: list[dict[str, Any]] | None = None) -> list[tuple[str, str, str]]:
-    if rows is None:
-        rows = _v30031_read_authority_jsonl_rows(limit=None)
-    ranges: list[tuple[str, str, str]] = []
-    for r in rows or []:
-        if not isinstance(r, dict):
-            continue
-        action = str(r.get("action_type") or "").upper().strip()
-        has_range = bool(r.get("delete_range_start") or r.get("delete_range_end"))
-        if action != "DELETE_LOG_RANGE" and not has_range:
-            continue
-        s = _date_text(r.get("delete_range_start") or r.get("start_date") or "")
-        e = _date_text(r.get("delete_range_end") or r.get("end_date") or "")
-        marker_time = _v30031_row_time_text(r)
-        if s and e:
-            ranges.append((s, e, marker_time))
-    ranges.sort(key=lambda x: (x[0], x[1], x[2]))
-    return ranges
-
-
-def _v30031_should_hide_by_delete_range(row: dict[str, Any], ranges: list[tuple[str, str, str]]) -> bool:
-    if not isinstance(row, dict):
-        return False
-    action = str(row.get("action_type") or "").upper().strip()
-    if action == "DELETE_LOG_RANGE":
-        return False
-    d = _v30031_row_date(row)
-    if not d:
-        return False
-    row_time = _v30031_row_time_text(row)
-    for s, e, marker_time in ranges:
-        if not (s <= d <= e):
-            continue
-        # When deleting a range that includes the marker day, keep logs created after
-        # the delete action. This prevents a same-day delete marker from hiding all
-        # future operations performed later that day.
-        marker_date = _date_text(marker_time)
-        if marker_date and d == marker_date and row_time and marker_time and row_time > marker_time:
-            continue
-        return True
-    return False
-
-
-def _v30031_apply_delete_ranges(rows: list[dict[str, Any]], ranges: list[tuple[str, str, str]] | None = None) -> list[dict[str, Any]]:
-    ranges = ranges if ranges is not None else _v30031_delete_ranges_from_rows()
-    if not ranges:
-        return rows
-    return [dict(r) for r in rows or [] if isinstance(r, dict) and not _v30031_should_hide_by_delete_range(r, ranges)]
-
-
-def _v30031_filter_rows(rows: list[dict[str, Any]], start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None) -> list[dict[str, Any]]:
-    s = _date_text(start_date)
-    e = _date_text(end_date)
-    act = str(action_type or "").strip()
-    lvl = str(level or "").strip().upper()
-    kw = str(keyword or "").strip().lower()
-    out: list[dict[str, Any]] = []
-    for r in rows or []:
-        if not isinstance(r, dict):
-            continue
-        d = _v30031_row_date(r)
-        if s and (not d or d < s):
-            continue
-        if e and (not d or d > e):
-            continue
-        if act and str(r.get("action_type") or "") != act:
-            continue
-        if lvl and lvl not in {"ALL", "全部"} and str(r.get("level") or "").upper() != lvl:
-            continue
-        if kw:
-            blob = " ".join(str(r.get(k, "") or "") for k in ("user_name", "action_type", "target_table", "target_id", "message", "detail", "level")).lower()
-            if kw not in blob:
-                continue
-        out.append(dict(r))
-    out.sort(key=lambda x: _v30031_row_time_text(x), reverse=True)
-    return out
-
-
-def _v30031_normalize_df(rows: list[dict[str, Any]]) -> pd.DataFrame:
-    df = pd.DataFrame(rows or [])
-    for c in ["id", "log_time", "user_name", "action_type", "target_table", "target_id", "message", "detail", "level", "source"]:
-        if c not in df.columns:
-            df[c] = ""
-    return df
-
-
-def _v30031_collect_base_rows(limit: int = 100000, start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    if callable(_v30031_prev_load_logs):
         try:
-            obj = _v30031_prev_load_logs(limit=limit, start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword)
-            if isinstance(obj, pd.DataFrame):
-                rows += obj.where(pd.notna(obj), "").to_dict(orient="records")
-            elif isinstance(obj, list):
-                rows += [dict(x) for x in obj if isinstance(x, dict)]
+            root = _v30032_Path(__file__).resolve().parents[1]
         except Exception:
-            rows += []
-    # Always add the authority JSONL directly so delete markers and durable rows are
-    # considered even if an older wrapper or cache returns stale rows.
-    rows += _v30031_read_authority_jsonl_rows(limit=None)
+            root = _v30032_Path(".").resolve()
+        return root / "data" / "permanent_store" / "modules" / "06_log_query" / "records.jsonl"
+
+
+def _v30032_safe_log_text(value: Any) -> str:
     try:
-        from services.authority_consistency_service import merge_by_event_id
-        rows = merge_by_event_id(rows, id_fields=("log_time", "user_name", "action_type", "target_table", "target_id", "message"))
+        if pd.isna(value):
+            return ""
     except Exception:
-        seen: set[str] = set()
-        merged: list[dict[str, Any]] = []
-        for r in rows:
-            key = "|".join(str(r.get(k, "") or "") for k in ("log_time", "user_name", "action_type", "target_table", "target_id", "message"))
-            if key in seen:
-                continue
-            seen.add(key)
-            merged.append(r)
-        rows = merged
-    rows = _v30031_apply_delete_ranges(rows)
-    rows = _v30031_filter_rows(rows, start_date, end_date, action_type, level, keyword)
-    if limit and int(limit) > 0:
-        rows = rows[: int(limit)]
-    return rows
+        pass
+    if value is None:
+        return ""
+    text = str(value)
+    return "" if text.strip().lower() in {"none", "nan", "nat", "null", "<na>"} else text
 
 
-def load_logs(limit: int = 500, start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None):  # type: ignore[override]
-    rows = _v30031_collect_base_rows(limit=max(_v30031_safe_int(limit, 500), 1), start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword)
-    return _v30031_normalize_df(rows)
-
-
-def load_logs_page(start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None, page: int = 1, page_size: int = 500) -> dict[str, Any]:  # type: ignore[override]
-    p = max(1, _v30031_safe_int(page, 1))
-    size = max(1, min(_v30031_safe_int(page_size, 500), 5000))
-    # Read enough for the requested page plus direct JSONL delete markers.
-    rows = _v30031_collect_base_rows(limit=max(p * size, size), start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword)
-    start_i = (p - 1) * size
-    page_rows = rows[start_i:start_i + size]
-    df = _v30031_normalize_df(page_rows)
+def _v30032_build_log_row(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> dict[str, Any]:
+    ts = now_text()
     return {
-        "ok": True,
-        "rows": page_rows,
-        "data": page_rows,
-        "df": df,
-        "total_rows": len(rows),
-        "page": p,
-        "page_size": size,
-        "total_pages": max(1, (len(rows) + size - 1) // size),
-        "elapsed_seconds": 0,
-        "source": "v30031_06_log_delete_range_authority_filter",
-        "complete_log_source": True,
-        "delete_range_authority_filter": True,
-    }
-
-
-def count_logs_by_date_range(start_date: Any, end_date: Any) -> int:  # type: ignore[override]
-    try:
-        return int(load_logs_page(start_date=start_date, end_date=end_date, page=1, page_size=1).get("total_rows", 0) or 0)
-    except Exception:
-        if callable(_v30031_prev_count_logs_by_date_range):
-            try:
-                return int(_v30031_prev_count_logs_by_date_range(start_date, end_date) or 0)
-            except Exception:
-                pass
-        return 0
-
-
-def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit: bool = True, user_name: str | None = None) -> int:  # type: ignore[override]
-    s = _date_text(start_date)
-    e = _date_text(end_date)
-    if not s or not e or s > e:
-        return 0
-    # Count visible rows before writing the new delete marker. This is the number the
-    # user expects to disappear from 06, regardless of which source currently holds them.
-    before_rows = _v30031_collect_base_rows(limit=300000, start_date=s, end_date=e)
-    deleted = len([r for r in before_rows if str(r.get("action_type") or "").upper() != "DELETE_LOG_RANGE"])
-
-    # Best-effort legacy physical cleanup/tombstone for SQLite and old 06_logs authority.
-    # The final source of truth remains the JSONL delete marker below.
-    if callable(_v30031_prev_delete_logs_by_date_range):
-        try:
-            _v30031_prev_delete_logs_by_date_range(start_date, end_date, keep_delete_audit=False, user_name=user_name)
-        except TypeError:
-            try:
-                _v30031_prev_delete_logs_by_date_range(start_date, end_date)
-            except Exception:
-                pass
-        except Exception:
-            pass
-
-    marker = {
-        "log_time": now_text(),
+        "log_time": ts,
         "user_name": user_name or _current_log_user(),
-        "action_type": "DELETE_LOG_RANGE",
-        "target_table": "system_logs",
-        "target_id": f"{s}~{e}",
-        "message": f"刪除 LOG 日期區間：{s} ~ {e}，刪除筆數：{deleted}",
-        "detail": f"deleted_count={deleted};source=v30031_delete_range_authority_filter",
-        "level": "WARN",
-        "source": "06_log_query_delete_tombstone_v30031",
-        "delete_range_start": s,
-        "delete_range_end": e,
+        "action_type": _v30032_safe_log_text(action_type),
+        "target_table": _v30032_safe_log_text(target_table),
+        "target_id": _v30032_safe_log_text(target_id),
+        "message": _v30032_safe_log_text(message),
+        "detail": _v30032_safe_log_text(detail),
+        "level": _v30032_safe_log_text(level or "INFO") or "INFO",
+        "source": "06_log_query_jsonl_v30032_hot_path_flatten",
+        "authority_module_key": "06_log_query",
+        "authority_written_at": ts,
+        "authority_event_id": f"06log:{ts}:{str(_v30032_uuid.uuid4())}",
+        "authority_patch_version": _V30032_LOG_VERSION,
     }
+
+
+def _v30032_append_log_row_local(row: dict[str, Any]) -> None:
     try:
-        from services.authority_consistency_service import append_jsonl, upload_authority_file
-        append_jsonl(
-            "06_log_query",
-            marker,
-            identity_fields=("log_time", "action_type", "target_id", "message"),
-            github=True,
-            reason="delete_logs_range_v30031",
+        path = _v30032_log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(_v30032_json.dumps(row, ensure_ascii=False, default=str) + "\n")
+    except Exception:
+        pass
+
+
+def _v30032_write_sqlite_log_row(row: dict[str, Any]) -> None:
+    try:
+        execute(
+            """
+            INSERT INTO system_logs
+            (log_time, user_name, action_type, target_table, target_id, message, detail, level)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                row.get("log_time", ""),
+                row.get("user_name", "SYSTEM"),
+                row.get("action_type", ""),
+                row.get("target_table", ""),
+                row.get("target_id", ""),
+                row.get("message", ""),
+                row.get("detail", ""),
+                row.get("level", "INFO"),
+            ),
         )
-        # Explicit upload is harmless if append_jsonl already uploaded, and helps older
-        # deployments where github=True is ignored by wrapper order.
-        try:
-            upload_authority_file("06_log_query", "records.jsonl", reason="delete_logs_range_v30031_final_upload")
-        except Exception:
-            pass
     except Exception:
         pass
+
+
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    """V300.32 terminal write_log: one local DB write + one local authority append.
+
+    This intentionally avoids the historical wrapper chain and any foreground
+    GitHub/upload/download work. It fixes 01 工時紀錄 buttons that looked stuck
+    because a single action generated hundreds of nested LOG authority writes.
+    """
+    row = _v30032_build_log_row(action_type, message, target_table, target_id, detail, level, user_name)
+    _v30032_write_sqlite_log_row(row)
+    _v30032_append_log_row_local(row)
+    return None
+
+
+def audit_v30032_log_hot_path_flatten() -> dict[str, Any]:
     try:
-        clear_log_query_cache()  # type: ignore[name-defined]
-    except Exception:
-        pass
-    return int(deleted)
-
-
-def get_system_log_authority_status() -> dict[str, Any]:  # type: ignore[override]
-    base: dict[str, Any] = {}
-    if callable(_v30031_prev_get_system_log_authority_status):
-        try:
-            base = dict(_v30031_prev_get_system_log_authority_status() or {})
-        except Exception as exc:
-            base = {"error": str(exc)[:300]}
-    try:
-        rows = _v30031_read_authority_jsonl_rows(limit=None)
-        ranges = _v30031_delete_ranges_from_rows(rows)
-        visible = _v30031_apply_delete_ranges(rows, ranges)
-        base.update({
-            "authority_type": "jsonl_direct_github_v30031_delete_range_filter",
-            "count": len(visible),
-            "raw_jsonl_count": len(rows),
-            "deleted_keys": len(ranges),
-            "delete_range_authority_filter": True,
-        })
-    except Exception:
-        base.update({"delete_range_authority_filter": True})
-    return base
-
-
-def audit_v30031_06_log_delete_fix() -> dict[str, Any]:
-    try:
-        rows = _v30031_read_authority_jsonl_rows(limit=None)
-        ranges = _v30031_delete_ranges_from_rows(rows)
+        p = _v30032_log_path()
         return {
-            "version": "V300.31_06_LOG_DELETE_RANGE_AUTHORITY_FIX",
-            "module": "06_log_query",
-            "raw_jsonl_rows": len(rows),
-            "delete_ranges": len(ranges),
-            "visible_jsonl_rows": len(_v30031_apply_delete_ranges(rows, ranges)),
-            "no_ui_css_theme_changes": True,
+            "version": _V30032_LOG_VERSION,
+            "terminal_write_log": True,
+            "calls_previous_write_log_wrappers": False,
+            "foreground_github_upload": False,
+            "authority_jsonl": str(p),
+            "authority_jsonl_exists": p.exists(),
+            "ui_changed": False,
+            "css_changed": False,
+            "theme_changed": False,
         }
     except Exception as exc:
-        return {"version": "V300.31_06_LOG_DELETE_RANGE_AUTHORITY_FIX", "ok": False, "error": str(exc)[:300]}
-
-# ================= END V300.31 06 LOG DELETE RANGE AUTHORITY FIX =================
+        return {"version": _V30032_LOG_VERSION, "ok": False, "error": str(exc)[:300]}
+# ================= END V300.32 06 LOG HOT-PATH FLATTEN PATCH =================
