@@ -1,0 +1,123 @@
+# SPT Clean Authority Project Report
+## 核心原則
+- 01/02 核心程式邏輯未修改；只解碼檔名與清除重複/舊來源。
+- 10 權限管理改為只讀寫 `data/permanent_store/modules/10_permissions/records.json`。
+- 移除會造成 Reboot 後覆蓋新資料的 `persistent_modules` / `persistent_state` 舊來源。
+- 06/11 使用 append-only `records.jsonl`。
+## 重新命名檔案
+- renamed: `pages/09_09. #U8cc7#U6599#U6c38#U4e45#U4fdd#U5b58#U8207#U5099#U4efd.py` -> `pages/09_09. 資料永久保存與備份.py`
+- renamed: `data/permanent_store/pages/98_98. #U6b0a#U5a01#U6a94#U8a3a#U65b7.py` -> `data/permanent_store/pages/98_98. 權威檔診斷.py`
+- renamed: `pages/12_12. #U6a21#U7d44#U6c38#U4e45#U7d00#U9304#U4e2d#U5fc3.py` -> `pages/12_12. 模組永久紀錄中心.py`
+- renamed: `pages/14_14. #U8cc7#U6599#U5065#U5eb7#U6aa2#U67e5#U4e2d#U5fc3.py` -> `pages/14_14. 資料健康檢查中心.py`
+- renamed: `pages/07_07. #U4eca#U65e5#U672a#U7d00#U9304#U540d#U55ae.py` -> `pages/07_07. 今日未紀錄名單.py`
+- renamed: `pages/05_05. #U88fd#U4ee4#U5de5#U6642#U5206#U6790.py` -> `pages/05_05. 製令工時分析.py`
+- renamed: `pages/08_08. #U4eba#U54e1#U6bcf#U65e5#U5de5#U6642.py` -> `pages/08_08. 人員每日工時.py`
+- renamed: `pages/98_98. #U6b0a#U5a01#U6a94#U8a3a#U65b7.py` -> `pages/98_98. 權威檔診斷.py`
+- renamed: `pages/pages/01_01. #U5de5#U6642#U7d00#U9304.py` -> `pages/pages/01_01. 工時紀錄.py`
+- renamed: `pages/pages/99_99. #U6548#U80fd#U8a3a#U65b7.py` -> `pages/pages/99_99. 效能診斷.py`
+- renamed: `pages/pages/99_#U6548#U80fd#U8a3a#U65b7.py` -> `pages/pages/99_效能診斷.py`
+- renamed: `pages/01_01. #U5de5#U6642#U7d00#U9304.py` -> `pages/01_01. 工時紀錄.py`
+- renamed: `pages/02_02. #U6b77#U53f2#U7d00#U9304.py` -> `pages/02_02. 歷史紀錄.py`
+- renamed: `pages/03_03. #U88fd#U4ee4#U7ba1#U7406.py` -> `pages/03_03. 製令管理.py`
+- renamed: `pages/04_04. #U4eba#U54e1#U540d#U55ae.py` -> `pages/04_04. 人員名單.py`
+- renamed: `pages/10_10. #U6b0a#U9650#U7ba1#U7406.py` -> `pages/10_10. 權限管理.py`
+- renamed: `pages/11_11. #U767b#U5165#U7d00#U9304.py` -> `pages/11_11. 登入紀錄.py`
+- renamed: `pages/13_13. #U7cfb#U7d71#U8a2d#U5b9a.py` -> `pages/13_13. 系統設定.py`
+- renamed: `pages/99_99. #U6548#U80fd#U8a3a#U65b7.py` -> `pages/99_99. 效能診斷.py`
+- renamed: `pages/06_06. LOG#U67e5#U8a62.py` -> `pages/06_06. LOG查詢.py`
+
+## 移除項目
+- `__pycache__`
+- `services/__pycache__`
+- `tools/__pycache__`
+- `.devcontainer/1`
+- `.github/1`
+- `.streamlit/1`
+- `data/1`
+- `logo/1`
+- `data/logo/1`
+- `data/permanent_store/1`
+- `data/permanent_store/_backups/1`
+- `data/permanent_store/config/1`
+- `data/permanent_store/database/1`
+- `data/permanent_store/modules/1`
+- `data/permanent_store/persistent_modules/1`
+- `data/permanent_store/persistent_state/1`
+- `data/permanent_store/system/1`
+- `data/permanent_store/persistent_state/history/1`
+- `data/permanent_store/persistent_modules/01_time_records/1`
+- `data/permanent_store/persistent_modules/02_history/1`
+- `data/permanent_store/persistent_modules/03_work_orders/1`
+- `data/permanent_store/persistent_modules/04_employees/1`
+- `data/permanent_store/persistent_modules/05_analysis/1`
+- `data/permanent_store/persistent_modules/06_logs/1`
+- `data/permanent_store/persistent_modules/06_system_logs/1`
+- `data/permanent_store/persistent_modules/07_missing/1`
+- `data/permanent_store/persistent_modules/07_missing_records/1`
+- `data/permanent_store/persistent_modules/07_missing_today/1`
+- `data/permanent_store/persistent_modules/08_daily_hours/1`
+- `data/permanent_store/persistent_modules/09_persistence/1`
+- `data/permanent_store/persistent_modules/10_permissions/1`
+- `data/permanent_store/persistent_modules/11_login_logs/1`
+- `data/permanent_store/persistent_modules/12_module_persistence/1`
+- `data/permanent_store/persistent_modules/13_system_settings/1`
+- `data/permanent_store/persistent_modules/ui_table_settings/1`
+- `data/permanent_store/persistent_modules/01_time_records/history/1`
+- `data/permanent_store/modules/13_system_settings_process/1`
+- `data/permanent_store/modules/13_system_settings_rest/1`
+- `data/permanent_store/config/history/1`
+- `.github/workflows/1`
+- `pages/pages`
+- `pages/services`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v103.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v104.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v105.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v106.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v110.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v112.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v113.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v114.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v116.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v117.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v119.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v120.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v122.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v126.yml`
+- `.github/workflows/cleanup_legacy_mojibake_pages_v133.yml`
+- `security_service.py`
+- `time_record_service.py`
+- `theme_service.py`
+- `log_service.py`
+- `module_persistence_service.py`
+- `README_V259.txt`
+- `V300_15_README.md`
+- `services/V259_THEME_SERVICE_APPEND_ONLY.txt`
+- `data/permanent_store/persistent_modules`
+- `data/permanent_store/persistent_state`
+- `data/permanent_store/config/history`
+- `data/permanent_store/pages`
+- `data/permanent_store/tools`
+- `data/permanent_store/services`
+- `data/permanent_store/modules/10_permissions_live`
+
+## 權威檔路徑
+- 01_time_records：`data/permanent_store/modules/01_time_records/`
+- 02_history：`data/permanent_store/modules/02_history/`
+- 03_work_orders：`data/permanent_store/modules/03_work_orders/`
+- 04_employees：`data/permanent_store/modules/04_employees/`
+- 05_work_order_time_analysis：`data/permanent_store/modules/05_work_order_time_analysis/`
+- 06_log_query：`data/permanent_store/modules/06_log_query/`
+- 07_missing_today：`data/permanent_store/modules/07_missing_today/`
+- 08_employee_daily_hours：`data/permanent_store/modules/08_employee_daily_hours/`
+- 09_backup_restore：`data/permanent_store/modules/09_backup_restore/`
+- 10_permissions：`data/permanent_store/modules/10_permissions/`
+- 11_login_records：`data/permanent_store/modules/11_login_records/`
+- 12_module_persistence_center：`data/permanent_store/modules/12_module_persistence_center/`
+- 13_system_settings：`data/permanent_store/modules/13_system_settings/`
+- 14_data_health：`data/permanent_store/modules/14_data_health/`
+- 99_speed_diagnostic：`data/permanent_store/modules/99_speed_diagnostic/`
+
+## 10 權限管理讀寫規則
+- 新增/修改/刪除帳號直接寫入 `data/permanent_store/modules/10_permissions/records.json`。
+- 密碼空白或 `********` 不覆蓋既有 `password_hash`。
+- 儲存後嘗試立即同步 GitHub；若 GitHub secrets 不可用，至少本地權威檔會更新。
