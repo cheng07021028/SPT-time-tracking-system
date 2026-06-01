@@ -8038,45 +8038,36 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
 
 # ======================= V300.12.5 IDLE TIMEOUT INDEPENDENT AUTHORITY FILE END =======================
 
-# ======================= V300.17.2 PERMISSION CREATE/DELETE AUTHORITY WRITE FIX START =======================
+# ======================= V300.17.3 PERMISSION PASSWORD EMERGENCY RECOVERY START =======================
 # Purpose:
-#   V300.17.1 prevents account-count collapse, but some 10. 權限管理 page actions can still
-#   appear to work only in the current session because created/deleted accounts or matrix edits
-#   are not guaranteed to be written back to the canonical authority file and read back.
-# Rule:
-#   Account master save, account delete, and permission matrix save all merge into and write
-#   data/permanent_store/modules/10_permissions/records.json, then immediately read back.
+#   V300.17.2 could overwrite account rows without preserving password_hash values.
+#   This emergency block restores password_hash/password_hint from the trusted 104-user
+#   recovery authority file and prevents future account saves from blanking existing hashes.
 # Scope:
-#   This block only affects 10. 權限管理. It does not touch 01/02, 06/11/13, UI, CSS, theme.
+#   Only 10. 權限管理 account/password authority. Does not touch 01/02, 06/11/13, UI/CSS/theme.
 
 try:
-    _v300172_prev_save_users = save_users  # type: ignore[name-defined]
+    _v300173_prev_get_users = get_users  # type: ignore[name-defined]
 except Exception:  # pragma: no cover
-    _v300172_prev_save_users = None
+    _v300173_prev_get_users = None
 try:
-    _v300172_prev_delete_users = delete_users  # type: ignore[name-defined]
+    _v300173_prev_save_users = save_users  # type: ignore[name-defined]
 except Exception:  # pragma: no cover
-    _v300172_prev_delete_users = None
-try:
-    _v300172_prev_save_account_permissions = save_account_permissions  # type: ignore[name-defined]
-except Exception:  # pragma: no cover
-    _v300172_prev_save_account_permissions = None
+    _v300173_prev_save_users = None
 
-_V300172_AUTHORITY_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json"
-_V300172_BACKUP_DIR = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "recovery_backups"
+_V300173_AUTHORITY_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json"
+_V300173_RECOVERY_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "recovery" / "V30012_2_records_recovery_104.json"
+_V300173_BACKUP_DIR = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "recovery_backups"
 
 
-def _v300172_now() -> str:
+def _v300173_now() -> str:
     try:
-        return _v30012_now()  # type: ignore[name-defined]
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
-        try:
-            return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        except Exception:
-            return ""
+        return ""
 
 
-def _v300172_read_json(path: Path) -> dict:
+def _v300173_read_json(path: Path) -> dict:
     try:
         if path.exists() and path.is_file() and path.stat().st_size > 2:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -8086,7 +8077,7 @@ def _v300172_read_json(path: Path) -> dict:
     return {}
 
 
-def _v300172_atomic_write_json(path: Path, payload: dict) -> bool:
+def _v300173_write_json(path: Path, payload: dict) -> bool:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".tmp")
@@ -8098,415 +8089,158 @@ def _v300172_atomic_write_json(path: Path, payload: dict) -> bool:
         return False
 
 
-def _v300172_user_key(row: dict) -> str:
+def _v300173_tables(payload: dict) -> dict:
     try:
-        return _v30012_clean_username(row).strip().lower()  # type: ignore[name-defined]
+        tables = payload.get("tables", {}) if isinstance(payload, dict) else {}
+        if not isinstance(tables, dict):
+            tables = {}
+        keys = ["auth_users", "auth_account_permissions", "auth_security_settings", "security_settings", "security_users", "security_user_roles"]
+        out = {}
+        for k in keys:
+            rows = tables.get(k, [])
+            out[k] = [dict(r) for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+        return out
     except Exception:
-        return str((row or {}).get("username") or (row or {}).get("帳號 / Username") or (row or {}).get("帳號") or "").strip().lower()
+        return {"auth_users": [], "auth_account_permissions": [], "auth_security_settings": [], "security_settings": [], "security_users": [], "security_user_roles": []}
 
 
-def _v300172_bool(v, default: bool = False) -> int:
+def _v300173_user_key(row: dict | str) -> str:
     try:
-        return _v30012_bool(v, default)  # type: ignore[name-defined]
+        if isinstance(row, str):
+            return row.strip().lower()
+        return str(row.get("username") or row.get("帳號 / Username") or row.get("帳號") or row.get("user_name") or "").strip().lower()
     except Exception:
-        if v is None:
-            return 1 if default else 0
-        if isinstance(v, bool):
-            return 1 if v else 0
-        s = str(v).strip().lower()
-        if s in {"1", "true", "yes", "y", "on", "是", "啟用", "active", "checked", "勾選", "✓"}:
-            return 1
-        if s in {"0", "false", "no", "n", "off", "否", "停用", "inactive", "unchecked", ""}:
-            return 0
-        return 1 if default else 0
+        return ""
 
 
-def _v300172_tables(payload: dict) -> dict:
+def _v300173_has_hash(row: dict) -> bool:
     try:
-        tables = _v300122_tables(payload)  # type: ignore[name-defined]
-        if isinstance(tables, dict):
-            return tables
-    except Exception:
-        pass
-    try:
-        out = _v30012_empty_tables()  # type: ignore[name-defined]
-    except Exception:
-        out = {t: [] for t in ["auth_users", "auth_account_permissions", "auth_security_settings", "security_settings", "security_users", "security_user_roles"]}
-    raw = payload.get("tables") if isinstance(payload, dict) and isinstance(payload.get("tables"), dict) else {}
-    for k in list(out):
-        rows = raw.get(k, []) if isinstance(raw, dict) else []
-        out[k] = [dict(r) for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
-    return out
-
-
-def _v300172_payload() -> dict:
-    try:
-        payload = _v30012_payload_with_fallback()  # type: ignore[name-defined]
-    except Exception:
-        payload = _v300172_read_json(_V300172_AUTHORITY_FILE)
-    if not isinstance(payload, dict):
-        payload = {}
-    payload.setdefault("tables", _v300172_tables(payload))
-    payload.setdefault("deleted_usernames", [])
-    return payload
-
-
-def _v300172_count_active_users(payload: dict) -> int:
-    try:
-        return _v300122_count_users(payload)[1]  # type: ignore[name-defined]
-    except Exception:
-        count = 0
-        for r in _v300172_tables(payload).get("auth_users", []):
-            if _v300172_user_key(r) and _v300172_bool(r.get("is_active", 1), True) == 1:
-                count += 1
-        return count
-
-
-def _v300172_backup_before_write(payload: dict, reason: str) -> None:
-    try:
-        _V300172_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = _V300172_BACKUP_DIR / f"records_before_v30017_2_{reason}_{stamp}.json"
-        path.write_text(json.dumps(payload if isinstance(payload, dict) else {}, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-    except Exception:
-        pass
-
-
-def _v300172_upload_authority_to_github(payload: dict, message: str) -> bool:
-    # Best-effort only. Local authority correctness is still enforced by read-back.
-    try:
-        token = ""; repo = ""; branch = ""
-        try:
-            if st is not None:
-                token = str(st.secrets.get("GITHUB_TOKEN", "") or "").strip()  # type: ignore[attr-defined]
-                repo = str(st.secrets.get("GITHUB_REPOSITORY", "") or "").strip()  # type: ignore[attr-defined]
-                branch = str(st.secrets.get("GITHUB_BRANCH", "") or "").strip()  # type: ignore[attr-defined]
-        except Exception:
-            pass
-        token = token or os.environ.get("GITHUB_TOKEN", "").strip()
-        repo = repo or os.environ.get("GITHUB_REPOSITORY", "cheng07021028/SPT-time-tracking-system").strip()
-        branch = branch or os.environ.get("GITHUB_BRANCH", "main").strip()
-        if not token or not repo:
-            return False
-        import base64 as _b64
-        import urllib.parse as _urlparse
-        import urllib.request as _urlreq
-        rel = str(_V300172_AUTHORITY_FILE.relative_to(PROJECT_ROOT)).replace("\\", "/")
-        api = f"https://api.github.com/repos/{repo}/contents/{_urlparse.quote(rel)}"
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "Content-Type": "application/json",
-            "User-Agent": "SPT-V30017-2-permission-authority-write",
-        }
-        sha = ""
-        try:
-            req = _urlreq.Request(api + f"?ref={_urlparse.quote(branch)}", headers=headers, method="GET")
-            with _urlreq.urlopen(req, timeout=10) as resp:  # nosec
-                current = json.loads(resp.read().decode("utf-8"))
-                sha = str(current.get("sha", "") or "") if isinstance(current, dict) else ""
-        except Exception:
-            sha = ""
-        body = {
-            "message": f"{message} ({_v300172_now()})",
-            "content": _b64.b64encode(json.dumps(payload, ensure_ascii=False, indent=2, default=str).encode("utf-8")).decode("ascii"),
-            "branch": branch,
-        }
-        if sha:
-            body["sha"] = sha
-        req = _urlreq.Request(api, data=json.dumps(body).encode("utf-8"), headers=headers, method="PUT")
-        with _urlreq.urlopen(req, timeout=15) as resp:  # nosec
-            return 200 <= int(getattr(resp, "status", 200)) < 300
+        h = str((row or {}).get("password_hash") or "").strip()
+        return bool(h and h.lower() not in {"none", "nan", "null", "", "********"})
     except Exception:
         return False
 
 
-def _v300172_sync_runtime_cache(payload: dict) -> None:
+def _v300173_backup_current(reason: str) -> None:
     try:
-        _v30012_sync_sqlite_cache(payload)  # type: ignore[name-defined]
+        if _V300173_AUTHORITY_FILE.exists():
+            _V300173_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            target = _V300173_BACKUP_DIR / f"records_before_v30017_3_{reason}_{stamp}.json"
+            target.write_text(_V300173_AUTHORITY_FILE.read_text(encoding="utf-8"), encoding="utf-8")
     except Exception:
         pass
+
+
+def _v300173_repair_passwords_if_needed(reason: str = "auto") -> dict:
+    current = _v300173_read_json(_V300173_AUTHORITY_FILE)
+    recovery = _v300173_read_json(_V300173_RECOVERY_FILE)
+    if not recovery:
+        return {"ok": False, "reason": reason, "error": "missing_recovery_file"}
+    cur_tables = _v300173_tables(current)
+    rec_tables = _v300173_tables(recovery)
+    cur_users = cur_tables.get("auth_users", [])
+    rec_users = rec_tables.get("auth_users", [])
+    rec_by_user = {_v300173_user_key(r): dict(r) for r in rec_users if _v300173_user_key(r)}
+    cur_by_user = {_v300173_user_key(r): dict(r) for r in cur_users if _v300173_user_key(r)}
+    admin = cur_by_user.get("admin", {})
+    missing_admin_hash = not _v300173_has_hash(admin)
+    missing_hash_users = [u for u, r in cur_by_user.items() if not _v300173_has_hash(r)]
+    active_count = 0
+    for r in cur_by_user.values():
+        if str(r.get("is_active", 1)).strip().lower() not in {"0", "false", "no", "n", "否", "停用"}:
+            active_count += 1
+    collapse = bool(active_count and active_count < 50 and len(rec_by_user) >= 100)
+    if not missing_admin_hash and not missing_hash_users and not collapse:
+        return {"ok": True, "changed": False, "reason": reason, "active_users": active_count, "missing_hash_users": 0}
+    # Merge current visible metadata with trusted recovery passwords. If the current authority
+    # collapsed badly, restore recovery users first, then overlay safe non-password fields from current.
+    merged_by_user = dict(rec_by_user) if collapse else dict(cur_by_user)
+    for u, cur in cur_by_user.items():
+        rec = rec_by_user.get(u, {})
+        base = dict(merged_by_user.get(u, rec or cur))
+        # Preserve current non-password edits, but never accept a blank password_hash over recovery.
+        for k, v in cur.items():
+            if k not in {"password_hash", "password", "密碼 / Password", "new_password", "新密碼 / New Password"}:
+                base[k] = v
+        if _v300173_has_hash(cur):
+            base["password_hash"] = cur.get("password_hash")
+            if cur.get("password_hint"):
+                base["password_hint"] = cur.get("password_hint")
+        elif rec and _v300173_has_hash(rec):
+            base["password_hash"] = rec.get("password_hash")
+            base["password_hint"] = rec.get("password_hint") or "V300.17.3 restored from recovery authority"
+        merged_by_user[u] = base
+    # Ensure admin is always restored from recovery if damaged.
+    if "admin" in rec_by_user and ("admin" not in merged_by_user or not _v300173_has_hash(merged_by_user.get("admin", {}))):
+        merged_by_user["admin"] = dict(rec_by_user["admin"])
+    new_payload = current if isinstance(current, dict) else {}
+    if not new_payload:
+        new_payload = dict(recovery)
+    new_tables = _v300173_tables(new_payload)
+    new_tables["auth_users"] = list(merged_by_user.values())
+    # If account-permission table collapsed too, restore recovery matrix; otherwise keep current.
+    if len(new_tables.get("auth_account_permissions", [])) < 100 and len(rec_tables.get("auth_account_permissions", [])) >= 100:
+        new_tables["auth_account_permissions"] = rec_tables.get("auth_account_permissions", [])
+    new_payload["tables"] = new_tables
+    new_payload["authority_schema"] = "SPT-10-Permissions-Authority-V30017.3"
+    new_payload["version"] = "V300.17.3-password-emergency-recovery"
+    new_payload["module_key"] = "10_permissions"
+    new_payload["updated_at"] = _v300173_now()
+    new_payload["reason"] = f"v30017_3_password_recovery_{reason}"
+    new_payload["table_counts"] = {k: len(v) for k, v in new_tables.items() if isinstance(v, list)}
+    _v300173_backup_current(reason)
+    ok = _v300173_write_json(_V300173_AUTHORITY_FILE, new_payload)
     try:
         clear_permission_runtime_cache()
     except Exception:
         pass
-
-
-def _v300172_write_authority(payload: dict, reason: str, *, expected_users: set[str] | None = None, expected_deleted: set[str] | None = None) -> dict:
-    payload = payload if isinstance(payload, dict) else {}
-    old = _v300172_read_json(_V300172_AUTHORITY_FILE)
-    old_active = _v300172_count_active_users(old)
-    new_active = _v300172_count_active_users(payload)
-    # Guard: normal create/delete operations must never accidentally collapse 100+ users to 35.
-    expected_deleted = {u.strip().lower() for u in (expected_deleted or set()) if u.strip().lower() != "admin"}
-    max_allowed_drop = max(len(expected_deleted), 3)
-    if old_active >= 50 and new_active < (old_active - max_allowed_drop):
-        return {"ok": False, "error": "blocked_account_collapse", "old_active": old_active, "new_active": new_active, "reason": reason}
-    payload["authority_schema"] = "SPT-10-Permissions-Authority-V30017.2"
-    payload["version"] = "V300.17.2-create-delete-authority-write"
-    payload["module_key"] = "10_permissions"
-    payload["kind"] = "records"
-    payload["authority_file"] = "data/permanent_store/modules/10_permissions/records.json"
-    payload["reason"] = reason
-    payload["updated_at"] = _v300172_now()
-    payload["table_counts"] = {k: len(v) for k, v in _v300172_tables(payload).items() if isinstance(v, list)}
-    _v300172_backup_before_write(old, reason)
-    local_ok = _v300172_atomic_write_json(_V300172_AUTHORITY_FILE, payload)
-    readback = _v300172_read_json(_V300172_AUTHORITY_FILE)
-    rb_tables = _v300172_tables(readback)
-    rb_users = {_v300172_user_key(r) for r in rb_tables.get("auth_users", []) if isinstance(r, dict) and _v300172_user_key(r)}
-    rb_deleted = {str(x).strip().lower() for x in (readback.get("deleted_usernames") or []) if str(x).strip().lower()}
-    expected_users = {u.strip().lower() for u in (expected_users or set()) if u.strip().lower()}
-    missing_users = sorted(u for u in expected_users if u not in rb_users and u not in rb_deleted)
-    missing_deleted = sorted(u for u in (expected_deleted or set()) if u not in rb_deleted)
-    github_ok = False
-    if local_ok and not missing_users and not missing_deleted:
-        github_ok = _v300172_upload_authority_to_github(payload, f"V300.17.2 {reason}")
-        _v300172_sync_runtime_cache(payload)
-    return {
-        "ok": bool(local_ok and not missing_users and not missing_deleted),
-        "local_write_ok": bool(local_ok),
-        "github_write_ok": bool(github_ok),
-        "file": str(_V300172_AUTHORITY_FILE),
-        "reason": reason,
-        "expected_users": sorted(expected_users),
-        "missing_users_after_readback": missing_users,
-        "expected_deleted": sorted(expected_deleted),
-        "missing_deleted_after_readback": missing_deleted,
-        "active_before": old_active,
-        "active_after": new_active,
-        "table_counts": payload.get("table_counts", {}),
-    }
-
-
-def _v300172_normalize_user_row(row: dict, existing: dict | None = None) -> tuple[dict | None, str]:
-    existing = existing if isinstance(existing, dict) else {}
-    r = row if isinstance(row, dict) else {}
-    username = str(r.get("username") or r.get("帳號 / Username") or r.get("帳號") or r.get("user_name") or "").strip()
-    if not username:
-        return None, "missing username"
-    key = username.strip().lower()
-    role = str(r.get("role_code") or r.get("角色 / Role") or r.get("角色") or existing.get("role_code") or "operator").strip() or "operator"
-    new_password = str(r.get("new_password") or r.get("密碼 / Password") or r.get("新密碼 / New Password") or r.get("password") or "").strip()
-    password_hash = str(r.get("password_hash") or existing.get("password_hash") or "").strip()
-    password_hint = str(r.get("password_hint") or existing.get("password_hint") or "").strip()
-    force_change = _v300172_bool(r.get("force_password_change", r.get("強制改密碼 / Force Change", existing.get("force_password_change", False))), False)
-    if new_password and new_password != "********":
-        try:
-            password_hash = hash_password(new_password)
-        except Exception:
-            password_hash = str(new_password)
-        password_hint = "由權限管理頁更新"
-    elif not password_hash:
-        # Do not drop newly-added account silently. Persist it with a forced-change temporary password.
-        try:
-            password_hash = hash_password("ChangeMe@1234")
-        except Exception:
-            password_hash = "ChangeMe@1234"
-        password_hint = "V300.17.2 temporary password; force change required"
-        force_change = 1
-    out = dict(existing)
-    out.update({
-        "username": username,
-        "password_hash": password_hash,
-        "password_hint": password_hint,
-        "employee_id": str(r.get("employee_id") or r.get("工號 / Employee ID") or r.get("工號") or existing.get("employee_id") or "").strip(),
-        "display_name": str(r.get("display_name") or r.get("姓名 / Display Name") or r.get("姓名") or existing.get("display_name") or username).strip(),
-        "email": str(r.get("email") or r.get("Email") or existing.get("email") or "").strip(),
-        "role_code": role,
-        "is_active": _v300172_bool(r.get("is_active", r.get("啟用 / Active", r.get("啟用", existing.get("is_active", True)))), True),
-        "force_password_change": _v300172_bool(force_change, False),
-        "note": str(r.get("note") or r.get("備註 / Note") or r.get("備註") or existing.get("note") or "").strip(),
-        "created_at": existing.get("created_at") or r.get("created_at") or _v300172_now(),
-        "updated_at": _v300172_now(),
-    })
-    out.pop("id", None)
-    return out, ""
-
-
-def _v300172_default_permissions_for_user(username: str, role: str) -> list[dict]:
-    rows: list[dict] = []
-    for m in MODULES:
-        module_no = _v30012_normalize_module_no(m.get("module_code")) if "_v30012_normalize_module_no" in globals() else str(m.get("module_code", "")).zfill(2)
-        try:
-            preset = _v30012_role_preset(role, module_no)  # type: ignore[name-defined]
-        except Exception:
-            preset = {k: (1 if role == "admin" else 0) for k, _, _ in ACTIONS}
-        row = {
-            "username": username,
-            "module_code": module_no,
-            "module_name_zh": str(m.get("module_name_zh") or ""),
-            "module_name_en": str(m.get("module_name_en") or ""),
-            "updated_at": _v300172_now(),
-        }
-        for col, _, _ in ACTIONS:
-            row[col] = _v300172_bool(preset.get(col, 0), False)
-        if module_no == "99" and role != "admin":
-            for col, _, _ in ACTIONS:
-                row[col] = 0
-        rows.append(row)
-    return rows
+    return {"ok": bool(ok), "changed": bool(ok), "reason": reason, "active_users_after": len(merged_by_user), "recovered_missing_hash_users": len(missing_hash_users), "collapse_recovered": collapse}
 
 
 def get_users() -> List[dict]:  # type: ignore[override]
-    payload = _v300172_payload()
-    deleted = {str(x).strip().lower() for x in (payload.get("deleted_usernames") or []) if str(x).strip().lower()}
-    out = []
-    seen = set()
-    for r in _v300172_tables(payload).get("auth_users", []):
-        if not isinstance(r, dict):
-            continue
-        key = _v300172_user_key(r)
-        if not key or key in seen or key in deleted:
-            continue
-        seen.add(key)
-        x = dict(r); x.pop("id", None)
-        out.append(x)
-    return sorted(out, key=lambda r: (str(r.get("role_code", "")), str(r.get("username", "")).lower()))
+    _v300173_repair_passwords_if_needed("get_users")
+    if callable(_v300173_prev_get_users):
+        return _v300173_prev_get_users()  # type: ignore[misc]
+    payload = _v300173_read_json(_V300173_AUTHORITY_FILE)
+    return _v300173_tables(payload).get("auth_users", [])
 
 
 def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
-    payload = _v300172_payload()
-    tables = _v300172_tables(payload)
-    existing = {_v300172_user_key(r): dict(r) for r in tables.get("auth_users", []) if isinstance(r, dict) and _v300172_user_key(r)}
-    deleted = {str(x).strip().lower() for x in (payload.get("deleted_usernames") or []) if str(x).strip().lower() and str(x).strip().lower() != "admin"}
-    saved = 0; skipped: list[str] = []; expected: set[str] = set(); touched_roles: dict[str, str] = {}
+    # Pre-repair so existing password hashes are available before page rows are saved.
+    _v300173_repair_passwords_if_needed("pre_save_users")
+    payload = _v300173_read_json(_V300173_AUTHORITY_FILE)
+    tables = _v300173_tables(payload)
+    existing = {_v300173_user_key(r): dict(r) for r in tables.get("auth_users", []) if _v300173_user_key(r)}
+    safe_rows = []
     for row in rows or []:
         if not isinstance(row, dict):
             continue
-        key = _v300172_user_key(row)
-        normalized, reason = _v300172_normalize_user_row(row, existing.get(key))
-        if not normalized:
-            if reason:
-                skipped.append(reason)
-            continue
-        key = _v300172_user_key(normalized)
-        existing[key] = normalized
-        deleted.discard(key)
-        expected.add(key)
-        touched_roles[key] = str(normalized.get("role_code") or "operator")
-        saved += 1
-    tables["auth_users"] = list(existing.values())
-    # Merge defaults for newly added users without overwriting edited matrix rows.
-    perms = tables.get("auth_account_permissions", []) if isinstance(tables.get("auth_account_permissions"), list) else []
-    by_key = {}
-    for p in perms:
-        if not isinstance(p, dict):
-            continue
-        u = _v300172_user_key(p)
-        mod = _v30012_normalize_module_no(p.get("module_code")) if "_v30012_normalize_module_no" in globals() else str(p.get("module_code", "")).zfill(2)
-        if u and mod:
-            by_key[(u, mod)] = dict(p)
-    for u, role in touched_roles.items():
-        for p in _v300172_default_permissions_for_user(existing[u].get("username", u), role):
-            mod = _v30012_normalize_module_no(p.get("module_code")) if "_v30012_normalize_module_no" in globals() else str(p.get("module_code", "")).zfill(2)
-            by_key.setdefault((u, mod), p)
-    tables["auth_account_permissions"] = list(by_key.values())
-    payload["tables"] = tables
-    payload["deleted_usernames"] = sorted(deleted)
-    wr = _v300172_write_authority(payload, "save_users_v30017_2", expected_users=expected)
-    return {"saved": saved, "skipped": skipped, "permanent_save": wr, "readback_ok": bool(wr.get("ok"))}
+        x = dict(row)
+        u = _v300173_user_key(x)
+        old = existing.get(u, {})
+        # If the page did not explicitly provide a new password, preserve old password_hash.
+        raw_pw = str(x.get("new_password") or x.get("新密碼 / New Password") or x.get("密碼 / Password") or x.get("password") or "").strip()
+        if (not raw_pw or raw_pw == "********") and _v300173_has_hash(old):
+            x["password_hash"] = old.get("password_hash")
+            x["password_hint"] = old.get("password_hint", x.get("password_hint", ""))
+            x.pop("new_password", None); x.pop("新密碼 / New Password", None); x.pop("密碼 / Password", None); x.pop("password", None)
+        safe_rows.append(x)
+    if callable(_v300173_prev_save_users):
+        res = _v300173_prev_save_users(safe_rows)  # type: ignore[misc]
+    else:
+        res = {"saved": len(safe_rows)}
+    _v300173_repair_passwords_if_needed("post_save_users")
+    return res
 
 
-def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
-    targets = {str(u).strip().lower() for u in (usernames or []) if str(u).strip() and str(u).strip().lower() != "admin"}
-    if not targets:
-        return 0
-    payload = _v300172_payload()
-    tables = _v300172_tables(payload)
-    deleted = {str(x).strip().lower() for x in (payload.get("deleted_usernames") or []) if str(x).strip().lower() and str(x).strip().lower() != "admin"} | targets
-    filtered = {}
-    for t, rows in tables.items():
-        clean = []
-        for r in rows if isinstance(rows, list) else []:
-            if not isinstance(r, dict):
-                continue
-            u = _v300172_user_key(r)
-            if u and u in deleted:
-                continue
-            clean.append(dict(r))
-        filtered[t] = clean
-    payload["tables"] = filtered
-    payload["deleted_usernames"] = sorted(deleted)
-    wr = _v300172_write_authority(payload, "delete_users_v30017_2", expected_deleted=targets)
-    return len(targets) if wr.get("ok") else 0
+def permission_password_emergency_recovery() -> dict:
+    return _v300173_repair_passwords_if_needed("manual")
 
+# Run once at import so an admin account with a blank hash can be restored before login checks.
+try:
+    _V300173_IMPORT_RECOVERY_STATUS = _v300173_repair_passwords_if_needed("import")
+except Exception:
+    _V300173_IMPORT_RECOVERY_STATUS = {"ok": False, "error": "import_recovery_failed"}
 
-def save_account_master(rows: Iterable[dict], delete_usernames: Iterable[str] | None = None) -> dict:  # type: ignore[override]
-    delete_set = {str(u).strip().lower() for u in (delete_usernames or []) if str(u).strip() and str(u).strip().lower() != "admin"}
-    deleted_count = 0
-    if delete_set:
-        deleted_count = delete_users(delete_set)
-    res = save_users(rows or [])
-    if isinstance(res, dict):
-        res["deleted"] = deleted_count
-        res["deleted_usernames"] = sorted(delete_set)
-    return res if isinstance(res, dict) else {"saved": 0, "deleted": deleted_count, "permanent_save": {"ok": False}}
-
-
-def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
-    payload = _v300172_payload()
-    tables = _v300172_tables(payload)
-    deleted = {str(x).strip().lower() for x in (payload.get("deleted_usernames") or []) if str(x).strip().lower()}
-    existing = {}
-    for p in tables.get("auth_account_permissions", []):
-        if not isinstance(p, dict):
-            continue
-        u = _v300172_user_key(p)
-        mod = _v30012_normalize_module_no(p.get("module_code")) if "_v30012_normalize_module_no" in globals() else str(p.get("module_code", "")).zfill(2)
-        if u and mod and u not in deleted:
-            existing[(u, mod)] = dict(p)
-    count = 0
-    for r in rows or []:
-        if not isinstance(r, dict):
-            continue
-        u = _v300172_user_key(r)
-        if not u or u in deleted:
-            continue
-        mod_raw = r.get("module_code") or r.get("模組代碼 / Module Code") or r.get("模組 / Module") or r.get("module_no") or ""
-        mod = _v30012_normalize_module_no(mod_raw) if "_v30012_normalize_module_no" in globals() else str(mod_raw).zfill(2)
-        if not mod:
-            continue
-        x = dict(existing.get((u, mod), {}))
-        username_display = str(r.get("username") or r.get("帳號 / Username") or r.get("帳號") or x.get("username") or u).strip()
-        x.update({"username": username_display, "module_code": mod, "updated_at": _v300172_now()})
-        for m in MODULES:
-            m_no = _v30012_normalize_module_no(m.get("module_code")) if "_v30012_normalize_module_no" in globals() else str(m.get("module_code", "")).zfill(2)
-            if m_no == mod:
-                x["module_name_zh"] = str(r.get("module_name_zh") or r.get("模組名稱") or m.get("module_name_zh") or "")
-                x["module_name_en"] = str(r.get("module_name_en") or m.get("module_name_en") or "")
-                break
-        for col, _, _ in ACTIONS:
-            x[col] = _v300172_bool(r.get(col, x.get(col, 0)), False)
-        # 99 remains admin-only.
-        if mod == "99":
-            role = ""
-            for user_row in tables.get("auth_users", []):
-                if _v300172_user_key(user_row) == u:
-                    role = str(user_row.get("role_code") or "").strip().lower()
-                    break
-            if role != "admin":
-                for col, _, _ in ACTIONS:
-                    x[col] = 0
-        existing[(u, mod)] = x
-        count += 1
-    tables["auth_account_permissions"] = list(existing.values())
-    payload["tables"] = tables
-    wr = _v300172_write_authority(payload, "save_account_permissions_v30017_2")
-    return count if wr.get("ok") else 0
-
-
-def permission_authority_write_diagnostic() -> dict:
-    payload = _v300172_payload()
-    tables = _v300172_tables(payload)
-    return {
-        "authority_file": str(_V300172_AUTHORITY_FILE),
-        "exists": _V300172_AUTHORITY_FILE.exists(),
-        "table_counts": {k: len(v) for k, v in tables.items() if isinstance(v, list)},
-        "active_users": _v300172_count_active_users(payload),
-        "deleted_usernames_count": len(payload.get("deleted_usernames", []) if isinstance(payload.get("deleted_usernames"), list) else []),
-        "version": payload.get("version", ""),
-        "updated_at": payload.get("updated_at", ""),
-    }
-
-# ======================= V300.17.2 PERMISSION CREATE/DELETE AUTHORITY WRITE FIX END =======================
+# ======================= V300.17.3 PERMISSION PASSWORD EMERGENCY RECOVERY END =======================
