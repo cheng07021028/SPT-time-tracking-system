@@ -2542,3 +2542,305 @@ def audit_v30017_11_login_records_authority() -> Dict[str, Any]:
         return {"ok": False, "error": str(exc)[:300]}
 
 # ================= END V300.17 11 LOGIN RECORDS SINGLE AUTHORITY JSONL PATCH =================
+
+# =================== V300.23 11 LOGIN RECORDS DIRECT AUTHORITY GITHUB SYNC ===================
+# Scope: 11. 登入紀錄 only. This does not modify 01/02 or permission data.
+try:
+    _v30023_prev_record_login_log = record_login_log  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30023_prev_record_login_log = None
+try:
+    _v30023_prev_delete_login_logs_by_date_range = delete_login_logs_by_date_range  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30023_prev_delete_login_logs_by_date_range = None
+
+_V30023_LOGIN_SYNC_STATE: Dict[str, Any] = {"last_result": {}, "last_error": ""}
+
+
+def _v30023_sync_11_login_authority(reason: str = "record_login_log_v30023") -> Dict[str, Any]:
+    try:
+        from services.authority_consistency_service import upload_authority_file
+        res = upload_authority_file("11_login_records", "records.jsonl", reason=reason)
+        _V30023_LOGIN_SYNC_STATE["last_result"] = dict(res or {})
+        if not res.get("ok"):
+            _V30023_LOGIN_SYNC_STATE["last_error"] = str(res.get("error") or res.get("message") or "")[:300]
+        else:
+            _V30023_LOGIN_SYNC_STATE["last_error"] = ""
+        return dict(res or {})
+    except Exception as exc:
+        _V30023_LOGIN_SYNC_STATE["last_error"] = str(exc)[:300]
+        return {"ok": False, "error": str(exc)[:300]}
+
+
+def record_login_log(username: str = "", display_name: str = "", event_type: str = "LOGIN", result: str = "SUCCESS", message: str = "", module_code: str = "", login_time: Optional[str] = None, logout_time: Optional[str] = None, idle_minutes: Optional[float] = None, ip_address: str = "", user_agent: str = "", **kwargs: Any) -> int:  # type: ignore[override]
+    new_id = 0
+    if callable(_v30023_prev_record_login_log):
+        try:
+            new_id = int(_v30023_prev_record_login_log(username=username, display_name=display_name, event_type=event_type, result=result, message=message, module_code=module_code, login_time=login_time, logout_time=logout_time, idle_minutes=idle_minutes, ip_address=ip_address, user_agent=user_agent, **kwargs) or 0)
+        except Exception:
+            new_id = 0
+    _v30023_sync_11_login_authority(f"11_login_{str(event_type or 'event')[:40]}")
+    return new_id
+
+write_login_log = record_login_log
+add_login_log = record_login_log
+append_login_log = record_login_log
+write_audit_log = record_login_log
+record_audit_log = record_login_log
+log_login_event = record_login_log
+save_login_log = record_login_log
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    deleted = 0
+    if callable(_v30023_prev_delete_login_logs_by_date_range):
+        try:
+            deleted = int(_v30023_prev_delete_login_logs_by_date_range(start_date, end_date) or 0)
+        except Exception:
+            deleted = 0
+    _v30023_sync_11_login_authority("11_login_delete_range_v30023")
+    return deleted
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date = delete_login_logs_by_date_range
+
+
+def audit_v30023_11_login_direct_github_sync() -> Dict[str, Any]:
+    try:
+        from services.authority_consistency_service import records_jsonl_path
+        p = records_jsonl_path("11_login_records")
+        return {"version": "V300.23_11_LOGIN_DIRECT_GITHUB_SYNC", "authority_file": str(p), "exists": p.exists(), "size": p.stat().st_size if p.exists() else 0, **dict(_V30023_LOGIN_SYNC_STATE)}
+    except Exception as exc:
+        return {"version": "V300.23_11_LOGIN_DIRECT_GITHUB_SYNC", "ok": False, "error": str(exc)[:300]}
+
+# ================= END V300.23 11 LOGIN RECORDS DIRECT AUTHORITY GITHUB SYNC =================
+
+# =================== V300.23 11 LOGIN RECORDS DIRECT GITHUB AUTHORITY WRITE ===================
+# Scope: 11. 登入紀錄 only. Does not modify 01/02, 10, 13, UI, CSS, or theme.
+# Goal: every new login/security event is appended to the single authority JSONL and uploaded to GitHub,
+#       so Reboot App does not read old/empty runtime files.
+try:
+    _v30023_prev_record_login_log = record_login_log  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30023_prev_record_login_log = None
+try:
+    _v30023_prev_load_login_logs = load_login_logs  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30023_prev_load_login_logs = None
+try:
+    _v30023_prev_delete_login_logs_by_date_range = delete_login_logs_by_date_range  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30023_prev_delete_login_logs_by_date_range = None
+
+
+def _v30023_login_row(username: str = "", display_name: str = "", event_type: str = "LOGIN", result: str = "SUCCESS", message: str = "", module_code: str = "", login_time: Optional[str] = None, logout_time: Optional[str] = None, idle_minutes: Optional[float] = None, ip_address: str = "", user_agent: str = "", **kwargs: Any) -> Dict[str, Any]:
+    return {
+        "username": username or "",
+        "display_name": display_name or "",
+        "event_type": event_type or "LOGIN",
+        "result": result or "SUCCESS",
+        "message": message or "",
+        "module_code": module_code or "",
+        "login_time": login_time or _now(),
+        "logout_time": logout_time or "",
+        "idle_minutes": idle_minutes if idle_minutes is not None else "",
+        "ip_address": ip_address or "",
+        "user_agent": user_agent or "",
+        "created_at": kwargs.get("created_at") or _now(),
+        "source": "11_login_records_jsonl_v30023_direct_github",
+    }
+
+
+def _v30023_append_login_authority(row: Dict[str, Any], *, github: bool = True, reason: str = "login_append_v30023") -> Dict[str, Any]:
+    try:
+        from services.authority_consistency_service import append_jsonl
+        return append_jsonl(
+            "11_login_records",
+            row,
+            identity_fields=("username", "event_type", "result", "login_time", "module_code", "message"),
+            github=github,
+            reason=reason,
+        )
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300]}
+
+
+def record_login_log(username: str = "", display_name: str = "", event_type: str = "LOGIN", result: str = "SUCCESS", message: str = "", module_code: str = "", login_time: Optional[str] = None, logout_time: Optional[str] = None, idle_minutes: Optional[float] = None, ip_address: str = "", user_agent: str = "", **kwargs: Any) -> int:  # type: ignore[override]
+    row = _v30023_login_row(username, display_name, event_type, result, message, module_code, login_time, logout_time, idle_minutes, ip_address, user_agent, **kwargs)
+    new_id = 0
+    if callable(_v30023_prev_record_login_log):
+        try:
+            new_id = int(_v30023_prev_record_login_log(username=username, display_name=display_name, event_type=event_type, result=result, message=message, module_code=module_code, login_time=login_time, logout_time=logout_time, idle_minutes=idle_minutes, ip_address=ip_address, user_agent=user_agent, **kwargs) or 0)
+        except Exception:
+            new_id = 0
+    if new_id:
+        row["id"] = new_id
+    _v30023_append_login_authority(row, github=True, reason="record_login_log_v30023_direct_github")
+    return new_id
+
+# Rebind aliases after the final override.
+write_login_log = record_login_log
+add_login_log = record_login_log
+append_login_log = record_login_log
+write_audit_log = record_login_log
+record_audit_log = record_login_log
+log_login_event = record_login_log
+save_login_log = record_login_log
+
+
+def _v30023_authority_login_rows(limit: int = 100000) -> List[Dict[str, Any]]:
+    try:
+        from services.authority_consistency_service import read_jsonl, merge_by_event_id
+        rows = read_jsonl("11_login_records", limit=limit)
+        return merge_by_event_id(rows, id_fields=("username", "event_type", "result", "login_time", "module_code", "message"))
+    except Exception:
+        return []
+
+
+def _v30023_login_delete_ranges(rows: List[Dict[str, Any]]) -> List[tuple[str, str, str]]:
+    ranges: List[tuple[str, str, str]] = []
+    for r in rows or []:
+        event = str(r.get("event_type") or "").upper()
+        if event == "DELETE_LOGIN_LOG_RANGE" or r.get("delete_range_start") or r.get("delete_range_end"):
+            s = str(r.get("delete_range_start") or "")[:10]
+            e = str(r.get("delete_range_end") or "")[:10]
+            marker_time = str(r.get("login_time") or r.get("created_at") or "")
+            if s and e:
+                ranges.append((s, e, marker_time))
+    return ranges
+
+
+def _v30023_login_date(row: Dict[str, Any]) -> str:
+    for key in ("login_time", "created_at", "logout_time"):
+        val = str(row.get(key) or "").strip()
+        if val:
+            return val.replace("/", "-")[:10]
+    return ""
+
+
+def _v30023_should_hide_login_row_by_delete_range(row: Dict[str, Any], ranges: List[tuple[str, str, str]]) -> bool:
+    d = _v30023_login_date(row)
+    row_time = str(row.get("login_time") or row.get("created_at") or "")
+    if not d:
+        return False
+    for s, e, marker_time in ranges:
+        if not (s <= d <= e):
+            continue
+        marker_date = str(marker_time or "")[:10]
+        if marker_date and d == marker_date and row_time and marker_time and row_time > marker_time:
+            continue
+        return True
+    return False
+
+
+def _v30023_apply_login_delete_ranges(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    ranges = _v30023_login_delete_ranges(rows)
+    if not ranges:
+        return rows
+    out: List[Dict[str, Any]] = []
+    for r in rows or []:
+        event = str(r.get("event_type") or "").upper()
+        if event == "DELETE_LOGIN_LOG_RANGE":
+            out.append(r)
+            continue
+        if _v30023_should_hide_login_row_by_delete_range(r, ranges):
+            continue
+        out.append(r)
+    return out
+
+
+def load_login_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "", limit: int = 1000, event_types: Optional[List[str]] = None, results: Optional[List[str]] = None, include_legacy: bool = True, **kwargs: Any):  # type: ignore[override]
+    rows: List[Dict[str, Any]] = []
+    if callable(_v30023_prev_load_login_logs):
+        try:
+            obj = _v30023_prev_load_login_logs(start_date=start_date, end_date=end_date, keyword=keyword, limit=limit, event_types=event_types, results=results, include_legacy=include_legacy, **kwargs)
+            rows.extend(_to_records(obj))
+        except Exception:
+            pass
+    rows.extend(_v30023_authority_login_rows(limit=max(int(limit or 1000) * 5, 100000)))
+    try:
+        from services.authority_consistency_service import merge_by_event_id
+        rows = merge_by_event_id(rows, id_fields=("username", "event_type", "result", "login_time", "module_code", "message"))
+    except Exception:
+        try:
+            rows = _merge_record_sets(rows)
+        except Exception:
+            pass
+    rows = _v30023_apply_login_delete_ranges(rows)
+    rows = _filter_records(rows, start_date, end_date, keyword, event_types, results)
+    rows.sort(key=lambda r: str(r.get("login_time") or r.get("created_at") or ""), reverse=True)
+    if limit:
+        rows = rows[:int(limit)]
+    if pd is not None:
+        return pd.DataFrame(rows)
+    return rows
+
+get_login_logs = load_login_logs
+query_login_logs = load_login_logs
+load_audit_logs = load_login_logs
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    deleted = 0
+    # Keep existing DB/delete behavior. The previous V300.17 path may also append a marker;
+    # append_jsonl now de-duplicates by event id, and we add one direct marker as a safety net.
+    if callable(_v30023_prev_delete_login_logs_by_date_range):
+        try:
+            deleted = int(_v30023_prev_delete_login_logs_by_date_range(start_date, end_date) or 0)
+        except Exception:
+            deleted = 0
+    marker = {
+        "username": "SYSTEM",
+        "display_name": "SYSTEM",
+        "event_type": "DELETE_LOGIN_LOG_RANGE",
+        "result": "WARN",
+        "message": f"刪除登入紀錄日期區間：{start_date} ~ {end_date}，刪除筆數：{deleted}",
+        "module_code": "11_login_records",
+        "login_time": _now(),
+        "created_at": _now(),
+        "delete_range_start": str(start_date),
+        "delete_range_end": str(end_date),
+        "source": "11_login_records_delete_tombstone_v30023_direct_github",
+    }
+    _v30023_append_login_authority(marker, github=True, reason="delete_login_logs_range_v30023_direct_github")
+    return deleted
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+delete_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+clear_audit_logs_by_date = delete_login_logs_by_date_range
+
+
+def get_audit_permanent_status() -> Dict[str, Any]:  # type: ignore[override]
+    try:
+        from services.authority_consistency_service import records_jsonl_path, read_jsonl
+        p = records_jsonl_path("11_login_records")
+        rows = read_jsonl("11_login_records", limit=None)
+        return {
+            "exists": p.exists(),
+            "path": str(p),
+            "count": len(rows),
+            "db_count": "",
+            "authority_schema": "jsonl_direct_github_v30023",
+            "delete_state_path": str(p),
+            "deleted_keys": len(_v30023_login_delete_ranges(rows)),
+        }
+    except Exception as exc:
+        return {"exists": False, "count": 0, "error": str(exc)[:300]}
+
+get_login_log_permanent_status = get_audit_permanent_status
+login_log_state_status = get_audit_permanent_status
+
+
+def audit_v30023_11_login_records_authority() -> Dict[str, Any]:
+    try:
+        from services.authority_consistency_service import audit_v30023_jsonl_direct_authority
+        return audit_v30023_jsonl_direct_authority().get("modules", {}).get("11_login_records", {})
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300]}
+
+# ================= END V300.23 11 LOGIN RECORDS DIRECT GITHUB AUTHORITY WRITE =================
