@@ -32021,3 +32021,172 @@ def audit_v30037_01_start_block_rule() -> dict[str, Any]:
         "lower_layer_auto_pause_forced_off": True,
     }
 # ===== V300.37 01 START CONFLICT WARNING BLOCK END =====
+
+# ===== V300.38 01 FRONTEND HOT-PATH FAST DISPLAY FIX BEGIN =====
+# 2026-06-01
+# Requirement: 01 page display after login must not scan full authority files.
+# Frontend display hot paths (currently active list / active group preview) use
+# SQLite hot cache only. Heavy authority reconciliation remains inside button
+# transactions such as start_work / finish_work, where correctness matters.
+try:
+    _v30038_prev_get_active_records = get_active_records  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30038_prev_get_active_records = None
+try:
+    _v30038_prev_get_active_group = get_active_group  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30038_prev_get_active_group = None
+
+
+def _v30038_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    text = str(value).strip()
+    return "" if text.lower() in {"", "none", "nan", "nat", "null", "<na>"} else text
+
+
+def _v30038_int(value) -> int | None:
+    text = _v30038_text(value)
+    if not text:
+        return None
+    try:
+        n = int(float(text))
+        return n if n > 0 else None
+    except Exception:
+        return None
+
+
+def _v30038_start_date_series(df: pd.DataFrame) -> pd.Series:
+    if df is None or df.empty:
+        return pd.Series([], dtype=str)
+    idx = df.index
+    if "start_date" in df.columns:
+        dates = df["start_date"].map(_v30038_text)
+    else:
+        dates = pd.Series([""] * len(df), index=idx)
+    if "start_timestamp" in df.columns:
+        dates = dates.where(dates.ne(""), df["start_timestamp"].map(lambda v: _v30038_text(v)[:10]))
+    return dates
+
+
+def _v30038_active_mask(df: pd.DataFrame) -> pd.Series:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.Series([], dtype=bool)
+    idx = df.index
+    end_ts = df["end_timestamp"].map(_v30038_text) if "end_timestamp" in df.columns else pd.Series([""] * len(df), index=idx)
+    status = df["status"].map(_v30038_text) if "status" in df.columns else pd.Series([""] * len(df), index=idx)
+    ended_status = {"下班", "暫停", "完工", "完成", "已結束", "結束", "補登結束", "已刪除", "刪除", "deleted"}
+    return end_ts.eq("") & (~status.isin(ended_status))
+
+
+def _v30038_fast_sqlite_active_df() -> pd.DataFrame:
+    """Fast frontend source: SQLite hot cache only, never authority full scan."""
+    try:
+        df = query_df("SELECT * FROM time_records WHERE COALESCE(TRIM(end_timestamp),'')='' AND COALESCE(TRIM(status),'') NOT IN ('下班','暫停','完工','完成','已結束','結束','補登結束','已刪除','刪除','deleted')")
+    except Exception:
+        try:
+            df = query_df("SELECT * FROM time_records")
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                df = df[_v30038_active_mask(df)].copy()
+        except Exception:
+            df = pd.DataFrame()
+    if df is None or not isinstance(df, pd.DataFrame):
+        return pd.DataFrame()
+    return df.reset_index(drop=True)
+
+
+def _v30038_filter_fast_active(
+    df: pd.DataFrame,
+    employee_id: str | None = None,
+    employee_name: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    work_order: str | None = None,
+) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    if employee_id and "employee_id" in out.columns:
+        out = out[out["employee_id"].map(_v30038_text).eq(_v30038_text(employee_id))]
+    if employee_name and "employee_name" in out.columns:
+        name = _v30038_text(employee_name)
+        if name:
+            out = out[out["employee_name"].map(_v30038_text).isin([name, ""])]
+    if process_name and "process_name" in out.columns:
+        out = out[out["process_name"].map(_v30038_text).eq(_v30038_text(process_name))]
+    if start_date:
+        out = out[_v30038_start_date_series(out).eq(_v30038_text(start_date))]
+    if work_order and "work_order" in out.columns:
+        out = out[out["work_order"].map(_v30038_text).eq(_v30038_text(work_order))]
+    if "id" in out.columns:
+        out["_v30038_id_sort"] = pd.to_numeric(out["id"], errors="coerce")
+        out = out.sort_values("_v30038_id_sort", ascending=True, kind="stable").drop(columns=["_v30038_id_sort"], errors="ignore")
+    try:
+        # Preserve V300.11 checkbox visibility behavior when that helper exists.
+        if "_v30011_apply_parallel_flags_to_df" in globals() and callable(_v30011_apply_parallel_flags_to_df):  # type: ignore[name-defined]
+            out = _v30011_apply_parallel_flags_to_df(out)  # type: ignore[name-defined]
+    except Exception:
+        pass
+    return out.reset_index(drop=True)
+
+
+def get_active_records(
+    employee_id: str | None = None,
+    employee_name: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    work_order: str | None = None,
+    **kwargs,
+) -> pd.DataFrame:  # type: ignore[override]
+    """V300.38: frontend-safe active list. No authority full scan on page load."""
+    df = _v30038_fast_sqlite_active_df()
+    return _v30038_filter_fast_active(
+        df,
+        employee_id=employee_id,
+        employee_name=employee_name,
+        process_name=process_name,
+        start_date=start_date,
+        work_order=work_order,
+    )
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    """V300.38: fast group preview for page display; finish_work still uses authority reconciliation."""
+    rid = _v30038_int(record_id)
+    df = _v30038_fast_sqlite_active_df()
+    if rid is None or df.empty or "id" not in df.columns:
+        return pd.DataFrame()
+    hit = df[df["id"].map(_v30038_int).eq(rid)]
+    if hit.empty:
+        return pd.DataFrame()
+    row = hit.iloc[0].to_dict()
+    date = _v30038_text(row.get("start_date")) or _v30038_text(row.get("start_timestamp"))[:10]
+    return _v30038_filter_fast_active(
+        df,
+        employee_id=_v30038_text(row.get("employee_id")),
+        employee_name=_v30038_text(row.get("employee_name")),
+        process_name=_v30038_text(row.get("process_name")),
+        start_date=date,
+    )
+
+
+def audit_v30038_01_frontend_hot_path() -> dict[str, Any]:
+    import time as _time
+    t0 = _time.perf_counter()
+    df = get_active_records()
+    elapsed = round(_time.perf_counter() - t0, 4)
+    return {
+        "version": "V300.38_01_FRONTEND_HOT_PATH_FAST_DISPLAY",
+        "frontend_active_records_source": "sqlite_hot_cache_only",
+        "frontend_authority_full_scan": False,
+        "button_transactions_keep_authority_reconciliation": True,
+        "active_records_elapsed_seconds": elapsed,
+        "active_records_count": int(len(df)) if isinstance(df, pd.DataFrame) else 0,
+        "purpose": "Stop 01 page from spinning after login while preserving button-level correctness.",
+    }
+# ===== V300.38 01 FRONTEND HOT-PATH FAST DISPLAY FIX END =====

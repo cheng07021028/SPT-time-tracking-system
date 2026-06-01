@@ -1549,3 +1549,108 @@ def v30036_unique_authority_status() -> dict[str, Any]:
         "does_not_change_ui_css_theme": True,
     }
 # ===== V300.36 UNIQUE AUTHORITY CRITICAL MODULES EXTENSION END =====
+
+# ===== V300.38 AUTHORITY BACKGROUND QUEUE STATUS COMPATIBILITY BEGIN =====
+# 2026-06-01
+# Some admin/diagnostic pages expect get_authority_upload_queue_status() and
+# flush_authority_upload_queue_now().  V300.19 switched to lightweight pending
+# markers, but these compatibility functions were missing, so background status
+# looked broken even when foreground isolation was working.
+
+def _v30038_pending_marker_dir() -> Path:
+    base = ROOT if "ROOT" in globals() else Path(__file__).resolve().parents[1]
+    return base / "data" / "permanent_store" / "_pending_authority_uploads"
+
+
+def _v30038_read_pending_markers() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    marker_dir = _v30038_pending_marker_dir()
+    try:
+        if not marker_dir.exists():
+            return rows
+        for path in sorted(marker_dir.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    row = dict(data)
+                else:
+                    row = {"raw": str(data)[:500]}
+            except Exception as exc:
+                row = {"error": str(exc)[:300]}
+            row.setdefault("marker_file", path.name)
+            rows.append(row)
+    except Exception:
+        pass
+    return rows
+
+
+def get_authority_upload_queue_status() -> dict[str, Any]:
+    """Compatibility status for V155 backup queue diagnostics.
+
+    This is read-only and does not upload, recalculate, delete, or rewrite data.
+    """
+    rows = _v30038_read_pending_markers()
+    return {
+        "available": True,
+        "pending": len(rows),
+        "running": False,
+        "last_error": "",
+        "entries": rows,
+        "queue_backend": "v30019_pending_markers",
+        "pending_marker_dir": str(_v30038_pending_marker_dir()),
+    }
+
+
+def flush_authority_upload_queue_now(reason: str = "manual_v30038_authority_flush", max_seconds: float = 12.0) -> dict[str, Any]:
+    """Best-effort foreground upload for pending authority markers.
+
+    It only tries to upload already-written authority files.  It does not create,
+    edit, delete, merge, or recalculate business rows.
+    """
+    import time as _time
+    started = _time.time()
+    rows = _v30038_read_pending_markers()
+    actions: list[dict[str, Any]] = []
+    done_files: list[Path] = []
+    for row in rows:
+        if _time.time() - started > float(max_seconds or 12.0):
+            actions.append({"timeout": True, "remaining_marker": row.get("marker_file")})
+            break
+        module_key = str(row.get("module_key") or "").strip()
+        kind = str(row.get("kind") or "records").strip() or "records"
+        marker_name = str(row.get("marker_file") or "").strip()
+        if not module_key:
+            actions.append({"marker_file": marker_name, "ok": False, "error": "missing_module_key"})
+            continue
+        try:
+            res = force_upload_authority_file(module_key, kind=kind if kind != "records_or_settings" else "records", reason=reason)
+            actions.append({"marker_file": marker_name, "module_key": module_key, "kind": kind, "result": res})
+            if isinstance(res, dict) and res.get("ok") and not res.get("deferred"):
+                done_files.append(_v30038_pending_marker_dir() / marker_name)
+        except Exception as exc:
+            actions.append({"marker_file": marker_name, "module_key": module_key, "kind": kind, "ok": False, "error": str(exc)[:500]})
+    for path in done_files:
+        try:
+            if path.exists():
+                path.unlink()
+        except Exception:
+            pass
+    after = get_authority_upload_queue_status()
+    return {
+        "ok": not any(isinstance(a, dict) and a.get("ok") is False for a in actions),
+        "reason": reason,
+        "started_pending": len(rows),
+        "actions": actions,
+        "after": after,
+        "elapsed_sec": round(_time.time() - started, 3),
+    }
+
+
+def audit_v30038_authority_background_queue_status() -> dict[str, Any]:
+    return {
+        "version": "V300.38_AUTHORITY_BACKGROUND_QUEUE_STATUS_COMPATIBILITY",
+        "get_authority_upload_queue_status_available": callable(globals().get("get_authority_upload_queue_status")),
+        "flush_authority_upload_queue_now_available": callable(globals().get("flush_authority_upload_queue_now")),
+        "status": get_authority_upload_queue_status(),
+    }
+# ===== V300.38 AUTHORITY BACKGROUND QUEUE STATUS COMPATIBILITY END =====
