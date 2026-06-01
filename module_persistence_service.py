@@ -5,7 +5,7 @@ V1.43 Module-level Permanent Records Service
 
 Purpose
 - Keep an independent permanent file and settings file for every module.
-- Files are stored under data/persistent_modules/<module_code>/ and are not overwritten by patch updates.
+- Files are stored under data/permanent_store/persistent_modules/<module_code>/ and are not overwritten by patch updates.
 - Each export also writes a timestamp history snapshot.
 - Designed as an additive service: it does not remove or replace existing page features.
 """
@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from services.timezone_service import now_text, now_stamp, today_text, today_date
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
@@ -68,10 +69,10 @@ MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
         "tables": ["employees", "time_records"],
         "settings_keys": ["table_columns", "sort", "filters", "ui"],
     },
-
+    # 舊版相容代碼：部分權限或永久檔仍可能使用 07_missing。
     "07_missing": {
         "name_zh": "今日未紀錄名單",
-        "name_en": "Missing Today",
+        "name_en": "Missing Today Legacy",
         "tables": ["employees", "time_records"],
         "settings_keys": ["table_columns", "sort", "filters", "ui"],
     },
@@ -90,10 +91,15 @@ MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
     "10_permissions": {
         "name_zh": "權限管理",
         "name_en": "Permissions",
-        "tables": ["users", "roles", "user_roles", "role_permissions", "user_module_permissions"],
+        "tables": ["auth_users", "auth_account_permissions", "auth_security_settings", "security_users", "security_module_permissions", "security_settings"],
         "settings_keys": ["table_columns", "sort", "filters", "security", "ui"],
     },
-
+    "11_login_logs": {
+        "name_zh": "登入紀錄",
+        "name_en": "Login Logs",
+        "tables": ["auth_login_logs", "security_login_logs"],
+        "settings_keys": ["table_columns", "sort", "filters", "retention", "ui"],
+    },
     "12_module_persistence": {
         "name_zh": "模組永久紀錄中心",
         "name_en": "Module Permanent Records",
@@ -106,25 +112,89 @@ MODULE_TABLE_MAP: Dict[str, Dict[str, Any]] = {
         "tables": ["process_options", "rest_periods", "system_settings"],
         "settings_keys": ["process", "rest_periods", "ui"],
     },
-    "11_login_logs": {
-        "name_zh": "登入紀錄",
-        "name_en": "Login Logs",
-        "tables": ["login_logs"],
-        "settings_keys": ["table_columns", "sort", "filters", "retention", "ui"],
-    },
 }
 
-
 def _now() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return now_text()
 
 
 def _stamp() -> str:
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+    return now_stamp()
+
+
+def normalize_module_code(module_code: str) -> str:
+    """Normalize legacy module codes to the canonical persistent folder names."""
+    code = str(module_code or "").strip()
+    if code == "01_time_record":
+        return "01_time_records"
+    return code
 
 
 def _json_default(obj: Any) -> str:
     return str(obj)
+
+
+DERIVED_RECORD_MODULES = {"07_missing_today", "07_missing", "08_daily_hours"}
+
+
+def _path_exists(*parts: str) -> bool:
+    try:
+        return (PROJECT_ROOT.joinpath(*parts)).exists()
+    except Exception:
+        return False
+
+
+def _module_sources_exist(*module_codes: str) -> bool:
+    for code in module_codes:
+        ncode = normalize_module_code(code)
+        if not latest_records_path(ncode).exists():
+            return False
+    return True
+
+
+def _health_records_exists(module_code: str) -> tuple[bool, str, str]:
+    """Return (exists, path, note) for module records health.
+
+    Some modules are derived or settings-only. They should not be flagged as broken
+    just because <module>_records.json is not the true source of truth.
+    """
+    code = normalize_module_code(module_code)
+    if code in DERIVED_RECORD_MODULES:
+        ok = _module_sources_exist("04_employees", "01_time_records") or _module_sources_exist("04_employees", "02_history")
+        return ok, "derived: 04_employees + 01_time_records/02_history", "衍生查詢模組，允許沒有獨立 records；檢查來源模組資料。"
+    if code == "13_system_settings":
+        candidates = [
+            PROJECT_ROOT / "data" / "permanent_store" / "config" / "system_settings.json",
+            PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_system_settings.json",
+            PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "system_settings.json",
+        ]
+        ok = any(p.exists() and p.stat().st_size > 0 for p in candidates)
+        path = "; ".join(str(p.relative_to(PROJECT_ROOT)) for p in candidates)
+        return ok, path, "設定型模組，records 來源為 system_settings 永久設定檔。"
+    rec = latest_records_path(code)
+    return rec.exists(), str(rec.relative_to(PROJECT_ROOT)), ""
+
+
+def _health_settings_exists(module_code: str) -> tuple[bool, str, str]:
+    code = normalize_module_code(module_code)
+    if code in DERIVED_RECORD_MODULES:
+        settings = latest_settings_path(code)
+        ok = settings.exists() or (_module_sources_exist("04_employees", "01_time_records") or _module_sources_exist("04_employees", "02_history"))
+        return ok, str(settings.relative_to(PROJECT_ROOT)), "衍生查詢模組設定檔可選；若未建立，使用來源模組與預設篩選設定。"
+    if code == "13_system_settings":
+        candidates = [
+            PROJECT_ROOT / "data" / "permanent_store" / "config" / "system_settings.json",
+            PROJECT_ROOT / "data" / "permanent_store" / "config" / "auto_backup_settings.json",
+            PROJECT_ROOT / "data" / "permanent_store" / "config" / "auto_external_backup_schedule.json",
+            PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_system_settings.json",
+            PROJECT_ROOT / "data" / "permanent_store" / "persistent_state" / "spt_auto_backup_settings.json",
+            PROJECT_ROOT / "data" / "permanent_store" / "persistent_modules" / "13_system_settings" / "system_settings.json",
+        ]
+        ok = any(p.exists() and p.stat().st_size > 0 for p in candidates)
+        path = "; ".join(str(p.relative_to(PROJECT_ROOT)) for p in candidates)
+        return ok, path, "檢查系統設定、自動備份與 13 模組永久設定檔。"
+    settings = latest_settings_path(code)
+    return settings.exists(), str(settings.relative_to(PROJECT_ROOT)), ""
 
 
 def ensure_dirs() -> None:
@@ -137,27 +207,32 @@ def ensure_dirs() -> None:
 
 
 def module_dir(module_code: str) -> Path:
-    return PERSIST_ROOT / module_code
+    return PERSIST_ROOT / normalize_module_code(module_code)
 
 
 def latest_records_path(module_code: str) -> Path:
-    return module_dir(module_code) / f"{module_code}_records.json"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / f"{code}_records.json"
 
 
 def latest_settings_path(module_code: str) -> Path:
-    return module_dir(module_code) / f"{module_code}_settings.json"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / f"{code}_settings.json"
 
 
 def latest_audit_path(module_code: str) -> Path:
-    return module_dir(module_code) / f"{module_code}_audit.jsonl"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / f"{code}_audit.jsonl"
 
 
 def history_records_path(module_code: str) -> Path:
-    return module_dir(module_code) / "history" / f"{module_code}_records_{_stamp()}.json"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / "history" / f"{code}_records_{_stamp()}.json"
 
 
 def history_settings_path(module_code: str) -> Path:
-    return module_dir(module_code) / "history" / f"{module_code}_settings_{_stamp()}.json"
+    code = normalize_module_code(module_code)
+    return module_dir(code) / "history" / f"{code}_settings_{_stamp()}.json"
 
 
 def connect_db() -> sqlite3.Connection:
@@ -262,19 +337,28 @@ def export_all_modules(username: str = "SYSTEM") -> Dict[str, Any]:
 def get_module_status() -> List[Dict[str, Any]]:
     ensure_dirs()
     rows: List[Dict[str, Any]] = []
-    for code, info in MODULE_TABLE_MAP.items():
+    seen: set[str] = set()
+    for raw_code, info in MODULE_TABLE_MAP.items():
+        code = normalize_module_code(raw_code)
+        if code in seen:
+            continue
+        seen.add(code)
         rec = load_json(latest_records_path(code), {}) or {}
         settings = load_json(latest_settings_path(code), {}) or {}
         counts = rec.get("counts", {})
+        rec_ok, rec_path, rec_note = _health_records_exists(code)
+        set_ok, set_path, set_note = _health_settings_exists(code)
         rows.append({
             "模組代碼 / Module Code": code,
             "模組 / Module": f'{info["name_zh"]} / {info["name_en"]}',
-            "紀錄檔 / Records Exists": latest_records_path(code).exists(),
-            "設定檔 / Settings Exists": latest_settings_path(code).exists(),
+            "紀錄檔 / Records Exists": bool(rec_ok),
+            "設定檔 / Settings Exists": bool(set_ok),
             "紀錄時間 / Exported At": rec.get("exported_at", ""),
             "設定時間 / Settings At": settings.get("saved_at", ""),
             "資料筆數 / Counts": json.dumps(counts, ensure_ascii=False),
-            "路徑 / Path": str(module_dir(code).relative_to(PROJECT_ROOT)),
+            "路徑 / Path": rec_path if rec_note else str(module_dir(code).relative_to(PROJECT_ROOT)),
+            "檢查說明 / Health Note": rec_note or set_note,
+            "設定路徑 / Settings Path": set_path,
         })
     return rows
 
@@ -328,7 +412,7 @@ def rebuild_global_index() -> Dict[str, Any]:
     settings_index = {
         "schema_version": "1.43",
         "updated_at": _now(),
-        "note": "Independent module settings are saved under data/persistent_modules/<module_code>/.",
+        "note": "Independent module settings are saved under data/permanent_store/persistent_modules/<module_code>/.",
         "modules": {code: str(latest_settings_path(code).relative_to(PROJECT_ROOT)) for code in MODULE_TABLE_MAP},
     }
     save_json(GLOBAL_SETTINGS, settings_index)

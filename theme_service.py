@@ -519,50 +519,69 @@ div[data-baseweb="radio"] [aria-checked="true"] {
     border-color: #67f5ff !important;
     color: #04101d !important;
 }
-/* Data editor checkbox cells: keep clickable checkbox visible on dark table. */
+/* Data editor checkbox cells: always visible on dark table, without hover. */
+[data-testid="stDataEditor"] [data-baseweb="checkbox"],
+[data-testid="stDataEditor"] [data-baseweb="checkbox"] *,
 [data-testid="stDataEditor"] input[type="checkbox"],
-[data-testid="stDataEditor"] [role="checkbox"],
-[data-testid="stDataFrame"] input[type="checkbox"],
-[data-testid="stDataFrame"] [role="checkbox"] {
+[data-testid="stDataEditor"] [role="checkbox"] {
     opacity: 1 !important;
     visibility: visible !important;
+}
+
+/* Native checkbox fallback used by some Streamlit/Glide cells. */
+[data-testid="stDataEditor"] input[type="checkbox"] {
+    appearance: auto !important;
+    -webkit-appearance: checkbox !important;
     accent-color: #18d7f0 !important;
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px !important;
+    min-height: 16px !important;
+    background: #f5fbff !important;
+    border: 2px solid #67f5ff !important;
+    outline: 1px solid rgba(223,250,255,.92) !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.65) inset, 0 0 10px rgba(35,230,255,.35) !important;
+}
+
+/* BaseWeb checkbox fallback used inside st.data_editor cells. */
+[data-testid="stDataEditor"] [data-baseweb="checkbox"] > div,
+[data-testid="stDataEditor"] [data-baseweb="checkbox"] div[role="checkbox"],
+[data-testid="stDataEditor"] [role="checkbox"] {
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px !important;
+    min-height: 16px !important;
     background: linear-gradient(180deg, #f5fbff 0%, #dff7ff 100%) !important;
-    border: 2px solid rgba(103,245,255,.96) !important;
-    outline: 1px solid rgba(223,250,255,.90) !important;
+    border: 2px solid rgba(103,245,255,.98) !important;
     border-radius: 4px !important;
-    box-shadow: 0 0 0 1px rgba(255,255,255,.70) inset, 0 0 12px rgba(35,230,255,.34) !important;
+    outline: 1px solid rgba(223,250,255,.92) !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.70) inset, 0 0 10px rgba(35,230,255,.35) !important;
     color: #04101d !important;
-    -webkit-text-fill-color: #04101d !important;
 }
-[data-testid="stDataEditor"] input[type="checkbox"]:disabled,
-[data-testid="stDataEditor"] [role="checkbox"][aria-disabled="true"],
-[data-testid="stDataFrame"] input[type="checkbox"]:disabled,
-[data-testid="stDataFrame"] [role="checkbox"][aria-disabled="true"] {
-    opacity: 1 !important;
-    filter: none !important;
-    background: linear-gradient(180deg, #f5fbff 0%, #dff7ff 100%) !important;
-    border-color: rgba(103,245,255,.96) !important;
-}
-[data-testid="stDataEditor"] [role="checkbox"][aria-checked="true"],
+
+/* Checked state: keep the cyan fill and dark tick clearly visible. */
 [data-testid="stDataEditor"] input[type="checkbox"]:checked,
-[data-testid="stDataFrame"] [role="checkbox"][aria-checked="true"],
-[data-testid="stDataFrame"] input[type="checkbox"]:checked {
-    opacity: 1 !important;
-    accent-color: #18d7f0 !important;
-    background: linear-gradient(180deg, #dffaff 0%, #bdf6ff 100%) !important;
-    border-color: #67f5ff !important;
-    box-shadow: 0 0 0 1px rgba(255,255,255,.75) inset, 0 0 14px rgba(35,230,255,.45) !important;
+[data-testid="stDataEditor"] [data-baseweb="checkbox"] [aria-checked="true"],
+[data-testid="stDataEditor"] [role="checkbox"][aria-checked="true"] {
+    background: linear-gradient(180deg, #dffaff 0%, #b9f6ff 100%) !important;
+    border-color: #18d7f0 !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.80) inset, 0 0 13px rgba(35,230,255,.48) !important;
     color: #04101d !important;
-    -webkit-text-fill-color: #04101d !important;
 }
+[data-testid="stDataEditor"] [data-baseweb="checkbox"] svg,
+[data-testid="stDataEditor"] [data-baseweb="checkbox"] path,
 [data-testid="stDataEditor"] [role="checkbox"] svg,
-[data-testid="stDataEditor"] [role="checkbox"] path,
-[data-testid="stDataFrame"] [role="checkbox"] svg,
-[data-testid="stDataFrame"] [role="checkbox"] path {
-    opacity: 1 !important;
+[data-testid="stDataEditor"] [role="checkbox"] path {
     fill: #04101d !important;
     stroke: #04101d !important;
+    opacity: 1 !important;
+}
+
+/* Disabled/read-only tables must not fade the checkbox into the dark cell background. */
+[data-testid="stDataEditor"] [aria-disabled="true"],
+[data-testid="stDataEditor"] [disabled],
+[data-testid="stDataEditor"] [data-disabled="true"] {
+    opacity: 1 !important;
 }
 
 /* V2.03: checkbox/radio/toggle rows use light background so confirmations are clearly visible. */
@@ -2105,3 +2124,641 @@ def render_dropdown_size_settings_panel():
 def render_dropdown_size_settings_panel_main_fallback():
     return
 # ===== V2.88 FAST BOOT GUARD END =====
+
+
+# ===== V2.89 PERMISSION BUTTON STANDARD GUARD START =====
+def apply_v289_permission_button_standard_guard():
+    """Force every Streamlit button/download/form-submit button to use the same
+    visual language as 10｜權限管理: light cyber button, dark readable text,
+    full-width friendly height, clear hover/disabled state, no clipped label.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+    st.markdown(
+        """
+        <style>
+        :root {
+            --spt-btn-bg-top: #f8fdff;
+            --spt-btn-bg-bottom: #d9f7ff;
+            --spt-btn-primary-top: #eaffff;
+            --spt-btn-primary-bottom: #bdf3ff;
+            --spt-btn-text: #031220;
+            --spt-btn-border: rgba(35, 230, 255, .96);
+            --spt-btn-glow: rgba(35, 230, 255, .30);
+            --spt-btn-hover-glow: rgba(35, 230, 255, .60);
+        }
+
+        /* All normal buttons, column buttons, form submit buttons and download buttons. */
+        div[data-testid="stButton"] > button,
+        .stButton > button,
+        div[data-testid="stDownloadButton"] > button,
+        .stDownloadButton > button,
+        div[data-testid="stFormSubmitButton"] > button,
+        div[data-testid="stFormSubmitButton"] button,
+        button[data-testid="baseButton-secondary"],
+        button[data-testid="baseButton-primary"],
+        button[kind="secondary"],
+        button[kind="primary"] {
+            min-height: 44px !important;
+            height: auto !important;
+            width: 100% !important;
+            padding: 8px 12px !important;
+            border-radius: 13px !important;
+            border: 1px solid var(--spt-btn-border) !important;
+            background: linear-gradient(180deg, var(--spt-btn-bg-top) 0%, var(--spt-btn-bg-bottom) 100%) !important;
+            color: var(--spt-btn-text) !important;
+            -webkit-text-fill-color: var(--spt-btn-text) !important;
+            font-size: 14.5px !important;
+            font-weight: 950 !important;
+            letter-spacing: .2px !important;
+            line-height: 1.28 !important;
+            text-align: center !important;
+            white-space: normal !important;
+            word-break: keep-all !important;
+            overflow: visible !important;
+            text-shadow: none !important;
+            box-shadow:
+                0 0 0 1px rgba(255,255,255,.72) inset,
+                0 0 0 2px rgba(35,230,255,.14) inset,
+                0 0 16px var(--spt-btn-glow) !important;
+            transition: transform .10s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease !important;
+        }
+
+        div[data-testid="stButton"] > button *,
+        .stButton > button *,
+        div[data-testid="stDownloadButton"] > button *,
+        .stDownloadButton > button *,
+        div[data-testid="stFormSubmitButton"] button *,
+        button[data-testid="baseButton-secondary"] *,
+        button[data-testid="baseButton-primary"] * {
+            color: var(--spt-btn-text) !important;
+            -webkit-text-fill-color: var(--spt-btn-text) !important;
+            font-weight: 950 !important;
+            text-shadow: none !important;
+        }
+
+        /* Primary buttons keep the same readable style, with slightly stronger cyan body. */
+        button[kind="primary"],
+        button[data-testid="baseButton-primary"],
+        div[data-testid="stFormSubmitButton"] button[kind="primary"] {
+            background: linear-gradient(180deg, var(--spt-btn-primary-top) 0%, var(--spt-btn-primary-bottom) 100%) !important;
+            border-color: #62f6ff !important;
+            box-shadow:
+                0 0 0 1px rgba(255,255,255,.86) inset,
+                0 0 0 2px rgba(35,230,255,.22) inset,
+                0 0 22px rgba(35,230,255,.42) !important;
+        }
+
+        div[data-testid="stButton"] > button:hover,
+        .stButton > button:hover,
+        div[data-testid="stDownloadButton"] > button:hover,
+        .stDownloadButton > button:hover,
+        div[data-testid="stFormSubmitButton"] button:hover,
+        button[data-testid="baseButton-secondary"]:hover,
+        button[data-testid="baseButton-primary"]:hover,
+        button[kind="secondary"]:hover,
+        button[kind="primary"]:hover {
+            background: linear-gradient(180deg, #ffffff 0%, #bdf4ff 100%) !important;
+            color: #020b14 !important;
+            -webkit-text-fill-color: #020b14 !important;
+            border-color: #8bfbff !important;
+            transform: translateY(-1px) !important;
+            box-shadow:
+                0 0 0 1px rgba(255,255,255,.94) inset,
+                0 0 0 2px rgba(35,230,255,.38) inset,
+                0 0 26px var(--spt-btn-hover-glow),
+                0 0 46px rgba(112,61,255,.18) !important;
+        }
+
+        div[data-testid="stButton"] > button:active,
+        .stButton > button:active,
+        div[data-testid="stDownloadButton"] > button:active,
+        .stDownloadButton > button:active,
+        div[data-testid="stFormSubmitButton"] button:active {
+            transform: translateY(0) scale(.995) !important;
+        }
+
+        div[data-testid="stButton"] > button:disabled,
+        .stButton > button:disabled,
+        div[data-testid="stDownloadButton"] > button:disabled,
+        .stDownloadButton > button:disabled,
+        div[data-testid="stFormSubmitButton"] button:disabled,
+        button:disabled {
+            background: linear-gradient(180deg, rgba(210,222,232,.78) 0%, rgba(175,194,208,.70) 100%) !important;
+            color: rgba(15,31,45,.68) !important;
+            -webkit-text-fill-color: rgba(15,31,45,.68) !important;
+            border-color: rgba(145,171,188,.70) !important;
+            box-shadow: 0 0 0 1px rgba(255,255,255,.48) inset !important;
+            opacity: .72 !important;
+            transform: none !important;
+            cursor: not-allowed !important;
+        }
+
+        /* Keep column groups compact and aligned like 10｜權限管理. */
+        div[data-testid="stHorizontalBlock"] div[data-testid="column"] .stButton,
+        div[data-testid="stHorizontalBlock"] div[data-testid="column"] [data-testid="stButton"],
+        div[data-testid="stHorizontalBlock"] div[data-testid="column"] .stDownloadButton,
+        div[data-testid="stHorizontalBlock"] div[data-testid="column"] [data-testid="stFormSubmitButton"] {
+            margin-top: 0 !important;
+            margin-bottom: 6px !important;
+            overflow: visible !important;
+        }
+
+        /* Older Streamlit sometimes clips buttons inside forms/expanders. */
+        div[data-testid="stForm"],
+        div[data-testid="stForm"] > div,
+        div[data-testid="stExpander"],
+        div[data-testid="stExpander"] > div {
+            overflow: visible !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v289_permission_button_standard_guard()
+except Exception:
+    pass
+
+for _spt_v289_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v289_func = globals().get(_spt_v289_name)
+    if callable(_spt_v289_func) and not getattr(_spt_v289_func, "_spt_v289_wrapped", False):
+        def _spt_v289_make_wrapper(_original):
+            def _spt_v289_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v289_permission_button_standard_guard()
+                except Exception:
+                    pass
+                return result
+            _spt_v289_wrapper._spt_v289_wrapped = True
+            return _spt_v289_wrapper
+        globals()[_spt_v289_name] = _spt_v289_make_wrapper(_spt_v289_func)
+# ===== V2.89 PERMISSION BUTTON STANDARD GUARD END =====
+
+# ===== V2.90 LIGHT INPUT DARK TEXT GUARD START =====
+def apply_v290_light_input_dark_text_guard():
+    """Keep normal text/date/number/password inputs readable on light or white fields.
+
+    Scope is intentionally limited to native input widgets only. It does not target
+    selectbox/multiselect BaseWeb select containers, data editors, buttons, or tables.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.90｜白底/淺色底輸入框文字深色防回退
+           只處理一般輸入框：Text / Date / Number / Password / TextArea。
+           不碰 selectbox / multiselect、表格、按鈕，避免影響既有 V2.84 下拉風格。 */
+
+        :root {
+            --spt-v290-light-input-text: #061427;
+            --spt-v290-light-input-placeholder: #3c536a;
+            --spt-v290-light-input-caret: #061427;
+        }
+
+        .stTextInput input,
+        .stDateInput input,
+        .stNumberInput input,
+        .stPasswordInput input,
+        .stTextArea textarea,
+        div[data-testid="stTextInputRootElement"] input,
+        div[data-testid="stNumberInputRootElement"] input,
+        div[data-testid="stDateInputField"] input,
+        div[data-testid="stPasswordInput"] input,
+        div[data-testid="stTextArea"] textarea {
+            color: var(--spt-v290-light-input-text) !important;
+            -webkit-text-fill-color: var(--spt-v290-light-input-text) !important;
+            caret-color: var(--spt-v290-light-input-caret) !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+            mix-blend-mode: normal !important;
+        }
+
+        .stTextInput input::placeholder,
+        .stDateInput input::placeholder,
+        .stNumberInput input::placeholder,
+        .stPasswordInput input::placeholder,
+        .stTextArea textarea::placeholder,
+        div[data-testid="stTextInputRootElement"] input::placeholder,
+        div[data-testid="stNumberInputRootElement"] input::placeholder,
+        div[data-testid="stDateInputField"] input::placeholder,
+        div[data-testid="stPasswordInput"] input::placeholder,
+        div[data-testid="stTextArea"] textarea::placeholder {
+            color: var(--spt-v290-light-input-placeholder) !important;
+            -webkit-text-fill-color: var(--spt-v290-light-input-placeholder) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        /* 明確排除 selectbox / multiselect 內部搜尋 input，維持下拉選單既有淺色顯示修正。 */
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete="list"] {
+            caret-color: #8df7ff !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v290_light_input_dark_text_guard()
+except Exception:
+    pass
+
+for _spt_v290_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v290_func = globals().get(_spt_v290_name)
+    if callable(_spt_v290_func) and not getattr(_spt_v290_func, "_spt_v290_wrapped", False):
+        def _spt_v290_make_wrapper(_original):
+            def _spt_v290_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v290_light_input_dark_text_guard()
+                except Exception:
+                    pass
+                return result
+            _spt_v290_wrapper._spt_v290_wrapped = True
+            return _spt_v290_wrapper
+        globals()[_spt_v290_name] = _spt_v290_make_wrapper(_spt_v290_func)
+# ===== V2.90 LIGHT INPUT DARK TEXT GUARD END =====
+
+# ===== V2.91 INPUT CONTRAST AUTO GUARD START =====
+def apply_v291_input_contrast_auto_guard():
+    """V2.91: keep input text readable by matching field background tone.
+
+    Rule applied conservatively:
+    - Technology/dark text inputs and textareas use light text.
+    - Explicit light date/number fields use dark text.
+    - Data editor editable cells keep light background + dark text.
+    - Selectbox/multiselect are not changed; V2.82/V2.84/V2.88/V2.90 select guards remain in charge.
+    """
+    try:
+        import streamlit as st
+    except Exception:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* V2.91｜輸入框依底色調整文字顏色
+           深色科技底：淺色字；白底/淺色底：深色字。
+           只修 input/textarea 可讀性，不動 selectbox/multiselect、按鈕、表格邏輯、權威檔讀寫。 */
+        :root {
+            --spt-v291-dark-field-bg-a: rgba(12, 22, 50, 0.96);
+            --spt-v291-dark-field-bg-b: rgba(39, 32, 91, 0.92);
+            --spt-v291-dark-field-text: #f4fdff;
+            --spt-v291-dark-field-placeholder: rgba(214, 245, 255, 0.62);
+            --spt-v291-light-field-bg: #f3f9ff;
+            --spt-v291-light-field-text: #061427;
+            --spt-v291-light-field-placeholder: rgba(20, 42, 62, 0.62);
+        }
+
+        /* 一般文字/密碼/備註輸入框：維持深色科技底，因此文字強制淺色。
+           這會修正 02 關鍵字搜尋這種深底黑字看不到的問題。 */
+        .stTextInput input,
+        .stPasswordInput input,
+        .stTextArea textarea,
+        div[data-testid="stTextInputRootElement"] input,
+        div[data-testid="stPasswordInput"] input,
+        div[data-testid="stTextArea"] textarea,
+        input[type="text"]:not([aria-autocomplete="list"]),
+        input[type="password"],
+        textarea {
+            background:
+                linear-gradient(100deg, transparent 0%, rgba(133,245,255,0.10) 45%, transparent 70%) -180% 0 / 180% 100% no-repeat,
+                linear-gradient(135deg, var(--spt-v291-dark-field-bg-a) 0%, var(--spt-v291-dark-field-bg-b) 100%) !important;
+            color: var(--spt-v291-dark-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v291-dark-field-text) !important;
+            caret-color: #b9fbff !important;
+            text-shadow: 0 0 8px rgba(107, 232, 255, 0.16) !important;
+            opacity: 1 !important;
+            mix-blend-mode: normal !important;
+            border-color: rgba(84, 218, 255, 0.78) !important;
+        }
+
+        .stTextInput input::placeholder,
+        .stPasswordInput input::placeholder,
+        .stTextArea textarea::placeholder,
+        div[data-testid="stTextInputRootElement"] input::placeholder,
+        div[data-testid="stPasswordInput"] input::placeholder,
+        div[data-testid="stTextArea"] textarea::placeholder,
+        input[type="text"]:not([aria-autocomplete="list"])::placeholder,
+        input[type="password"]::placeholder,
+        textarea::placeholder {
+            color: var(--spt-v291-dark-field-placeholder) !important;
+            -webkit-text-fill-color: var(--spt-v291-dark-field-placeholder) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        /* 日期/數字欄通常是白底或淺色底，文字維持深色。 */
+        .stDateInput input,
+        .stTimeInput input,
+        .stNumberInput input,
+        div[data-testid="stDateInputField"] input,
+        div[data-testid="stNumberInputRootElement"] input,
+        input[type="date"],
+        input[type="time"],
+        input[type="number"] {
+            background: var(--spt-v291-light-field-bg) !important;
+            color: var(--spt-v291-light-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v291-light-field-text) !important;
+            caret-color: var(--spt-v291-light-field-text) !important;
+            text-shadow: none !important;
+            opacity: 1 !important;
+            mix-blend-mode: normal !important;
+        }
+
+        .stDateInput input::placeholder,
+        .stTimeInput input::placeholder,
+        .stNumberInput input::placeholder,
+        div[data-testid="stDateInputField"] input::placeholder,
+        div[data-testid="stNumberInputRootElement"] input::placeholder,
+        input[type="date"]::placeholder,
+        input[type="time"]::placeholder,
+        input[type="number"]::placeholder {
+            color: var(--spt-v291-light-field-placeholder) !important;
+            -webkit-text-fill-color: var(--spt-v291-light-field-placeholder) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        /* Data editor 編輯格維持淺底深字，避免表格輸入時看不到。 */
+        [data-testid="stDataEditor"] input,
+        [data-testid="stDataEditor"] textarea,
+        [data-testid="stDataEditor"] select,
+        [data-testid="stDataEditor"] [contenteditable="true"] {
+            background: var(--spt-v291-light-field-bg) !important;
+            color: var(--spt-v291-light-field-text) !important;
+            -webkit-text-fill-color: var(--spt-v291-light-field-text) !important;
+            caret-color: var(--spt-v291-light-field-text) !important;
+            text-shadow: none !important;
+        }
+
+        /* selectbox / multiselect 內部搜尋 input 不套用文字輸入框規則，保留既有下拉深底淺字修正。 */
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete="list"] {
+            background: transparent !important;
+            color: #f4fdff !important;
+            -webkit-text-fill-color: #f4fdff !important;
+            caret-color: #8df7ff !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v291_input_contrast_auto_guard()
+except Exception:
+    pass
+
+for _spt_v291_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v291_func = globals().get(_spt_v291_name)
+    if callable(_spt_v291_func) and not getattr(_spt_v291_func, "_spt_v291_wrapped", False):
+        def _spt_v291_make_wrapper(_original):
+            def _spt_v291_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v291_input_contrast_auto_guard()
+                except Exception:
+                    pass
+                return result
+            _spt_v291_wrapper._spt_v291_wrapped = True
+            return _spt_v291_wrapper
+        globals()[_spt_v291_name] = _spt_v291_make_wrapper(_spt_v291_func)
+# ===== V2.91 INPUT CONTRAST AUTO GUARD END =====
+
+
+# ===== V2.92 / V130 FINAL TEXT-COLOR ONLY CONTRAST GUARD START =====
+def apply_v292_final_text_color_only_guard() -> None:
+    """V130: final text-color-only guard.
+
+    Scope:
+    - Dark/glass normal inputs and all selectbox/multiselect display/search text: light text.
+    - Light table/date/number editing fields: dark text.
+    - No background, layout, button, data, authority-file, or table behavior changes.
+    """
+    st.markdown(
+        """
+        <style>
+        /* ===== V130｜只修字色：深底淺字、淺底深字，不改功能/底色/尺寸 ===== */
+        :root {
+            --spt-v130-light-text: #f2fdff;
+            --spt-v130-light-text-strong: #ffffff;
+            --spt-v130-light-placeholder: rgba(226, 250, 255, 0.72);
+            --spt-v130-dark-text: #071523;
+            --spt-v130-dark-placeholder: rgba(35, 55, 74, 0.68);
+            --spt-v130-caret: #8df7ff;
+        }
+
+        /* 一般深色科技感輸入框：文字改淺色。
+           覆蓋 05/06/10 等頁的 text/password/textarea，不動背景、不動功能。 */
+        .stTextInput input,
+        .stPasswordInput input,
+        .stTextArea textarea,
+        div[data-testid="stTextInputRootElement"] input,
+        div[data-testid="stPasswordInput"] input,
+        div[data-testid="stTextArea"] textarea,
+        div[data-baseweb="input"] input:not([type="number"]):not([type="date"]):not([type="time"]),
+        div[data-baseweb="textarea"] textarea,
+        input[type="text"]:not([aria-autocomplete="list"]),
+        input[type="password"],
+        textarea {
+            color: var(--spt-v130-light-text) !important;
+            -webkit-text-fill-color: var(--spt-v130-light-text) !important;
+            caret-color: var(--spt-v130-caret) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            mix-blend-mode: normal !important;
+        }
+
+        .stTextInput input::placeholder,
+        .stPasswordInput input::placeholder,
+        .stTextArea textarea::placeholder,
+        div[data-testid="stTextInputRootElement"] input::placeholder,
+        div[data-testid="stPasswordInput"] input::placeholder,
+        div[data-testid="stTextArea"] textarea::placeholder,
+        div[data-baseweb="input"] input::placeholder,
+        div[data-baseweb="textarea"] textarea::placeholder,
+        input[type="text"]::placeholder,
+        input[type="password"]::placeholder,
+        textarea::placeholder {
+            color: var(--spt-v130-light-placeholder) !important;
+            -webkit-text-fill-color: var(--spt-v130-light-placeholder) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        /* selectbox / multiselect：關閉狀態已選文字、placeholder、內部搜尋文字全部改淺色。
+           對應 05 製令工時分析、06 LOG查詢 Action Type、各模組下拉選單。 */
+        .stSelectbox div[data-baseweb="select"],
+        .stMultiSelect div[data-baseweb="select"],
+        .stSelectbox div[data-baseweb="select"] *,
+        .stMultiSelect div[data-baseweb="select"] *,
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] div,
+        div[data-baseweb="select"] input,
+        div[data-baseweb="select"] input[type="text"],
+        div[data-baseweb="select"] input[aria-autocomplete="list"],
+        div[data-baseweb="select"] [data-testid],
+        div[data-baseweb="select"] [role="button"],
+        div[data-baseweb="select"] [role="combobox"] {
+            color: var(--spt-v130-light-text) !important;
+            -webkit-text-fill-color: var(--spt-v130-light-text) !important;
+            caret-color: var(--spt-v130-caret) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            mix-blend-mode: normal !important;
+        }
+
+        /* 下拉箭頭 / X icon 只改顏色，不改功能。 */
+        div[data-baseweb="select"] svg,
+        div[data-baseweb="select"] svg path,
+        div[data-baseweb="select"] [aria-label="open"] svg,
+        div[data-baseweb="select"] [aria-label="clear value"] svg {
+            color: var(--spt-v130-light-text) !important;
+            fill: var(--spt-v130-light-text) !important;
+            stroke: var(--spt-v130-light-text) !important;
+        }
+
+        /* 多選已選標籤文字改淺色。 */
+        div[data-baseweb="tag"],
+        div[data-baseweb="tag"] *,
+        div[data-baseweb="tag"] span,
+        div[data-baseweb="tag"] div,
+        div[data-baseweb="tag"] svg,
+        div[data-baseweb="tag"] svg path {
+            color: var(--spt-v130-light-text-strong) !important;
+            -webkit-text-fill-color: var(--spt-v130-light-text-strong) !important;
+            fill: var(--spt-v130-light-text-strong) !important;
+            stroke: var(--spt-v130-light-text-strong) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        /* 展開後選單文字改淺色。 */
+        div[data-baseweb="popover"] [role="listbox"],
+        div[data-baseweb="popover"] [role="option"],
+        div[data-baseweb="popover"] [role="option"] *,
+        ul[role="listbox"],
+        ul[role="listbox"] li,
+        ul[role="listbox"] li *,
+        div[role="listbox"],
+        div[role="listbox"] *,
+        div[role="option"],
+        div[role="option"] * {
+            color: var(--spt-v130-light-text) !important;
+            -webkit-text-fill-color: var(--spt-v130-light-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        /* 淺色底欄位維持深色文字：日期/時間/數字與表格編輯格。 */
+        .stDateInput input,
+        .stTimeInput input,
+        .stNumberInput input,
+        div[data-testid="stDateInputField"] input,
+        div[data-testid="stTimeInput"] input,
+        div[data-testid="stNumberInputRootElement"] input,
+        input[type="date"],
+        input[type="time"],
+        input[type="number"],
+        [data-testid="stDataEditor"] input,
+        [data-testid="stDataEditor"] textarea,
+        [data-testid="stDataEditor"] select,
+        [data-testid="stDataEditor"] [contenteditable="true"] {
+            color: var(--spt-v130-dark-text) !important;
+            -webkit-text-fill-color: var(--spt-v130-dark-text) !important;
+            caret-color: var(--spt-v130-dark-text) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+            mix-blend-mode: normal !important;
+        }
+
+        .stDateInput input::placeholder,
+        .stTimeInput input::placeholder,
+        .stNumberInput input::placeholder,
+        div[data-testid="stDateInputField"] input::placeholder,
+        div[data-testid="stTimeInput"] input::placeholder,
+        div[data-testid="stNumberInputRootElement"] input::placeholder,
+        input[type="date"]::placeholder,
+        input[type="time"]::placeholder,
+        input[type="number"]::placeholder,
+        [data-testid="stDataEditor"] input::placeholder,
+        [data-testid="stDataEditor"] textarea::placeholder {
+            color: var(--spt-v130-dark-placeholder) !important;
+            -webkit-text-fill-color: var(--spt-v130-dark-placeholder) !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+try:
+    apply_v292_final_text_color_only_guard()
+except Exception:
+    pass
+
+for _spt_v292_name in (
+    "apply_theme",
+    "apply_global_theme",
+    "apply_warroom_theme",
+    "inject_theme",
+    "inject_global_css",
+    "inject_common_css",
+    "render_global_css",
+    "apply_app_theme",
+):
+    _spt_v292_func = globals().get(_spt_v292_name)
+    if callable(_spt_v292_func) and not getattr(_spt_v292_func, "_spt_v292_wrapped", False):
+        def _spt_v292_make_wrapper(_original):
+            def _spt_v292_wrapper(*args, **kwargs):
+                result = _original(*args, **kwargs)
+                try:
+                    apply_v292_final_text_color_only_guard()
+                except Exception:
+                    pass
+                return result
+            _spt_v292_wrapper._spt_v292_wrapped = True
+            return _spt_v292_wrapper
+        globals()[_spt_v292_name] = _spt_v292_make_wrapper(_spt_v292_func)
+# ===== V2.92 / V130 FINAL TEXT-COLOR ONLY CONTRAST GUARD END =====
