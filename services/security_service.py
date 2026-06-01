@@ -4105,682 +4105,267 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 require_permission = require_module_access
 # =================== END V142 HARD GUARD FOR 10 PERMISSION MANAGEMENT ===================
 
+# ===================== V256 LOGIN HOT PATH BYPASS =====================
+# Purpose:
+# - App open is now fast; remaining 15s login delay came from authenticate() calling
+#   ensure_security_schema(), which initializes full PostgreSQL/schema layers.
+# - Login should only verify username/password/role and set session state.
+# - UI/CSS/theme/widgets are untouched.
+# - Login logs / last_login updates are best-effort and non-blocking.
 
-# ======================= V300.12.3 IDLE TIMEOUT RECORDS-FIRST RUNTIME FIX START =======================
-# 目的：runtime 自動登出分鐘數不可再被舊 settings.json / legacy file 的 15 分鐘覆蓋。
-#       get_idle_timeout_minutes() 改成 records.json 優先；set_idle_timeout_minutes() 同步寫 records.json + settings.json。
+import threading as _v256_threading
+import sqlite3 as _v256_sqlite3
 
-def _v300123_json_read(path: Path) -> dict[str, Any]:
+
+def _v256_db_backend() -> str:
     try:
-        if path.exists() and path.is_file() and path.stat().st_size > 0:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
+        from services.db_service import is_postgres_enabled as _is_pg
+        return "postgres" if bool(_is_pg()) else "sqlite"
+    except Exception:
+        return "sqlite"
+
+
+def _v256_direct_pg_dsn() -> str:
+    try:
+        from services import db_service as _db
+        fn = getattr(_db, "_v25_postgres_dsn", None)
+        if callable(fn):
+            return str(fn() or "")
     except Exception:
         pass
-    return {}
+    for k in ("DATABASE_URL", "POSTGRES_URL", "POSTGRESQL_URL", "NEON_DATABASE_URL", "DB_URL"):
+        v = os.environ.get(k)
+        if v:
+            return str(v)
+    return ""
 
 
-def _v300123_json_write(path: Path, payload: dict[str, Any]) -> None:
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload if isinstance(payload, dict) else {}, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-    except Exception:
-        pass
-
-
-def _v300123_perm_dir() -> Path:
-    return Path(__file__).resolve().parents[1] / "data" / "permanent_store" / "modules" / "10_permissions"
-
-
-def _v300123_extract_idle_from_payload(payload: Any) -> int | None:
-    try:
-        if not isinstance(payload, dict):
-            return None
-        values: list[Any] = []
-        values.append(payload.get("idle_timeout_minutes"))
-        sec = payload.get("security_settings") if isinstance(payload.get("security_settings"), dict) else {}
-        values.append(sec.get("idle_timeout_minutes") if isinstance(sec, dict) else None)
-        settings = payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
-        values.append(settings.get("idle_timeout_minutes") if isinstance(settings, dict) else None)
-        inner = settings.get("security_settings") if isinstance(settings, dict) and isinstance(settings.get("security_settings"), dict) else {}
-        values.append(inner.get("idle_timeout_minutes") if isinstance(inner, dict) else None)
-        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
-        for t in ("auth_security_settings", "security_settings"):
-            for row in tables.get(t, []) if isinstance(tables.get(t), list) else []:
-                if isinstance(row, dict) and str(row.get("setting_key") or "").strip() == "idle_timeout_minutes":
-                    values.append(row.get("setting_value"))
-        for v in values:
-            if v in (None, ""):
-                continue
-            n = int(float(str(v).strip()))
-            if n >= 1:
-                return n
-    except Exception:
+def _v256_pg_query_one(sql: str, params: tuple = ()) -> dict[str, Any] | None:
+    dsn = _v256_direct_pg_dsn()
+    if not dsn:
         return None
-    return None
-
-
-def _v300123_idle_paths_records_first() -> list[Path]:
-    root = Path(__file__).resolve().parents[1]
-    return [
-        _v300123_perm_dir() / "records.json",
-        _v300123_perm_dir() / "settings.json",
-        root / "data" / "permanent_store" / "config" / "idle_timeout_settings.json",
-        root / "data" / "permanent_store" / "persistent_state" / "spt_idle_timeout_settings.json",
-        root / "data" / "config" / "idle_timeout_settings.json",
-        root / "data" / "persistent_state" / "spt_idle_timeout_settings.json",
-        root / "data" / "persistent_modules" / "10_permissions" / "idle_timeout_settings.json",
-    ]
-
-
-def get_idle_timeout_minutes() -> int:  # type: ignore[override]
     try:
-        cache = st.session_state.get("_spt_idle_timeout_cache")
-        if isinstance(cache, dict):
-            minutes = int(float(cache.get("minutes", 0)))
-            if minutes >= 1:
-                return minutes
-    except Exception:
-        pass
-    minutes = None
-    for path in _v300123_idle_paths_records_first():
-        minutes = _v300123_extract_idle_from_payload(_v300123_json_read(path))
-        if minutes is not None:
-            break
-    if minutes is None:
-        try:
-            ensure_security_schema()
-            for table in ("auth_security_settings", "security_settings"):
-                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
-                if row and row.get("setting_value") not in (None, ""):
-                    minutes = int(float(row.get("setting_value")))
-                    break
-        except Exception:
-            minutes = None
-    if minutes is None:
-        minutes = DEFAULT_IDLE_MINUTES
-    minutes = max(1, int(minutes))
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
-    except Exception:
-        pass
-    return minutes
-
-
-def _v300123_write_idle_to_authority(minutes: int, ask: str = "1") -> None:
-    now = _now()
-    minutes = max(1, int(minutes))
-    ask = "0" if str(ask).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
-    records_path = _v300123_perm_dir() / "records.json"
-    settings_path = _v300123_perm_dir() / "settings.json"
-    payload = _v300123_json_read(records_path)
-    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
-    rows = [
-        {"setting_key": "idle_timeout_minutes", "setting_value": str(minutes), "note": "V300.12.3 runtime canonical idle timeout", "updated_at": now},
-        {"setting_key": "ask_continue_after_record", "setting_value": ask, "note": "V300.12.3 runtime ask continue setting", "updated_at": now},
-    ]
-    # Preserve custom security rows.
-    seen = {"idle_timeout_minutes", "ask_continue_after_record"}
-    for t in ("auth_security_settings", "security_settings"):
-        for row in tables.get(t, []) if isinstance(tables.get(t), list) else []:
-            if not isinstance(row, dict):
-                continue
-            k = str(row.get("setting_key") or "").strip()
-            if not k or k in seen:
-                continue
-            rows.append(dict(row)); seen.add(k)
-    tables["auth_security_settings"] = [dict(r) for r in rows]
-    tables["security_settings"] = [dict(r) for r in rows]
-    payload["tables"] = tables
-    payload.setdefault("module_key", "10_permissions")
-    payload.setdefault("kind", "records")
-    payload["updated_at"] = now
-    payload["reason"] = "v30012_3_runtime_idle_timeout"
-    payload["settings"] = dict(payload.get("settings") if isinstance(payload.get("settings"), dict) else {})
-    payload["settings"].update({
-        "idle_timeout_minutes": str(minutes),
-        "ask_continue_after_record": ask,
-        "security_settings": {"idle_timeout_minutes": str(minutes), "ask_continue_after_record": ask},
-    })
-    _v300123_json_write(records_path, payload)
-    setting_payload = {
-        "idle_timeout_minutes": str(minutes),
-        "ask_continue_after_record": ask,
-        "security_settings": {"idle_timeout_minutes": str(minutes), "ask_continue_after_record": ask},
-        "settings": {"idle_timeout_minutes": str(minutes), "ask_continue_after_record": ask, "security_settings": {"idle_timeout_minutes": str(minutes), "ask_continue_after_record": ask}},
-        "updated_at": now,
-        "reason": "v30012_3_runtime_idle_timeout",
-    }
-    _v300123_json_write(settings_path, setting_payload)
-    simple = {"idle_timeout_minutes": minutes, "ask_continue_after_record": ask, "updated_at": now, "reason": "v30012_3_runtime_idle_timeout"}
-    for path in _v300123_idle_paths_records_first()[2:]:
-        _v300123_json_write(path, simple)
-
-
-_v300123_prev_set_idle_timeout_minutes = globals().get("set_idle_timeout_minutes")
-
-
-def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
-    minutes = max(1, int(minutes))
-    ask = "1"
-    try:
-        ss = st.session_state.get("spt_security_settings", {})
-        if isinstance(ss, dict) and ss.get("ask_continue_after_record") is not None:
-            ask = str(ss.get("ask_continue_after_record"))
-    except Exception:
-        pass
-    ask = "0" if str(ask).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
-    try:
-        if callable(_v300123_prev_set_idle_timeout_minutes):
-            _v300123_prev_set_idle_timeout_minutes(minutes)
-    except Exception:
-        pass
-    _v300123_write_idle_to_authority(minutes, ask)
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
-        ss = st.session_state.get("spt_security_settings", {})
-        if not isinstance(ss, dict):
-            ss = {}
-        ss["idle_timeout_minutes"] = str(minutes)
-        ss["ask_continue_after_record"] = ask
-        st.session_state["spt_security_settings"] = ss
-    except Exception:
-        pass
-
-# ======================= V300.12.3 IDLE TIMEOUT RECORDS-FIRST RUNTIME FIX END =======================
-
-# ======================= V300.12.4 IDLE TIMEOUT GITHUB AUTHORITY RUNTIME FIX START =======================
-# Security runtime must use the same records.json-first authority as 10. 權限管理.
-# set_idle_timeout_minutes() also delegates to permission_service.save_security_settings(), which writes GitHub authority.
-
-def _v300124_read_idle_records_first() -> int | None:
-    try:
-        for path in _v300123_idle_paths_records_first():  # type: ignore[name-defined]
-            minutes = _v300123_extract_idle_from_payload(_v300123_json_read(path))  # type: ignore[name-defined]
-            if minutes is not None:
-                return minutes
-    except Exception:
-        pass
-    try:
-        from services.permission_service import get_security_settings as _perm_get_security
-        sec = _perm_get_security()
-        if sec.get("idle_timeout_minutes") not in (None, ""):
-            n = int(float(sec.get("idle_timeout_minutes")))
-            if n >= 1:
-                return n
-    except Exception:
-        pass
-    return None
-
-
-def get_idle_timeout_minutes() -> int:  # type: ignore[override]
-    try:
-        cache = st.session_state.get("_spt_idle_timeout_cache")
-        if isinstance(cache, dict):
-            minutes = int(float(cache.get("minutes", 0)))
-            if minutes >= 1:
-                return minutes
-    except Exception:
-        pass
-    minutes = _v300124_read_idle_records_first()
-    if minutes is None:
-        try:
-            ensure_security_schema()
-            for table in ("auth_security_settings", "security_settings"):
-                row = query_one(f"SELECT setting_value FROM {table} WHERE setting_key='idle_timeout_minutes'")
-                if row and row.get("setting_value") not in (None, ""):
-                    minutes = int(float(row.get("setting_value")))
-                    break
-        except Exception:
-            minutes = None
-    if minutes is None:
-        minutes = DEFAULT_IDLE_MINUTES
-    minutes = max(1, int(minutes))
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
-    except Exception:
-        pass
-    return minutes
-
-
-def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
-    minutes = max(1, int(minutes))
-    ask = "1"
-    try:
-        ss = st.session_state.get("spt_security_settings", {})
-        if isinstance(ss, dict) and ss.get("ask_continue_after_record") is not None:
-            ask = str(ss.get("ask_continue_after_record"))
-    except Exception:
-        pass
-    ask = "0" if str(ask).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
-    try:
-        from services.permission_service import save_security_settings as _perm_save_security
-        _perm_save_security({"idle_timeout_minutes": str(minutes), "ask_continue_after_record": ask})
-    except Exception:
-        try:
-            _v300123_write_idle_to_authority(minutes, ask)  # type: ignore[name-defined]
-        except Exception:
-            pass
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
-        sec = st.session_state.get("spt_security_settings", {})
-        if not isinstance(sec, dict):
-            sec = {}
-        sec["idle_timeout_minutes"] = str(minutes)
-        sec["ask_continue_after_record"] = ask
-        st.session_state["spt_security_settings"] = sec
-    except Exception:
-        pass
-
-# ======================= V300.12.4 IDLE TIMEOUT GITHUB AUTHORITY RUNTIME FIX END =======================
-
-# ======================= V300.12.5 IDLE TIMEOUT INDEPENDENT AUTHORITY FILE START =======================
-# Runtime-side override. Read/write the idle auto logout minutes from one
-# independent authority file before any mixed account/permission/settings source.
-# This block does not alter 01/02 work-time logic, account recovery, permissions,
-# UI/CSS/theme, or delete/sync behavior.
-
-try:
-    _v300125_prev_get_idle_timeout_minutes = get_idle_timeout_minutes  # type: ignore[name-defined]
-except Exception:  # pragma: no cover
-    _v300125_prev_get_idle_timeout_minutes = None
-try:
-    _v300125_prev_set_idle_timeout_minutes = set_idle_timeout_minutes  # type: ignore[name-defined]
-except Exception:  # pragma: no cover
-    _v300125_prev_set_idle_timeout_minutes = None
-
-_V300125_RUNTIME_SETTINGS_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "security_runtime_settings.json"
-
-
-def _v300125_read_json(path: Path) -> dict:
-    try:
-        if path.exists() and path.is_file() and path.stat().st_size > 0:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
-    except Exception:
-        pass
-    return {}
-
-
-def _v300125_write_json(path: Path, payload: dict) -> bool:
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload if isinstance(payload, dict) else {}, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-        tmp.replace(path)
-        return True
-    except Exception:
-        return False
-
-
-def _v300125_now_text() -> str:
-    try:
-        return _now()  # type: ignore[name-defined]
-    except Exception:
-        try:
-            return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        except Exception:
-            return ""
-
-
-def _v300125_parse_minutes(v, default: int | None = None) -> int | None:
-    try:
-        if v in (None, ""):
-            return default
-        n = int(float(str(v).strip()))
-        return n if n >= 1 else default
-    except Exception:
-        return default
-
-
-def _v300125_read_runtime_minutes() -> int | None:
-    payload = _v300125_read_json(_V300125_RUNTIME_SETTINGS_FILE)
-    minutes = _v300125_parse_minutes(payload.get("idle_auto_logout_minutes"), None)
-    if minutes is None:
-        minutes = _v300125_parse_minutes(payload.get("idle_timeout_minutes"), None)
-    sec = payload.get("security_settings") if isinstance(payload.get("security_settings"), dict) else {}
-    if minutes is None and isinstance(sec, dict):
-        minutes = _v300125_parse_minutes(sec.get("idle_auto_logout_minutes"), None)
-    if minutes is None and isinstance(sec, dict):
-        minutes = _v300125_parse_minutes(sec.get("idle_timeout_minutes"), None)
-    return minutes
-
-
-def _v300125_upload_runtime_settings_to_github(payload: dict) -> bool:
-    try:
-        token = ""
-        repo = ""
-        branch = ""
-        try:
-            if st is not None:
-                token = str(st.secrets.get("GITHUB_TOKEN", "") or "").strip()  # type: ignore[attr-defined]
-                repo = str(st.secrets.get("GITHUB_REPOSITORY", "") or "").strip()  # type: ignore[attr-defined]
-                branch = str(st.secrets.get("GITHUB_BRANCH", "") or "").strip()  # type: ignore[attr-defined]
-        except Exception:
-            pass
-        token = token or os.environ.get("GITHUB_TOKEN", "").strip()
-        repo = repo or os.environ.get("GITHUB_REPOSITORY", "cheng07021028/SPT-time-tracking-system").strip()
-        branch = branch or os.environ.get("GITHUB_BRANCH", "main").strip()
-        if not token or not repo:
-            return False
-        import base64 as _b64
-        import urllib.parse as _urlparse
-        import urllib.request as _urlreq
-        rel = str(_V300125_RUNTIME_SETTINGS_FILE.relative_to(PROJECT_ROOT)).replace("\\", "/")
-        api = f"https://api.github.com/repos/{repo}/contents/{_urlparse.quote(rel)}"
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "Content-Type": "application/json",
-            "User-Agent": "SPT-V30012-5-idle-timeout-runtime",
-        }
-        sha = ""
-        try:
-            req = _urlreq.Request(api + f"?ref={_urlparse.quote(branch)}", headers=headers, method="GET")
-            with _urlreq.urlopen(req, timeout=10) as resp:  # nosec - controlled GitHub API
-                current = json.loads(resp.read().decode("utf-8"))
-                sha = str(current.get("sha", "") or "") if isinstance(current, dict) else ""
-        except Exception:
-            sha = ""
-        body = {
-            "message": f"V300.12.5 update idle timeout runtime authority ({_v300125_now_text()})",
-            "content": _b64.b64encode(json.dumps(payload, ensure_ascii=False, indent=2, default=str).encode("utf-8")).decode("ascii"),
-            "branch": branch,
-        }
-        if sha:
-            body["sha"] = sha
-        req = _urlreq.Request(api, data=json.dumps(body).encode("utf-8"), headers=headers, method="PUT")
-        with _urlreq.urlopen(req, timeout=15) as resp:  # nosec - controlled GitHub API
-            return 200 <= int(getattr(resp, "status", 200)) < 300
-    except Exception:
-        return False
-
-
-def _v300125_write_runtime_minutes(minutes: int, *, ask_continue_after_record: str = "1", updated_by: str = "", reason: str = "v30012_5_security_runtime") -> dict:
-    minutes = max(1, int(minutes))
-    ask = "0" if str(ask_continue_after_record).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
-    payload = {
-        "authority_schema": "SPT-10-Permissions-SecurityRuntimeSettings-V30012.5",
-        "version": "V300.12.5-idle-timeout-independent-authority",
-        "idle_auto_logout_minutes": minutes,
-        "idle_timeout_minutes": minutes,
-        "ask_continue_after_record": ask,
-        "security_settings": {"idle_auto_logout_minutes": minutes, "idle_timeout_minutes": minutes, "ask_continue_after_record": ask},
-        "updated_at": _v300125_now_text(),
-        "updated_by": str(updated_by or ""),
-        "reason": reason,
-        "note": "Independent authority file for idle auto logout minutes. Startup/login/permission recovery must not overwrite this file.",
-    }
-    local_ok = _v300125_write_json(_V300125_RUNTIME_SETTINGS_FILE, payload)
-    github_ok = _v300125_upload_runtime_settings_to_github(payload)
-    try:
-        payload["local_write_ok"] = bool(local_ok)
-        payload["github_write_ok"] = bool(github_ok)
-        _v300125_write_json(_V300125_RUNTIME_SETTINGS_FILE, payload)
-    except Exception:
-        pass
-    return payload
-
-
-def get_idle_timeout_minutes() -> int:  # type: ignore[override]
-    try:
-        cache = st.session_state.get("_spt_idle_timeout_cache")
-        if cache:
-            minutes = _v300125_parse_minutes(cache.get("minutes"), None)
-            if minutes is not None:
-                return minutes
-    except Exception:
-        pass
-    minutes = _v300125_read_runtime_minutes()
-    if minutes is None:
-        try:
-            if callable(_v300125_prev_get_idle_timeout_minutes):
-                minutes = int(_v300125_prev_get_idle_timeout_minutes())
-        except Exception:
-            minutes = None
-    if minutes is None:
-        minutes = DEFAULT_IDLE_MINUTES
-    minutes = max(1, int(minutes))
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
-    except Exception:
-        pass
-    return minutes
-
-
-def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
-    minutes = max(1, int(minutes))
-    ask = "1"
-    try:
-        ss = st.session_state.get("spt_security_settings", {})
-        if isinstance(ss, dict):
-            ask = str(ss.get("ask_continue_after_record", "1"))
-    except Exception:
-        pass
-    try:
-        if callable(_v300125_prev_set_idle_timeout_minutes):
-            _v300125_prev_set_idle_timeout_minutes(minutes)
-    except Exception:
-        pass
-    user = ""
-    try:
-        user = str(st.session_state.get("auth_username", "") or st.session_state.get("username", "") or "")
-    except Exception:
-        user = ""
-    _v300125_write_runtime_minutes(minutes, ask_continue_after_record=ask, updated_by=user, reason="set_idle_timeout_minutes_v30012_5")
-    try:
-        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": 0}
-        settings = st.session_state.get("spt_security_settings", {})
-        if not isinstance(settings, dict):
-            settings = {}
-        settings["idle_timeout_minutes"] = str(minutes)
-        settings["idle_auto_logout_minutes"] = str(minutes)
-        st.session_state["spt_security_settings"] = settings
-    except Exception:
-        pass
-
-# ======================= V300.12.5 IDLE TIMEOUT INDEPENDENT AUTHORITY FILE END =======================
-
-# ======================= V300.17.4 ADMIN PASSWORD FORCE RESTORE START =======================
-# Emergency scope:
-#   Restore admin login after permission authority password hash damage.
-#   This block only handles admin/Admin@1234 rescue and delegates normal auth to the
-#   existing authenticate() implementation. It does not touch 01/02, 06/11/13 or UI.
-
-try:
-    _v300174_prev_authenticate = authenticate  # type: ignore[name-defined]
-except Exception:  # pragma: no cover
-    _v300174_prev_authenticate = None
-
-_V300174_ADMIN_USERNAME = "admin"
-_V300174_ADMIN_PASSWORD = "Admin@1234"
-_V300174_AUTHORITY_FILE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "10_permissions" / "records.json"
-
-
-def _v300174_permission_hash(password: str, salt: str | None = None) -> str:
-    try:
-        salt = salt or os.urandom(16).hex()
-        digest = hashlib.pbkdf2_hmac("sha256", str(password).encode("utf-8"), str(salt).encode("utf-8"), 120000)
-        return f"pbkdf2_sha256${salt}${digest.hex()}"
-    except Exception:
-        try:
-            return hash_password(password)
-        except Exception:
-            return ""
-
-
-def _v300174_read_json(path: Path) -> dict:
-    try:
-        if path.exists() and path.is_file() and path.stat().st_size > 2:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
-    except Exception:
-        pass
-    return {}
-
-
-def _v300174_write_json(path: Path, payload: dict) -> bool:
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-        json.loads(tmp.read_text(encoding="utf-8"))
-        tmp.replace(path)
-        return True
-    except Exception:
-        return False
-
-
-def _v300174_now() -> str:
-    try:
-        return _now()
-    except Exception:
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
-def _v300174_force_admin_runtime_and_authority() -> dict:
-    admin_hash = _v300174_permission_hash(_V300174_ADMIN_PASSWORD)
-    if not admin_hash:
-        return {"ok": False, "error": "hash_failed"}
-    # Authority file
-    payload = _v300174_read_json(_V300174_AUTHORITY_FILE)
-    if payload:
-        tables = payload.setdefault("tables", {})
-        if not isinstance(tables, dict):
-            tables = {}; payload["tables"] = tables
-        users = tables.setdefault("auth_users", [])
-        if not isinstance(users, list):
-            users = []; tables["auth_users"] = users
-        found = False
-        for row in users:
-            if isinstance(row, dict) and str(row.get("username", "")).strip().lower() == "admin":
-                found = True
-                row.update({"username": "admin", "password_hash": admin_hash, "password_hint": "V300.17.4 restored to Admin@1234", "display_name": row.get("display_name") or "系統管理員", "role_code": "admin", "is_active": 1, "force_password_change": 0, "updated_at": _v300174_now()})
-        if not found:
-            users.append({"username": "admin", "password_hash": admin_hash, "password_hint": "V300.17.4 restored to Admin@1234", "display_name": "系統管理員", "role_code": "admin", "is_active": 1, "force_password_change": 0, "created_at": _v300174_now(), "updated_at": _v300174_now()})
-        deleted = payload.get("deleted_usernames", [])
-        if isinstance(deleted, list):
-            payload["deleted_usernames"] = [x for x in deleted if str(x).strip().lower() != "admin"]
-        sec_users = tables.setdefault("security_users", [])
-        if isinstance(sec_users, list):
-            sfound = False
-            for row in sec_users:
-                if isinstance(row, dict) and str(row.get("username", "")).strip().lower() == "admin":
-                    sfound = True
-                    row.update({"username": "admin", "password_hash": admin_hash, "password_hint": "V300.17.4 restored to Admin@1234", "display_name": row.get("display_name") or "系統管理員", "role_code": "admin", "is_active": 1, "force_password_change": 0, "updated_at": _v300174_now()})
-            if not sfound:
-                sec_users.append({"username": "admin", "password_hash": admin_hash, "password_hint": "V300.17.4 restored to Admin@1234", "display_name": "系統管理員", "role_code": "admin", "is_active": 1, "force_password_change": 0, "created_at": _v300174_now(), "updated_at": _v300174_now()})
-        roles = tables.setdefault("security_user_roles", [])
-        if isinstance(roles, list) and not any(isinstance(r, dict) and str(r.get("username", "")).strip().lower() == "admin" and str(r.get("role_code", "")).strip().lower() == "admin" for r in roles):
-            roles.append({"username": "admin", "role_code": "admin", "created_at": _v300174_now(), "updated_at": _v300174_now()})
-        payload["updated_at"] = _v300174_now()
-        payload["reason"] = "v30017_4_force_restore_admin_password_security_service"
-        payload["version"] = "V300.17.4-admin-password-force-restore"
-        try:
-            payload["table_counts"] = {k: len(v) for k, v in tables.items() if isinstance(v, list)}
-        except Exception:
-            pass
-        _v300174_write_json(_V300174_AUTHORITY_FILE, payload)
-    # Runtime DB best effort.
-    try:
-        for sql in [
-            "UPDATE auth_users SET password_hash=?, password_hint=?, role_code='admin', is_active=1, force_password_change=0, updated_at=? WHERE lower(username)='admin'",
-            "UPDATE security_users SET password_hash=?, password_hint=?, role_code='admin', is_active=1, force_password_change=0, updated_at=? WHERE lower(username)='admin'",
-        ]:
+        import psycopg
+        from psycopg.rows import dict_row
+        with psycopg.connect(dsn, row_factory=dict_row, connect_timeout=5) as conn:
             try:
-                execute(sql, (admin_hash, "V300.17.4 restored to Admin@1234", _v300174_now()))
+                conn.execute("SET statement_timeout = '6000ms'")
             except Exception:
                 pass
-        try:
-            execute("DELETE FROM security_user_roles WHERE lower(username)='admin'", ())
-            execute("INSERT INTO security_user_roles(username, role_code, created_at, updated_at) VALUES (?,?,?,?)", ("admin", "admin", _v300174_now(), _v300174_now()))
-        except Exception:
-            pass
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                row = cur.fetchone()
+                return dict(row) if row else None
+    except Exception:
+        return None
+
+
+def _v256_pg_execute(sql: str, params: tuple = ()) -> None:
+    dsn = _v256_direct_pg_dsn()
+    if not dsn:
+        return
+    try:
+        import psycopg
+        with psycopg.connect(dsn, connect_timeout=5) as conn:
+            try:
+                conn.execute("SET statement_timeout = '6000ms'")
+            except Exception:
+                pass
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+            conn.commit()
     except Exception:
         pass
-    return {"ok": True, "admin_password": "Admin@1234"}
 
 
-def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
-    uname = str(username or "").strip().lower()
-    if uname == "admin":
-        _v300174_force_admin_runtime_and_authority()
-    ok, msg = _v300174_prev_authenticate(username, password) if callable(_v300174_prev_authenticate) else (False, "帳號或密碼錯誤。")
-    if ok:
-        return ok, msg
-    # Emergency fallback: if the admin authority/DB repair happened but old cache still rejects,
-    # allow the known restored password and let the next rerun read the repaired authority.
-    if uname == "admin" and str(password or "") == _V300174_ADMIN_PASSWORD:
+def _v256_sqlite_query_one(sql: str, params: tuple = ()) -> dict[str, Any] | None:
+    try:
+        from services import db_service as _db
+        db_path = Path(getattr(_db, "DB_PATH"))
+    except Exception:
+        db_path = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
+    try:
+        conn = _v256_sqlite3.connect(db_path, timeout=5, check_same_thread=False)
+        conn.row_factory = _v256_sqlite3.Row
+        row = conn.execute(sql, params).fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
+
+def _v256_sqlite_execute(sql: str, params: tuple = ()) -> None:
+    try:
+        from services import db_service as _db
+        db_path = Path(getattr(_db, "DB_PATH"))
+    except Exception:
+        db_path = PROJECT_ROOT / "data" / "permanent_store" / "database" / "spt_time_tracking.db"
+    try:
+        conn = _v256_sqlite3.connect(db_path, timeout=5, check_same_thread=False)
+        conn.execute(sql, params)
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def _v256_direct_auth_row(username: str) -> dict[str, Any] | None:
+    username = str(username or "").strip()
+    if not username:
+        return None
+    if _v256_db_backend() == "postgres":
+        row = _v256_pg_query_one("SELECT * FROM auth_users WHERE username=%s LIMIT 1", (username,))
+        if row:
+            return row
+        row = _v256_pg_query_one("SELECT * FROM security_users WHERE username=%s LIMIT 1", (username,))
+        if row:
+            role = _v256_pg_query_one("SELECT role_code FROM security_user_roles WHERE username=%s ORDER BY id LIMIT 1", (username,)) or {}
+            row["role_code"] = row.get("role_code") or role.get("role_code") or "viewer"
+            return row
+        return None
+    row = _v256_sqlite_query_one("SELECT * FROM auth_users WHERE username=? LIMIT 1", (username,))
+    if row:
+        return row
+    row = _v256_sqlite_query_one("SELECT * FROM security_users WHERE username=? LIMIT 1", (username,))
+    if row:
+        role = _v256_sqlite_query_one("SELECT role_code FROM security_user_roles WHERE username=? ORDER BY id LIMIT 1", (username,)) or {}
+        row["role_code"] = row.get("role_code") or role.get("role_code") or "viewer"
+        return row
+    return None
+
+
+def _v256_login_side_effects(username: str, ok: bool, message: str) -> None:
+    def _worker() -> None:
+        now = _now()
         try:
-            st.session_state["auth_username"] = "admin"
-            st.session_state["username"] = "admin"
-            st.session_state["auth_role"] = "admin"
-            st.session_state["auth_display_name"] = "系統管理員"
-            st.session_state["auth_logged_in"] = True
-            st.session_state["authenticated"] = True
+            if _v256_db_backend() == "postgres":
+                if ok:
+                    _v256_pg_execute("UPDATE auth_users SET last_login_at=%s, updated_at=%s WHERE username=%s", (now, now, username))
+                    _v256_pg_execute("UPDATE security_users SET last_login_at=%s, updated_at=%s WHERE username=%s", (now, now, username))
+                _v256_pg_execute(
+                    """
+                    INSERT INTO security_login_logs
+                    (username, display_name, event_type, result, message, module_code, login_time, created_at)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (username, st.session_state.get("auth_display_name", ""), "LOGIN", "SUCCESS" if ok else "FAIL", message, "", now, now),
+                )
+            else:
+                if ok:
+                    _v256_sqlite_execute("UPDATE auth_users SET last_login_at=?, updated_at=? WHERE username=?", (now, now, username))
+                    _v256_sqlite_execute("UPDATE security_users SET last_login_at=?, updated_at=? WHERE username=?", (now, now, username))
+                _v256_sqlite_execute(
+                    """
+                    INSERT INTO security_login_logs
+                    (username, display_name, event_type, result, message, module_code, login_time, created_at)
+                    VALUES (?,?,?,?,?,?,?,?)
+                    """,
+                    (username, st.session_state.get("auth_display_name", ""), "LOGIN", "SUCCESS" if ok else "FAIL", message, "", now, now),
+                )
         except Exception:
             pass
-        return True, "系統管理員登入已由 V300.17.4 緊急恢復。"
-    return ok, msg
-
-try:
-    _V300174_SECURITY_IMPORT_RESTORE_STATUS = _v300174_force_admin_runtime_and_authority()
-except Exception:
-    _V300174_SECURITY_IMPORT_RESTORE_STATUS = {"ok": False, "error": "import_failed"}
-
-# ======================= V300.17.4 ADMIN PASSWORD FORCE RESTORE END =======================
-
-
-# ======================= CLEAN AUTHORITY ONLY SECURITY OVERRIDES START =======================
-# This block makes login and permission checks read the same clean 10_permissions authority file.
-def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
     try:
-        from services import permission_service as ps
-        uname = str(username or "").strip()
-        for row in ps.get_users():
-            if str(row.get("username","")).strip().lower() == uname.lower():
-                if not bool(ps._norm_bool(row.get("is_active",1), True)):
-                    return False, "帳號已停用。"
-                if ps.verify_password(str(password or ""), str(row.get("password_hash") or "")):
-                    try:
-                        st.session_state["auth_username"] = row.get("username") or uname
-                        st.session_state["username"] = row.get("username") or uname
-                        st.session_state["auth_role"] = row.get("role_code") or "operator"
-                        st.session_state["auth_display_name"] = row.get("display_name") or uname
-                        st.session_state["auth_logged_in"] = True
-                        st.session_state["authenticated"] = True
-                    except Exception:
-                        pass
-                    try: ps.add_login_log(uname, "login", "success", "login ok")
-                    except Exception: pass
-                    return True, "登入成功。"
-                return False, "帳號或密碼錯誤。"
-        return False, "帳號或密碼錯誤。"
-    except Exception as e:
-        return False, f"登入服務錯誤：{e}"
-
-def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
-    try:
-        from services import permission_service as ps
-        username = st.session_state.get("username") or st.session_state.get("auth_username") or ""
-        return bool(ps.has_permission(str(username), module_code, action))
+        _v256_threading.Thread(target=_worker, name="SPT-V256-login-log", daemon=True).start()
     except Exception:
-        return False
+        pass
 
-def clear_permission_cache(username: str | None = None):  # type: ignore[override]
-    return None
+
+def authenticate(username: str, password: str) -> tuple[bool, str]:  # type: ignore[override]
+    username = (username or "").strip()
+    row = _v256_direct_auth_row(username)
+    if not row:
+        _v256_login_side_effects(username, False, "帳號不存在")
+        return False, "帳號或密碼錯誤。"
+    try:
+        active = int(row.get("is_active", 1) if row.get("is_active", 1) is not None else 1)
+    except Exception:
+        active = 1
+    if not active:
+        _v256_login_side_effects(username, False, "帳號停用")
+        return False, "帳號已停用。"
+    if not verify_password(password, row.get("password_hash")):
+        _v256_login_side_effects(username, False, "密碼錯誤")
+        return False, "帳號或密碼錯誤。"
+    role = str(row.get("role_code") or "").strip()
+    if not role:
+        # Keep legacy role lookup cheap; do not initialize full schema.
+        role_row = None
+        if _v256_db_backend() == "postgres":
+            role_row = _v256_pg_query_one("SELECT role_code FROM security_user_roles WHERE username=%s ORDER BY id LIMIT 1", (username,))
+        else:
+            role_row = _v256_sqlite_query_one("SELECT role_code FROM security_user_roles WHERE username=? ORDER BY id LIMIT 1", (username,))
+        role = str((role_row or {}).get("role_code") or "viewer").strip()
+    roles = [role] if role else ["viewer"]
+    st.session_state["auth_logged_in"] = True
+    st.session_state["auth_username"] = username
+    st.session_state["auth_display_name"] = row.get("display_name") or username
+    st.session_state["auth_employee_id"] = row.get("employee_id") or ""
+    st.session_state["auth_roles"] = roles
+    now_ts = time.time()
+    st.session_state["auth_login_ts"] = now_ts
+    st.session_state["auth_last_activity_ts"] = now_ts
+    try:
+        clear_permission_cache(username)
+    except Exception:
+        pass
+    if role == "admin":
+        try:
+            st.session_state[f"_spt_perm_cache_{username}"] = {"ts": now_ts, "data": {m["module_code"]: {c: True for c in PERMISSION_COLUMNS} for m in MODULES}}
+        except Exception:
+            pass
+    _v256_login_side_effects(username, True, f"roles={','.join(roles)}")
+    return True, "登入成功。"
+
 
 def get_idle_timeout_minutes() -> int:  # type: ignore[override]
     try:
-        from services import permission_service as ps
-        return int(float(ps.get_security_settings().get("idle_timeout_minutes", 15)))
-    except Exception:
-        return 15
-
-def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
-    try:
-        from services import permission_service as ps
-        ps.save_security_settings({"idle_timeout_minutes": int(minutes), "idle_auto_logout_minutes": int(minutes)})
+        cache = st.session_state.get("_spt_idle_timeout_cache")
+        now_ts = time.time()
+        if cache and now_ts - float(cache.get("ts", 0)) < 300:
+            return max(1, int(cache.get("minutes", DEFAULT_IDLE_MINUTES)))
     except Exception:
         pass
-# ======================= CLEAN AUTHORITY ONLY SECURITY OVERRIDES END =======================
+    minutes = _read_idle_timeout_from_files() or DEFAULT_IDLE_MINUTES
+    try:
+        settings = _v169_load_persistent_security_settings()
+        if settings.get("idle_timeout_minutes") not in (None, ""):
+            minutes = int(float(settings["idle_timeout_minutes"]))
+    except Exception:
+        pass
+    minutes = max(1, int(minutes))
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+    except Exception:
+        pass
+    return minutes
+
+
+def require_login(module_code: str = "") -> None:  # type: ignore[override]
+    # Do not ensure full schema on login/home/page reruns.
+    if not st.session_state.get("auth_logged_in"):
+        render_login_form()
+        st.stop()
+    _check_idle_timeout()
+    render_user_bar(module_code)
+
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    user = get_current_user()
+    if not user:
+        return False
+    roles = [str(r).strip() for r in (user.get("roles", []) or []) if str(r).strip()]
+    if "admin" in roles:
+        return True
+    if action not in PERMISSION_COLUMNS:
+        action = "can_view"
+    try:
+        perms = _load_permission_cache(user["username"], roles)
+        row = perms.get(module_code) or perms.get(MODULE_CODE_TO_NO.get(module_code, module_code), {})
+        if row.get("can_manage"):
+            return True
+        return bool(row.get(action, False))
+    except Exception:
+        # Safety fallback: non-admin cannot access if permission cache fails.
+        return False
+
+# =================== END V256 LOGIN HOT PATH BYPASS ===================
