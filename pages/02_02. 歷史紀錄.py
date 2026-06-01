@@ -23,10 +23,9 @@ from services.time_record_delete_unifier_service import delete_selected_time_rec
 from services.duration_service import hours_to_hms
 from services.history_filter_service import load_history_filters, save_history_filters, reset_history_filters
 try:
-    from services.large_table_query_service import load_history_records_sql_filtered, load_history_filter_options_sql
+    from services.large_table_query_service import load_history_records_sql_filtered
 except Exception:
     load_history_records_sql_filtered = None
-    load_history_filter_options_sql = None
 
 # === V180B_HISTORY_TOTAL_TIME_TYPE_FIX_BEGIN ===
 def _v180b_parse_work_hours_to_decimal_hours(value):
@@ -1181,7 +1180,7 @@ def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     return out
 
 
-def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame, work_orders: pd.DataFrame, option_values: dict | None = None) -> tuple[pd.DataFrame, dict]:
+def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame, work_orders: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     stored = load_history_filters()
     if "history_filters_applied_v216" not in st.session_state:
         st.session_state["history_filters_applied_v216"] = stored
@@ -1205,18 +1204,17 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
             end_input = r1c3.date_input("結束日期", value=end_default)
             detail_limit = r1c4.number_input("明細讀取上限", min_value=50, max_value=50000, value=int(applied.get("detail_limit") or 1000), step=50)
 
-            # V253: build options from SQL DISTINCT values when available, not full history rows.
-            _opt = option_values or {}
-            wo_options = _merge_options(_safe_unique(work_orders, "work_order"), list(_opt.get("work_order", [])) or _safe_unique(base_df, "work_order"))
-            pn_options = _merge_options(_safe_unique(work_orders, "part_no"), list(_opt.get("part_no", [])) or _safe_unique(base_df, "part_no"))
-            type_options = _merge_options(_safe_unique(work_orders, "type_name"), list(_opt.get("type_name", [])) or _safe_unique(base_df, "type_name"))
-            loc_options = _merge_options(_safe_unique(work_orders, "assembly_location"), list(_opt.get("assembly_location", [])) or _safe_unique(base_df, "assembly_location"))
-            process_options = list(_opt.get("process_name", [])) or _safe_unique(base_df, "process_name")
-            emp_id_options = _merge_options(_safe_unique(employees, "employee_id"), list(_opt.get("employee_id", [])) or _safe_unique(base_df, "employee_id"))
-            emp_name_options = _merge_options(_safe_unique(employees, "employee_name"), list(_opt.get("employee_name", [])) or _safe_unique(base_df, "employee_name"))
+            # Build options from current broad query + master data.
+            wo_options = _merge_options(_safe_unique(work_orders, "work_order"), _safe_unique(base_df, "work_order"))
+            pn_options = _merge_options(_safe_unique(work_orders, "part_no"), _safe_unique(base_df, "part_no"))
+            type_options = _merge_options(_safe_unique(work_orders, "type_name"), _safe_unique(base_df, "type_name"))
+            loc_options = _merge_options(_safe_unique(work_orders, "assembly_location"), _safe_unique(base_df, "assembly_location"))
+            process_options = _safe_unique(base_df, "process_name")
+            emp_id_options = _merge_options(_safe_unique(employees, "employee_id"), _safe_unique(base_df, "employee_id"))
+            emp_name_options = _merge_options(_safe_unique(employees, "employee_name"), _safe_unique(base_df, "employee_name"))
             dept_options = _safe_unique(employees, "department")
             title_options = _safe_unique(employees, "title")
-            status_options = list(_opt.get("status", [])) or _safe_unique(base_df, "status")
+            status_options = _safe_unique(base_df, "status")
 
             r2c1, r2c2, r2c3 = st.columns(3)
             work_orders_selected = r2c1.multiselect("製令", wo_options, default=[x for x in applied.get("work_orders", []) if x in wo_options])
@@ -1241,19 +1239,17 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
             sort_by = r5c4.selectbox("排序方式", ["ID由新到舊", "ID由舊到新", "開始時間由新到舊", "開始時間由舊到新", "工時由大到小", "工時由小到大", "製令排序", "人員排序"], index=["ID由新到舊", "ID由舊到新", "開始時間由新到舊", "開始時間由舊到新", "工時由大到小", "工時由小到大", "製令排序", "人員排序"].index(applied.get("sort_by", "ID由新到舊")) if applied.get("sort_by", "ID由新到舊") in ["ID由新到舊", "ID由舊到新", "開始時間由新到舊", "開始時間由舊到新", "工時由大到小", "工時由小到大", "製令排序", "人員排序"] else 0)
 
             keyword = st.text_input("關鍵字搜尋：製令 / 料號 / 機型 / 工段 / 工號 / 姓名 / 備註", value=applied.get("keyword", ""))
-            b1, b2, b3 = st.columns([1.3, 1, 1.6])
+            b1, b2, b3 = st.columns([1.3, 1, 2])
             apply_clicked = b1.form_submit_button("⌕ 套用篩選並永久記錄", type="primary", use_container_width=True)
             reset_clicked = b2.form_submit_button("↺ 恢復預設篩選", use_container_width=True)
-            query_clicked = b3.form_submit_button("⌕ 查詢目前篩選 / Query", type="primary", use_container_width=True)
 
         if reset_clicked:
             new_filters = reset_history_filters()
             st.session_state["history_filters_applied_v216"] = new_filters
-            st.session_state["history_query_ready_v3009"] = False
             _add_history_result("success", "已恢復 02｜歷史紀錄預設篩選。", append=False)
             rerun()
 
-        if apply_clicked or query_clicked:
+        if apply_clicked:
             actual_start, actual_end = _date_range_from_preset(date_preset, str(start_input), str(end_input))
             if date_preset == "自訂區間":
                 actual_start, actual_end = start_input, end_input
@@ -1278,19 +1274,12 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
                 "sort_by": sort_by,
                 "detail_limit": int(detail_limit),
             }
-            if apply_clicked:
-                saved = save_history_filters(new_filters)
-                st.session_state["history_filters_applied_v216"] = saved
-                _add_history_result("success", "已套用並永久記錄 02｜歷史紀錄篩選條件，並開始查詢。", append=False)
-            else:
-                st.session_state["history_filters_applied_v216"] = new_filters
-                _add_history_result("success", "已依目前篩選條件開始查詢。", append=False)
-            st.session_state["history_query_ready_v3009"] = True
+            saved = save_history_filters(new_filters)
+            st.session_state["history_filters_applied_v216"] = saved
+            _add_history_result("success", "已套用並永久記錄 02｜歷史紀錄篩選條件。", append=False)
             rerun()
 
     applied = st.session_state["history_filters_applied_v216"]
-    if not bool(st.session_state.get("history_query_ready_v3009", False)):
-        return pd.DataFrame(), applied
     filtered = _apply_history_filters(base_df, applied)
     return filtered, applied
 
@@ -1306,29 +1295,11 @@ _seed_start, _seed_end = _date_range_from_preset(
     _history_filter_seed.get("start_date"),
     _history_filter_seed.get("end_date"),
 )
-# V253: do not load full 02 history merely to render filter options.
-# SQL DISTINCT options keep the same UI but avoid expensive foreground work on Neon.
-_history_option_values = {}
-if callable(load_history_filter_options_sql):
-    try:
-        _history_option_values = load_history_filter_options_sql(str(_seed_start), str(_seed_end), limit_per_column=5000)
-    except Exception:
-        _history_option_values = {}
-
-_history_query_ready_v3009 = bool(st.session_state.get("history_query_ready_v3009", False))
-if _history_option_values or not _history_query_ready_v3009:
-    base_df = pd.DataFrame()
-else:
-    # Fallback for environments without the large-table SQL helper.
-    # V300.9: only run this after the user explicitly presses Query/Apply.
-    base_df = load_records(str(_seed_start), str(_seed_end), None, None)
-_panel_df, history_filters = _render_history_filter_panel(base_df, employees, work_orders, _history_option_values)
-_history_query_ready_v3009 = bool(st.session_state.get("history_query_ready_v3009", False))
+base_df = load_records(str(_seed_start), str(_seed_end), None, None)
+_panel_df, history_filters = _render_history_filter_panel(base_df, employees, work_orders)
 
 df = _panel_df
-if (not _history_query_ready_v3009):
-    df = pd.DataFrame()
-elif callable(load_history_records_sql_filtered):
+if callable(load_history_records_sql_filtered):
     try:
         _detail_limit = int(history_filters.get("detail_limit") or 1000)
     except Exception:
@@ -1362,9 +1333,6 @@ m6.metric("製令數 / W/O", f"{df['work_order'].nunique():,}" if not df.empty a
 
 can_edit = check_permission("02_history", "can_edit")
 can_delete = check_permission("02_history", "can_delete")
-
-if not bool(st.session_state.get("history_query_ready_v3009", False)):
-    st.info("V300.9：02 歷史紀錄已改成『按下查詢/套用後才載入資料』，避免進入模組或勾選欄位時就開始大量運算。")
 
 tab1, tab2, tab3 = st.tabs(["歷史明細編輯", "Excel 匯入", "貼上資料"])
 
@@ -1473,34 +1441,36 @@ with tab1:
             editor_key = f"history_editor_v27_{st.session_state[editor_version_key]}"
             history_draft_key = "history_records_edited_draft_v58"
             st.info("V63：歷史紀錄表格與 10｜權限管理同模式；批次按鈕會清除全域 data_editor 草稿，避免 KPI 與 checkbox 畫面不同步。")
-            with st.form(f"history_records_commit_form_v3009_{st.session_state[editor_version_key]}", clear_on_submit=False):
-                edited = render_table(
-                    edit_df,
-                    "history_records",
-                    editable=True,
-                    disabled=["id", "record_key", "created_at", "updated_at", HISTORY_CROSS_DAY_ALERT_COL, HISTORY_CROSS_DAY_RANGE_COL],
-                    key=editor_key,
-                    height=560,
-                )
-                st.markdown("**確認後執行動作 / Confirm Action**")
-                hist_save_col, hist_recalc_col, hist_delete_col = st.columns([1.1, 1.7, 1.2])
-                history_save_clicked = hist_save_col.form_submit_button(
-                    "◈ 儲存編輯 / Save",
-                    type="primary",
-                    use_container_width=True,
-                )
-                history_recalc_clicked = hist_recalc_col.form_submit_button(
-                    "◇ 重算勾選工時 / Recalc Selected",
-                    type="primary",
-                    use_container_width=True,
-                )
-                history_delete_clicked = hist_delete_col.form_submit_button(
-                    "◉ 刪除勾選整列 / Delete Selected",
-                    type="primary",
-                    use_container_width=True,
-                )
+            edited = render_table(
+                edit_df,
+                "history_records",
+                editable=True,
+                disabled=["id", "record_key", "created_at", "updated_at", HISTORY_CROSS_DAY_ALERT_COL, HISTORY_CROSS_DAY_RANGE_COL],
+                key=editor_key,
+                height=560,
+            )
             if isinstance(edited, pd.DataFrame):
                 st.session_state[history_draft_key] = edited.copy()
+            st.markdown("**確認後執行動作 / Confirm Action**")
+            hist_save_col, hist_recalc_col, hist_delete_col = st.columns([1.1, 1.7, 1.2])
+            history_save_clicked = hist_save_col.button(
+                "◈ 儲存編輯 / Save",
+                type="primary",
+                use_container_width=True,
+                key="history_records_save_button_v73",
+            )
+            history_recalc_clicked = hist_recalc_col.button(
+                "◇ 重算勾選工時 / Recalc Selected",
+                type="primary",
+                use_container_width=True,
+                key="history_records_recalc_button_v73",
+            )
+            history_delete_clicked = hist_delete_col.button(
+                "◉ 刪除勾選整列 / Delete Selected",
+                type="primary",
+                use_container_width=True,
+                key="history_records_delete_button_v73",
+            )
             submitted_history = bool(history_save_clicked or history_recalc_clicked or history_delete_clicked)
             if history_save_clicked:
                 history_action = "儲存編輯"
