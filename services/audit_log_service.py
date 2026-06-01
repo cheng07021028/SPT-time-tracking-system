@@ -2845,20 +2845,78 @@ def audit_v30023_11_login_records_authority() -> Dict[str, Any]:
 
 # ================= END V300.23 11 LOGIN RECORDS DIRECT GITHUB AUTHORITY WRITE =================
 
+# =================== V300.23.1 LOGIN HOT PATH EMERGENCY ISOLATION ===================
+# Problem fixed:
+# V300.23 made every login event synchronously merge/download/upload the 11_login_records
+# authority JSONL to GitHub.  That put network I/O on the login hot path and can make the
+# whole app spin before the user gets into the system.
+#
+# Rule from V300.23.1:
+# - Login must never wait for GitHub / remote authority write.
+# - Login records are appended locally to SQLite + data/permanent_store/modules/11_login_records/records.jsonl.
+# - 11 page reads local JSONL + SQLite cache only; no remote fetch on page render.
+# - GitHub sync for 11 must be handled separately/manual/background, not during login.
+# This patch does not touch 01/02, 10 permissions, 13 settings, UI/CSS/theme.
 
-# =================== V300.23.1 EMERGENCY LOGIN HOTPATH UNBLOCK ===================
-# Scope: 11. 登入紀錄 only. Do NOT wait for GitHub/direct authority upload during login.
-# Reason: V300.23 direct GitHub sync placed remote upload in the login hot path and could spin forever.
+_V300231_LOGIN_RECORDS_JSONL = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_records" / "records.jsonl"
+_V300231_LOGIN_SYNC_TRACE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_records" / "v30023_1_hotpath_state.json"
 
-def record_login_log(username: str = "", display_name: str = "", event_type: str = "LOGIN", result: str = "SUCCESS", message: str = "", module_code: str = "", login_time: Optional[str] = None, logout_time: Optional[str] = None, idle_minutes: Optional[float] = None, ip_address: str = "", user_agent: str = "", **kwargs: Any) -> int:  # type: ignore[override]
-    """Lightweight login log write.
 
-    This function must never block user login on GitHub/network authority sync.
-    It writes the local DB row and appends local JSONL only. GitHub sync must be manual/background.
-    """
-    new_id = 0
-    login_time = login_time or _now()
-    created_at = kwargs.get("created_at") or _now()
+def _v300231_event_id(row: Dict[str, Any]) -> str:
+    try:
+        return _v103_record_key(row) if "_v103_record_key" in globals() else _login_record_key(row)
+    except Exception:
+        return "|".join(str((row or {}).get(k, "")) for k in ("username", "event_type", "result", "login_time", "created_at", "module_code", "message"))
+
+
+def _v300231_append_local_jsonl(row: Dict[str, Any]) -> None:
+    """Append one login record locally only.  No GitHub, no remote download, no full merge."""
+    try:
+        rec = dict(row or {})
+        rec.setdefault("authority_module_key", "11_login_records")
+        rec.setdefault("authority_written_at", _now())
+        rec.setdefault("authority_event_id", _v300231_event_id(rec))
+        rec.setdefault("source", "11_login_records_jsonl_v30023_1_local_hotpath")
+        _V300231_LOGIN_RECORDS_JSONL.parent.mkdir(parents=True, exist_ok=True)
+        with _V300231_LOGIN_RECORDS_JSONL.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+    except Exception:
+        # Login must not fail because audit append failed.
+        pass
+
+
+def _v300231_read_local_jsonl(limit: int | None = 100000) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    try:
+        if not _V300231_LOGIN_RECORDS_JSONL.exists():
+            return []
+        lines = _V300231_LOGIN_RECORDS_JSONL.read_text(encoding="utf-8", errors="ignore").splitlines()
+        if limit and int(limit) > 0:
+            lines = lines[-int(limit):]
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+                if isinstance(obj, dict):
+                    rows.append(obj)
+            except Exception:
+                continue
+    except Exception:
+        return []
+    try:
+        from services.authority_consistency_service import merge_by_event_id
+        return merge_by_event_id(rows, id_fields=("username", "event_type", "result", "login_time", "module_code", "message"))
+    except Exception:
+        try:
+            return _merge_record_sets(rows)
+        except Exception:
+            return rows
+
+
+def _v300231_insert_login_sqlite(row: Dict[str, Any]) -> int:
+    """Direct lightweight SQLite insert.  Avoid old wrapped record_login_log chain."""
     try:
         ensure_login_logs_table()
         conn = get_connection()
@@ -2868,47 +2926,77 @@ def record_login_log(username: str = "", display_name: str = "", event_type: str
             username, display_name, event_type, result, message, module_code,
             login_time, logout_time, idle_minutes, ip_address, user_agent, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (username, display_name, event_type, result, message, module_code,
-              login_time, logout_time, idle_minutes, ip_address, user_agent, created_at))
-        try:
-            new_id = int(cur.lastrowid or 0)
-        except Exception:
-            new_id = 0
+        """, (
+            row.get("username") or "",
+            row.get("display_name") or "",
+            _normalise_event_type(row.get("event_type") or "LOGIN"),
+            _normalise_result(row.get("result") or "SUCCESS"),
+            row.get("message") or "",
+            row.get("module_code") or "",
+            row.get("login_time") or row.get("created_at") or _now(),
+            row.get("logout_time") or "",
+            row.get("idle_minutes") if row.get("idle_minutes") not in (None, "") else None,
+            row.get("ip_address") or "",
+            row.get("user_agent") or "streamlit",
+            row.get("created_at") or row.get("login_time") or _now(),
+        ))
+        new_id = int(cur.lastrowid or 0)
         conn.commit()
         conn.close()
+        return new_id
     except Exception:
-        new_id = 0
+        try:
+            conn.close()  # type: ignore[name-defined]
+        except Exception:
+            pass
+        return 0
 
-    # Local append-only authority cache only; no GitHub wait here.
+
+def _v300231_build_login_row(username: str = "", display_name: str = "", event_type: str = "LOGIN", result: str = "SUCCESS", message: str = "", module_code: str = "", login_time: Optional[str] = None, logout_time: Optional[str] = None, idle_minutes: Optional[float] = None, ip_address: str = "", user_agent: str = "streamlit", **kwargs: Any) -> Dict[str, Any]:
+    event_time = login_time or kwargs.get("event_time") or kwargs.get("created_at") or _now()
+    norm_event = _normalise_event_type(event_type or "LOGIN")
+    row = {
+        "username": username or "",
+        "display_name": display_name or "",
+        "event_type": norm_event,
+        "result": _normalise_result(result or "SUCCESS"),
+        "message": message or "",
+        "module_code": module_code or "",
+        "login_time": event_time,
+        "logout_time": logout_time or (event_time if norm_event in {"LOGOUT", "AUTO_LOGOUT", "POST_RECORD_LOGOUT", "SESSION_TIMEOUT"} else ""),
+        "idle_minutes": idle_minutes if idle_minutes not in (None, "") else kwargs.get("idle_minutes", ""),
+        "ip_address": ip_address or "",
+        "user_agent": user_agent or "streamlit",
+        "created_at": kwargs.get("created_at") or event_time,
+        "source": "login_logs_v30023_1_hotpath",
+    }
+    clean = _canonical_login_row("login_logs", row)
+    return clean if isinstance(clean, dict) else row
+
+
+def record_login_log(username: str = "", display_name: str = "", event_type: str = "LOGIN", result: str = "SUCCESS", message: str = "", module_code: str = "", login_time: Optional[str] = None, logout_time: Optional[str] = None, idle_minutes: Optional[float] = None, ip_address: str = "", user_agent: str = "streamlit", **kwargs: Any) -> int:  # type: ignore[override]
+    """Final V300.23.1 login logger: local-only, no remote, no full authority rebuild."""
+    row = _v300231_build_login_row(username, display_name, event_type, result, message, module_code, login_time, logout_time, idle_minutes, ip_address, user_agent, **kwargs)
+    new_id = _v300231_insert_login_sqlite(row)
+    if new_id:
+        row["id"] = new_id
+    _v300231_append_local_jsonl(row)
     try:
-        from services.authority_consistency_service import append_jsonl
-        row = {
-            "id": new_id or "",
-            "username": username or "",
-            "display_name": display_name or "",
-            "event_type": event_type or "LOGIN",
-            "result": result or "SUCCESS",
-            "message": message or "",
-            "module_code": module_code or "",
-            "login_time": login_time,
-            "logout_time": logout_time or "",
-            "idle_minutes": idle_minutes if idle_minutes is not None else "",
-            "ip_address": ip_address or "",
-            "user_agent": user_agent or "",
-            "created_at": created_at,
-            "source": "11_login_records_v30023_1_local_nonblocking",
-        }
-        append_jsonl(
-            "11_login_records",
-            row,
-            identity_fields=("username", "event_type", "result", "login_time", "module_code", "message"),
-            github=False,
-            reason="record_login_log_v30023_1_local_nonblocking",
-        )
+        _V300231_LOGIN_SYNC_TRACE.parent.mkdir(parents=True, exist_ok=True)
+        _V300231_LOGIN_SYNC_TRACE.write_text(json.dumps({
+            "version": "V300.23.1",
+            "updated_at": _now(),
+            "mode": "login_hot_path_local_only",
+            "reason": "GitHub/authority upload disabled during login to prevent spinning",
+            "last_username": username or "",
+            "last_event_type": event_type or "LOGIN",
+            "records_jsonl": str(_V300231_LOGIN_RECORDS_JSONL),
+        }, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     except Exception:
         pass
-    return new_id
+    return int(new_id or 0)
 
+# Rebind aliases to V300.23.1 local-only implementation.
 write_login_log = record_login_log
 add_login_log = record_login_log
 append_login_log = record_login_log
@@ -2918,18 +3006,357 @@ log_login_event = record_login_log
 save_login_log = record_login_log
 
 
-def audit_v30023_1_login_hotpath_unblock() -> Dict[str, Any]:
+def load_login_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "", limit: int = 1000, event_types: Optional[List[str]] = None, results: Optional[List[str]] = None, include_legacy: bool = True, **kwargs: Any):  # type: ignore[override]
+    """V300.23.1: Page 11 reads local authority/cache only; it never downloads from GitHub on render."""
+    rows: List[Dict[str, Any]] = []
     try:
-        from services.authority_consistency_service import records_jsonl_path
-        p = records_jsonl_path("11_login_records")
+        rows.extend(_v300231_read_local_jsonl(limit=max(int(limit or 1000) * 5, 100000)))
+    except Exception:
+        pass
+    try:
+        rows.extend(_v103_db_login_records(include_legacy=include_legacy) if "_v103_db_login_records" in globals() else _to_records(_primary_login_rows(get_connection())))
+    except Exception:
+        pass
+    try:
+        from services.authority_consistency_service import merge_by_event_id
+        rows = merge_by_event_id(rows, id_fields=("username", "event_type", "result", "login_time", "module_code", "message"))
+    except Exception:
+        try:
+            rows = _merge_record_sets(rows)
+        except Exception:
+            pass
+    try:
+        if "_v135_filter_deleted_records" in globals():
+            rows = _v135_filter_deleted_records(rows)
+        elif "_v106_apply_delete_tombstone" in globals():
+            rows = _v106_apply_delete_tombstone(rows)
+    except Exception:
+        pass
+    rows = _filter_records(rows, start_date, end_date, keyword, event_types, results)
+    rows.sort(key=lambda r: str(r.get("login_time") or r.get("created_at") or ""), reverse=True)
+    if limit:
+        rows = rows[:int(limit)]
+    if pd is not None:
+        return pd.DataFrame(rows)
+    return rows
+
+get_login_logs = load_login_logs
+query_login_logs = load_login_logs
+load_audit_logs = load_login_logs
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    """Local-only clear marker for 11.  No GitHub upload during foreground action."""
+    deleted = 0
+    try:
+        if callable(globals().get("_v30017_prev_delete_login_logs_by_date_range")):
+            deleted = int(_v30017_prev_delete_login_logs_by_date_range(start_date, end_date) or 0)  # type: ignore[name-defined]
+    except Exception:
+        deleted = 0
+    marker = {
+        "username": "SYSTEM",
+        "display_name": "SYSTEM",
+        "event_type": "DELETE_LOGIN_LOG_RANGE",
+        "result": "WARN",
+        "message": f"刪除登入紀錄日期區間：{start_date} ~ {end_date}，刪除筆數：{deleted}",
+        "module_code": "11_login_records",
+        "login_time": _now(),
+        "created_at": _now(),
+        "delete_range_start": str(start_date),
+        "delete_range_end": str(end_date),
+        "source": "11_login_records_delete_tombstone_v30023_1_local_only",
+    }
+    _v300231_append_local_jsonl(marker)
+    return int(deleted)
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+clear_audit_logs = delete_login_logs_by_date_range
+
+
+def audit_v300231_11_login_hotpath_isolation() -> Dict[str, Any]:
+    try:
+        p = _V300231_LOGIN_RECORDS_JSONL
         return {
-            "version": "V300.23.1_LOGIN_HOTPATH_UNBLOCK",
-            "login_waits_for_github": False,
-            "authority_file": str(p),
+            "version": "V300.23.1",
+            "mode": "login_hot_path_local_only_no_github_foreground",
+            "records_jsonl": str(p),
             "exists": p.exists(),
             "size": p.stat().st_size if p.exists() else 0,
+            "rows": len(_v300231_read_local_jsonl(limit=None)),
         }
     except Exception as exc:
-        return {"version": "V300.23.1_LOGIN_HOTPATH_UNBLOCK", "ok": False, "error": str(exc)[:300]}
+        return {"version": "V300.23.1", "ok": False, "error": str(exc)[:300]}
 
-# ================= END V300.23.1 EMERGENCY LOGIN HOTPATH UNBLOCK =================
+# ================= END V300.23.1 LOGIN HOT PATH EMERGENCY ISOLATION =================
+
+# ================= V300.23.2 11 LOGIN CLEAR HOTPATH FIX =================
+# Fix: clearing login records must not call old delete chain, GitHub upload,
+# full authority rebuild, or legacy restore.  It only writes a local delete-state
+# and lightweight SQLite delete, then filters rows in Page 11 reads.
+from datetime import date as _v300232_date
+
+_V300232_LOGIN_DELETE_STATE = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_records" / "delete_state.json"
+
+
+def _v300232_date_text(value: Any) -> str:
+    s = _txt(value)
+    if not s:
+        return ""
+    return s[:10]
+
+
+def _v300232_in_range(day: str, start: str, end: str) -> bool:
+    day = _v300232_date_text(day)
+    start = _v300232_date_text(start)
+    end = _v300232_date_text(end)
+    if not day or not start or not end:
+        return False
+    return start <= day <= end
+
+
+def _v300232_read_delete_state() -> Dict[str, Any]:
+    try:
+        if _V300232_LOGIN_DELETE_STATE.exists():
+            obj = json.loads(_V300232_LOGIN_DELETE_STATE.read_text(encoding="utf-8"))
+            if isinstance(obj, dict):
+                return obj
+    except Exception:
+        pass
+    return {"authority_schema": "SPT_11_LOGIN_DELETE_STATE_V300_23_2", "delete_ranges": [], "updated_at": ""}
+
+
+def _v300232_write_delete_state(state: Dict[str, Any]) -> None:
+    try:
+        _V300232_LOGIN_DELETE_STATE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _V300232_LOGIN_DELETE_STATE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        json.loads(tmp.read_text(encoding="utf-8"))
+        tmp.replace(_V300232_LOGIN_DELETE_STATE)
+    except Exception:
+        pass
+
+
+def _v300232_add_delete_range(start_date: str, end_date: str, deleted_count: int = 0) -> None:
+    state = _v300232_read_delete_state()
+    ranges = state.get("delete_ranges")
+    if not isinstance(ranges, list):
+        ranges = []
+    rec = {
+        "start_date": _v300232_date_text(start_date),
+        "end_date": _v300232_date_text(end_date),
+        "deleted_count": int(deleted_count or 0),
+        "deleted_at": _now(),
+        "mode": "local_only_no_github_foreground",
+        "version": "V300.23.2",
+    }
+    ranges.append(rec)
+    state.update({
+        "authority_schema": "SPT_11_LOGIN_DELETE_STATE_V300_23_2",
+        "updated_at": _now(),
+        "last_deleted_count": int(deleted_count or 0),
+        "delete_ranges": ranges,
+        "note": "Page 11 clear is local and non-blocking; remote sync must be manual/background.",
+    })
+    _v300232_write_delete_state(state)
+
+
+def _v300232_is_deleted_by_range(row: Dict[str, Any], ranges: Optional[List[Dict[str, Any]]] = None) -> bool:
+    if not isinstance(row, dict):
+        return False
+    ev = _normalise_event_type(row.get("event_type"))
+    if ev == "DELETE_LOGIN_LOG_RANGE":
+        return True
+    day = _v300232_date_text(row.get("login_time") or row.get("created_at") or row.get("logout_time"))
+    if not day:
+        return False
+    if ranges is None:
+        state = _v300232_read_delete_state()
+        ranges = state.get("delete_ranges", []) if isinstance(state, dict) else []
+    for r in ranges or []:
+        if not isinstance(r, dict):
+            continue
+        if _v300232_in_range(day, r.get("start_date", ""), r.get("end_date", "")):
+            return True
+    return False
+
+
+def _v300232_filter_deleted_ranges(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    state = _v300232_read_delete_state()
+    ranges = state.get("delete_ranges", []) if isinstance(state, dict) else []
+    out: List[Dict[str, Any]] = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        if _v300232_is_deleted_by_range(r, ranges):
+            continue
+        out.append(r)
+    return out
+
+
+def _v300232_sqlite_delete_range(start_date: str, end_date: str) -> int:
+    deleted = 0
+    try:
+        ensure_login_logs_table()
+        conn = get_connection()
+        cur = conn.cursor()
+        # Use simple substring comparisons to avoid SQLite date parsing issues.
+        try:
+            cur.execute(
+                "DELETE FROM login_logs WHERE substr(COALESCE(login_time, created_at, logout_time, ''), 1, 10) BETWEEN ? AND ?",
+                (_v300232_date_text(start_date), _v300232_date_text(end_date)),
+            )
+            deleted += int(cur.rowcount if cur.rowcount is not None and cur.rowcount >= 0 else 0)
+        except Exception:
+            pass
+        # Some deployments also have security_login_logs/auth_login_logs.
+        for table in ("security_login_logs", "auth_login_logs"):
+            try:
+                if _table_exists(conn, table):
+                    cur.execute(
+                        f"DELETE FROM {table} WHERE substr(COALESCE(login_time, created_at, event_time, log_time, ''), 1, 10) BETWEEN ? AND ?",
+                        (_v300232_date_text(start_date), _v300232_date_text(end_date)),
+                    )
+                    deleted += int(cur.rowcount if cur.rowcount is not None and cur.rowcount >= 0 else 0)
+            except Exception:
+                pass
+        conn.commit()
+        conn.close()
+    except Exception:
+        try:
+            conn.close()  # type: ignore[name-defined]
+        except Exception:
+            pass
+    return int(deleted or 0)
+
+
+def load_login_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "", limit: int = 1000, event_types: Optional[List[str]] = None, results: Optional[List[str]] = None, include_legacy: bool = True, **kwargs: Any):  # type: ignore[override]
+    """V300.23.2: local-only Page 11 read, with delete-range filtering."""
+    rows: List[Dict[str, Any]] = []
+    try:
+        rows.extend(_v300231_read_local_jsonl(limit=max(int(limit or 1000) * 5, 100000)))
+    except Exception:
+        pass
+    try:
+        if "_v103_db_login_records" in globals():
+            rows.extend(_v103_db_login_records(include_legacy=include_legacy))
+        else:
+            rows.extend(_to_records(_primary_login_rows(get_connection())))
+    except Exception:
+        pass
+    try:
+        from services.authority_consistency_service import merge_by_event_id
+        rows = merge_by_event_id(rows, id_fields=("username", "event_type", "result", "login_time", "module_code", "message"))
+    except Exception:
+        try:
+            rows = _merge_record_sets(rows)
+        except Exception:
+            pass
+    try:
+        if "_v135_filter_deleted_records" in globals():
+            rows = _v135_filter_deleted_records(rows)
+    except Exception:
+        pass
+    rows = _v300232_filter_deleted_ranges(rows)
+    rows = _filter_records(rows, start_date, end_date, keyword, event_types, results)
+    rows.sort(key=lambda r: str(r.get("login_time") or r.get("created_at") or ""), reverse=True)
+    if limit:
+        rows = rows[:int(limit)]
+    if pd is not None:
+        return pd.DataFrame(rows)
+    return rows
+
+get_login_logs = load_login_logs
+query_login_logs = load_login_logs
+load_audit_logs = load_login_logs
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    """V300.23.2 final clear: no previous chain, no GitHub, no full rebuild."""
+    # Count visible rows in range before clearing without triggering old delete chains.
+    count = 0
+    try:
+        before = load_login_logs(start_date=start_date, end_date=end_date, keyword="", limit=100000, include_legacy=True)
+        count = int(len(before)) if before is not None else 0
+    except Exception:
+        count = 0
+    try:
+        count = max(count, _v300232_sqlite_delete_range(start_date, end_date))
+    except Exception:
+        pass
+    _v300232_add_delete_range(start_date, end_date, count)
+    marker = {
+        "username": "SYSTEM",
+        "display_name": "SYSTEM",
+        "event_type": "DELETE_LOGIN_LOG_RANGE",
+        "result": "WARN",
+        "message": f"本機快速清除登入紀錄日期區間：{start_date} ~ {end_date}，估計筆數：{count}",
+        "module_code": "11_login_records",
+        "login_time": _now(),
+        "created_at": _now(),
+        "delete_range_start": str(start_date),
+        "delete_range_end": str(end_date),
+        "source": "11_login_records_delete_tombstone_v30023_2_local_only",
+    }
+    try:
+        _v300231_append_local_jsonl(marker)
+    except Exception:
+        pass
+    return int(count or 0)
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+clear_audit_logs = delete_login_logs_by_date_range
+
+
+def get_audit_permanent_status() -> Dict[str, Any]:  # type: ignore[override]
+    try:
+        rows = _v300232_filter_deleted_ranges(_v300231_read_local_jsonl(limit=None))
+    except Exception:
+        rows = []
+    state = _v300232_read_delete_state()
+    try:
+        db_count = len(_v300232_filter_deleted_ranges(_v103_db_login_records(include_legacy=True))) if "_v103_db_login_records" in globals() else 0
+    except Exception:
+        db_count = 0
+    p = _V300231_LOGIN_RECORDS_JSONL if "_V300231_LOGIN_RECORDS_JSONL" in globals() else records_jsonl_path("11_login_records")  # type: ignore[name-defined]
+    return {
+        "exists": p.exists(),
+        "path": str(p),
+        "size": p.stat().st_size if p.exists() else 0,
+        "count": len(rows),
+        "exported_at": "",
+        "db_count": db_count,
+        "authority_schema": "SPT_11_LOGIN_RECORDS_JSONL_V300_23_2_LOCAL_ONLY",
+        "delete_state_path": str(_V300232_LOGIN_DELETE_STATE),
+        "delete_state_exists": _V300232_LOGIN_DELETE_STATE.exists(),
+        "deleted_keys": 0,
+        "delete_ranges": len(state.get("delete_ranges", []) or []),
+        "last_deleted_count": int(state.get("last_deleted_count", 0) or 0),
+    }
+
+audit_permanent_status = get_audit_permanent_status
+get_audit_state_status = get_audit_permanent_status
+login_log_state_status = get_audit_permanent_status
+get_login_log_permanent_status = get_audit_permanent_status
+
+
+def audit_v300232_11_login_clear_hotpath() -> Dict[str, Any]:
+    try:
+        return {
+            "version": "V300.23.2",
+            "mode": "clear_local_only_no_github_no_previous_delete_chain",
+            "records_jsonl": str(_V300231_LOGIN_RECORDS_JSONL),
+            "delete_state": str(_V300232_LOGIN_DELETE_STATE),
+            "delete_ranges": len((_v300232_read_delete_state().get("delete_ranges") or [])),
+        }
+    except Exception as exc:
+        return {"version": "V300.23.2", "ok": False, "error": str(exc)[:300]}
+
+# =============== END V300.23.2 11 LOGIN CLEAR HOTPATH FIX ===============
