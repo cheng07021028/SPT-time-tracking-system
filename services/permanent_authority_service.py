@@ -1246,3 +1246,162 @@ def github_put_file(path: Path, content: str, message: str) -> dict[str, Any]:  
 
 
 # =================== END V124 CLOUD RUNTIME GITHUB WRITE GUARD ===================
+
+# ===== V300.19 AUTHORITY HOTPATH ISOLATION BEGIN =====
+# Purpose:
+# - Authority files remain the durable source, but page/button foreground paths
+#   must not wait for GitHub upload or full read-back/export.
+# - Local JSON writes still happen. GitHub upload is opt-in via env/manual tool.
+# - Does not alter 01/02 data model, delete/sync logic, UI/CSS/theme.
+
+def _v30019_truthy_env(name: str, default: str = "0") -> bool:
+    try:
+        val = str(os.environ.get(name, default)).strip().lower()
+    except Exception:
+        val = default
+    return val in {"1", "true", "yes", "y", "on", "enable", "enabled"}
+
+try:
+    _v30019_prev_save_authority = save_authority  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30019_prev_save_authority = None
+
+try:
+    _v30019_prev_force_upload_authority_file = force_upload_authority_file  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30019_prev_force_upload_authority_file = None
+
+
+def _v30019_write_pending_upload_marker(module_key: str, kind: str, reason: str) -> None:
+    try:
+        marker_dir = ROOT / "data" / "permanent_store" / "_pending_authority_uploads"
+        marker_dir.mkdir(parents=True, exist_ok=True)
+        marker = marker_dir / f"{str(module_key).replace('/', '_')}__{str(kind).replace('/', '_')}.json"
+        payload = {
+            "module_key": str(module_key),
+            "kind": str(kind),
+            "reason": str(reason),
+            "updated_at": now_text(),
+            "status": "pending_manual_or_background_upload",
+            "note": "V300.19 prevents foreground GitHub upload; run manual backup/sync from admin tools.",
+        }
+        marker.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    """V300.19: local authority write only by default; GitHub foreground upload is opt-in."""
+    allow_foreground_github = _v30019_truthy_env("SPT_FOREGROUND_AUTHORITY_SYNC", "0")
+    effective_github = bool(github and allow_foreground_github)
+    if callable(_v30019_prev_save_authority):
+        res = _v30019_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=effective_github)
+    else:
+        res = {"ok": False, "error": "previous_save_authority_missing", "module_key": module_key}
+    if github and not effective_github:
+        try:
+            _v30019_write_pending_upload_marker(module_key, "records_or_settings", reason)
+        except Exception:
+            pass
+        if isinstance(res, dict):
+            res = dict(res)
+            res["github_requested"] = True
+            res["github_deferred_by_v30019"] = True
+            res["manual_override_env"] = "SPT_FOREGROUND_AUTHORITY_SYNC=1"
+    return res
+
+
+def force_upload_authority_file(module_key: str, kind: str = "records", reason: str = "force_authority_upload_v98") -> dict[str, Any]:  # type: ignore[override]
+    """V300.19: do not block foreground on GitHub upload unless explicitly enabled."""
+    allow_foreground_github = _v30019_truthy_env("SPT_FOREGROUND_AUTHORITY_SYNC", "0")
+    if allow_foreground_github and callable(_v30019_prev_force_upload_authority_file):
+        return _v30019_prev_force_upload_authority_file(module_key, kind, reason)
+    _v30019_write_pending_upload_marker(module_key, kind, reason)
+    return {
+        "ok": True,
+        "deferred": True,
+        "module_key": str(module_key),
+        "kind": str(kind),
+        "reason": str(reason),
+        "message": "V300.19: foreground GitHub upload deferred; use admin/manual backup sync.",
+    }
+
+
+def v30019_authority_hotpath_status() -> dict[str, Any]:
+    return {
+        "version": "V300.19",
+        "foreground_github_authority_upload_enabled": _v30019_truthy_env("SPT_FOREGROUND_AUTHORITY_SYNC", "0"),
+        "manual_override_env": "SPT_FOREGROUND_AUTHORITY_SYNC=1",
+        "pending_marker_dir": str(ROOT / "data" / "permanent_store" / "_pending_authority_uploads"),
+    }
+# ===== V300.19 AUTHORITY HOTPATH ISOLATION END =====
+
+# ===== V300.19.1 CRITICAL AUTHORITY FOREGROUND SYNC EXCEPTION START =====
+def _v300191_is_critical_foreground_module(module_key: str) -> bool:
+    """Modules whose user edits must survive Streamlit Cloud reboot immediately."""
+    return str(module_key or "").strip() in {"10_permissions", "10_permissions_live"}
+
+
+def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    """V300.19.1: keep hot-path deferral globally, but do NOT defer 10 permission authority.
+
+    Reason:
+    - Streamlit Cloud reboot loses local-only authority writes.
+    - Account/permission/security edits are critical and must be durable immediately.
+    - Other modules keep V300.19 deferred GitHub behavior to avoid slow global UI.
+    """
+    critical = _v300191_is_critical_foreground_module(module_key)
+    allow_foreground_github = _v30019_truthy_env("SPT_FOREGROUND_AUTHORITY_SYNC", "0")
+    effective_github = bool(github and (critical or allow_foreground_github))
+    if callable(_v30019_prev_save_authority):
+        res = _v30019_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=effective_github)
+    else:
+        res = {"ok": False, "error": "previous_save_authority_missing", "module_key": module_key}
+    if github and not effective_github:
+        try:
+            _v30019_write_pending_upload_marker(module_key, "records_or_settings", reason)
+        except Exception:
+            pass
+        if isinstance(res, dict):
+            res = dict(res)
+            res["github_requested"] = True
+            res["github_deferred_by_v30019"] = True
+            res["manual_override_env"] = "SPT_FOREGROUND_AUTHORITY_SYNC=1"
+    elif critical and isinstance(res, dict):
+        res = dict(res)
+        res["github_foreground_sync_for_critical_module"] = True
+        res["critical_module"] = str(module_key)
+    return res
+
+
+def force_upload_authority_file(module_key: str, kind: str = "records", reason: str = "force_authority_upload_v98") -> dict[str, Any]:  # type: ignore[override]
+    """V300.19.1: allow foreground upload for critical 10 permission authority only."""
+    critical = _v300191_is_critical_foreground_module(module_key)
+    allow_foreground_github = _v30019_truthy_env("SPT_FOREGROUND_AUTHORITY_SYNC", "0")
+    if (critical or allow_foreground_github) and callable(_v30019_prev_force_upload_authority_file):
+        res = _v30019_prev_force_upload_authority_file(module_key, kind, reason)
+        if isinstance(res, dict) and critical:
+            res = dict(res)
+            res["github_foreground_sync_for_critical_module"] = True
+            res["critical_module"] = str(module_key)
+        return res
+    _v30019_write_pending_upload_marker(module_key, kind, reason)
+    return {
+        "ok": True,
+        "deferred": True,
+        "module_key": str(module_key),
+        "kind": str(kind),
+        "reason": str(reason),
+        "message": "V300.19.1: foreground GitHub upload deferred except for 10 permission authority.",
+    }
+
+
+def v300191_authority_hotpath_status() -> dict[str, Any]:
+    return {
+        "version": "V300.19.1",
+        "critical_foreground_modules": ["10_permissions", "10_permissions_live"],
+        "foreground_github_authority_upload_enabled": _v30019_truthy_env("SPT_FOREGROUND_AUTHORITY_SYNC", "0"),
+        "manual_override_env": "SPT_FOREGROUND_AUTHORITY_SYNC=1",
+        "pending_marker_dir": str(ROOT / "data" / "permanent_store" / "_pending_authority_uploads"),
+    }
+# ===== V300.19.1 CRITICAL AUTHORITY FOREGROUND SYNC EXCEPTION END =====
