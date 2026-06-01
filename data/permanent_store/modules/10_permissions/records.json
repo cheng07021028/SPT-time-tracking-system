@@ -2,15 +2,15 @@
   "authority_schema": "SPT-10-Permissions-Authority-V30017.2",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-06-01 14:47:02",
+  "updated_at": "2026-06-01 14:47:07",
   "exported_at": "2026-05-29 14:43:31",
-  "reason": "delete_users_v30017_2",
+  "reason": "save_users_v30017_2",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
       {
         "username": "admin",
-        "password_hash": "pbkdf2_sha256$0fbe76615cacb09b83b796ac50d666ed$cd8b2da228bd1245b3a045b9352492986a8a7c60e2b22ff8272ea3ea294491c0",
+        "password_hash": "pbkdf2_sha256$90a2a6ab3ff2a6e1f5a2934d2f40509d$9b4149820702383b5add14748c49a2d1f6fa57ac0c9e9c517c16d44ea8405365",
         "password_hint": "由權限管理頁更新",
         "employee_id": "nan",
         "display_name": "系統管理員",
@@ -21,11 +21,11 @@
         "last_login_at": "2026-05-29 11:28:38",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "manager",
-        "password_hash": "pbkdf2_sha256$2f8ee39311f0368d7fc30f424be03b37$dfe48fb6a68c1255020e5f5b51977263e651440f83fbb9f822fd63eef2781b62",
+        "password_hash": "pbkdf2_sha256$969660b7aedc567f34dc5ecab5ffc561$1fe25b3c52e5c55f50f427fabec7c6a87b96cca3b1d9b018e02dd6cc16545de8",
         "password_hint": "由權限管理頁更新",
         "employee_id": "nan",
         "display_name": "製造主管",
@@ -36,11 +36,11 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "leader",
-        "password_hash": "pbkdf2_sha256$d4e6d115b3a8746639786dbe2e1c2124$fa52ee2224892f982c49fd39635d72b1d553c2e17776d8f5bf6dd05ae58bafbf",
+        "password_hash": "pbkdf2_sha256$85a5ab0fa3c6d8d4ad0d6a66102616e6$13191f8eb52258971c69661059b8a66385ab1cc875bc7be8305e122b17f33fa0",
         "password_hint": "由權限管理頁更新",
         "employee_id": "nan",
         "display_name": "現場幹部",
@@ -51,11 +51,11 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "operator",
-        "password_hash": "pbkdf2_sha256$c55f398b252a41c724e47492e41b7459$05e59600d54eee8cfa7d6f1f6f11a8091078c0d54d6aabcc894af98981e36793",
+        "password_hash": "pbkdf2_sha256$9e2da6ed646b5433f0b0b77bd01340ee$009ed85fbe6e8b669f41f7bab7e86da65dfb13e277fcad780f3d6e6816417eee",
         "password_hint": "由權限管理頁更新",
         "employee_id": "nan",
         "display_name": "作業人員",
@@ -66,11 +66,11 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "viewer",
-        "password_hash": "pbkdf2_sha256$7e461fb390317acce60fa8a9df021773$caa4f809802267f8f54bce6b390adcc6934b804aae9dd2f660c8049a31b345ab",
+        "password_hash": "pbkdf2_sha256$ecc09827fed5399c96dd19ff51cb6f2a$4e70226f797c828751f10adbb5eb00ea58be01dc38bcb6d4ccca741bf9cabb27",
         "password_hint": "由權限管理頁更新",
         "employee_id": "nan",
         "display_name": "查詢者",
@@ -81,11 +81,11 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:07"
       },
       {
         "username": "auditor",
-        "password_hash": "pbkdf2_sha256$f699f81a3d2a208dab786f2c9341be7c$22f6f4289a19227b24dc86cd6ba788cb02d2da9555c26d3ba87f3a80cbc01916",
+        "password_hash": "pbkdf2_sha256$2b0b7fd82cc13e15aec0d973b0003780$38083e2f37b8c5fec78d70a8cd1a5f01871d6d0f0c039cfd77f0c2f2cded6ab0",
         "password_hint": "由權限管理頁更新",
         "employee_id": "nan",
         "display_name": "稽核",
@@ -96,11 +96,11 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "SPT142",
-        "password_hash": "pbkdf2_sha256$a8259fbb1694592258fb32e57e99299f$a11410ee9171e83862699a549edbcf51e7130bb880c1727ef7c6fc01ed048985",
+        "password_hash": "pbkdf2_sha256$3611c1ab46a52cce3a3d6d6659eab03f$9a0b6f5c6f8237457b0aca1bdf94979fc1c2efbb38d474a24955382da3870b73",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT142",
         "display_name": "黃沂澂",
@@ -111,12 +111,12 @@
         "last_login_at": "2026-05-15 11:18:26",
         "note": "",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "B211",
-        "password_hash": "pbkdf2_sha256$180000$l5AVIR3LHGflYFFAOEv9Yg==$d7HKc0NHYDpzj1BT3KwKpSzWwFLwU1YHNtQ135nk7/c=",
-        "password_hint": "由權限管理頁建立",
+        "password_hash": "pbkdf2_sha256$02a01a44178533bc623fd610dbd1b9c8$afb911513d8a3b98d7577846e211661cc7684eaa3c734e770a1f909a86076c17",
+        "password_hint": "由權限管理頁更新",
         "employee_id": "B211",
         "display_name": "張瑀榛",
         "email": "",
@@ -126,14 +126,14 @@
         "last_login_at": "2026-05-29 10:06:59",
         "note": "",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-05-29 18:01:40",
+        "updated_at": "2026-06-01 14:47:05",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "Ethan",
-        "password_hash": "pbkdf2_sha256$3b606b8ff672a6a0fb3c96a820f0d6e7$22364b81baf0611dd8712d0808bddf0eb6f7e54d2f0d5e53d6eae0cc3bb8939c",
+        "password_hash": "pbkdf2_sha256$22f9e3bb653bbf8f642f9fe4d1f46d6e$23fbe6f80b497c6c7b8eb6507f9332b31cd5ec631aeb78af4aef63c195d7a044",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT142",
         "display_name": "Ethan",
@@ -144,11 +144,11 @@
         "last_login_at": null,
         "note": "",
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "SPT121",
-        "password_hash": "pbkdf2_sha256$180000$1K2wK5SLisMssSZDs6hEuw==$mD5zv0KY1Xl3C8pvxbxXv3fawjpy0d6x1naH7aw2o1k=",
+        "password_hash": "pbkdf2_sha256$a9ac58131ee834986ff123794ca7539e$14a09910393867417c799c3e602c2d9231c0c0e841e4ffb17b42ed686e67f776",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT121",
         "display_name": "徐兆生",
@@ -159,15 +159,15 @@
         "last_login_at": "2026-05-29 11:24:40",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-29 18:01:17",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "B164",
-        "password_hash": "pbkdf2_sha256$180000$AdYikUm97lLLwGFwM1jRDQ==$ocuVzqoR4Zw9a7qri7v7d91z6lCAcfjVriMxOS+r6ko=",
-        "password_hint": "V105 canonical authority login cache",
+        "password_hash": "pbkdf2_sha256$a5cda09a7e4f7cb9a00473acf71b06d6$fa08a40e42a3165b085bc748fde1aaf6d33e37fc07002f3410aa67fd54f7cbf3",
+        "password_hint": "由權限管理頁更新",
         "employee_id": "B164",
         "display_name": "陳宛廷",
         "email": "",
@@ -177,14 +177,14 @@
         "last_login_at": "2026-05-29 10:09:41",
         "note": "",
         "created_at": "2026-05-27 10:23:13",
-        "updated_at": "2026-05-30 08:46:15",
+        "updated_at": "2026-06-01 14:47:05",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT220",
-        "password_hash": "pbkdf2_sha256$cc9d1ff6d5ab84c6e0f6fd92b1afc194$65605b527817cda1acd551dadfd1936ded15c8d425ca1ddcee64cfa295f9de8d",
+        "password_hash": "pbkdf2_sha256$55ce4cabeeeab8eb386571961f4606a9$d1b9332bb2a8ef1b52313c2ca3be1997380173e240cddee7a38186f3474ea740",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT220",
         "display_name": "劉韋廷",
@@ -195,11 +195,11 @@
         "last_login_at": "2026-05-29 10:01:15",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:07"
       },
       {
         "username": "SPT031",
-        "password_hash": "pbkdf2_sha256$94bcfac304537684083f4ef89c562a8e$3dc5ec1b57e0a2cc0386fbc80a863e285905dcab767061dfa980b6e0b5d54bf1",
+        "password_hash": "pbkdf2_sha256$4bc3fbf2dadf246ca1f8d2b4ced1af83$01109a8ef022473c329abee60bdf722537a220c2a606f6f8c7fd4572884084ae",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT031",
         "display_name": "吳政昌",
@@ -210,11 +210,11 @@
         "last_login_at": "2026-05-29 10:52:16",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT199",
-        "password_hash": "pbkdf2_sha256$54926b3a6cf5b97e57c72756b7979347$d0cd2ee249fcea478107c46325cca83309abd50c589f02ba13eb057ad8107a91",
+        "password_hash": "pbkdf2_sha256$3cf91bc5264694f3250278aa5ba95fa2$e69a7f18588dc23c9dd144da97081845d2ceace764e2737139155541b99a736e",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT199",
         "display_name": "龍斯愷",
@@ -225,11 +225,11 @@
         "last_login_at": "2026-05-29 10:05:43",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:07"
       },
       {
         "username": "B246",
-        "password_hash": "pbkdf2_sha256$180000$UBRVSsb3sNiV/gCmRFnuOQ==$d9wq14CyBtBJEiEWwrcp9MEoJ+mO5yk/eQwMbHXUnMg=",
+        "password_hash": "pbkdf2_sha256$b04b307261b2a068790fccb7c2f20ca9$49231e9b2c518d3e3137896884cd58e3d203904f1fdc8cee24ee2b657bae547a",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B246",
         "display_name": "湯詠棋",
@@ -240,14 +240,14 @@
         "last_login_at": "2026-05-29 10:05:55",
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-30 09:37:27",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT148",
-        "password_hash": "pbkdf2_sha256$180000$UjtI5xUhrW8pPeeQjsMDAg==$v2rhPR6QzWcS5RL/tTB9LiVfvXO8bKcW2Bu5Tvyodg0=",
+        "password_hash": "pbkdf2_sha256$833419c3c5dc11dbb439af608ac7682d$9e5440ca3a53e9e707a61b2deff3395e262f5c87b7a247020274b1ded6ac0c04",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT148",
         "display_name": "羅立昕",
@@ -258,15 +258,15 @@
         "last_login_at": "2026-05-29 11:27:16",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-29 17:54:24",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT203",
-        "password_hash": "pbkdf2_sha256$180000$BkCKvyjHEceLxiVcfDNnIA==$HlPNm2+MJpmF+wKUOZQ3SPui+b9RWFERTGqVF3e1XwY=",
-        "password_hint": "V105 canonical authority login cache",
+        "password_hash": "pbkdf2_sha256$0341be6b0e0ca7de95b0c6708852ac73$cb579cb97df3d82090ed08b388e327e1cf59b82bcc7b8292304682ec12fa7b54",
+        "password_hint": "由權限管理頁更新",
         "employee_id": "SPT203",
         "display_name": "徐梓翔",
         "email": "",
@@ -276,14 +276,14 @@
         "last_login_at": "2026-05-29 10:08:50",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-29 17:36:48",
+        "updated_at": "2026-06-01 14:47:07",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT241",
-        "password_hash": "pbkdf2_sha256$180000$CWQNCUeMms2dS8lqryh34g==$6kkB+FphodPq1el2dB5C7hSEcApl7eenCJ4XDtXIK8I=",
+        "password_hash": "pbkdf2_sha256$e2105bc6d1f08b1522c37d2eb6e95c5c$196705eca5f459ed3ee138712456a280530868280e108d0753dae14bc3b25eec",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT241",
         "display_name": "達文",
@@ -294,15 +294,15 @@
         "last_login_at": "2026-05-29 10:13:24",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-30 09:05:20",
+        "updated_at": "2026-06-01 14:47:07",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT256",
-        "password_hash": "pbkdf2_sha256$180000$1mRBOMsCd5I+ivu2ATZfVQ==$iPw5QSipfhh570GK07cYwE3WPS8QqVJubD5Jwez/aMI=",
-        "password_hint": "V105 canonical authority login cache",
+        "password_hash": "pbkdf2_sha256$b3d3e3eb206821b50b44877559c73d27$87bbeeeb9cbe44d5effb9914f79a4a5a9311ba409af62832516b29b8e696ad90",
+        "password_hint": "由權限管理頁更新",
         "employee_id": "SPT256",
         "display_name": "阿杰",
         "email": "operator",
@@ -312,14 +312,14 @@
         "last_login_at": "2026-05-29 10:18:57",
         "note": "",
         "created_at": "2026-05-27 10:05:01",
-        "updated_at": "2026-05-30 09:08:11",
+        "updated_at": "2026-06-01 14:47:07",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT208",
-        "password_hash": "pbkdf2_sha256$180000$1NCaGbcQKE/SIsLUpHFigw==$BDGOYIhij6PAcU/8YpqjoB/bNTIK54EGg3/YEWD25iw=",
+        "password_hash": "pbkdf2_sha256$5cac8f475274a8f5acdb37a0994343de$1e537671d15a58e5e40f7346815ea238e13472c94f192b2f2a405ea1db0f6616",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT208",
         "display_name": "邱珍娜",
@@ -330,14 +330,14 @@
         "last_login_at": "2026-05-29 11:25:51",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-30 08:18:29",
+        "updated_at": "2026-06-01 14:47:07",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT145",
-        "password_hash": "pbkdf2_sha256$180000$I0rtNt8zNm5xIr19ib1pdA==$3nOJ26jrura3te6b5J7NSbznb8bOgooWXOO929bNGM4=",
+        "password_hash": "pbkdf2_sha256$fd5f2ad4b9d7513739bb02cede887270$d9bf03a21b8295f2413942da71df4e38f9e8db5e48d4c33e394c8c0474fd9e96",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT145",
         "display_name": "潘威捷",
@@ -348,14 +348,14 @@
         "last_login_at": "2026-05-29 10:21:09",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-29 18:01:33",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT230",
-        "password_hash": "pbkdf2_sha256$c2fc0d26c91427162afbeaef982ccfcc$bb3ea08726c7d9d5bc154f4ef948a9f2bc46b17db4f35f43ab5b464e8fd7c75e",
+        "password_hash": "pbkdf2_sha256$c340d91ba3dabbf256863889dbd2bb97$33b73b8093ec6c77edd93f6b0163f15a1534f8030403d32b4721ecbc0fb09d1f",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT230",
         "display_name": "梁志宏",
@@ -366,11 +366,11 @@
         "last_login_at": "2026-05-29 10:23:01",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:07"
       },
       {
         "username": "SPT239",
-        "password_hash": "pbkdf2_sha256$180000$rr5JaLPIoikj2kDG3jCBCw==$KeiMxkkoLKnNpE+2VujJ+F0YQy93vsyT1IkZB4pLWKU=",
+        "password_hash": "pbkdf2_sha256$e25e7235696a69307ae28c5c30aa88a0$cfeb9c739dc3e38dadaf70a4d4bb93d7ffe2c944f800fbef70b657a4ebcb3ce3",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT239",
         "display_name": "麥可",
@@ -381,14 +381,14 @@
         "last_login_at": "2026-05-29 11:27:54",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-30 08:21:42",
+        "updated_at": "2026-06-01 14:47:07",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT174",
-        "password_hash": "pbkdf2_sha256$376760f8ed52551ee52f6f6ee50884d5$ef1dbbaaf787ceceb204739724cbb8a4daf7005e6279c4600074f5fa989fc47f",
+        "password_hash": "pbkdf2_sha256$8f4337ea45ccf11438e052cde2f53831$6d5c2d53e8a3667a15f109ac1f79119a778b674d16f1576ad8f5a2f952d7907b",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT174",
         "display_name": "龍才華",
@@ -399,11 +399,11 @@
         "last_login_at": "2026-05-29 10:32:53",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT240",
-        "password_hash": "pbkdf2_sha256$180000$y28JWG+3KNTZZyD4h5n9Zg==$FH60X8HOFg6BCqOd/aiR0zXO2vvOj6pWG/62Ehz0gJI=",
+        "password_hash": "pbkdf2_sha256$9cef113b71974e76743f3bde8df44177$7425ec6f6eb21870887f56fae305ae44c5944b13620fa15f003a2be3baa631d9",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT240",
         "display_name": "吉爾",
@@ -414,14 +414,14 @@
         "last_login_at": "2026-05-29 10:45:19",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-30 09:01:54",
+        "updated_at": "2026-06-01 14:47:07",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "SPT244",
-        "password_hash": "pbkdf2_sha256$180000$YgkIzGq1u/qu569LZBcarA==$xpzHD8JZ8JghlyreBTO26EQDvcsmkBm6mVBGUxc/HRI=",
+        "password_hash": "pbkdf2_sha256$eb29cadbc2126e758610b01033e61cf6$6220a202fa08fe1f09982ac8b7bb17f1d183f62895c0a8f3bbec8948cbcdb0f6",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT244",
         "display_name": "費南",
@@ -432,14 +432,14 @@
         "last_login_at": "2026-05-29 10:40:46",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-05-30 09:42:38",
+        "updated_at": "2026-06-01 14:47:07",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "B226",
-        "password_hash": "pbkdf2_sha256$8d8960a7b3e56ee8a098f123c80c0017$3bd34f57406631ecbff53639c2eeb4c88b37370952e2775c0471dcfc4ef83248",
+        "password_hash": "pbkdf2_sha256$91d703be518446a03b59843b2e72a6f0$f0edfe3df67060f76b1bcce0625a13be4aca60421a2c4b3a78982e5ed845e21a",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B226",
         "display_name": "周政龍",
@@ -450,11 +450,11 @@
         "last_login_at": "2026-05-29 10:46:18",
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "SPT149",
-        "password_hash": "pbkdf2_sha256$180000$8POQ2i8hEAIFeMebUQJQeQ==$C0mCzBSaOPFfdwg8++b8Hp3za6vvLeIWUSPwK9B0yH4=",
+        "password_hash": "pbkdf2_sha256$4214321c80868f35e0f94fa27982eacd$c058ce92da590cbd22c08aa74be2ea53ca1705e1e10996599edb9422566f5295",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT149",
         "display_name": "江金福",
@@ -465,14 +465,14 @@
         "last_login_at": "2026-05-29 10:51:19",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-29 17:54:59",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
       },
       {
         "username": "B135",
-        "password_hash": "pbkdf2_sha256$c668a519f4768abfc93cb49925d38933$480e14009d26f38427a9b9b349a9ed3ffba6869b29ca51764fded3a2ff791680",
+        "password_hash": "pbkdf2_sha256$1d6e7fb5058cb14dc5bc0464dafb731e$2dfa79685428a465bc328831fb1240abd86c080c8321e727ba20d8048b79960f",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B135",
         "display_name": "鍾明志",
@@ -483,11 +483,11 @@
         "last_login_at": "2026-05-29 10:56:09",
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "SPT087",
-        "password_hash": "pbkdf2_sha256$96491d1c15193b0aeca4cfc27d9a7704$318f8b8fd44c6d52e6a64560572eb62f06e3daf6d943793a3db879b83f2fa387",
+        "password_hash": "pbkdf2_sha256$257b9d739d2d4280a46825b74cfbc029$dc5771a77c8e94399cd3e09a87a78544e4fa7ac4b68495eab36767bb2942d501",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT087",
         "display_name": "牟育玄",
@@ -498,11 +498,11 @@
         "last_login_at": "2026-05-29 11:02:58",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "B189",
-        "password_hash": "pbkdf2_sha256$a0f848b56b978d662006a42c182205b2$b591d35d257c4c4cb99353f93d66ef57ac0b1dcc16c9e582d8ce68658045b5fb",
+        "password_hash": "pbkdf2_sha256$e2d5fa2ca035de945fc1b82ad7564aaf$e0c8ce6efb2f019d5d95894d8bbf59928fcf402a0579f65135f5fceb73850b90",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B189",
         "display_name": "羅文發",
@@ -513,11 +513,11 @@
         "last_login_at": "2026-05-29 11:07:58",
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "B190",
-        "password_hash": "pbkdf2_sha256$bae14bf703f414f0e738cd89cde8d56d$f78a9acc3dd7051244f5d5b9ba54d0ef1ae1356657c9af1a6a84caa8f4f7c007",
+        "password_hash": "pbkdf2_sha256$f673a7ef8c398a494c826f7e860057b8$04c46b802ece326f6a8432ae6c374e751f075ed3c247a3a7483756ff67bbac9b",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B190",
         "display_name": "黃瑞翎",
@@ -528,11 +528,11 @@
         "last_login_at": "2026-05-29 11:09:49",
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "B204",
-        "password_hash": "pbkdf2_sha256$54c6f8d5167ff647dedf93c12e584d94$7b1f50cbfb19a518248ac0a0b1e97305ae280674da31f9c06b33dc2b5b817e0a",
+        "password_hash": "pbkdf2_sha256$1b9980dbee62416788ff6b30a1accfbf$48294b756a24c145432acf3b0383eddf51be61463f8c12cbb2cd4e10300787fe",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B204",
         "display_name": "周棟榮",
@@ -543,11 +543,11 @@
         "last_login_at": "2026-05-29 11:15:12",
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "SPT118",
-        "password_hash": "pbkdf2_sha256$0aac0d032a28f09a315033d7157718ef$5b64a0746a2a2eb17eb6df611d3ef104341939e9006aaf6ffec79ae0c36d6c75",
+        "password_hash": "pbkdf2_sha256$9c98392140513075221bd28fbe377c92$47ba2be11f4f17ae1d1ea9d988e2c654273706a1fc3caa256fd3b00d11d5d4f6",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT118",
         "display_name": "郭家吟",
@@ -558,11 +558,11 @@
         "last_login_at": "2026-05-29 11:24:24",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT003",
-        "password_hash": "pbkdf2_sha256$b0d7d7f63fd7f82e5b6338cbe89ae869$3dc0a9c4632eaaa7458ed50ef6cc692c393ea008a86cf553290399ff9f100b2a",
+        "password_hash": "pbkdf2_sha256$fed87ae671a568acd72d55b741890fd8$93fc6aa8f110eb56b4092b41cb83e7c8f2932af79f9c04319ceea0df6da93ee6",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT003",
         "display_name": "林威呈",
@@ -572,11 +572,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:50",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "SPT005",
-        "password_hash": "pbkdf2_sha256$8babcd62dc698322327946cadcc48234$ecc18868a6eb331cfa6c1c12494c2508241f2fc0d62941ff5094ca207476cb69",
+        "password_hash": "pbkdf2_sha256$39fc9ff3ecacd9a4668c3fac6e2f3cb4$64edfa7e3ee928019512a6cbe88a97e2892f7ec426c52d7c380cbee1e1a7f4ef",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT005",
         "display_name": "張景智",
@@ -586,11 +586,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:50",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "SPT236",
-        "password_hash": "pbkdf2_sha256$180000$bkfIzTjK4iU+0iwTEZjGzg==$i/llL9yzoRYMNFIGqCC83tdR+o+TFLK4UXL9DeN0ac0=",
+        "password_hash": "pbkdf2_sha256$aa56e4b212777d296a86b113ace79be0$af16041740b664a0a95ead0aac3702f52db0112b454f15894303bc7b850fa600",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT236",
         "display_name": "賴智文",
@@ -600,11 +600,11 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:50",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "SPT015",
-        "password_hash": "pbkdf2_sha256$480933097afc423c2a72cdb041b750bb$023665b882cdd9671c60b749a5814befd4cb631c08fe389b3e8e0f93ecd04f8f",
+        "password_hash": "pbkdf2_sha256$cfac816bba5f42919fdffd18c8179df2$bce5af9b3208a13ab7c9425cc58776cd695a4294df9659ed631de958df9e9f2b",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT015",
         "display_name": "陳文山",
@@ -614,11 +614,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:50",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT024",
-        "password_hash": "pbkdf2_sha256$ab1fa858b58615794694d13c9887c659$9a797709e308be17a516fe06d2385affd9d987624f6803f79613425b4b63514f",
+        "password_hash": "pbkdf2_sha256$2fa7ee2f0f4b8fc6d86f5c256452f0f9$3b49cc697773d43e56ddaa45ae2ffaef58dd925fdc22d8aa3480635041f0dcd5",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT024",
         "display_name": "陳德文",
@@ -628,11 +628,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:50",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT034",
-        "password_hash": "pbkdf2_sha256$5c7183b9fd85390d185c52d92e9a3c60$f549e44f654da60f95508e590fb0e12fa48d0e6ced78fcb0c112accb5ad9dbbf",
+        "password_hash": "pbkdf2_sha256$60c572b31a7689e02ec76ed8f8ec3001$acca71e60460d8a484f3a8e352168444cda7d02b9f7ff73a9652412a5390e3bc",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT034",
         "display_name": "陳長彥",
@@ -642,11 +642,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT048",
-        "password_hash": "pbkdf2_sha256$5b7b6e008f64e59e60ce915602558d76$5c55487e43dc69d5884dc8d1ce03b9e59c1554d341e808fbb3994bedcf9c6ff2",
+        "password_hash": "pbkdf2_sha256$da829be96fc44e715946e46666147ba0$419f2b0ac734c5c3a45fafb84308918442315a9d1906e16ea4cbc1320a9be7f2",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT048",
         "display_name": "李俊霖",
@@ -656,11 +656,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT059",
-        "password_hash": "pbkdf2_sha256$2e6d740b1bb3aff9aa0b0b281f170d3f$0f1ce3991f862c45c5f276bff5030001e86dbc24291ed7fc8d752fa998b0b8c9",
+        "password_hash": "pbkdf2_sha256$d61f57d159725d8cd0c799d2fa45802e$23a3e60e222439b3bb5720dabbd9199d6d2488bfeeab18b9e859b5e1170a0304",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT059",
         "display_name": "蘇萬紘",
@@ -670,7 +670,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT063",
@@ -684,7 +684,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 17:15:59",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -697,7 +697,7 @@
       },
       {
         "username": "SPT077",
-        "password_hash": "pbkdf2_sha256$1355a7677632a4dd24a45a242f0f5a36$08ee85bc70242f9eb61927035f837a3fcf72a26d1375672d5d673b448d17f3b1",
+        "password_hash": "pbkdf2_sha256$0976c6b000d9c38566f61bbc648e0295$6a31696c8316a4b479628c3faacd03a5de5ee4efbaa64e184c77c1ed0349a7ea",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT077",
         "display_name": "謝宛庭",
@@ -707,11 +707,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT084",
-        "password_hash": "pbkdf2_sha256$048ea985381d6ee2ec02c44976d52c07$b6849dde9ac86ce0bb4db1ca82d809a0eaff3a1695641a2ac95baa27dd343c59",
+        "password_hash": "pbkdf2_sha256$5e05df437ad053f772a1e2ef895be14f$bd4afd4bda4fb82b6ff0dde2377aa9455968c272036cacc3075d5a4bba45adb7",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT084",
         "display_name": "陳育信",
@@ -721,11 +721,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT088",
-        "password_hash": "pbkdf2_sha256$acaeae97b9c3055d30a58249e4e59217$26322f02f709b43543eea74058c784c7e697ac6476caae6b39ba4e2b19b9bf8a",
+        "password_hash": "pbkdf2_sha256$6d37bdf45f65368b340d21b10e917c8d$2d6677f029b487561a5d0de8ec411fca591d8cbbeb64b0f8124ccb99a070b44d",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT088",
         "display_name": "林建安",
@@ -735,7 +735,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT089",
@@ -749,7 +749,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 18:05:54",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -772,7 +772,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 17:40:48",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -795,7 +795,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 17:33:46",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -818,7 +818,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 17:50:17",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -831,7 +831,7 @@
       },
       {
         "username": "SPT105",
-        "password_hash": "pbkdf2_sha256$8895f60f0562da6e779fda1dc166b660$a285ccae0f2c7195960f662f54b7c3466cf4af90d8eafb6e6a4c76556cd560d2",
+        "password_hash": "pbkdf2_sha256$d608ef958a22006bafb01357367e9533$78be67c8243df13bedcb04eed941992457f9375bd51d442efd6ac456af5f8737",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT105",
         "display_name": "劉秀鳳",
@@ -841,11 +841,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT120",
-        "password_hash": "pbkdf2_sha256$de0efdb775868d113b76e34db11e425f$dae0e08484238983d6a6d09e21e2eeb11d83204dd0ff44bd6136920cb672349f",
+        "password_hash": "pbkdf2_sha256$b6863fad6889b2fcd1c84384d72a2756$0f80ee064f95c4444fe14872e29770d5d27753aa972a3ab56b1459e4639fa4e9",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT120",
         "display_name": "彭雅琴",
@@ -855,7 +855,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT150",
@@ -869,7 +869,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 17:27:45",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -882,7 +882,7 @@
       },
       {
         "username": "SPT151",
-        "password_hash": "pbkdf2_sha256$cebb8a16ccd3b702913e3fe8b7ba5b27$90501c542aa0d4ecd02cb8cc4af0438e7dcbf0a5a8205ab15463dace5a39d7b6",
+        "password_hash": "pbkdf2_sha256$a1c55f0822170755d8180d22cae1f151$56d6dcc35bb4588187cd190125820d994eb775559da445649aecdeb66273701c",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT151",
         "display_name": "鄭智鍵",
@@ -892,11 +892,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT158",
-        "password_hash": "pbkdf2_sha256$63267b8b44e0849b93c15b6a16e67e4c$7564b376416e0586f603e1b9ace9286661470997140b8877521bb9e2aa6094d1",
+        "password_hash": "pbkdf2_sha256$c67832c073a20f4379236aa1c8873762$42a8a5f99681a99f52c5e0b1295c4185255aa230ca6f1500747a56166d222545",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT158",
         "display_name": "劉定澤",
@@ -906,7 +906,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT160",
@@ -920,7 +920,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 17:51:59",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -933,7 +933,7 @@
       },
       {
         "username": "SPT172",
-        "password_hash": "pbkdf2_sha256$c8f97a240b8547506ed409c7b66816e5$ff29285c4dfbe9960d34132846c246e61dd1e1ed030d2a49863a8690ba14debc",
+        "password_hash": "pbkdf2_sha256$44d11d1c3467538f811072fc4ccbf9e1$845eef16b09211d01c92dd47f82d09ca7ea98c87ea18a2578de7e17cfcb65040",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT172",
         "display_name": "胡瑄芸",
@@ -943,11 +943,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT173",
-        "password_hash": "pbkdf2_sha256$0a37b54dc6920cd0068cf02bf9cfc575$4d84e3a6577367395c8d136e74aeb39739ffcbe97b27061f6f2b959d7781a2fb",
+        "password_hash": "pbkdf2_sha256$c9e1d61d4d0283ee15a06059e1599d63$fbf1b3b31573fddead55cc056a4751762ad7ae2ad352d1faabc3452a1f264e4c",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT173",
         "display_name": "吳芷熙",
@@ -957,11 +957,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT183",
-        "password_hash": "pbkdf2_sha256$344532a92419b48c83a50e5c746b0eb5$25c1b57328f699c53024edb4e3d471fdd4d6713069123d1381466a8e1a2682c3",
+        "password_hash": "pbkdf2_sha256$d1afc98a80fbdbe61b6e8d74e9ef4c18$2bac72568899255b0c27899f305ab7406f71415a6e5514d8508b2183b5c7ef7a",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT183",
         "display_name": "蕭詩瓊",
@@ -971,11 +971,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT189",
-        "password_hash": "pbkdf2_sha256$4be83c6542a7486ac67e021e77d1f970$dc4b3d1e0fc4ac2eca5655757ce50659c468254fa2be26c3c4e17c823255a153",
+        "password_hash": "pbkdf2_sha256$eca2b526c3cb1d7ea6398168cf372c15$ab9d90ede1e066edbb8d90008dba721050f4958f1ce355b05b4d6fe4395037a9",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT189",
         "display_name": "劉欣惠",
@@ -985,7 +985,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT193",
@@ -999,7 +999,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 17:48:53",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1012,7 +1012,7 @@
       },
       {
         "username": "SPT195",
-        "password_hash": "pbkdf2_sha256$76966b9ef5b6aa48e3cdc86a4c64a1f0$701d64fa111aad6ba402cb96bd48fe4be264597c3e8c2c77977c2c9e7110b7fa",
+        "password_hash": "pbkdf2_sha256$46c2900f1ea30b8037c82fd2aa55f6f3$82410d3739adae9b26829a2606b80c804df861b676bbabf4817880d5a4e4bc27",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT195",
         "display_name": "姜治銘",
@@ -1022,11 +1022,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT196",
-        "password_hash": "pbkdf2_sha256$8f5d465bce1dbbb5954655bfaaf77d4d$19dfae30bd5d180c4568a754e04d41adbca68889d0babdc88407753166d4dd49",
+        "password_hash": "pbkdf2_sha256$779d9a1b3bdc549930b17466079f07ea$ec91bd4fe12b511c4ae53658925d4853e415fe3aa9d1d2b9299bbdf45ae31c84",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT196",
         "display_name": "黃建堃",
@@ -1036,11 +1036,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:07"
       },
       {
         "username": "SPT201",
-        "password_hash": "pbkdf2_sha256$b0a4d03101907713b34d56ddcdf9e978$5cf19f43e92b287ffe5b03d8d4ee912ec6bfd4c343d4a0b9c70159baaf75a20b",
+        "password_hash": "pbkdf2_sha256$3ec99d94820ed79c93fea15f0aadc6d3$e99e39e08a2e979c41b2d3b4bc2fffcabc671e543f1b2b8f7b94e354ae693a2c",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT201",
         "display_name": "彭毓萱",
@@ -1050,7 +1050,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:07"
       },
       {
         "username": "SPT227",
@@ -1064,7 +1064,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:36:07",
+        "updated_at": "2026-06-01 14:47:07",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1077,7 +1077,7 @@
       },
       {
         "username": "SPT228",
-        "password_hash": "pbkdf2_sha256$662d7841edc0f5864bc9d21463addf21$db86594bb16694a8cc3883edd10e3ad6bbf0113c84d6b3e5938b7063802a44ca",
+        "password_hash": "pbkdf2_sha256$d47a1df0ed3556fd564e15e3e70cdac7$2d40e60461350580066f50d8773ba6fe05cb6a54cc98daf50b6a24e07b50bcd1",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT228",
         "display_name": "王添慶",
@@ -1087,11 +1087,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:07"
       },
       {
         "username": "SPT229",
-        "password_hash": "pbkdf2_sha256$2c758fcd72c57fae88b6c03e6c485a32$0780b3dc404c9d67a6e3696a84afa0ff06f328e15cdd30b39018241a8fee891b",
+        "password_hash": "pbkdf2_sha256$59651f556497e86e7e9a482d2de90dd2$7e03d7e2b57e1af0f0b1416597e26f222f3e722ae0b0b809a21b876b8842a321",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT229",
         "display_name": "彭子芸",
@@ -1101,11 +1101,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "SPT231",
-        "password_hash": "pbkdf2_sha256$e8ebdc70a4ee7394315ccf233c7f8296$bb327de0ada8e1a933d78386c3f9b1aa971ab8f26ec5ccce29ba00faca5eb822",
+        "password_hash": "pbkdf2_sha256$366f30451a62d856d836040d30fed8c7$72a1cf9df3bf63455b3cf84be8e6d12eb0b5a32cc919b1350446f08ae4f5e407",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT231",
         "display_name": "陳建勳",
@@ -1115,11 +1115,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:07"
       },
       {
         "username": "SPT235",
-        "password_hash": "pbkdf2_sha256$e1ab814b1bc27ed33c21804b0b8f0c35$6ad526472ba9363d08b0e96af3461c058e08db7f69369b8c6d1cda6122fc2052",
+        "password_hash": "pbkdf2_sha256$65da53af7912b77efb58d5c3d30bf855$17fe5e1b4018214cbdae3ae7379ec935670a699d167f327635d345b96baf6992",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT235",
         "display_name": "曾純鈺",
@@ -1129,7 +1129,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:07"
       },
       {
         "username": "SPT242",
@@ -1143,7 +1143,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-30 08:27:49",
+        "updated_at": "2026-06-01 14:47:07",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1166,7 +1166,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-30 08:24:45",
+        "updated_at": "2026-06-01 14:47:07",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1189,7 +1189,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-30 09:12:56",
+        "updated_at": "2026-06-01 14:47:07",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1212,7 +1212,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 18:04:32",
+        "updated_at": "2026-06-01 14:47:07",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1225,7 +1225,7 @@
       },
       {
         "username": "SPT252",
-        "password_hash": "pbkdf2_sha256$c683b3316ba73c377a3d9e55ffa603c5$2361a2fc6950d7c1f8a567440105c680c5d24f79a92951534a8e0c593cf9c8b5",
+        "password_hash": "pbkdf2_sha256$c69bc04bb11a5ec90871d2f86ab0ebd0$c4aa46870fe897273fbd8ef4e81fdb9d83e608babe07a70220393eb03381a612",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT252",
         "display_name": "許佩瑜",
@@ -1235,7 +1235,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:07"
       },
       {
         "username": "B002",
@@ -1249,7 +1249,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 17:49:36",
+        "updated_at": "2026-06-01 14:47:05",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1272,7 +1272,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-30 08:36:30",
+        "updated_at": "2026-06-01 14:47:05",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1295,7 +1295,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-30 08:48:30",
+        "updated_at": "2026-06-01 14:47:05",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1308,7 +1308,7 @@
       },
       {
         "username": "B203",
-        "password_hash": "pbkdf2_sha256$5e0f9e511a51d0a6d6087bb451b92064$bcb6db70abf8e328e0f0554f836eae116ff93f344c9d021ae6b26adc0ee9ef34",
+        "password_hash": "pbkdf2_sha256$5c489061bdb7a4096bde3708bc49a310$c2465f4c893375f65d4923aee64a1f1acf29e888ac7f990a2c515d66bb61c218",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B203",
         "display_name": "蕭桓惟",
@@ -1318,11 +1318,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "B227",
-        "password_hash": "pbkdf2_sha256$697b61b1cf9641f43e3c14ea1ecc2ee2$a2d11a07b61a6a5d5dfaea992711e763d11c13acbe30fc78674c86c1ebed8e4d",
+        "password_hash": "pbkdf2_sha256$454da0f743f24fd4d60e37c4fec6357f$d20d9120b7de5574db03a6f23bba0f8bdc2ab7d6319dd697e36b29cd5f932429",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B227",
         "display_name": "潘信成",
@@ -1332,7 +1332,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "B210",
@@ -1346,7 +1346,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-30 11:26:51",
+        "updated_at": "2026-06-01 14:47:05",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1369,7 +1369,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 16:38:45",
+        "updated_at": "2026-06-01 14:47:05",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1392,7 +1392,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-30 08:38:06",
+        "updated_at": "2026-06-01 14:47:05",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1415,7 +1415,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 17:33:44",
+        "updated_at": "2026-06-01 14:47:05",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1438,7 +1438,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 17:53:18",
+        "updated_at": "2026-06-01 14:47:05",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1451,7 +1451,7 @@
       },
       {
         "username": "B229",
-        "password_hash": "pbkdf2_sha256$8660b75057dbf10e70a31f76c5c3488b$d4d290f8790c146795338387fd8faff58a681edd87f151b6d30d6409cbfbc3ca",
+        "password_hash": "pbkdf2_sha256$d15995b189d3166505aee3722be9adb9$f4a81c60c2a014b9e2bde1d5dd83fa8b3962f82e415d86ca037077873b1ae8ef",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B229",
         "display_name": "姚奕舟",
@@ -1461,11 +1461,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "B230",
-        "password_hash": "pbkdf2_sha256$d006f576581d4b197a0aad9cb5c9cb99$4695d9ae5d0ccad24d3da6ca2297b0330f7a3f3f147531620ed4998410be69a2",
+        "password_hash": "pbkdf2_sha256$c2239481175276c1f14ee86afb5e6e24$1085b3790f890e32ed6cccd9e86d45562599833ebe7a166fb245c2800c886d75",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B230",
         "display_name": "姜智翔",
@@ -1475,11 +1475,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "B243",
-        "password_hash": "pbkdf2_sha256$9de69c9ec3269444fa7884d0f5eeb781$186a020ae589edb946b7c1b328eeeb748cb0c7aa1117294326e5131d49ea4e16",
+        "password_hash": "pbkdf2_sha256$9903b56af75b57b5285097ab363c0ca5$7ba74d06d233b7ec526871aef2f66b2f62f350b5ee019d4588810b451d624c2d",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B243",
         "display_name": "周美琪",
@@ -1489,7 +1489,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "B244",
@@ -1503,7 +1503,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 17:49:28",
+        "updated_at": "2026-06-01 14:47:05",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1516,7 +1516,7 @@
       },
       {
         "username": "B245",
-        "password_hash": "pbkdf2_sha256$1a172dc359e1988790b5dc475fc0f1d6$e287f3eb898b1bd2873d841fb7f39d328241bc81f6e7f7582099d9166f5c8643",
+        "password_hash": "pbkdf2_sha256$8bf615815c4549db6f94350a3e3785de$fb8574013d6c149159cc09ce947ca3612f6bdedd955ad5d2421ccbedc747e50e",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B245",
         "display_name": "張維宏",
@@ -1526,11 +1526,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "B247",
-        "password_hash": "pbkdf2_sha256$dcdb3552825e82099777d456ad336fb2$87ec5b35855f644a40d4289c18a5c9f5aab9c5c578d3e7bb4433866eb8460033",
+        "password_hash": "pbkdf2_sha256$43c35cafb28e7f2dfbbd27bde5cc5e32$24364bc81923ab7aa88a62de6555f8f8a8f56c1a573323a8903233950dafadb0",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B247",
         "display_name": "劉家瑋",
@@ -1540,7 +1540,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "B248",
@@ -1554,7 +1554,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 17:56:34",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1567,7 +1567,7 @@
       },
       {
         "username": "B250",
-        "password_hash": "pbkdf2_sha256$220c05b81cc38e5e2e875c31f919be16$beba1bf8d6a7f89b871ae7297d204a656699c9da10868b39b083bd8f9ab05002",
+        "password_hash": "pbkdf2_sha256$c170e33744cd24b8ff4b3a672d338dc5$add4573e2719faddaa43db52379ea8e91773706cb1debe237f8e1d113bc2eee1",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B250",
         "display_name": "劉順榮",
@@ -1577,11 +1577,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "B251",
-        "password_hash": "pbkdf2_sha256$773f31052963fa4e28a8c6568cf0a263$4044f75dbb98f856f232303ccac673f7e3b8a0e5bb136996c425c88d9dd37240",
+        "password_hash": "pbkdf2_sha256$f5d2c4ff36de63d6aa88b1ffd19cc8b2$ba65a4b58bb6d7fd04b962684e7e23482e28ca2ff9ecf8dbb226919d405750ee",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B251",
         "display_name": "胡昌叡",
@@ -1591,11 +1591,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "B252",
-        "password_hash": "pbkdf2_sha256$eaeee88a0b72bdf36edf4b17a3fef1c4$d20ddbf147488ab0e7709d6350b6e7da52da28b45fae7405567a1e290955ccef",
+        "password_hash": "pbkdf2_sha256$422d75b3145985c7bd18bdf3a59bfb48$ffbd2d1a3b0c537a8472281430282d786dddd1135d436b85dad0d46e54a9add9",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B252",
         "display_name": "吳家穎",
@@ -1605,11 +1605,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "B253",
-        "password_hash": "pbkdf2_sha256$5eb54f0520b5ac3d84bb2f52db07f96b$b0d6e3d8698dbc865e6a5b7e1a84d18504d0064f1fbfe6ead097776d35ced01e",
+        "password_hash": "pbkdf2_sha256$374c9eb7b8a7a0b7868bceb0bb778a5f$b58ff203a1f57272da1ee47d62094995b11220d2ca0dd75f6e57e93c531de48f",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B253",
         "display_name": "呂定樺",
@@ -1619,11 +1619,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "B254",
-        "password_hash": "pbkdf2_sha256$e0ccc5116be201722764a071010e66ff$7059da31c1d751ecea806466a537b5b2a17fabed0465b8741bfe2fb728db87db",
+        "password_hash": "pbkdf2_sha256$43f9678d8545bbd1cb80bd6b7a4bbeda$0129ea046c437e64b40e032ee3dd55e643aef84a5eab7390b77b6f24cb4cb32d",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B254",
         "display_name": "陳展榮",
@@ -1633,11 +1633,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "B255",
-        "password_hash": "pbkdf2_sha256$3885da2466d0349776b5b5c2eb46b014$8ad19830ad6ca7da14768e39f14a80a7c70f1e0fd2c228152baea7118b114764",
+        "password_hash": "pbkdf2_sha256$6ddb32b69de4322e012fc502a79e6920$8261ab34fea7f6373ce16766ef405e020f6f682445f49dd6a048f78401002eaf",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B255",
         "display_name": "郭建佑",
@@ -1647,7 +1647,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "B256",
@@ -1661,7 +1661,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-05-29 17:50:49",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1674,7 +1674,7 @@
       },
       {
         "username": "B249",
-        "password_hash": "pbkdf2_sha256$432bfa5a1513654c74cf0ecaca972c84$26f1ff3ad7567da1e745da09c905db79234255e1c71510bf25338601f7775f45",
+        "password_hash": "pbkdf2_sha256$15e52d06a9640a6dfac0903e1b27c0df$090f36521699ce9bbb7e48f2ad3e1620765742f20aaaa2b7628053d02470808d",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B249",
         "display_name": "劉翰霖",
@@ -1684,11 +1684,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "B258",
-        "password_hash": "pbkdf2_sha256$01fdf6dedf7358c0b97980931db6c7ee$573e42ace3a1994586d6b56dcbf211087bb002ea507a6266f82aacad2f7588db",
+        "password_hash": "pbkdf2_sha256$378de0edd8ee543844e35631614af67d$e23468b748d7e07045b1d5f99fc01b10ca24b56921a36441349dafe710ec3cd9",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B258",
         "display_name": "羅仕君",
@@ -1698,7 +1698,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "B259",
@@ -1712,7 +1712,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-05-29 17:54:38",
+        "updated_at": "2026-06-01 14:47:06",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1725,7 +1725,7 @@
       },
       {
         "username": "B257",
-        "password_hash": "pbkdf2_sha256$6c102235dfe20528239475f6843fd3e0$32122328199cac73aa1cabf0d83aaf59a7d23fa7de9a637265fc4f02d381a43e",
+        "password_hash": "pbkdf2_sha256$1ffbae449689c872ece6d27076947a58$e272d8798781e9ab0487f6156da011cb0f9d566b47a33bdd4cf266504412e8bd",
         "password_hint": "由權限管理頁更新",
         "employee_id": "B257",
         "display_name": "彭紹恩",
@@ -1735,11 +1735,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:06"
       },
       {
         "username": "SPT187",
-        "password_hash": "pbkdf2_sha256$8e1e7d9ca8167871db6cf73805f20f87$44dfeb60e5bcd6dce438890544b90286a9fe7f8ed00bb205a5463c1dca6dc3ef",
+        "password_hash": "pbkdf2_sha256$8f98aba21f11977ed85a57c16fbd21fd$160514600770ae66717fa70ff4c9d6fbf6ba98218dd51eb2be7a6399da36dd9d",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SPT187",
         "display_name": "彭欣惠",
@@ -1749,11 +1749,11 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:05"
       },
       {
         "username": "SSS",
-        "password_hash": "pbkdf2_sha256$f2277ab635bf4943c461f45ae741e443$ded34929eaa36d2044182681186a5e0975e56e5fc55f18e825e9d1bdb4d3b989",
+        "password_hash": "pbkdf2_sha256$05477eee11c41b2fb8926c9c8166aa66$8f6386aafbd6bc4b20ab7c706109a8a80666004e806e5e90bbee41a8b95a4d09",
         "password_hint": "由權限管理頁更新",
         "employee_id": "SSS",
         "display_name": "SSS",
@@ -1763,7 +1763,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 15:01:16",
-        "updated_at": "2026-05-29 15:18:29"
+        "updated_at": "2026-06-01 14:47:07"
       }
     ],
     "auth_account_permissions": [
@@ -23846,6 +23846,1670 @@
         "can_restore": 0,
         "can_manage": 0,
         "updated_at": "2026-05-29 13:29:17"
+      },
+      {
+        "username": "admin",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1
+      },
+      {
+        "username": "Ethan",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1
+      },
+      {
+        "username": "SPT236",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 1,
+        "can_import": 1,
+        "can_export": 1,
+        "can_backup": 1,
+        "can_restore": 1,
+        "can_manage": 1
+      },
+      {
+        "username": "auditor",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "leader",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT187",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "manager",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT003",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT005",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT142",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT229",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B002",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B126",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B135",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B155",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B164",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B168",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B177",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B189",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B190",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B203",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B204",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B210",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B211",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B226",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B227",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B228",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B229",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B230",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B235",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B243",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B244",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B245",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B246",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B247",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B248",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B249",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B250",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B251",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B252",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B253",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B254",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B255",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B256",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B257",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B258",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B259",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "operator",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT015",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT024",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT031",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT034",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT048",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT059",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT063",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT077",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT084",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT087",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT088",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT089",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT091",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT092",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT105",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT118",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT120",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT121",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT138",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT145",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT148",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT149",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT150",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT151",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT158",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT160",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT172",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT173",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT174",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT183",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT189",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT193",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT195",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT196",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT199",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT201",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT203",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT208",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT220",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT227",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT228",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT230",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT231",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT235",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT239",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT240",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT241",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT242",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT243",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT244",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT245",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT250",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT252",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SPT256",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "SSS",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "viewer",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance Diagnostic",
+        "updated_at": "2026-06-01 14:47:07",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
       }
     ],
     "auth_security_settings": [
@@ -23964,7 +25628,7 @@
       {
         "username": "spt142",
         "password_hash": "pbkdf2_sha256$767f80cda95ff0103ed131ffe8f43d95$77c112f466cb74aa5de47ce378f2e30b3a3360228948301569e8c1cd894df5d9",
-        "employee_id": "",
+        "employee_id": "SPT142",
         "display_name": "spt142",
         "email": "",
         "is_active": 1,
@@ -23976,7 +25640,7 @@
       {
         "username": "B211",
         "password_hash": "pbkdf2_sha256$80bd0fbcd7f99be462a491ef162f8803$fb7e693d3fb4e38b3738297e723e7026fe406e31ea35a42f207fab1ce914f09c",
-        "employee_id": "",
+        "employee_id": "B211",
         "display_name": "B211",
         "email": "",
         "is_active": 1,
@@ -23996,6 +25660,1146 @@
         "last_login_at": null,
         "created_at": "2026-05-16 14:29:55",
         "updated_at": "2026-05-19 22:46:32"
+      },
+      {
+        "username": "SPT121",
+        "password_hash": "pbkdf2_sha256$180000$1K2wK5SLisMssSZDs6hEuw==$mD5zv0KY1Xl3C8pvxbxXv3fawjpy0d6x1naH7aw2o1k=",
+        "employee_id": "SPT121",
+        "display_name": "徐兆生",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 11:24:40",
+        "created_at": "2026-05-25 18:11:34",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B164",
+        "password_hash": "pbkdf2_sha256$180000$AdYikUm97lLLwGFwM1jRDQ==$ocuVzqoR4Zw9a7qri7v7d91z6lCAcfjVriMxOS+r6ko=",
+        "employee_id": "B164",
+        "display_name": "陳宛廷",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 10:09:41",
+        "created_at": "2026-05-27 10:23:13",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT220",
+        "password_hash": "pbkdf2_sha256$cc9d1ff6d5ab84c6e0f6fd92b1afc194$65605b527817cda1acd551dadfd1936ded15c8d425ca1ddcee64cfa295f9de8d",
+        "employee_id": "SPT220",
+        "display_name": "劉韋廷",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-29 10:01:15",
+        "created_at": "2026-05-25 18:11:35",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT031",
+        "password_hash": "pbkdf2_sha256$94bcfac304537684083f4ef89c562a8e$3dc5ec1b57e0a2cc0386fbc80a863e285905dcab767061dfa980b6e0b5d54bf1",
+        "employee_id": "SPT031",
+        "display_name": "吳政昌",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-29 10:52:16",
+        "created_at": "2026-05-25 18:11:34",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT199",
+        "password_hash": "pbkdf2_sha256$54926b3a6cf5b97e57c72756b7979347$d0cd2ee249fcea478107c46325cca83309abd50c589f02ba13eb057ad8107a91",
+        "employee_id": "SPT199",
+        "display_name": "龍斯愷",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-29 10:05:43",
+        "created_at": "2026-05-25 18:11:35",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B246",
+        "password_hash": "pbkdf2_sha256$180000$UBRVSsb3sNiV/gCmRFnuOQ==$d9wq14CyBtBJEiEWwrcp9MEoJ+mO5yk/eQwMbHXUnMg=",
+        "employee_id": "B246",
+        "display_name": "湯詠棋",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 10:05:55",
+        "created_at": "2026-05-25 18:11:33",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT148",
+        "password_hash": "pbkdf2_sha256$180000$UjtI5xUhrW8pPeeQjsMDAg==$v2rhPR6QzWcS5RL/tTB9LiVfvXO8bKcW2Bu5Tvyodg0=",
+        "employee_id": "SPT148",
+        "display_name": "羅立昕",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 11:27:16",
+        "created_at": "2026-05-25 18:11:34",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT203",
+        "password_hash": "pbkdf2_sha256$180000$BkCKvyjHEceLxiVcfDNnIA==$HlPNm2+MJpmF+wKUOZQ3SPui+b9RWFERTGqVF3e1XwY=",
+        "employee_id": "SPT203",
+        "display_name": "徐梓翔",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 10:08:50",
+        "created_at": "2026-05-25 18:11:35",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT241",
+        "password_hash": "pbkdf2_sha256$180000$CWQNCUeMms2dS8lqryh34g==$6kkB+FphodPq1el2dB5C7hSEcApl7eenCJ4XDtXIK8I=",
+        "employee_id": "SPT241",
+        "display_name": "達文",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 10:13:24",
+        "created_at": "2026-05-25 18:11:35",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT256",
+        "password_hash": "pbkdf2_sha256$180000$1mRBOMsCd5I+ivu2ATZfVQ==$iPw5QSipfhh570GK07cYwE3WPS8QqVJubD5Jwez/aMI=",
+        "employee_id": "SPT256",
+        "display_name": "阿杰",
+        "email": "operator",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 10:18:57",
+        "created_at": "2026-05-27 10:05:01",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT208",
+        "password_hash": "pbkdf2_sha256$180000$1NCaGbcQKE/SIsLUpHFigw==$BDGOYIhij6PAcU/8YpqjoB/bNTIK54EGg3/YEWD25iw=",
+        "employee_id": "SPT208",
+        "display_name": "邱珍娜",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 11:25:51",
+        "created_at": "2026-05-25 18:11:35",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT145",
+        "password_hash": "pbkdf2_sha256$180000$I0rtNt8zNm5xIr19ib1pdA==$3nOJ26jrura3te6b5J7NSbznb8bOgooWXOO929bNGM4=",
+        "employee_id": "SPT145",
+        "display_name": "潘威捷",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 10:21:09",
+        "created_at": "2026-05-25 18:11:34",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT230",
+        "password_hash": "pbkdf2_sha256$c2fc0d26c91427162afbeaef982ccfcc$bb3ea08726c7d9d5bc154f4ef948a9f2bc46b17db4f35f43ab5b464e8fd7c75e",
+        "employee_id": "SPT230",
+        "display_name": "梁志宏",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-29 10:23:01",
+        "created_at": "2026-05-25 18:11:35",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT239",
+        "password_hash": "pbkdf2_sha256$180000$rr5JaLPIoikj2kDG3jCBCw==$KeiMxkkoLKnNpE+2VujJ+F0YQy93vsyT1IkZB4pLWKU=",
+        "employee_id": "SPT239",
+        "display_name": "麥可",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 11:27:54",
+        "created_at": "2026-05-25 18:11:35",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT174",
+        "password_hash": "pbkdf2_sha256$376760f8ed52551ee52f6f6ee50884d5$ef1dbbaaf787ceceb204739724cbb8a4daf7005e6279c4600074f5fa989fc47f",
+        "employee_id": "SPT174",
+        "display_name": "龍才華",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-29 10:32:53",
+        "created_at": "2026-05-25 18:11:35",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT240",
+        "password_hash": "pbkdf2_sha256$180000$y28JWG+3KNTZZyD4h5n9Zg==$FH60X8HOFg6BCqOd/aiR0zXO2vvOj6pWG/62Ehz0gJI=",
+        "employee_id": "SPT240",
+        "display_name": "吉爾",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 10:45:19",
+        "created_at": "2026-05-25 18:11:35",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT244",
+        "password_hash": "pbkdf2_sha256$180000$YgkIzGq1u/qu569LZBcarA==$xpzHD8JZ8JghlyreBTO26EQDvcsmkBm6mVBGUxc/HRI=",
+        "employee_id": "SPT244",
+        "display_name": "費南",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 10:40:46",
+        "created_at": "2026-05-25 18:11:35",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B226",
+        "password_hash": "pbkdf2_sha256$8d8960a7b3e56ee8a098f123c80c0017$3bd34f57406631ecbff53639c2eeb4c88b37370952e2775c0471dcfc4ef83248",
+        "employee_id": "B226",
+        "display_name": "周政龍",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-29 10:46:18",
+        "created_at": "2026-05-25 18:11:33",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT149",
+        "password_hash": "pbkdf2_sha256$180000$8POQ2i8hEAIFeMebUQJQeQ==$C0mCzBSaOPFfdwg8++b8Hp3za6vvLeIWUSPwK9B0yH4=",
+        "employee_id": "SPT149",
+        "display_name": "江金福",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": "2026-05-29 10:51:19",
+        "created_at": "2026-05-25 18:11:34",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B135",
+        "password_hash": "pbkdf2_sha256$c668a519f4768abfc93cb49925d38933$480e14009d26f38427a9b9b349a9ed3ffba6869b29ca51764fded3a2ff791680",
+        "employee_id": "B135",
+        "display_name": "鍾明志",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-29 10:56:09",
+        "created_at": "2026-05-25 18:11:33",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT087",
+        "password_hash": "pbkdf2_sha256$96491d1c15193b0aeca4cfc27d9a7704$318f8b8fd44c6d52e6a64560572eb62f06e3daf6d943793a3db879b83f2fa387",
+        "employee_id": "SPT087",
+        "display_name": "牟育玄",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-29 11:02:58",
+        "created_at": "2026-05-25 18:11:34",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B189",
+        "password_hash": "pbkdf2_sha256$a0f848b56b978d662006a42c182205b2$b591d35d257c4c4cb99353f93d66ef57ac0b1dcc16c9e582d8ce68658045b5fb",
+        "employee_id": "B189",
+        "display_name": "羅文發",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-29 11:07:58",
+        "created_at": "2026-05-25 18:11:33",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B190",
+        "password_hash": "pbkdf2_sha256$bae14bf703f414f0e738cd89cde8d56d$f78a9acc3dd7051244f5d5b9ba54d0ef1ae1356657c9af1a6a84caa8f4f7c007",
+        "employee_id": "B190",
+        "display_name": "黃瑞翎",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-29 11:09:49",
+        "created_at": "2026-05-25 18:11:33",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B204",
+        "password_hash": "pbkdf2_sha256$54c6f8d5167ff647dedf93c12e584d94$7b1f50cbfb19a518248ac0a0b1e97305ae280674da31f9c06b33dc2b5b817e0a",
+        "employee_id": "B204",
+        "display_name": "周棟榮",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-29 11:15:12",
+        "created_at": "2026-05-25 18:11:33",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT118",
+        "password_hash": "pbkdf2_sha256$0aac0d032a28f09a315033d7157718ef$5b64a0746a2a2eb17eb6df611d3ef104341939e9006aaf6ffec79ae0c36d6c75",
+        "employee_id": "SPT118",
+        "display_name": "郭家吟",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": "2026-05-29 11:24:24",
+        "created_at": "2026-05-25 18:11:34",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT003",
+        "password_hash": "pbkdf2_sha256$b0d7d7f63fd7f82e5b6338cbe89ae869$3dc0a9c4632eaaa7458ed50ef6cc692c393ea008a86cf553290399ff9f100b2a",
+        "employee_id": "SPT003",
+        "display_name": "林威呈",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:50",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT005",
+        "password_hash": "pbkdf2_sha256$8babcd62dc698322327946cadcc48234$ecc18868a6eb331cfa6c1c12494c2508241f2fc0d62941ff5094ca207476cb69",
+        "employee_id": "SPT005",
+        "display_name": "張景智",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:50",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT236",
+        "password_hash": "pbkdf2_sha256$180000$bkfIzTjK4iU+0iwTEZjGzg==$i/llL9yzoRYMNFIGqCC83tdR+o+TFLK4UXL9DeN0ac0=",
+        "employee_id": "SPT236",
+        "display_name": "賴智文",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:50",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT015",
+        "password_hash": "pbkdf2_sha256$480933097afc423c2a72cdb041b750bb$023665b882cdd9671c60b749a5814befd4cb631c08fe389b3e8e0f93ecd04f8f",
+        "employee_id": "SPT015",
+        "display_name": "陳文山",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:50",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT024",
+        "password_hash": "pbkdf2_sha256$ab1fa858b58615794694d13c9887c659$9a797709e308be17a516fe06d2385affd9d987624f6803f79613425b4b63514f",
+        "employee_id": "SPT024",
+        "display_name": "陳德文",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:50",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT034",
+        "password_hash": "pbkdf2_sha256$5c7183b9fd85390d185c52d92e9a3c60$f549e44f654da60f95508e590fb0e12fa48d0e6ced78fcb0c112accb5ad9dbbf",
+        "employee_id": "SPT034",
+        "display_name": "陳長彥",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT048",
+        "password_hash": "pbkdf2_sha256$5b7b6e008f64e59e60ce915602558d76$5c55487e43dc69d5884dc8d1ce03b9e59c1554d341e808fbb3994bedcf9c6ff2",
+        "employee_id": "SPT048",
+        "display_name": "李俊霖",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT059",
+        "password_hash": "pbkdf2_sha256$2e6d740b1bb3aff9aa0b0b281f170d3f$0f1ce3991f862c45c5f276bff5030001e86dbc24291ed7fc8d752fa998b0b8c9",
+        "employee_id": "SPT059",
+        "display_name": "蘇萬紘",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT063",
+        "password_hash": "pbkdf2_sha256$180000$lvrBSN9SiSHOZFC2z0fKDg==$iIKcSF/Z3nCkZAsoAq1TYVvDSvi6deL1eRwVS8nD9aQ=",
+        "employee_id": "SPT063",
+        "display_name": "劉志偉",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT077",
+        "password_hash": "pbkdf2_sha256$1355a7677632a4dd24a45a242f0f5a36$08ee85bc70242f9eb61927035f837a3fcf72a26d1375672d5d673b448d17f3b1",
+        "employee_id": "SPT077",
+        "display_name": "謝宛庭",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT084",
+        "password_hash": "pbkdf2_sha256$048ea985381d6ee2ec02c44976d52c07$b6849dde9ac86ce0bb4db1ca82d809a0eaff3a1695641a2ac95baa27dd343c59",
+        "employee_id": "SPT084",
+        "display_name": "陳育信",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT088",
+        "password_hash": "pbkdf2_sha256$acaeae97b9c3055d30a58249e4e59217$26322f02f709b43543eea74058c784c7e697ac6476caae6b39ba4e2b19b9bf8a",
+        "employee_id": "SPT088",
+        "display_name": "林建安",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT089",
+        "password_hash": "pbkdf2_sha256$180000$pGjU+w1leTKlLDpOYndFJw==$etNqSlGCD3u+Jmm54DSczXt2ALLKKF6/qQ2UjbEVEq4=",
+        "employee_id": "SPT089",
+        "display_name": "陳凱彥",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT091",
+        "password_hash": "pbkdf2_sha256$180000$X03Mwy72CN9mKucxYo7Suw==$Pr5GLFZk/IzeS795JgqCPLh59Z3Z1FnW787GDBMchsk=",
+        "employee_id": "SPT091",
+        "display_name": "魏瑄毅",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT092",
+        "password_hash": "pbkdf2_sha256$180000$EdS0yZldNkKzgv/JLzNE6g==$lewU23rkppEmC/ufNoV3sN70EKi8lgGXMkxJGB8GByI=",
+        "employee_id": "SPT092",
+        "display_name": "林昶志",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT138",
+        "password_hash": "pbkdf2_sha256$180000$TSWoguKQ7fq8HVbnd9O1Yg==$6/Lf+9XuYMuljMQd1pxnxl/WswUOygAMi4jF3HLvBvk=",
+        "employee_id": "SPT138",
+        "display_name": "蘇雍盛",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT105",
+        "password_hash": "pbkdf2_sha256$8895f60f0562da6e779fda1dc166b660$a285ccae0f2c7195960f662f54b7c3466cf4af90d8eafb6e6a4c76556cd560d2",
+        "employee_id": "SPT105",
+        "display_name": "劉秀鳳",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT120",
+        "password_hash": "pbkdf2_sha256$de0efdb775868d113b76e34db11e425f$dae0e08484238983d6a6d09e21e2eeb11d83204dd0ff44bd6136920cb672349f",
+        "employee_id": "SPT120",
+        "display_name": "彭雅琴",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT150",
+        "password_hash": "pbkdf2_sha256$180000$aiRE4vyO3tb6ZklO56+YFA==$2rZTtjgCJHz9HWoqdNs0zAGHJO3lgUnhI/CnCKPpGzE=",
+        "employee_id": "SPT150",
+        "display_name": "李守益",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT151",
+        "password_hash": "pbkdf2_sha256$cebb8a16ccd3b702913e3fe8b7ba5b27$90501c542aa0d4ecd02cb8cc4af0438e7dcbf0a5a8205ab15463dace5a39d7b6",
+        "employee_id": "SPT151",
+        "display_name": "鄭智鍵",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT158",
+        "password_hash": "pbkdf2_sha256$63267b8b44e0849b93c15b6a16e67e4c$7564b376416e0586f603e1b9ace9286661470997140b8877521bb9e2aa6094d1",
+        "employee_id": "SPT158",
+        "display_name": "劉定澤",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT160",
+        "password_hash": "pbkdf2_sha256$180000$N9p8+/UfKzRT43OczUi7hg==$6h+MsWFc4KxiATL89jrI7aHN4PRYdGov0rj91g610RA=",
+        "employee_id": "SPT160",
+        "display_name": "邱信維",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT172",
+        "password_hash": "pbkdf2_sha256$c8f97a240b8547506ed409c7b66816e5$ff29285c4dfbe9960d34132846c246e61dd1e1ed030d2a49863a8690ba14debc",
+        "employee_id": "SPT172",
+        "display_name": "胡瑄芸",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT173",
+        "password_hash": "pbkdf2_sha256$0a37b54dc6920cd0068cf02bf9cfc575$4d84e3a6577367395c8d136e74aeb39739ffcbe97b27061f6f2b959d7781a2fb",
+        "employee_id": "SPT173",
+        "display_name": "吳芷熙",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT183",
+        "password_hash": "pbkdf2_sha256$344532a92419b48c83a50e5c746b0eb5$25c1b57328f699c53024edb4e3d471fdd4d6713069123d1381466a8e1a2682c3",
+        "employee_id": "SPT183",
+        "display_name": "蕭詩瓊",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT189",
+        "password_hash": "pbkdf2_sha256$4be83c6542a7486ac67e021e77d1f970$dc4b3d1e0fc4ac2eca5655757ce50659c468254fa2be26c3c4e17c823255a153",
+        "employee_id": "SPT189",
+        "display_name": "劉欣惠",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT193",
+        "password_hash": "pbkdf2_sha256$180000$Cn9YisO0BscVTznmWFINpQ==$8KCxez0WrYwGwLuj++d8s2ZpLihoBoh6pFy1aXKq0u8=",
+        "employee_id": "SPT193",
+        "display_name": "呂昰儒",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT195",
+        "password_hash": "pbkdf2_sha256$76966b9ef5b6aa48e3cdc86a4c64a1f0$701d64fa111aad6ba402cb96bd48fe4be264597c3e8c2c77977c2c9e7110b7fa",
+        "employee_id": "SPT195",
+        "display_name": "姜治銘",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT196",
+        "password_hash": "pbkdf2_sha256$8f5d465bce1dbbb5954655bfaaf77d4d$19dfae30bd5d180c4568a754e04d41adbca68889d0babdc88407753166d4dd49",
+        "employee_id": "SPT196",
+        "display_name": "黃建堃",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT201",
+        "password_hash": "pbkdf2_sha256$b0a4d03101907713b34d56ddcdf9e978$5cf19f43e92b287ffe5b03d8d4ee912ec6bfd4c343d4a0b9c70159baaf75a20b",
+        "employee_id": "SPT201",
+        "display_name": "彭毓萱",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT227",
+        "password_hash": "pbkdf2_sha256$180000$LLGSWhFzLAg9QkDuq+C1Xg==$OGJtL3HXFDGPf3Mjs2stAfkfuyj7lxdsDhf8fPxxrq8=",
+        "employee_id": "SPT227",
+        "display_name": "張佳銓",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT228",
+        "password_hash": "pbkdf2_sha256$662d7841edc0f5864bc9d21463addf21$db86594bb16694a8cc3883edd10e3ad6bbf0113c84d6b3e5938b7063802a44ca",
+        "employee_id": "SPT228",
+        "display_name": "王添慶",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT229",
+        "password_hash": "pbkdf2_sha256$2c758fcd72c57fae88b6c03e6c485a32$0780b3dc404c9d67a6e3696a84afa0ff06f328e15cdd30b39018241a8fee891b",
+        "employee_id": "SPT229",
+        "display_name": "彭子芸",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:51",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT231",
+        "password_hash": "pbkdf2_sha256$e8ebdc70a4ee7394315ccf233c7f8296$bb327de0ada8e1a933d78386c3f9b1aa971ab8f26ec5ccce29ba00faca5eb822",
+        "employee_id": "SPT231",
+        "display_name": "陳建勳",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT235",
+        "password_hash": "pbkdf2_sha256$e1ab814b1bc27ed33c21804b0b8f0c35$6ad526472ba9363d08b0e96af3461c058e08db7f69369b8c6d1cda6122fc2052",
+        "employee_id": "SPT235",
+        "display_name": "曾純鈺",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT242",
+        "password_hash": "pbkdf2_sha256$180000$dRRLLUTKzP3IzPCpKkuKoQ==$VYI9Tx7XOvVG2gIfXp/Z55j1lAuv1tJVV1OorzsQfmI=",
+        "employee_id": "SPT242",
+        "display_name": "保羅",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT243",
+        "password_hash": "pbkdf2_sha256$180000$fa79CJByGiWbpJtyP/v2Vg==$XwergCHtwBdICa8sZX5S9+cIj/yv0taIYedUJ6bk7+I=",
+        "employee_id": "SPT243",
+        "display_name": "羅丹",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT245",
+        "password_hash": "pbkdf2_sha256$180000$hQU4IGqB0WAwLe+4z/BPmA==$d5eOplmH3F5RV8J7ySGB8SnNwv1w7RMZyrgJBR4Dbow=",
+        "employee_id": "SPT245",
+        "display_name": "傑米",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT250",
+        "password_hash": "pbkdf2_sha256$180000$RaWznP7H2RQm3CPWdSNbXA==$72RPnBub+kafuaj4zT6j4qrLFYrXnhgv4z3M4LOgZCQ=",
+        "employee_id": "SPT250",
+        "display_name": "鄭至賢",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT252",
+        "password_hash": "pbkdf2_sha256$c683b3316ba73c377a3d9e55ffa603c5$2361a2fc6950d7c1f8a567440105c680c5d24f79a92951534a8e0c593cf9c8b5",
+        "employee_id": "SPT252",
+        "display_name": "許佩瑜",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B002",
+        "password_hash": "pbkdf2_sha256$180000$EzXkpUAY7EY+E/vkYcKB6Q==$U0TQtfuHx5Aewq0Ytjp/MWmHB8iATcoebVLKpGqFNlo=",
+        "employee_id": "B002",
+        "display_name": "張文品",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B126",
+        "password_hash": "pbkdf2_sha256$180000$yHIr1CJB84mzq8y1a72c7g==$lt8/9h81VI4cNvjO+45JKQnx1QfY7vqSre2ESi95Y+I=",
+        "employee_id": "B126",
+        "display_name": "戴鎰祥",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B177",
+        "password_hash": "pbkdf2_sha256$180000$pNILe38ALbgm2c147pi85A==$FY1pD60l8Io+gCbtUFmPZXXVeDWesDEX70irvJEhqAg=",
+        "employee_id": "B177",
+        "display_name": "羅章淳",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B203",
+        "password_hash": "pbkdf2_sha256$5e0f9e511a51d0a6d6087bb451b92064$bcb6db70abf8e328e0f0554f836eae116ff93f344c9d021ae6b26adc0ee9ef34",
+        "employee_id": "B203",
+        "display_name": "蕭桓惟",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B227",
+        "password_hash": "pbkdf2_sha256$697b61b1cf9641f43e3c14ea1ecc2ee2$a2d11a07b61a6a5d5dfaea992711e763d11c13acbe30fc78674c86c1ebed8e4d",
+        "employee_id": "B227",
+        "display_name": "潘信成",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B210",
+        "password_hash": "pbkdf2_sha256$180000$SesJL5qM6dZdZFw8D9Zn7w==$h02FgsNrwru2eVbVN91irWsKrv4XgEpKrRdiJmpM34w=",
+        "employee_id": "B210",
+        "display_name": "黃承淮",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B228",
+        "password_hash": "pbkdf2_sha256$180000$wIIZZjqHzlPFnTRFV0REgA==$K8ae8JGegnLXEsiZBOT8VyMVrzpQxNtak4EyMxPXmos=",
+        "employee_id": "B228",
+        "display_name": "溫翠茹",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B235",
+        "password_hash": "pbkdf2_sha256$180000$iTmZXuGhBLpJE7Mpfms0UA==$txLNwkghVgK3Qjq4RqgFwL0pomJFiaQIoD+4kgNaWkE=",
+        "employee_id": "B235",
+        "display_name": "徐聖淇",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B155",
+        "password_hash": "pbkdf2_sha256$180000$6sKeF283RZxPyCfdmLkFYg==$5ONr5ZXDpTm+8uMeeCiutOSkDVo3gIArf+tWTZNG3qg=",
+        "employee_id": "B155",
+        "display_name": "趙健浩",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B168",
+        "password_hash": "pbkdf2_sha256$180000$TBmCr1InBsEMgC0leMT/HQ==$hdwcdzXuQY4mKkf66iOjY7lK5EVpQQ/aTMqL5YEp1Kw=",
+        "employee_id": "B168",
+        "display_name": "洪敏強",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B229",
+        "password_hash": "pbkdf2_sha256$8660b75057dbf10e70a31f76c5c3488b$d4d290f8790c146795338387fd8faff58a681edd87f151b6d30d6409cbfbc3ca",
+        "employee_id": "B229",
+        "display_name": "姚奕舟",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B230",
+        "password_hash": "pbkdf2_sha256$d006f576581d4b197a0aad9cb5c9cb99$4695d9ae5d0ccad24d3da6ca2297b0330f7a3f3f147531620ed4998410be69a2",
+        "employee_id": "B230",
+        "display_name": "姜智翔",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B243",
+        "password_hash": "pbkdf2_sha256$9de69c9ec3269444fa7884d0f5eeb781$186a020ae589edb946b7c1b328eeeb748cb0c7aa1117294326e5131d49ea4e16",
+        "employee_id": "B243",
+        "display_name": "周美琪",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B244",
+        "password_hash": "pbkdf2_sha256$180000$ZLUSclIKWSgmSId+OQ2iOQ==$f25FiJQjFQ4qP3Y76SWXUD28qDyymhINMgnjuhadBv8=",
+        "employee_id": "B244",
+        "display_name": "范耀文",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B245",
+        "password_hash": "pbkdf2_sha256$1a172dc359e1988790b5dc475fc0f1d6$e287f3eb898b1bd2873d841fb7f39d328241bc81f6e7f7582099d9166f5c8643",
+        "employee_id": "B245",
+        "display_name": "張維宏",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B247",
+        "password_hash": "pbkdf2_sha256$dcdb3552825e82099777d456ad336fb2$87ec5b35855f644a40d4289c18a5c9f5aab9c5c578d3e7bb4433866eb8460033",
+        "employee_id": "B247",
+        "display_name": "劉家瑋",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B248",
+        "password_hash": "pbkdf2_sha256$180000$XI2QjHze+5lRoJmn9XXyag==$RQaCOnXUUpNTvnv/dedrxK2BzaXTkFJHbdktO/8/Kxg=",
+        "employee_id": "B248",
+        "display_name": "佘銘訓",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B250",
+        "password_hash": "pbkdf2_sha256$220c05b81cc38e5e2e875c31f919be16$beba1bf8d6a7f89b871ae7297d204a656699c9da10868b39b083bd8f9ab05002",
+        "employee_id": "B250",
+        "display_name": "劉順榮",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B251",
+        "password_hash": "pbkdf2_sha256$773f31052963fa4e28a8c6568cf0a263$4044f75dbb98f856f232303ccac673f7e3b8a0e5bb136996c425c88d9dd37240",
+        "employee_id": "B251",
+        "display_name": "胡昌叡",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B252",
+        "password_hash": "pbkdf2_sha256$eaeee88a0b72bdf36edf4b17a3fef1c4$d20ddbf147488ab0e7709d6350b6e7da52da28b45fae7405567a1e290955ccef",
+        "employee_id": "B252",
+        "display_name": "吳家穎",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B253",
+        "password_hash": "pbkdf2_sha256$5eb54f0520b5ac3d84bb2f52db07f96b$b0d6e3d8698dbc865e6a5b7e1a84d18504d0064f1fbfe6ead097776d35ced01e",
+        "employee_id": "B253",
+        "display_name": "呂定樺",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B254",
+        "password_hash": "pbkdf2_sha256$e0ccc5116be201722764a071010e66ff$7059da31c1d751ecea806466a537b5b2a17fabed0465b8741bfe2fb728db87db",
+        "employee_id": "B254",
+        "display_name": "陳展榮",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:52",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B255",
+        "password_hash": "pbkdf2_sha256$3885da2466d0349776b5b5c2eb46b014$8ad19830ad6ca7da14768e39f14a80a7c70f1e0fd2c228152baea7118b114764",
+        "employee_id": "B255",
+        "display_name": "郭建佑",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:53",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B256",
+        "password_hash": "pbkdf2_sha256$180000$2yy1xYHShEIgY8w5HZw4Tg==$ImalTxQSx449w+5rA3HTEgyD7s+Q0hXAqw0Dgvr/+/U=",
+        "employee_id": "B256",
+        "display_name": "莊翔宇",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:53",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B249",
+        "password_hash": "pbkdf2_sha256$432bfa5a1513654c74cf0ecaca972c84$26f1ff3ad7567da1e745da09c905db79234255e1c71510bf25338601f7775f45",
+        "employee_id": "B249",
+        "display_name": "劉翰霖",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:53",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B258",
+        "password_hash": "pbkdf2_sha256$01fdf6dedf7358c0b97980931db6c7ee$573e42ace3a1994586d6b56dcbf211087bb002ea507a6266f82aacad2f7588db",
+        "employee_id": "B258",
+        "display_name": "羅仕君",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:53",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B259",
+        "password_hash": "pbkdf2_sha256$180000$PhYotrtY+s6Z71IWgNnOZg==$zXudUbJ5IjuKp3Vhf9boygy/2bq4ZduMHtOYZmK280c=",
+        "employee_id": "B259",
+        "display_name": "鄧文誠",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:53",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B257",
+        "password_hash": "pbkdf2_sha256$6c102235dfe20528239475f6843fd3e0$32122328199cac73aa1cabf0d83aaf59a7d23fa7de9a637265fc4f02d381a43e",
+        "employee_id": "B257",
+        "display_name": "彭紹恩",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:53",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT187",
+        "password_hash": "pbkdf2_sha256$8e1e7d9ca8167871db6cf73805f20f87$44dfeb60e5bcd6dce438890544b90286a9fe7f8ed00bb205a5463c1dca6dc3ef",
+        "employee_id": "SPT187",
+        "display_name": "彭欣惠",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 1,
+        "last_login_at": null,
+        "created_at": "2026-05-29 14:59:53",
+        "updated_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SSS",
+        "password_hash": "pbkdf2_sha256$f2277ab635bf4943c461f45ae741e443$ded34929eaa36d2044182681186a5e0975e56e5fc55f18e825e9d1bdb4d3b989",
+        "employee_id": "SSS",
+        "display_name": "SSS",
+        "email": "",
+        "is_active": 1,
+        "force_password_change": 0,
+        "last_login_at": null,
+        "created_at": "2026-05-29 15:01:16",
+        "updated_at": "2026-06-01 14:47:04"
       }
     ],
     "security_user_roles": [
@@ -24048,17 +26852,497 @@
         "username": "spt142",
         "role_code": "admin",
         "created_at": "2026-05-18 15:25:08"
+      },
+      {
+        "username": "SPT142",
+        "role_code": "manager",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT121",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B164",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT220",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT031",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT199",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B246",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT148",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT203",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT241",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT256",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT208",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT145",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT230",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT239",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT174",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT240",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT244",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B226",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT149",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B135",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT087",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B189",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B190",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B204",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT118",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT003",
+        "role_code": "manager",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT005",
+        "role_code": "manager",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT236",
+        "role_code": "admin",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT015",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT024",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT034",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT048",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT059",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT063",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT077",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT084",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT088",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT089",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT091",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT092",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT138",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT105",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT120",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT150",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT151",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT158",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT160",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT172",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT173",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT183",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT189",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT193",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT195",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT196",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT201",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT227",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT228",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT229",
+        "role_code": "manager",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT231",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT235",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT242",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT243",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT245",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT250",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT252",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B002",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B126",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B177",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B203",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B227",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B210",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B228",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B235",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B155",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B168",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B229",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B230",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B243",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B244",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B245",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B247",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B248",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B250",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B251",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B252",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B253",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B254",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B255",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B256",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B249",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B258",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B259",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "B257",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SPT187",
+        "role_code": "leader",
+        "created_at": "2026-06-01 14:47:04"
+      },
+      {
+        "username": "SSS",
+        "role_code": "operator",
+        "created_at": "2026-06-01 14:47:04"
       }
     ]
   },
   "settings": {},
   "table_counts": {
     "auth_users": 104,
-    "auth_account_permissions": 1380,
+    "auth_account_permissions": 1484,
     "auth_security_settings": 3,
     "security_settings": 3,
-    "security_users": 9,
-    "security_user_roles": 10
+    "security_users": 104,
+    "security_user_roles": 106
   },
   "deleted_usernames": [
     "c"
