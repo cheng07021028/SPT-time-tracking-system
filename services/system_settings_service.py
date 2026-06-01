@@ -4305,3 +4305,160 @@ def audit_v30017_13_system_settings_authority() -> dict[str, Any]:
     return base
 
 # ================= END V300.17 13 SYSTEM SETTINGS AUTHORITY CONSISTENCY PATCH =================
+
+# =================== V300.39 13 SYSTEM SETTINGS FRONT/BACK READ ISOLATION ===================
+# 目的：13.系統設定頁面讀取也走前台/後台隔離，不影響既有讀寫規則。
+# - 前台讀取：同一個 app process / 同一輪 rerun 內，13 設定表只讀一次權威檔並使用記憶體快取。
+# - 寫入規則：所有 save/delete 仍透過既有 _v85_save_tables -> permanent_authority_service.save_authority
+#   即時寫回 data/permanent_store/modules/13_system_settings/records.json，並依現有規則 GitHub 同步。
+# - 快取失效：只要權威檔 mtime/size 改變或執行儲存/刪除，就清除快取；不會用快取覆蓋權威檔。
+# - 不改 UI / CSS / theme，不改 01/02 工時資料讀寫。
+try:
+    import time as _v30039_time
+except Exception:  # pragma: no cover
+    _v30039_time = None  # type: ignore
+
+_V30039_13_CACHE_SECONDS = 30.0
+_V30039_13_TABLES_CACHE: dict[str, Any] = {
+    "fingerprint": None,
+    "loaded_at": 0.0,
+    "tables": None,
+    "hit": 0,
+    "miss": 0,
+    "last_reason": "init",
+}
+
+
+def _v30039_copy_tables(tables: dict[str, list[dict[str, Any]]] | None) -> dict[str, list[dict[str, Any]]]:
+    out: dict[str, list[dict[str, Any]]] = {}
+    for k, rows in (tables or {}).items():
+        if isinstance(rows, list):
+            out[str(k)] = [dict(r) for r in rows if isinstance(r, dict)]
+    return out
+
+
+def _v30039_cache_now() -> float:
+    try:
+        if _v30039_time is not None:
+            return float(_v30039_time.time())
+    except Exception:
+        pass
+    return 0.0
+
+
+def _v30039_records_path() -> Path | None:
+    try:
+        if _v85_pa_canonical_path is not None:
+            return _v85_pa_canonical_path(_V85_MODULE_KEY, "records")
+    except Exception:
+        pass
+    try:
+        return PROJECT_ROOT / "data" / "permanent_store" / "modules" / _V85_MODULE_KEY / "records.json"
+    except Exception:
+        return None
+
+
+def _v30039_records_fingerprint() -> tuple[str, int, int] | tuple[str, int, int, str]:
+    try:
+        p = _v30039_records_path()
+        if p is not None and p.exists():
+            stp = p.stat()
+            return (str(p), int(stp.st_mtime_ns), int(stp.st_size))
+        return (str(p or ""), 0, 0, "missing")
+    except Exception as exc:
+        return ("error", 0, 0, str(exc)[:120])
+
+
+def clear_13_system_settings_front_cache(reason: str = "manual_clear") -> None:
+    """清除 13 前台讀取快取；儲存/刪除後必須呼叫，確保讀寫一致。"""
+    try:
+        _V30039_13_TABLES_CACHE["fingerprint"] = None
+        _V30039_13_TABLES_CACHE["loaded_at"] = 0.0
+        _V30039_13_TABLES_CACHE["tables"] = None
+        _V30039_13_TABLES_CACHE["last_reason"] = str(reason or "manual_clear")
+    except Exception:
+        pass
+    try:
+        _v88_clear_all_system_caches()
+    except Exception:
+        pass
+    try:
+        clear_time_record_system_fast_cache()
+    except Exception:
+        pass
+
+
+try:
+    _v30039_prev_v85_tables = _v85_tables  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30039_prev_v85_tables = None
+
+
+def _v85_tables() -> dict[str, list[dict[str, Any]]]:  # type: ignore[override]
+    """V300.39：13 前台讀取快取，不改權威檔讀寫。"""
+    fp = _v30039_records_fingerprint()
+    now_s = _v30039_cache_now()
+    cached_fp = _V30039_13_TABLES_CACHE.get("fingerprint")
+    cached_tables = _V30039_13_TABLES_CACHE.get("tables")
+    cached_at = float(_V30039_13_TABLES_CACHE.get("loaded_at") or 0.0)
+    if cached_tables is not None and cached_fp == fp and (now_s - cached_at) <= _V30039_13_CACHE_SECONDS:
+        _V30039_13_TABLES_CACHE["hit"] = int(_V30039_13_TABLES_CACHE.get("hit") or 0) + 1
+        return _v30039_copy_tables(cached_tables)
+    if callable(_v30039_prev_v85_tables):
+        tables = _v30039_prev_v85_tables()
+    else:
+        tables = {}
+    tables = _v85_normalize_tables(tables) if "_v85_normalize_tables" in globals() else _v30039_copy_tables(tables)
+    _V30039_13_TABLES_CACHE["fingerprint"] = fp
+    _V30039_13_TABLES_CACHE["loaded_at"] = now_s
+    _V30039_13_TABLES_CACHE["tables"] = _v30039_copy_tables(tables)
+    _V30039_13_TABLES_CACHE["miss"] = int(_V30039_13_TABLES_CACHE.get("miss") or 0) + 1
+    _V30039_13_TABLES_CACHE["last_reason"] = "authority_file_read"
+    return _v30039_copy_tables(tables)
+
+
+try:
+    _v30039_prev_v85_save_tables = _v85_save_tables  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30039_prev_v85_save_tables = None
+
+
+def _v85_save_tables(tables: dict[str, list[dict[str, Any]]], reason: str) -> dict[str, Any]:  # type: ignore[override]
+    """V300.39：儲存仍走原權威檔寫入；只在寫入前後清除前台讀取快取。"""
+    clear_13_system_settings_front_cache(f"before_save_{reason}")
+    if callable(_v30039_prev_v85_save_tables):
+        res = _v30039_prev_v85_save_tables(tables, reason)
+    else:
+        res = {"ok": False, "error": "previous_v85_save_tables_missing", "reason": reason}
+    clear_13_system_settings_front_cache(f"after_save_{reason}")
+    try:
+        if isinstance(res, dict):
+            res = dict(res)
+            res["v30039_front_back_read_isolation"] = True
+            res["front_cache_cleared_after_write"] = True
+    except Exception:
+        pass
+    return res
+
+
+def audit_v30039_13_front_back_runtime() -> dict[str, Any]:
+    """供 98/診斷頁檢查：13 前台讀取與權威檔寫入是否隔離。"""
+    try:
+        fp = _v30039_records_fingerprint()
+    except Exception as exc:
+        fp = ("error", 0, 0, str(exc)[:120])
+    return {
+        "version": "V300.39_13_SYSTEM_SETTINGS_FRONT_BACK_READ_ISOLATION_20260601",
+        "module": "13_system_settings",
+        "front_path": "load_* reads use short-lived in-process cache keyed by records.json fingerprint",
+        "write_path": "save/delete still calls _v85_save_tables -> permanent_authority_service.save_authority(github=True)",
+        "does_not_change_current_read_write_rules": True,
+        "does_not_change_ui_css_theme": True,
+        "cache_seconds": _V30039_13_CACHE_SECONDS,
+        "fingerprint": fp,
+        "cache_hit": int(_V30039_13_TABLES_CACHE.get("hit") or 0),
+        "cache_miss": int(_V30039_13_TABLES_CACHE.get("miss") or 0),
+        "last_reason": str(_V30039_13_TABLES_CACHE.get("last_reason") or ""),
+    }
+
+# ================= END V300.39 13 SYSTEM SETTINGS FRONT/BACK READ ISOLATION =================
