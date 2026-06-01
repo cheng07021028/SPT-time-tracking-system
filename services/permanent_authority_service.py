@@ -1487,3 +1487,65 @@ def v30025_authority_hotpath_status() -> dict[str, Any]:
         "pending_marker_dir": str(ROOT / "data" / "permanent_store" / "_pending_authority_uploads") if "ROOT" in globals() else "",
     }
 # ===== V300.25 MASTER AUTHORITY WRITE PARITY FOR 03/04 END =====
+
+# ===== V300.36 UNIQUE AUTHORITY CRITICAL MODULES EXTENSION START =====
+# 03/04/10/13 are small admin-maintained authority modules. Their explicit edits
+# must survive Streamlit Cloud reboot immediately. High-frequency append-only
+# modules such as 06_log_query and 11_login_records remain nonblocking unless
+# their own delete-tombstone path explicitly uploads the JSONL authority file.
+def _v30036_is_critical_foreground_module(module_key: str) -> bool:
+    return str(module_key or "").strip() in {
+        "03_work_orders",
+        "04_employees",
+        "10_permissions",
+        "10_permissions_live",
+        "13_system_settings",
+    }
+
+try:
+    _v30036_prev_save_authority = save_authority  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30036_prev_save_authority = None
+try:
+    _v30036_prev_force_upload_authority_file = force_upload_authority_file  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30036_prev_force_upload_authority_file = None
+
+
+def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    critical = _v30036_is_critical_foreground_module(module_key)
+    if callable(_v30036_prev_save_authority):
+        # Previous V300.25 already allows critical 03/04/10.  This wrapper makes
+        # the critical list explicit and adds 13_system_settings without changing
+        # the nonblocking behavior of 06/11 hot paths.
+        res = _v30036_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=github)
+    else:
+        res = {"ok": False, "error": "previous_save_authority_missing", "module_key": str(module_key)}
+    if critical and isinstance(res, dict):
+        res = dict(res)
+        res["v30036_unique_authority_critical"] = True
+        res["critical_module"] = str(module_key)
+    return res
+
+
+def force_upload_authority_file(module_key: str, kind: str = "records", reason: str = "force_authority_upload_v98") -> dict[str, Any]:  # type: ignore[override]
+    critical = _v30036_is_critical_foreground_module(module_key)
+    if callable(_v30036_prev_force_upload_authority_file):
+        res = _v30036_prev_force_upload_authority_file(module_key, kind, reason)
+    else:
+        res = {"ok": False, "error": "previous_force_upload_authority_file_missing", "module_key": str(module_key), "kind": str(kind)}
+    if critical and isinstance(res, dict):
+        res = dict(res)
+        res["v30036_unique_authority_critical"] = True
+        res["critical_module"] = str(module_key)
+    return res
+
+
+def v30036_unique_authority_status() -> dict[str, Any]:
+    return {
+        "version": "V300.36_UNIQUE_AUTHORITY_CRITICAL_MODULES_20260601",
+        "critical_foreground_modules": ["03_work_orders", "04_employees", "10_permissions", "10_permissions_live", "13_system_settings"],
+        "nonblocking_append_only_modules": ["06_log_query", "11_login_records"],
+        "does_not_change_ui_css_theme": True,
+    }
+# ===== V300.36 UNIQUE AUTHORITY CRITICAL MODULES EXTENSION END =====

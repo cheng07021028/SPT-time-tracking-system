@@ -31570,34 +31570,44 @@ def audit_v30011_parallel_checkbox_visibility() -> dict:
     }
 # ======================= END V300.11 PARALLEL WORK CHECKBOX VISIBILITY FIX =======================
 
-# ===================== V300.33 PARALLEL FINISH AUTHORITY GROUP HYDRATION FIX =====================
-# Purpose:
-# - In some Streamlit Cloud runs, 01 Today Records / authority files can contain the full
-#   parallel active group while the fast foreground SQLite hot table contains only part of it.
-# - V300.8 finish_work only grouped rows from SQLite, so ending one parallel work could write
-#   back only the hot-table rows and leave authority-only sibling rows active.
-# - Before finishing, hydrate all same employee/name/process/date unfinished authority rows
-#   from 01_time_records / 02_history back into SQLite, then run the existing fast finish path.
-# - Does not change UI/CSS/theme, delete logic, or work-hour formula.
+# ===== V300.36 01 WORK RULES FULL AUTHORITY RECOVERY START =====
+# Restores the core 01 rules at the final override layer:
+# 1) Non-parallel new work must auto-stop every previous active non-parallel record for the employee.
+# 2) Parallel work = same employee + same date + same process active records; one finish stops the whole group.
+# 3) Group finish averages calculated hours and writes every affected row back to 01_time_records and 02_history.
+# 4) Authority files and SQLite hot cache are reconciled before decisions, so UI-visible authority rows are not missed.
 try:
-    _v30033_prev_finish_work = finish_work
+    _v30036_prev_start_work = start_work  # type: ignore[name-defined]
 except Exception:  # pragma: no cover
-    _v30033_prev_finish_work = None
+    _v30036_prev_start_work = None
+try:
+    _v30036_prev_get_active_records = get_active_records  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30036_prev_get_active_records = None
+try:
+    _v30036_prev_get_active_group = get_active_group  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30036_prev_get_active_group = None
+try:
+    _v30036_prev_get_conflicting_active_records = get_conflicting_active_records  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30036_prev_get_conflicting_active_records = None
 
 
-def _v30033_text(value) -> str:
+def _v30036_text(value) -> str:
     try:
-        if value is None or pd.isna(value):
+        if pd.isna(value):
             return ""
     except Exception:
-        if value is None:
-            return ""
+        pass
+    if value is None:
+        return ""
     text = str(value).strip()
     return "" if text.lower() in {"", "none", "nan", "nat", "null", "<na>"} else text
 
 
-def _v30033_int(value) -> int | None:
-    text = _v30033_text(value)
+def _v30036_int(value) -> int | None:
+    text = _v30036_text(value)
     if not text:
         return None
     try:
@@ -31607,251 +31617,335 @@ def _v30033_int(value) -> int | None:
         return None
 
 
-def _v30033_unfinished_mask(df: pd.DataFrame) -> pd.Series:
+def _v30036_active_mask(df: pd.DataFrame) -> pd.Series:
     if df is None or not isinstance(df, pd.DataFrame) or df.empty:
         return pd.Series([], dtype=bool)
     idx = df.index
-    end_ts = df["end_timestamp"].map(_v30033_text) if "end_timestamp" in df.columns else pd.Series([""] * len(df), index=idx)
-    status = df["status"].map(_v30033_text) if "status" in df.columns else pd.Series([""] * len(df), index=idx)
-    ended = status.isin(["下班", "暫停", "完工", "完成", "已結束", "結束", "補登結束", "deleted", "delete", "刪除", "已刪除"])
+    end_ts = df["end_timestamp"].map(_v30036_text) if "end_timestamp" in df.columns else pd.Series([""] * len(df), index=idx)
+    status = df["status"].map(_v30036_text) if "status" in df.columns else pd.Series([""] * len(df), index=idx)
+    ended = status.isin(["下班", "暫停", "完工", "完成", "已結束", "結束", "補登結束", "已刪除", "刪除", "deleted"])
     return end_ts.eq("") & (~ended)
 
 
-def _v30033_authority_df(module_key: str) -> pd.DataFrame:
+def _v30036_db_columns() -> list[str]:
     try:
-        from services.permanent_authority_service import df_from_table
-        df = df_from_table(module_key, "time_records")
-        if isinstance(df, pd.DataFrame):
-            out = df.copy()
-            try:
-                # Respect existing 02 delete tombstones if available.
-                if "_v97_filter_deleted_df" in globals() and callable(globals().get("_v97_filter_deleted_df")):
-                    out = _v97_filter_deleted_df(out)  # type: ignore[name-defined]
-                elif "_v94_filter_deleted_df" in globals() and callable(globals().get("_v94_filter_deleted_df")):
-                    out = _v94_filter_deleted_df(out)  # type: ignore[name-defined]
-            except Exception:
-                pass
-            return out
+        info = query_df("PRAGMA table_info(time_records)")
+        if isinstance(info, pd.DataFrame) and "name" in info.columns:
+            return [str(x) for x in info["name"].tolist() if str(x)]
     except Exception:
         pass
-    return pd.DataFrame()
+    return []
 
 
-def _v30033_combined_authority_df() -> pd.DataFrame:
-    frames = []
-    for module_key in ("01_time_records", "02_history"):
-        df = _v30033_authority_df(module_key)
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            frames.append(df)
+def _v30036_sqlite_records_df() -> pd.DataFrame:
+    try:
+        return query_df("SELECT * FROM time_records")
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v30036_authority_union_df() -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    try:
+        frames.append(_v89_authority_df("01_time_records"))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        frames.append(_v89_authority_df("02_history"))  # type: ignore[name-defined]
+    except Exception:
+        pass
+    try:
+        frames.append(_v30036_sqlite_records_df())
+    except Exception:
+        pass
+    frames = [f.copy() for f in frames if isinstance(f, pd.DataFrame) and not f.empty]
     if not frames:
         return pd.DataFrame()
-    # Merge duplicate rows by record_key when possible, otherwise by id. Later frames overwrite older ones.
     cols: list[str] = []
-    chosen: dict[str, dict] = {}
-    for df in frames:
-        for c in df.columns:
-            if c not in cols:
-                cols.append(c)
-        for _, row in df.iterrows():
-            rd = row.to_dict()
-            rk = _v30033_text(rd.get("record_key"))
-            rid = _v30033_int(rd.get("id"))
-            key = f"rk:{rk}" if rk else (f"id:{rid}" if rid is not None else "tmp:" + str(len(chosen)))
-            chosen[key] = rd
-    return pd.DataFrame([{c: r.get(c) for c in cols} for r in chosen.values()], columns=cols)
+    for f in frames:
+        for c in f.columns:
+            if str(c) not in cols:
+                cols.append(str(c))
+    merged_rows: dict[int, dict] = {}
+    noid: list[dict] = []
+    # Order: 01, 02, SQLite. SQLite may include latest hot start record, authority may include rows missing from SQLite.
+    for f in frames:
+        for c in cols:
+            if c not in f.columns:
+                f[c] = None
+        for _, r in f[cols].iterrows():
+            row = r.to_dict()
+            rid = _v30036_int(row.get("id"))
+            if rid is None:
+                noid.append(row)
+            else:
+                prev = merged_rows.get(rid, {})
+                # Preserve nonblank values from the later row, but do not blank out earlier authority values.
+                combined = dict(prev)
+                for k, v in row.items():
+                    if not _v30036_text(v) == "":
+                        combined[k] = v
+                    elif k not in combined:
+                        combined[k] = v
+                combined["id"] = rid
+                merged_rows[rid] = combined
+    rows = list(merged_rows.values()) + noid
+    return pd.DataFrame(rows)
 
 
-def _v30033_row_by_id_from_authority(record_id: int) -> dict:
-    df = _v30033_combined_authority_df()
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty or "id" not in df.columns:
-        return {}
-    rid = _v30033_int(record_id)
-    if rid is None:
-        return {}
-    hit = df[df["id"].map(_v30033_int) == rid]
-    if hit.empty:
-        return {}
-    return hit.iloc[0].where(pd.notna(hit.iloc[0]), None).to_dict()
-
-
-def _v30033_active_authority_group_for_record(record: dict) -> pd.DataFrame:
-    if not record:
+def _v30036_filter_active(df: pd.DataFrame, employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None, work_order: str | None = None) -> pd.DataFrame:
+    if df is None or df.empty:
         return pd.DataFrame()
-    auth = _v30033_combined_authority_df()
-    if auth is None or not isinstance(auth, pd.DataFrame) or auth.empty:
-        return pd.DataFrame()
-    auth = auth.loc[_v30033_unfinished_mask(auth)].copy()
-    if auth.empty:
-        return auth
-    emp_id = _v30033_text(record.get("employee_id"))
-    emp_name = _v30033_text(record.get("employee_name"))
-    proc = _v30033_text(record.get("process_name"))
-    sdate = _v30033_text(record.get("start_date")) or _v30033_text(record.get("start_timestamp"))[:10]
-    gkey = _v30033_text(record.get("group_key"))
-    if not emp_id or not proc or not sdate:
-        return pd.DataFrame()
-    same = pd.Series([False] * len(auth), index=auth.index)
-    if "group_key" in auth.columns and gkey:
-        same = same | auth["group_key"].map(_v30033_text).eq(gkey)
-    mask = pd.Series([True] * len(auth), index=auth.index)
-    if "employee_id" in auth.columns:
-        mask &= auth["employee_id"].map(_v30033_text).eq(emp_id)
-    if emp_name and "employee_name" in auth.columns:
-        mask &= auth["employee_name"].map(_v30033_text).eq(emp_name)
-    if "process_name" in auth.columns:
-        mask &= auth["process_name"].map(_v30033_text).eq(proc)
-    if "start_date" in auth.columns:
-        mask &= auth["start_date"].map(_v30033_text).eq(sdate)
-    same = same | mask
-    out = auth.loc[same].copy()
+    out = df.copy()
+    out = out[_v30036_active_mask(out)].copy()
+    if employee_id and "employee_id" in out.columns:
+        out = out[out["employee_id"].map(_v30036_text) == _v30036_text(employee_id)]
+    # employee_name is intentionally not mandatory for group decisions. Some authority rows have bilingual/blank names.
+    if employee_name and "employee_name" in out.columns:
+        name = _v30036_text(employee_name)
+        if name:
+            # Prefer matching name, but do not drop blank-name rows for the same employee.
+            out = out[out["employee_name"].map(_v30036_text).isin([name, ""])]
+    if process_name and "process_name" in out.columns:
+        out = out[out["process_name"].map(_v30036_text) == _v30036_text(process_name)]
+    if start_date:
+        if "start_date" in out.columns:
+            dates = out["start_date"].map(_v30036_text)
+        else:
+            dates = pd.Series([""] * len(out), index=out.index)
+        if "start_timestamp" in out.columns:
+            dates = dates.where(dates.ne(""), out["start_timestamp"].map(lambda v: _v30036_text(v)[:10]))
+        out = out[dates == _v30036_text(start_date)]
+    if work_order and "work_order" in out.columns:
+        out = out[out["work_order"].map(_v30036_text) == _v30036_text(work_order)]
     if "id" in out.columns:
-        try:
-            out["_v30033_sort"] = out["id"].map(_v30033_int)
-            out = out.sort_values("_v30033_sort", kind="stable").drop(columns=["_v30033_sort"], errors="ignore")
-        except Exception:
-            pass
+        out["_v30036_id_sort"] = pd.to_numeric(out["id"], errors="coerce")
+        out = out.sort_values("_v30036_id_sort", ascending=True, kind="stable").drop(columns=["_v30036_id_sort"], errors="ignore")
     return out.reset_index(drop=True)
 
 
-def _v30033_existing_time_columns() -> list[str]:
-    try:
-        df0 = query_df("PRAGMA table_info(time_records)")
-        if isinstance(df0, pd.DataFrame) and not df0.empty and "name" in df0.columns:
-            return [str(x) for x in df0["name"].tolist() if str(x)]
-    except Exception:
-        pass
-    try:
-        return _v104_time_record_columns() if "_v104_time_record_columns" in globals() else []  # type: ignore[name-defined]
-    except Exception:
-        return []
+def _v30036_row_start_date(row: dict) -> str:
+    return _v30036_text(row.get("start_date")) or _v30036_text(row.get("start_timestamp"))[:10]
 
 
-def _v30033_clean_sql_value(value):
-    if _v30033_text(value) == "":
-        return None
-    if isinstance(value, (datetime, date)):
-        return value.strftime("%Y-%m-%d %H:%M:%S") if isinstance(value, datetime) else value.strftime("%Y-%m-%d")
-    try:
-        if hasattr(value, "item"):
-            return value.item()
-    except Exception:
-        pass
-    return value
+def _v30036_active_group_for_row(row: dict) -> pd.DataFrame:
+    return _v30036_filter_active(
+        _v30036_authority_union_df(),
+        employee_id=_v30036_text(row.get("employee_id")),
+        process_name=_v30036_text(row.get("process_name")),
+        start_date=_v30036_row_start_date(row),
+        employee_name=_v30036_text(row.get("employee_name")),
+    )
 
 
-def _v30033_hydrate_group_to_sqlite(group_df: pd.DataFrame) -> list[int]:
-    if group_df is None or not isinstance(group_df, pd.DataFrame) or group_df.empty:
-        return []
-    cols = _v30033_existing_time_columns()
+def _v30036_upsert_rows_to_sqlite(rows_df: pd.DataFrame) -> int:
+    if rows_df is None or not isinstance(rows_df, pd.DataFrame) or rows_df.empty:
+        return 0
+    cols = _v30036_db_columns()
     if not cols:
-        return []
-    hydrated: list[int] = []
-    for _, row in group_df.iterrows():
-        rid = _v30033_int(row.get("id")) if hasattr(row, "get") else None
-        if rid is None:
-            continue
-        insert_cols: list[str] = []
-        values: list[object] = []
-        for c in cols:
-            if c not in group_df.columns and c != "id":
+        return 0
+    import sqlite3 as _sqlite3
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = _sqlite3.connect(DB_PATH, timeout=15)
+    try:
+        conn.execute("PRAGMA busy_timeout=8000")
+        changed = 0
+        for _, r in rows_df.iterrows():
+            row = r.to_dict()
+            rid = _v30036_int(row.get("id"))
+            if rid is None:
                 continue
-            v = rid if c == "id" else row.get(c, None)
-            if c == "work_hours":
-                try:
-                    v = float(v) if _v30033_text(v) else 0.0
-                except Exception:
-                    v = 0.0
-            if c == "is_group_work":
-                try:
-                    v = 1 if str(v).strip().lower() in {"1", "true", "yes", "y", "on", "是", "勾選"} or v is True else 0
-                except Exception:
-                    v = 0
-            insert_cols.append(c)
-            values.append(_v30033_clean_sql_value(v))
-        if not insert_cols:
-            continue
-        try:
-            qcols = ", ".join([f'"{c}"' for c in insert_cols])
-            ph = ", ".join(["?"] * len(insert_cols))
-            execute(f"INSERT OR REPLACE INTO time_records ({qcols}) VALUES ({ph})", tuple(values))
-            hydrated.append(int(rid))
-        except Exception as exc:
-            try:
-                write_log("V30033_PARALLEL_HYDRATE_ROW_ERROR", f"同時作業完工前回填 SQLite 失敗 id={rid}: {exc}", "time_records", rid, level="ERROR")
-            except Exception:
-                pass
+            exists = conn.execute("SELECT 1 FROM time_records WHERE id=?", (rid,)).fetchone()
+            usable = [c for c in cols if c in row]
+            if not usable:
+                continue
+            vals = [None if _v30036_text(row.get(c)) == "" else row.get(c) for c in usable]
+            if exists:
+                set_cols = [c for c in usable if c != "id"]
+                if not set_cols:
+                    continue
+                sql = "UPDATE time_records SET " + ",".join([f'"{c}"=?' for c in set_cols]) + " WHERE id=?"
+                conn.execute(sql, [None if _v30036_text(row.get(c)) == "" else row.get(c) for c in set_cols] + [rid])
+            else:
+                quoted = ",".join([f'"{c}"' for c in usable])
+                placeholders = ",".join(["?"] * len(usable))
+                conn.execute(f"INSERT INTO time_records ({quoted}) VALUES ({placeholders})", vals)
+            changed += 1
+        conn.commit()
+        return changed
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def get_active_records(employee_id: str | None = None, employee_name: str | None = None, process_name: str | None = None, start_date: str | None = None, work_order: str | None = None, **kwargs) -> pd.DataFrame:  # type: ignore[override]
+    return _v30036_filter_active(_v30036_authority_union_df(), employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date, work_order=work_order)
+
+
+def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    active = _v30036_filter_active(_v30036_authority_union_df(), employee_id=employee_id, employee_name=employee_name)
+    if active.empty:
+        return active
+    proc = _v30036_text(process_name)
+    sdate = _v30036_text(start_date)
+    dates = active["start_date"].map(_v30036_text) if "start_date" in active.columns else pd.Series([""] * len(active), index=active.index)
+    if "start_timestamp" in active.columns:
+        dates = dates.where(dates.ne(""), active["start_timestamp"].map(lambda v: _v30036_text(v)[:10]))
+    procs = active["process_name"].map(_v30036_text) if "process_name" in active.columns else pd.Series([""] * len(active), index=active.index)
+    # Only same employee + same date + same process is allowed to remain as synchronized work.
+    conflict_mask = (procs != proc) | ((dates != sdate) if sdate else False)
+    return active[conflict_mask].reset_index(drop=True)
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    rid = _v30036_int(record_id)
+    union = _v30036_authority_union_df()
+    if rid is None or union.empty or "id" not in union.columns:
+        return pd.DataFrame()
+    matches = union[union["id"].map(_v30036_int) == rid]
+    if matches.empty:
+        return pd.DataFrame()
+    return _v30036_active_group_for_row(matches.iloc[0].to_dict())
+
+
+def _v30036_sync_employee_active_to_sqlite(employee_id: str) -> int:
+    active = _v30036_filter_active(_v30036_authority_union_df(), employee_id=employee_id)
+    if active.empty:
+        return 0
+    try:
+        return _v30036_upsert_rows_to_sqlite(active)
+    except Exception:
+        return 0
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    employee_id = _v30036_text((employee or {}).get("employee_id"))
+    if employee_id:
+        _v30036_sync_employee_active_to_sqlite(employee_id)
+    rid = int(_v30036_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0) if callable(_v30036_prev_start_work) else 0
+    try:
+        rows = _v30036_filter_active(_v30036_authority_union_df(), employee_id=employee_id)
+        _v30036_upsert_rows_to_sqlite(rows)
+    except Exception:
+        pass
+    try:
+        clear_today_records_fast_cache()  # type: ignore[name-defined]
+    except Exception:
+        pass
     try:
         clear_query_cache()
     except Exception:
         pass
-    return sorted(set(hydrated))
-
-
-def _v30033_group_ids_for_record(record_id: int) -> list[int]:
-    rec = query_one("SELECT * FROM time_records WHERE id=?", (int(record_id),)) or {}
-    if not rec:
-        rec = _v30033_row_by_id_from_authority(int(record_id))
-    if not rec:
-        return []
-    group_df = _v30033_active_authority_group_for_record(rec)
-    ids = []
-    if isinstance(group_df, pd.DataFrame) and not group_df.empty and "id" in group_df.columns:
-        for x in group_df["id"].tolist():
-            rid = _v30033_int(x)
-            if rid is not None and rid not in ids:
-                ids.append(int(rid))
-    return ids
+    return rid
 
 
 def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
-    """V300.33: finish the complete parallel group even when some active siblings live only in authority files."""
-    rid = _v30033_int(record_id)
-    if rid is None:
+    rid0 = _v30036_int(record_id)
+    if rid0 is None:
         raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
-    expected_ids: list[int] = []
+    union = _v30036_authority_union_df()
+    if union.empty or "id" not in union.columns:
+        raise ValueError("找不到工時紀錄；請重新整理 01. 工時紀錄後再操作。")
+    hit = union[union["id"].map(_v30036_int) == rid0]
+    if hit.empty:
+        raise ValueError("找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。")
+    rec = hit.iloc[0].to_dict()
+    if _v30036_text(rec.get("end_timestamp")):
+        return 0
+
     if finish_parallel_group:
-        try:
-            rec = query_one("SELECT * FROM time_records WHERE id=?", (int(rid),)) or _v30033_row_by_id_from_authority(int(rid))
-            group_df = _v30033_active_authority_group_for_record(rec)
-            if isinstance(group_df, pd.DataFrame) and not group_df.empty:
-                expected_ids = _v30033_hydrate_group_to_sqlite(group_df)
-        except Exception as exc:
-            try:
-                write_log("V30033_PARALLEL_PRE_HYDRATE_WARN", f"同時作業完工前權威檔群組回填失敗：{exc}", "time_records", rid, level="WARN")
-            except Exception:
-                pass
-    if not expected_ids:
-        expected_ids = [int(rid)]
-    if not callable(_v30033_prev_finish_work):
-        raise RuntimeError("finish_work core implementation is unavailable")
-    n = int(_v30033_prev_finish_work(int(rid), end_action, remark, finish_parallel_group=finish_parallel_group) or 0)
+        group = _v30036_active_group_for_row(rec)
+    else:
+        group = hit.copy()
+    if group is None or group.empty:
+        group = hit.copy()
+    group_ids = []
+    for x in group.get("id", pd.Series([rid0])).tolist():
+        n = _v30036_int(x)
+        if n is not None and n not in group_ids:
+            group_ids.append(n)
+    if not group_ids:
+        group_ids = [rid0]
+    group = group[group["id"].map(_v30036_int).isin(set(group_ids))].copy() if "id" in group.columns else group
+    _v30036_upsert_rows_to_sqlite(group)
+
+    now = _now()
+    end_date, end_time = split_timestamp(now)
+    status = end_action if end_action in ("下班", "暫停", "完工") else "已結束"
+    starts = []
+    if "start_timestamp" in group.columns:
+        starts = [_v30036_text(x) for x in group["start_timestamp"].tolist() if _v30036_text(x)]
+    earliest_start = min(starts) if starts else (_v30036_text(rec.get("start_timestamp")) or now)
+    total_hours = calculate_work_hours(earliest_start, now)
+    avg_hours = round(total_hours / max(len(group_ids), 1), 2)
+    group_key = _v30036_text(rec.get("group_key")) or f"{_v30036_text(rec.get('employee_id'))}|{_v30036_text(rec.get('process_name'))}|{_v30036_row_start_date(rec)}"
+    is_group = 1 if len(group_ids) > 1 else int(bool(rec.get("is_group_work") or 0))
+    updated_ids: list[int] = []
+    summary = ""
     try:
-        # Final safety: sync every expected group id after the existing finish path.
-        rows = _v3008_fetch_rows_by_ids(expected_ids) if "_v3008_fetch_rows_by_ids" in globals() else pd.DataFrame()
-        if isinstance(rows, pd.DataFrame) and not rows.empty:
-            if "_v30061_sync_authority_rows" in globals() and callable(globals().get("_v30061_sync_authority_rows")):
-                _v30061_sync_authority_rows(rows, "finish_work_v30033_parallel_authority_complete")  # type: ignore[name-defined]
-            elif "_v137_upsert_rows" in globals() and callable(globals().get("_v137_upsert_rows")):
-                _v137_upsert_rows(rows, "finish_work_v30033_parallel_authority_complete", github=False)  # type: ignore[name-defined]
-    except Exception as exc:
+        summary = _v138_parallel_summary_text(len(group_ids), total_hours, avg_hours) if len(group_ids) > 1 else ""  # type: ignore[name-defined]
+    except Exception:
+        summary = f"同步作業{len(group_ids)}筆，總工時={total_hours}，平均={avg_hours}" if len(group_ids) > 1 else ""
+
+    for rid in group_ids:
+        old = query_one("SELECT remark FROM time_records WHERE id=?", (rid,)) or {}
+        old_remark = _v30036_text(old.get("remark"))
+        append_parts = [x for x in [_v30036_text(remark), summary] if x]
+        new_remark = old_remark
+        if append_parts:
+            new_remark = (old_remark + "；" if old_remark else "") + "；".join(append_parts)
+        execute(
+            """
+            UPDATE time_records
+            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
+            WHERE id=? AND (end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='')
+            """,
+            (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, is_group, now, rid),
+        )
+        updated_ids.append(rid)
+
+    rows_df = _v90_query_records_by_ids(updated_ids) if "_v90_query_records_by_ids" in globals() else query_df("SELECT * FROM time_records WHERE id IN (%s)" % ",".join("?" for _ in updated_ids), updated_ids)
+    try:
+        _v90_upsert_rows_to_0102_authority(rows_df, "finish_work_v30036_full_group_authority_merge", github=False)  # type: ignore[name-defined]
+    except Exception:
         try:
-            write_log("V30033_PARALLEL_FINAL_SYNC_WARN", f"同時作業完工後補同步權威檔失敗：{exc}", "time_records", rid, level="WARN")
+            if "_v89_save_time_authority_df" in globals():
+                auth = _v30036_authority_union_df()
+                _v89_save_time_authority_df(auth, "finish_work_v30036_fallback_save", github=False)  # type: ignore[name-defined]
         except Exception:
             pass
     try:
-        if finish_parallel_group and expected_ids and n < len(expected_ids):
-            write_log("V30033_PARALLEL_COUNT_WARN", f"同時作業預期同步 {len(expected_ids)} 筆，但核心流程回傳 {n} 筆；expected_ids={expected_ids}", "time_records", rid, level="WARN")
+        clear_today_records_fast_cache()  # type: ignore[name-defined]
     except Exception:
         pass
-    return int(max(n, len(expected_ids) if finish_parallel_group and len(expected_ids) > 1 else n))
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        write_log(
+            "END_WORK_GROUP" if len(updated_ids) > 1 else "END_WORK",
+            f"V300.36 結束工時紀錄 #{rid0}，同步結束={len(updated_ids)}筆，狀態={status}，群組總工時={total_hours}，平均工時={avg_hours}",
+            "time_records",
+            rid0,
+            detail=",".join(str(x) for x in updated_ids),
+        )
+    except Exception:
+        pass
+    return len(updated_ids)
 
 
-def audit_v30033_parallel_finish_authority_hydration() -> dict:
+def audit_v30036_01_work_rules() -> dict[str, Any]:
     return {
-        "version": "V300.33_PARALLEL_FINISH_AUTHORITY_GROUP_HYDRATION_20260601",
-        "hydrates_authority_active_group_before_finish": True,
-        "syncs_expected_group_ids_after_finish": True,
-        "does_not_change_ui_css_theme": True,
-        "does_not_change_delete_logic": True,
+        "version": "V300.36_01_WORK_RULES_FULL_AUTHORITY_RECOVERY",
+        "non_parallel_start_auto_stops_previous_active_records": True,
+        "parallel_group_rule": "same employee_id + same start_date + same process_name",
+        "finish_one_parallel_record_finishes_whole_group": True,
+        "average_hours_written_to_all_group_rows": True,
+        "authority_merge_targets": ["01_time_records", "02_history"],
+        "employee_name_is_not_required_for_group_match": True,
     }
-# =================== END V300.33 PARALLEL FINISH AUTHORITY GROUP HYDRATION FIX ===================
+# ===== V300.36 01 WORK RULES FULL AUTHORITY RECOVERY END =====

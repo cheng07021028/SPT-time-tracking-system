@@ -800,69 +800,172 @@ def save_employees(df: pd.DataFrame) -> dict:  # type: ignore[override]
     return {"inserted": 0, "updated": len(rows), "deleted": 0, "skipped": 0, "saved": len(rows), "deduped": True}
 # ===== V300.25 03/04 MASTER DATA DEDUPE + AUTHORITY WRITE NORMALIZATION END =====
 
-
-# ===== V300.31 03 WORK ORDERS CLOUD REBOOT DURABILITY FIX START =====
-# Purpose:
-# - 03. 製令管理新增/修改後，Streamlit Cloud Reboot 不可消失。
-# - V300.25 already writes local canonical authority.  This layer explicitly uploads
-#   the small 03/04 master authority file through github_cloud_storage_service,
-#   bypassing the runtime hot-path guard that intentionally blocks 06/11.
-# - No UI/CSS/theme changes; no 01/02 data model changes.
-try:
-    _v30031_prev_save_work_orders = save_work_orders  # type: ignore[name-defined]
-except Exception:  # pragma: no cover
-    _v30031_prev_save_work_orders = None
-try:
-    _v30031_prev_save_employees = save_employees  # type: ignore[name-defined]
-except Exception:  # pragma: no cover
-    _v30031_prev_save_employees = None
-
-
-def _v30031_upload_master_authority(module_key: str) -> dict:
-    """Upload the canonical master authority file when an admin explicitly saves it."""
+# ===== V300.36 03/04 UNIQUE AUTHORITY SAVE DELETE START =====
+# 03 製令管理 and 04 人員名單 must use one authority file as the source of truth.
+# Deleting rows in the editor must remove them from that authority file; old SQLite
+# or persistent_modules snapshots must not restore them after reboot.
+def _v30036_blank(value: Any) -> bool:
     try:
-        from services.permanent_authority_service import canonical_path
-        from services.github_cloud_storage_service import upload_file_to_github
-        local = canonical_path(module_key, "records")
-        if not local.exists():
-            return {"ok": False, "skipped": True, "reason": "canonical_missing", "path": str(local)}
-        remote = f"data/permanent_store/modules/{module_key}/records.json"
-        return dict(upload_file_to_github(local, remote, f"SPT V300.31 durable master authority {module_key}" ) or {})
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    return str(value or "").strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _v30036_txt(value: Any) -> str:
+    return "" if _v30036_blank(value) else str(value).strip()
+
+
+def _v30036_bool(value: Any, default: bool = False) -> bool:
+    if _v30036_blank(value):
+        return bool(default)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return bool(int(value))
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "on", "是", "啟用", "在廠", "出勤", "v", "✓", "勾選", "checked"}
+
+
+def _v30036_row_deleted(row: dict[str, Any]) -> bool:
+    for key in ("_delete", "刪除", "刪除 / Delete", "Delete", "delete", "deleted"):
+        if key in row and _v30036_bool(row.get(key), False):
+            return True
+    return False
+
+
+def _v30036_normalize_master_df(df: pd.DataFrame, *, table: str) -> pd.DataFrame:
+    if table == "work_orders":
+        cols = ["id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
+        key_col = "work_order"
+        bool_cols = ["is_active"]
+    else:
+        cols = ["id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at"]
+        key_col = "employee_id"
+        bool_cols = ["is_active", "is_in_factory", "is_today_attendance"]
+    out = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    for c in cols:
+        if c not in out.columns:
+            out[c] = ""
+    if out.empty:
+        return pd.DataFrame(columns=cols)
+    rows: list[dict[str, Any]] = []
+    for _, r in out.iterrows():
+        row = {c: r.get(c, "") for c in cols}
+        key = _v30036_txt(row.get(key_col))
+        if not key:
+            continue
+        row[key_col] = key
+        if table == "employees" and not _v30036_txt(row.get("employee_name")):
+            continue
+        for c in bool_cols:
+            row[c] = _v30036_bool(row.get(c), True)
+        row["created_at"] = _v30036_txt(row.get("created_at")) or now_text()
+        row["updated_at"] = _v30036_txt(row.get("updated_at")) or now_text()
+        rows.append(row)
+    # Business key is unique. Last visible editor row wins; deleted rows were already removed before this function.
+    by_key: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        by_key[_v30036_txt(row.get(key_col))] = row
+    clean = list(by_key.values())
+    used: set[int] = set()
+    next_id = 1
+    for row in clean:
+        try:
+            rid = int(float(str(row.get("id") or "").strip()))
+        except Exception:
+            rid = 0
+        if rid <= 0 or rid in used:
+            while next_id in used:
+                next_id += 1
+            rid = next_id
+        used.add(rid)
+        row["id"] = rid
+    return pd.DataFrame(clean, columns=cols)
+
+
+def _v30036_authority_df(module_key: str, table: str, cols: list[str]) -> pd.DataFrame:
+    try:
+        from services.permanent_authority_service import df_from_table
+        df = df_from_table(module_key, table, columns=cols)
+        if isinstance(df, pd.DataFrame):
+            for c in cols:
+                if c not in df.columns:
+                    df[c] = ""
+            return df[cols].copy()
+    except Exception:
+        pass
+    return pd.DataFrame(columns=cols)
+
+
+def load_work_orders() -> pd.DataFrame:  # type: ignore[override]
+    cols = ["id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
+    df = _v30036_authority_df("03_work_orders", "work_orders", cols)
+    df = _v30036_normalize_master_df(df, table="work_orders")
+    if "is_active" in df.columns:
+        df["is_active"] = df["is_active"].map(lambda v: _v30036_bool(v, True))
+    return df[cols]
+
+
+def load_employees() -> pd.DataFrame:  # type: ignore[override]
+    cols = ["id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at"]
+    df = _v30036_authority_df("04_employees", "employees", cols)
+    df = _v30036_normalize_master_df(df, table="employees")
+    for c in ["is_active", "is_in_factory", "is_today_attendance"]:
+        if c in df.columns:
+            df[c] = df[c].map(lambda v: _v30036_bool(v, True))
+    return df[cols]
+
+
+def _v30036_save_master_df(df: pd.DataFrame, *, module_key: str, table: str) -> dict:
+    now = now_text()
+    input_df = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    deleted_keys: list[str] = []
+    key_col = "work_order" if table == "work_orders" else "employee_id"
+    for _, r in input_df.iterrows():
+        row = dict(r)
+        key = _v30036_txt(row.get(key_col))
+        if _v30036_row_deleted(row):
+            if key:
+                deleted_keys.append(key)
+            continue
+        if key:
+            row["updated_at"] = now
+            if _v30036_blank(row.get("created_at")):
+                row["created_at"] = now
+            rows.append(row)
+    clean = _v30036_normalize_master_df(pd.DataFrame(rows), table=table)
+    if deleted_keys and not clean.empty and key_col in clean.columns:
+        clean = clean[~clean[key_col].astype(str).isin(set(deleted_keys))].copy()
+    payload = {table: clean.where(pd.notna(clean), "").to_dict(orient="records")}
+    res = {}
+    try:
+        from services.permanent_authority_service import update_tables
+        res = dict(update_tables(module_key, payload, reason=f"v30036_unique_authority_save_{module_key}", github=True) or {})
     except Exception as exc:
-        return {"ok": False, "error": str(exc)[:300], "module_key": str(module_key)}
+        res = {"ok": False, "error": str(exc)[:300]}
+    try:
+        log_action(f"SAVE_{table.upper()}_V30036", table, f"唯一權威檔儲存 {module_key}", f"saved={len(payload[table])};deleted={len(deleted_keys)};res={res}")
+    except Exception:
+        pass
+    return {"inserted": 0, "updated": len(payload[table]), "deleted": len(deleted_keys), "skipped": 0, "saved": len(payload[table]), "authority_result": res}
 
 
 def save_work_orders(df: pd.DataFrame) -> dict:  # type: ignore[override]
-    res = _v30031_prev_save_work_orders(df) if callable(_v30031_prev_save_work_orders) else {"ok": False, "error": "previous_save_work_orders_missing"}
-    upload = _v30031_upload_master_authority("03_work_orders")
-    try:
-        if isinstance(res, dict):
-            res = dict(res)
-            res["v30031_cloud_reboot_durable"] = True
-            res["github_upload"] = upload
-    except Exception:
-        pass
-    return res
+    return _v30036_save_master_df(df, module_key="03_work_orders", table="work_orders")
 
 
 def save_employees(df: pd.DataFrame) -> dict:  # type: ignore[override]
-    res = _v30031_prev_save_employees(df) if callable(_v30031_prev_save_employees) else {"ok": False, "error": "previous_save_employees_missing"}
-    upload = _v30031_upload_master_authority("04_employees")
-    try:
-        if isinstance(res, dict):
-            res = dict(res)
-            res["v30031_cloud_reboot_durable"] = True
-            res["github_upload"] = upload
-    except Exception:
-        pass
-    return res
+    return _v30036_save_master_df(df, module_key="04_employees", table="employees")
 
 
-def audit_v30031_master_authority_upload() -> dict:
+def audit_v30036_03_04_unique_authority() -> dict:
     return {
-        "version": "V300.31",
-        "scope": "03_work_orders_and_04_employees_master_authority_upload",
-        "work_orders_upload_check": _v30031_upload_master_authority("03_work_orders"),
-        "employees_upload_check": _v30031_upload_master_authority("04_employees"),
+        "version": "V300.36_03_04_UNIQUE_AUTHORITY_SAVE_DELETE",
+        "work_orders_rows": int(len(load_work_orders())),
+        "employees_rows": int(len(load_employees())),
+        "delete_columns_supported": ["_delete", "刪除", "刪除 / Delete", "Delete"],
+        "business_keys_unique": {"03_work_orders": "work_order", "04_employees": "employee_id"},
     }
-# ===== V300.31 03 WORK ORDERS CLOUD REBOOT DURABILITY FIX END =====
+# ===== V300.36 03/04 UNIQUE AUTHORITY SAVE DELETE END =====

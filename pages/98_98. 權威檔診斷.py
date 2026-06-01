@@ -14,6 +14,18 @@ import streamlit as st
 
 st.set_page_config(page_title="98. 權威檔診斷", layout="wide")
 
+# V300.36: keep page 98 visually consistent with the rest of the system.
+# Only apply the shared theme/header; no CSS/theme definitions are changed here.
+try:
+    from services.theme_service import apply_theme, render_header
+    apply_theme()
+except Exception:
+    def render_header(title: str, subtitle: str = "") -> None:  # type: ignore
+        st.title(title)
+        if subtitle:
+            st.caption(subtitle)
+
+
 
 def _admin_guard() -> None:
     try:
@@ -51,8 +63,8 @@ TRACE_DIR = ROOT / "data" / "permanent_store" / "authority_trace"
 SNAPSHOT_PATH = TRACE_DIR / "v30015_latest_snapshot.json"
 REPORT_PATH = TRACE_DIR / "V300_15_AUTHORITY_TRACE_REPORT.md"
 
-st.title("98. 權威檔診斷 / Authority File Diagnostic")
-st.caption("V300.15.1｜盤點 01～99 共 15 個模組的權威檔與舊來源。只診斷，不修改正式資料。")
+render_header("98 | 權威檔診斷", "Authority File Diagnostic / 盤點 01～99 模組權威檔與舊來源")
+st.caption("V300.36｜沿用全系統科技感樣式；只診斷，不修改正式資料。")
 
 st.warning(
     "這個頁面只做盤點與報告產生：不改動 01/02、權限帳號、系統設定、登入紀錄或 LOG 內容。",

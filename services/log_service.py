@@ -2220,127 +2220,166 @@ def audit_v30023_06_log_direct_github_sync() -> dict[str, Any]:
 
 # ================= END V300.23 06 LOG DIRECT AUTHORITY GITHUB SYNC =================
 
-# =================== V300.32 06 LOG HOT-PATH FLATTEN PATCH｜2026-06-01 ===================
-# Root cause fixed:
-#   Older V300.23 layers wrapped write_log repeatedly. A single 01 Start/Finish
-#   call could append/upload 900+ LOG rows before returning, making every button
-#   look like it spins forever and blocking 01 calculation/sync feedback.
-# Principles:
-#   - Do not call previous write_log wrappers.
-#   - Write one SQLite log row best-effort.
-#   - Append one JSONL authority row locally without GitHub/network in foreground.
-#   - Keep 06 LOG query/delete authority behavior readable through existing loaders.
-#   - No UI/CSS/theme/table changes.
-import json as _v30032_json
-import uuid as _v30032_uuid
-from pathlib import Path as _v30032_Path
+# ===== V300.36 06 LOG UNIQUE AUTHORITY DELETE TOMBSTONE START =====
+# 06 LOG must honor the authority delete range even when SQLite, legacy 06_logs,
+# or old shards still contain the deleted rows.  The durable source of deletion is
+# 06_log_query/records.jsonl DELETE_LOG_RANGE marker.
+try:
+    _v30036_prev_load_logs = load_logs  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30036_prev_load_logs = None
+try:
+    _v30036_prev_load_logs_page = load_logs_page  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30036_prev_load_logs_page = None
+try:
+    _v30036_prev_delete_logs_by_date_range = delete_logs_by_date_range  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30036_prev_delete_logs_by_date_range = None
 
-_V30032_LOG_VERSION = "V300.32_LOG_HOT_PATH_FLATTEN_20260601"
 
-
-def _v30032_log_path() -> _v30032_Path:
+def _v30036_date_text(value: Any) -> str:
     try:
-        from services.authority_consistency_service import records_jsonl_path
-        return records_jsonl_path("06_log_query")
+        return _date_text(value)  # type: ignore[name-defined]
     except Exception:
-        try:
-            root = _v30032_Path(__file__).resolve().parents[1]
-        except Exception:
-            root = _v30032_Path(".").resolve()
-        return root / "data" / "permanent_store" / "modules" / "06_log_query" / "records.jsonl"
-
-
-def _v30032_safe_log_text(value: Any) -> str:
-    try:
-        if pd.isna(value):
+        text = str(value or "").strip()
+        if not text:
             return ""
+        return text[:10].replace("/", "-")
+
+
+def _v30036_read_log_authority_rows(limit: int | None = None) -> list[dict[str, Any]]:
+    try:
+        from services.authority_consistency_service import read_jsonl
+        rows = read_jsonl("06_log_query", limit=limit)
+        return [dict(r) for r in rows if isinstance(r, dict)]
     except Exception:
-        pass
-    if value is None:
-        return ""
-    text = str(value)
-    return "" if text.strip().lower() in {"none", "nan", "nat", "null", "<na>"} else text
+        return []
 
 
-def _v30032_build_log_row(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> dict[str, Any]:
-    ts = now_text()
-    return {
-        "log_time": ts,
+def _v30036_log_delete_ranges() -> list[tuple[str, str]]:
+    ranges: list[tuple[str, str]] = []
+    for r in _v30036_read_log_authority_rows(None):
+        action = str(r.get("action_type") or r.get("event_type") or "").upper().strip()
+        if action != "DELETE_LOG_RANGE" and not (r.get("delete_range_start") or r.get("delete_range_end")):
+            continue
+        s = _v30036_date_text(r.get("delete_range_start") or r.get("start_date") or r.get("target_id") or "")
+        e = _v30036_date_text(r.get("delete_range_end") or r.get("end_date") or r.get("target_id") or "")
+        if "~" in str(r.get("target_id") or "") and (not s or not e):
+            parts = str(r.get("target_id") or "").split("~", 1)
+            s = s or _v30036_date_text(parts[0])
+            e = e or _v30036_date_text(parts[1])
+        if s and not e:
+            e = s
+        if e and not s:
+            s = e
+        if s and e:
+            if s > e:
+                s, e = e, s
+            ranges.append((s, e))
+    # widest/oldest ranges first is not required; deterministic output helps tests.
+    ranges.sort()
+    return ranges
+
+
+def _v30036_is_delete_marker(row: dict[str, Any]) -> bool:
+    return str(row.get("action_type") or row.get("event_type") or "").upper().strip() == "DELETE_LOG_RANGE" or bool(row.get("delete_range_start") or row.get("delete_range_end"))
+
+
+def _v30036_log_row_date(row: dict[str, Any]) -> str:
+    return _v30036_date_text(row.get("log_time") or row.get("created_at") or row.get("timestamp") or row.get("time") or "")
+
+
+def _v30036_filter_deleted_log_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ranges = _v30036_log_delete_ranges()
+    if not ranges:
+        return rows
+    out: list[dict[str, Any]] = []
+    for r in rows or []:
+        if _v30036_is_delete_marker(r):
+            out.append(r)
+            continue
+        d = _v30036_log_row_date(r)
+        if d and any(s <= d <= e for s, e in ranges):
+            continue
+        out.append(r)
+    return out
+
+
+def load_logs(limit: int = 500, start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None):  # type: ignore[override]
+    df = _v30036_prev_load_logs(limit=limit, start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword) if callable(_v30036_prev_load_logs) else pd.DataFrame()
+    rows = df.where(pd.notna(df), "").to_dict(orient="records") if isinstance(df, pd.DataFrame) else ([dict(x) for x in df] if isinstance(df, list) else [])
+    rows = _v30036_filter_deleted_log_rows(rows)
+    # Apply requested filters again after delete-range filtering because legacy sources may have been merged before tombstone filtering.
+    s = _v30036_date_text(start_date)
+    e = _v30036_date_text(end_date)
+    kw = str(keyword or "").strip().lower()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        d = _v30036_log_row_date(r)
+        if s and (not d or d < s):
+            continue
+        if e and (not d or d > e):
+            continue
+        if action_type and str(r.get("action_type") or "") != str(action_type):
+            continue
+        if level and str(level).upper() != "ALL" and str(r.get("level") or "") != str(level):
+            continue
+        if kw:
+            blob = " ".join(str(r.get(k, "") or "") for k in ("user_name", "action_type", "target_table", "target_id", "message", "detail", "level")).lower()
+            if kw not in blob:
+                continue
+        out.append(r)
+    out.sort(key=lambda x: str(x.get("log_time") or x.get("created_at") or ""), reverse=True)
+    if limit:
+        out = out[: int(limit)]
+    return pd.DataFrame(out)
+
+
+def load_logs_page(start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None, page: int = 1, page_size: int = 500) -> dict[str, Any]:  # type: ignore[override]
+    p = max(1, int(page or 1))
+    size = max(1, int(page_size or 500))
+    df = load_logs(limit=max(p * size, size), start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword)
+    rows = df.where(pd.notna(df), "").to_dict(orient="records") if isinstance(df, pd.DataFrame) else []
+    start = (p - 1) * size
+    page_rows = rows[start:start + size]
+    return {"ok": True, "rows": page_rows, "data": page_rows, "df": pd.DataFrame(page_rows), "total_rows": len(rows), "page": p, "page_size": size, "total_pages": max(1, (len(rows) + size - 1) // size), "elapsed_seconds": 0, "source": "v30036_06_log_unique_authority_tombstone"}
+
+
+def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit: bool = True, user_name: str | None = None) -> int:  # type: ignore[override]
+    # Count visible rows first, then write one durable authority tombstone.  Do not rely on SQLite deletion as the source of truth.
+    before = load_logs(limit=100000, start_date=start_date, end_date=end_date)
+    deleted = int(len(before)) if isinstance(before, pd.DataFrame) else 0
+    marker = {
+        "log_time": now_text(),
         "user_name": user_name or _current_log_user(),
-        "action_type": _v30032_safe_log_text(action_type),
-        "target_table": _v30032_safe_log_text(target_table),
-        "target_id": _v30032_safe_log_text(target_id),
-        "message": _v30032_safe_log_text(message),
-        "detail": _v30032_safe_log_text(detail),
-        "level": _v30032_safe_log_text(level or "INFO") or "INFO",
-        "source": "06_log_query_jsonl_v30032_hot_path_flatten",
-        "authority_module_key": "06_log_query",
-        "authority_written_at": ts,
-        "authority_event_id": f"06log:{ts}:{str(_v30032_uuid.uuid4())}",
-        "authority_patch_version": _V30032_LOG_VERSION,
+        "action_type": "DELETE_LOG_RANGE",
+        "target_table": "system_logs",
+        "target_id": f"{_v30036_date_text(start_date)}~{_v30036_date_text(end_date)}",
+        "message": f"刪除 LOG 日期區間：{_v30036_date_text(start_date)} ~ {_v30036_date_text(end_date)}，刪除筆數：{deleted}",
+        "detail": f"deleted_count={deleted};authority=06_log_query.records.jsonl;v30036=1",
+        "level": "WARN",
+        "source": "06_log_query_delete_tombstone_v30036_unique_authority",
+        "delete_range_start": _v30036_date_text(start_date),
+        "delete_range_end": _v30036_date_text(end_date),
     }
-
-
-def _v30032_append_log_row_local(row: dict[str, Any]) -> None:
     try:
-        path = _v30032_log_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(_v30032_json.dumps(row, ensure_ascii=False, default=str) + "\n")
+        from services.authority_consistency_service import append_jsonl, upload_authority_file
+        append_jsonl("06_log_query", marker, identity_fields=("action_type", "delete_range_start", "delete_range_end", "log_time"), github=False, reason="delete_logs_range_v30036")
+        # Explicit delete must be durable. Upload only this small JSONL authority file; ordinary write_log remains nonblocking.
+        try:
+            upload_authority_file("06_log_query", "records.jsonl", reason="delete_logs_range_v30036")
+        except Exception:
+            pass
     except Exception:
         pass
-
-
-def _v30032_write_sqlite_log_row(row: dict[str, Any]) -> None:
     try:
-        execute(
-            """
-            INSERT INTO system_logs
-            (log_time, user_name, action_type, target_table, target_id, message, detail, level)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                row.get("log_time", ""),
-                row.get("user_name", "SYSTEM"),
-                row.get("action_type", ""),
-                row.get("target_table", ""),
-                row.get("target_id", ""),
-                row.get("message", ""),
-                row.get("detail", ""),
-                row.get("level", "INFO"),
-            ),
-        )
+        clear_query_cache()
     except Exception:
         pass
+    return deleted
 
 
-def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
-    """V300.32 terminal write_log: one local DB write + one local authority append.
-
-    This intentionally avoids the historical wrapper chain and any foreground
-    GitHub/upload/download work. It fixes 01 工時紀錄 buttons that looked stuck
-    because a single action generated hundreds of nested LOG authority writes.
-    """
-    row = _v30032_build_log_row(action_type, message, target_table, target_id, detail, level, user_name)
-    _v30032_write_sqlite_log_row(row)
-    _v30032_append_log_row_local(row)
-    return None
-
-
-def audit_v30032_log_hot_path_flatten() -> dict[str, Any]:
-    try:
-        p = _v30032_log_path()
-        return {
-            "version": _V30032_LOG_VERSION,
-            "terminal_write_log": True,
-            "calls_previous_write_log_wrappers": False,
-            "foreground_github_upload": False,
-            "authority_jsonl": str(p),
-            "authority_jsonl_exists": p.exists(),
-            "ui_changed": False,
-            "css_changed": False,
-            "theme_changed": False,
-        }
-    except Exception as exc:
-        return {"version": _V30032_LOG_VERSION, "ok": False, "error": str(exc)[:300]}
-# ================= END V300.32 06 LOG HOT-PATH FLATTEN PATCH =================
+def audit_v30036_06_log_delete_authority() -> dict[str, Any]:
+    return {"version": "V300.36_06_LOG_UNIQUE_AUTHORITY_DELETE_TOMBSTONE", "delete_ranges": _v30036_log_delete_ranges(), "authority_rows": len(_v30036_read_log_authority_rows(None)), "deleted_rows_never_return_from_legacy_sources": True}
+# ===== V300.36 06 LOG UNIQUE AUTHORITY DELETE TOMBSTONE END =====
