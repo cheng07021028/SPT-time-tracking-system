@@ -2,9 +2,9 @@
   "authority_schema": "SPT_PERMISSION_AUTHORITY_CLEAN_V1",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-06-01 08:59:54",
+  "updated_at": "2026-06-01 09:00:49",
   "exported_at": "2026-05-29 14:43:31",
-  "reason": "delete_users_direct_authority",
+  "reason": "save_users_direct_authority",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -21,7 +21,7 @@
         "last_login_at": "2026-05-29 11:28:38",
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "manager",
@@ -36,7 +36,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "leader",
@@ -51,7 +51,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "operator",
@@ -66,7 +66,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "viewer",
@@ -81,7 +81,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "auditor",
@@ -96,7 +96,7 @@
         "last_login_at": null,
         "note": "V1.29 default account",
         "created_at": "2026-05-15 03:46:58",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "SPT142",
@@ -111,7 +111,7 @@
         "last_login_at": "2026-05-15 11:18:26",
         "note": "",
         "created_at": "2026-05-15 10:48:48",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "B211",
@@ -126,7 +126,7 @@
         "last_login_at": "2026-05-29 10:06:59",
         "note": "",
         "created_at": "2026-05-15 10:58:31",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -144,7 +144,7 @@
         "last_login_at": null,
         "note": "",
         "created_at": "2026-05-16 14:29:55",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT121",
@@ -159,7 +159,7 @@
         "last_login_at": "2026-05-29 11:24:40",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -177,7 +177,7 @@
         "last_login_at": "2026-05-29 10:09:41",
         "note": "",
         "created_at": "2026-05-27 10:23:13",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -195,7 +195,7 @@
         "last_login_at": "2026-05-29 10:01:15",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT031",
@@ -210,7 +210,7 @@
         "last_login_at": "2026-05-29 10:52:16",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT199",
@@ -225,7 +225,7 @@
         "last_login_at": "2026-05-29 10:05:43",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "B246",
@@ -240,7 +240,7 @@
         "last_login_at": "2026-05-29 10:05:55",
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -258,7 +258,7 @@
         "last_login_at": "2026-05-29 11:27:16",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -276,7 +276,7 @@
         "last_login_at": "2026-05-29 10:08:50",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -294,7 +294,7 @@
         "last_login_at": "2026-05-29 10:13:24",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -312,7 +312,7 @@
         "last_login_at": "2026-05-29 10:18:57",
         "note": "",
         "created_at": "2026-05-27 10:05:01",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -330,7 +330,7 @@
         "last_login_at": "2026-05-29 11:25:51",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -348,7 +348,7 @@
         "last_login_at": "2026-05-29 10:21:09",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -366,7 +366,7 @@
         "last_login_at": "2026-05-29 10:23:01",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT239",
@@ -381,7 +381,7 @@
         "last_login_at": "2026-05-29 11:27:54",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -399,7 +399,7 @@
         "last_login_at": "2026-05-29 10:32:53",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT240",
@@ -414,7 +414,7 @@
         "last_login_at": "2026-05-29 10:45:19",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -432,7 +432,7 @@
         "last_login_at": "2026-05-29 10:40:46",
         "note": "",
         "created_at": "2026-05-25 18:11:35",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -450,7 +450,7 @@
         "last_login_at": "2026-05-29 10:46:18",
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "SPT149",
@@ -465,7 +465,7 @@
         "last_login_at": "2026-05-29 10:51:19",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "強制改密碼": false,
         "強制改密碼 / Force Change": false
@@ -483,7 +483,7 @@
         "last_login_at": "2026-05-29 10:56:09",
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "SPT087",
@@ -498,7 +498,7 @@
         "last_login_at": "2026-05-29 11:02:58",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "B189",
@@ -513,7 +513,7 @@
         "last_login_at": "2026-05-29 11:07:58",
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B190",
@@ -528,7 +528,7 @@
         "last_login_at": "2026-05-29 11:09:49",
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B204",
@@ -543,7 +543,7 @@
         "last_login_at": "2026-05-29 11:15:12",
         "note": "",
         "created_at": "2026-05-25 18:11:33",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "SPT118",
@@ -558,7 +558,7 @@
         "last_login_at": "2026-05-29 11:24:24",
         "note": "",
         "created_at": "2026-05-25 18:11:34",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT003",
@@ -572,7 +572,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:50",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT005",
@@ -586,7 +586,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:50",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT236",
@@ -600,7 +600,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:50",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT015",
@@ -614,7 +614,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:50",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT024",
@@ -628,7 +628,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:50",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT034",
@@ -642,7 +642,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT048",
@@ -656,7 +656,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT059",
@@ -670,7 +670,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT063",
@@ -684,7 +684,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -707,7 +707,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT084",
@@ -721,7 +721,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT088",
@@ -735,7 +735,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT089",
@@ -749,7 +749,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -772,7 +772,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -795,7 +795,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -818,7 +818,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -841,7 +841,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT120",
@@ -855,7 +855,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT150",
@@ -869,7 +869,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -892,7 +892,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT158",
@@ -906,7 +906,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT160",
@@ -920,7 +920,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -943,7 +943,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT173",
@@ -957,7 +957,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT183",
@@ -971,7 +971,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT189",
@@ -985,7 +985,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT193",
@@ -999,7 +999,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1022,7 +1022,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT196",
@@ -1036,7 +1036,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT201",
@@ -1050,7 +1050,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT227",
@@ -1064,7 +1064,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1087,7 +1087,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT229",
@@ -1101,7 +1101,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:51",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT231",
@@ -1115,7 +1115,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT235",
@@ -1129,7 +1129,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT242",
@@ -1143,7 +1143,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1166,7 +1166,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1189,7 +1189,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1212,7 +1212,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1235,7 +1235,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "B002",
@@ -1249,7 +1249,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1272,7 +1272,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1295,7 +1295,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1318,7 +1318,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B227",
@@ -1332,7 +1332,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B210",
@@ -1346,7 +1346,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1369,7 +1369,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1392,7 +1392,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1415,7 +1415,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1438,7 +1438,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1461,7 +1461,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B230",
@@ -1475,7 +1475,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B243",
@@ -1489,7 +1489,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B244",
@@ -1503,7 +1503,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1526,7 +1526,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B247",
@@ -1540,7 +1540,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B248",
@@ -1554,7 +1554,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51",
+        "updated_at": "2026-06-01 09:00:48",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1577,7 +1577,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B251",
@@ -1591,7 +1591,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B252",
@@ -1605,7 +1605,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B253",
@@ -1619,7 +1619,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B254",
@@ -1633,7 +1633,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:52",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "B255",
@@ -1647,7 +1647,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "B256",
@@ -1661,7 +1661,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1684,7 +1684,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-06-01 08:59:51"
+        "updated_at": "2026-06-01 09:00:48"
       },
       {
         "username": "B258",
@@ -1698,7 +1698,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "B259",
@@ -1712,7 +1712,7 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-06-01 08:59:52",
+        "updated_at": "2026-06-01 09:00:49",
         "password_display": "********",
         "new_password": "",
         "password": "",
@@ -1735,7 +1735,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SPT187",
@@ -1749,7 +1749,7 @@
         "force_password_change": 1,
         "note": "",
         "created_at": "2026-05-29 14:59:53",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
       },
       {
         "username": "SSS",
@@ -1763,7 +1763,20 @@
         "force_password_change": 0,
         "note": "",
         "created_at": "2026-05-29 15:01:16",
-        "updated_at": "2026-06-01 08:59:52"
+        "updated_at": "2026-06-01 09:00:49"
+      },
+      {
+        "username": "B260",
+        "password_hash": "pbkdf2_sha256$bae5eda9d59ce130701ed3aa06387fe7$888dd4a659a7b38cc743a80397dd0487d3795128a43c6e210790331058835232",
+        "employee_id": "B260",
+        "display_name": "莊仕琦",
+        "email": "",
+        "role_code": "operator",
+        "is_active": 1,
+        "force_password_change": 0,
+        "note": "",
+        "updated_at": "2026-06-01 09:00:49",
+        "created_at": "2026-06-01 09:00:49"
       }
     ],
     "auth_account_permissions": [
@@ -26726,6 +26739,246 @@
         "can_backup": 0,
         "can_restore": 0,
         "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "01",
+        "module_name_zh": "工時紀錄",
+        "module_name_en": "Time Recording",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "02",
+        "module_name_zh": "歷史紀錄",
+        "module_name_en": "History",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "03",
+        "module_name_zh": "製令管理",
+        "module_name_en": "Work Orders",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "04",
+        "module_name_zh": "人員名單",
+        "module_name_en": "Employees",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "05",
+        "module_name_zh": "製令工時分析",
+        "module_name_en": "WO Time Analysis",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "06",
+        "module_name_zh": "LOG查詢",
+        "module_name_en": "Logs",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "07",
+        "module_name_zh": "今日未紀錄名單",
+        "module_name_en": "Missing Today",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "08",
+        "module_name_zh": "人員每日工時",
+        "module_name_en": "Daily Hours",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "09",
+        "module_name_zh": "資料永久保存與備份",
+        "module_name_en": "Backup",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "10",
+        "module_name_zh": "權限管理",
+        "module_name_en": "Permissions",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "11",
+        "module_name_zh": "登入紀錄",
+        "module_name_en": "Login Records",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "12",
+        "module_name_zh": "模組永久紀錄中心",
+        "module_name_en": "Persistence Center",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "13",
+        "module_name_zh": "系統設定",
+        "module_name_en": "System Settings",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "14",
+        "module_name_zh": "資料健康檢查中心",
+        "module_name_en": "Data Health",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 1,
+        "can_create": 1,
+        "can_edit": 1,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
+      },
+      {
+        "username": "B260",
+        "module_code": "99",
+        "module_name_zh": "效能診斷",
+        "module_name_en": "Performance",
+        "updated_at": "2026-06-01 09:00:49",
+        "can_view": 0,
+        "can_create": 0,
+        "can_edit": 0,
+        "can_delete": 0,
+        "can_import": 0,
+        "can_export": 0,
+        "can_backup": 0,
+        "can_restore": 0,
+        "can_manage": 0
       }
     ],
     "auth_security_settings": [
@@ -28555,8 +28808,8 @@
   },
   "settings": {},
   "table_counts": {
-    "auth_users": 104,
-    "auth_account_permissions": 1560,
+    "auth_users": 105,
+    "auth_account_permissions": 1575,
     "auth_security_settings": 3,
     "security_settings": 3,
     "security_users": 104,
