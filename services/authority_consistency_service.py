@@ -157,10 +157,10 @@ def _truthy_env(name: str, default: bool = False) -> bool:
 
 
 def _is_durable_jsonl_module(key: str) -> bool:
-    # V300.23：06/11 使用與 10 權限管理相同的 Reboot 可保存觀念：
+    # V300.23：V300.23.1: 06 LOG 保留即時同步；11 登入紀錄不得在登入熱路徑等待 GitHub：
     # 寫入後要盡量立即同步到 GitHub 上的同一路徑，避免 Streamlit Cloud
     # Reboot 後又讀回 GitHub 舊檔。
-    return module_key(key) in {"06_log_query", "11_login_records"}
+    return module_key(key) in {"06_log_query"}
 
 
 def append_jsonl(key: str, row: dict[str, Any], *, identity_fields: Iterable[str] | None = None, github: bool = False, reason: str = "append_jsonl") -> dict[str, Any]:
@@ -175,7 +175,7 @@ def append_jsonl(key: str, row: dict[str, Any], *, identity_fields: Iterable[str
     with path.open("a", encoding="utf-8") as fh:
         fh.write(line + "\n")
 
-    # 06 / 11 是 append-only 正式紀錄。預設啟用 immediate GitHub write-through，
+    # 06 是 append-only 正式紀錄。11 登入紀錄由背景/手動同步，避免卡住登入。
     # 可用 SPT_DISABLE_0611_IMMEDIATE_GITHUB_SYNC=1 暫時停用。
     durable_write = _is_durable_jsonl_module(k) and not _truthy_env("SPT_DISABLE_0611_IMMEDIATE_GITHUB_SYNC", False)
     should_upload = bool(github or durable_write)

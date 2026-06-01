@@ -2844,3 +2844,92 @@ def audit_v30023_11_login_records_authority() -> Dict[str, Any]:
         return {"ok": False, "error": str(exc)[:300]}
 
 # ================= END V300.23 11 LOGIN RECORDS DIRECT GITHUB AUTHORITY WRITE =================
+
+
+# =================== V300.23.1 EMERGENCY LOGIN HOTPATH UNBLOCK ===================
+# Scope: 11. 登入紀錄 only. Do NOT wait for GitHub/direct authority upload during login.
+# Reason: V300.23 direct GitHub sync placed remote upload in the login hot path and could spin forever.
+
+def record_login_log(username: str = "", display_name: str = "", event_type: str = "LOGIN", result: str = "SUCCESS", message: str = "", module_code: str = "", login_time: Optional[str] = None, logout_time: Optional[str] = None, idle_minutes: Optional[float] = None, ip_address: str = "", user_agent: str = "", **kwargs: Any) -> int:  # type: ignore[override]
+    """Lightweight login log write.
+
+    This function must never block user login on GitHub/network authority sync.
+    It writes the local DB row and appends local JSONL only. GitHub sync must be manual/background.
+    """
+    new_id = 0
+    login_time = login_time or _now()
+    created_at = kwargs.get("created_at") or _now()
+    try:
+        ensure_login_logs_table()
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT INTO login_logs (
+            username, display_name, event_type, result, message, module_code,
+            login_time, logout_time, idle_minutes, ip_address, user_agent, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (username, display_name, event_type, result, message, module_code,
+              login_time, logout_time, idle_minutes, ip_address, user_agent, created_at))
+        try:
+            new_id = int(cur.lastrowid or 0)
+        except Exception:
+            new_id = 0
+        conn.commit()
+        conn.close()
+    except Exception:
+        new_id = 0
+
+    # Local append-only authority cache only; no GitHub wait here.
+    try:
+        from services.authority_consistency_service import append_jsonl
+        row = {
+            "id": new_id or "",
+            "username": username or "",
+            "display_name": display_name or "",
+            "event_type": event_type or "LOGIN",
+            "result": result or "SUCCESS",
+            "message": message or "",
+            "module_code": module_code or "",
+            "login_time": login_time,
+            "logout_time": logout_time or "",
+            "idle_minutes": idle_minutes if idle_minutes is not None else "",
+            "ip_address": ip_address or "",
+            "user_agent": user_agent or "",
+            "created_at": created_at,
+            "source": "11_login_records_v30023_1_local_nonblocking",
+        }
+        append_jsonl(
+            "11_login_records",
+            row,
+            identity_fields=("username", "event_type", "result", "login_time", "module_code", "message"),
+            github=False,
+            reason="record_login_log_v30023_1_local_nonblocking",
+        )
+    except Exception:
+        pass
+    return new_id
+
+write_login_log = record_login_log
+add_login_log = record_login_log
+append_login_log = record_login_log
+write_audit_log = record_login_log
+record_audit_log = record_login_log
+log_login_event = record_login_log
+save_login_log = record_login_log
+
+
+def audit_v30023_1_login_hotpath_unblock() -> Dict[str, Any]:
+    try:
+        from services.authority_consistency_service import records_jsonl_path
+        p = records_jsonl_path("11_login_records")
+        return {
+            "version": "V300.23.1_LOGIN_HOTPATH_UNBLOCK",
+            "login_waits_for_github": False,
+            "authority_file": str(p),
+            "exists": p.exists(),
+            "size": p.stat().st_size if p.exists() else 0,
+        }
+    except Exception as exc:
+        return {"version": "V300.23.1_LOGIN_HOTPATH_UNBLOCK", "ok": False, "error": str(exc)[:300]}
+
+# ================= END V300.23.1 EMERGENCY LOGIN HOTPATH UNBLOCK =================
