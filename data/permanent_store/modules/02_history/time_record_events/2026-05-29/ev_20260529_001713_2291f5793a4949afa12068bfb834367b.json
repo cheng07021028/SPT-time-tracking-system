@@ -1,0 +1,46 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "2291f5793a4949afa12068bfb834367b",
+  "event_type": "PAUSE_WORK",
+  "event_time": "2026-05-29 00:17:13",
+  "record_id": "324",
+  "record_key": "SSS|NA|6S|2026-05-29 00:14:26|b5c196cd",
+  "operator_account": "SSS",
+  "reason": "finish_work_v176_fast_transaction",
+  "row": {
+    "id": "324",
+    "record_key": "SSS|NA|6S|2026-05-29 00:14:26|b5c196cd",
+    "status": "暫停",
+    "work_order": "NA",
+    "part_no": "",
+    "type_name": "",
+    "process_name": "6S",
+    "employee_id": "SSS",
+    "employee_name": "SSS",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-29 00:14:26",
+    "end_action": "暫停",
+    "end_timestamp": "2026-05-29 00:17:13",
+    "remark": "系統自動暫停：同一人員切換不同工段或不同日期作業",
+    "start_date": "2026-05-29",
+    "start_time": "00:14:26",
+    "end_date": "2026-05-29",
+    "end_time": "00:17:13",
+    "work_hours": "0.05",
+    "assembly_location": "",
+    "group_key": "SSS|6S|2026-05-29",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-29 00:14:26",
+    "updated_at": "2026-05-29 00:17:13"
+  },
+  "extra": {
+    "end_action": "暫停",
+    "remark": "系統自動暫停：同一人員切換不同工段或不同日期作業",
+    "affected_ids": [
+      324
+    ]
+  },
+  "previous_checksum": "89dc82e7b8045af0ab0884832aab364caae32f6e51b765051316a178ac3f8f5b",
+  "checksum": "d46f50d6d7043f747943442259fafb1fdfca6f1191693f180d3e6a3365888c4f"
+}

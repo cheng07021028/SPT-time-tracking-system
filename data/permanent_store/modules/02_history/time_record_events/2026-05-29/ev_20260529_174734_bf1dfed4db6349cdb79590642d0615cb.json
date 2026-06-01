@@ -1,0 +1,48 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "bf1dfed4db6349cdb79590642d0615cb",
+  "event_type": "PAUSE_WORK",
+  "event_time": "2026-05-29 17:47:34",
+  "record_id": "409",
+  "record_key": "SPT149|26M0051-09|模組|2026-05-29 13:21:50|aea0b9ab",
+  "operator_account": "SPT149",
+  "reason": "finish_work_v212_restore_per_row_save",
+  "row": {
+    "id": "409",
+    "record_key": "SPT149|26M0051-09|模組|2026-05-29 13:21:50|aea0b9ab",
+    "status": "暫停",
+    "work_order": "26M0051-09",
+    "part_no": "PSRSC151-SB4L-05",
+    "type_name": "RSC151-SB4L+Argus",
+    "process_name": "模組",
+    "employee_id": "SPT149",
+    "employee_name": "江金福",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-29 13:21:50",
+    "end_action": "暫停",
+    "end_timestamp": "2026-05-29 17:47:34",
+    "remark": "同步作業平均分配：2筆，群組總工時=04:10:44，平均=02:05:24",
+    "start_date": "2026-05-29",
+    "start_time": "13:21:50",
+    "end_date": "2026-05-29",
+    "end_time": "17:47:34",
+    "work_hours": "2.09",
+    "assembly_location": "竹東",
+    "group_key": "SPT149|模組|2026-05-29",
+    "is_group_work": "1",
+    "source": "streamlit",
+    "created_at": "2026-05-29 13:21:50",
+    "updated_at": "2026-05-29 17:47:34"
+  },
+  "extra": {
+    "end_action": "暫停",
+    "remark": "",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      409,
+      411
+    ]
+  },
+  "previous_checksum": "",
+  "checksum": "7a3f9b43e2187031dba3d80a4f6baac0e406b3121c0df5863adee73f29e371b8"
+}

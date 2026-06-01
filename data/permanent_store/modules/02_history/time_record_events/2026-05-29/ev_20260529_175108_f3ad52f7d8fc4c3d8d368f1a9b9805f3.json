@@ -1,0 +1,47 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "f3ad52f7d8fc4c3d8d368f1a9b9805f3",
+  "event_type": "OFF_DUTY",
+  "event_time": "2026-05-29 17:51:08",
+  "record_id": "430",
+  "record_key": "SPT138|25MN0014-10|其他|2026-05-29 13:56:59|cecae76f",
+  "operator_account": "SPT138",
+  "reason": "finish_work_v212_restore_per_row_save",
+  "row": {
+    "id": "430",
+    "record_key": "SPT138|25MN0014-10|其他|2026-05-29 13:56:59|cecae76f",
+    "status": "下班",
+    "work_order": "25MN0014-10",
+    "part_no": "BWS3200\nRSC2A2-BWN01-03",
+    "type_name": "9MRSC2A2-BWN01-03",
+    "process_name": "其他",
+    "employee_id": "SPT138",
+    "employee_name": "蘇雍盛",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-29 13:56:59",
+    "end_action": "下班",
+    "end_timestamp": "2026-05-29 17:51:07",
+    "remark": "SENSORT線材製作",
+    "start_date": "2026-05-29",
+    "start_time": "13:56:59",
+    "end_date": "2026-05-29",
+    "end_time": "17:51:07",
+    "work_hours": "3.65",
+    "assembly_location": "竹東",
+    "group_key": "SPT138|其他|2026-05-29",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-29 13:56:59",
+    "updated_at": "2026-05-29 17:51:07"
+  },
+  "extra": {
+    "end_action": "下班",
+    "remark": "",
+    "finish_parallel_group": true,
+    "affected_ids": [
+      430
+    ]
+  },
+  "previous_checksum": "1cb87c8ea2f616c90a32fb12ac5cae44a4eb0cf1fcc885002dbfef2176db8364",
+  "checksum": "dbb677666112e48e9a9e26cd06698fd2d33290c73f21adccd36ed4daf1f32d32"
+}

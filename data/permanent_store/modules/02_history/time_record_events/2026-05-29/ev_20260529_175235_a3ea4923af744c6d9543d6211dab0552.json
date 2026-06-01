@@ -1,0 +1,47 @@
+{
+  "schema": "SPT-TimeRecordEvent-V152",
+  "event_id": "a3ea4923af744c6d9543d6211dab0552",
+  "event_type": "FINISH_WORK",
+  "event_time": "2026-05-29 17:52:35",
+  "record_id": "372",
+  "record_key": "SPT160|25M0785-02|水平|2026-05-29 09:44:48|75b18968",
+  "operator_account": "SPT160",
+  "reason": "finish_work_v212_restore_per_row_save",
+  "row": {
+    "id": "372",
+    "record_key": "SPT160|25M0785-02|水平|2026-05-29 09:44:48|75b18968",
+    "status": "完工",
+    "work_order": "25M0785-02",
+    "part_no": "PSRSC131-N01-04",
+    "type_name": "PSRSC131-N01",
+    "process_name": "水平",
+    "employee_id": "SPT160",
+    "employee_name": "邱信維",
+    "start_action": "開始",
+    "start_timestamp": "2026-05-29 09:44:48",
+    "end_action": "完工",
+    "end_timestamp": "2026-05-29 17:52:34",
+    "remark": "",
+    "start_date": "2026-05-29",
+    "start_time": "09:44:48",
+    "end_date": "2026-05-29",
+    "end_time": "17:52:34",
+    "work_hours": "6.63",
+    "assembly_location": "竹東",
+    "group_key": "SPT160|水平|2026-05-29",
+    "is_group_work": "0",
+    "source": "streamlit",
+    "created_at": "2026-05-29 09:44:48",
+    "updated_at": "2026-05-29 17:52:34"
+  },
+  "extra": {
+    "end_action": "完工",
+    "remark": "",
+    "finish_parallel_group": false,
+    "affected_ids": [
+      372
+    ]
+  },
+  "previous_checksum": "c16c97cef6d1eeca2d808cfaf7005b81cc07df2130f58f08209d8e13e77efcf0",
+  "checksum": "35bd4bc0e4e5a4bcde4ac9d5ba47ece674d464007b403a5a2f758396b669a5fd"
+}
