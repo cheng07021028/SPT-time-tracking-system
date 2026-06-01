@@ -48,12 +48,15 @@ MODULES = [
     {"module_code":"99","module_name_zh":"效能診斷","module_name_en":"Performance"},
 ]
 ROLE_DESCRIPTIONS = {
-    "admin": {"label":"系統管理員", "description":"全部權限"},
-    "manager": {"label":"主管", "description":"管理與查詢"},
-    "leader": {"label":"現場幹部", "description":"現場操作"},
-    "operator": {"label":"作業人員", "description":"工時操作"},
-    "viewer": {"label":"查詢者", "description":"只讀查詢"},
-    "auditor": {"label":"稽核", "description":"稽核查詢"},
+    # Keep both old/new keys for page compatibility:
+    # - zh/en/desc are used by 10_10. 權限管理.py
+    # - label/description are used by older services and fallback code
+    "admin": {"zh":"系統管理員", "en":"Administrator", "desc":"全部權限", "label":"系統管理員", "description":"全部權限"},
+    "manager": {"zh":"主管", "en":"Manager", "desc":"管理與查詢", "label":"主管", "description":"管理與查詢"},
+    "leader": {"zh":"現場幹部", "en":"Leader", "desc":"現場操作", "label":"現場幹部", "description":"現場操作"},
+    "operator": {"zh":"作業人員", "en":"Operator", "desc":"工時操作", "label":"作業人員", "description":"工時操作"},
+    "viewer": {"zh":"查詢者", "en":"Viewer", "desc":"只讀查詢", "label":"查詢者", "description":"只讀查詢"},
+    "auditor": {"zh":"稽核", "en":"Auditor", "desc":"稽核查詢", "label":"稽核", "description":"稽核查詢"},
 }
 
 def now_text() -> str:

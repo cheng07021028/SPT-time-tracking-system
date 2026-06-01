@@ -101,13 +101,26 @@ with st.expander("⧠ 權限設定使用說明 / User Guide", expanded=False):
 角色可填：`admin / manager / leader / operator / viewer / auditor`，也可填中文：系統管理員、製造主管、現場幹部、作業人員、查詢者、稽核。
 """)
 
+def _role_text(info, key: str, fallback_key: str = "", default: str = "") -> str:
+    """V300 clean compatibility: role metadata may come from old/new schema."""
+    if not isinstance(info, dict):
+        return default
+    value = info.get(key)
+    if value not in (None, ""):
+        return str(value)
+    if fallback_key:
+        value = info.get(fallback_key)
+        if value not in (None, ""):
+            return str(value)
+    return default
+
 with st.expander("⌖ 角色權限說明 / Role Permission Description", expanded=False):
     st.dataframe(pd.DataFrame([
         {
             "角色代碼 / Role Code": role_code,
-            "中文角色 / Chinese Role": info["zh"],
-            "英文角色 / English Role": info["en"],
-            "建議用途 / Recommendation": info["desc"],
+            "中文角色 / Chinese Role": _role_text(info, "zh", "label", role_code),
+            "英文角色 / English Role": _role_text(info, "en", "role_en", role_code),
+            "建議用途 / Recommendation": _role_text(info, "desc", "description", ""),
         }
         for role_code, info in ROLE_DESCRIPTIONS.items()
     ]), use_container_width=True, hide_index=True)
