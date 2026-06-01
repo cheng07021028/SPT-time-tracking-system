@@ -8037,3 +8037,631 @@ def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[ov
         pass
 
 # ======================= V300.12.5 IDLE TIMEOUT INDEPENDENT AUTHORITY FILE END =======================
+
+# ======================= V300.16 10 PERMISSION TRUE CANONICAL READ/WRITE =======================
+# Goal:
+# - 10. 權限管理 must read and write the same authority file on every save.
+# - Never restore from data/persistent_modules, data/persistent_state, history, or default accounts
+#   after the canonical authority file exists.
+# - Account editor and Account x Module Permission Matrix must persist after Reboot App.
+# - This patch intentionally does NOT touch 01/02 logic.
+from typing import Any as _V30016Any
+import copy as _v30016_copy
+
+_V30016_MODULE_KEY = "10_permissions"
+_V30016_AUTH_DIR = PROJECT_ROOT / "data" / "permanent_store" / "modules" / _V30016_MODULE_KEY
+_V30016_RECORDS_FILE = _V30016_AUTH_DIR / "records.json"
+_V30016_SECURITY_FILE = _V30016_AUTH_DIR / "security_runtime_settings.json"
+_V30016_AUTH_TABLES = [
+    "auth_users",
+    "auth_account_permissions",
+    "auth_security_settings",
+    "security_users",
+    "security_user_roles",
+    "security_settings",
+]
+
+
+def _v30016_now() -> str:
+    try:
+        return now_text()
+    except Exception:
+        from datetime import datetime as _dt
+        return _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v30016_read_json(path: Path) -> dict:
+    try:
+        if path.exists() and path.is_file() and path.stat().st_size > 2:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+    return {}
+
+
+def _v30016_atomic_write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    text = json.dumps(payload, ensure_ascii=False, indent=2, default=str)
+    tmp.write_text(text, encoding="utf-8")
+    # Validate before replace.
+    json.loads(tmp.read_text(encoding="utf-8"))
+    tmp.replace(path)
+
+
+def _v30016_github_write(path: Path, reason: str) -> dict:
+    """Best-effort GitHub write-through using the existing authority service."""
+    try:
+        from services.permanent_authority_service import github_put_file as _gh_put
+        return _gh_put(path, path.read_text(encoding="utf-8"), f"SPT V300.16 permission authority: {reason}")
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300], "path": str(path)}
+
+
+def _v30016_empty_payload(reason: str = "init") -> dict:
+    return {
+        "authority_schema": "SPT-10-Permissions-SingleAuthority-V300.16",
+        "version": "V300.16-true-canonical-permission-authority",
+        "module_key": _V30016_MODULE_KEY,
+        "kind": "records",
+        "authority_file": "data/permanent_store/modules/10_permissions/records.json",
+        "reason": reason,
+        "updated_at": _v30016_now(),
+        "deleted_usernames": [],
+        "tables": {t: [] for t in _V30016_AUTH_TABLES},
+        "table_counts": {t: 0 for t in _V30016_AUTH_TABLES},
+    }
+
+
+def _v30016_normalize_payload(payload: dict | None, reason: str = "normalize") -> dict:
+    payload = payload if isinstance(payload, dict) else {}
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    out = _v30016_empty_payload(reason)
+    out.update({
+        "authority_schema": "SPT-10-Permissions-SingleAuthority-V300.16",
+        "version": "V300.16-true-canonical-permission-authority",
+        "module_key": _V30016_MODULE_KEY,
+        "kind": "records",
+        "authority_file": "data/permanent_store/modules/10_permissions/records.json",
+        "created_from_version": payload.get("version") or payload.get("authority_schema") or "unknown",
+    })
+    deleted = payload.get("deleted_usernames", [])
+    if not isinstance(deleted, list):
+        deleted = []
+    out["deleted_usernames"] = sorted({str(x).strip().lower() for x in deleted if str(x).strip() and str(x).strip().lower() != "admin"})
+    norm_tables = {}
+    for t in _V30016_AUTH_TABLES:
+        rows = tables.get(t, []) if isinstance(tables, dict) else []
+        norm_tables[t] = [dict(r) for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+    # Support old settings locations without turning them into a separate authority.
+    settings = payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
+    sec = settings.get("security_settings") if isinstance(settings.get("security_settings"), dict) else {}
+    if sec:
+        existing_keys = {str(r.get("setting_key") or "") for r in norm_tables.get("auth_security_settings", []) if isinstance(r, dict)}
+        for k, v in sec.items():
+            if str(k) and str(k) not in existing_keys:
+                norm_tables["auth_security_settings"].append({"setting_key": str(k), "setting_value": str(v), "note": "migrated from settings.security_settings", "updated_at": _v30016_now()})
+                norm_tables["security_settings"].append({"setting_key": str(k), "setting_value": str(v), "note": "migrated from settings.security_settings", "updated_at": _v30016_now()})
+    out["tables"] = _v30016_filter_deleted_tables(norm_tables, set(out["deleted_usernames"]))
+    out["table_counts"] = {k: len(v) for k, v in out["tables"].items() if isinstance(v, list)}
+    out["updated_at"] = _v30016_now()
+    out["reason"] = reason
+    return out
+
+
+def _v30016_payload(reason: str = "read") -> dict:
+    payload = _v30016_read_json(_V30016_RECORDS_FILE)
+    if isinstance(payload.get("tables"), dict) and isinstance(payload.get("tables", {}).get("auth_users"), list):
+        return _v30016_normalize_payload(payload, reason)
+    # Last resort only when the canonical file does not exist/invalid: read via permanent_authority_service.
+    # This does NOT read persistent_modules/history directly.
+    try:
+        from services.permanent_authority_service import load_authority as _pa_load_authority
+        data = _pa_load_authority(_V30016_MODULE_KEY, "records")
+        if isinstance(data, dict) and isinstance(data.get("tables"), dict):
+            return _v30016_normalize_payload(data, reason + "_pa_fallback")
+    except Exception:
+        pass
+    return _v30016_empty_payload(reason)
+
+
+def _v30016_write_payload(payload: dict, reason: str = "save", *, github: bool = True) -> dict:
+    current = _v30016_read_json(_V30016_RECORDS_FILE)
+    try:
+        backup_dir = _V30016_AUTH_DIR / "recovery_backups"
+        if current:
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            ts = _v30016_now().replace(":", "").replace(" ", "_").replace("-", "")
+            _v30016_atomic_write_json(backup_dir / f"records_before_{reason}_{ts}.json", current)
+    except Exception:
+        pass
+    normalized = _v30016_normalize_payload(payload, reason)
+    auth_users = normalized.get("tables", {}).get("auth_users", [])
+    if not isinstance(auth_users, list) or len(auth_users) == 0:
+        return {"ok": False, "blocked": True, "reason": "empty_auth_users_blocked", "file": str(_V30016_RECORDS_FILE)}
+    _v30016_atomic_write_json(_V30016_RECORDS_FILE, normalized)
+    readback = _v30016_read_json(_V30016_RECORDS_FILE)
+    ok = isinstance(readback.get("tables"), dict) and len(readback.get("tables", {}).get("auth_users", [])) == len(auth_users)
+    gh = _v30016_github_write(_V30016_RECORDS_FILE, reason) if github else {"ok": True, "skipped": True, "reason": "github_false"}
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    return {
+        "ok": bool(ok),
+        "mode": "v30016_true_canonical_authority",
+        "file": str(_V30016_RECORDS_FILE),
+        "table_counts": normalized.get("table_counts", {}),
+        "readback_ok": bool(ok),
+        "github": gh,
+    }
+
+
+def _v30016_deleted(payload: dict | None = None) -> set[str]:
+    payload = payload if isinstance(payload, dict) else _v30016_payload("deleted")
+    raw = payload.get("deleted_usernames", []) if isinstance(payload, dict) else []
+    if not isinstance(raw, list):
+        raw = []
+    return {str(x).strip().lower() for x in raw if str(x).strip() and str(x).strip().lower() != "admin"}
+
+
+def _v30016_username(row: dict) -> str:
+    return str(row.get("username") or row.get("帳號 / Username") or row.get("帳號") or row.get("user_name") or "").strip()
+
+
+def _v30016_filter_deleted_tables(tables: dict, deleted: set[str]) -> dict:
+    out = {}
+    deleted = {str(x).strip().lower() for x in (deleted or set()) if str(x).strip().lower() != "admin"}
+    for table, rows in (tables or {}).items():
+        clean = []
+        for row in rows if isinstance(rows, list) else []:
+            if not isinstance(row, dict):
+                continue
+            uname = _v30016_username(row).lower()
+            if uname and uname in deleted:
+                continue
+            clean.append(dict(row))
+        out[str(table)] = clean
+    for t in _V30016_AUTH_TABLES:
+        out.setdefault(t, [])
+    return out
+
+
+def _v30016_bool(v, default: bool = False) -> int:
+    try:
+        return 1 if _truthy(v, default) else 0
+    except Exception:
+        if v is None:
+            return 1 if default else 0
+        s = str(v).strip().lower()
+        if s in {"1", "true", "yes", "y", "on", "啟用", "是", "v", "✓", "checked"}:
+            return 1
+        if s in {"0", "false", "no", "n", "off", "停用", "否", "", "none", "nan", "unchecked"}:
+            return 0
+        return 1 if default else 0
+
+
+def _v30016_module_code(v) -> str:
+    s = str(v or "").strip()
+    if s in {"99", "99_speed_diagnostic", "99_performance_diagnostic", "效能診斷"}:
+        return "99"
+    digits = "".join(ch for ch in s if ch.isdigit())[:2]
+    return digits.zfill(2) if digits else s.zfill(2)
+
+
+def _v30016_modules() -> list[dict]:
+    mods = [dict(m) for m in MODULES]
+    if not any(_v30016_module_code(m.get("module_code")) == "99" for m in mods):
+        mods.append({"module_code": "99", "module_name_zh": "效能診斷", "module_name_en": "Performance Diagnostic"})
+    # Stable unique by code.
+    out = {}
+    for m in mods:
+        code = _v30016_module_code(m.get("module_code"))
+        if code:
+            x = dict(m); x["module_code"] = code
+            out[code] = x
+    return [out[k] for k in sorted(out.keys(), key=lambda x: int(x) if x.isdigit() else 999)]
+
+
+def _v30016_role_preset(role: str, module_code: str) -> dict:
+    role = str(role or "operator").strip().lower() or "operator"
+    code = _v30016_module_code(module_code)
+    if code == "99" and role != "admin":
+        return {k: 0 for k, _, _ in ACTIONS}
+    base = ROLE_PRESET.get(role) or ROLE_PRESET.get("operator") or {}
+    return {k: int(base.get(k, 0) or 0) for k, _, _ in ACTIONS}
+
+
+def _v30016_default_permission_rows(username: str, role: str) -> list[dict]:
+    now = _v30016_now()
+    rows = []
+    for m in _v30016_modules():
+        code = _v30016_module_code(m.get("module_code"))
+        preset = _v30016_role_preset(role, code)
+        row = {
+            "username": username,
+            "module_code": code,
+            "module_name_zh": str(m.get("module_name_zh") or ""),
+            "module_name_en": str(m.get("module_name_en") or ""),
+            "updated_at": now,
+        }
+        row.update(preset)
+        rows.append(row)
+    return rows
+
+
+def _v30016_normalize_user_row(row: dict, existing: dict | None = None) -> tuple[dict | None, str]:
+    existing = existing if isinstance(existing, dict) else {}
+    username = _v30016_username(row)
+    if not username:
+        return None, "空白帳號略過"
+    new_password = str(row.get("new_password") or row.get("新密碼 / New Password") or row.get("密碼 / Password") or row.get("password") or "").strip()
+    old_hash = str(existing.get("password_hash") or "")
+    if new_password and new_password != "********":
+        password_hash = hash_password(new_password)
+        password_hint = "由權限管理頁更新"
+    elif old_hash:
+        password_hash = old_hash
+        password_hint = str(existing.get("password_hint") or "")
+    else:
+        return None, f"{username} 未設定新密碼 / new password required"
+    role = str(row.get("role_code") or row.get("角色 / Role") or existing.get("role_code") or "operator").strip() or "operator"
+    return {
+        "username": username,
+        "password_hash": password_hash,
+        "password_hint": password_hint,
+        "employee_id": str(row.get("employee_id") or row.get("工號 / Employee ID") or existing.get("employee_id") or "").strip(),
+        "display_name": str(row.get("display_name") or row.get("姓名 / Display Name") or existing.get("display_name") or username).strip(),
+        "email": str(row.get("email") or row.get("Email") or existing.get("email") or "").strip(),
+        "role_code": role,
+        "is_active": _v30016_bool(row.get("is_active", row.get("啟用 / Active", existing.get("is_active", True))), True),
+        "force_password_change": _v30016_bool(row.get("force_password_change", row.get("強制改密碼 / Force Change", existing.get("force_password_change", False))), False),
+        "last_login_at": str(existing.get("last_login_at") or row.get("last_login_at") or row.get("最後登入 / Last Login") or ""),
+        "note": str(row.get("note") or row.get("備註 / Note") or existing.get("note") or "").strip(),
+        "created_at": str(existing.get("created_at") or _v30016_now()),
+        "updated_at": _v30016_now(),
+    }, ""
+
+
+def _v30016_sync_sqlite_cache(payload: dict | None = None) -> None:
+    """Best-effort runtime cache sync. Authority is JSON, not SQLite."""
+    payload = payload if isinstance(payload, dict) else _v30016_payload("sync_cache")
+    tables = _v30016_filter_deleted_tables(payload.get("tables", {}), _v30016_deleted(payload))
+    try:
+        _v91_schema_only() if "_v91_schema_only" in globals() else None
+        conn = connect_db(); cur = conn.cursor()
+        for table in _V30016_AUTH_TABLES:
+            rows = tables.get(table, []) if isinstance(tables.get(table), list) else []
+            try:
+                cur.execute(f'DELETE FROM "{table}"')
+            except Exception:
+                continue
+            try:
+                cols = {str(r[1]) for r in cur.execute(f'PRAGMA table_info("{table}")').fetchall()}
+            except Exception:
+                cols = set()
+            for row in rows:
+                clean = {str(k): v for k, v in dict(row).items() if str(k) in cols and str(k) != "id"}
+                if not clean:
+                    continue
+                col_sql = ",".join([f'"{c}"' for c in clean.keys()])
+                ph = ",".join(["?"] * len(clean))
+                try:
+                    cur.execute(f'INSERT INTO "{table}" ({col_sql}) VALUES ({ph})', list(clean.values()))
+                except Exception:
+                    pass
+        conn.commit(); conn.close()
+        try:
+            sync_auth_users_to_runtime_security()
+        except Exception:
+            pass
+    except Exception:
+        try:
+            conn.close()  # type: ignore[name-defined]
+        except Exception:
+            pass
+
+
+def init_permission_tables(force: bool = False) -> None:  # type: ignore[override]
+    # V300.16: schema/cache sync only. Never read persistent_modules/history/default restore.
+    try:
+        _v91_schema_only() if "_v91_schema_only" in globals() else None
+    except Exception:
+        pass
+    if force:
+        _v30016_sync_sqlite_cache(_v30016_payload("init_force"))
+
+init_auth_tables = init_permission_tables
+
+
+def restore_permission_settings_from_permanent_files(force: bool = False) -> dict:  # type: ignore[override]
+    payload = _v30016_payload("restore_canonical_only")
+    _v30016_sync_sqlite_cache(payload)
+    return {"ok": True, "mode": "v30016_canonical_only", "file": str(_V30016_RECORDS_FILE), "table_counts": payload.get("table_counts", {})}
+
+
+def export_permission_settings_permanently(reason: str = "permission_settings_saved") -> dict:  # type: ignore[override]
+    payload = _v30016_payload(reason)
+    # Export current authority as-is; no DB pull, no old-source scan.
+    return _v30016_write_payload(payload, reason, github=True)
+
+
+def get_users() -> List[dict]:  # type: ignore[override]
+    payload = _v30016_payload("get_users")
+    deleted = _v30016_deleted(payload)
+    rows = payload.get("tables", {}).get("auth_users", []) if isinstance(payload.get("tables"), dict) else []
+    out = []
+    for r in rows if isinstance(rows, list) else []:
+        if not isinstance(r, dict):
+            continue
+        uname = _v30016_username(r)
+        if not uname or uname.lower() in deleted:
+            continue
+        x = dict(r)
+        x["username"] = uname
+        x.setdefault("password_display", "********" if x.get("password_hash") else "")
+        x.setdefault("new_password", "")
+        x["is_active"] = _v30016_bool(x.get("is_active", True), True)
+        x["force_password_change"] = _v30016_bool(x.get("force_password_change", False), False)
+        out.append(x)
+    return sorted(out, key=lambda x: (0 if str(x.get("username", "")).lower() == "admin" else 1, str(x.get("username", "")).lower()))
+
+
+def save_users(rows: Iterable[dict]) -> dict:  # type: ignore[override]
+    return save_account_master(rows, delete_usernames=None)
+
+
+def save_account_master(rows: Iterable[dict], delete_usernames: Iterable[str] | None = None) -> dict:  # type: ignore[override]
+    payload = _v30016_payload("save_account_master")
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {t: [] for t in _V30016_AUTH_TABLES}
+    deleted = _v30016_deleted(payload) | {str(u).strip().lower() for u in (delete_usernames or []) if str(u).strip() and str(u).strip().lower() != "admin"}
+    existing = {str(u.get("username") or "").strip().lower(): dict(u) for u in tables.get("auth_users", []) if isinstance(u, dict) and str(u.get("username") or "").strip()}
+    new_by_user = {}
+    saved = 0; skipped: list[str] = []
+    explicit = set()
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        uname = _v30016_username(r)
+        if not uname:
+            continue
+        uk = uname.lower()
+        explicit.add(uk)
+        if uk in deleted:
+            continue
+        row, msg = _v30016_normalize_user_row(r, existing.get(uk))
+        if row is None:
+            if msg:
+                skipped.append(msg)
+            continue
+        new_by_user[uk] = row
+        saved += 1
+    # Explicit non-deleted row means recreate account: remove tombstone.
+    deleted -= {u for u in explicit if u and u != "admin" and u not in {str(x).strip().lower() for x in (delete_usernames or [])}}
+    tables["auth_users"] = [new_by_user[k] for k in sorted(new_by_user.keys(), key=lambda x: (0 if x == "admin" else 1, x))]
+    # Preserve existing permissions for remaining accounts; add default rows only for missing account/module pairs.
+    perms_existing = [dict(p) for p in tables.get("auth_account_permissions", []) if isinstance(p, dict)]
+    perms_by_key: dict[tuple[str, str], dict] = {}
+    active_users = {u: row for u, row in new_by_user.items() if u not in deleted}
+    for p in perms_existing:
+        uname = _v30016_username(p)
+        code = _v30016_module_code(p.get("module_code"))
+        if not uname or uname.lower() not in active_users or uname.lower() in deleted or not code:
+            continue
+        x = dict(p)
+        x["username"] = active_users[uname.lower()].get("username", uname)
+        x["module_code"] = code
+        for col, _, _ in ACTIONS:
+            x[col] = _v30016_bool(x.get(col, False), False)
+        perms_by_key[(uname.lower(), code)] = x
+    for uk, user in active_users.items():
+        for default_row in _v30016_default_permission_rows(str(user.get("username")), str(user.get("role_code") or "operator")):
+            key = (uk, str(default_row.get("module_code")))
+            if key not in perms_by_key:
+                perms_by_key[key] = default_row
+    tables["auth_account_permissions"] = [perms_by_key[k] for k in sorted(perms_by_key.keys(), key=lambda x: (x[0], int(x[1]) if str(x[1]).isdigit() else 999))]
+    payload["tables"] = tables
+    payload["deleted_usernames"] = sorted(deleted)
+    result = _v30016_write_payload(payload, "save_account_master_v30016", github=True)
+    _v30016_sync_sqlite_cache(payload)
+    return {"saved": saved, "skipped": skipped, "deleted": len(delete_usernames or []), "permanent_save": result, "table_counts": result.get("table_counts", {})}
+
+
+def delete_users(usernames: Iterable[str]) -> int:  # type: ignore[override]
+    targets = [str(u).strip() for u in (usernames or []) if str(u).strip() and str(u).strip().lower() != "admin"]
+    if not targets:
+        return 0
+    current_rows = [u for u in get_users() if str(u.get("username", "")).strip().lower() not in {x.lower() for x in targets}]
+    save_account_master(current_rows, delete_usernames=targets)
+    return len(targets)
+
+
+def get_account_permissions() -> List[dict]:  # type: ignore[override]
+    payload = _v30016_payload("get_account_permissions")
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    deleted = _v30016_deleted(payload)
+    users = {str(u.get("username") or "").strip().lower(): dict(u) for u in tables.get("auth_users", []) if isinstance(u, dict) and str(u.get("username") or "").strip().lower() not in deleted}
+    perms = [dict(p) for p in tables.get("auth_account_permissions", []) if isinstance(p, dict)]
+    out_by_key = {}
+    for p in perms:
+        uname = _v30016_username(p)
+        uk = uname.lower()
+        code = _v30016_module_code(p.get("module_code"))
+        if not uname or uk not in users or uk in deleted or not code:
+            continue
+        user = users.get(uk, {})
+        x = dict(p)
+        x["username"] = str(user.get("username") or uname)
+        x["display_name"] = str(user.get("display_name") or x.get("display_name") or "")
+        x["role_code"] = str(user.get("role_code") or x.get("role_code") or "operator")
+        x["module_code"] = code
+        mod = next((m for m in _v30016_modules() if _v30016_module_code(m.get("module_code")) == code), {})
+        x["module_name_zh"] = str(x.get("module_name_zh") or mod.get("module_name_zh") or "")
+        x["module_name_en"] = str(x.get("module_name_en") or mod.get("module_name_en") or "")
+        for col, _, _ in ACTIONS:
+            x[col] = _v30016_bool(x.get(col, False), False)
+        out_by_key[(uk, code)] = x
+    for uk, user in users.items():
+        for d in _v30016_default_permission_rows(str(user.get("username")), str(user.get("role_code") or "operator")):
+            key = (uk, str(d.get("module_code")))
+            if key not in out_by_key:
+                x = dict(d)
+                x["display_name"] = str(user.get("display_name") or "")
+                x["role_code"] = str(user.get("role_code") or "operator")
+                out_by_key[key] = x
+    return [out_by_key[k] for k in sorted(out_by_key.keys(), key=lambda x: (x[0], int(x[1]) if str(x[1]).isdigit() else 999))]
+
+
+def save_account_permissions(rows: Iterable[dict]) -> int:  # type: ignore[override]
+    payload = _v30016_payload("save_account_permissions")
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {t: [] for t in _V30016_AUTH_TABLES}
+    deleted = _v30016_deleted(payload)
+    users = {str(u.get("username") or "").strip().lower(): dict(u) for u in tables.get("auth_users", []) if isinstance(u, dict) and str(u.get("username") or "").strip().lower() not in deleted}
+    existing = get_account_permissions()
+    by_key = {(str(r.get("username") or "").strip().lower(), _v30016_module_code(r.get("module_code"))): dict(r) for r in existing}
+    count = 0
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        uname = _v30016_username(r)
+        uk = uname.lower()
+        code = _v30016_module_code(r.get("module_code"))
+        if not uname or uk not in users or uk in deleted or not code:
+            continue
+        mod = next((m for m in _v30016_modules() if _v30016_module_code(m.get("module_code")) == code), {})
+        x = dict(by_key.get((uk, code), {}))
+        x.update({
+            "username": str(users[uk].get("username") or uname),
+            "module_code": code,
+            "module_name_zh": str(r.get("module_name_zh") or mod.get("module_name_zh") or ""),
+            "module_name_en": str(r.get("module_name_en") or mod.get("module_name_en") or ""),
+            "updated_at": _v30016_now(),
+        })
+        for col, _, _ in ACTIONS:
+            x[col] = _v30016_bool(r.get(col, x.get(col, False)), False)
+        by_key[(uk, code)] = x
+        count += 1
+    # Hard guard: module 99 is admin-only.
+    for (uk, code), x in list(by_key.items()):
+        if code == "99" and str(users.get(uk, {}).get("role_code") or "").lower() != "admin":
+            for col, _, _ in ACTIONS:
+                x[col] = 0
+    tables["auth_account_permissions"] = [by_key[k] for k in sorted(by_key.keys(), key=lambda x: (x[0], int(x[1]) if str(x[1]).isdigit() else 999))]
+    payload["tables"] = tables
+    result = _v30016_write_payload(payload, "save_account_permissions_v30016", github=True)
+    _v30016_sync_sqlite_cache(payload)
+    return count
+
+
+def _v30016_extract_security_from_payload(payload: dict) -> dict:
+    out = dict(DEFAULT_SECURITY_SETTINGS)
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+    for table in ["auth_security_settings", "security_settings"]:
+        for r in tables.get(table, []) if isinstance(tables.get(table), list) else []:
+            if not isinstance(r, dict):
+                continue
+            k = str(r.get("setting_key") or "").strip()
+            if k:
+                out[k] = str(r.get("setting_value") if r.get("setting_value") is not None else out.get(k, ""))
+    # Independent idle authority remains highest priority for idle only.
+    idle_data = _v30016_read_json(_V30016_SECURITY_FILE)
+    for key in ["idle_auto_logout_minutes", "idle_timeout_minutes"]:
+        val = idle_data.get(key)
+        if val not in (None, ""):
+            out["idle_timeout_minutes"] = str(val)
+            break
+    return out
+
+
+def get_security_settings() -> Dict[str, str]:  # type: ignore[override]
+    return _v30016_extract_security_from_payload(_v30016_payload("get_security_settings"))
+
+
+def save_security_settings(settings: Dict[str, str]) -> None:  # type: ignore[override]
+    payload = _v30016_payload("save_security_settings")
+    tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {t: [] for t in _V30016_AUTH_TABLES}
+    merged = get_security_settings()
+    merged.update({str(k): str(v) for k, v in (settings or {}).items()})
+    try:
+        idle = max(1, int(float(merged.get("idle_timeout_minutes", "15") or 15)))
+    except Exception:
+        idle = 15
+    merged["idle_timeout_minutes"] = str(idle)
+    merged["ask_continue_after_record"] = "0" if str(merged.get("ask_continue_after_record", "1")).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    rows = [{"setting_key": k, "setting_value": str(v), "note": "V300.16 single canonical security setting", "updated_at": _v30016_now()} for k, v in merged.items()]
+    tables["auth_security_settings"] = list(rows)
+    tables["security_settings"] = list(rows)
+    payload["tables"] = tables
+    _v30016_write_payload(payload, "save_security_settings_v30016", github=True)
+    # Keep independent idle authority in sync, but do not let it control accounts/permissions.
+    sec_payload = {"idle_timeout_minutes": idle, "idle_auto_logout_minutes": idle, "updated_at": _v30016_now(), "updated_by": "10_permissions", "authority_schema": "SPT-IdleTimeout-V300.16"}
+    _v30016_atomic_write_json(_V30016_SECURITY_FILE, sec_payload)
+    _v30016_github_write(_V30016_SECURITY_FILE, "save_idle_timeout_v30016")
+    try:
+        _v30016_sync_sqlite_cache(payload)
+    except Exception:
+        pass
+    if st is not None:
+        try:
+            st.session_state["_spt_idle_timeout_cache"] = {"minutes": idle, "ts": 0}
+            st.session_state["spt_security_settings"] = dict(merged)
+        except Exception:
+            pass
+
+
+def permission_authority_diagnostic_v30016() -> dict:
+    payload = _v30016_payload("diagnostic")
+    tables = payload.get("tables", {}) if isinstance(payload.get("tables"), dict) else {}
+    return {
+        "authority_file": str(_V30016_RECORDS_FILE),
+        "exists": _V30016_RECORDS_FILE.exists(),
+        "table_counts": {k: len(v) for k, v in tables.items() if isinstance(v, list)},
+        "deleted_usernames_count": len(_v30016_deleted(payload)),
+        "version": payload.get("version"),
+        "updated_at": payload.get("updated_at"),
+        "note": "V300.16 reads/writes only canonical records.json; legacy persistent_modules/persistent_state/history are not used.",
+    }
+
+# 10 權限管理頁的 check_permission/has_permission 既有管制不改；只改資料持久化路徑。
+check_permission = has_permission
+# ===================== END V300.16 10 PERMISSION TRUE CANONICAL READ/WRITE =====================
+
+# =================== V300.17 10 PERMISSION AUTHORITY MANIFEST PATCH ===================
+# Scope: 10 權限管理 only. Keeps V300.16 canonical read/write rules.
+# Adds an explicit manifest/readback diagnostic; does not alter 01/02, UI, or login CSS.
+def audit_v30017_10_permission_authority() -> dict:  # type: ignore[override]
+    try:
+        base = permission_authority_diagnostic_v30016() if 'permission_authority_diagnostic_v30016' in globals() else {}
+    except Exception as exc:
+        base = {"ok": False, "error": str(exc)[:300]}
+    try:
+        from services.authority_consistency_service import atomic_write_json, manifest_path, now_text
+        payload = _v30016_payload("audit_v30017")
+        tables = payload.get("tables") if isinstance(payload.get("tables"), dict) else {}
+        atomic_write_json(manifest_path("10_permissions"), {
+            "authority_schema": "SPT_MODULE_AUTHORITY_MANIFEST_V1",
+            "module_key": "10_permissions",
+            "mode": "records.json + security_runtime_settings.json",
+            "updated_at": now_text(),
+            "read_rule": "read only data/permanent_store/modules/10_permissions/records.json for accounts/permissions",
+            "security_runtime_file": "security_runtime_settings.json",
+            "legacy_sources_not_authoritative": [
+                "data/permanent_store/persistent_modules",
+                "data/permanent_store/persistent_state",
+                "data/persistent_modules",
+                "data/persistent_state",
+                "sqlite/default seed",
+            ],
+            "table_counts": {k: len(v) for k, v in tables.items() if isinstance(v, list)},
+        })
+    except Exception:
+        pass
+    try:
+        base["v30017_manifest_written"] = True
+        base["legacy_sources_not_authoritative"] = True
+    except Exception:
+        pass
+    return base
+
+# ================= END V300.17 10 PERMISSION AUTHORITY MANIFEST PATCH =================

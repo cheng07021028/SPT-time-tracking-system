@@ -2397,127 +2397,62 @@ restore_login_logs_from_permanent_file = restore_audit_logs_from_permanent_file
 restore_login_logs_from_state = restore_audit_logs_from_permanent_file
 # =================== END V135 LOGIN LOG AUTHORITY + DELETE-RANGE HARD FIX ===================
 
+# =================== V300.17 11 LOGIN RECORDS SINGLE AUTHORITY JSONL PATCH ===================
+# Scope: 11 登入紀錄 only. Append-only authority avoids losing login events after Reboot.
+try:
+    _v30017_prev_record_login_log = record_login_log  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30017_prev_record_login_log = None
+try:
+    _v30017_prev_load_login_logs = load_login_logs  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30017_prev_load_login_logs = None
+try:
+    _v30017_prev_delete_login_logs_by_date_range = delete_login_logs_by_date_range  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30017_prev_delete_login_logs_by_date_range = None
 
-# ===================== V254 FAST LOGIN AUDIT WRITE =====================
-# Problem: record_login_log originally inserted a row, then synchronously called
-# export_audit_logs_to_permanent_file().  Later V135 overrode that export to read up to
-# 100000 login rows and save authority with github=True.  That made every successful
-# login wait for a large authority/GitHub path, commonly around 15 seconds.
-# Fix: login/logout/security events stay durable in SQLite immediately, and the
-# canonical 11_login_logs authority refresh is queued in a daemon thread with github=False.
-# UI/CSS/table/button behavior is untouched.
-import threading as _v254_threading
-import time as _v254_time
 
-_V254_LOGIN_EXPORT_STATE = {"running": False, "last_run_ts": 0.0, "last_error": ""}
-_V254_LOGIN_EXPORT_LOCK = _v254_threading.RLock()
-_V254_LOGIN_EXPORT_MIN_SECONDS = 10.0
+def _v30017_login_authority_row(username: str = "", display_name: str = "", event_type: str = "LOGIN", result: str = "SUCCESS", message: str = "", module_code: str = "", login_time: Optional[str] = None, logout_time: Optional[str] = None, idle_minutes: Optional[float] = None, ip_address: str = "", user_agent: str = "", **kwargs: Any) -> Dict[str, Any]:
+    return {
+        "username": username or "",
+        "display_name": display_name or "",
+        "event_type": event_type or "LOGIN",
+        "result": result or "SUCCESS",
+        "message": message or "",
+        "module_code": module_code or "",
+        "login_time": login_time or _now(),
+        "logout_time": logout_time or "",
+        "idle_minutes": idle_minutes if idle_minutes is not None else "",
+        "ip_address": ip_address or "",
+        "user_agent": user_agent or "",
+        "created_at": kwargs.get("created_at") or _now(),
+        "source": "11_login_records_jsonl_v30017",
+    }
 
 
-def _v254_refresh_login_authority_worker(reason: str = "v254_fast_login_audit") -> None:
-    with _V254_LOGIN_EXPORT_LOCK:
-        if _V254_LOGIN_EXPORT_STATE.get("running"):
-            return
-        _V254_LOGIN_EXPORT_STATE["running"] = True
+def _v30017_append_login_authority(row: Dict[str, Any], *, github: bool = False, reason: str = "login_append") -> None:
     try:
-        now_ts = _v254_time.time()
-        last_ts = float(_V254_LOGIN_EXPORT_STATE.get("last_run_ts") or 0.0)
-        if last_ts and now_ts - last_ts < _V254_LOGIN_EXPORT_MIN_SECONDS:
-            return
-        records = []
-        try:
-            records = _to_records(load_login_logs(limit=100000, include_legacy=True))
-        except TypeError:
-            records = _to_records(load_login_logs())
-        if "_v135_write_authority_and_cache" in globals():
-            _v135_write_authority_and_cache(records, reason=reason, github=False)  # type: ignore[name-defined]
-        else:
-            try:
-                payload = {
-                    "authority_schema": "SPT-PermanentAuthority-V254-FastLogin",
-                    "module_key": "11_login_logs",
-                    "kind": "records",
-                    "updated_at": _now(),
-                    "tables": {"login_logs": records, "auth_login_logs": [], "security_login_logs": []},
-                    "records": records,
-                    "count": len(records),
-                }
-                for path in (AUDIT_STATE_PATH, MODULE_RECORDS_PATH):
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    tmp = path.with_suffix(path.suffix + ".tmp")
-                    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-                    tmp.replace(path)
-            except Exception:
-                pass
-        _V254_LOGIN_EXPORT_STATE["last_run_ts"] = _v254_time.time()
-        _V254_LOGIN_EXPORT_STATE["last_error"] = ""
-    except Exception as exc:
-        _V254_LOGIN_EXPORT_STATE["last_error"] = str(exc)[:500]
-    finally:
-        with _V254_LOGIN_EXPORT_LOCK:
-            _V254_LOGIN_EXPORT_STATE["running"] = False
-
-
-def _v254_queue_login_authority_refresh(reason: str = "v254_fast_login_audit") -> None:
-    try:
-        if _V254_LOGIN_EXPORT_STATE.get("running"):
-            return
-        t = _v254_threading.Thread(
-            target=_v254_refresh_login_authority_worker,
-            args=(reason,),
-            name="SPT-V254-LoginAuditAuthorityRefresh",
-            daemon=True,
-        )
-        t.start()
+        from services.authority_consistency_service import append_jsonl
+        append_jsonl("11_login_records", row, identity_fields=("username", "event_type", "result", "login_time", "module_code", "message"), github=github, reason=reason)
     except Exception:
         pass
 
 
-def record_login_log(
-    username: str = "",
-    display_name: str = "",
-    event_type: str = "LOGIN",
-    result: str = "SUCCESS",
-    message: str = "",
-    module_code: str = "",
-    login_time: Optional[str] = None,
-    logout_time: Optional[str] = None,
-    idle_minutes: Optional[float] = None,
-    ip_address: str = "",
-    user_agent: str = "",
-    **kwargs: Any,
-) -> int:  # type: ignore[override]
-    """V254: durable immediate SQLite insert; non-blocking authority refresh."""
-    try:
-        ensure_login_logs_table()
-    except Exception:
-        pass
-    login_time = login_time or _now()
-    created_at = kwargs.get("created_at") or _now()
+def record_login_log(username: str = "", display_name: str = "", event_type: str = "LOGIN", result: str = "SUCCESS", message: str = "", module_code: str = "", login_time: Optional[str] = None, logout_time: Optional[str] = None, idle_minutes: Optional[float] = None, ip_address: str = "", user_agent: str = "", **kwargs: Any) -> int:  # type: ignore[override]
+    row = _v30017_login_authority_row(username, display_name, event_type, result, message, module_code, login_time, logout_time, idle_minutes, ip_address, user_agent, **kwargs)
     new_id = 0
-    conn = None
-    try:
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("""
-        INSERT INTO login_logs (
-            username, display_name, event_type, result, message, module_code,
-            login_time, logout_time, idle_minutes, ip_address, user_agent, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (username, display_name, event_type, result, message, module_code,
-              login_time, logout_time, idle_minutes, ip_address, user_agent, created_at))
-        new_id = int(cur.lastrowid or 0)
-        conn.commit()
-    finally:
+    if callable(_v30017_prev_record_login_log):
         try:
-            if conn is not None:
-                conn.close()
+            new_id = int(_v30017_prev_record_login_log(username=username, display_name=display_name, event_type=event_type, result=result, message=message, module_code=module_code, login_time=login_time, logout_time=logout_time, idle_minutes=idle_minutes, ip_address=ip_address, user_agent=user_agent, **kwargs) or 0)
         except Exception:
-            pass
-    _v254_queue_login_authority_refresh("v254_login_audit_async_refresh")
+            new_id = 0
+    if new_id:
+        row["id"] = new_id
+    _v30017_append_login_authority(row, github=False, reason="record_login_log_v30017")
     return new_id
 
-
+# Rebind common aliases to the final override.
 write_login_log = record_login_log
 add_login_log = record_login_log
 append_login_log = record_login_log
@@ -2525,4 +2460,85 @@ write_audit_log = record_login_log
 record_audit_log = record_login_log
 log_login_event = record_login_log
 save_login_log = record_login_log
-# =================== END V254 FAST LOGIN AUDIT WRITE ===================
+
+
+def _v30017_authority_login_rows(limit: int = 100000) -> List[Dict[str, Any]]:
+    try:
+        from services.authority_consistency_service import read_jsonl, merge_by_event_id
+        rows = read_jsonl("11_login_records", limit=limit)
+        return merge_by_event_id(rows, id_fields=("username", "event_type", "result", "login_time", "module_code", "message"))
+    except Exception:
+        return []
+
+
+def load_login_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "", limit: int = 1000, event_types: Optional[List[str]] = None, results: Optional[List[str]] = None, include_legacy: bool = True, **kwargs: Any):  # type: ignore[override]
+    rows: List[Dict[str, Any]] = []
+    if callable(_v30017_prev_load_login_logs):
+        try:
+            obj = _v30017_prev_load_login_logs(start_date=start_date, end_date=end_date, keyword=keyword, limit=limit, event_types=event_types, results=results, include_legacy=include_legacy, **kwargs)
+            rows.extend(_to_records(obj))
+        except Exception:
+            pass
+    rows.extend(_v30017_authority_login_rows(limit=max(int(limit or 1000) * 5, 100000)))
+    try:
+        from services.authority_consistency_service import merge_by_event_id
+        rows = merge_by_event_id(rows, id_fields=("username", "event_type", "result", "login_time", "module_code", "message"))
+    except Exception:
+        try:
+            rows = _merge_record_sets(rows)
+        except Exception:
+            pass
+    rows = _filter_records(rows, start_date, end_date, keyword, event_types, results)
+    rows.sort(key=lambda r: str(r.get("login_time") or r.get("created_at") or ""), reverse=True)
+    if limit:
+        rows = rows[:int(limit)]
+    if pd is not None:
+        return pd.DataFrame(rows)
+    return rows
+
+get_login_logs = load_login_logs
+query_login_logs = load_login_logs
+load_audit_logs = load_login_logs
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    deleted = 0
+    if callable(_v30017_prev_delete_login_logs_by_date_range):
+        try:
+            deleted = int(_v30017_prev_delete_login_logs_by_date_range(start_date, end_date) or 0)
+        except Exception:
+            deleted = 0
+    try:
+        from services.authority_consistency_service import append_jsonl
+        append_jsonl("11_login_records", {
+            "username": "SYSTEM",
+            "display_name": "SYSTEM",
+            "event_type": "DELETE_LOGIN_LOG_RANGE",
+            "result": "WARN",
+            "message": f"刪除登入紀錄日期區間：{start_date} ~ {end_date}，刪除筆數：{deleted}",
+            "module_code": "11_login_records",
+            "login_time": _now(),
+            "created_at": _now(),
+            "delete_range_start": str(start_date),
+            "delete_range_end": str(end_date),
+            "source": "11_login_records_delete_tombstone_v30017",
+        }, identity_fields=("event_type", "login_time", "delete_range_start", "delete_range_end", "message"), github=True, reason="delete_login_logs_range_v30017")
+    except Exception:
+        pass
+    return deleted
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+delete_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+clear_audit_logs_by_date = delete_login_logs_by_date_range
+
+
+def audit_v30017_11_login_records_authority() -> Dict[str, Any]:
+    try:
+        from services.authority_consistency_service import audit_authority_consistency
+        return audit_authority_consistency().get("modules", {}).get("11_login_records", {})
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300]}
+
+# ================= END V300.17 11 LOGIN RECORDS SINGLE AUTHORITY JSONL PATCH =================

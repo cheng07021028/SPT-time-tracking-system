@@ -4207,3 +4207,101 @@ def audit_v89_process_settings_ensure_fast_path() -> dict[str, Any]:
     }
 
 # ================= END V89 01 PROCESS SETTINGS ENSURE FAST PATH =================
+
+# =================== V300.17 13 SYSTEM SETTINGS AUTHORITY CONSISTENCY PATCH ===================
+# Scope: 13 system settings only. 01/02 runtime links are not changed.
+# This patch keeps the existing V85/V88 single-authority behavior, but adds
+# settings/manifest read-back metadata so 13 does not depend on legacy config.
+try:
+    _v30017_prev_export_system_settings_permanent = export_system_settings_permanent  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30017_prev_export_system_settings_permanent = None
+try:
+    _v30017_prev_restore_system_settings_from_permanent = restore_system_settings_from_permanent  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30017_prev_restore_system_settings_from_permanent = None
+
+
+def _v30017_13_write_settings_manifest(reason: str, table_counts: dict[str, Any] | None = None) -> None:
+    try:
+        from services.authority_consistency_service import save_settings, atomic_write_json, manifest_path, now_text
+        save_settings("13_system_settings", {
+            "last_reason": reason,
+            "table_counts": dict(table_counts or {}),
+            "read_rule": "13 reads data/permanent_store/modules/13_system_settings/records.json first",
+            "write_rule": "13 saves data/permanent_store/modules/13_system_settings/records.json via permanent_authority_service",
+            "do_not_change_01_02_runtime_links": True,
+        }, github=True, reason=f"13_system_settings_v30017_{reason}")
+        atomic_write_json(manifest_path("13_system_settings"), {
+            "authority_schema": "SPT_MODULE_AUTHORITY_MANIFEST_V1",
+            "module_key": "13_system_settings",
+            "mode": "records.json + settings.json",
+            "updated_at": now_text(),
+            "last_reason": reason,
+            "table_counts": dict(table_counts or {}),
+            "legacy_sources_not_authoritative": [
+                "data/permanent_store/config",
+                "data/config",
+                "data/persistent_modules/13_system_settings",
+                "data/persistent_state/spt_system_settings.json",
+            ],
+        })
+    except Exception:
+        pass
+
+
+def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    res: dict[str, Any] = {}
+    if callable(_v30017_prev_export_system_settings_permanent):
+        try:
+            res = dict(_v30017_prev_export_system_settings_permanent(reason=reason, write_history=write_history) or {})
+        except TypeError:
+            try:
+                res = dict(_v30017_prev_export_system_settings_permanent(reason, write_history) or {})
+            except Exception as exc:
+                res = {"ok": False, "error": str(exc)[:300]}
+        except Exception as exc:
+            res = {"ok": False, "error": str(exc)[:300]}
+    table_counts = {}
+    try:
+        table_counts = dict(res.get("table_counts") or res.get("counts") or {})
+    except Exception:
+        table_counts = {}
+    _v30017_13_write_settings_manifest(str(reason or "system_settings_changed"), table_counts)
+    try:
+        res["v30017_authority_consistency"] = True
+        res["settings_authority"] = "data/permanent_store/modules/13_system_settings/settings.json"
+    except Exception:
+        pass
+    return res
+
+
+def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    if callable(_v30017_prev_restore_system_settings_from_permanent):
+        try:
+            return dict(_v30017_prev_restore_system_settings_from_permanent(force=force) or {})
+        except TypeError:
+            try:
+                return dict(_v30017_prev_restore_system_settings_from_permanent(force) or {})
+            except Exception as exc:
+                return {"ok": False, "error": str(exc)[:300], "mode": "v30017_restore_wrapper"}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)[:300], "mode": "v30017_restore_wrapper"}
+    return {"ok": False, "message": "no previous restore function", "mode": "v30017_restore_wrapper"}
+
+
+def audit_v30017_13_system_settings_authority() -> dict[str, Any]:
+    try:
+        from services.authority_consistency_service import audit_authority_consistency
+        base = audit_authority_consistency().get("modules", {}).get("13_system_settings", {})
+    except Exception as exc:
+        base = {"ok": False, "error": str(exc)[:300]}
+    try:
+        tables = _v85_tables() if "_v85_tables" in globals() else {}
+        base["tables_available"] = sorted([k for k, v in tables.items() if isinstance(v, list)])
+        base["table_counts"] = {k: len(v) for k, v in tables.items() if isinstance(v, list)}
+    except Exception:
+        pass
+    return base
+
+# ================= END V300.17 13 SYSTEM SETTINGS AUTHORITY CONSISTENCY PATCH =================

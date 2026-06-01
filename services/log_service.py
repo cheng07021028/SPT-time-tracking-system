@@ -1718,3 +1718,174 @@ def audit_v212_async_postgresql_log_writes() -> dict[str, Any]:
 
 
 # ================= END V212 ASYNC POSTGRESQL LOG WRITES =================
+
+# =================== V300.17 06 LOG SINGLE AUTHORITY JSONL PATCH ===================
+# Scope: 06 LOG only. Does not touch 01/02, UI, permissions, or system settings.
+# Purpose: keep operation logs in an append-only module authority file so Reboot
+# does not depend on old persistent_modules/persistent_state sources.
+try:
+    _v30017_prev_write_log = write_log  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30017_prev_write_log = None
+try:
+    _v30017_prev_load_logs = load_logs  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30017_prev_load_logs = None
+try:
+    _v30017_prev_load_logs_page = load_logs_page  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30017_prev_load_logs_page = None
+try:
+    _v30017_prev_delete_logs_by_date_range = delete_logs_by_date_range  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30017_prev_delete_logs_by_date_range = None
+
+
+def _v30017_log_row(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> dict[str, Any]:
+    return {
+        "log_time": now_text(),
+        "user_name": user_name or _current_log_user(),
+        "action_type": str(action_type or ""),
+        "target_table": str(target_table or ""),
+        "target_id": str(target_id or ""),
+        "message": str(message or ""),
+        "detail": str(detail or ""),
+        "level": str(level or "INFO"),
+        "source": "06_log_query_jsonl_v30017",
+    }
+
+
+def _v30017_append_log_authority(row: dict[str, Any], *, github: bool = False, reason: str = "06_log_append") -> None:
+    try:
+        from services.authority_consistency_service import append_jsonl
+        append_jsonl("06_log_query", row, identity_fields=("log_time", "user_name", "action_type", "target_table", "target_id", "message"), github=github, reason=reason)
+    except Exception:
+        pass
+
+
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    row = _v30017_log_row(action_type, message, target_table, target_id, detail, level, user_name)
+    # Keep the existing hot path exactly as before; append-only authority is a parallel durability layer.
+    if callable(_v30017_prev_write_log):
+        try:
+            _v30017_prev_write_log(action_type, message, target_table, target_id, detail, level, user_name)
+        except Exception:
+            pass
+    _v30017_append_log_authority(row, github=False, reason="write_log_v30017")
+    return None
+
+
+def _v30017_authority_log_rows(limit: int = 5000) -> list[dict[str, Any]]:
+    try:
+        from services.authority_consistency_service import read_jsonl, merge_by_event_id
+        rows = read_jsonl("06_log_query", limit=limit)
+        return merge_by_event_id(rows, id_fields=("log_time", "user_name", "action_type", "target_table", "target_id", "message"))
+    except Exception:
+        return []
+
+
+def _v30017_filter_log_rows(rows: list[dict[str, Any]], start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None) -> list[dict[str, Any]]:
+    s = _date_text(start_date)
+    e = _date_text(end_date)
+    kw = str(keyword or "").strip().lower()
+    out: list[dict[str, Any]] = []
+    for r in rows or []:
+        d = _date_text(r.get("log_time"))
+        if s and (not d or d < s):
+            continue
+        if e and (not d or d > e):
+            continue
+        if action_type and str(r.get("action_type") or "") != str(action_type):
+            continue
+        if level and str(level).upper() != "ALL" and str(r.get("level") or "") != str(level):
+            continue
+        if kw:
+            blob = " ".join(str(r.get(k, "") or "") for k in ("user_name", "action_type", "target_table", "target_id", "message", "detail", "level")).lower()
+            if kw not in blob:
+                continue
+        out.append(r)
+    out.sort(key=lambda x: str(x.get("log_time") or ""), reverse=True)
+    return out
+
+
+def load_logs(limit: int = 500, start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None):  # type: ignore[override]
+    base_rows: list[dict[str, Any]] = []
+    if callable(_v30017_prev_load_logs):
+        try:
+            obj = _v30017_prev_load_logs(limit=limit, start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword)
+            if isinstance(obj, pd.DataFrame):
+                base_rows = obj.where(pd.notna(obj), "").to_dict(orient="records")
+            elif isinstance(obj, list):
+                base_rows = [dict(x) for x in obj if isinstance(x, dict)]
+        except Exception:
+            base_rows = []
+    auth_rows = _v30017_filter_log_rows(_v30017_authority_log_rows(max(int(limit or 500) * 5, 5000)), start_date, end_date, action_type, level, keyword)
+    try:
+        from services.authority_consistency_service import merge_by_event_id
+        merged = merge_by_event_id(base_rows + auth_rows, id_fields=("log_time", "user_name", "action_type", "target_table", "target_id", "message"))
+    except Exception:
+        merged = base_rows + auth_rows
+    merged.sort(key=lambda x: str(x.get("log_time") or ""), reverse=True)
+    if limit:
+        merged = merged[: int(limit)]
+    return pd.DataFrame(merged)
+
+
+def load_logs_page(start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None, page: int = 1, page_size: int = 500) -> dict[str, Any]:  # type: ignore[override]
+    df = load_logs(limit=max(int(page or 1) * int(page_size or 500), int(page_size or 500)), start_date=start_date, end_date=end_date, action_type=action_type, level=level, keyword=keyword)
+    rows = df.where(pd.notna(df), "").to_dict(orient="records") if isinstance(df, pd.DataFrame) else []
+    p = max(1, int(page or 1))
+    size = max(1, int(page_size or 500))
+    start = (p - 1) * size
+    page_rows = rows[start:start + size]
+    return {
+        "rows": page_rows,
+        "data": page_rows,
+        "total_rows": len(rows),
+        "page": p,
+        "page_size": size,
+        "total_pages": max(1, (len(rows) + size - 1) // size),
+        "source": "v30017_06_log_query_jsonl_plus_existing",
+    }
+
+
+def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit: bool = True, user_name: str | None = None) -> int:  # type: ignore[override]
+    deleted = 0
+    if callable(_v30017_prev_delete_logs_by_date_range):
+        try:
+            deleted = int(_v30017_prev_delete_logs_by_date_range(start_date, end_date, keep_delete_audit=keep_delete_audit, user_name=user_name) or 0)
+        except TypeError:
+            try:
+                deleted = int(_v30017_prev_delete_logs_by_date_range(start_date, end_date) or 0)
+            except Exception:
+                deleted = 0
+        except Exception:
+            deleted = 0
+    try:
+        from services.authority_consistency_service import append_jsonl
+        append_jsonl("06_log_query", {
+            "log_time": now_text(),
+            "user_name": user_name or _current_log_user(),
+            "action_type": "DELETE_LOG_RANGE",
+            "target_table": "system_logs",
+            "target_id": f"{_date_text(start_date)}~{_date_text(end_date)}",
+            "message": f"刪除 LOG 日期區間：{_date_text(start_date)} ~ {_date_text(end_date)}，刪除筆數：{deleted}",
+            "detail": f"deleted_count={deleted}",
+            "level": "WARN",
+            "source": "06_log_query_delete_tombstone_v30017",
+            "delete_range_start": _date_text(start_date),
+            "delete_range_end": _date_text(end_date),
+        }, identity_fields=("log_time", "action_type", "target_id", "message"), github=True, reason="delete_logs_range_v30017")
+    except Exception:
+        pass
+    return deleted
+
+
+def audit_v30017_06_log_authority() -> dict[str, Any]:
+    try:
+        from services.authority_consistency_service import audit_authority_consistency
+        return audit_authority_consistency().get("modules", {}).get("06_log_query", {})
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300]}
+
+# ================= END V300.17 06 LOG SINGLE AUTHORITY JSONL PATCH =================
