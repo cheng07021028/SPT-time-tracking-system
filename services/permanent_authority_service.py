@@ -1339,7 +1339,7 @@ def v30019_authority_hotpath_status() -> dict[str, Any]:
 # ===== V300.19.1 CRITICAL AUTHORITY FOREGROUND SYNC EXCEPTION START =====
 def _v300191_is_critical_foreground_module(module_key: str) -> bool:
     """Modules whose user edits must survive Streamlit Cloud reboot immediately."""
-    return str(module_key or "").strip() in {"10_permissions", "10_permissions_live", "03_work_orders"}
+    return str(module_key or "").strip() in {"10_permissions", "10_permissions_live"}
 
 
 def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
@@ -1399,20 +1399,91 @@ def force_upload_authority_file(module_key: str, kind: str = "records", reason: 
 def v300191_authority_hotpath_status() -> dict[str, Any]:
     return {
         "version": "V300.19.1",
-        "critical_foreground_modules": ["10_permissions", "10_permissions_live", "03_work_orders"],
+        "critical_foreground_modules": ["10_permissions", "10_permissions_live"],
         "foreground_github_authority_upload_enabled": _v30019_truthy_env("SPT_FOREGROUND_AUTHORITY_SYNC", "0"),
         "manual_override_env": "SPT_FOREGROUND_AUTHORITY_SYNC=1",
         "pending_marker_dir": str(ROOT / "data" / "permanent_store" / "_pending_authority_uploads"),
     }
 # ===== V300.19.1 CRITICAL AUTHORITY FOREGROUND SYNC EXCEPTION END =====
 
+# ===== V300.25 MASTER AUTHORITY WRITE PARITY FOR 03/04 START =====
+# Purpose:
+# - Use the same durable foreground GitHub authority write exception that made
+#   10_permissions reliable for master data modules whose edits must survive
+#   Streamlit Cloud reboot.
+# - 03_work_orders and 04_employees are small master-data tables, so immediate
+#   authority write is acceptable and avoids disappearing edits after reboot.
+# - 06/11 remain append-only/local hot-path to avoid login/log clearing spins.
 
-# ===== V300.24 03 WORK ORDERS DURABLE AUTHORITY WRITE START =====
-# 03. 製令管理 must behave like 10. 權限管理 for durability:
-# user edits are low-frequency but business-critical, so records.json must be
-# uploaded to GitHub immediately instead of being deferred by V300.19.
-# Implementation is intentionally limited to permanent_authority_service:
-# save_work_orders() and the 03 page already call update_tables/save_authority
-# with module_key="03_work_orders" and github=True.  By making 03 critical,
-# those existing calls now write the same authority path durably.
-# ===== V300.24 03 WORK ORDERS DURABLE AUTHORITY WRITE END =====
+def _v30025_is_critical_foreground_module(module_key: str) -> bool:
+    """Modules whose explicit admin edits must be durable immediately."""
+    return str(module_key or "").strip() in {
+        "10_permissions",
+        "10_permissions_live",
+        "03_work_orders",
+        "04_employees",
+    }
+
+
+def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    """V300.25: keep hot-path deferral globally, but not for 03/04/10 master edits.
+
+    This intentionally does NOT add 06/11 to foreground GitHub sync because 11 login
+    records are written during login and must never block authentication.
+    """
+    critical = _v30025_is_critical_foreground_module(module_key)
+    allow_foreground_github = _v30019_truthy_env("SPT_FOREGROUND_AUTHORITY_SYNC", "0") if "_v30019_truthy_env" in globals() else False
+    effective_github = bool(github and (critical or allow_foreground_github))
+    if callable(_v30019_prev_save_authority):
+        res = _v30019_prev_save_authority(module_key, records=records, settings=settings, reason=reason, github=effective_github)
+    else:
+        res = {"ok": False, "error": "previous_save_authority_missing", "module_key": module_key}
+    if github and not effective_github:
+        try:
+            _v30019_write_pending_upload_marker(module_key, "records_or_settings", reason)
+        except Exception:
+            pass
+        if isinstance(res, dict):
+            res = dict(res)
+            res["github_requested"] = True
+            res["github_deferred_by_v30019"] = True
+            res["manual_override_env"] = "SPT_FOREGROUND_AUTHORITY_SYNC=1"
+    elif critical and isinstance(res, dict):
+        res = dict(res)
+        res["github_foreground_sync_for_critical_module"] = True
+        res["critical_module"] = str(module_key)
+    return res
+
+
+def force_upload_authority_file(module_key: str, kind: str = "records", reason: str = "force_authority_upload_v98") -> dict[str, Any]:  # type: ignore[override]
+    """V300.25: allow foreground upload for 03/04/10 master authority only."""
+    critical = _v30025_is_critical_foreground_module(module_key)
+    allow_foreground_github = _v30019_truthy_env("SPT_FOREGROUND_AUTHORITY_SYNC", "0") if "_v30019_truthy_env" in globals() else False
+    if (critical or allow_foreground_github) and callable(_v30019_prev_force_upload_authority_file):
+        res = _v30019_prev_force_upload_authority_file(module_key, kind, reason)
+        if isinstance(res, dict) and critical:
+            res = dict(res)
+            res["github_foreground_sync_for_critical_module"] = True
+            res["critical_module"] = str(module_key)
+        return res
+    _v30019_write_pending_upload_marker(module_key, kind, reason)
+    return {
+        "ok": True,
+        "deferred": True,
+        "module_key": str(module_key),
+        "kind": str(kind),
+        "reason": str(reason),
+        "message": "V300.25: foreground GitHub upload deferred except for 03/04/10 master authority.",
+    }
+
+
+def v30025_authority_hotpath_status() -> dict[str, Any]:
+    return {
+        "version": "V300.25",
+        "critical_foreground_modules": ["03_work_orders", "04_employees", "10_permissions", "10_permissions_live"],
+        "nonblocking_append_only_modules": ["06_log_query", "11_login_records"],
+        "foreground_github_authority_upload_enabled": _v30019_truthy_env("SPT_FOREGROUND_AUTHORITY_SYNC", "0") if "_v30019_truthy_env" in globals() else False,
+        "manual_override_env": "SPT_FOREGROUND_AUTHORITY_SYNC=1",
+        "pending_marker_dir": str(ROOT / "data" / "permanent_store" / "_pending_authority_uploads") if "ROOT" in globals() else "",
+    }
+# ===== V300.25 MASTER AUTHORITY WRITE PARITY FOR 03/04 END =====

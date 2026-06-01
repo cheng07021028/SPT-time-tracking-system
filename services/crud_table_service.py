@@ -650,3 +650,152 @@ def save_employees(df: pd.DataFrame) -> dict:  # type: ignore[override]
     log_action("SAVE_EMPLOYEES", "employees", "V113 儲存人員清單並正規化 ID", f"rows={len(rows)}")
     return {"inserted": 0, "updated": len(rows), "deleted": 0, "skipped": 0, "saved": len(rows), "id_normalized": True}
 # ======================= END V113 EMPLOYEE ID DISPLAY NORMALIZATION =====================
+
+# ===== V300.25 03/04 MASTER DATA DEDUPE + AUTHORITY WRITE NORMALIZATION START =====
+# Purpose:
+# - 04 employees reported one new employee being saved as 3 identical rows.
+# - Normalize before writing authority: one employee_id = one row, one work_order = one row.
+# - Keep the last non-empty edited row, so edits in the data editor win.
+# - Use existing permanent_authority_service.update_tables(), which now writes
+#   03/04 immediately through the same durable lane as 10 permissions.
+
+
+def _v30025_blank(v: Any) -> bool:
+    try:
+        if pd.isna(v):
+            return True
+    except Exception:
+        pass
+    return str(v or "").strip().lower() in {"", "none", "nan", "nat", "null", "<na>"}
+
+
+def _v30025_clean_key(v: Any) -> str:
+    if _v30025_blank(v):
+        return ""
+    return str(v).strip()
+
+
+def _v30025_bool(v: Any) -> bool:
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return bool(v)
+    return str(v or "").strip().lower() in {"1", "true", "yes", "y", "是", "啟用", "在廠", "出勤", "active"}
+
+
+def _v30025_keep_last_by_key(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
+    order: list[str] = []
+    by_key: dict[str, dict[str, Any]] = {}
+    no_key_rows: list[dict[str, Any]] = []
+    for row in rows:
+        r = dict(row or {})
+        k = _v30025_clean_key(r.get(key))
+        if not k:
+            # Preserve intentionally blank editor rows only if they have meaningful content.
+            meaningful = any(not _v30025_blank(v) for kk, v in r.items() if kk not in {"id", "created_at", "updated_at"})
+            if meaningful:
+                no_key_rows.append(r)
+            continue
+        if k not in by_key:
+            order.append(k)
+        # Later row wins, but keep earlier non-empty fields when the later value is blank.
+        prev = by_key.get(k, {})
+        merged = dict(prev)
+        for col, val in r.items():
+            if not _v30025_blank(val) or col not in merged:
+                merged[col] = val
+        merged[key] = k
+        by_key[k] = merged
+    return [by_key[k] for k in order] + no_key_rows
+
+
+def _v30025_next_ids(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    used: set[int] = set()
+    for r in rows:
+        x = dict(r)
+        try:
+            n = int(float(str(x.get("id", "")).strip()))
+        except Exception:
+            n = 0
+        if n > 0 and n not in used:
+            used.add(n)
+            x["id"] = n
+        else:
+            x["id"] = ""
+        out.append(x)
+    next_id = 1
+    for x in out:
+        if not _v30025_blank(x.get("id")):
+            continue
+        while next_id in used:
+            next_id += 1
+        x["id"] = next_id
+        used.add(next_id)
+        next_id += 1
+    return out
+
+
+try:
+    _v30025_update_tables = _v28_update_tables
+    _v30025_table_from_df = _v28_table_from_df
+except Exception:
+    _v30025_update_tables = None
+    _v30025_table_from_df = None
+
+
+def _v30025_df_rows(df: pd.DataFrame, cols: list[str]) -> list[dict[str, Any]]:
+    work = df.drop(columns=["刪除 / Delete", "刪除", "_delete"], errors="ignore").copy() if isinstance(df, pd.DataFrame) else pd.DataFrame(columns=cols)
+    for c in cols:
+        if c not in work.columns:
+            work[c] = ""
+    work = work[cols].fillna("")
+    if callable(_v30025_table_from_df):
+        return _v30025_table_from_df(work)
+    return [dict(r) for _, r in work.iterrows()]
+
+
+def save_work_orders(df: pd.DataFrame) -> dict:  # type: ignore[override]
+    cols = ["id", "work_order", "part_no", "type_name", "assembly_location", "customer", "note", "is_active", "created_at", "updated_at"]
+    rows = _v30025_df_rows(df, cols)
+    rows = _v30025_keep_last_by_key(rows, "work_order")
+    rows = _v30025_next_ids(rows)
+    for r in rows:
+        r["is_active"] = _v30025_bool(r.get("is_active"))
+    if callable(_v30025_update_tables):
+        _v30025_update_tables("03_work_orders", {"work_orders": rows}, reason="v30025_save_work_orders_dedupe_durable", github=True)
+    log_action("SAVE_WORK_ORDERS", "work_orders", "V300.25 儲存製令清單：去重並寫入權威檔", f"rows={len(rows)}")
+    return {"inserted": 0, "updated": len(rows), "deleted": 0, "skipped": 0, "saved": len(rows), "deduped": True}
+
+
+def load_employees() -> pd.DataFrame:  # type: ignore[override]
+    cols = ["id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at"]
+    df = _v28_df_from_table("04_employees", "employees", columns=cols) if _v28_df_from_table is not None else pd.DataFrame(columns=cols)
+    for c in cols:
+        if c not in df.columns:
+            df[c] = ""
+    rows = _v30025_keep_last_by_key([dict(r) for _, r in df[cols].fillna("").iterrows()], "employee_id")
+    rows = _v30025_next_ids(rows)
+    out = pd.DataFrame(rows)
+    for c in cols:
+        if c not in out.columns:
+            out[c] = ""
+    for c in ["is_active", "is_in_factory", "is_today_attendance"]:
+        out[c] = out[c].map(_v30025_bool).astype(bool)
+    return out[cols]
+
+
+def save_employees(df: pd.DataFrame) -> dict:  # type: ignore[override]
+    cols = ["id", "employee_id", "employee_name", "department", "title", "is_active", "is_in_factory", "is_today_attendance", "note", "created_at", "updated_at"]
+    rows = _v30025_df_rows(df, cols)
+    rows = _v30025_keep_last_by_key(rows, "employee_id")
+    rows = _v30025_next_ids(rows)
+    for r in rows:
+        r["is_active"] = _v30025_bool(r.get("is_active"))
+        r["is_in_factory"] = _v30025_bool(r.get("is_in_factory"))
+        r["is_today_attendance"] = _v30025_bool(r.get("is_today_attendance"))
+    if callable(_v30025_update_tables):
+        _v30025_update_tables("04_employees", {"employees": rows}, reason="v30025_save_employees_dedupe_durable", github=True)
+    log_action("SAVE_EMPLOYEES", "employees", "V300.25 儲存人員清單：去重並寫入權威檔", f"rows={len(rows)}")
+    return {"inserted": 0, "updated": len(rows), "deleted": 0, "skipped": 0, "saved": len(rows), "deduped": True}
+# ===== V300.25 03/04 MASTER DATA DEDUPE + AUTHORITY WRITE NORMALIZATION END =====
