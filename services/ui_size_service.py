@@ -94,3 +94,11 @@ def audit_v30040_01_url_rerun_component_guard() -> dict:
         "changes_data_read_write_rules": False,
     }
 # ================= END V300.40 01 URL-RERUN COMPONENT GUARD =================
+
+# V300.43: install URL-rerun component guard at module import time too. 01 imports
+# this helper before injecting its old spt_wo_kw JavaScript, so this makes the
+# guard independent of whether apply_dropdown_menu_size_only() completes.
+try:
+    _v30040_install_01_url_rerun_component_guard()
+except Exception:
+    pass

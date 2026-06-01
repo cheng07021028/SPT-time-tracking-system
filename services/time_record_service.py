@@ -29375,392 +29375,119 @@ def audit_v256_frontend_click_isolation() -> dict:
 
 # =================== END V256 01 FRONTEND CLICK ISOLATION ===================
 
-# ================= V300.42 01 COMPLETE RULE + SIMULATION-SAFE HOT PATH =================
-# 2026-06-01
-# Final override for 01.工時紀錄 in this package.
-# Rules restored:
-# 1. Same employee + same work order + same process + same date cannot start twice.
-# 2. Same employee + same date + same process + different work orders is synchronized work.
-# 3. Different process/date active work blocks Start with a warning/error; it is NOT auto-paused.
-# 4. Finishing/Pause/Off-duty one synchronized record finishes the whole active group and averages hours.
-# 5. Foreground display active lookups are SQLite hot-cache only. Authority fallback is used only inside Finish transaction.
-# 6. Old SQLite schemas self-heal before button transactions.
-import json as _v30042_json
-import time as _v30042_time
+# ================= V300.43 01 PAGE LOAD HOT PATH + START BLOCK RESTORE =================
+# 2026-06-02
+# Purpose:
+# - Uploaded project had reverted to older V256 tail. 01 page display functions could
+#   still fall through to legacy authority repair / reconcile paths and make page
+#   loading stay in Streamlit's running state.
+# - 01 page display must be SQL hot-cache only. Authority reconciliation is allowed
+#   only on button transactions / explicit maintenance, not during page paint.
+# - Business rule restored: starting a different process/date while another job is
+#   active must warn/block. It must NOT auto-pause the previous job silently.
+try:
+    _v30043_prev_start_work = start_work
+except Exception:  # pragma: no cover
+    _v30043_prev_start_work = None
+try:
+    _v30043_prev_finish_work = finish_work
+except Exception:  # pragma: no cover
+    _v30043_prev_finish_work = None
 
-_V30042_TERMINAL_STATUSES = {"下班", "暫停", "完工", "已結束", "結束", "完成", "補登結束", "deleted", "刪除", "已刪除"}
-_V30042_TIME_RECORD_COLS = [
-    "id", "record_key", "status", "work_order", "part_no", "type_name", "process_name",
-    "employee_id", "employee_name", "start_action", "start_timestamp", "end_action", "end_timestamp",
-    "remark", "start_date", "start_time", "end_date", "end_time", "work_hours", "assembly_location",
-    "group_key", "is_group_work", "source", "created_at", "updated_at", "is_deleted", "delete_flag",
-]
+_V30043_TERMINAL_STATUSES = {"暫停", "完工", "下班", "已結束", "deleted", "刪除", "已刪除"}
 
 
-def _v30042_text(value) -> str:
+def _v30043_text(value) -> str:
     try:
-        if pd.isna(value):
+        if value is None or pd.isna(value):
             return ""
     except Exception:
-        pass
-    if value is None:
-        return ""
-    text = str(value).strip()
-    return "" if text.lower() in {"none", "nan", "nat", "null", "<na>"} else text
+        if value is None:
+            return ""
+    return str(value).strip()
 
 
-def _v30042_blank(value) -> bool:
-    return _v30042_text(value) == ""
+def _v30043_active_sql(extra_where: list[str] | None = None) -> tuple[str, list]:
+    where = [
+        "(end_timestamp IS NULL OR TRIM(COALESCE(end_timestamp,''))='' OR LOWER(TRIM(COALESCE(end_timestamp,''))) IN ('none','nan','nat'))",
+        "LOWER(TRIM(COALESCE(status,''))) NOT IN ('暫停','完工','下班','已結束','deleted','刪除','已刪除')",
+    ]
+    if extra_where:
+        where.extend(extra_where)
+    return " AND ".join(where), []
 
 
-def _v30042_bool(value, default: bool = False) -> bool:
-    if _v30042_blank(value):
-        return bool(default)
-    if isinstance(value, bool):
-        return value
+def _v30043_query_df(sql: str, params: tuple | list = ()) -> pd.DataFrame:
     try:
-        if isinstance(value, (int, float)):
-            return bool(int(value))
-    except Exception:
-        pass
-    return str(value).strip().lower() in {"1", "true", "yes", "y", "on", "是", "啟用", "v", "✓"}
-
-
-def _v30042_is_pg() -> bool:
-    try:
-        from services.db_service import is_postgres_enabled as _is_pg  # type: ignore
-        return bool(_is_pg())
-    except Exception:
-        return False
-
-
-def _v30042_ensure_time_records_schema() -> None:
-    """Idempotent SQLite schema repair for old time_records cache tables."""
-    if _v30042_is_pg():
-        return
-    try:
-        from services.db_service import get_connection, ensure_database  # type: ignore
+        from services.db_service import ensure_database as _ensure_db
         try:
-            ensure_database()
+            _ensure_db()
         except Exception:
             pass
-        conn = get_connection()
+        return query_df(sql, tuple(params or ()))
     except Exception:
-        return
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS time_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                record_key TEXT,
-                status TEXT,
-                work_order TEXT,
-                part_no TEXT,
-                type_name TEXT,
-                process_name TEXT,
-                employee_id TEXT,
-                employee_name TEXT,
-                start_action TEXT,
-                start_timestamp TEXT,
-                end_action TEXT,
-                end_timestamp TEXT,
-                remark TEXT,
-                start_date TEXT,
-                start_time TEXT,
-                end_date TEXT,
-                end_time TEXT,
-                work_hours REAL DEFAULT 0,
-                assembly_location TEXT,
-                group_key TEXT,
-                is_group_work INTEGER DEFAULT 0,
-                source TEXT,
-                created_at TEXT,
-                updated_at TEXT,
-                is_deleted INTEGER DEFAULT 0,
-                delete_flag TEXT
-            )
-            """
-        )
-        info = cur.execute("PRAGMA table_info(time_records)").fetchall()
-        cols = {str(r[1]) for r in info}
-        migrations = {
-            "id": "INTEGER",
-            "record_key": "TEXT", "status": "TEXT", "work_order": "TEXT", "part_no": "TEXT", "type_name": "TEXT",
-            "process_name": "TEXT", "employee_id": "TEXT", "employee_name": "TEXT", "start_action": "TEXT",
-            "start_timestamp": "TEXT", "end_action": "TEXT", "end_timestamp": "TEXT", "remark": "TEXT",
-            "start_date": "TEXT", "start_time": "TEXT", "end_date": "TEXT", "end_time": "TEXT",
-            "work_hours": "REAL DEFAULT 0", "assembly_location": "TEXT", "group_key": "TEXT",
-            "is_group_work": "INTEGER DEFAULT 0", "source": "TEXT", "created_at": "TEXT", "updated_at": "TEXT",
-            "is_deleted": "INTEGER DEFAULT 0", "delete_flag": "TEXT",
-        }
-        for col, definition in migrations.items():
-            if col not in cols:
-                try:
-                    cur.execute(f"ALTER TABLE time_records ADD COLUMN {col} {definition}")
-                except Exception:
-                    pass
         try:
-            cur.execute("UPDATE time_records SET id=rowid WHERE id IS NULL OR TRIM(COALESCE(id,''))=''")
+            return pd.DataFrame()
         except Exception:
-            pass
-        for sql in (
-            "CREATE INDEX IF NOT EXISTS idx_v30042_time_records_active_emp ON time_records(employee_id, employee_name, process_name, start_date, end_timestamp)",
-            "CREATE INDEX IF NOT EXISTS idx_v30042_time_records_record_key ON time_records(record_key)",
-            "CREATE INDEX IF NOT EXISTS idx_v30042_time_records_work_order ON time_records(work_order)",
-        ):
-            try:
-                cur.execute(sql)
-            except Exception:
-                pass
-        conn.commit()
+            return None  # type: ignore[return-value]
+
+
+def _v30043_normalize_active_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    for col in [
+        "id", "employee_id", "employee_name", "work_order", "process_name", "start_date",
+        "start_timestamp", "end_timestamp", "status", "group_key", "is_group_work", "remark", "work_hours"
+    ]:
+        if col not in out.columns:
+            out[col] = ""
+    try:
+        out = out.where(pd.notna(out), "")
     except Exception:
         pass
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-
-def _v30042_active_where() -> str:
-    terminals = ",".join("'" + s.replace("'", "''") + "'" for s in sorted(_V30042_TERMINAL_STATUSES))
-    return (
-        "(COALESCE(is_deleted,0)=0) "
-        "AND LOWER(TRIM(COALESCE(delete_flag,''))) NOT IN ('1','true','yes','y') "
-        f"AND COALESCE(status,'') NOT IN ({terminals}) "
-        "AND (COALESCE(TRIM(end_timestamp),'')='' OR LOWER(TRIM(COALESCE(end_timestamp,''))) IN ('none','nan','nat','null'))"
-    )
-
-
-def _v30042_sql_df(sql: str, params: list | tuple | None = None) -> pd.DataFrame:
-    _v30042_ensure_time_records_schema()
     try:
-        df = query_df(sql, tuple(params or ()))
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            return df.copy().where(pd.notna(df), "").reset_index(drop=True)
+        if "id" in out.columns:
+            out["_v30043_id"] = pd.to_numeric(out["id"], errors="coerce")
+            out = out.sort_values("_v30043_id", ascending=False, kind="stable").drop(columns=["_v30043_id"], errors="ignore")
     except Exception:
         pass
-    return pd.DataFrame()
+    return out.reset_index(drop=True)
 
 
-def _v30042_sql_one(sql: str, params: list | tuple | None = None) -> dict | None:
-    _v30042_ensure_time_records_schema()
-    try:
-        row = query_one(sql, tuple(params or ()))
-        return dict(row) if row else None
-    except Exception:
-        return None
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """V300.43 SQL-only active records for 01 page display.
 
-
-def get_active_records(employee_id: str | None = None, employee_name: str | None = None, process_name: str | None = None, start_date: str | None = None, work_order: str | None = None, **kwargs):  # type: ignore[override]
-    """01 foreground active read: SQL hot path only; no authority scan on page load."""
-    where = [_v30042_active_where()]
+    Never scans 01/02 authority JSON, never repairs/writes authority, and never
+    starts durable sync while Streamlit is painting the page.
+    """
+    extra: list[str] = []
     params: list = []
-    if _v30042_text(employee_id):
-        where.append("employee_id=?")
-        params.append(_v30042_text(employee_id))
-    elif _v30042_text(employee_name):
-        where.append("employee_name=?")
-        params.append(_v30042_text(employee_name))
-    if _v30042_text(employee_name) and _v30042_text(employee_id):
-        where.append("COALESCE(employee_name,'')=?")
-        params.append(_v30042_text(employee_name))
-    if _v30042_text(process_name):
-        where.append("process_name=?")
-        params.append(_v30042_text(process_name))
-    if _v30042_text(start_date):
-        where.append("start_date=?")
-        params.append(_v30042_text(start_date))
-    if _v30042_text(work_order):
-        where.append("work_order=?")
-        params.append(_v30042_text(work_order))
-    sql = f"SELECT * FROM time_records WHERE {' AND '.join(where)} ORDER BY COALESCE(start_timestamp, created_at, updated_at, '') ASC, id ASC"
-    return _v30042_sql_df(sql, params)
+    if employee_id:
+        extra.append("COALESCE(employee_id,'') = ?")
+        params.append(str(employee_id).strip())
+    elif employee_name:
+        extra.append("COALESCE(employee_name,'') = ?")
+        params.append(str(employee_name).strip())
+    if process_name:
+        extra.append("COALESCE(process_name,'') = ?")
+        params.append(str(process_name).strip())
+    if start_date:
+        extra.append("COALESCE(NULLIF(start_date,''), SUBSTR(COALESCE(start_timestamp,''),1,10)) = ?")
+        params.append(str(start_date)[:10])
+    where, _ = _v30043_active_sql(extra)
+    df = _v30043_query_df(f"SELECT * FROM time_records WHERE {where} ORDER BY id DESC LIMIT 500", params)
+    return _v30043_normalize_active_df(df)
 
 
 def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
     df = get_active_records(employee_id=employee_id, employee_name=employee_name)
-    if isinstance(df, pd.DataFrame) and not df.empty:
-        try:
-            out = df.copy()
-            out["_sort_ts"] = out.get("start_timestamp", "").astype(str)
-            out["_sort_id"] = pd.to_numeric(out.get("id", 0), errors="coerce").fillna(0)
-            out = out.sort_values(["_sort_ts", "_sort_id"], ascending=[False, False], kind="stable")
-            return dict(out.iloc[0].drop(labels=["_sort_ts", "_sort_id"], errors="ignore").to_dict())
-        except Exception:
-            return dict(df.iloc[-1].to_dict())
-    return None
-
-
-def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
-    df = get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date or today_text(), work_order=work_order)
-    if isinstance(df, pd.DataFrame) and not df.empty:
-        return dict(df.iloc[0].to_dict())
-    return None
-
-
-def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
-    active = get_active_records(employee_id=employee_id, employee_name=employee_name)
-    if not isinstance(active, pd.DataFrame) or active.empty:
-        return pd.DataFrame()
-    sd = _v30042_text(start_date or today_text())
-    proc = _v30042_text(process_name)
-    mask = (active.get("process_name", "").astype(str).str.strip() != proc) | (active.get("start_date", "").astype(str).str.strip() != sd)
-    return active.loc[mask].copy().reset_index(drop=True)
-
-
-def _v30042_normalize_record_row(row: dict) -> dict:
-    out = {c: row.get(c, "") for c in _V30042_TIME_RECORD_COLS}
-    if _v30042_blank(out.get("start_date")) and not _v30042_blank(out.get("start_timestamp")):
-        out["start_date"] = _v30042_text(out.get("start_timestamp"))[:10].replace("/", "-")
-    if _v30042_blank(out.get("start_time")) and not _v30042_blank(out.get("start_timestamp")) and len(_v30042_text(out.get("start_timestamp"))) >= 16:
-        out["start_time"] = _v30042_text(out.get("start_timestamp"))[11:19]
-    if _v30042_blank(out.get("created_at")):
-        out["created_at"] = _v30042_text(out.get("start_timestamp")) or _now()
-    if _v30042_blank(out.get("updated_at")):
-        out["updated_at"] = out.get("created_at") or _now()
+    if df is None or df.empty:
+        return None
     try:
-        out["work_hours"] = float(out.get("work_hours") or 0)
+        return df.iloc[0].to_dict()
     except Exception:
-        out["work_hours"] = 0.0
-    try:
-        out["is_group_work"] = int(float(out.get("is_group_work") or 0))
-    except Exception:
-        out["is_group_work"] = 0
-    try:
-        out["is_deleted"] = int(float(out.get("is_deleted") or 0))
-    except Exception:
-        out["is_deleted"] = 0
-    return out
-
-
-def _v30042_row_identity(row: dict) -> str:
-    rk = _v30042_text(row.get("record_key"))
-    if rk:
-        return "rk:" + rk
-    rid = _v30042_text(row.get("id"))
-    if rid:
-        return "id:" + rid
-    return "biz:" + "|".join(_v30042_text(row.get(k)) for k in ("employee_id", "employee_name", "work_order", "process_name", "start_timestamp"))
-
-
-def _v30042_is_active_row(row: dict) -> bool:
-    if _v30042_bool(row.get("is_deleted"), False) or _v30042_bool(row.get("delete_flag"), False):
-        return False
-    if _v30042_text(row.get("status")) in _V30042_TERMINAL_STATUSES:
-        return False
-    end_ts = _v30042_text(row.get("end_timestamp"))
-    return end_ts == ""
-
-
-def _v30042_authority_time_rows() -> list[dict]:
-    rows: list[dict] = []
-    try:
-        from services.permanent_authority_service import df_from_table as _pa_df_from_table  # type: ignore
-        for module_key in ("01_time_records", "02_history"):
-            try:
-                df = _pa_df_from_table(module_key, "time_records")
-                if isinstance(df, pd.DataFrame) and not df.empty:
-                    rows.extend([_v30042_normalize_record_row(dict(r)) for _, r in df.iterrows()])
-            except Exception:
-                pass
-    except Exception:
-        pass
-    if rows:
-        return rows
-    # Fallback: parse records.json directly if service import failed.
-    try:
-        base = Path(__file__).resolve().parents[1]
-        for module_key in ("01_time_records", "02_history"):
-            path = base / "data" / "permanent_store" / "modules" / module_key / "records.json"
-            if not path.exists():
-                continue
-            data = _v30042_json.loads(path.read_text(encoding="utf-8"))
-            tables = data.get("tables") if isinstance(data, dict) else {}
-            raw = tables.get("time_records") if isinstance(tables, dict) else []
-            if isinstance(raw, list):
-                rows.extend([_v30042_normalize_record_row(r) for r in raw if isinstance(r, dict)])
-    except Exception:
-        pass
-    return rows
-
-
-def _v30042_authority_active_group(rec: dict) -> pd.DataFrame:
-    emp = _v30042_text(rec.get("employee_id"))
-    name = _v30042_text(rec.get("employee_name"))
-    proc = _v30042_text(rec.get("process_name"))
-    sd = _v30042_text(rec.get("start_date") or _v30042_text(rec.get("start_timestamp"))[:10])
-    out: list[dict] = []
-    seen: set[str] = set()
-    for r0 in _v30042_authority_time_rows():
-        r = _v30042_normalize_record_row(r0)
-        if not _v30042_is_active_row(r):
-            continue
-        if _v30042_text(r.get("employee_id")) != emp:
-            continue
-        if name and _v30042_text(r.get("employee_name")) != name:
-            continue
-        if _v30042_text(r.get("process_name")) != proc:
-            continue
-        if _v30042_text(r.get("start_date")) != sd:
-            continue
-        key = _v30042_row_identity(r)
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(r)
-    return pd.DataFrame(out)
-
-
-def _v30042_upsert_rows_to_sqlite(df: pd.DataFrame) -> int:
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return 0
-    _v30042_ensure_time_records_schema()
-    count = 0
-    for _, rr in df.iterrows():
-        row = _v30042_normalize_record_row(dict(rr))
-        # Preserve source IDs when available; otherwise let SQLite rowid become id.
-        rid_text = _v30042_text(row.get("id"))
-        rid = 0
-        try:
-            rid = int(float(rid_text)) if rid_text else 0
-        except Exception:
-            rid = 0
-        exists = None
-        if rid > 0:
-            exists = _v30042_sql_one("SELECT id FROM time_records WHERE id=?", (rid,))
-        if not exists and _v30042_text(row.get("record_key")):
-            exists = _v30042_sql_one("SELECT id FROM time_records WHERE record_key=?", (_v30042_text(row.get("record_key")),))
-            try:
-                if exists and _v30042_text(exists.get("id")):
-                    rid = int(float(exists.get("id")))
-            except Exception:
-                pass
-        payload = {c: row.get(c, "") for c in _V30042_TIME_RECORD_COLS if c not in {"id"}}
-        if exists and rid > 0:
-            sets = ", ".join([f"{c}=?" for c in payload.keys()])
-            execute(f"UPDATE time_records SET {sets} WHERE id=?", tuple(payload.values()) + (rid,))
-            count += 1
-        else:
-            cols = [c for c in _V30042_TIME_RECORD_COLS if c in row and c != "id"]
-            vals = [row.get(c, "") for c in cols]
-            if rid > 0:
-                cols = ["id"] + cols
-                vals = [rid] + vals
-            placeholders = ",".join(["?"] * len(cols))
-            new_id = execute(f"INSERT INTO time_records({', '.join(cols)}) VALUES ({placeholders})", tuple(vals))
-            try:
-                if (not rid or rid <= 0) and new_id:
-                    execute("UPDATE time_records SET id=? WHERE rowid=? AND (id IS NULL OR TRIM(COALESCE(id,''))='')", (int(new_id), int(new_id)))
-            except Exception:
-                pass
-            count += 1
-    try:
-        clear_query_cache()
-    except Exception:
-        pass
-    return count
+        return None
 
 
 def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
@@ -29768,270 +29495,80 @@ def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
         rid = int(float(str(record_id).strip()))
     except Exception:
         return pd.DataFrame()
-    rec = _v30042_sql_one("SELECT * FROM time_records WHERE id=?", (rid,))
-    if not rec:
+    where, _ = _v30043_active_sql(["id = ?"])
+    rec_df = _v30043_query_df(f"SELECT * FROM time_records WHERE {where} LIMIT 1", [rid])
+    rec_df = _v30043_normalize_active_df(rec_df)
+    if rec_df.empty:
         return pd.DataFrame()
-    return get_active_records(
-        employee_id=_v30042_text(rec.get("employee_id")),
-        employee_name=_v30042_text(rec.get("employee_name")),
-        process_name=_v30042_text(rec.get("process_name")),
-        start_date=_v30042_text(rec.get("start_date") or _v30042_text(rec.get("start_timestamp"))[:10]),
-    )
+    rec = rec_df.iloc[0].to_dict()
+    emp_id = _v30043_text(rec.get("employee_id"))
+    emp_name = _v30043_text(rec.get("employee_name"))
+    process = _v30043_text(rec.get("process_name"))
+    sdate = _v30043_text(rec.get("start_date") or _v30043_text(rec.get("start_timestamp"))[:10])
+    extra = ["COALESCE(process_name,'') = ?", "COALESCE(NULLIF(start_date,''), SUBSTR(COALESCE(start_timestamp,''),1,10)) = ?"]
+    params: list = [process, sdate]
+    if emp_id:
+        extra.append("COALESCE(employee_id,'') = ?")
+        params.append(emp_id)
+    elif emp_name:
+        extra.append("COALESCE(employee_name,'') = ?")
+        params.append(emp_name)
+    where, _ = _v30043_active_sql(extra)
+    df = _v30043_query_df(f"SELECT * FROM time_records WHERE {where} ORDER BY id ASC LIMIT 200", params)
+    return _v30043_normalize_active_df(df)
 
 
-def _v30042_parallel_summary_text(count: int, total_hours: float, avg_hours: float) -> str:
-    try:
-        return _v138_parallel_summary_text(count, total_hours, avg_hours)  # type: ignore[name-defined]
-    except Exception:
-        return f"同步作業平均分配：{count} 筆，總工時 {float(total_hours):.2f} 小時，平均每筆 {float(avg_hours):.2f} 小時"
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process_name, start_date=start_date)
+    if df is None or df.empty:
+        return None
+    wo = str(work_order or "").strip()
+    if "work_order" in df.columns:
+        same = df[df["work_order"].fillna("").astype(str).str.strip() == wo]
+        if not same.empty:
+            return same.iloc[0].to_dict()
+    return None
 
 
-def _v30042_fetch_rows_by_ids(ids: list[int]) -> pd.DataFrame:
-    clean = [int(x) for x in ids if int(x) > 0]
-    if not clean:
+def get_conflicting_active_records(employee_id: str, process_name: str, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or df.empty:
         return pd.DataFrame()
-    placeholders = ",".join(["?"] * len(clean))
-    return _v30042_sql_df(f"SELECT * FROM time_records WHERE id IN ({placeholders}) ORDER BY id", clean)
-
-
-def _v30042_sync_authority_rows(df: pd.DataFrame, reason: str, event_type: str, extra: dict | None = None) -> None:
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return
+    proc = str(process_name or "").strip()
     try:
-        # Immediate local 01/02 upsert; no GitHub wait.  This is the required 01/02
-        # synchronization proof for Start/Finish and synchronized average writes.
-        if "_v176_upsert_authority_rows" in globals() and callable(_v176_upsert_authority_rows):  # type: ignore[name-defined]
-            _v176_upsert_authority_rows(df, reason)  # type: ignore[name-defined]
+        mask = df["process_name"].fillna("").astype(str).str.strip() != proc
+        return _v30043_normalize_active_df(df[mask].copy())
     except Exception:
-        pass
-    try:
-        # Keep existing event journal/background behavior if available, but never let it block the button.
-        if "_v176_write_durable_layers" in globals() and callable(_v176_write_durable_layers):  # type: ignore[name-defined]
-            _v176_write_durable_layers(df, reason + "_deferred", event_type, extra=extra or {})  # type: ignore[name-defined]
-    except Exception:
-        pass
-
-
-def _v30042_after_sqlite_insert_fix_id(lastrowid: int | None, record_key: str) -> int:
-    rid = 0
-    try:
-        rid = int(lastrowid or 0)
-    except Exception:
-        rid = 0
-    try:
-        if rid > 0:
-            execute("UPDATE time_records SET id=? WHERE rowid=? AND (id IS NULL OR TRIM(COALESCE(id,''))='')", (rid, rid))
-    except Exception:
-        pass
-    if rid <= 0 and record_key:
-        row = _v30042_sql_one("SELECT id, rowid FROM time_records WHERE record_key=? ORDER BY rowid DESC LIMIT 1", (record_key,))
-        try:
-            rid = int(float(row.get("id") or row.get("rowid") or 0)) if row else 0
-        except Exception:
-            rid = 0
-    return rid
+        return pd.DataFrame()
 
 
 def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
-    """Start work with restored conflict rule: warning/error, no auto-pause."""
-    _v30042_ensure_time_records_schema()
     employee = employee or {}
     work_order = work_order or {}
-    now = _now()
-    start_date, start_time = split_timestamp(now)
-    employee_id = _v30042_text(employee.get("employee_id"))
-    employee_name = _v30042_text(employee.get("employee_name"))
-    wo_no = _v30042_text(work_order.get("work_order"))
-    process = _v30042_text(process_name)
-    if not employee_id or not wo_no or not process:
+    emp_id = _v30043_text(employee.get("employee_id"))
+    emp_name = _v30043_text(employee.get("employee_name"))
+    wo_no = _v30043_text(work_order.get("work_order"))
+    proc = _v30043_text(process_name)
+    if not emp_id or not wo_no or not proc:
         raise ValueError("工號、製令、工段名稱不可空白。")
-
-    duplicate = get_active_same_work(employee_id, wo_no, process, start_date=start_date, employee_name=employee_name)
+    duplicate = get_active_same_work(emp_id, wo_no, proc, employee_name=emp_name)
     if duplicate:
-        raise ValueError(f"禁止重複紀錄：此人員已有相同製令與工段正在計時：{wo_no} / {process}")
-
-    conflicts = get_conflicting_active_records(employee_id, process, start_date=start_date, employee_name=employee_name)
+        raise ValueError(f"禁止重複紀錄：此人員已有相同製令與工段正在計時：{wo_no} / {proc}")
+    conflicts = get_conflicting_active_records(emp_id, proc, employee_name=emp_name)
     if isinstance(conflicts, pd.DataFrame) and not conflicts.empty:
-        raise ValueError("此人員已有不同工段或不同日期作業尚未結束，請先手動暫停 / 完工 / 下班前一筆作業後，再開始新作業。")
-
-    record_key = make_record_key(employee_id, wo_no, process, now)
-    group_key = f"{employee_id}|{process}|{start_date}"
-    rid_raw = execute(
-        """
-        INSERT INTO time_records(
-            record_key, status, work_order, part_no, type_name, process_name,
-            employee_id, employee_name, start_action, start_timestamp,
-            remark, start_date, start_time, assembly_location,
-            group_key, is_group_work, source, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            record_key, "作業中", wo_no, work_order.get("part_no", ""), work_order.get("type_name", ""),
-            process, employee_id, employee_name, "開始", now, remark, start_date, start_time,
-            work_order.get("assembly_location", ""), group_key, 0, "streamlit_v30042", now, now,
-        ),
-    )
-    rid = _v30042_after_sqlite_insert_fix_id(rid_raw, record_key)
-    parallel = get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process, start_date=start_date)
-    if isinstance(parallel, pd.DataFrame) and len(parallel) > 1:
-        execute(
-            f"UPDATE time_records SET group_key=?, is_group_work=1, updated_at=? WHERE employee_id=? AND process_name=? AND start_date=? AND {_v30042_active_where()}",
-            (group_key, now, employee_id, process, start_date),
-        )
-        parallel = get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process, start_date=start_date)
-    changed = _v30042_fetch_rows_by_ids([rid]) if rid else pd.DataFrame()
-    if isinstance(parallel, pd.DataFrame) and len(parallel) > 1:
-        try:
-            ids = [int(float(x)) for x in parallel.get("id", pd.Series(dtype=object)).tolist() if _v30042_text(x)]
-            changed = _v30042_fetch_rows_by_ids(ids)
-        except Exception:
-            pass
-    _v30042_sync_authority_rows(changed, "v30042_start_work_authority_sync", "START_WORK", {"record_id": rid})
-    try:
-        write_log("START_WORK", f"{employee_name} 開始 {wo_no} / {process}", "time_records", rid)
-    except Exception:
-        pass
-    try:
-        clear_query_cache()
-    except Exception:
-        pass
-    return int(rid or 0)
+        raise ValueError("此人員已有不同工段正在計時，請先暫停、完工或下班前一筆作業後，再開始新作業。")
+    if callable(_v30043_prev_start_work):
+        # Force old implementations not to auto-pause anything if they run their own checks.
+        return int(_v30043_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=False))
+    raise RuntimeError("start_work 服務尚未初始化完成。")
 
 
-def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
-    """Finish/Pause/Off-duty one record; synchronized group is completed together."""
-    _v30042_ensure_time_records_schema()
-    try:
-        rid0 = int(float(str(record_id).strip()))
-    except Exception:
-        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
-    rec = _v30042_sql_one("SELECT * FROM time_records WHERE id=?", (rid0,))
-    if not rec:
-        raise ValueError("找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。")
-    if not _v30042_is_active_row(rec):
-        return 0
-
-    if finish_parallel_group:
-        sqlite_group = get_active_group(rid0)
-        auth_group = _v30042_authority_active_group(rec)
-        merged_rows: dict[str, dict] = {}
-        for df in (sqlite_group, auth_group):
-            if isinstance(df, pd.DataFrame) and not df.empty:
-                for _, r in df.iterrows():
-                    d = _v30042_normalize_record_row(dict(r))
-                    if _v30042_is_active_row(d):
-                        merged_rows[_v30042_row_identity(d)] = d
-        group = pd.DataFrame(list(merged_rows.values())) if merged_rows else pd.DataFrame([rec])
-        # If authority had active group rows not present in SQLite, hydrate them before update.
-        _v30042_upsert_rows_to_sqlite(group)
-        group = get_active_group(rid0)
-    else:
-        group = pd.DataFrame([rec])
-    if group is None or not isinstance(group, pd.DataFrame) or group.empty:
-        group = pd.DataFrame([rec])
-
-    group_ids: list[int] = []
-    for x in group.get("id", pd.Series(dtype=object)).tolist():
-        try:
-            n = int(float(str(x).strip()))
-            if n > 0 and n not in group_ids:
-                group_ids.append(n)
-        except Exception:
-            pass
-    if not group_ids:
-        return 0
-
-    now = _now()
-    end_date, end_time = split_timestamp(now)
-    starts = [_v30042_text(x) for x in group.get("start_timestamp", pd.Series(dtype=object)).tolist() if _v30042_text(x)]
-    earliest_start = min(starts) if starts else _v30042_text(rec.get("start_timestamp") or now)
-    try:
-        total_hours = float(calculate_work_hours(earliest_start, now) or 0.0)
-    except Exception:
-        total_hours = 0.0
-    avg_hours = round(total_hours / max(len(group_ids), 1), 2)
-    status = end_action if str(end_action) in {"下班", "暫停", "完工"} else "已結束"
-    group_key = _v30042_text(rec.get("group_key")) or f"{rec.get('employee_id')}|{rec.get('process_name')}|{rec.get('start_date')}"
-    summary = _v30042_parallel_summary_text(len(group_ids), total_hours, avg_hours) if len(group_ids) > 1 else ""
-    for rid in group_ids:
-        old = _v30042_sql_one("SELECT remark FROM time_records WHERE id=?", (rid,)) or {}
-        old_remark = _v30042_text(old.get("remark"))
-        append = _v30042_text(remark)
-        if summary:
-            append = (append + "；" if append else "") + summary
-        new_remark = old_remark + ("；" if old_remark and append else "") + append if append else old_remark
-        execute(
-            f"""
-            UPDATE time_records
-            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
-                work_hours=?, remark=?, group_key=?, is_group_work=?, updated_at=?
-            WHERE id=? AND {_v30042_active_where()}
-            """,
-            (status, end_action, now, end_date, end_time, avg_hours, new_remark, group_key, 1 if len(group_ids) > 1 else int(rec.get("is_group_work") or 0), now, rid),
-        )
-    try:
-        clear_query_cache()
-    except Exception:
-        pass
-    changed = _v30042_fetch_rows_by_ids(group_ids)
-    _v30042_sync_authority_rows(changed, "v30042_finish_parallel_group_authority_sync", "END_WORK_GROUP" if len(group_ids) > 1 else "END_WORK", {"record_id": rid0, "group_ids": group_ids, "end_action": end_action})
-    try:
-        write_log("END_WORK_GROUP" if len(group_ids) > 1 else "END_WORK", f"結束工時紀錄 #{rid0}，同步結束={len(group_ids)}筆，狀態={status}，平均工時={avg_hours}", "time_records", rid0, detail=",".join(str(x) for x in group_ids))
-    except Exception:
-        pass
-    return int(len(group_ids))
-
-
-def refresh_active_records_for_employee(employee_id: str, employee_name: str | None = None):  # type: ignore[override]
-    try:
-        clear_query_cache()
-    except Exception:
-        pass
-    return get_active_records(employee_id=employee_id, employee_name=employee_name)
-
-
-def audit_v30042_01_rules_runtime() -> dict:
+def audit_v30043_01_page_load_hot_path() -> dict:
     return {
-        "version": "V300.42_01_COMPLETE_RULE_HOT_PATH",
-        "foreground_active_reads_sql_only": True,
-        "start_conflict_auto_pause_removed": True,
-        "start_conflict_blocks_new_record": True,
-        "same_process_same_day_parallel_allowed": True,
-        "finish_one_parallel_record_finishes_whole_group": True,
-        "finish_parallel_group_authority_gap_hydration": True,
-        "finish_average_hours_written_to_all_group_rows": True,
-        "sqlite_schema_self_heal_before_buttons": True,
-        "authority_sync_01_02_after_start_finish": True,
+        "version": "V300.43_01_PAGE_LOAD_HOT_PATH_AND_START_BLOCK",
+        "page_display_functions_sql_only": True,
+        "active_functions_scan_authority_on_page_paint": False,
+        "different_process_start_is_blocked_not_auto_paused": True,
+        "changes_ui_css_theme": False,
     }
-# ================= END V300.42 01 COMPLETE RULE + SIMULATION-SAFE HOT PATH =================
-
-# ===== V300.42.1 01 AUTHORITY SYNC NO DUPLICATE WORKER =====
-# The V300.42 sync already does the required immediate local 01/02 authority upsert.
-# Do not call the older deferred worker again here; it can race with the direct upsert,
-# hold authority locks, and make Start/Finish appear to run forever.
-def _v30042_sync_authority_rows(df: pd.DataFrame, reason: str, event_type: str, extra: dict | None = None) -> None:  # type: ignore[override]
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return
-    try:
-        if "_v176_upsert_authority_rows" in globals() and callable(_v176_upsert_authority_rows):  # type: ignore[name-defined]
-            _v176_upsert_authority_rows(df, reason)  # type: ignore[name-defined]
-    except Exception:
-        pass
-    try:
-        clear_query_cache()
-    except Exception:
-        pass
-    try:
-        if "clear_today_records_fast_cache" in globals():
-            clear_today_records_fast_cache()
-    except Exception:
-        pass
-
-def audit_v300421_01_no_duplicate_authority_worker() -> dict:
-    return {
-        "version": "V300.42.1_01_AUTHORITY_SYNC_NO_DUPLICATE_WORKER",
-        "direct_local_01_02_authority_upsert": True,
-        "deferred_worker_not_called_from_v30042_sync": True,
-        "prevents_authority_lock_race_on_start_finish": True,
-    }
-# ===== END V300.42.1 01 AUTHORITY SYNC NO DUPLICATE WORKER =====
+# ================= END V300.43 01 PAGE LOAD HOT PATH + START BLOCK RESTORE =================
