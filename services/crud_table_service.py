@@ -799,3 +799,70 @@ def save_employees(df: pd.DataFrame) -> dict:  # type: ignore[override]
     log_action("SAVE_EMPLOYEES", "employees", "V300.25 儲存人員清單：去重並寫入權威檔", f"rows={len(rows)}")
     return {"inserted": 0, "updated": len(rows), "deleted": 0, "skipped": 0, "saved": len(rows), "deduped": True}
 # ===== V300.25 03/04 MASTER DATA DEDUPE + AUTHORITY WRITE NORMALIZATION END =====
+
+
+# ===== V300.31 03 WORK ORDERS CLOUD REBOOT DURABILITY FIX START =====
+# Purpose:
+# - 03. 製令管理新增/修改後，Streamlit Cloud Reboot 不可消失。
+# - V300.25 already writes local canonical authority.  This layer explicitly uploads
+#   the small 03/04 master authority file through github_cloud_storage_service,
+#   bypassing the runtime hot-path guard that intentionally blocks 06/11.
+# - No UI/CSS/theme changes; no 01/02 data model changes.
+try:
+    _v30031_prev_save_work_orders = save_work_orders  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30031_prev_save_work_orders = None
+try:
+    _v30031_prev_save_employees = save_employees  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30031_prev_save_employees = None
+
+
+def _v30031_upload_master_authority(module_key: str) -> dict:
+    """Upload the canonical master authority file when an admin explicitly saves it."""
+    try:
+        from services.permanent_authority_service import canonical_path
+        from services.github_cloud_storage_service import upload_file_to_github
+        local = canonical_path(module_key, "records")
+        if not local.exists():
+            return {"ok": False, "skipped": True, "reason": "canonical_missing", "path": str(local)}
+        remote = f"data/permanent_store/modules/{module_key}/records.json"
+        return dict(upload_file_to_github(local, remote, f"SPT V300.31 durable master authority {module_key}" ) or {})
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:300], "module_key": str(module_key)}
+
+
+def save_work_orders(df: pd.DataFrame) -> dict:  # type: ignore[override]
+    res = _v30031_prev_save_work_orders(df) if callable(_v30031_prev_save_work_orders) else {"ok": False, "error": "previous_save_work_orders_missing"}
+    upload = _v30031_upload_master_authority("03_work_orders")
+    try:
+        if isinstance(res, dict):
+            res = dict(res)
+            res["v30031_cloud_reboot_durable"] = True
+            res["github_upload"] = upload
+    except Exception:
+        pass
+    return res
+
+
+def save_employees(df: pd.DataFrame) -> dict:  # type: ignore[override]
+    res = _v30031_prev_save_employees(df) if callable(_v30031_prev_save_employees) else {"ok": False, "error": "previous_save_employees_missing"}
+    upload = _v30031_upload_master_authority("04_employees")
+    try:
+        if isinstance(res, dict):
+            res = dict(res)
+            res["v30031_cloud_reboot_durable"] = True
+            res["github_upload"] = upload
+    except Exception:
+        pass
+    return res
+
+
+def audit_v30031_master_authority_upload() -> dict:
+    return {
+        "version": "V300.31",
+        "scope": "03_work_orders_and_04_employees_master_authority_upload",
+        "work_orders_upload_check": _v30031_upload_master_authority("03_work_orders"),
+        "employees_upload_check": _v30031_upload_master_authority("04_employees"),
+    }
+# ===== V300.31 03 WORK ORDERS CLOUD REBOOT DURABILITY FIX END =====

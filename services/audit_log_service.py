@@ -3360,3 +3360,367 @@ def audit_v300232_11_login_clear_hotpath() -> Dict[str, Any]:
         return {"version": "V300.23.2", "ok": False, "error": str(exc)[:300]}
 
 # =============== END V300.23.2 11 LOGIN CLEAR HOTPATH FIX ===============
+
+
+# ================= V300.31 11 LOGIN DELETE REBOOT-PROOF AUTHORITY FIX =================
+# Root cause fixed:
+# - V300.23.2 wrote delete ranges to a local delete_state.json only.
+# - On Streamlit Cloud Reboot, local files can be rebuilt from GitHub records.jsonl;
+#   if the delete marker was not durable in the same JSONL authority, old rows reappeared.
+# Fix:
+# - A clear action writes a DELETE_LOGIN_LOG_RANGE marker into 11_login_records/records.jsonl
+#   and uploads that JSONL for admin clear actions only.
+# - Page 11 loads delete ranges from both local delete_state.json and durable JSONL markers.
+# - Rows in the cleared date range are hidden only if their event time is before the marker,
+#   so new logins after the clear are still visible.
+try:
+    _v30031_prev_load_login_logs = load_login_logs  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30031_prev_load_login_logs = None
+try:
+    _v30031_prev_delete_login_logs_by_date_range = delete_login_logs_by_date_range  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30031_prev_delete_login_logs_by_date_range = None
+try:
+    _v30031_prev_get_audit_permanent_status = get_audit_permanent_status  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30031_prev_get_audit_permanent_status = None
+
+
+def _v30031_parse_dt(value: Any):
+    if value in (None, ""):
+        return None
+    s = str(value).strip().replace("T", " ").replace("/", "-").replace(".", "-")
+    if not s:
+        return None
+    if "+" in s:
+        s = s.split("+", 1)[0].strip()
+    if s.endswith("Z"):
+        s = s[:-1].strip()
+    for c in (s, s[:19], s[:16], s[:10]):
+        c = str(c or "").strip()
+        if not c:
+            continue
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%Y%m%d"):
+            try:
+                return datetime.strptime(c, fmt)
+            except Exception:
+                pass
+        try:
+            return datetime.fromisoformat(c)
+        except Exception:
+            pass
+    return None
+
+
+def _v30031_date_text(value: Any) -> str:
+    dt = _v30031_parse_dt(value)
+    if dt is not None:
+        return dt.date().isoformat()
+    s = _txt(value).replace("/", "-")
+    return s[:10] if s else ""
+
+
+def _v30031_row_dt(row: Dict[str, Any]):
+    for key in ("login_time", "created_at", "logout_time", "event_time", "log_time", "timestamp"):
+        dt = _v30031_parse_dt((row or {}).get(key))
+        if dt is not None:
+            return dt
+    return None
+
+
+def _v30031_marker_ranges_from_state() -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    try:
+        state = _v300232_read_delete_state() if "_v300232_read_delete_state" in globals() else {}
+        ranges = state.get("delete_ranges", []) if isinstance(state, dict) else []
+        for r in ranges or []:
+            if isinstance(r, dict):
+                out.append({
+                    "start_date": _v30031_date_text(r.get("start_date")),
+                    "end_date": _v30031_date_text(r.get("end_date")),
+                    "deleted_at": str(r.get("deleted_at") or r.get("updated_at") or state.get("updated_at") or ""),
+                    "source": "delete_state",
+                })
+    except Exception:
+        pass
+    return out
+
+
+def _v30031_marker_ranges_from_jsonl() -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    try:
+        rows = _v300231_read_local_jsonl(limit=None) if "_v300231_read_local_jsonl" in globals() else []
+    except Exception:
+        rows = []
+    for r in rows or []:
+        try:
+            ev = _normalise_event_type((r or {}).get("event_type"))
+            if ev != "DELETE_LOGIN_LOG_RANGE" and not ((r or {}).get("delete_range_start") or (r or {}).get("delete_range_end")):
+                continue
+            sd = _v30031_date_text((r or {}).get("delete_range_start"))
+            ed = _v30031_date_text((r or {}).get("delete_range_end"))
+            if not sd or not ed:
+                continue
+            out.append({
+                "start_date": sd,
+                "end_date": ed,
+                "deleted_at": str((r or {}).get("deleted_at") or (r or {}).get("login_time") or (r or {}).get("created_at") or ""),
+                "source": "records_jsonl_marker",
+            })
+        except Exception:
+            continue
+    return out
+
+
+def _v30031_all_delete_ranges() -> List[Dict[str, Any]]:
+    seen: set[tuple[str, str, str]] = set()
+    out: List[Dict[str, Any]] = []
+    for r in _v30031_marker_ranges_from_state() + _v30031_marker_ranges_from_jsonl():
+        sd = str(r.get("start_date") or "")[:10]
+        ed = str(r.get("end_date") or "")[:10]
+        da = str(r.get("deleted_at") or "")
+        if not sd or not ed:
+            continue
+        if ed < sd:
+            sd, ed = ed, sd
+        key = (sd, ed, da[:19])
+        if key in seen:
+            continue
+        seen.add(key)
+        x = dict(r)
+        x["start_date"] = sd
+        x["end_date"] = ed
+        out.append(x)
+    return out
+
+
+def _v30031_row_deleted_by_ranges(row: Dict[str, Any], ranges: List[Dict[str, Any]]) -> bool:
+    if not isinstance(row, dict):
+        return False
+    ev = _normalise_event_type(row.get("event_type"))
+    if ev == "DELETE_LOGIN_LOG_RANGE":
+        return True
+    row_dt = _v30031_row_dt(row)
+    if row_dt is None:
+        return False
+    day = row_dt.date().isoformat()
+    for r in ranges or []:
+        sd = str(r.get("start_date") or "")[:10]
+        ed = str(r.get("end_date") or "")[:10]
+        if not sd or not ed:
+            continue
+        if ed < sd:
+            sd, ed = ed, sd
+        if not (sd <= day <= ed):
+            continue
+        marker_dt = _v30031_parse_dt(r.get("deleted_at"))
+        # If we know the marker time, only old rows should be hidden.  If the marker
+        # came from an old state without time, treat the date range as authoritative.
+        if marker_dt is None or row_dt <= marker_dt:
+            return True
+    return False
+
+
+def _v30031_filter_deleted_login_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    ranges = _v30031_all_delete_ranges()
+    if not ranges:
+        return rows or []
+    out: List[Dict[str, Any]] = []
+    for r in rows or []:
+        if _v30031_row_deleted_by_ranges(r, ranges):
+            continue
+        out.append(r)
+    try:
+        from services.authority_consistency_service import merge_by_event_id
+        return merge_by_event_id(out, id_fields=("username", "event_type", "result", "login_time", "module_code", "message"))
+    except Exception:
+        try:
+            return _merge_record_sets(out)
+        except Exception:
+            return out
+
+
+# Override the V300.23.2 range filter so existing helpers also use durable JSONL markers.
+def _v300232_filter_deleted_ranges(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:  # type: ignore[override]
+    return _v30031_filter_deleted_login_rows(rows or [])
+
+
+def load_login_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "", limit: int = 1000, event_types: Optional[List[str]] = None, results: Optional[List[str]] = None, include_legacy: bool = True, **kwargs: Any):  # type: ignore[override]
+    rows: List[Dict[str, Any]] = []
+    try:
+        rows.extend(_v300231_read_local_jsonl(limit=max(int(limit or 1000) * 5, 100000)))
+    except Exception:
+        pass
+    try:
+        if "_v103_db_login_records" in globals():
+            rows.extend(_v103_db_login_records(include_legacy=include_legacy))
+        else:
+            rows.extend(_to_records(_primary_login_rows(get_connection())))
+    except Exception:
+        pass
+    try:
+        from services.authority_consistency_service import merge_by_event_id
+        rows = merge_by_event_id(rows, id_fields=("username", "event_type", "result", "login_time", "module_code", "message"))
+    except Exception:
+        try:
+            rows = _merge_record_sets(rows)
+        except Exception:
+            pass
+    rows = _v30031_filter_deleted_login_rows(rows)
+    rows = _filter_records(rows, start_date, end_date, keyword, event_types, results)
+    rows.sort(key=lambda r: str(r.get("login_time") or r.get("created_at") or ""), reverse=True)
+    if limit:
+        rows = rows[:int(limit)]
+    if pd is not None:
+        return pd.DataFrame(rows)
+    return rows
+
+
+get_login_logs = load_login_logs
+query_login_logs = load_login_logs
+load_audit_logs = load_login_logs
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    """Final V300.31 clear: durable delete marker in records.jsonl + local delete_state.
+
+    Explicit admin clear may upload 11_login_records/records.jsonl, but login event writes
+    remain local-only and never wait for GitHub.
+    """
+    count = 0
+    try:
+        before = load_login_logs(start_date=start_date, end_date=end_date, keyword="", limit=100000, include_legacy=True)
+        count = int(len(before)) if before is not None else 0
+    except Exception:
+        count = 0
+    try:
+        count = max(count, _v300232_sqlite_delete_range(start_date, end_date))
+    except Exception:
+        pass
+    try:
+        _v300232_add_delete_range(start_date, end_date, count)
+    except Exception:
+        pass
+    marker = {
+        "username": "SYSTEM",
+        "display_name": "SYSTEM",
+        "event_type": "DELETE_LOGIN_LOG_RANGE",
+        "result": "WARN",
+        "message": f"持久清除登入紀錄日期區間：{start_date} ~ {end_date}，估計筆數：{count}",
+        "module_code": "11_login_records",
+        "login_time": _now(),
+        "created_at": _now(),
+        "deleted_at": _now(),
+        "delete_range_start": str(start_date),
+        "delete_range_end": str(end_date),
+        "source": "11_login_records_delete_tombstone_v30031_reboot_proof",
+    }
+    upload_res: Dict[str, Any] = {}
+    try:
+        from services.authority_consistency_service import append_jsonl
+        upload_res = append_jsonl(
+            "11_login_records",
+            marker,
+            identity_fields=("event_type", "delete_range_start", "delete_range_end", "login_time", "message"),
+            github=True,
+            reason="delete_login_logs_range_v30031_reboot_proof",
+        )
+    except Exception as exc:
+        upload_res = {"ok": False, "error": str(exc)[:300]}
+        try:
+            _v300231_append_local_jsonl(marker)
+        except Exception:
+            pass
+    try:
+        _V300231_LOGIN_SYNC_TRACE.parent.mkdir(parents=True, exist_ok=True)
+        _V300231_LOGIN_SYNC_TRACE.write_text(json.dumps({
+            "version": "V300.31",
+            "updated_at": _now(),
+            "mode": "delete_marker_reboot_proof_jsonl",
+            "last_delete_range_start": str(start_date),
+            "last_delete_range_end": str(end_date),
+            "last_deleted_count": int(count or 0),
+            "github_upload": upload_res,
+        }, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    except Exception:
+        pass
+    return int(count or 0)
+
+
+clear_login_logs_by_date_range = delete_login_logs_by_date_range
+clear_login_logs_by_date = delete_login_logs_by_date_range
+clear_audit_logs_by_date_range = delete_login_logs_by_date_range
+clear_audit_logs_by_date = delete_login_logs_by_date_range
+clear_login_logs = delete_login_logs_by_date_range
+clear_audit_logs = delete_login_logs_by_date_range
+
+
+def get_login_log_stats(start_date: Optional[str] = None, end_date: Optional[str] = None, keyword: str = "") -> Dict[str, int]:  # type: ignore[override]
+    logs = load_login_logs(start_date=start_date, end_date=end_date, keyword=keyword, limit=100000)
+    if pd is not None and hasattr(logs, "empty"):
+        total = int(len(logs))
+        success = 0
+        if total:
+            result_s = logs.get("result", "").astype(str).str.upper()
+            success = int(result_s.isin(["SUCCESS", "OK", "INFO"]).sum())
+        return {"records": total, "success": success, "failed": total - success}
+    total = len(logs)
+    success = sum(1 for r in logs if _normalise_result(r.get("result")) in {"SUCCESS", "OK", "INFO"})
+    return {"records": total, "success": success, "failed": total - success}
+
+
+login_log_stats = get_login_log_stats
+
+
+def get_audit_permanent_status() -> Dict[str, Any]:  # type: ignore[override]
+    try:
+        rows = _v30031_filter_deleted_login_rows(_v300231_read_local_jsonl(limit=None))
+    except Exception:
+        rows = []
+    try:
+        db_count = len(_v30031_filter_deleted_login_rows(_v103_db_login_records(include_legacy=True))) if "_v103_db_login_records" in globals() else 0
+    except Exception:
+        db_count = 0
+    try:
+        p = _V300231_LOGIN_RECORDS_JSONL
+    except Exception:
+        p = PROJECT_ROOT / "data" / "permanent_store" / "modules" / "11_login_records" / "records.jsonl"
+    ranges = _v30031_all_delete_ranges()
+    return {
+        "exists": p.exists(),
+        "path": str(p),
+        "size": p.stat().st_size if p.exists() else 0,
+        "count": len(rows),
+        "exported_at": "",
+        "db_count": db_count,
+        "authority_schema": "SPT_11_LOGIN_RECORDS_JSONL_V300_31_REBOOT_PROOF_DELETE",
+        "delete_state_path": str(_V300232_LOGIN_DELETE_STATE) if "_V300232_LOGIN_DELETE_STATE" in globals() else "",
+        "delete_state_exists": _V300232_LOGIN_DELETE_STATE.exists() if "_V300232_LOGIN_DELETE_STATE" in globals() else False,
+        "deleted_keys": 0,
+        "delete_ranges": len(ranges),
+        "last_deleted_count": int((_v300232_read_delete_state().get("last_deleted_count", 0) if "_v300232_read_delete_state" in globals() else 0) or 0),
+    }
+
+
+audit_permanent_status = get_audit_permanent_status
+get_audit_state_status = get_audit_permanent_status
+login_log_state_status = get_audit_permanent_status
+get_login_log_permanent_status = get_audit_permanent_status
+
+
+def audit_v30031_11_login_delete_reboot_proof() -> Dict[str, Any]:
+    try:
+        ranges = _v30031_all_delete_ranges()
+        return {
+            "version": "V300.31",
+            "mode": "delete_marker_in_records_jsonl_reboot_proof",
+            "records_jsonl": str(_V300231_LOGIN_RECORDS_JSONL),
+            "delete_state": str(_V300232_LOGIN_DELETE_STATE) if "_V300232_LOGIN_DELETE_STATE" in globals() else "",
+            "delete_ranges": len(ranges),
+            "jsonl_marker_ranges": len(_v30031_marker_ranges_from_jsonl()),
+            "state_ranges": len(_v30031_marker_ranges_from_state()),
+        }
+    except Exception as exc:
+        return {"version": "V300.31", "ok": False, "error": str(exc)[:300]}
+# =============== END V300.31 11 LOGIN DELETE REBOOT-PROOF AUTHORITY FIX ===============
