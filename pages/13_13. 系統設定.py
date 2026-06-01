@@ -70,6 +70,42 @@ if _pending_message:
     st.success(_pending_message)
 
 
+# -----------------------------------------------------------------------------
+# V300.14: 13｜系統設定 fast display isolation
+# -----------------------------------------------------------------------------
+# 只改善 13 頁面的「進頁顯示速度」，不改 01/02 讀取系統設定的正式服務函式、
+# 不改工段/休息時間的儲存格式，也不切換任何模組串接。
+# 重點是避免進入 13 頁面時立刻渲染三張重表格、產生 Excel、或跑完整診斷。
+_V30014_FAST_MODE_KEY = "spt_v30014_system_settings_fast_mode"
+
+def _v30014_fast_mode() -> bool:
+    return bool(st.session_state.get(_V30014_FAST_MODE_KEY, True))
+
+def _v30014_load_key(name: str) -> str:
+    return f"spt_v30014_load_{name}"
+
+def _v30014_is_loaded(name: str) -> bool:
+    return (not _v30014_fast_mode()) or bool(st.session_state.get(_v30014_load_key(name), False))
+
+def _v30014_load_button(name: str, label: str, *, type: str = "secondary") -> bool:
+    if _v30014_is_loaded(name):
+        return True
+    st.caption("快速載入模式：此區塊不會在進頁時自動讀取與渲染，按下後才載入。")
+    if st.button(label, key=f"v30014_load_button_{name}", use_container_width=True, type=type):
+        st.session_state[_v30014_load_key(name)] = True
+        st.rerun()
+    return False
+
+def _v30014_clear_loaded(*names: str) -> None:
+    for name in names:
+        st.session_state.pop(_v30014_load_key(name), None)
+
+def _v30014_overview_card(title: str, detail: str, button_label: str, key_name: str) -> None:
+    with st.container():
+        st.markdown(f"**{title}**")
+        st.caption(detail)
+        _v30014_load_button(key_name, button_label)
+
 
 def _excel_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:
     bio = BytesIO()
@@ -267,10 +303,17 @@ def _render_system_settings_health_center() -> None:
     with st.expander("系統設定永久保存健康檢查 / System Settings Persistence Health", expanded=False):
         h1, h2, h3 = st.columns(3)
         h1.metric("永久檔存在 / Existing Files", f"{ok_count}/{len(quick_rows)}")
-        h2.metric("目前工時頁重置時間", get_live_page_reset_time())
+        if _v30014_is_loaded("health_live_reset_time"):
+            h2.metric("目前工時頁重置時間", get_live_page_reset_time())
+        else:
+            h2.metric("目前工時頁重置時間", "按需載入")
         h3.metric("完整檢查", "按需執行")
         st.dataframe(pd.DataFrame(quick_rows), use_container_width=True, hide_index=True, height=180)
 
+        if not _v30014_is_loaded("health_live_reset_time"):
+            if st.button("載入重置時間 / Load Reset Time", key="v30014_load_health_reset_time", use_container_width=True):
+                st.session_state[_v30014_load_key("health_live_reset_time")] = True
+                st.rerun()
         run_full = st.checkbox("顯示完整永久檔 / GitHub 診斷 / Show full diagnostics", value=False, key="v25_show_full_system_health")
         if run_full:
             rows = [_file_health_row(path, label) for path, label in health_targets]
@@ -597,58 +640,85 @@ def _render_external_auto_backup_center() -> None:
     st.divider()
 
 
-# V3.23：先顯示系統設定永久保存健康檢查，再顯示自動備份設定。
+# V300.14：進頁先呈現輕量入口，不自動渲染重表格或產生 Excel。
+fast_col1, fast_col2, fast_col3 = st.columns([1, 2, 2])
+with fast_col1:
+    fast_mode_value = st.toggle(
+        "快速載入模式",
+        value=st.session_state.get(_V30014_FAST_MODE_KEY, True),
+        key="v30014_fast_mode_toggle",
+        help="開啟時，13 頁面只在按下各區塊載入按鈕後才讀取重表格；不影響 01/02 讀取系統設定。",
+    )
+    st.session_state[_V30014_FAST_MODE_KEY] = bool(fast_mode_value)
+with fast_col2:
+    st.caption("V300.14：只改善 13 頁面顯示速度，不變更 01/02 串接、儲存格式或權威資料來源。")
+with fast_col3:
+    if st.button("重新載入全部區塊 / Load All Sections", key="v30014_load_all_sections", use_container_width=True):
+        for _name in ["excel", "categories", "processes", "rest", "backup"]:
+            st.session_state[_v30014_load_key(_name)] = True
+        st.rerun()
+
+# V3.23：永久保存健康檢查保留，但完整診斷仍按需執行。
 _render_system_settings_health_center()
 
-# V3.20：每日自動備份設定必須保留在 13｜系統設定，不可被系統設定修正覆蓋移除。
-_render_external_auto_backup_center()
+# V3.20：每日自動備份設定保留，但詳細內容按需載入。
+if _v30014_is_loaded("backup"):
+    _render_external_auto_backup_center()
+else:
+    st.subheader("每日自動備份設定 / Daily Backup Schedule")
+    _v30014_load_button("backup", "載入自動備份設定 / Load Backup Settings")
 
 # -----------------------------------------------------------------------------
 # 0) Excel import/export for all system settings
 # -----------------------------------------------------------------------------
 st.subheader("零、系統設定 Excel 上傳 / 下載 / System Settings Excel")
-current_process_export = load_process_options_df(active_only=False)
-current_rest_export = load_rest_periods_df(active_only=False)
-app_settings_export = pd.DataFrame([{"setting_key": "live_page_reset_time", "setting_value": get_live_page_reset_time(), "note": "01 工時紀錄每日重新整理時間 HH:MM"}])
-st.download_button(
-    "⟰ 下載全部系統設定 Excel / Export All System Settings",
-    data=_excel_bytes({"process_options": current_process_export, "rest_periods": current_rest_export, "app_settings": app_settings_export}),
-    file_name="SPT_系統設定.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    use_container_width=True,
-)
-if can_manage:
-    setting_file = st.file_uploader("上傳系統設定 Excel / Upload System Settings", type=["xlsx", "xlsm", "xls"], key="system_settings_excel_upload_v243")
-    if setting_file is not None:
-        try:
-            sheets = pd.read_excel(setting_file, sheet_name=None)
-            st.success("已讀取系統設定 Excel，請確認後按下方按鈕套用。")
-            for nm, dfp in sheets.items():
-                with st.expander(f"預覽：{nm}", expanded=False):
-                    st.dataframe(dfp, use_container_width=True, height=220)
-            if st.button("▣ 確認匯入並永久套用系統設定 / Import Settings", type="primary", use_container_width=True, key="import_system_settings_excel_v243"):
-                p_count = r_count = 0
-                if "process_options" in sheets:
-                    pdf = sheets["process_options"].copy()
-                    p_count = save_process_options_df(pdf)
-                if "rest_periods" in sheets:
-                    rdf = sheets["rest_periods"].copy()
-                    r_count = save_rest_periods_df(rdf)
-                if "app_settings" in sheets:
-                    adf = sheets["app_settings"]
-                    for _, row in adf.iterrows():
-                        if str(row.get("setting_key", "")).strip() == "live_page_reset_time":
-                            save_live_page_reset_time(str(row.get("setting_value", "02:00")).strip())
-                _export_permanent_settings(f"已匯入系統設定：工段 {p_count} 筆、休息時間 {r_count} 筆")
-                _refresh_after_apply("已匯入並永久套用系統設定，畫面已重新整理。")
-        except Exception as exc:
-            st.error(f"系統設定 Excel 讀取失敗：{exc}")
+if _v30014_load_button("excel", "載入 Excel 匯入/下載功能 / Load Excel Import & Export"):
+    current_process_export = load_process_options_df(active_only=False)
+    current_rest_export = load_rest_periods_df(active_only=False)
+    app_settings_export = pd.DataFrame([{"setting_key": "live_page_reset_time", "setting_value": get_live_page_reset_time(), "note": "01 工時紀錄每日重新整理時間 HH:MM"}])
+    st.download_button(
+        "⟰ 下載全部系統設定 Excel / Export All System Settings",
+        data=_excel_bytes({"process_options": current_process_export, "rest_periods": current_rest_export, "app_settings": app_settings_export}),
+        file_name="SPT_系統設定.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
+    if can_manage:
+        setting_file = st.file_uploader("上傳系統設定 Excel / Upload System Settings", type=["xlsx", "xlsm", "xls"], key="system_settings_excel_upload_v243")
+        if setting_file is not None:
+            try:
+                sheets = pd.read_excel(setting_file, sheet_name=None)
+                st.success("已讀取系統設定 Excel，請確認後按下方按鈕套用。")
+                for nm, dfp in sheets.items():
+                    with st.expander(f"預覽：{nm}", expanded=False):
+                        st.dataframe(dfp, use_container_width=True, height=220)
+                if st.button("▣ 確認匯入並永久套用系統設定 / Import Settings", type="primary", use_container_width=True, key="import_system_settings_excel_v243"):
+                    p_count = r_count = 0
+                    if "process_options" in sheets:
+                        pdf = sheets["process_options"].copy()
+                        p_count = save_process_options_df(pdf)
+                    if "rest_periods" in sheets:
+                        rdf = sheets["rest_periods"].copy()
+                        r_count = save_rest_periods_df(rdf)
+                    if "app_settings" in sheets:
+                        adf = sheets["app_settings"]
+                        for _, row in adf.iterrows():
+                            if str(row.get("setting_key", "")).strip() == "live_page_reset_time":
+                                save_live_page_reset_time(str(row.get("setting_value", "02:00")).strip())
+                    _export_permanent_settings(f"已匯入系統設定：工段 {p_count} 筆、休息時間 {r_count} 筆")
+                    _refresh_after_apply("已匯入並永久套用系統設定，畫面已重新整理。")
+            except Exception as exc:
+                st.error(f"系統設定 Excel 讀取失敗：{exc}")
 st.divider()
 # -----------------------------------------------------------------------------
 # 1) Process options
 # -----------------------------------------------------------------------------
 st.subheader("一、類別與工段名稱設定 / Category & Process Options")
 st.caption("這裡會套用到 01｜工時紀錄的『類別 / Category』與『工段名稱』下拉選單。可依類別建立不同工段；「全部 / 通用」代表所有類別共用。")
+
+if not _v30014_load_button("categories", "載入類別與工段設定 / Load Category & Process Settings", type="primary"):
+    st.info("快速載入模式已啟用：01/02 仍照原本服務讀取系統設定；此處只延後 13 頁面的重表格渲染。")
+    st.stop()
 
 category_choices = load_process_category_choices(include_common=True)
 current_default_category = get_default_process_category()
@@ -879,6 +949,9 @@ st.divider()
 # -----------------------------------------------------------------------------
 st.subheader("二、休息時間設定 / Rest Periods")
 st.caption("這裡會套用到工時計算。格式請使用 HH:MM，例如 10:30、12:00。只有『啟用』的休息時間會被扣除。")
+if not _v30014_load_button("rest", "載入休息時間設定 / Load Rest Periods"):
+    st.success("已保留 01/02 工時計算串接；休息時間表格按需載入，不會在進頁時自動渲染。")
+    st.stop()
 rest_df = load_rest_periods_df(active_only=False)
 if rest_df.empty:
     rest_df = pd.DataFrame(columns=["id", "name", "start_time", "end_time", "is_active", "sort_order"])
