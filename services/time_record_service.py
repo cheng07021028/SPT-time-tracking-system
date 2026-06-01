@@ -31949,3 +31949,75 @@ def audit_v30036_01_work_rules() -> dict[str, Any]:
         "employee_name_is_not_required_for_group_match": True,
     }
 # ===== V300.36 01 WORK RULES FULL AUTHORITY RECOVERY END =====
+
+# ===== V300.37 01 START CONFLICT WARNING BLOCK BEGIN =====
+# 2026-06-01
+# Requirement restored: when the same employee has an active record in a
+# different process/date, Start Work must be blocked with a warning/error.
+# The system must NOT auto-pause the previous work and then start a new one.
+# Parallel/synchronized work remains allowed only for the same employee + same
+# date + same process (different work orders in the same process group).
+try:
+    _v30037_prev_start_work = start_work  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v30037_prev_start_work = None
+
+
+def _v30037_conflict_message(conflicts: pd.DataFrame, process_name: str) -> str:
+    try:
+        cnt = int(len(conflicts)) if isinstance(conflicts, pd.DataFrame) else 0
+    except Exception:
+        cnt = 0
+    suffix = f"目前尚有 {cnt} 筆不同工段或不同日期的作業未結束。" if cnt else "目前尚有不同工段或不同日期的作業未結束。"
+    return (
+        suffix
+        + "依 01.工時紀錄規定，非同步作業不可直接開始下一項作業；"
+        + "請先回到『結束目前作業』將前一項作業暫停、完工或下班後，再按開始作業。"
+    )
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V300.37: block non-parallel starts instead of auto-pausing old work."""
+    employee = employee or {}
+    work_order = work_order or {}
+    employee_id = _v30036_text(employee.get("employee_id")) if "_v30036_text" in globals() else str(employee.get("employee_id") or "").strip()
+    employee_name = _v30036_text(employee.get("employee_name")) if "_v30036_text" in globals() else str(employee.get("employee_name") or "").strip()
+    proc = _v30036_text(process_name) if "_v30036_text" in globals() else str(process_name or "").strip()
+    try:
+        now = _now()  # type: ignore[name-defined]
+        start_date, _start_time = split_timestamp(now)  # type: ignore[name-defined]
+    except Exception:
+        from datetime import datetime as _dt
+        start_date = _dt.now().strftime("%Y-%m-%d")
+
+    if employee_id:
+        try:
+            _v30036_sync_employee_active_to_sqlite(employee_id)  # type: ignore[name-defined]
+        except Exception:
+            pass
+        try:
+            conflicts = get_conflicting_active_records(employee_id, proc, start_date, employee_name=employee_name)  # type: ignore[name-defined]
+        except TypeError:
+            conflicts = get_conflicting_active_records(employee_id, proc, start_date)  # type: ignore[name-defined]
+        except Exception:
+            conflicts = pd.DataFrame()
+        if isinstance(conflicts, pd.DataFrame) and not conflicts.empty:
+            raise ValueError(_v30037_conflict_message(conflicts, proc))
+
+    if not callable(_v30037_prev_start_work):
+        raise RuntimeError("start_work 核心流程尚未初始化，請重新啟動 App。")
+    # Force the lower layers to keep the same rule. Even if a page still passes
+    # auto_pause_old=True, old active records must not be auto-paused here.
+    return int(_v30037_prev_start_work(employee, work_order, process_name, remark=remark, auto_pause_old=False) or 0)
+
+
+def audit_v30037_01_start_block_rule() -> dict[str, Any]:
+    return {
+        "version": "V300.37_01_START_CONFLICT_WARNING_BLOCK",
+        "non_parallel_start_auto_stops_previous_active_records": False,
+        "non_parallel_start_behavior": "block_start_and_show_warning_error",
+        "parallel_start_allowed_when": "same employee_id + same start_date + same process_name",
+        "backend_enforced": True,
+        "lower_layer_auto_pause_forced_off": True,
+    }
+# ===== V300.37 01 START CONFLICT WARNING BLOCK END =====
