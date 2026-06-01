@@ -29572,3 +29572,833 @@ def audit_v30043_01_page_load_hot_path() -> dict:
         "changes_ui_css_theme": False,
     }
 # ================= END V300.43 01 PAGE LOAD HOT PATH + START BLOCK RESTORE =================
+
+# ================= V300.44 01 BUTTON ACTION AUTHORITY FINAL GUARD =================
+# Backend-only patch for 01. Time Records buttons.
+# Goals:
+# - Delete button must delete from SQLite hot cache AND 01/02 authority records.
+# - Finish/Pause/Off Duty must update the full parallel group even when SQLite has
+#   only the clicked row and the rest exists in 01/02 authority.
+# - Page display paths remain fast; no UI/CSS/theme changes.
+# - Different-process start remains blocked by the V300.43 start_work wrapper.
+
+def _v30044_json_module():
+    import json as _json
+    return _json
+
+
+def _v30044_root() -> Path:
+    try:
+        return Path(__file__).resolve().parents[1]
+    except Exception:
+        return Path.cwd()
+
+
+def _v30044_auth_file(module_key: str, name: str = "records.json") -> Path:
+    return _v30044_root() / "data" / "permanent_store" / "modules" / str(module_key) / name
+
+
+def _v30044_now() -> str:
+    try:
+        return str(_now())
+    except Exception:
+        try:
+            return now_text()
+        except Exception:
+            return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v30044_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v30044_int(value):
+    s = _v30044_text(value)
+    if not s or s.lower() in {"none", "nan", "nat", "<na>"}:
+        return None
+    try:
+        return int(float(s))
+    except Exception:
+        return None
+
+
+def _v30044_is_active(row: dict) -> bool:
+    status = _v30044_text(row.get("status"))
+    end_ts = _v30044_text(row.get("end_timestamp"))
+    if _v30044_text(row.get("is_deleted")).lower() in {"1", "true", "yes", "y"}:
+        return False
+    if end_ts:
+        return False
+    return status not in {"下班", "暫停", "完工", "已結束", "結束", "Off Duty", "Pause", "Complete", "Finished"}
+
+
+def _v30044_record_key(row: dict) -> str:
+    rk = _v30044_text(row.get("record_key"))
+    if rk:
+        return "rk:" + rk
+    rid = _v30044_int(row.get("id"))
+    if rid is not None:
+        return "id:" + str(rid)
+    parts = [
+        _v30044_text(row.get("employee_id")),
+        _v30044_text(row.get("employee_name")),
+        _v30044_text(row.get("work_order")),
+        _v30044_text(row.get("process_name")),
+        _v30044_text(row.get("start_timestamp")),
+    ]
+    return "bk:" + "|".join(parts)
+
+
+def _v30044_load_authority_payload(module_key: str) -> dict:
+    p = _v30044_auth_file(module_key, "records.json")
+    if not p.exists():
+        return {"authority_schema": "v30044", "module_key": module_key, "kind": "records", "tables": {"time_records": []}, "settings": {}, "table_counts": {"time_records": 0}}
+    try:
+        return _v30044_json_module().loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {"authority_schema": "v30044", "module_key": module_key, "kind": "records", "tables": {"time_records": []}, "settings": {}, "table_counts": {"time_records": 0}}
+
+
+def _v30044_authority_rows(module_key: str) -> list[dict]:
+    data = _v30044_load_authority_payload(module_key)
+    tables = data.get("tables") if isinstance(data, dict) else {}
+    rows = []
+    if isinstance(tables, dict):
+        val = tables.get("time_records") or []
+        if isinstance(val, list):
+            rows = [dict(x) for x in val if isinstance(x, dict)]
+    return rows
+
+
+def _v30044_write_authority_rows(module_key: str, rows: list[dict], reason: str) -> None:
+    p = _v30044_auth_file(module_key, "records.json")
+    p.parent.mkdir(parents=True, exist_ok=True)
+    data = _v30044_load_authority_payload(module_key)
+    if not isinstance(data, dict):
+        data = {}
+    data.setdefault("authority_schema", "v30044")
+    data["module_key"] = module_key
+    data["kind"] = "records"
+    data["updated_at"] = _v30044_now()
+    data["reason"] = reason
+    tables = data.get("tables")
+    if not isinstance(tables, dict):
+        tables = {}
+    tables["time_records"] = [dict(r) for r in rows]
+    data["tables"] = tables
+    counts = data.get("table_counts") if isinstance(data.get("table_counts"), dict) else {}
+    counts["time_records"] = len(rows)
+    data["table_counts"] = counts
+    p.write_text(_v30044_json_module().dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        from services import permanent_authority_service as _pas
+        if hasattr(_pas, "force_upload_authority_file"):
+            _pas.force_upload_authority_file(module_key, kind="records", reason=reason)
+    except Exception:
+        pass
+
+
+def _v30044_append_tombstones(module_key: str, rows: list[dict], reason: str) -> None:
+    p = _v30044_auth_file(module_key, "tombstones.json")
+    p.parent.mkdir(parents=True, exist_ok=True)
+    js = _v30044_json_module()
+    try:
+        data = js.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    except Exception:
+        data = {}
+    data["module_key"] = module_key
+    data["updated_at"] = _v30044_now()
+    existing = data.get("deleted_keys")
+    if not isinstance(existing, list):
+        existing = []
+    seen = set()
+    normalized = []
+    for item in existing:
+        if isinstance(item, dict):
+            key = _v30044_text(item.get("key")) or _v30044_text(item.get("record_key")) or _v30044_text(item.get("id"))
+            sig = key or str(item)
+            if sig not in seen:
+                normalized.append(item)
+                seen.add(sig)
+        elif _v30044_text(item):
+            sig = _v30044_text(item)
+            if sig not in seen:
+                normalized.append(item)
+                seen.add(sig)
+    for r in rows:
+        key = _v30044_record_key(r)
+        if key in seen:
+            continue
+        normalized.append({
+            "key": key,
+            "id": _v30044_int(r.get("id")),
+            "record_key": _v30044_text(r.get("record_key")),
+            "deleted_at": _v30044_now(),
+            "reason": reason,
+        })
+        seen.add(key)
+    data["deleted_keys"] = normalized
+    p.write_text(js.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        from services import permanent_authority_service as _pas
+        if hasattr(_pas, "force_upload_authority_file"):
+            _pas.force_upload_authority_file(module_key, kind="tombstones", reason=reason)
+    except Exception:
+        pass
+
+
+def _v30044_sqlite_rows_by_ids(ids: list[int]) -> list[dict]:
+    if not ids:
+        return []
+    try:
+        _v30044_ensure_sqlite_schema()
+        placeholders = ",".join(["?"] * len(ids))
+        df = query_df(f"SELECT * FROM time_records WHERE id IN ({placeholders})", ids)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return [dict(r) for _, r in df.iterrows()]
+    except Exception:
+        pass
+    return []
+
+
+def _v30044_ensure_sqlite_schema() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    cols = {
+        "id": "INTEGER",
+        "record_key": "TEXT",
+        "status": "TEXT",
+        "work_order": "TEXT",
+        "part_no": "TEXT",
+        "type_name": "TEXT",
+        "process_name": "TEXT",
+        "employee_id": "TEXT",
+        "employee_name": "TEXT",
+        "start_action": "TEXT",
+        "start_timestamp": "TEXT",
+        "end_action": "TEXT",
+        "end_timestamp": "TEXT",
+        "remark": "TEXT",
+        "start_date": "TEXT",
+        "start_time": "TEXT",
+        "end_date": "TEXT",
+        "end_time": "TEXT",
+        "work_hours": "REAL",
+        "assembly_location": "TEXT",
+        "group_key": "TEXT",
+        "is_group_work": "INTEGER DEFAULT 0",
+        "source": "TEXT",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+        "is_deleted": "INTEGER DEFAULT 0",
+        "deleted_at": "TEXT",
+    }
+    with sqlite3.connect(DB_PATH, timeout=15) as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS time_records (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+        have = {r[1] for r in conn.execute("PRAGMA table_info(time_records)").fetchall()}
+        for c, typ in cols.items():
+            if c not in have:
+                try:
+                    conn.execute(f"ALTER TABLE time_records ADD COLUMN {c} {typ}")
+                except Exception:
+                    pass
+        conn.commit()
+
+
+def _v30044_upsert_sqlite_rows(rows: list[dict]) -> int:
+    if not rows:
+        return 0
+    _v30044_ensure_sqlite_schema()
+    count = 0
+    with sqlite3.connect(DB_PATH, timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        cols_have = {r[1] for r in conn.execute("PRAGMA table_info(time_records)").fetchall()}
+        for r in rows:
+            row = {k: v for k, v in dict(r).items() if k in cols_have}
+            if not row:
+                continue
+            rid = _v30044_int(row.get("id"))
+            rk = _v30044_text(row.get("record_key"))
+            exists = None
+            if rid is not None:
+                exists = conn.execute("SELECT id FROM time_records WHERE id=?", (rid,)).fetchone()
+                row["id"] = rid
+            if exists is None and rk:
+                exists = conn.execute("SELECT id FROM time_records WHERE record_key=?", (rk,)).fetchone()
+                if exists and "id" in row:
+                    row.pop("id", None)
+            if exists:
+                where_col = "id" if rid is not None else "record_key"
+                where_val = rid if rid is not None else rk
+                upd_cols = [c for c in row.keys() if c != where_col]
+                if upd_cols:
+                    conn.execute(f"UPDATE time_records SET {', '.join([c+'=?' for c in upd_cols])} WHERE {where_col}=?", tuple(row[c] for c in upd_cols) + (where_val,))
+            else:
+                ins_cols = list(row.keys())
+                conn.execute(f"INSERT INTO time_records ({', '.join(ins_cols)}) VALUES ({', '.join(['?']*len(ins_cols))})", tuple(row[c] for c in ins_cols))
+            count += 1
+        conn.commit()
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return count
+
+
+def _v30044_combined_rows() -> list[dict]:
+    out = []
+    seen = set()
+    for r in _v30044_sqlite_rows_all() + _v30044_authority_rows("01_time_records") + _v30044_authority_rows("02_history"):
+        k = _v30044_record_key(r)
+        if k in seen:
+            continue
+        out.append(dict(r))
+        seen.add(k)
+    return out
+
+
+def _v30044_sqlite_rows_all() -> list[dict]:
+    try:
+        _v30044_ensure_sqlite_schema()
+        df = query_df("SELECT * FROM time_records")
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return [dict(r) for _, r in df.iterrows()]
+    except Exception:
+        pass
+    return []
+
+
+def _v30044_find_record(record_id: int) -> dict | None:
+    rid = _v30044_int(record_id)
+    if rid is None:
+        return None
+    for r in _v30044_combined_rows():
+        if _v30044_int(r.get("id")) == rid:
+            return dict(r)
+    return None
+
+
+def _v30044_parallel_group(record: dict, finish_parallel_group: bool = True) -> list[dict]:
+    if not finish_parallel_group:
+        return [dict(record)]
+    emp_id = _v30044_text(record.get("employee_id"))
+    emp_name = _v30044_text(record.get("employee_name"))
+    proc = _v30044_text(record.get("process_name"))
+    start_date = _v30044_text(record.get("start_date")) or _v30044_text(record.get("start_timestamp"))[:10]
+    rows = []
+    seen = set()
+    for r in _v30044_combined_rows():
+        if not _v30044_is_active(r):
+            continue
+        same_person = (emp_id and _v30044_text(r.get("employee_id")) == emp_id) or (not emp_id and emp_name and _v30044_text(r.get("employee_name")) == emp_name)
+        if same_person and _v30044_text(r.get("process_name")) == proc and (_v30044_text(r.get("start_date")) or _v30044_text(r.get("start_timestamp"))[:10]) == start_date:
+            k = _v30044_record_key(r)
+            if k not in seen:
+                rows.append(dict(r))
+                seen.add(k)
+    if not rows:
+        rows = [dict(record)]
+    return rows
+
+
+def _v30044_upsert_authority_rows(updated_rows: list[dict], reason: str) -> None:
+    if not updated_rows:
+        return
+    upd_by_key = {_v30044_record_key(r): dict(r) for r in updated_rows}
+    upd_by_id = {_v30044_int(r.get("id")): dict(r) for r in updated_rows if _v30044_int(r.get("id")) is not None}
+    for mod in ("01_time_records", "02_history"):
+        rows = _v30044_authority_rows(mod)
+        used = set()
+        new_rows = []
+        for r in rows:
+            rid = _v30044_int(r.get("id"))
+            k = _v30044_record_key(r)
+            replacement = upd_by_id.get(rid) if rid is not None else None
+            replacement = replacement or upd_by_key.get(k)
+            if replacement:
+                merged = dict(r)
+                merged.update(replacement)
+                new_rows.append(merged)
+                used.add(_v30044_record_key(replacement))
+            else:
+                new_rows.append(r)
+        existing_keys = {_v30044_record_key(r) for r in new_rows}
+        for k, r in upd_by_key.items():
+            if k not in existing_keys and k not in used:
+                new_rows.append(dict(r))
+        _v30044_write_authority_rows(mod, new_rows, reason)
+
+
+_v30044_prev_finish_work = finish_work
+_v30044_prev_delete_time_records = delete_time_records
+_v30044_prev_delete_from_editor = globals().get("delete_time_records_from_editor_df")
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    rid = _v30044_int(record_id)
+    if rid is None:
+        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+    rec = _v30044_find_record(rid)
+    if not rec:
+        raise ValueError("找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。")
+    if not _v30044_is_active(rec):
+        return 0
+    group = _v30044_parallel_group(rec, finish_parallel_group=finish_parallel_group)
+    now = _v30044_now()
+    try:
+        end_date, end_time = split_timestamp(now)
+    except Exception:
+        end_date, end_time = now[:10], now[11:19]
+    starts = [_v30044_text(r.get("start_timestamp")) for r in group if _v30044_text(r.get("start_timestamp"))]
+    earliest_start = min(starts) if starts else _v30044_text(rec.get("start_timestamp")) or now
+    try:
+        total_hours = float(calculate_work_hours(earliest_start, now) or 0)
+    except Exception:
+        total_hours = 0.0
+    avg_hours = round(total_hours / max(len(group), 1), 2)
+    status = end_action if _v30044_text(end_action) in {"下班", "暫停", "完工"} else "已結束"
+    group_key = _v30044_text(rec.get("group_key")) or "|".join([_v30044_text(rec.get("employee_id")), _v30044_text(rec.get("process_name")), _v30044_text(rec.get("start_date")) or _v30044_text(rec.get("start_timestamp"))[:10]])
+    summary = ""
+    if len(group) > 1:
+        summary = f"同時作業 {len(group)} 筆，總工時 {total_hours:.2f} 小時，平均 {avg_hours:.2f} 小時"
+    updated = []
+    for r in group:
+        nr = dict(r)
+        old_remark = _v30044_text(nr.get("remark"))
+        append = _v30044_text(remark)
+        if summary:
+            append = (append + "；" if append else "") + summary
+        nr.update({
+            "status": status,
+            "end_action": end_action,
+            "end_timestamp": now,
+            "end_date": end_date,
+            "end_time": end_time,
+            "work_hours": avg_hours,
+            "remark": (old_remark + "；" if old_remark and append else old_remark) + append,
+            "group_key": group_key,
+            "is_group_work": 1 if len(group) > 1 else int(float(nr.get("is_group_work") or 0)),
+            "updated_at": now,
+        })
+        updated.append(nr)
+    _v30044_upsert_sqlite_rows(updated)
+    _v30044_upsert_authority_rows(updated, f"v30044_finish_work_{end_action}")
+    try:
+        write_log("END_WORK_GROUP" if len(updated) > 1 else "END_WORK", f"V300.44 結束工時紀錄 #{rid}，同步結束={len(updated)}筆，狀態={status}", "time_records", rid, detail=",".join(_v30044_text(x.get("id")) for x in updated))
+    except Exception:
+        pass
+    try:
+        clear_query_cache()
+        mark_data_changed(f"已結束工時紀錄 {len(updated)} 筆，01/02 權威檔已同步。", "V30044 finish_work")
+    except Exception:
+        pass
+    return int(len(updated))
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = []
+    for x in record_ids or []:
+        i = _v30044_int(x)
+        if i is not None and i > 0 and i not in ids:
+            ids.append(i)
+    if not ids:
+        return 0
+    idset = set(ids)
+    deleted_rows = []
+    remaining_by_mod = {}
+    for mod in ("01_time_records", "02_history"):
+        rows = _v30044_authority_rows(mod)
+        keep = []
+        gone = []
+        for r in rows:
+            if _v30044_int(r.get("id")) in idset:
+                gone.append(dict(r))
+            else:
+                keep.append(dict(r))
+        remaining_by_mod[mod] = keep
+        deleted_rows.extend(gone)
+    if not deleted_rows:
+        deleted_rows.extend(_v30044_sqlite_rows_by_ids(ids))
+    # Delete from SQLite hot cache regardless of authority result.
+    try:
+        _v30044_ensure_sqlite_schema()
+        with sqlite3.connect(DB_PATH, timeout=15) as conn:
+            ph = ",".join(["?"] * len(ids))
+            conn.execute(f"DELETE FROM time_records WHERE id IN ({ph})", tuple(ids))
+            conn.commit()
+    except Exception:
+        pass
+    # Save 01/02 authority without the deleted rows.
+    for mod, keep in remaining_by_mod.items():
+        _v30044_write_authority_rows(mod, keep, f"v30044_delete_time_records:{reason}")
+        _v30044_append_tombstones(mod, deleted_rows, reason)
+    try:
+        clear_query_cache()
+        mark_data_changed(f"已刪除工時紀錄 {len(set(ids))} 筆，01/02 權威檔已同步。", "V30044 delete_time_records")
+    except Exception:
+        pass
+    try:
+        write_log("DELETE_TIME_RECORDS", f"{reason}：V300.44 已刪除 {len(set(ids))} 筆，並同步 01/02 權威檔。", "time_records", level="WARN")
+    except Exception:
+        pass
+    return int(len(set(ids)))
+
+
+def _v30044_checked(v) -> bool:
+    if isinstance(v, str):
+        return v.strip().lower() in {"1", "true", "yes", "y", "on", "是", "勾選", "checked"}
+    try:
+        if pd.isna(v):
+            return False
+    except Exception:
+        pass
+    return bool(v)
+
+
+def delete_time_records_from_editor_df(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete", reason: str = "01 管理員維護表刪除") -> int:  # type: ignore[override]
+    df = editor_df.copy() if isinstance(editor_df, pd.DataFrame) else pd.DataFrame()
+    if df.empty:
+        return 0
+    dcol = delete_column if delete_column in df.columns else ""
+    if not dcol:
+        for c in df.columns:
+            if "刪除" in str(c) or str(c).strip().lower() in {"delete", "deleted", "remove"}:
+                dcol = c
+                break
+    if not dcol:
+        return 0
+    selected = df.loc[df[dcol].map(_v30044_checked)].copy()
+    if selected.empty:
+        return 0
+    id_col = ""
+    for c in ["id", "ID", "ID / ID", "ID / ID / ID", "紀錄編號", "record_id"]:
+        if c in selected.columns:
+            id_col = c
+            break
+    ids = []
+    if id_col:
+        for x in selected[id_col].tolist():
+            i = _v30044_int(x)
+            if i is not None and i not in ids:
+                ids.append(i)
+    if ids:
+        return delete_time_records(ids, reason=reason)
+    # Business-key fallback for translated or missing ID columns.
+    selected_keys = {_v30044_record_key(dict(r)) for _, r in selected.iterrows()}
+    ids2 = []
+    for r in _v30044_combined_rows():
+        if _v30044_record_key(r) in selected_keys:
+            i = _v30044_int(r.get("id"))
+            if i is not None and i not in ids2:
+                ids2.append(i)
+    return delete_time_records(ids2, reason=reason) if ids2 else 0
+
+
+def audit_v30044_01_button_actions() -> dict:
+    return {
+        "version": "V300.44_01_BUTTON_ACTION_AUTHORITY_FINAL_GUARD",
+        "delete_updates_sqlite": True,
+        "delete_updates_01_authority": True,
+        "delete_updates_02_authority": True,
+        "delete_writes_tombstones": True,
+        "finish_updates_parallel_group_from_sqlite_and_authority": True,
+        "page_display_hot_path_unchanged": True,
+        "changes_ui_css_theme": False,
+    }
+# ================= END V300.44 01 BUTTON ACTION AUTHORITY FINAL GUARD =================
+
+# ---- V300.44.1 foreground no-upload safety for 01 buttons ----
+def _v30044_write_authority_rows(module_key: str, rows: list[dict], reason: str) -> None:  # type: ignore[override]
+    p = _v30044_auth_file(module_key, "records.json")
+    p.parent.mkdir(parents=True, exist_ok=True)
+    data = _v30044_load_authority_payload(module_key)
+    if not isinstance(data, dict):
+        data = {}
+    data.setdefault("authority_schema", "v30044")
+    data["module_key"] = module_key
+    data["kind"] = "records"
+    data["updated_at"] = _v30044_now()
+    data["reason"] = reason
+    tables = data.get("tables")
+    if not isinstance(tables, dict):
+        tables = {}
+    tables["time_records"] = [dict(r) for r in rows]
+    data["tables"] = tables
+    counts = data.get("table_counts") if isinstance(data.get("table_counts"), dict) else {}
+    counts["time_records"] = len(rows)
+    data["table_counts"] = counts
+    p.write_text(_v30044_json_module().dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        marker = _v30044_root() / "data" / "permanent_store" / "_pending_authority_uploads"
+        marker.mkdir(parents=True, exist_ok=True)
+        (marker / f"{module_key}_records.pending.json").write_text(_v30044_json_module().dumps({"module_key":module_key,"kind":"records","reason":reason,"updated_at":_v30044_now()}, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _v30044_append_tombstones(module_key: str, rows: list[dict], reason: str) -> None:  # type: ignore[override]
+    p = _v30044_auth_file(module_key, "tombstones.json")
+    p.parent.mkdir(parents=True, exist_ok=True)
+    js = _v30044_json_module()
+    try:
+        data = js.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    except Exception:
+        data = {}
+    data["module_key"] = module_key
+    data["updated_at"] = _v30044_now()
+    existing = data.get("deleted_keys")
+    if not isinstance(existing, list):
+        existing = []
+    seen = set()
+    normalized = []
+    for item in existing:
+        if isinstance(item, dict):
+            key = _v30044_text(item.get("key")) or _v30044_text(item.get("record_key")) or _v30044_text(item.get("id"))
+            sig = key or str(item)
+            if sig not in seen:
+                normalized.append(item); seen.add(sig)
+        elif _v30044_text(item):
+            sig = _v30044_text(item)
+            if sig not in seen:
+                normalized.append(item); seen.add(sig)
+    for r in rows:
+        key = _v30044_record_key(r)
+        if key in seen:
+            continue
+        normalized.append({"key": key, "id": _v30044_int(r.get("id")), "record_key": _v30044_text(r.get("record_key")), "deleted_at": _v30044_now(), "reason": reason})
+        seen.add(key)
+    data["deleted_keys"] = normalized
+    p.write_text(js.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        marker = _v30044_root() / "data" / "permanent_store" / "_pending_authority_uploads"
+        marker.mkdir(parents=True, exist_ok=True)
+        (marker / f"{module_key}_tombstones.pending.json").write_text(js.dumps({"module_key":module_key,"kind":"tombstones","reason":reason,"updated_at":_v30044_now()}, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+# ---- V300.44.2 no-heavy-log foreground button overrides ----
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    rid = _v30044_int(record_id)
+    if rid is None:
+        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+    rec = _v30044_find_record(rid)
+    if not rec:
+        raise ValueError("找不到工時紀錄；此筆可能已刪除、已結束，或畫面資料尚未重新整理。")
+    if not _v30044_is_active(rec):
+        return 0
+    group = _v30044_parallel_group(rec, finish_parallel_group=finish_parallel_group)
+    now = _v30044_now()
+    try:
+        end_date, end_time = split_timestamp(now)
+    except Exception:
+        end_date, end_time = now[:10], now[11:19]
+    starts = [_v30044_text(r.get("start_timestamp")) for r in group if _v30044_text(r.get("start_timestamp"))]
+    earliest_start = min(starts) if starts else _v30044_text(rec.get("start_timestamp")) or now
+    try:
+        total_hours = float(calculate_work_hours(earliest_start, now) or 0)
+    except Exception:
+        total_hours = 0.0
+    avg_hours = round(total_hours / max(len(group), 1), 2)
+    status = end_action if _v30044_text(end_action) in {"下班", "暫停", "完工"} else "已結束"
+    group_key = _v30044_text(rec.get("group_key")) or "|".join([_v30044_text(rec.get("employee_id")), _v30044_text(rec.get("process_name")), _v30044_text(rec.get("start_date")) or _v30044_text(rec.get("start_timestamp"))[:10]])
+    summary = f"同時作業 {len(group)} 筆，總工時 {total_hours:.2f} 小時，平均 {avg_hours:.2f} 小時" if len(group) > 1 else ""
+    updated = []
+    for r in group:
+        nr = dict(r)
+        old_remark = _v30044_text(nr.get("remark"))
+        append = _v30044_text(remark)
+        if summary:
+            append = (append + "；" if append else "") + summary
+        nr.update({"status": status, "end_action": end_action, "end_timestamp": now, "end_date": end_date, "end_time": end_time, "work_hours": avg_hours, "remark": (old_remark + "；" if old_remark and append else old_remark) + append, "group_key": group_key, "is_group_work": 1 if len(group) > 1 else int(float(nr.get("is_group_work") or 0)), "updated_at": now})
+        updated.append(nr)
+    _v30044_upsert_sqlite_rows(updated)
+    _v30044_upsert_authority_rows(updated, f"v30044_2_finish_work_{end_action}")
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(len(updated))
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = []
+    for x in record_ids or []:
+        i = _v30044_int(x)
+        if i is not None and i > 0 and i not in ids:
+            ids.append(i)
+    if not ids:
+        return 0
+    idset = set(ids)
+    deleted_rows = []
+    remaining_by_mod = {}
+    for mod in ("01_time_records", "02_history"):
+        rows = _v30044_authority_rows(mod)
+        keep, gone = [], []
+        for r in rows:
+            if _v30044_int(r.get("id")) in idset:
+                gone.append(dict(r))
+            else:
+                keep.append(dict(r))
+        remaining_by_mod[mod] = keep
+        deleted_rows.extend(gone)
+    if not deleted_rows:
+        deleted_rows.extend(_v30044_sqlite_rows_by_ids(ids))
+    try:
+        _v30044_ensure_sqlite_schema()
+        with sqlite3.connect(DB_PATH, timeout=8) as conn:
+            ph = ",".join(["?"] * len(ids))
+            conn.execute(f"DELETE FROM time_records WHERE id IN ({ph})", tuple(ids))
+            conn.commit()
+    except Exception:
+        pass
+    for mod, keep in remaining_by_mod.items():
+        _v30044_write_authority_rows(mod, keep, f"v30044_2_delete_time_records:{reason}")
+        _v30044_append_tombstones(mod, deleted_rows, reason)
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(len(ids))
+
+# ---- V300.44.3 avoid db_service/log recursion in 01 button hot path ----
+def _v30044_sqlite_rows_all() -> list[dict]:  # type: ignore[override]
+    try:
+        _v30044_ensure_sqlite_schema()
+        with sqlite3.connect(DB_PATH, timeout=8) as conn:
+            conn.row_factory = sqlite3.Row
+            return [dict(r) for r in conn.execute("SELECT * FROM time_records").fetchall()]
+    except Exception:
+        return []
+
+
+def _v30044_sqlite_rows_by_ids(ids: list[int]) -> list[dict]:  # type: ignore[override]
+    if not ids:
+        return []
+    try:
+        _v30044_ensure_sqlite_schema()
+        with sqlite3.connect(DB_PATH, timeout=8) as conn:
+            conn.row_factory = sqlite3.Row
+            ph = ",".join(["?"] * len(ids))
+            return [dict(r) for r in conn.execute(f"SELECT * FROM time_records WHERE id IN ({ph})", tuple(ids)).fetchall()]
+    except Exception:
+        return []
+
+# ---- V300.44.4 independent start button path to avoid old signature conflicts ----
+def _v30044_next_id() -> int:
+    mx = 0
+    for r in _v30044_combined_rows():
+        i = _v30044_int(r.get("id"))
+        if i is not None and i > mx:
+            mx = i
+    try:
+        _v30044_ensure_sqlite_schema()
+        with sqlite3.connect(DB_PATH, timeout=8) as conn:
+            row = conn.execute("SELECT MAX(id) FROM time_records").fetchone()
+            if row and row[0] is not None:
+                mx = max(mx, int(row[0]))
+    except Exception:
+        pass
+    return mx + 1
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    employee = employee or {}
+    work_order = work_order or {}
+    emp_id = _v30044_text(employee.get("employee_id"))
+    emp_name = _v30044_text(employee.get("employee_name"))
+    wo_no = _v30044_text(work_order.get("work_order"))
+    proc = _v30044_text(process_name)
+    if not emp_id or not wo_no or not proc:
+        raise ValueError("工號、製令、工段名稱不可空白。")
+    now = _v30044_now()
+    try:
+        start_date, start_time = split_timestamp(now)
+    except Exception:
+        start_date, start_time = now[:10], now[11:19]
+    active = []
+    for r in _v30044_combined_rows():
+        if not _v30044_is_active(r):
+            continue
+        same_person = (_v30044_text(r.get("employee_id")) == emp_id) if emp_id else (_v30044_text(r.get("employee_name")) == emp_name)
+        if same_person:
+            active.append(r)
+    for r in active:
+        r_date = _v30044_text(r.get("start_date")) or _v30044_text(r.get("start_timestamp"))[:10]
+        if _v30044_text(r.get("work_order")) == wo_no and _v30044_text(r.get("process_name")) == proc and r_date == start_date:
+            raise ValueError(f"禁止重複紀錄：此人員已有相同製令與工段正在計時：{wo_no} / {proc}")
+    conflicts = []
+    for r in active:
+        r_date = _v30044_text(r.get("start_date")) or _v30044_text(r.get("start_timestamp"))[:10]
+        if _v30044_text(r.get("process_name")) != proc or r_date != start_date:
+            conflicts.append(r)
+    if conflicts:
+        raise ValueError("此人員已有不同工段正在計時，請先暫停、完工或下班前一筆作業後，再開始新作業。")
+    rid = _v30044_next_id()
+    group_key = f"{emp_id}|{proc}|{start_date}"
+    record_key = _v30044_text(work_order.get("record_key")) or f"{emp_id}|{wo_no}|{proc}|{now}"
+    row = {
+        "id": rid,
+        "record_key": record_key,
+        "status": "作業中",
+        "work_order": wo_no,
+        "part_no": work_order.get("part_no", ""),
+        "type_name": work_order.get("type_name", ""),
+        "process_name": proc,
+        "employee_id": emp_id,
+        "employee_name": emp_name,
+        "start_action": "開始",
+        "start_timestamp": now,
+        "end_action": "",
+        "end_timestamp": "",
+        "remark": remark,
+        "start_date": start_date,
+        "start_time": start_time,
+        "end_date": "",
+        "end_time": "",
+        "work_hours": 0,
+        "assembly_location": work_order.get("assembly_location", ""),
+        "group_key": group_key,
+        "is_group_work": 0,
+        "source": "v30044_start_button",
+        "created_at": now,
+        "updated_at": now,
+    }
+    # If this is a parallel same-person/same-date/same-process group, mark all active group rows.
+    same_group = []
+    for r in active:
+        r_date = _v30044_text(r.get("start_date")) or _v30044_text(r.get("start_timestamp"))[:10]
+        if _v30044_text(r.get("process_name")) == proc and r_date == start_date:
+            nr = dict(r)
+            nr["group_key"] = group_key
+            nr["is_group_work"] = 1
+            nr["updated_at"] = now
+            same_group.append(nr)
+    if same_group:
+        row["is_group_work"] = 1
+    updates = same_group + [row]
+    _v30044_upsert_sqlite_rows(updates)
+    _v30044_upsert_authority_rows(updates, "v30044_4_start_work")
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(rid)
+
+
+def audit_v30044_01_all_button_paths() -> dict:
+    out = audit_v30044_01_button_actions()
+    out.update({
+        "start_independent_no_old_signature_conflict": True,
+        "start_blocks_different_process_without_auto_pause": True,
+        "start_allows_same_process_parallel": True,
+        "finish_no_heavy_log_or_github_foreground": True,
+        "delete_no_heavy_log_or_github_foreground": True,
+    })
+    return out
+# ---- END V300.44.4 ----
