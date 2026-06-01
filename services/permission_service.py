@@ -8244,3 +8244,167 @@ except Exception:
     _V300173_IMPORT_RECOVERY_STATUS = {"ok": False, "error": "import_recovery_failed"}
 
 # ======================= V300.17.3 PERMISSION PASSWORD EMERGENCY RECOVERY END =======================
+
+# ======================= V300.17.4 ADMIN PASSWORD FORCE RESTORE START =======================
+# Emergency scope:
+#   Restore the system administrator login after V300.17.x password hash damage.
+#   This block only touches admin password/active/admin-role fields in the 10_permissions
+#   authority file and runtime auth/security tables. It does NOT touch 01/02, 06/11/13,
+#   UI/CSS/theme, or any non-admin passwords.
+
+_V300174_ADMIN_USERNAME = "admin"
+_V300174_ADMIN_PASSWORD = "Admin@1234"
+_V300174_REASON = "v30017_4_force_restore_admin_password"
+
+
+def _v300174_hash_password_compat(password: str, salt: str | None = None) -> str:
+    """Permission-service compatible hash: pbkdf2_sha256$salt_hex$digest_hex."""
+    try:
+        salt = salt or os.urandom(16).hex()
+        digest = hashlib.pbkdf2_hmac("sha256", str(password).encode("utf-8"), str(salt).encode("utf-8"), 120000)
+        return f"pbkdf2_sha256${salt}${digest.hex()}"
+    except Exception:
+        try:
+            return hash_password(password)  # type: ignore[name-defined]
+        except Exception:
+            return ""
+
+
+def _v300174_verify_hash(password: str, h: str) -> bool:
+    try:
+        return bool(verify_password(password, h))  # type: ignore[name-defined]
+    except Exception:
+        return False
+
+
+def _v300174_force_admin_password(reason: str = _V300174_REASON) -> dict:
+    admin_hash = _v300174_hash_password_compat(_V300174_ADMIN_PASSWORD)
+    if not admin_hash:
+        return {"ok": False, "error": "hash_failed"}
+    changed = False
+    # 1) Authority records.json
+    try:
+        payload = _v300173_read_json(_V300173_AUTHORITY_FILE) if "_v300173_read_json" in globals() else {}
+        if not payload:
+            payload = _v300173_read_json(_V300173_RECOVERY_FILE) if "_v300173_read_json" in globals() else {}
+        if isinstance(payload, dict):
+            tables = payload.setdefault("tables", {})
+            if not isinstance(tables, dict):
+                tables = {}; payload["tables"] = tables
+            users = tables.setdefault("auth_users", [])
+            if not isinstance(users, list):
+                users = []; tables["auth_users"] = users
+            found = False
+            for row in users:
+                if isinstance(row, dict) and str(row.get("username", "")).strip().lower() == _V300174_ADMIN_USERNAME:
+                    found = True
+                    if not _v300174_verify_hash(_V300174_ADMIN_PASSWORD, str(row.get("password_hash") or "")):
+                        changed = True
+                    row.update({
+                        "username": "admin",
+                        "password_hash": admin_hash,
+                        "password_hint": "V300.17.4 restored to Admin@1234",
+                        "display_name": row.get("display_name") or "系統管理員",
+                        "role_code": "admin",
+                        "is_active": 1,
+                        "force_password_change": 0,
+                        "updated_at": _v300173_now() if "_v300173_now" in globals() else "",
+                    })
+            if not found:
+                changed = True
+                users.append({
+                    "username": "admin",
+                    "password_hash": admin_hash,
+                    "password_hint": "V300.17.4 restored to Admin@1234",
+                    "display_name": "系統管理員",
+                    "email": "",
+                    "role_code": "admin",
+                    "is_active": 1,
+                    "force_password_change": 0,
+                    "note": "V300.17.4 emergency admin restore",
+                    "created_at": _v300173_now() if "_v300173_now" in globals() else "",
+                    "updated_at": _v300173_now() if "_v300173_now" in globals() else "",
+                })
+            # Admin must never be tombstoned.
+            deleted = payload.get("deleted_usernames", [])
+            if isinstance(deleted, list) and any(str(x).strip().lower() == "admin" for x in deleted):
+                payload["deleted_usernames"] = [x for x in deleted if str(x).strip().lower() != "admin"]
+                changed = True
+            # Maintain runtime tables in authority payload too.
+            sec_users = tables.setdefault("security_users", [])
+            if not isinstance(sec_users, list):
+                sec_users = []; tables["security_users"] = sec_users
+            sec_found = False
+            for row in sec_users:
+                if isinstance(row, dict) and str(row.get("username", "")).strip().lower() == "admin":
+                    sec_found = True
+                    row.update({"username": "admin", "password_hash": admin_hash, "display_name": row.get("display_name") or "系統管理員", "role_code": "admin", "is_active": 1, "force_password_change": 0, "updated_at": _v300173_now() if "_v300173_now" in globals() else ""})
+            if not sec_found:
+                sec_users.append({"username": "admin", "password_hash": admin_hash, "display_name": "系統管理員", "role_code": "admin", "is_active": 1, "force_password_change": 0, "created_at": _v300173_now() if "_v300173_now" in globals() else "", "updated_at": _v300173_now() if "_v300173_now" in globals() else ""})
+                changed = True
+            roles = tables.setdefault("security_user_roles", [])
+            if isinstance(roles, list) and not any(isinstance(r, dict) and str(r.get("username", "")).strip().lower() == "admin" and str(r.get("role_code", "")).strip().lower() == "admin" for r in roles):
+                roles.append({"username": "admin", "role_code": "admin", "created_at": _v300173_now() if "_v300173_now" in globals() else "", "updated_at": _v300173_now() if "_v300173_now" in globals() else ""})
+                changed = True
+            payload["updated_at"] = _v300173_now() if "_v300173_now" in globals() else ""
+            payload["reason"] = reason
+            payload["version"] = "V300.17.4-admin-password-force-restore"
+            payload["table_counts"] = {k: len(v) for k, v in tables.items() if isinstance(v, list)}
+            try:
+                _v300173_backup_current("v30017_4_admin_restore")
+            except Exception:
+                pass
+            ok = _v300173_write_json(_V300173_AUTHORITY_FILE, payload) if "_v300173_write_json" in globals() else False
+            changed = bool(changed or ok)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+    # 2) Runtime DB auth/security tables. Best effort; avoids needing Reboot if DB is already loaded.
+    try:
+        conn = connect_db(); cur = conn.cursor()
+        try:
+            _v91_schema_only() if "_v91_schema_only" in globals() else None
+        except Exception:
+            pass
+        for sql in [
+            "UPDATE auth_users SET password_hash=?, password_hint=?, role_code='admin', is_active=1, force_password_change=0, updated_at=? WHERE lower(username)='admin'",
+            "UPDATE security_users SET password_hash=?, password_hint=?, role_code='admin', is_active=1, force_password_change=0, updated_at=? WHERE lower(username)='admin'",
+        ]:
+            try:
+                cur.execute(sql, (admin_hash, "V300.17.4 restored to Admin@1234", _v300173_now() if "_v300173_now" in globals() else ""))
+            except Exception:
+                pass
+        try:
+            cur.execute("INSERT INTO auth_users(username,password_hash,password_hint,display_name,role_code,is_active,force_password_change,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM auth_users WHERE lower(username)='admin')", ("admin", admin_hash, "V300.17.4 restored to Admin@1234", "系統管理員", "admin", 1, 0, _v300173_now() if "_v300173_now" in globals() else "", _v300173_now() if "_v300173_now" in globals() else ""))
+        except Exception:
+            pass
+        try:
+            cur.execute("INSERT INTO security_users(username,password_hash,password_hint,display_name,role_code,is_active,force_password_change,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM security_users WHERE lower(username)='admin')", ("admin", admin_hash, "V300.17.4 restored to Admin@1234", "系統管理員", "admin", 1, 0, _v300173_now() if "_v300173_now" in globals() else "", _v300173_now() if "_v300173_now" in globals() else ""))
+        except Exception:
+            pass
+        try:
+            cur.execute("DELETE FROM security_user_roles WHERE lower(username)='admin'")
+            cur.execute("INSERT INTO security_user_roles(username, role_code, created_at, updated_at) VALUES (?,?,?,?)", ("admin", "admin", _v300173_now() if "_v300173_now" in globals() else "", _v300173_now() if "_v300173_now" in globals() else ""))
+        except Exception:
+            pass
+        conn.commit()
+        try: conn.close()
+        except Exception: pass
+    except Exception:
+        pass
+    try:
+        clear_permission_runtime_cache()
+    except Exception:
+        pass
+    return {"ok": True, "changed": changed, "admin_password": "Admin@1234", "reason": reason}
+
+
+def force_restore_admin_password_v30017_4() -> dict:
+    return _v300174_force_admin_password("manual_force_restore_admin_password_v30017_4")
+
+try:
+    _V300174_ADMIN_RESTORE_STATUS = _v300174_force_admin_password("import_force_restore_admin_password_v30017_4")
+except Exception:
+    _V300174_ADMIN_RESTORE_STATUS = {"ok": False, "error": "import_failed"}
+
+# ======================= V300.17.4 ADMIN PASSWORD FORCE RESTORE END =======================
