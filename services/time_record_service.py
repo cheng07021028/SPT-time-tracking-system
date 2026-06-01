@@ -32190,3 +32190,90 @@ def audit_v30038_01_frontend_hot_path() -> dict[str, Any]:
         "purpose": "Stop 01 page from spinning after login while preserving button-level correctness.",
     }
 # ===== V300.38 01 FRONTEND HOT-PATH FAST DISPLAY FIX END =====
+
+
+# ===== V300.40 01 DISPLAY ABSOLUTE FAST ACTIVE LOOKUP BEGIN =====
+# 2026-06-01
+# Keep 01 page display completely out of authority-file scans. Button actions
+# still call start_work/finish_work wrappers that perform authority validation
+# and full group write-back. These display helpers are only for page rendering.
+def get_active_records(
+    employee_id: str | None = None,
+    employee_name: str | None = None,
+    process_name: str | None = None,
+    start_date: str | None = None,
+    work_order: str | None = None,
+    **kwargs,
+) -> pd.DataFrame:  # type: ignore[override]
+    df = _v30038_fast_sqlite_active_df() if "_v30038_fast_sqlite_active_df" in globals() else pd.DataFrame()
+    if "_v30038_filter_fast_active" in globals():
+        return _v30038_filter_fast_active(
+            df,
+            employee_id=employee_id,
+            employee_name=employee_name,
+            process_name=process_name,
+            start_date=start_date,
+            work_order=work_order,
+        )
+    return df
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return None
+    return df.iloc[0].fillna("").to_dict()
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    rid = _v30038_int(record_id) if "_v30038_int" in globals() else None
+    df = _v30038_fast_sqlite_active_df() if "_v30038_fast_sqlite_active_df" in globals() else pd.DataFrame()
+    if rid is None or df is None or df.empty or "id" not in df.columns:
+        return pd.DataFrame()
+    hit = df[df["id"].map(_v30038_int).eq(rid)] if "_v30038_int" in globals() else pd.DataFrame()
+    if hit.empty:
+        return pd.DataFrame()
+    row = hit.iloc[0].to_dict()
+    date = _v30038_text(row.get("start_date")) or _v30038_text(row.get("start_timestamp"))[:10]
+    return get_active_records(
+        employee_id=_v30038_text(row.get("employee_id")),
+        employee_name=_v30038_text(row.get("employee_name")),
+        process_name=_v30038_text(row.get("process_name")),
+        start_date=date,
+    )
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name, process_name=process_name, work_order=work_order)
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return None
+    return df.iloc[0].fillna("").to_dict()
+
+
+def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    proc = _v30038_text(process_name) if "_v30038_text" in globals() else str(process_name or "").strip()
+    if proc and "process_name" in out.columns:
+        out = out[~out["process_name"].map(_v30038_text).eq(proc)]
+    if start_date:
+        dates = _v30038_start_date_series(out) if "_v30038_start_date_series" in globals() else pd.Series([""] * len(out), index=out.index)
+        out = out[~dates.eq(_v30038_text(start_date)) | (out["process_name"].map(_v30038_text) != proc if "process_name" in out.columns else True)]
+    return out.reset_index(drop=True)
+
+
+def audit_v30040_01_display_absolute_fast() -> dict[str, Any]:
+    import time as _time
+    t0 = _time.perf_counter()
+    df = get_active_records()
+    return {
+        "version": "V300.40_01_DISPLAY_ABSOLUTE_FAST_ACTIVE_LOOKUP",
+        "display_source": "sqlite_hot_cache_only",
+        "authority_scan_on_page_display": False,
+        "button_transactions_still_authority_checked": True,
+        "elapsed_seconds": round(_time.perf_counter() - t0, 4),
+        "active_rows": int(len(df)) if isinstance(df, pd.DataFrame) else 0,
+    }
+# ===== V300.40 01 DISPLAY ABSOLUTE FAST ACTIVE LOOKUP END =====

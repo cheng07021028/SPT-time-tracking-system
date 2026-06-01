@@ -767,3 +767,60 @@ def audit_v128_master_data_hot_cache() -> dict:
     }
 
 # ================= END V128 01 MASTER DATA LONGER HOT CACHE =================
+
+
+# ================= V300.40 01 LOGIN EMPLOYEE CONTEXT FAST FIX =================
+# 2026-06-01
+# Some login paths store the current role in auth_role instead of auth_roles.
+# If 01 sees an empty role list, admin/manager accounts can be treated like an
+# unbound operator and master-data loading may fall into a slow/empty path.
+# This override keeps the existing filtering rule but recognizes all current
+# session role keys.
+def _current_login_context() -> tuple[str, str, list[str]]:  # type: ignore[override]
+    try:
+        import streamlit as st
+        username = str(
+            st.session_state.get("auth_username")
+            or st.session_state.get("username")
+            or ""
+        ).strip()
+        employee_id = str(
+            st.session_state.get("auth_employee_id")
+            or st.session_state.get("employee_id")
+            or ""
+        ).strip()
+        roles_raw = (
+            st.session_state.get("auth_roles")
+            or st.session_state.get("roles")
+            or st.session_state.get("auth_role")
+            or st.session_state.get("role")
+            or []
+        )
+        if isinstance(roles_raw, str):
+            roles = [roles_raw]
+        elif isinstance(roles_raw, (list, tuple, set)):
+            roles = list(roles_raw)
+        else:
+            roles = []
+        auth_role = st.session_state.get("auth_role") or st.session_state.get("role")
+        if auth_role and str(auth_role).strip() not in [str(r).strip() for r in roles]:
+            roles.append(str(auth_role).strip())
+        return username, employee_id, [str(r).strip() for r in roles if str(r).strip()]
+    except Exception:
+        return "", "", []
+
+
+def audit_v30040_01_master_context() -> dict:
+    try:
+        username, employee_id, roles = _current_login_context()
+    except Exception:
+        username, employee_id, roles = "", "", []
+    return {
+        "version": "V300.40_01_LOGIN_EMPLOYEE_CONTEXT_FAST_FIX",
+        "username_detected": bool(username),
+        "employee_id_detected": bool(employee_id),
+        "roles": roles,
+        "recognizes_auth_role": True,
+        "changes_authority_read_write_rules": False,
+    }
+# ================= END V300.40 01 LOGIN EMPLOYEE CONTEXT FAST FIX =================
