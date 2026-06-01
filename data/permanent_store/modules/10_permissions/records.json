@@ -2,9 +2,9 @@
   "authority_schema": "SPT_PERMISSION_AUTHORITY_CLEAN_V1",
   "module_key": "10_permissions",
   "kind": "records",
-  "updated_at": "2026-06-01 09:15:06",
+  "updated_at": "2026-06-01 15:17:14",
   "exported_at": "2026-05-29 14:43:31",
-  "reason": "save_users_direct_authority",
+  "reason": "save_security_settings_direct_authority",
   "empty_authoritative": false,
   "tables": {
     "auth_users": [
@@ -27226,42 +27226,46 @@
     ],
     "auth_security_settings": [
       {
+        "setting_key": "idle_auto_logout_minutes",
+        "setting_value": "6",
+        "updated_at": "2026-06-01 15:17:14"
+      },
+      {
         "setting_key": "idle_timeout_minutes",
-        "setting_value": "15",
-        "note": "V1.69 synchronized security setting",
-        "updated_at": "2026-05-15 11:23:50"
+        "setting_value": "6",
+        "updated_at": "2026-06-01 15:17:14"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
-        "note": "V1.69 synchronized security setting",
-        "updated_at": "2026-05-15 11:23:50"
+        "updated_at": "2026-06-01 15:17:14"
       },
       {
         "setting_key": "security_settings",
         "setting_value": "{'idle_timeout_minutes': '15', 'ask_continue_after_record': '1'}",
-        "note": "recovered from legacy flat settings",
-        "updated_at": "2026-06-01 14:46:14"
+        "updated_at": "2026-06-01 15:17:14"
       }
     ],
     "security_settings": [
       {
+        "setting_key": "idle_auto_logout_minutes",
+        "setting_value": "6",
+        "updated_at": "2026-06-01 15:17:14"
+      },
+      {
         "setting_key": "idle_timeout_minutes",
-        "setting_value": "15",
-        "note": "V1.69 synchronized security setting",
-        "updated_at": "2026-05-15 11:23:50"
+        "setting_value": "6",
+        "updated_at": "2026-06-01 15:17:14"
       },
       {
         "setting_key": "ask_continue_after_record",
         "setting_value": "1",
-        "note": "V1.69 synchronized security setting",
-        "updated_at": "2026-05-15 11:23:50"
+        "updated_at": "2026-06-01 15:17:14"
       },
       {
         "setting_key": "security_settings",
         "setting_value": "{'idle_timeout_minutes': '15', 'ask_continue_after_record': '1'}",
-        "note": "recovered from legacy flat settings",
-        "updated_at": "2026-06-01 14:46:14"
+        "updated_at": "2026-06-01 15:17:14"
       }
     ],
     "security_users": [
@@ -29036,8 +29040,8 @@
   "table_counts": {
     "auth_users": 106,
     "auth_account_permissions": 1590,
-    "auth_security_settings": 3,
-    "security_settings": 3,
+    "auth_security_settings": 4,
+    "security_settings": 4,
     "security_users": 103,
     "security_user_roles": 105
   },
