@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Run V300.15 authority-chain diagnostics.
+"""Run V300.15.1 all-module authority diagnostics.
 
 Usage:
     python tools/v30015_authority_trace.py
@@ -17,18 +17,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from services.authority_trace_service import render_markdown_report, save_snapshot
+from services.authority_trace_service import REPORT_FILE, SNAPSHOT_FILE, save_snapshot  # noqa: E402
 
 
 def main() -> int:
-    snapshot = save_snapshot(ROOT)
-    report = render_markdown_report(snapshot)
-    out_dir = ROOT / "data" / "permanent_store" / "authority_trace"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "V300_15_AUTHORITY_TRACE_REPORT.md"
-    out_path.write_text(report, encoding="utf-8")
-    print(f"V300.15 authority trace snapshot saved: {out_dir / 'v30015_latest_snapshot.json'}")
-    print(f"V300.15 authority trace report saved: {out_path}")
+    save_snapshot(ROOT)
+    print(f"V300.15.1 all-module authority snapshot saved: {ROOT / SNAPSHOT_FILE}")
+    print(f"V300.15.1 all-module authority report saved: {ROOT / REPORT_FILE}")
     return 0
 
 
