@@ -1339,7 +1339,7 @@ def v30019_authority_hotpath_status() -> dict[str, Any]:
 # ===== V300.19.1 CRITICAL AUTHORITY FOREGROUND SYNC EXCEPTION START =====
 def _v300191_is_critical_foreground_module(module_key: str) -> bool:
     """Modules whose user edits must survive Streamlit Cloud reboot immediately."""
-    return str(module_key or "").strip() in {"10_permissions", "10_permissions_live"}
+    return str(module_key or "").strip() in {"10_permissions", "10_permissions_live", "03_work_orders"}
 
 
 def save_authority(module_key: str, *, records: dict[str, list[dict[str, Any]]] | None = None, settings: dict[str, Any] | None = None, reason: str = "authority_save", github: bool = True) -> dict[str, Any]:  # type: ignore[override]
@@ -1399,9 +1399,20 @@ def force_upload_authority_file(module_key: str, kind: str = "records", reason: 
 def v300191_authority_hotpath_status() -> dict[str, Any]:
     return {
         "version": "V300.19.1",
-        "critical_foreground_modules": ["10_permissions", "10_permissions_live"],
+        "critical_foreground_modules": ["10_permissions", "10_permissions_live", "03_work_orders"],
         "foreground_github_authority_upload_enabled": _v30019_truthy_env("SPT_FOREGROUND_AUTHORITY_SYNC", "0"),
         "manual_override_env": "SPT_FOREGROUND_AUTHORITY_SYNC=1",
         "pending_marker_dir": str(ROOT / "data" / "permanent_store" / "_pending_authority_uploads"),
     }
 # ===== V300.19.1 CRITICAL AUTHORITY FOREGROUND SYNC EXCEPTION END =====
+
+
+# ===== V300.24 03 WORK ORDERS DURABLE AUTHORITY WRITE START =====
+# 03. 製令管理 must behave like 10. 權限管理 for durability:
+# user edits are low-frequency but business-critical, so records.json must be
+# uploaded to GitHub immediately instead of being deferred by V300.19.
+# Implementation is intentionally limited to permanent_authority_service:
+# save_work_orders() and the 03 page already call update_tables/save_authority
+# with module_key="03_work_orders" and github=True.  By making 03 critical,
+# those existing calls now write the same authority path durably.
+# ===== V300.24 03 WORK ORDERS DURABLE AUTHORITY WRITE END =====
