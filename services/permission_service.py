@@ -10,7 +10,7 @@ V300 CLEAN RULES
 from __future__ import annotations
 from pathlib import Path
 from datetime import datetime
-import json, os, hashlib, hmac, base64
+import json, os, hashlib, hmac, base64, urllib.request, urllib.error
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -92,6 +92,125 @@ def _payload() -> dict:
     _tables(data)
     return data
 
+def _truthy(value: Any) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on", "enabled"}
+
+
+def _read_secret(name: str, default: str = "") -> str:
+    """Read a Streamlit secret or environment variable without importing Streamlit at module load."""
+    try:
+        import streamlit as st  # type: ignore
+        value = st.secrets.get(name, None)
+        if value is not None:
+            return str(value)
+    except Exception:
+        pass
+    return str(os.environ.get(name, default) or "")
+
+
+def _github_config() -> dict[str, str]:
+    return {
+        "token": _read_secret("GITHUB_TOKEN"),
+        "repo": _read_secret("GITHUB_REPOSITORY", "cheng07021028/SPT-time-tracking-system"),
+        "branch": _read_secret("GITHUB_BRANCH", "main"),
+    }
+
+
+def _remote_path(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(PROJECT_ROOT.resolve()).as_posix()
+    except Exception:
+        return path.name
+
+
+def _github_api_request(url: str, *, method: str = "GET", payload: dict[str, Any] | None = None, token: str = "") -> dict[str, Any]:
+    data = None
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "SPT-Time-Tracking-Authority-Writer",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if payload is not None:
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            body = resp.read().decode("utf-8")
+            return {"ok": True, "status": int(getattr(resp, "status", 200)), "data": json.loads(body) if body else {}}
+    except urllib.error.HTTPError as e:
+        try:
+            err_body = e.read().decode("utf-8")[:500]
+        except Exception:
+            err_body = ""
+        return {"ok": False, "status": e.code, "error": err_body or str(e)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:500]}
+
+
+def _sync_github_best_effort(message: str = "SPT 10_permissions authority save") -> dict:
+    """Direct GitHub write-through for 10_permissions.
+
+    This intentionally bypasses permanent_authority_service's runtime GitHub write guard.
+    10. 權限管理 is critical: if it is only written to Streamlit's local runtime disk,
+    Reboot App will reload the old GitHub file and new accounts disappear.
+    """
+    cfg = _github_config()
+    token, repo, branch = cfg["token"], cfg["repo"], cfg["branch"]
+    rel = _remote_path(AUTH_FILE)
+    if not token:
+        return {"ok": False, "error": "missing_GITHUB_TOKEN", "path": rel}
+    if not repo:
+        return {"ok": False, "error": "missing_GITHUB_REPOSITORY", "path": rel}
+    content = AUTH_FILE.read_text(encoding="utf-8")
+    encoded = base64.b64encode(content.encode("utf-8")).decode("ascii")
+    api = f"https://api.github.com/repos/{repo}/contents/{rel}"
+    get_res = _github_api_request(f"{api}?ref={branch}", token=token)
+    sha = ""
+    if get_res.get("ok") and isinstance(get_res.get("data"), dict):
+        sha = str(get_res["data"].get("sha") or "")
+    put_payload = {
+        "message": message,
+        "content": encoded,
+        "branch": branch,
+    }
+    if sha:
+        put_payload["sha"] = sha
+    put_res = _github_api_request(api, method="PUT", payload=put_payload, token=token)
+    put_res["path"] = rel
+    put_res["branch"] = branch
+    return put_res
+
+
+def _write_trace(reason: str, github_result: dict[str, Any], table_counts: dict[str, int]) -> None:
+    try:
+        trace_path = PERM_DIR / "authority_write_trace.json"
+        trace = _read_json(trace_path, {"events": []})
+        events = trace.get("events") if isinstance(trace, dict) else []
+        if not isinstance(events, list):
+            events = []
+        events.append({
+            "ts": now_text(),
+            "reason": reason,
+            "authority_file": str(AUTH_FILE),
+            "table_counts": table_counts,
+            "github": github_result,
+        })
+        trace = {"updated_at": now_text(), "events": events[-80:]}
+        _atomic_write_json(trace_path, trace)
+    except Exception:
+        pass
+
+
+def _should_sync_github(reason: str) -> bool:
+    r = str(reason or "").lower()
+    critical = ("save_users" in r) or ("delete_users" in r) or ("save_account" in r) or ("save_security" in r) or ("force_restore_admin" in r)
+    if critical:
+        return True
+    return _truthy(_read_secret("SPT_PERMISSION_SYNC_ALL_WRITES"))
+
+
 def _write_payload(data: dict, reason: str="permission_save") -> dict:
     data["authority_schema"] = "SPT_PERMISSION_AUTHORITY_CLEAN_V1"
     data["module_key"] = "10_permissions"
@@ -101,18 +220,17 @@ def _write_payload(data: dict, reason: str="permission_save") -> dict:
     t = _tables(data)
     data["table_counts"] = {k: len(v) for k,v in t.items() if isinstance(v, list)}
     _atomic_write_json(AUTH_FILE, data)
-    _sync_github_best_effort()
-    return {"ok": True, "authority_file": str(AUTH_FILE), "table_counts": data["table_counts"]}
-
-def _sync_github_best_effort() -> dict:
-    """Best effort immediate GitHub write-through for Streamlit Cloud reboot durability."""
-    try:
-        from services import permanent_authority_service as pas
-        if hasattr(pas, "github_put_file"):
-            return pas.github_put_file(AUTH_FILE, AUTH_FILE.read_text(encoding="utf-8"), "SPT 10_permissions authority save")
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
-    return {"ok": False, "error": "github_put_file_unavailable"}
+    github_result = {"ok": True, "skipped": True, "reason": "non_critical_permission_write"}
+    if _should_sync_github(reason):
+        github_result = _sync_github_best_effort(f"SPT 10_permissions authority save: {reason}")
+    _write_trace(reason, github_result, data["table_counts"])
+    res = {"ok": True, "authority_file": str(AUTH_FILE), "table_counts": data["table_counts"], "github": github_result}
+    if _should_sync_github(reason) and not github_result.get("ok"):
+        res["skipped"] = [
+            "警告：帳號已寫入本機權威檔，但 GitHub 同步失敗；Streamlit Cloud Reboot 後可能讀回舊檔。"
+            f"原因：{github_result.get('error') or github_result.get('reason') or 'unknown'}"
+        ]
+    return res
 
 def _clean_username(v: Any) -> str:
     return str(v or "").strip()
@@ -231,7 +349,8 @@ def save_users(rows: list[dict[str,Any]]) -> dict:
         _ensure_permissions_for_user(t, username, row.get("role_code","operator"))
         saved += 1
     res=_write_payload(data, "save_users_direct_authority")
-    res.update({"saved": saved, "skipped": skipped})
+    merged_skipped = list(res.get("skipped", []) or []) + list(skipped or [])
+    res.update({"saved": saved, "skipped": merged_skipped})
     return res
 
 def save_account_master(rows: list[dict[str,Any]], delete_usernames: list[str]|None=None) -> dict:
