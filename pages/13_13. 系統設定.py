@@ -607,42 +607,50 @@ _render_external_auto_backup_center()
 # 0) Excel import/export for all system settings
 # -----------------------------------------------------------------------------
 st.subheader("零、系統設定 Excel 上傳 / 下載 / System Settings Excel")
-current_process_export = load_process_options_df(active_only=False)
-current_rest_export = load_rest_periods_df(active_only=False)
-app_settings_export = pd.DataFrame([{"setting_key": "live_page_reset_time", "setting_value": get_live_page_reset_time(), "note": "01 工時紀錄每日重新整理時間 HH:MM"}])
-st.download_button(
-    "⟰ 下載全部系統設定 Excel / Export All System Settings",
-    data=_excel_bytes({"process_options": current_process_export, "rest_periods": current_rest_export, "app_settings": app_settings_export}),
-    file_name="SPT_系統設定.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    use_container_width=True,
-)
+st.caption("V34 快速進頁：Excel 匯出資料只有按下按鈕時才產生，避免每次進入 13 頁面都讀取全部設定並建立 Excel。")
+exp1, exp2 = st.columns(2)
+with exp1:
+    if st.button("⟰ 產生並下載全部系統設定 Excel / Prepare Export", use_container_width=True, key="v34_prepare_system_settings_excel"):
+        current_process_export = load_process_options_df(active_only=False)
+        current_rest_export = load_rest_periods_df(active_only=False)
+        app_settings_export = pd.DataFrame([{"setting_key": "live_page_reset_time", "setting_value": get_live_page_reset_time(), "note": "01 工時紀錄每日重新整理時間 HH:MM"}])
+        st.session_state["v34_system_settings_excel_bytes"] = _excel_bytes({"process_options": current_process_export, "rest_periods": current_rest_export, "app_settings": app_settings_export})
+        st.session_state["v34_system_settings_excel_ready"] = True
+if st.session_state.get("v34_system_settings_excel_ready"):
+    st.download_button(
+        "⬇️ 下載全部系統設定 Excel / Download All System Settings",
+        data=st.session_state.get("v34_system_settings_excel_bytes", b""),
+        file_name="SPT_系統設定.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
 if can_manage:
-    setting_file = st.file_uploader("上傳系統設定 Excel / Upload System Settings", type=["xlsx", "xlsm", "xls"], key="system_settings_excel_upload_v243")
-    if setting_file is not None:
-        try:
-            sheets = pd.read_excel(setting_file, sheet_name=None)
-            st.success("已讀取系統設定 Excel，請確認後按下方按鈕套用。")
-            for nm, dfp in sheets.items():
-                with st.expander(f"預覽：{nm}", expanded=False):
-                    st.dataframe(dfp, use_container_width=True, height=220)
-            if st.button("▣ 確認匯入並永久套用系統設定 / Import Settings", type="primary", use_container_width=True, key="import_system_settings_excel_v243"):
-                p_count = r_count = 0
-                if "process_options" in sheets:
-                    pdf = sheets["process_options"].copy()
-                    p_count = save_process_options_df(pdf)
-                if "rest_periods" in sheets:
-                    rdf = sheets["rest_periods"].copy()
-                    r_count = save_rest_periods_df(rdf)
-                if "app_settings" in sheets:
-                    adf = sheets["app_settings"]
-                    for _, row in adf.iterrows():
-                        if str(row.get("setting_key", "")).strip() == "live_page_reset_time":
-                            save_live_page_reset_time(str(row.get("setting_value", "02:00")).strip())
-                _export_permanent_settings(f"已匯入系統設定：工段 {p_count} 筆、休息時間 {r_count} 筆")
-                _refresh_after_apply("已匯入並永久套用系統設定，畫面已重新整理。")
-        except Exception as exc:
-            st.error(f"系統設定 Excel 讀取失敗：{exc}")
+    with st.expander("上傳系統設定 Excel / Upload System Settings", expanded=False):
+        setting_file = st.file_uploader("上傳系統設定 Excel / Upload System Settings", type=["xlsx", "xlsm", "xls"], key="system_settings_excel_upload_v243")
+        if setting_file is not None:
+            try:
+                sheets = pd.read_excel(setting_file, sheet_name=None)
+                st.success("已讀取系統設定 Excel，請確認後按下方按鈕套用。")
+                for nm, dfp in sheets.items():
+                    with st.expander(f"預覽：{nm}", expanded=False):
+                        st.dataframe(dfp, use_container_width=True, height=220)
+                if st.button("▣ 確認匯入並永久套用系統設定 / Import Settings", type="primary", use_container_width=True, key="import_system_settings_excel_v243"):
+                    p_count = r_count = 0
+                    if "process_options" in sheets:
+                        pdf = sheets["process_options"].copy()
+                        p_count = save_process_options_df(pdf)
+                    if "rest_periods" in sheets:
+                        rdf = sheets["rest_periods"].copy()
+                        r_count = save_rest_periods_df(rdf)
+                    if "app_settings" in sheets:
+                        adf = sheets["app_settings"]
+                        for _, row in adf.iterrows():
+                            if str(row.get("setting_key", "")).strip() == "live_page_reset_time":
+                                save_live_page_reset_time(str(row.get("setting_value", "02:00")).strip())
+                    _export_permanent_settings(f"已匯入系統設定：工段 {p_count} 筆、休息時間 {r_count} 筆")
+                    _refresh_after_apply("已匯入並永久套用系統設定，畫面已重新整理。")
+            except Exception as exc:
+                st.error(f"系統設定 Excel 讀取失敗：{exc}")
 st.divider()
 # -----------------------------------------------------------------------------
 # 1) Process options

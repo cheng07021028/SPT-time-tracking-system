@@ -53,31 +53,36 @@ with st.expander("⧠ 使用說明 / User Guide", expanded=False):
 - 清除紀錄前，建議先建立登入紀錄永久檔或上傳 GitHub。
 """)
 
-st.markdown("### 登入紀錄永久保存狀態 / Audit Log Permanent Status")
-status = get_audit_permanent_status()
-c1, c2, c3 = st.columns(3)
-c1.metric("權威檔 / Authority File", "Exists" if status.get("exists") else "Not Found")
-c2.metric("權威檔筆數 / Authority Rows", status.get("count", 0))
-c3.metric("SQLite快取筆數 / Cache Rows", status.get("db_count", 0))
-st.caption(f"權威檔路徑：{status.get('path', '-')}｜Schema：{status.get('authority_schema', '-') or '-'}｜DeleteState：{status.get('delete_state_path', '-')}｜DeletedKeys：{status.get('deleted_keys', 0)}")
+st.markdown("### 登入紀錄狀態 / Login Log Authority Status")
+st.caption("V34 快速進頁：狀態統計與在線人員清單改為按需載入，避免進入 11 頁面時掃描大量紀錄。")
+if st.button("載入登入紀錄狀態與在線人員 / Load Status", use_container_width=True, key="v34_load_login_status"):
+    st.session_state["v34_login_status_loaded"] = True
 
+if st.session_state.get("v34_login_status_loaded"):
+    status = get_audit_permanent_status()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("權威來源 / Authority", status.get("authority_schema", "Neon/PostgreSQL"))
+    c2.metric("目前有效筆數 / Active Rows", status.get("count", 0))
+    c3.metric("快取/資料庫筆數 / DB Rows", status.get("db_count", 0))
+    st.caption(f"資料來源：{status.get('path', 'neon://auth_login_logs')}｜DeleteState：{status.get('delete_state_path', 'neon://deleted_at')}")
+
+    with st.expander("目前在線人員名單 / Current Online Users", expanded=False):
+        try:
+            online_df = get_online_users()
+        except Exception as exc:
+            online_df = pd.DataFrame()
+            st.warning(f"在線人員名單讀取失敗：{exc}")
+        if online_df is None or online_df.empty:
+            st.info("目前沒有偵測到在線人員，或尚未產生 heartbeat。")
+        else:
+            oc1, oc2 = st.columns([1, 3])
+            oc1.metric("在線人數 / Online", len(online_df))
+            oc2.caption("同一帳號開多個瀏覽器分頁會以不同 Session 顯示。")
+            st.dataframe(online_df, use_container_width=True, hide_index=True, height=min(360, 82 + len(online_df) * 36))
+else:
+    st.info("登入紀錄查詢區已可直接使用；狀態與在線清單請按上方按鈕載入。")
 
 st.divider()
-st.markdown("### 目前在線人員名單 / Current Online Users")
-st.caption("V122：此區塊讀取目前 Streamlit session heartbeat，不是歷史紀錄；人員登出或超過閒置時間後會自動從在線清單排除。")
-try:
-    online_df = get_online_users()
-except Exception as exc:
-    online_df = pd.DataFrame()
-    st.warning(f"在線人員名單讀取失敗：{exc}")
-if online_df is None or online_df.empty:
-    st.info("目前沒有偵測到在線人員，或尚未產生 heartbeat。")
-else:
-    oc1, oc2 = st.columns([1, 3])
-    oc1.metric("在線人數 / Online", len(online_df))
-    oc2.caption("同一帳號開多個瀏覽器分頁會以不同 Session 顯示；這可協助判斷現場是否多人同時登入。")
-    st.dataframe(online_df, use_container_width=True, hide_index=True, height=min(360, 82 + len(online_df) * 36))
-
 b1, b2, b3, b4 = st.columns(4)
 with b1:
     if st.button("⟳ 同步舊登入紀錄 / Sync Legacy Logs", use_container_width=True):
@@ -116,9 +121,9 @@ with fc2:
 with fc3:
     keyword = st.text_input("關鍵字 / Keyword", value="", placeholder="帳號、姓名、事件、訊息...")
 
-limit = st.slider("讀取筆數 / Limit", min_value=100, max_value=10000, value=1000, step=100)
+limit = st.slider("讀取筆數 / Limit", min_value=100, max_value=2000, value=300, step=100)
 
-stats = get_login_log_stats(str(start), str(end), keyword)
+stats = get_login_log_stats(str(start), str(end), keyword)  # V34: SQL COUNT only, no full-table load
 s1, s2, s3 = st.columns(3)
 s1.metric("筆數 / Records", stats.get("records", 0))
 s2.metric("成功 / Success", stats.get("success", 0))

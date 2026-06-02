@@ -30644,3 +30644,352 @@ def audit_v30045_01_delete_true_source_fix() -> dict:
         "ui_css_theme_changed": False,
     }
 # ================= END V300.45 01 DELETE TRUE SOURCE FIX =================
+
+# ================= V34 NEON HOTPATH FOR 01 TIME RECORDS｜2026-06-02 =================
+# Purpose:
+# - 01 Today Records refresh must be seconds, not minutes.
+# - Neon/PostgreSQL is the single source of truth when DATABASE_URL is configured.
+# - No local JSON/SQLite authority read path on Cloud hot actions.
+# - All foreground reads use date/active filters + LIMIT.
+try:
+    _v34_prev_today_records = today_records  # type: ignore[name-defined]
+    _v34_prev_load_records = load_records  # type: ignore[name-defined]
+    _v34_prev_get_active_records = get_active_records  # type: ignore[name-defined]
+    _v34_prev_get_active_record = get_active_record  # type: ignore[name-defined]
+    _v34_prev_get_active_group = get_active_group  # type: ignore[name-defined]
+    _v34_prev_start_work = start_work  # type: ignore[name-defined]
+    _v34_prev_finish_work = finish_work  # type: ignore[name-defined]
+    _v34_prev_delete_time_records = delete_time_records  # type: ignore[name-defined]
+except Exception:
+    _v34_prev_today_records = None
+    _v34_prev_load_records = None
+    _v34_prev_get_active_records = None
+    _v34_prev_get_active_record = None
+    _v34_prev_get_active_group = None
+    _v34_prev_start_work = None
+    _v34_prev_finish_work = None
+    _v34_prev_delete_time_records = None
+
+_V34_TODAY_LIMIT = 2000
+_V34_HISTORY_LIMIT = 3000
+
+
+def _v34_tr_pg_enabled() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled
+        return bool(is_postgres_enabled())
+    except Exception:
+        return False
+
+
+def _v34_tr_now() -> str:
+    try:
+        from services.timezone_service import now_text
+        return str(now_text())
+    except Exception:
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v34_tr_today() -> str:
+    try:
+        from services.timezone_service import today_text
+        return str(today_text())
+    except Exception:
+        return _v34_tr_now()[:10]
+
+
+def _v34_tr_text(v, default: str = "") -> str:
+    try:
+        if pd.isna(v):
+            return default
+    except Exception:
+        pass
+    return str(v if v is not None else default).strip()
+
+
+def _v34_tr_int(v, default: int = 0) -> int:
+    try:
+        if pd.isna(v):
+            return default
+    except Exception:
+        pass
+    try:
+        return int(float(str(v).strip()))
+    except Exception:
+        return default
+
+
+def _v34_deleted_filter() -> str:
+    return "COALESCE(deleted_at,'')=''"
+
+
+def _v34_active_filter() -> str:
+    return "(COALESCE(end_timestamp,'')='' AND COALESCE(deleted_at,'')='' AND COALESCE(status,'作業中') IN ('作業中','進行中','開始',''))"
+
+
+def _v34_time_base_select() -> str:
+    return """
+        SELECT id, record_id, record_key, operation_id, status, work_order, work_order_no,
+               part_no, type_name, process_code, process_name, employee_id, employee_name,
+               start_action, start_timestamp, end_action, end_timestamp, remark,
+               start_date, start_time, end_date, end_time, work_hours, work_minutes,
+               raw_minutes, average_minutes, assembly_location, group_key, is_group_work,
+               source, created_at, updated_at, updated_by, deleted_at, deleted_by, delete_reason, version
+        FROM time_records
+    """
+
+
+def _v34_time_query_df(sql: str, params: tuple = ()) -> pd.DataFrame:
+    from services.db_service import query_df
+    df = query_df(sql, params)
+    return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+
+
+def _v34_time_query_one(sql: str, params: tuple = ()) -> dict | None:
+    from services.db_service import query_one
+    row = query_one(sql, params)
+    return dict(row) if isinstance(row, dict) else None
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    if not _v34_tr_pg_enabled():
+        return _v34_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only) if callable(_v34_prev_today_records) else pd.DataFrame()
+    try:
+        from services.db_service import ensure_database
+        ensure_database()
+        today = _v34_tr_today()
+        where = [
+            _v34_deleted_filter(),
+            "(start_date=? OR work_date=? OR substr(COALESCE(start_timestamp,''),1,10)=?)",
+        ]
+        params: list = [today, today, today]
+        if unfinished_only or not include_finished:
+            where.append("COALESCE(end_timestamp,'')='' AND COALESCE(status,'作業中') IN ('作業中','進行中','開始','')")
+        sql = _v34_time_base_select() + " WHERE " + " AND ".join(where) + " ORDER BY id DESC LIMIT ?"
+        params.append(_V34_TODAY_LIMIT)
+        return _v34_time_query_df(sql, tuple(params))
+    except Exception:
+        return pd.DataFrame()
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    if not _v34_tr_pg_enabled():
+        return _v34_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order) if callable(_v34_prev_load_records) else pd.DataFrame()
+    try:
+        from services.db_service import ensure_database
+        ensure_database()
+        if not start_date and not end_date:
+            start_date = _v34_tr_today()
+            end_date = _v34_tr_today()
+        where = [_v34_deleted_filter()]
+        params: list = []
+        if start_date:
+            where.append("COALESCE(start_date, work_date, substr(COALESCE(start_timestamp,''),1,10)) >= ?")
+            params.append(str(start_date))
+        if end_date:
+            where.append("COALESCE(start_date, work_date, substr(COALESCE(start_timestamp,''),1,10)) <= ?")
+            params.append(str(end_date))
+        if employee_id:
+            where.append("employee_id=?")
+            params.append(str(employee_id))
+        if work_order:
+            where.append("(work_order=? OR work_order_no=?)")
+            params.extend([str(work_order), str(work_order)])
+        sql = _v34_time_base_select() + " WHERE " + " AND ".join(where) + " ORDER BY COALESCE(start_timestamp, created_at) DESC NULLS LAST, id DESC LIMIT ?"
+        params.append(_V34_HISTORY_LIMIT)
+        return _v34_time_query_df(sql, tuple(params))
+    except Exception:
+        return pd.DataFrame()
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    if not _v34_tr_pg_enabled():
+        try:
+            return _v34_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name) if callable(_v34_prev_get_active_records) else pd.DataFrame()
+        except TypeError:
+            return _v34_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date) if callable(_v34_prev_get_active_records) else pd.DataFrame()
+    try:
+        where = [_v34_active_filter()]
+        params: list = []
+        if employee_id:
+            where.append("employee_id=?")
+            params.append(str(employee_id))
+        if employee_name:
+            where.append("employee_name=?")
+            params.append(str(employee_name))
+        if process_name:
+            where.append("process_name=?")
+            params.append(str(process_name))
+        if start_date:
+            where.append("(start_date=? OR work_date=? OR substr(COALESCE(start_timestamp,''),1,10)=?)")
+            params.extend([str(start_date), str(start_date), str(start_date)])
+        sql = _v34_time_base_select() + " WHERE " + " AND ".join(where) + " ORDER BY id DESC LIMIT 200"
+        return _v34_time_query_df(sql, tuple(params))
+    except Exception:
+        return pd.DataFrame()
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    if not _v34_tr_pg_enabled():
+        try:
+            return _v34_prev_get_active_record(employee_id, employee_name=employee_name) if callable(_v34_prev_get_active_record) else None
+        except TypeError:
+            return _v34_prev_get_active_record(employee_id) if callable(_v34_prev_get_active_record) else None
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return dict(df.iloc[0].fillna(""))
+    return None
+
+
+def get_active_group(record_id: int) -> pd.DataFrame:  # type: ignore[override]
+    if not _v34_tr_pg_enabled():
+        return _v34_prev_get_active_group(record_id) if callable(_v34_prev_get_active_group) else pd.DataFrame()
+    try:
+        rid = _v34_tr_int(record_id, 0)
+        if rid <= 0:
+            return pd.DataFrame()
+        rec = _v34_time_query_one(_v34_time_base_select() + " WHERE id=? AND " + _v34_deleted_filter() + " LIMIT 1", (rid,))
+        if not rec:
+            return pd.DataFrame()
+        group_key = _v34_tr_text(rec.get("group_key"))
+        if group_key:
+            return _v34_time_query_df(_v34_time_base_select() + " WHERE group_key=? AND " + _v34_active_filter() + " ORDER BY id LIMIT 100", (group_key,))
+        emp = _v34_tr_text(rec.get("employee_id"))
+        proc = _v34_tr_text(rec.get("process_name"))
+        sdate = _v34_tr_text(rec.get("start_date")) or _v34_tr_text(rec.get("start_timestamp"))[:10]
+        return get_active_records(employee_id=emp, process_name=proc, start_date=sdate)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _v34_calc_hours(start_ts: str, end_ts: str) -> float:
+    try:
+        return float(calculate_work_hours(start_ts, end_ts) or 0)
+    except Exception:
+        try:
+            from datetime import datetime
+            a = datetime.fromisoformat(str(start_ts).replace("/", "-"))
+            b = datetime.fromisoformat(str(end_ts).replace("/", "-"))
+            return max((b - a).total_seconds() / 3600.0, 0.0)
+        except Exception:
+            return 0.0
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    if not _v34_tr_pg_enabled():
+        return _v34_prev_start_work(employee, work_order, process_name, remark, auto_pause_old) if callable(_v34_prev_start_work) else 0  # type: ignore[misc]
+    employee = employee or {}
+    work_order = work_order or {}
+    emp_id = _v34_tr_text(employee.get("employee_id"))
+    emp_name = _v34_tr_text(employee.get("employee_name"))
+    wo_no = _v34_tr_text(work_order.get("work_order") or work_order.get("work_order_no"))
+    proc = _v34_tr_text(process_name)
+    if not emp_id or not wo_no or not proc:
+        raise ValueError("工號、製令、工段名稱不可空白。")
+    active_df = get_active_records(employee_id=emp_id)
+    if isinstance(active_df, pd.DataFrame) and not active_df.empty:
+        same = active_df[(active_df.get("work_order", "").astype(str).str.strip() == wo_no) & (active_df.get("process_name", "").astype(str).str.strip() == proc)] if "work_order" in active_df.columns and "process_name" in active_df.columns else pd.DataFrame()
+        if not same.empty:
+            raise ValueError(f"禁止重複紀錄：此人員已有相同製令與工段正在計時：{wo_no} / {proc}")
+        if not auto_pause_old:
+            raise ValueError("此人員已有未結束作業，請先暫停、完工或下班前一筆作業。")
+    now = _v34_tr_now()
+    start_date, start_time = now[:10], now[11:19]
+    import uuid
+    opid = uuid.uuid4().hex
+    record_key = f"{emp_id}|{wo_no}|{proc}|{opid}"
+    group_key = f"{emp_id}|{proc}|{start_date}"
+    from services.db_service import execute, query_one
+    rid = execute(
+        """
+        INSERT INTO time_records(record_id, record_key, operation_id, status, work_order, work_order_no, part_no, type_name, process_name, employee_id, employee_name, start_action, start_timestamp, remark, start_date, start_time, work_hours, work_minutes, raw_minutes, average_minutes, assembly_location, group_key, is_group_work, source, created_at, updated_at, deleted_at, version)
+        VALUES (?, ?, ?, '作業中', ?, ?, ?, ?, ?, ?, ?, '開始', ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, 0, 'v34_neon_start_work', ?, ?, '', 1)
+        """,
+        (opid, record_key, opid, wo_no, wo_no, _v34_tr_text(work_order.get("part_no")), _v34_tr_text(work_order.get("type_name")), proc, emp_id, emp_name, now, remark, start_date, start_time, _v34_tr_text(work_order.get("assembly_location")), group_key, now, now),
+    )
+    if not rid:
+        row = query_one("SELECT id FROM time_records WHERE record_key=? LIMIT 1", (record_key,)) or {}
+        rid = _v34_tr_int(row.get("id"), 0)
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(rid or 0)
+
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    if not _v34_tr_pg_enabled():
+        return _v34_prev_finish_work(record_id, end_action, remark, finish_parallel_group) if callable(_v34_prev_finish_work) else 0  # type: ignore[misc]
+    rid = _v34_tr_int(record_id, 0)
+    if rid <= 0:
+        raise ValueError("工時紀錄編號異常，請重新整理頁面後再操作。")
+    rec = _v34_time_query_one(_v34_time_base_select() + " WHERE id=? AND " + _v34_active_filter() + " LIMIT 1", (rid,))
+    if not rec:
+        return 0
+    group_df = get_active_group(rid) if finish_parallel_group else pd.DataFrame([rec])
+    if group_df is None or group_df.empty:
+        group_df = pd.DataFrame([rec])
+    now = _v34_tr_now()
+    end_date, end_time = now[:10], now[11:19]
+    starts = [_v34_tr_text(x) for x in group_df.get("start_timestamp", []).tolist() if _v34_tr_text(x)] if isinstance(group_df, pd.DataFrame) else []
+    earliest = min(starts) if starts else _v34_tr_text(rec.get("start_timestamp"))
+    total_hours = _v34_calc_hours(earliest, now)
+    avg_hours = round(total_hours / max(len(group_df), 1), 4)
+    avg_minutes = round(avg_hours * 60, 2)
+    status = _v34_tr_text(end_action) or "已結束"
+    ids = [_v34_tr_int(x, 0) for x in group_df.get("id", []).tolist() if _v34_tr_int(x, 0) > 0]
+    if not ids:
+        ids = [rid]
+    from services.db_service import execute
+    ph = ",".join(["?"] * len(ids))
+    execute(
+        f"""
+        UPDATE time_records
+        SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+            work_hours=?, work_minutes=?, raw_minutes=?, average_minutes=?,
+            remark=CASE WHEN COALESCE(remark,'')='' THEN ? ELSE remark || '；' || ? END,
+            updated_at=?, updated_by='system', version=COALESCE(version,1)+1
+        WHERE id IN ({ph}) AND {_v34_active_filter()}
+        """,
+        tuple([status, end_action, now, end_date, end_time, avg_hours, avg_minutes, round(total_hours*60,2), avg_minutes, _v34_tr_text(remark), _v34_tr_text(remark), now] + ids),
+    )
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return len(ids)
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    if not _v34_tr_pg_enabled():
+        return _v34_prev_delete_time_records(record_ids, reason=reason) if callable(_v34_prev_delete_time_records) else 0  # type: ignore[misc]
+    ids = []
+    for x in record_ids or []:
+        i = _v34_tr_int(x, 0)
+        if i > 0 and i not in ids:
+            ids.append(i)
+    if not ids:
+        return 0
+    from services.db_service import execute
+    ph = ",".join(["?"] * len(ids))
+    now = _v34_tr_now()
+    execute(f"UPDATE time_records SET deleted_at=?, deleted_by='admin', delete_reason=?, updated_at=?, version=COALESCE(version,1)+1 WHERE id IN ({ph}) AND COALESCE(deleted_at,'')=''", tuple([now, str(reason), now] + ids))
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return len(ids)
+
+
+def clear_today_records_fast_cache() -> None:  # type: ignore[override]
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+
+
+def audit_v34_time_record_neon_hotpath() -> dict:
+    return {"version": "V34_TIME_RECORD_NEON_HOTPATH", "postgres_enabled": _v34_tr_pg_enabled(), "today_limit": _V34_TODAY_LIMIT, "history_limit": _V34_HISTORY_LIMIT, "today_refresh_uses_direct_neon_sql": True, "local_json_tombstone_filter_disabled_on_hotpath": True, "soft_delete_only": True}
+
+# ================= END V34 NEON HOTPATH FOR 01 TIME RECORDS =================

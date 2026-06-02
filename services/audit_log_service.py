@@ -3178,3 +3178,259 @@ def get_audit_permanent_status() -> dict:  # type: ignore[override]
         return {"exists": False, "count": total, "db_count": total, "path": "neon://auth_login_logs", "authority_schema": "Neon/PostgreSQL", "error": str(exc)}
 
 # ===== END V31 FULL NEON SINGLE SOURCE LOGIN LOG OVERRIDES =====
+
+# ================= V34 FAST LOGIN LOG NEON HOTPATH｜2026-06-02 =================
+# Purpose:
+# - 11 Login Logs page must open in seconds, not minutes.
+# - No local JSON/permanent/GitHub work on page entry.
+# - Neon/PostgreSQL is the single source of truth when DATABASE_URL is configured.
+# - Schema checks are process-level one-time only.
+try:
+    import time as _v34_time
+except Exception:  # pragma: no cover
+    _v34_time = None  # type: ignore
+
+_V34_LOGIN_SCHEMA_READY = False
+_V34_HEARTBEAT_MIN_SECONDS = 300.0
+
+
+def _v34_pg_enabled() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled
+        return bool(is_postgres_enabled())
+    except Exception:
+        return False
+
+
+def _v34_login_now() -> str:
+    try:
+        from services.timezone_service import now_text
+        return str(now_text())
+    except Exception:
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v34_login_schema_once() -> None:
+    global _V34_LOGIN_SCHEMA_READY
+    if _V34_LOGIN_SCHEMA_READY:
+        return
+    try:
+        from services.db_service import ensure_database
+        ensure_database()
+        if _v34_pg_enabled():
+            from services import db_service as _db
+            with _db._v25_pg_connect() as conn:  # type: ignore[attr-defined]
+                with conn.cursor() as cur:
+                    for stmt in (
+                        "ALTER TABLE auth_login_logs ADD COLUMN IF NOT EXISTS deleted_at TEXT",
+                        "ALTER TABLE auth_login_logs ADD COLUMN IF NOT EXISTS deleted_by TEXT",
+                        "ALTER TABLE auth_login_logs ADD COLUMN IF NOT EXISTS delete_reason TEXT",
+                        "ALTER TABLE auth_login_logs ADD COLUMN IF NOT EXISTS source TEXT",
+                        "ALTER TABLE security_login_logs ADD COLUMN IF NOT EXISTS deleted_at TEXT",
+                        "ALTER TABLE security_login_logs ADD COLUMN IF NOT EXISTS deleted_by TEXT",
+                        "ALTER TABLE security_login_logs ADD COLUMN IF NOT EXISTS delete_reason TEXT",
+                        "ALTER TABLE security_login_logs ADD COLUMN IF NOT EXISTS source TEXT",
+                        "CREATE INDEX IF NOT EXISTS idx_v34_auth_login_fast ON auth_login_logs(event_time DESC, id DESC) WHERE COALESCE(deleted_at,'')=''",
+                        "CREATE INDEX IF NOT EXISTS idx_v34_sec_login_fast ON security_login_logs(login_time DESC, created_at DESC, id DESC) WHERE COALESCE(deleted_at,'')=''",
+                        "CREATE INDEX IF NOT EXISTS idx_v34_auth_login_user_fast ON auth_login_logs(lower(username), event_time DESC) WHERE COALESCE(deleted_at,'')=''",
+                        "CREATE INDEX IF NOT EXISTS idx_v34_sec_login_user_fast ON security_login_logs(lower(username), login_time DESC) WHERE COALESCE(deleted_at,'')=''",
+                    ):
+                        try:
+                            cur.execute(stmt)
+                        except Exception:
+                            pass
+                conn.commit()
+    except Exception:
+        # Never block page entry. If a query later fails, Streamlit logs will show it.
+        pass
+    _V34_LOGIN_SCHEMA_READY = True
+
+
+def bootstrap_audit_log_service() -> dict:  # type: ignore[override]
+    _v34_login_schema_once()
+    return {"ok": True, "backend": "Neon/PostgreSQL" if _v34_pg_enabled() else "SQLite/local fallback", "removed_invalid_login_rows": 0, "fast_entry": True}
+
+
+def auto_record_session_login(username: str = "", display_name: str = "", roles: str = "", **kwargs):  # type: ignore[override]
+    """Throttle heartbeat writes. Page entry must not insert a row on every rerun."""
+    if not username:
+        return None
+    try:
+        import streamlit as _st
+        now_ts = float(_v34_time.time()) if _v34_time is not None else 0.0
+        key = "_v34_login_heartbeat_last_ts"
+        last_ts = float(_st.session_state.get(key, 0) or 0)
+        if last_ts and now_ts and (now_ts - last_ts) < _V34_HEARTBEAT_MIN_SECONDS:
+            return None
+        _st.session_state[key] = now_ts
+    except Exception:
+        pass
+    _v34_login_schema_once()
+    try:
+        from services.db_service import execute
+        now = _v34_login_now()
+        execute(
+            """
+            INSERT INTO auth_login_logs(username, display_name, event_time, event_type, result, module_code, module_name, message, ip_address, user_agent, source)
+            VALUES (?, ?, ?, 'SESSION_HEARTBEAT', 'OK', ?, '', ?, '', '', 'v34_throttled_heartbeat')
+            """,
+            (str(username), str(display_name or username), now, str(kwargs.get("module_code", "")), f"roles={roles}"),
+        )
+    except Exception:
+        pass
+    return None
+
+
+def migrate_security_login_logs_to_login_logs() -> int:  # type: ignore[override]
+    # Manual legacy migration is intentionally disabled from the foreground hot path.
+    # Both auth_login_logs and security_login_logs are queried directly, so migration is not needed.
+    _v34_login_schema_once()
+    return 0
+
+
+def _v34_login_conditions(alias: str, time_expr: str, start_date=None, end_date=None, keyword: str = "") -> tuple[str, list]:
+    where = [f"COALESCE({alias}.deleted_at,'')='' "]
+    params: list = []
+    if start_date:
+        where.append(f"substr(COALESCE({time_expr}, ''),1,10) >= ?")
+        params.append(str(start_date))
+    if end_date:
+        where.append(f"substr(COALESCE({time_expr}, ''),1,10) <= ?")
+        params.append(str(end_date))
+    if keyword:
+        k = f"%{str(keyword).strip().lower()}%"
+        where.append(
+            "(" + " OR ".join([
+                f"lower(COALESCE({alias}.username,'')) LIKE ?",
+                f"lower(COALESCE({alias}.display_name,'')) LIKE ?",
+                f"lower(COALESCE({alias}.event_type,'')) LIKE ?",
+                f"lower(COALESCE({alias}.result,'')) LIKE ?",
+                f"lower(COALESCE({alias}.message,'')) LIKE ?",
+            ]) + ")"
+        )
+        params.extend([k, k, k, k, k])
+    return " AND ".join(where), params
+
+
+def load_login_logs(start_date=None, end_date=None, keyword: str = "", limit: int = 1000, event_types=None, results=None, include_legacy: bool = True, **kwargs):  # type: ignore[override]
+    _v34_login_schema_once()
+    import pandas as _pd
+    try:
+        from services.db_service import query_df
+        lim = max(1, min(int(limit or 300), 2000))
+        where1, params1 = _v34_login_conditions("a", "a.event_time", start_date, end_date, keyword)
+        where2, params2 = _v34_login_conditions("s", "COALESCE(s.login_time, s.created_at)", start_date, end_date, keyword)
+        if include_legacy:
+            sql = f"""
+            SELECT * FROM (
+                SELECT a.id, a.username, a.display_name, a.event_type, a.result,
+                       COALESCE(a.event_time, a.created_at) AS login_time,
+                       a.logout_time,
+                       CASE WHEN a.idle_seconds IS NULL THEN NULL ELSE CAST(a.idle_seconds AS TEXT) END AS idle_minutes,
+                       a.module_code, a.message, COALESCE(a.source, 'auth_login_logs') AS source,
+                       a.ip_address, a.user_agent, COALESCE(a.created_at, a.event_time) AS created_at
+                FROM auth_login_logs a
+                WHERE {where1}
+                UNION ALL
+                SELECT s.id, s.username, s.display_name, s.event_type, s.result,
+                       COALESCE(s.login_time, s.created_at) AS login_time,
+                       s.logout_time,
+                       CASE WHEN s.idle_seconds IS NULL THEN NULL ELSE CAST(s.idle_seconds AS TEXT) END AS idle_minutes,
+                       s.module_code, s.message, 'security_login_logs' AS source,
+                       '' AS ip_address, s.user_agent, COALESCE(s.created_at, s.login_time) AS created_at
+                FROM security_login_logs s
+                WHERE {where2}
+            ) q
+            ORDER BY login_time DESC NULLS LAST, id DESC
+            LIMIT ?
+            """
+            params = tuple(params1 + params2 + [lim])
+        else:
+            sql = f"""
+            SELECT a.id, a.username, a.display_name, a.event_type, a.result,
+                   COALESCE(a.event_time, a.created_at) AS login_time,
+                   a.logout_time,
+                   CASE WHEN a.idle_seconds IS NULL THEN NULL ELSE CAST(a.idle_seconds AS TEXT) END AS idle_minutes,
+                   a.module_code, a.message, COALESCE(a.source, 'auth_login_logs') AS source,
+                   a.ip_address, a.user_agent, COALESCE(a.created_at, a.event_time) AS created_at
+            FROM auth_login_logs a
+            WHERE {where1}
+            ORDER BY COALESCE(a.event_time, a.created_at) DESC NULLS LAST, a.id DESC
+            LIMIT ?
+            """
+            params = tuple(params1 + [lim])
+        df = query_df(sql, params)
+        if df is None:
+            return _pd.DataFrame()
+        if event_types and not df.empty and "event_type" in df.columns:
+            df = df[df["event_type"].isin(event_types)]
+        if results and not df.empty and "result" in df.columns:
+            df = df[df["result"].isin(results)]
+        return df.reset_index(drop=True)
+    except Exception:
+        return _pd.DataFrame()
+
+
+def _v34_count_table(table: str, time_expr: str, start_date=None, end_date=None, keyword: str = "") -> dict:
+    alias = "x"
+    where, params = _v34_login_conditions(alias, time_expr.replace(table + ".", alias + "."), start_date, end_date, keyword)
+    try:
+        from services.db_service import query_one
+        row = query_one(
+            f"""
+            SELECT COUNT(*) AS records,
+                   SUM(CASE WHEN upper(COALESCE({alias}.result,'')) IN ('OK','SUCCESS','成功') THEN 1 ELSE 0 END) AS success,
+                   SUM(CASE WHEN upper(COALESCE({alias}.result,'')) IN ('FAIL','FAILED','ERROR','失敗') THEN 1 ELSE 0 END) AS failed
+            FROM {table} {alias}
+            WHERE {where}
+            """,
+            tuple(params),
+        ) or {}
+        return {"records": int(row.get("records") or 0), "success": int(row.get("success") or 0), "failed": int(row.get("failed") or 0)}
+    except Exception:
+        return {"records": 0, "success": 0, "failed": 0}
+
+
+def get_login_log_stats(start_date=None, end_date=None, keyword: str = "") -> dict:  # type: ignore[override]
+    _v34_login_schema_once()
+    a = _v34_count_table("auth_login_logs", "auth_login_logs.event_time", start_date, end_date, keyword)
+    s = _v34_count_table("security_login_logs", "COALESCE(security_login_logs.login_time, security_login_logs.created_at)", start_date, end_date, keyword)
+    return {"records": a["records"] + s["records"], "success": a["success"] + s["success"], "failed": a["failed"] + s["failed"]}
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    _v34_login_schema_once()
+    before = int(get_login_log_stats(start_date, end_date, "").get("records") or 0)
+    try:
+        from services.db_service import execute
+        now = _v34_login_now()
+        execute("UPDATE auth_login_logs SET deleted_at=?, deleted_by='admin', delete_reason='clear_login_logs' WHERE substr(COALESCE(event_time, created_at, ''),1,10) >= ? AND substr(COALESCE(event_time, created_at, ''),1,10) <= ? AND COALESCE(deleted_at,'')=''", (now, str(start_date), str(end_date)))
+        execute("UPDATE security_login_logs SET deleted_at=?, deleted_by='admin', delete_reason='clear_login_logs' WHERE substr(COALESCE(login_time, created_at, ''),1,10) >= ? AND substr(COALESCE(login_time, created_at, ''),1,10) <= ? AND COALESCE(deleted_at,'')=''", (now, str(start_date), str(end_date)))
+    except Exception:
+        pass
+    return before
+
+
+def export_audit_logs_to_permanent_file(create_history: bool = True, merge_existing: bool = True) -> dict:  # type: ignore[override]
+    return {"ok": True, "message": "登入紀錄已在 Neon/PostgreSQL 中；前台不再建立本機永久檔。", "backend": "Neon/PostgreSQL", "fast_entry": True}
+
+
+def restore_audit_logs_from_permanent_file(*args, **kwargs) -> dict:  # type: ignore[override]
+    return {"ok": True, "message": "Neon/PostgreSQL 為單一真實來源；不從本機永久檔還原。", "backend": "Neon/PostgreSQL", "fast_entry": True}
+
+
+def upload_audit_logs_to_github() -> dict:  # type: ignore[override]
+    return {"ok": True, "message": "GitHub 不作為登入紀錄即時資料庫；正式資料已在 Neon/PostgreSQL。", "backend": "Neon/PostgreSQL", "fast_entry": True}
+
+
+def get_audit_permanent_status() -> dict:  # type: ignore[override]
+    _v34_login_schema_once()
+    stats = get_login_log_stats(None, None, "")
+    return {"exists": True, "count": int(stats.get("records") or 0), "db_count": int(stats.get("records") or 0), "path": "neon://auth_login_logs + security_login_logs", "authority_schema": "Neon/PostgreSQL" if _v34_pg_enabled() else "SQLite/local fallback", "delete_state_path": "neon://deleted_at", "deleted_keys": 0, "fast_entry": True}
+
+
+def audit_v34_login_log_fastpath() -> dict:
+    return {"version": "V34_LOGIN_LOG_FASTPATH", "schema_one_time": bool(_V34_LOGIN_SCHEMA_READY), "foreground_github_json_disabled": True, "stats_uses_sql_count": True, "query_has_limit": True, "heartbeat_throttled_seconds": _V34_HEARTBEAT_MIN_SECONDS}
+
+# ================= END V34 FAST LOGIN LOG NEON HOTPATH =================
