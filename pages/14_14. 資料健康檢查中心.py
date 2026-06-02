@@ -960,8 +960,7 @@ else:
                 "製令 / Work Order", "工段 / Process", "開始時間 / Start", "建議結束時間 / Suggested End", "建議來源 / Suggestion"
             ],
         )
-        with st:
-            v166b_editor_commit = st.form_submit_button("💾 暫存勾選與結束時間 / Update Selection", use_container_width=True)
+        v166b_editor_commit = st.form_submit_button("💾 暫存勾選與結束時間 / Update Selection", use_container_width=True)
     if v166b_editor_commit and isinstance(v166b_edit_df, pd.DataFrame):
         st.session_state["v166b_pending_close_effective_df"] = v166b_edit_df.copy()
     v166b_effective_df = st.session_state.get("v166b_pending_close_effective_df") if isinstance(st.session_state.get("v166b_pending_close_effective_df"), pd.DataFrame) else v166b_edit_df
@@ -1118,8 +1117,7 @@ else:
             column_config=v166c_column_config,
             disabled=[c for c in display_cols if c != "復原 / Recover"],
         )
-        with st:
-            v166c_editor_commit = st.form_submit_button("💾 暫存復原勾選 / Update Recovery Selection", use_container_width=True)
+        v166c_editor_commit = st.form_submit_button("💾 暫存復原勾選 / Update Recovery Selection", use_container_width=True)
     if v166c_editor_commit and isinstance(v166c_edit_df, pd.DataFrame):
         st.session_state["v166c_log_snapshot_effective_df"] = v166c_edit_df.copy()
     v166c_effective_df = st.session_state.get("v166c_log_snapshot_effective_df") if isinstance(st.session_state.get("v166c_log_snapshot_effective_df"), pd.DataFrame) else v166c_edit_df

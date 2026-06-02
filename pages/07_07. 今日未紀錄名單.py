@@ -796,8 +796,7 @@ else:
             },
             key=editor_key,
         )
-        with st:
-            submitted_today_attendance = st.form_submit_button("▣ 確認儲存今日出勤設定 / Save Today Attendance", type="primary", use_container_width=True)
+        submitted_today_attendance = st.form_submit_button("▣ 確認儲存今日出勤設定 / Save Today Attendance", type="primary", use_container_width=True)
     ignore_editor_return = bool(st.session_state.pop(EDITOR_IGNORE_RETURN_KEY, False))
     if isinstance(edited, pd.DataFrame) and not ignore_editor_return:
         st.session_state[STATE_KEY] = _from_editor_df(edited)
@@ -919,8 +918,7 @@ else:
             },
             key=_daily_editor_key,
         )
-        with st:
-            daily_submit = st.form_submit_button("▣ 儲存每日出勤紀錄 / Save Daily Attendance Records", type="primary", use_container_width=True)
+        daily_submit = st.form_submit_button("▣ 儲存每日出勤紀錄 / Save Daily Attendance Records", type="primary", use_container_width=True)
     if isinstance(daily_edited, pd.DataFrame):
         # 在 submit 之前也保留目前畫面草稿，切換下載或其他操作時不會丟失。
         st.session_state[DAILY_STATE_KEY] = _from_daily_editor_df(daily_edited, selected_date).drop(columns=["_delete"], errors="ignore")

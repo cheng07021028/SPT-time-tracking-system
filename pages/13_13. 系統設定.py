@@ -645,8 +645,7 @@ with st.form("spt_13_section_selector_form_v41", clear_on_submit=False):
         key="spt_13_pending_section_v41",
         help="選擇下拉選單只暫存；按『載入設定區塊』後才載入該區資料。",
     )
-    with st:
-        _load_section = st.form_submit_button("▣ 載入設定區塊 / Load Settings Area", use_container_width=True)
+    _load_section = st.form_submit_button("▣ 載入設定區塊 / Load Settings Area", use_container_width=True)
 if _load_section:
     st.session_state["spt_13_active_section_v41"] = _pending_section
     # 切換區塊時清掉重表格草稿，避免舊 editor 狀態污染新區塊。
@@ -751,8 +750,7 @@ if section == "類別與工段設定 / Category & Process":
                 help="選擇下拉選單只暫存；按『套用預設類別』才寫入 Neon。",
                 key="system_default_process_category_v41_pending",
             )
-            with st:
-                apply_default_clicked = st.form_submit_button("▣ 套用預設類別", use_container_width=True, disabled=not can_manage)
+            apply_default_clicked = st.form_submit_button("▣ 套用預設類別", use_container_width=True, disabled=not can_manage)
         if can_manage and apply_default_clicked:
             saved_category = save_default_process_category(selected_default_category)
             _export_permanent_settings(f"已套用預設類別：{saved_category}")
@@ -791,11 +789,9 @@ if section == "類別與工段設定 / Category & Process":
             )
             cat_apply_col, cat_delete_col = st.columns(2)
             with cat_apply_col:
-                with st:
-                    cat_apply_clicked = st.form_submit_button("◈ 套用並永久儲存類別 / Save Categories", type="primary", use_container_width=True, key="submit_save_categories_v42")
+                cat_apply_clicked = st.form_submit_button("◈ 套用並永久儲存類別 / Save Categories", type="primary", use_container_width=True, key="submit_save_categories_v42")
             with cat_delete_col:
-                with st:
-                    cat_delete_clicked = st.form_submit_button("◉ 刪除勾選類別 / Delete Selected", type="primary", use_container_width=True, key="submit_delete_categories_v42")
+                cat_delete_clicked = st.form_submit_button("◉ 刪除勾選類別 / Delete Selected", type="primary", use_container_width=True, key="submit_delete_categories_v42")
         if isinstance(edited_cat, pd.DataFrame):
             st.session_state[cat_draft_key] = edited_cat.copy()
         if cat_apply_clicked or cat_delete_clicked:
@@ -837,8 +833,7 @@ if section == "類別與工段設定 / Category & Process":
             key="system_process_category_filter_v41_pending",
             help="選擇下拉選單只暫存；按『載入此類別工段』後才查 Neon。",
         )
-        with st:
-            apply_filter_category = st.form_submit_button("▣ 載入此類別工段 / Load Category Processes", use_container_width=True)
+        apply_filter_category = st.form_submit_button("▣ 載入此類別工段 / Load Category Processes", use_container_width=True)
     if apply_filter_category:
         st.session_state["system_process_category_filter_applied_v41"] = pending_filter_category
         _v144_clear_process_option_editor_state("process_category_applied_v41")
@@ -883,11 +878,9 @@ if section == "類別與工段設定 / Category & Process":
             )
             proc_apply_col, proc_delete_col = st.columns(2)
             with proc_apply_col:
-                with st:
-                    proc_apply_clicked = st.form_submit_button("◈ 套用並永久儲存工段 / Save Processes", type="primary", use_container_width=True, key=f"submit_save_processes_v42_{_v144_process_category_key}")
+                proc_apply_clicked = st.form_submit_button("◈ 套用並永久儲存工段 / Save Processes", type="primary", use_container_width=True, key=f"submit_save_processes_v42_{_v144_process_category_key}")
             with proc_delete_col:
-                with st:
-                    proc_delete_clicked = st.form_submit_button("◉ 刪除勾選工段 / Delete Selected", type="primary", use_container_width=True, key=f"submit_delete_processes_v42_{_v144_process_category_key}")
+                proc_delete_clicked = st.form_submit_button("◉ 刪除勾選工段 / Delete Selected", type="primary", use_container_width=True, key=f"submit_delete_processes_v42_{_v144_process_category_key}")
         if isinstance(edited_proc, pd.DataFrame):
             st.session_state[proc_draft_key] = edited_proc.copy()
         if proc_apply_clicked or proc_delete_clicked:
@@ -956,11 +949,9 @@ if section == "休息時間設定 / Rest Periods":
             )
             rest_apply_col, rest_delete_col = st.columns(2)
             with rest_apply_col:
-                with st:
-                    rest_apply_clicked = st.form_submit_button("◈ 套用並永久儲存休息時間 / Save Rest Periods", type="primary", use_container_width=True, key="submit_save_rest_periods_v42")
+                rest_apply_clicked = st.form_submit_button("◈ 套用並永久儲存休息時間 / Save Rest Periods", type="primary", use_container_width=True, key="submit_save_rest_periods_v42")
             with rest_delete_col:
-                with st:
-                    rest_delete_clicked = st.form_submit_button("◉ 刪除勾選休息時間 / Delete Selected", type="primary", use_container_width=True, key="submit_delete_rest_periods_v42")
+                rest_delete_clicked = st.form_submit_button("◉ 刪除勾選休息時間 / Delete Selected", type="primary", use_container_width=True, key="submit_delete_rest_periods_v42")
         if isinstance(edited_rest, pd.DataFrame):
             st.session_state[rest_draft_key] = edited_rest.copy()
         if rest_apply_clicked or rest_delete_clicked:

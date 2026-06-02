@@ -402,9 +402,8 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
         detail_limit = r5c2.number_input("明細讀取上限 / Detail Limit", min_value=100, max_value=20000, value=int(filters.get("detail_limit", 1000) or 1000), step=100)
         clear_filter = r5c3.checkbox("清除所有篩選 / Clear", value=False)
 
-        with st:
 
-            apply_filter = st.form_submit_button("🔎 套用篩選並永久記錄 / Apply Filters", type="primary", use_container_width=True)
+        apply_filter = st.form_submit_button("🔎 套用篩選並永久記錄 / Apply Filters", type="primary", use_container_width=True)
     if apply_filter:
         if clear_filter:
             new_filters = load_analysis_filters()

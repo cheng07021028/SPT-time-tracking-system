@@ -1834,3 +1834,173 @@ def audit_v30011_table_parallel_checkbox_render() -> dict:
         "does_not_change_ui_css_theme": True,
     }
 # ======================= END V300.11 PARALLEL CHECKBOX TABLE RENDER FIX =======================
+
+
+# ======================= V43 NEON FAST TABLE UI OVERRIDE =======================
+# Purpose:
+# - Neon/PostgreSQL compatibility: remove SQLite datetime('now','localtime') from table_ui_settings.
+# - Speed: do not restore local JSON / GitHub table UI settings on every page render.
+# - UX: no automatic table-width settings panel during normal page entry.
+# - Authority rule: Neon is the source for saved UI table settings; local files are fallback/import only.
+_TABLE_UI_SCHEMA_READY = False
+_TABLE_UI_FAST_CACHE: dict[str, dict[str, Any]] = {}
+
+
+def _v43_pg_safe_now_sql() -> str:
+    try:
+        from .db_service import is_postgres_mode
+        if is_postgres_mode():
+            return "CURRENT_TIMESTAMP"
+    except Exception:
+        pass
+    return "datetime('now','localtime')"
+
+
+def ensure_table_ui_schema() -> None:  # type: ignore[override]
+    global _TABLE_UI_SCHEMA_READY
+    if _TABLE_UI_SCHEMA_READY:
+        return
+    try:
+        from .db_service import is_postgres_mode
+        if is_postgres_mode():
+            execute(
+                """
+                CREATE TABLE IF NOT EXISTS table_ui_settings (
+                    table_key TEXT PRIMARY KEY,
+                    widths_json TEXT,
+                    order_json TEXT,
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        else:
+            execute(
+                """
+                CREATE TABLE IF NOT EXISTS table_ui_settings (
+                    table_key TEXT PRIMARY KEY,
+                    widths_json TEXT,
+                    order_json TEXT,
+                    updated_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+                """
+            )
+        try:
+            execute("ALTER TABLE table_ui_settings ADD COLUMN order_json TEXT")
+        except Exception:
+            pass
+        try:
+            execute("ALTER TABLE table_ui_settings ADD COLUMN updated_at TIMESTAMPTZ")
+        except Exception:
+            pass
+        _TABLE_UI_SCHEMA_READY = True
+    except Exception:
+        # Never block page rendering because optional table UI preferences are unavailable.
+        _TABLE_UI_SCHEMA_READY = True
+
+
+def restore_table_ui_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    # V43: do not scan local JSON/GitHub during page entry. Dedicated import/restore tools may call older files separately.
+    ensure_table_ui_schema()
+    return {"ok": True, "restored": 0, "message": "V43: table UI restore skipped during normal page render"}
+
+
+def _v43_cached_row(table_key: str) -> dict[str, Any]:
+    ensure_table_ui_schema()
+    key = str(table_key or '').strip()
+    if not key:
+        return {}
+    try:
+        cached = _TABLE_UI_FAST_CACHE.get(key)
+        if cached and time.time() - float(cached.get('ts', 0)) < _WIDTH_CACHE_TTL_SECONDS:
+            return dict(cached.get('row') or {})
+    except Exception:
+        pass
+    try:
+        row = query_one("SELECT widths_json, order_json FROM table_ui_settings WHERE table_key=?", (key,)) or {}
+    except Exception:
+        row = {}
+    try:
+        _TABLE_UI_FAST_CACHE[key] = {'ts': time.time(), 'row': dict(row or {})}
+    except Exception:
+        pass
+    return row or {}
+
+
+def load_widths(table_key: str) -> dict[str, int]:  # type: ignore[override]
+    row = _v43_cached_row(table_key)
+    raw = row.get('widths_json') if isinstance(row, dict) else None
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+        return {str(k): int(v) for k, v in data.items() if isinstance(v, int) or str(v).isdigit()}
+    except Exception:
+        return {}
+
+
+def load_column_order(table_key: str) -> list[str]:  # type: ignore[override]
+    row = _v43_cached_row(table_key)
+    raw = row.get('order_json') if isinstance(row, dict) else None
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+        return [str(x) for x in data if str(x)] if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def save_widths(table_key: str, widths: dict[str, int]) -> None:  # type: ignore[override]
+    ensure_table_ui_schema()
+    now_expr = _v43_pg_safe_now_sql()
+    execute(
+        f"""
+        INSERT INTO table_ui_settings(table_key, widths_json, updated_at)
+        VALUES (?, ?, {now_expr})
+        ON CONFLICT(table_key) DO UPDATE SET
+            widths_json=excluded.widths_json,
+            updated_at=excluded.updated_at
+        """,
+        (str(table_key), json.dumps(widths or {}, ensure_ascii=False)),
+    )
+    _TABLE_UI_FAST_CACHE.pop(str(table_key), None)
+
+
+def save_column_order(table_key: str, order: Iterable[str]) -> None:  # type: ignore[override]
+    ensure_table_ui_schema()
+    now_expr = _v43_pg_safe_now_sql()
+    cols = [str(c) for c in order if str(c)]
+    execute(
+        f"""
+        INSERT INTO table_ui_settings(table_key, order_json, updated_at)
+        VALUES (?, ?, {now_expr})
+        ON CONFLICT(table_key) DO UPDATE SET
+            order_json=excluded.order_json,
+            updated_at=excluded.updated_at
+        """,
+        (str(table_key), json.dumps(cols, ensure_ascii=False)),
+    )
+    _TABLE_UI_FAST_CACHE.pop(str(table_key), None)
+
+
+def apply_column_order(table_key: str, df: pd.DataFrame) -> pd.DataFrame:  # type: ignore[override]
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return df
+    order = load_column_order(table_key)
+    if not order:
+        return df
+    ordered = [c for c in order if c in df.columns]
+    rest = [c for c in df.columns if c not in ordered]
+    return df[ordered + rest] if ordered else df
+
+
+def render_width_settings(table_key: str, df: pd.DataFrame, title: str = "欄寬設定 / Column Width Settings") -> None:  # type: ignore[override]
+    # V43: keep normal module entry fast. Future dedicated UI can call save_widths/save_column_order explicitly.
+    return None
+
+
+def export_table_ui_settings_permanent(reason: str = "table_ui_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    # V43: GitHub/local JSON is not an immediate authority. Keep as no-op during front-end transactions.
+    return {"ok": True, "files": [], "count": 0, "message": "V43: Neon table_ui_settings is authoritative; local export skipped"}
+
+# ===================== END V43 NEON FAST TABLE UI OVERRIDE =====================

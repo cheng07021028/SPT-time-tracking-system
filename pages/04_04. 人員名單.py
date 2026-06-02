@@ -453,8 +453,7 @@ with tab1:
             key=_editor_key(),
             disabled=not employee_edit_enabled,
         )
-        with st:
-            submitted_employees = st.form_submit_button("▣ 確認儲存人員清單 / Save Employees", type="primary", use_container_width=True, disabled=not employee_edit_enabled)
+        submitted_employees = st.form_submit_button("▣ 確認儲存人員清單 / Save Employees", type="primary", use_container_width=True, disabled=not employee_edit_enabled)
     ignore_editor_return = bool(st.session_state.pop(EDITOR_IGNORE_RETURN_KEY, False))
     if employee_edit_enabled and isinstance(edited, pd.DataFrame) and not ignore_editor_return:
         st.session_state[STATE_KEY] = _from_editor_df(edited.copy())

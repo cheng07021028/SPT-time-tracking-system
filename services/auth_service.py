@@ -134,8 +134,7 @@ def require_login() -> None:
     with st.form("login_form"):
         username = st.text_input("帳號", value="admin")
         password = st.text_input("密碼", type="password")
-        with st:
-            submitted = st.form_submit_button("登入")
+        submitted = st.form_submit_button("登入")
     st.info("乾淨版預設管理員：admin / admin123。正式使用前請到 10 權限管理修改密碼。")
     if submitted:
         if authenticate(username.strip(), password):
