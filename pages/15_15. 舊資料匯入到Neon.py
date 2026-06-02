@@ -11,6 +11,13 @@ from services.legacy_neon_migration_service import save_uploaded_zip_and_migrate
 
 st.set_page_config(page_title="15｜舊資料匯入到 Neon", page_icon="▣", layout="wide")
 apply_theme()
+
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("15", "舊資料匯入到Neon")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
 require_module_access("09_persistence", "can_restore")
 
 st.title("15｜舊資料匯入到 Neon")
@@ -43,3 +50,9 @@ if up is not None:
             except Exception as exc:
                 st.error(f"匯入失敗：{exc}")
                 st.exception(exc)
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

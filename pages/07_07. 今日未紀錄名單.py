@@ -32,6 +32,13 @@ render_header(
     "每日出勤紀錄、未紀錄工時人員查詢、Excel 匯出｜永久保存且穩定編輯。",
 )
 
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("07", "今日未紀錄名單")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
+
 STATE_KEY = "v202_today_attendance_editor"
 EDITOR_REV_KEY = "v202_today_attendance_editor_rev"
 EDITOR_IGNORE_RETURN_KEY = "v263_today_attendance_ignore_next_editor_return"
@@ -956,3 +963,9 @@ df = _build_missing_today_df(current_attendance_df, today)
 st.metric("今日未紀錄人數 / Missing Records", f"{len(df):,}")
 st.caption("V66：此區依目前畫面暫存的『啟用 / 在廠 / 今日出勤』狀態，加上今日工時權威檔即時計算；ID 為空不影響判斷，實際主鍵使用工號。")
 render_table(df, "missing_today_v202", editable=False, height=460)
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

@@ -22,6 +22,13 @@ apply_theme()
 require_module_access("05_analysis")
 render_header("05｜製令工時分析", "製令、工段、人員累積工時分析與明細編輯")
 
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("05", "製令工時分析")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
+
 FILTER_KEY = "_spt_05_analysis_filters"
 if FILTER_KEY not in st.session_state:
     st.session_state[FILTER_KEY] = load_analysis_filters()
@@ -724,3 +731,9 @@ with tab6:
             pass
         st.success(f"已儲存 {count} 筆明細。")
         st.rerun()
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

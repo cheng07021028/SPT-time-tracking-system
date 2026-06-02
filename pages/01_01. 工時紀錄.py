@@ -159,6 +159,13 @@ apply_theme()
 apply_dropdown_menu_size_only(560)
 require_module_access("01_time_record")
 render_header("01｜工時紀錄", "快速開始、同步作業、暫停、下班、完工｜自動記錄時間與扣除休息")
+
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("01", "工時紀錄")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
 render_post_record_continue_prompt()
 _spt_perf_after_header = _spt_perf_tick("01_header_auth_theme", _SPT_01_PAGE_T0, threshold_ms=500.0)
 
@@ -1403,3 +1410,9 @@ if is_admin:
                             st.rerun()
 
 _spt_perf_tick("01_full_page_total_runtime", _SPT_01_PAGE_T0, threshold_ms=1500.0, detail={"is_admin": bool(is_admin)})
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

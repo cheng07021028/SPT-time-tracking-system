@@ -60,6 +60,13 @@ render_header(
     "Authority File Diagnostic｜盤點各模組權威檔、舊來源與資料保存狀態，只診斷不覆蓋正式資料",
 )
 
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("98", "權威檔診斷")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
+
 module_count = len(MODULES_TO_TRACE)
 render_kpi_cards([
     ("診斷版本 / Version", "V300.15.1"),
@@ -189,3 +196,9 @@ with col_md:
 
 with st.expander("原始報告預覽", expanded=False):
     st.code(report_text or render_markdown_report(snapshot), language="markdown")
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

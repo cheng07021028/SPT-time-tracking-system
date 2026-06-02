@@ -27,6 +27,13 @@ require_module_access("11_login_logs", "can_view")
 
 render_header("11｜登入紀錄", "登入、登出、閒置自動登出、權限不足與安全事件查詢")
 
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("11", "登入紀錄")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
+
 # Make sure the current logged-in session is represented at least once.
 try:
     auto_record_session_login(
@@ -229,3 +236,9 @@ if st.button("⊖ 確認清除日期區間內登入紀錄 / Delete Logs in Date 
         st.caption(f"權威檔已更新：{status_after.get('path', '-')}｜DeleteState：{status_after.get('delete_state_path', '-')}｜DeletedKeys：{status_after.get('deleted_keys', 0)}｜LastDeleted：{status_after.get('last_deleted_count', 0)}")
         st.session_state["v11_reset_confirm_delete_login_logs"] = True
         st.rerun()
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

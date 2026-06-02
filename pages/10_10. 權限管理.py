@@ -30,6 +30,13 @@ except Exception:
 apply_theme()
 require_module_access("10_permissions", "can_manage")
 render_header("10 | 權限管理", "帳號密碼總表、帳號匯入、帳號貼上、帳號級模組權限 / Account & Permission Management")
+
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("10", "權限管理")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
 init_permission_tables()
 try:
     # V57：補回原始六個預設帳號（只新增缺少帳號，不覆蓋已存在帳號資料）
@@ -1069,3 +1076,9 @@ with tab_sec:
             pass
         st.success(f"安全設定已永久儲存：閒置自動登出 {int(new_idle)} 分鐘 / Security settings permanently saved")
         st.rerun()
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

@@ -108,6 +108,13 @@ apply_theme()
 require_module_access("02_history")
 render_header("02｜歷史紀錄", "完整工時明細查詢、資料編輯、刪除、重新計算、Excel 匯入、貼上資料與 Excel 匯出")
 
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("02", "歷史紀錄")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
+
 HISTORY_IMPORT_PREVIEW_KEY = "v197_history_import_preview"
 HISTORY_PASTE_RAW_KEY = "v197_history_paste_raw"
 HISTORY_RESULT_MESSAGES_KEY = "v238_history_result_messages"
@@ -1717,3 +1724,9 @@ with tab3:
                 st.dataframe(parsed, use_container_width=True, height=360)
         else:
             st.info("請先貼上 Excel 資料。")
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

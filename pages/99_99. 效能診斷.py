@@ -60,6 +60,13 @@ if not _is_system_admin():
     st.stop()
 render_header("99｜效能診斷", "V258 自動測速紀錄：登入、首頁、01工時紀錄、Neon/SQL、按鈕交易耗時｜限系統管理員")
 
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("99", "效能診斷")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
+
 st.info("請先正常操作一次：登入 → 進入 01 → 按開始/暫停/完工。再回到本頁按重新整理，即可下載測速報告。")
 
 st.info("V39：診斷條件只會先暫存；按『重新整理測速報告』後才讀取/彙總效能事件，避免每次調整數字就重新運算。")
@@ -101,6 +108,10 @@ for title, key in [("依函式/動作統計", "by_name"), ("依類別統計", "b
         _safe_table(rows)
     else:
         st.caption("目前尚無資料。")
+
+st.divider()
+st.subheader("V40 全模組頁面進入追蹤 / Page entry tracking")
+st.caption("所有 pages/*.py 已加入輕量頁面耗時事件：類別 page、名稱 page.01/page.02/...。請先實際點進慢的模組，再回本頁按『重新整理測速報告』查看最慢頁面與 rerun 次數。")
 
 st.subheader("最慢事件 Top")
 top_events = summary.get("top_events") or []
@@ -168,3 +179,9 @@ try:
         )
 except Exception:
     pass
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

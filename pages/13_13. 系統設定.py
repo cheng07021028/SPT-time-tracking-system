@@ -55,6 +55,13 @@ apply_dropdown_menu_size_only(560)
 require_module_access("13_system_settings", "can_view")
 render_header("13｜系統設定", "工段名稱下拉選單、休息時間扣除規則｜新增、刪除、修改、套用後永久保存")
 
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("13", "系統設定")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
+
 can_manage = check_permission("13_system_settings", "can_manage") or check_permission("13_system_settings", "can_edit")
 if not can_manage:
     st.warning("你目前只有查看權限，設定修改需由管理員或具備 13 系統設定 can_manage / can_edit 權限的人員操作。")
@@ -967,3 +974,9 @@ else:
 
 st.divider()
 st.success("設定套用後的串接：01｜工時紀錄工段下拉選單立即讀取啟用工段；工時計算與 02｜歷史紀錄重新計算會使用啟用中的休息時間。")
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

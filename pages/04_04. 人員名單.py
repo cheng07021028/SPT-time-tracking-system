@@ -12,6 +12,7 @@ except Exception:
     def apply_theme():
         pass
     def render_header(title: str, subtitle: str = ""):
+
         st.title(title)
         if subtitle:
             st.caption(subtitle)
@@ -28,6 +29,12 @@ st.set_page_config(page_title="04. 人員名單", page_icon="⧉", layout="wide"
 apply_theme()
 require_module_access("04_employees")
 render_header("04｜人員名單", "人員主檔、在廠狀態、今日出勤勾選、清單編輯、刪除與儲存")
+
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("04", "人員名單")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
 
 STATE_KEY = "v138_employees_editor"
 EDITOR_VERSION_KEY = "v253_employees_editor_version"
@@ -508,3 +515,9 @@ with tab3:
             )
     else:
         st.info("請先貼上 Excel 資料。建議包含標題列，例如：工號、姓名、單位、職稱、備註。")
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

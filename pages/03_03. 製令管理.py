@@ -13,6 +13,7 @@ except Exception:
     def apply_theme():
         pass
     def render_header(title: str, subtitle: str = ""):
+
         st.title(title)
         if subtitle:
             st.caption(subtitle)
@@ -43,6 +44,12 @@ st.set_page_config(page_title="03. 製令管理", page_icon="⧠", layout="wide"
 apply_theme()
 require_module_access("03_work_orders")
 render_header("03｜製令管理", "Excel 匯入、貼上資料、手動新增、頁面編輯、刪除、全選與存檔")
+
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("03", "製令管理")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
 
 STATE_KEY = "v138_work_orders_editor"
 EDITOR_VERSION_KEY = "v253_work_orders_editor_version"
@@ -1100,3 +1107,9 @@ with tab4:
                     # 清掉編輯頁舊 data_editor 草稿，回到製令清單可直接看到最新資料。
                     _refresh_editor_widget()
                     rerun()
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

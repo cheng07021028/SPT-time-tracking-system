@@ -42,6 +42,13 @@ apply_theme()
 require_module_access("09_persistence", "can_view")
 render_header("09｜資料永久保存與備份", "GitHub 雲端永久保存｜啟動自動還原｜防止空資料覆蓋")
 
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("09", "資料永久保存與備份")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
+
 st.subheader("資料防消失中心 / Data Guard Center")
 st.caption("V3.06：本頁只做備份紀錄、GitHub 備份狀態、手動雲端備份/還原查詢；每日自動備份排程統一在 13｜系統設定。")
 st.info(
@@ -249,3 +256,9 @@ if LATEST_STATE.exists():
             st.error(str(exc))
 
 st.caption("GitHub 正確保存路徑：data/permanent_store/persistent_state/ 與 data/permanent_store/persistent_state/history/。history 檔案使用時間戳，不會覆蓋舊檔。")
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

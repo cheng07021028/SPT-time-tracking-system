@@ -24,6 +24,13 @@ require_module_access("06_logs")
 render_header("06｜LOG 查詢", "記錄哪個帳號、什麼時間、在哪個模組做了什麼動作｜V189 後端分頁查詢")
 
 try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("06", "LOG查詢")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
+
+try:
     _log_auth_status = log_service.get_system_log_authority_status() if hasattr(log_service, "get_system_log_authority_status") else {}
 except Exception:
     _log_auth_status = {}
@@ -254,3 +261,9 @@ if check_permission("06_logs", "can_delete") or check_permission("06_logs", "can
             st.rerun()
 else:
     st.caption("你的帳號沒有 LOG 刪除權限；如需刪除區間 LOG，請請管理員在 10｜權限管理開啟 06 模組的刪除或管理權限。")
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

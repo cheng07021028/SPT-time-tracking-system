@@ -135,6 +135,13 @@ except Exception:
 
 render_header("14｜資料健康檢查中心", "工時紀錄稽核、資料遺失檢查、01/02 權威檔非破壞式修復")
 
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("14", "資料健康檢查中心")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
+
 st.warning(
     "本頁只用於資料健康檢查與非破壞式修復。檢查不寫入；修復只合併缺漏資料到 01/02 權威檔，"
     "不刪除、不重新編號、不用畫面局部資料覆蓋完整歷史。"
@@ -1525,3 +1532,9 @@ except Exception as _v202_page_exc:
     except Exception:
         pass
 # ================= END V202 TIME RECORD GOVERNANCE CENTER =================
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

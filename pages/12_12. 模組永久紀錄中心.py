@@ -23,6 +23,13 @@ apply_theme()
 require_module_access("12_module_persistence", "can_view")
 render_header("12｜模組永久紀錄中心", "各模組 records / settings / history 健康檢查，不重複做每日備份設定")
 
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("12", "模組永久紀錄中心")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
+
 username = st.session_state.get("auth_username", st.session_state.get("username", "SYSTEM"))
 
 try:
@@ -108,3 +115,9 @@ with st.expander("進階手動維護 / Advanced Manual Maintenance", expanded=Fa
         st.success("已匯出模組永久紀錄")
         st.json({"module_code": module_code, "counts": result.get("counts", {}), "exported_at": result.get("exported_at", ""), "warning": result.get("warning", "")})
         st.rerun()
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+

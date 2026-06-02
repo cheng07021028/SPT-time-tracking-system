@@ -22,6 +22,13 @@ apply_theme()
 require_module_access("08_daily_hours")
 render_header("08｜人員每日工時", "每日應紀錄 7~7.5 小時｜支援工號、姓名、單位、職稱、狀態篩選")
 
+try:
+    from services.performance_profiler_service import start_page_event as _spt_v40_start_page_event, finish_page_event as _spt_v40_finish_page_event
+    _SPT_V40_PAGE_TOKEN = _spt_v40_start_page_event("08", "人員每日工時")
+except Exception:
+    _SPT_V40_PAGE_TOKEN = None
+
+
 STATUS_OPTIONS = ["作業中", "未紀錄", "偏低", "正常", "超時"]
 
 
@@ -265,3 +272,9 @@ else:
     st.info("目前沒有符合條件的人員資料 / No employee data")
 
 render_table(df, "daily_employee_hours", editable=False, height=620)
+
+try:
+    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+except Exception:
+    pass
+
