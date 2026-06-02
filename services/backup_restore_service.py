@@ -571,3 +571,36 @@ def backup_manifest_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
 if __name__ == "__main__":
     snap = create_full_backup_snapshot(reason="cli_v158_backup", save_to_disk=True)
     print(json.dumps({k: v for k, v in snap.items() if k != "zip_bytes"}, ensure_ascii=False, indent=2))
+
+
+# ===== V32 NEON RESTORE SAFETY OVERRIDE =====
+# Backup ZIP can be inspected/exported, but restoring local/GitHub backup over Neon requires explicit opt-in.
+try:
+    _v32_prev_restore_missing_time_records_from_backup = restore_missing_time_records_from_backup  # type: ignore[name-defined]
+except Exception:
+    _v32_prev_restore_missing_time_records_from_backup = None
+
+
+def _v32_restore_is_neon() -> bool:
+    try:
+        from services.neon_authority_service import is_neon_enabled
+        return bool(is_neon_enabled())
+    except Exception:
+        return False
+
+
+def restore_missing_time_records_from_backup(data: bytes, *, dry_run: bool = True, github: bool = True, reason: str = "v158_restore_missing") -> dict[str, Any]:  # type: ignore[override]
+    if _v32_restore_is_neon() and not dry_run:
+        try:
+            import os
+            allow = str(os.environ.get("SPT_ALLOW_BACKUP_RESTORE_TO_NEON", "0") or "0").strip().lower() in {"1", "true", "yes", "on"}
+        except Exception:
+            allow = False
+        if not allow:
+            preview = _v32_prev_restore_missing_time_records_from_backup(data, dry_run=True, github=False, reason=reason) if callable(_v32_prev_restore_missing_time_records_from_backup) else {"ok": False}
+            preview.update({"ok": False, "blocked_by_v32": True, "message": "Neon is the authority. Backup restore is blocked unless SPT_ALLOW_BACKUP_RESTORE_TO_NEON=1. Use page 15 explicit migration for controlled imports.", "dry_run": True})
+            return preview
+    if callable(_v32_prev_restore_missing_time_records_from_backup):
+        return _v32_prev_restore_missing_time_records_from_backup(data, dry_run=dry_run, github=False if _v32_restore_is_neon() else github, reason=reason)
+    return {"ok": False, "message": "restore service unavailable"}
+# ===== END V32 NEON RESTORE SAFETY OVERRIDE =====

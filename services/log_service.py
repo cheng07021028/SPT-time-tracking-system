@@ -2810,3 +2810,144 @@ def audit_v300424_06_delete_range_sequence_visibility() -> dict[str, Any]:
         "same_second_after_delete_rows_visible_by_sequence": True,
     }
 # ================= END V300.42.4 06 DELETE RANGE JSONL SEQUENCE VISIBILITY =================
+
+
+# ================= BEGIN V32 06 LOG NEON SINGLE AUTHORITY FINAL OVERRIDE =================
+# 06 LOG 正式權威：Neon system_logs。GitHub/JSONL 只可作備份，不再是即時讀寫來源。
+def _v32_log_is_pg() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled
+        return bool(is_postgres_enabled())
+    except Exception:
+        return False
+
+
+def _v32_log_now() -> str:
+    try:
+        return now_text()
+    except Exception:
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    from services.db_service import execute, ensure_database
+    ensure_database()
+    execute(
+        """
+        INSERT INTO system_logs(log_time, user_name, action_type, target_table, target_id, message, detail, level)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (_v32_log_now(), user_name or _current_log_user(), str(action_type or ""), str(target_table or ""), str(target_id or ""), str(message or ""), str(detail or ""), str(level or "INFO")),
+    )
+    return None
+
+
+def _v32_log_where(start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None):
+    where = ["deleted_at IS NULL"]
+    params: list[Any] = []
+    s = _date_text(start_date)
+    e = _date_text(end_date)
+    if s:
+        where.append("SUBSTRING(COALESCE(log_time,''), 1, 10) >= ?")
+        params.append(s)
+    if e:
+        where.append("SUBSTRING(COALESCE(log_time,''), 1, 10) <= ?")
+        params.append(e)
+    if action_type and str(action_type).upper() != "ALL":
+        where.append("action_type = ?")
+        params.append(str(action_type))
+    if level and str(level).upper() != "ALL":
+        where.append("level = ?")
+        params.append(str(level))
+    kw = str(keyword or "").strip().lower()
+    if kw:
+        where.append("LOWER(COALESCE(user_name,'') || ' ' || COALESCE(action_type,'') || ' ' || COALESCE(target_table,'') || ' ' || COALESCE(target_id,'') || ' ' || COALESCE(message,'') || ' ' || COALESCE(detail,'')) LIKE ?")
+        params.append(f"%{kw}%")
+    return " AND ".join(where), params
+
+
+def load_logs(limit: int = 500, start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None):  # type: ignore[override]
+    from services.db_service import query_df, ensure_database
+    ensure_database()
+    where, params = _v32_log_where(start_date, end_date, action_type, level, keyword)
+    n = max(1, min(int(limit or 500), 5000))
+    return query_df(
+        f"""
+        SELECT id, log_time, user_name, action_type, target_table, target_id, message, detail, level
+        FROM system_logs
+        WHERE {where}
+        ORDER BY log_time DESC, id DESC
+        LIMIT ?
+        """,
+        tuple(params + [n]),
+    )
+
+
+def load_logs_page(start_date: Any | None = None, end_date: Any | None = None, action_type: str | None = None, level: str | None = None, keyword: str | None = None, page: int = 1, page_size: int = 500) -> dict[str, Any]:  # type: ignore[override]
+    from services.db_service import query_df, query_one, ensure_database
+    ensure_database()
+    p = max(1, int(page or 1))
+    size = max(20, min(int(page_size or 500), 1000))
+    offset = (p - 1) * size
+    where, params = _v32_log_where(start_date, end_date, action_type, level, keyword)
+    total_row = query_one(f"SELECT COUNT(*) AS c FROM system_logs WHERE {where}", tuple(params)) or {}
+    total = int(total_row.get("c") or 0)
+    df = query_df(
+        f"""
+        SELECT id, log_time, user_name, action_type, target_table, target_id, message, detail, level
+        FROM system_logs
+        WHERE {where}
+        ORDER BY log_time DESC, id DESC
+        LIMIT ? OFFSET ?
+        """,
+        tuple(params + [size, offset]),
+    )
+    rows = df.where(pd.notna(df), "").to_dict("records") if isinstance(df, pd.DataFrame) else []
+    return {"ok": True, "rows": rows, "data": rows, "df": pd.DataFrame(rows), "total_rows": total, "page": p, "page_size": size, "total_pages": max(1, (total + size - 1) // size), "source": "neon_system_logs_v32"}
+
+
+def delete_logs_by_date_range(start_date: Any, end_date: Any, keep_delete_audit: bool = True, user_name: str | None = None) -> int:  # type: ignore[override]
+    # Soft delete only. No physical deletion, no JSONL/GitHub authority.
+    from services.db_service import execute, ensure_database
+    ensure_database()
+    s = _date_text(start_date)
+    e = _date_text(end_date) or s
+    if not s:
+        return 0
+    if s > e:
+        s, e = e, s
+    deleted_at = _v32_log_now()
+    actor = user_name or _current_log_user()
+    count = execute(
+        """
+        UPDATE system_logs
+        SET deleted_at=?, deleted_by=?, delete_reason=?
+        WHERE deleted_at IS NULL
+          AND SUBSTRING(COALESCE(log_time,''), 1, 10) >= ?
+          AND SUBSTRING(COALESCE(log_time,''), 1, 10) <= ?
+        """,
+        (deleted_at, actor, f"DELETE_LOG_RANGE {s}~{e}", s, e),
+    )
+    if keep_delete_audit:
+        execute(
+            """
+            INSERT INTO system_logs(log_time, user_name, action_type, target_table, target_id, message, detail, level)
+            VALUES (?, ?, 'DELETE_LOG_RANGE', 'system_logs', ?, ?, ?, 'WARN')
+            """,
+            (deleted_at, actor, f"{s}~{e}", f"已封存 LOG 日期區間：{s} ~ {e}", f"soft_deleted_count={count}"),
+        )
+    return int(count or 0)
+
+
+def get_system_log_authority_status() -> dict[str, Any]:  # type: ignore[override]
+    try:
+        from services.db_service import query_one, get_database_backend
+        total = query_one("SELECT COUNT(*) AS c FROM system_logs") or {}
+        visible = query_one("SELECT COUNT(*) AS c FROM system_logs WHERE deleted_at IS NULL") or {}
+        hidden = query_one("SELECT COUNT(*) AS c FROM system_logs WHERE deleted_at IS NOT NULL") or {}
+        return {"exists": True, "authority_type": "neon_system_logs_v32", "backend": get_database_backend(), "count": int(total.get("c") or 0), "visible_count": int(visible.get("c") or 0), "soft_deleted_count": int(hidden.get("c") or 0), "path": "neon://system_logs"}
+    except Exception as exc:
+        return {"exists": False, "authority_type": "neon_system_logs_v32", "error": str(exc)[:300]}
+
+# ================= END V32 06 LOG NEON SINGLE AUTHORITY FINAL OVERRIDE =================

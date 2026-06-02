@@ -112,6 +112,30 @@ if top_events:
 else:
     st.caption("目前尚無慢事件。")
 
+
+
+st.divider()
+st.subheader("V32 Neon 架構合規與效能快測")
+st.caption("目標：20 台電腦、50 人以上同時記錄；每個常用按鈕/查詢 2~3 秒完成；所有正式資料以 Neon/PostgreSQL 為單一真實來源。")
+try:
+    from services.neon_performance_audit_service import module_architecture_audit, performance_probe, dataframe
+    audit = module_architecture_audit()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("資料權威", audit.get("backend", "unknown"))
+    c2.metric("PostgreSQL", "ON" if audit.get("postgres_enabled") else "OFF")
+    c3.metric("模組數", len(audit.get("modules", [])))
+    st.markdown("##### 模組架構稽核 / Module architecture audit")
+    _safe_table(audit.get("modules") or [], max_rows=30)
+    if st.button("執行 2~3 秒效能快測 / Run performance probe", use_container_width=True):
+        st.session_state["v32_perf_probe"] = performance_probe()
+    probe = st.session_state.get("v32_perf_probe")
+    if probe:
+        st.markdown("##### 效能快測結果 / Performance probe")
+        st.json({"backend": probe.get("backend"), "target_seconds": probe.get("target_seconds"), "ok": probe.get("ok")})
+        _safe_table(probe.get("checks") or [], max_rows=30)
+except Exception as exc:
+    st.warning(f"V32 架構/效能快測暫時無法執行：{exc}")
+
 json_text = json.dumps(summary, ensure_ascii=False, indent=2)
 st.download_button(
     "下載 V258 測速報告 JSON",

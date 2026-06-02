@@ -273,37 +273,61 @@ def _normalise_daily_rows(rows: Any) -> list[dict[str, Any]]:
 
 
 def _load_all_daily_attendance_rows() -> list[dict[str, Any]]:
+    # V32：正式環境改讀 Neon spt_module_authority；本機無 DATABASE_URL 時才讀舊 JSON fallback。
+    try:
+        from services.neon_authority_service import is_neon_enabled, load_payload
+        if is_neon_enabled():
+            payload = load_payload(DAILY_MODULE_KEY, "records", {}) or {}
+            return _normalise_daily_rows(_extract_daily_rows(payload))
+    except Exception:
+        pass
     return _normalise_daily_rows(_extract_daily_rows(_read_daily_payload()))
 
 
 def _save_all_daily_attendance_rows(rows: list[dict[str, Any]], *, reason: str = "save_daily_attendance") -> None:
     clean = _normalise_daily_rows(rows)
     payload = {
-        "authority_schema": "SPT-07-DailyAttendance-V234",
+        "authority_schema": "SPT-07-DailyAttendance-V32-neon_07_daily_attendance_v32",
         "module_key": DAILY_MODULE_KEY,
         "kind": "records",
         "updated_at": _now_text(),
+        "updated_by": _current_user_name(),
         "reason": reason,
         "tables": {"daily_attendance": clean},
         "table_counts": {"daily_attendance": len(clean)},
         "records": clean,
     }
+    try:
+        from services.neon_authority_service import is_neon_enabled, save_payload, append_audit
+        if is_neon_enabled():
+            save_payload(DAILY_MODULE_KEY, "records", payload, user=_current_user_name())
+            append_audit(DAILY_MODULE_KEY, "SAVE_DAILY_ATTENDANCE", _current_user_name(), "OK", reason, {"count": len(clean)})
+            return
+    except Exception:
+        pass
     _atomic_write_json(DAILY_RECORDS_PATH, payload, reason=reason)
 
 
 def _append_daily_event(action: str, rows: list[dict[str, Any]], *, target_date: str, note: str = "") -> None:
+    event = {
+        "event_id": f"DA-{datetime.now().strftime('%Y%m%d%H%M%S%f')}-{uuid.uuid4().hex[:8]}",
+        "action": action,
+        "target_date": target_date,
+        "row_count": len(rows),
+        "rows": rows,
+        "note": note,
+        "created_at": _now_text(),
+        "created_by": _current_user_name(),
+    }
+    try:
+        from services.neon_authority_service import is_neon_enabled, append_audit
+        if is_neon_enabled():
+            append_audit(DAILY_MODULE_KEY, action, _current_user_name(), "OK", note, event)
+            return
+    except Exception:
+        pass
     try:
         DAILY_EVENT_PATH.parent.mkdir(parents=True, exist_ok=True)
-        event = {
-            "event_id": f"DA-{datetime.now().strftime('%Y%m%d%H%M%S%f')}-{uuid.uuid4().hex[:8]}",
-            "action": action,
-            "target_date": target_date,
-            "row_count": len(rows),
-            "rows": rows,
-            "note": note,
-            "created_at": _now_text(),
-            "created_by": _current_user_name(),
-        }
         with DAILY_EVENT_PATH.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(event, ensure_ascii=False, default=_json_default) + "\n")
     except Exception:

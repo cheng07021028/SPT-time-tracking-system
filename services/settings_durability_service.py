@@ -174,3 +174,38 @@ def download_critical_settings_from_github(*, only_missing: bool = True, source:
             downloads.append({"ok": False, "path": rel, "message": f"write/validate failed: {exc}"})
     failures = [d for d in downloads if not d.get("ok") and not d.get("skipped")]
     return {"ok": len(failures) == 0, "source": source, "downloads": downloads, "failures": failures[:10], "updated_at": _now_text()}
+
+
+# ===== V32 NEON SETTINGS DURABILITY OVERRIDE =====
+# In Neon mode, GitHub is backup only. Loading settings from GitHub/local JSON over Neon is forbidden.
+try:
+    _v32_prev_upload_critical_settings_to_github = upload_critical_settings_to_github  # type: ignore[name-defined]
+    _v32_prev_download_critical_settings_from_github = download_critical_settings_from_github  # type: ignore[name-defined]
+except Exception:
+    _v32_prev_upload_critical_settings_to_github = None
+    _v32_prev_download_critical_settings_from_github = None
+
+
+def _v32_settings_is_neon() -> bool:
+    try:
+        from services.neon_authority_service import is_neon_enabled
+        return bool(is_neon_enabled())
+    except Exception:
+        return False
+
+
+def upload_critical_settings_to_github(*, archive: bool = False, source: str = "manual") -> dict[str, Any]:  # type: ignore[override]
+    if _v32_settings_is_neon():
+        return {"ok": True, "skipped": True, "backend": "neon", "message": "Neon is the authority. GitHub settings upload is backup-only and not needed for realtime durability.", "source": source, "updated_at": _now_text()}
+    if callable(_v32_prev_upload_critical_settings_to_github):
+        return _v32_prev_upload_critical_settings_to_github(archive=archive, source=source)
+    return {"ok": False, "skipped": True}
+
+
+def download_critical_settings_from_github(*, only_missing: bool = True, source: str = "manual") -> dict[str, Any]:  # type: ignore[override]
+    if _v32_settings_is_neon():
+        return {"ok": True, "skipped": True, "backend": "neon", "message": "Blocked: GitHub/local settings must not overwrite Neon authority. Use 15 legacy migration for explicit imports.", "source": source, "updated_at": _now_text()}
+    if callable(_v32_prev_download_critical_settings_from_github):
+        return _v32_prev_download_critical_settings_from_github(only_missing=only_missing, source=source)
+    return {"ok": False, "skipped": True}
+# ===== END V32 NEON SETTINGS DURABILITY OVERRIDE =====
