@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .db import execute
+from .db import backend, execute, fetch_all
 
 
 # Clean V2 schema.
@@ -224,6 +224,203 @@ SCHEMA_SQL = [
     """,
 ]
 
+# Existing Neon databases created by old builds may already contain some tables,
+# so CREATE TABLE IF NOT EXISTS will not add new columns.  Additive migrations are
+# intentionally kept here so app startup can safely upgrade old schema versions
+# before seed data or indexes run.  Definitions are nullable/defaulted to avoid
+# breaking tables that already contain data.
+MIGRATION_COLUMNS: dict[str, dict[str, str]] = {
+    "users": {
+        "username": "TEXT",
+        "display_name": "TEXT",
+        "password_hash": "TEXT",
+        "role": "TEXT DEFAULT 'operator'",
+        "employee_id": "TEXT",
+        "email": "TEXT",
+        "active": "INTEGER DEFAULT 1",
+        "force_password_change": "INTEGER DEFAULT 0",
+        "password_hint": "TEXT",
+        "last_login_at": "TEXT",
+        "note": "TEXT",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+        "deleted_at": "TEXT",
+    },
+    "employees": {
+        "employee_id": "TEXT",
+        "employee_name": "TEXT",
+        "department": "TEXT",
+        "team": "TEXT",
+        "role": "TEXT",
+        "title": "TEXT",
+        "active": "INTEGER DEFAULT 1",
+        "is_in_factory": "INTEGER DEFAULT 1",
+        "is_today_attendance": "INTEGER DEFAULT 1",
+        "permission_group": "TEXT",
+        "note": "TEXT",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+        "deleted_at": "TEXT",
+        "deleted_by": "TEXT",
+        "version": "INTEGER DEFAULT 1",
+    },
+    "work_orders": {
+        "work_order_no": "TEXT",
+        "model": "TEXT",
+        "product_name": "TEXT",
+        "part_no": "TEXT",
+        "type_name": "TEXT",
+        "assembly_location": "TEXT",
+        "customer": "TEXT",
+        "note": "TEXT",
+        "planned_qty": "REAL DEFAULT 0",
+        "completed_qty": "REAL DEFAULT 0",
+        "status": "TEXT DEFAULT 'open'",
+        "process_flow": "TEXT",
+        "active": "INTEGER DEFAULT 1",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+        "deleted_at": "TEXT",
+        "deleted_by": "TEXT",
+        "version": "INTEGER DEFAULT 1",
+    },
+    "processes": {
+        "process_code": "TEXT",
+        "process_name": "TEXT",
+        "process_category": "TEXT",
+        "sort_order": "INTEGER DEFAULT 0",
+        "active": "INTEGER DEFAULT 1",
+        "allow_parallel": "INTEGER DEFAULT 1",
+        "allow_group_average": "INTEGER DEFAULT 1",
+        "standard_minutes": "REAL DEFAULT 0",
+        "note": "TEXT",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+    },
+    "rest_periods": {
+        "rest_period_id": "TEXT",
+        "name": "TEXT",
+        "start_time": "TEXT",
+        "end_time": "TEXT",
+        "active": "INTEGER DEFAULT 1",
+        "sort_order": "INTEGER DEFAULT 0",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+    },
+    "system_settings": {
+        "setting_key": "TEXT",
+        "setting_value": "TEXT",
+        "updated_at": "TEXT",
+        "updated_by": "TEXT",
+    },
+    "time_records": {
+        "record_id": "TEXT",
+        "legacy_id": "TEXT",
+        "record_key": "TEXT",
+        "work_date": "TEXT",
+        "employee_id": "TEXT",
+        "employee_name": "TEXT",
+        "work_order_no": "TEXT",
+        "part_no": "TEXT",
+        "type_name": "TEXT",
+        "assembly_location": "TEXT",
+        "process_code": "TEXT",
+        "process_name": "TEXT",
+        "start_action": "TEXT",
+        "end_action": "TEXT",
+        "start_time": "TEXT",
+        "end_time": "TEXT",
+        "start_date": "TEXT",
+        "end_date": "TEXT",
+        "status": "TEXT",
+        "group_key": "TEXT",
+        "raw_minutes": "REAL DEFAULT 0",
+        "work_minutes": "REAL DEFAULT 0",
+        "average_minutes": "REAL DEFAULT 0",
+        "work_hours_hms": "TEXT",
+        "pause_reason": "TEXT",
+        "remark": "TEXT",
+        "source": "TEXT",
+        "created_by": "TEXT",
+        "created_at": "TEXT",
+        "updated_by": "TEXT",
+        "updated_at": "TEXT",
+        "deleted_at": "TEXT",
+        "deleted_by": "TEXT",
+        "delete_reason": "TEXT",
+        "version": "INTEGER DEFAULT 1",
+    },
+    "operation_logs": {
+        "log_id": "TEXT",
+        "timestamp": "TEXT",
+        "actor": "TEXT",
+        "module": "TEXT",
+        "action": "TEXT",
+        "target_type": "TEXT",
+        "target_id": "TEXT",
+        "before_value": "TEXT",
+        "after_value": "TEXT",
+        "result": "TEXT",
+        "error_message": "TEXT",
+        "request_id": "TEXT",
+        "app_version": "TEXT",
+    },
+    "login_events": {
+        "login_event_id": "TEXT",
+        "timestamp": "TEXT",
+        "username": "TEXT",
+        "display_name": "TEXT",
+        "role": "TEXT",
+        "login_result": "TEXT",
+        "session_id": "TEXT",
+        "error_message": "TEXT",
+        "logout_time": "TEXT",
+    },
+    "delete_events": {
+        "delete_event_id": "TEXT",
+        "target_table": "TEXT",
+        "target_id": "TEXT",
+        "deleted_by": "TEXT",
+        "deleted_at": "TEXT",
+        "reason": "TEXT",
+        "before_snapshot": "TEXT",
+    },
+    "account_permissions": {
+        "permission_id": "TEXT",
+        "username": "TEXT",
+        "module_code": "TEXT",
+        "module_name_zh": "TEXT",
+        "module_name_en": "TEXT",
+        "can_view": "INTEGER DEFAULT 0",
+        "can_create": "INTEGER DEFAULT 0",
+        "can_edit": "INTEGER DEFAULT 0",
+        "can_delete": "INTEGER DEFAULT 0",
+        "can_import": "INTEGER DEFAULT 0",
+        "can_export": "INTEGER DEFAULT 0",
+        "can_backup": "INTEGER DEFAULT 0",
+        "can_restore": "INTEGER DEFAULT 0",
+        "can_manage": "INTEGER DEFAULT 0",
+        "updated_at": "TEXT",
+    },
+    "idempotency_keys": {
+        "idempotency_key": "TEXT",
+        "module": "TEXT",
+        "action": "TEXT",
+        "target_id": "TEXT",
+        "created_at": "TEXT",
+        "result_ref": "TEXT",
+    },
+    "sync_jobs": {
+        "sync_job_id": "TEXT",
+        "job_type": "TEXT",
+        "payload": "TEXT",
+        "status": "TEXT DEFAULT 'pending'",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+        "error_message": "TEXT",
+    },
+}
+
 INDEX_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)",
     "CREATE INDEX IF NOT EXISTS idx_employees_active ON employees(active)",
@@ -243,8 +440,46 @@ INDEX_SQL = [
 ]
 
 
+def _sqlite_existing_columns(conn, table_name: str) -> set[str]:
+    rows = fetch_all(conn, f"PRAGMA table_info({table_name})")
+    return {str(row.get("name")) for row in rows}
+
+
+def _postgres_existing_columns(conn, table_name: str) -> set[str]:
+    rows = fetch_all(
+        conn,
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = :table_name
+        """,
+        {"table_name": table_name},
+    )
+    return {str(row.get("column_name")) for row in rows}
+
+
+def _existing_columns(conn, table_name: str) -> set[str]:
+    if backend() == "postgres":
+        return _postgres_existing_columns(conn, table_name)
+    return _sqlite_existing_columns(conn, table_name)
+
+
+def _apply_additive_migrations(conn) -> None:
+    for table_name, columns in MIGRATION_COLUMNS.items():
+        existing = _existing_columns(conn, table_name)
+        for column_name, column_type in columns.items():
+            if column_name in existing:
+                continue
+            if backend() == "postgres":
+                execute(conn, f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {column_name} {column_type}")
+            else:
+                execute(conn, f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+
+
 def create_schema(conn) -> None:
     for sql in SCHEMA_SQL:
         execute(conn, sql)
+    _apply_additive_migrations(conn)
     for sql in INDEX_SQL:
         execute(conn, sql)
