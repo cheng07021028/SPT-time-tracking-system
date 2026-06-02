@@ -30402,3 +30402,245 @@ def audit_v30044_01_all_button_paths() -> dict:
     })
     return out
 # ---- END V300.44.4 ----
+
+# ================= V300.45 01 DELETE TRUE SOURCE FIX｜2026-06-02 =================
+# Problem observed by user: after clicking 01 admin delete, the row flashes away and
+# then appears again.  Root cause: V300.44 deleted SQLite/authority, but the 01
+# display path is SQL-first through db_service.query_df.  On Streamlit Cloud this
+# can read PostgreSQL/Neon, so the row must also be deleted through db_service.execute,
+# and the display path must honor 01/02 tombstones as a final guard.
+
+def _v30045_deleted_sets() -> dict:
+    ids = set()
+    keys = set()
+    record_keys = set()
+    try:
+        js = _v30044_json_module()
+        for mod in ("01_time_records", "02_history"):
+            p = _v30044_auth_file(mod, "tombstones.json")
+            if not p.exists():
+                continue
+            try:
+                data = js.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                data = {}
+            items = data.get("deleted_keys")
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if isinstance(item, dict):
+                    rid = _v30044_int(item.get("id"))
+                    if rid is not None:
+                        ids.add(rid)
+                    key = _v30044_text(item.get("key"))
+                    if key:
+                        keys.add(key)
+                    rk = _v30044_text(item.get("record_key"))
+                    if rk:
+                        record_keys.add(rk)
+                else:
+                    txt = _v30044_text(item)
+                    if txt:
+                        keys.add(txt)
+    except Exception:
+        pass
+    return {"ids": ids, "keys": keys, "record_keys": record_keys}
+
+
+def _v30045_row_deleted(row: dict, deleted: dict | None = None) -> bool:
+    deleted = deleted or _v30045_deleted_sets()
+    rid = _v30044_int(row.get("id"))
+    if rid is not None and rid in deleted.get("ids", set()):
+        return True
+    rk = _v30044_text(row.get("record_key"))
+    if rk and rk in deleted.get("record_keys", set()):
+        return True
+    try:
+        key = _v30044_record_key(row)
+        if key and key in deleted.get("keys", set()):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _v30045_filter_deleted_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    deleted = _v30045_deleted_sets()
+    if not deleted.get("ids") and not deleted.get("keys") and not deleted.get("record_keys"):
+        return df.reset_index(drop=True)
+    keep = []
+    for _, row in df.iterrows():
+        try:
+            keep.append(not _v30045_row_deleted(dict(row), deleted))
+        except Exception:
+            keep.append(True)
+    return df.loc[keep].copy().reset_index(drop=True)
+
+
+_v30045_prev_today_records = today_records
+_v30045_prev_load_records = load_records
+_v30045_prev_delete_time_records_from_editor_df = globals().get("delete_time_records_from_editor_df")
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    return _v30045_filter_deleted_df(_v30045_prev_today_records(include_finished=include_finished, unfinished_only=unfinished_only))
+
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    return _v30045_filter_deleted_df(_v30045_prev_load_records(start_date=start_date, end_date=end_date, employee_id=employee_id, work_order=work_order))
+
+
+def _v30045_rows_by_ids_from_db(ids: list[int]) -> list[dict]:
+    if not ids:
+        return []
+    try:
+        ph = ",".join(["?"] * len(ids))
+        df = query_df(f"SELECT * FROM time_records WHERE id IN ({ph})", tuple(ids))
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return [dict(r) for _, r in df.where(pd.notna(df), "").iterrows()]
+    except Exception:
+        pass
+    return []
+
+
+def _v30045_unique_rows(rows: list[dict]) -> list[dict]:
+    out = []
+    seen = set()
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        key = _v30044_record_key(r)
+        if key in seen:
+            continue
+        out.append(dict(r))
+        seen.add(key)
+    return out
+
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids = []
+    for x in record_ids or []:
+        i = _v30044_int(x)
+        if i is not None and i > 0 and i not in ids:
+            ids.append(i)
+    if not ids:
+        return 0
+    idset = set(ids)
+
+    # Collect rows before deletion from every source that can re-display them.
+    deleted_rows = []
+    try:
+        deleted_rows.extend(_v30045_rows_by_ids_from_db(ids))
+    except Exception:
+        pass
+    try:
+        deleted_rows.extend(_v30044_sqlite_rows_by_ids(ids))
+    except Exception:
+        pass
+    remaining_by_mod = {}
+    for mod in ("01_time_records", "02_history"):
+        rows = _v30044_authority_rows(mod)
+        keep, gone = [], []
+        for r in rows:
+            if _v30044_int(r.get("id")) in idset:
+                gone.append(dict(r))
+            else:
+                keep.append(dict(r))
+        remaining_by_mod[mod] = keep
+        deleted_rows.extend(gone)
+    if not deleted_rows:
+        deleted_rows = [{"id": i, "record_key": "", "deleted_synthetic": True} for i in ids]
+    deleted_rows = _v30045_unique_rows(deleted_rows)
+
+    # 1) Delete through db_service.execute: this reaches PostgreSQL/Neon on Cloud
+    # and SQLite locally.  This is the source that V256 SQL-first display reads.
+    try:
+        ph = ",".join(["?"] * len(ids))
+        execute(f"DELETE FROM time_records WHERE id IN ({ph})", tuple(ids))
+    except Exception:
+        pass
+
+    # 2) Also delete directly from the local SQLite file as a fallback for old cache.
+    try:
+        _v30044_ensure_sqlite_schema()
+        with sqlite3.connect(DB_PATH, timeout=15) as conn:
+            ph = ",".join(["?"] * len(ids))
+            conn.execute(f"DELETE FROM time_records WHERE id IN ({ph})", tuple(ids))
+            conn.commit()
+    except Exception:
+        pass
+
+    # 3) Remove from 01/02 authority and write tombstones so even if a stale DB/cache
+    # returns the row, today_records/load_records will hide it.
+    for mod, keep in remaining_by_mod.items():
+        try:
+            _v30044_write_authority_rows(mod, keep, f"v30045_delete_time_records:{reason}")
+        except Exception:
+            pass
+        try:
+            _v30044_append_tombstones(mod, deleted_rows, reason)
+        except Exception:
+            pass
+
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        mark_data_changed(f"已刪除工時紀錄 {len(idset)} 筆，DB/01/02 權威檔與 tombstone 已同步。", "V30045 delete_time_records")
+    except Exception:
+        pass
+    return int(len(idset))
+
+
+def delete_time_records_from_editor_df(editor_df: pd.DataFrame, delete_column: str = "刪除 / Delete", reason: str = "01 管理員維護表刪除") -> int:  # type: ignore[override]
+    df = editor_df.copy() if isinstance(editor_df, pd.DataFrame) else pd.DataFrame()
+    if df.empty:
+        return 0
+    dcol = delete_column if delete_column in df.columns else ""
+    if not dcol:
+        for c in df.columns:
+            if "刪除" in str(c) or str(c).strip().lower() in {"delete", "deleted", "remove"}:
+                dcol = c
+                break
+    if not dcol:
+        return 0
+    selected = df.loc[df[dcol].map(_v30044_checked)].copy()
+    if selected.empty:
+        return 0
+    ids = []
+    for c in ["id", "ID", "ID / ID", "ID / ID / ID", "紀錄編號", "record_id"]:
+        if c in selected.columns:
+            for x in selected[c].tolist():
+                i = _v30044_int(x)
+                if i is not None and i not in ids:
+                    ids.append(i)
+            if ids:
+                break
+    if ids:
+        return delete_time_records(ids, reason=reason)
+    # Fallback: match selected business keys against all visible sources.
+    selected_keys = {_v30044_record_key(dict(r)) for _, r in selected.iterrows()}
+    ids2 = []
+    for r in _v30044_combined_rows() + _v30045_rows_by_ids_from_db([]):
+        if _v30044_record_key(r) in selected_keys:
+            i = _v30044_int(r.get("id"))
+            if i is not None and i not in ids2:
+                ids2.append(i)
+    return delete_time_records(ids2, reason=reason) if ids2 else 0
+
+
+def audit_v30045_01_delete_true_source_fix() -> dict:
+    return {
+        "version": "V300.45_01_DELETE_TRUE_SOURCE_FIX",
+        "delete_uses_db_service_execute_for_postgres_or_sqlite": True,
+        "delete_removes_local_sqlite_cache": True,
+        "delete_removes_01_02_authority_records": True,
+        "delete_writes_01_02_tombstones": True,
+        "today_records_filters_tombstones": True,
+        "load_records_filters_tombstones": True,
+        "ui_css_theme_changed": False,
+    }
+# ================= END V300.45 01 DELETE TRUE SOURCE FIX =================
