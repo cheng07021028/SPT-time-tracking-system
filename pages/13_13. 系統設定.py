@@ -848,8 +848,21 @@ if section == "類別與工段設定 / Category & Process":
     _v144_process_category_key = _v144_safe_key_part(_v144_current_process_category)
 
     proc_df = load_process_options_df(active_only=False, category_name=filter_category)
+    # V44 final display guard: the visible process table must always match the
+    # selected/applied category.  This prevents stale editor/table state or a
+    # legacy service fallback from showing another category such as Sorter/EFEM
+    # while the selector says NTB.
+    _v44_selected_process_category = _v144_normalize_category_text(filter_category or "全部 / 通用")
+    if isinstance(proc_df, pd.DataFrame) and not proc_df.empty:
+        if "category_name" in proc_df.columns:
+            proc_df = proc_df[proc_df["category_name"].map(_v144_normalize_category_text).eq(_v44_selected_process_category)].copy()
+        else:
+            proc_df = pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
     if proc_df.empty:
-        proc_df = pd.DataFrame([{"id": "", "category_name": filter_category or "全部 / 通用", "process_name": "", "is_active": True, "sort_order": 1, "note": "", "created_at": "", "updated_at": ""}])
+        proc_df = pd.DataFrame([{"id": "", "category_name": _v44_selected_process_category, "process_name": "", "is_active": True, "sort_order": 1, "note": "", "created_at": "", "updated_at": ""}])
+    else:
+        # New rows and saves from this editor must remain in the applied category.
+        proc_df["category_name"] = _v44_selected_process_category
     proc_view = _normalize_delete_column(proc_df)
 
     proc_edit_key = "_spt_13_process_edit_mode"

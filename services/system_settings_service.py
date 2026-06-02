@@ -5729,21 +5729,31 @@ _v41_prev_load_process_options_df = load_process_options_df
 def load_process_options_df(active_only: bool = False, category_name: str | None = None, limit: int | None = None) -> pd.DataFrame:  # type: ignore[override]
     """Load process options with optional category-level SQL filtering.
 
-    V41: 13. 系統設定 must not read every process row just to display one category.
-    Passing category_name makes the SQL filter run inside Neon/PostgreSQL and keeps the page hot path small.
+    V44 safety rule:
+    When category_name is provided, returned rows must be strictly limited to
+    that category.  This prevents the 13. 系統設定 table from showing rows from
+    another category after a category selector change or stale table/editor state.
     """
+    def _v44_category_norm(value: Any) -> str:
+        text = _v38_text(value, "全部 / 通用") or "全部 / 通用"
+        return text.strip() or "全部 / 通用"
+
+    category = _v44_category_norm(category_name) if category_name is not None else ""
+
     if not _v38_sys_pg_enabled():
         # Fallback keeps compatibility with old local mode, then filters in memory.
         df = _v41_prev_load_process_options_df(active_only=active_only)
-        if category_name and isinstance(df, pd.DataFrame) and not df.empty:
+        if category and isinstance(df, pd.DataFrame) and not df.empty:
             if "category_name" not in df.columns and "type_name" in df.columns:
                 df = df.rename(columns={"type_name": "category_name"})
             if "category_name" in df.columns:
-                df = df[df["category_name"].fillna("全部 / 通用").astype(str).eq(str(category_name))].copy()
+                mask = df["category_name"].map(_v44_category_norm).eq(category)
+                df = df[mask].copy()
+            else:
+                df = pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
         return df
 
     _v38_ensure_system_settings_neon_schema()
-    category = _v38_text(category_name) if category_name is not None else ""
     safe_limit = _v38_int(limit, 0)
 
     def _load() -> pd.DataFrame:
@@ -5752,24 +5762,28 @@ def load_process_options_df(active_only: bool = False, category_name: str | None
         if active_only:
             where += " AND COALESCE(is_active,active,1)=1"
         if category:
-            where += " AND COALESCE(category_name,'全部 / 通用')=?"
+            # NULL and blank category names are both treated as 全部 / 通用.
+            where += " AND COALESCE(NULLIF(category_name,''),'全部 / 通用')=?"
             params.append(category)
         limit_sql = ""
         if safe_limit > 0:
             limit_sql = f" LIMIT {int(safe_limit)}"
         df = _v38_query_df(
-            f"""SELECT id, COALESCE(category_name,'全部 / 通用') AS category_name, process_name,
+            f"""SELECT id, COALESCE(NULLIF(category_name,''),'全部 / 通用') AS category_name, process_name,
                        COALESCE(is_active,active,1) AS is_active,
                        COALESCE(sort_order,0) AS sort_order, note, created_at, updated_at
                 FROM process_options {where}
-                ORDER BY COALESCE(category_name,'全部 / 通用'), COALESCE(sort_order,0), id{limit_sql}""",
+                ORDER BY COALESCE(NULLIF(category_name,''),'全部 / 通用'), COALESCE(sort_order,0), id{limit_sql}""",
             tuple(params),
         )
         if df is None or df.empty:
             return pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+        if category and "category_name" in df.columns:
+            # Final Python-side guard in case a legacy adapter ignores SQL filters.
+            df = df[df["category_name"].map(_v44_category_norm).eq(category)].copy()
         return df
 
-    cache_key = f"v41_process:{active_only}:{category}:{safe_limit}"
+    cache_key = f"v44_process:{active_only}:{category}:{safe_limit}"
     return _v38_cached_df(cache_key, _load)
 
 
