@@ -6195,7 +6195,10 @@ def _v51_get_selected_category_from_df(df: pd.DataFrame) -> str:
         selected = ""
     if selected:
         return selected
-    for col in ["category_name", "category", "類別", "類別 / Category", "type_name", "機型"]:
+    category_cols = []
+    if isinstance(df, pd.DataFrame):
+        category_cols = [c for c in df.columns if str(c).strip() == "category_name" or str(c).strip().startswith("category_name /") or str(c).strip() in {"category", "類別", "類別 / Category", "type_name", "機型"}]
+    for col in category_cols:
         if isinstance(df, pd.DataFrame) and col in df.columns:
             for val in df[col].tolist():
                 cat = _v51_norm_text(val)
@@ -6219,6 +6222,31 @@ def _v51_process_value_from_row(row: Any) -> str:
     return ""
 
 
+
+def _v54_category_value_from_row(row: Any, selected_category: str) -> str:
+    """Return the category for a process-option row.
+
+    Streamlit's display dataframe may contain a generated column name such as
+    "category_name / category_name" instead of the raw "category_name" field.
+    Newly added rows may also contain None/blank.  Blank means the currently
+    loaded category; stale nonblank aliases are ignored by the page layer before
+    save, but this service remains defensive.
+    """
+    cols = []
+    try:
+        cols = list(getattr(row, 'index', []))
+    except Exception:
+        cols = []
+    for col in ["category_name", "category", "類別", "類別 / Category", "type_name", "機型"] + [c for c in cols if str(c).strip().startswith("category_name /")]:
+        try:
+            value = row.get(col)
+        except Exception:
+            value = None
+        text = _v51_norm_text(value)
+        if text and text.lower() not in {"none", "nan", "nat", "null", "<na>"}:
+            return text
+    return selected_category
+
 def _v51_clean_process_rows(df: pd.DataFrame) -> list[dict[str, Any]]:
     working = df if isinstance(df, pd.DataFrame) else pd.DataFrame()
     selected_category = _v51_get_selected_category_from_df(working)
@@ -6231,9 +6259,9 @@ def _v51_clean_process_rows(df: pd.DataFrame) -> list[dict[str, Any]]:
         process_names = _v51_split_process_names(process_cell)
         if not process_names:
             continue
-        category = _v51_norm_text(row.get("category_name") if hasattr(row, 'get') else "") or selected_category
+        category = _v54_category_value_from_row(row, selected_category)
         # Blank/None category in new dynamic rows means the current loaded category.
-        if category.lower() in {"none", "nan"}:
+        if category.lower() in {"none", "nan", "nat", "null", "<na>"}:
             category = selected_category
         active = _v38_bool_int(row.get("is_active") if "is_active" in getattr(row, 'index', []) else row.get("active"), 1)
         base_sort = _v38_int(row.get("sort_order") if hasattr(row, 'get') else 0, 0)

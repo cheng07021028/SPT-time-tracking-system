@@ -393,7 +393,7 @@ def _v53_apply_editor_state_to_process_table(
     best = max(candidates, key=_v53_business_row_count) if candidates else pd.DataFrame()
     if not isinstance(best, pd.DataFrame):
         best = pd.DataFrame()
-    best = _v49_force_process_table_category(best, selected)
+    best = _v54_force_editor_save_category_preserve_blank_rows(best, selected)
     # Do not keep purely blank dynamic rows in the confirmed draft.
     if isinstance(best, pd.DataFrame) and not best.empty:
         keep_mask = []
@@ -407,6 +407,77 @@ def _v53_apply_editor_state_to_process_table(
     return best
 
 # ================= END V53 data_editor dynamic-row recovery =================
+
+
+# =================== V54 editor blank-category preservation ===================
+def _v54_category_like_columns(df: pd.DataFrame) -> list[str]:
+    if not isinstance(df, pd.DataFrame):
+        return []
+    out = []
+    for col in df.columns:
+        text = str(col).strip()
+        if text == "category_name" or text.startswith("category_name /") or text in {"category", "類別", "類別 / Category", "type_name", "機型"}:
+            out.append(col)
+    return out
+
+
+def _v54_is_blank_category(value: object) -> bool:
+    text = _v53_process_text(value)
+    return (not text) or text.lower() in {"none", "nan", "nat", "null", "<na>"}
+
+
+def _v54_force_editor_save_category_preserve_blank_rows(df: pd.DataFrame, selected_category: str) -> pd.DataFrame:
+    """Prepare process-option editor data for saving without losing new rows.
+
+    V49's display guard filters rows by category before forcing the selected
+    category.  That is correct for readonly display, but it is unsafe for
+    st.data_editor dynamic rows because newly added rows often have blank/None
+    category cells until the user presses Save.  This V54 helper first converts
+    blank category cells to the loaded category, then only drops truly mismatched
+    stale rows.  This preserves all new NTB/GPTC/etc. rows while still blocking
+    old widget-state rows from another category.
+    """
+    selected = _v144_normalize_category_text(selected_category)
+    out = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    if out.empty:
+        return out
+
+    cat_cols = _v54_category_like_columns(out)
+    if "category_name" not in out.columns:
+        if cat_cols:
+            out["category_name"] = out[cat_cols[0]]
+        else:
+            out.insert(1 if len(out.columns) else 0, "category_name", selected)
+
+    # Dynamic rows added at the bottom usually arrive with category_name = None.
+    # Treat those as rows for the currently loaded category, not as rows to drop.
+    out["category_name"] = out["category_name"].map(lambda v: selected if _v54_is_blank_category(v) else _v144_normalize_category_text(v))
+
+    # If display aliases also exist, normalize blanks there too, then remove them
+    # so the service layer cannot accidentally read a stale alias value.
+    for c in cat_cols:
+        if c == "category_name" or c not in out.columns:
+            continue
+        try:
+            out[c] = out[c].map(lambda v: selected if _v54_is_blank_category(v) else _v144_normalize_category_text(v))
+        except Exception:
+            pass
+        out = out.drop(columns=[c], errors="ignore")
+
+    # Keep rows that either match the loaded category or are blank business rows
+    # that will be removed later.  Do not use _v49_force_process_table_category
+    # here because it drops blank-category dynamic rows before they can inherit
+    # the loaded category.
+    try:
+        out = out[out["category_name"].eq(selected)].copy()
+    except Exception:
+        out["category_name"] = selected
+
+    if not out.empty:
+        out["category_name"] = selected
+    return out.reset_index(drop=True)
+
+# ================= END V54 editor blank-category preservation =================
 
 # =================== END V144 Category Process Editor Category-Switch Guard ===================
 
