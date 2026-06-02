@@ -4434,3 +4434,137 @@ def require_module_access(module_code: str, action: str = "can_view") -> None:  
 require_permission = require_module_access
 
 # ================= END V33 PAGE ACCESS FASTPATH =================
+
+# =================== V36 NEON SECURITY SETTINGS FINAL AUTHORITY ===================
+# 2026-06-02
+# 目的：10｜權限管理的「閒置自動登出分鐘數」必須以 Neon/PostgreSQL
+# auth_security_settings/security_settings 為唯一正式權威。
+# 舊版最後覆蓋層仍優先讀 local JSON，因此會出現：10 頁面已顯示 6，
+# 但登入列仍顯示 15，或 Reboot 後被舊檔覆蓋回 15。
+# 本覆蓋層放在檔案最後，確保最終生效：
+#   讀取順序：session 快取 -> Neon auth_security_settings -> Neon security_settings -> 舊檔 fallback -> default
+#   寫入順序：Neon auth_security_settings + security_settings -> session 快取
+# local JSON 不再是正式權威，只保留最後 fallback，且不會覆蓋 Neon。
+
+_V36_IDLE_CACHE_TTL_SECONDS = 30.0
+
+
+def _v36_parse_minutes(value: Any) -> int | None:
+    try:
+        if value in (None, ""):
+            return None
+        minutes = int(float(value))
+        if minutes < 1:
+            return None
+        return max(1, min(240, minutes))
+    except Exception:
+        return None
+
+
+def _v36_query_security_minutes() -> int | None:
+    """Fast Neon-first reader. Do not create schema or scan local files here."""
+    for table in ("auth_security_settings", "security_settings"):
+        try:
+            row = query_one(
+                f"SELECT setting_value FROM {table} WHERE setting_key=? LIMIT 1",
+                ("idle_timeout_minutes",),
+            )
+            minutes = _v36_parse_minutes((row or {}).get("setting_value"))
+            if minutes is not None:
+                return minutes
+        except Exception:
+            continue
+    return None
+
+
+def _v36_upsert_security_setting(key: str, value: str, note: str = "") -> None:
+    now = _now()
+    for table in ("auth_security_settings", "security_settings"):
+        try:
+            execute(f"""
+                CREATE TABLE IF NOT EXISTS {table} (
+                    setting_key TEXT PRIMARY KEY,
+                    setting_value TEXT,
+                    note TEXT,
+                    updated_at TEXT
+                )
+            """)
+            # Use UPDATE + INSERT WHERE NOT EXISTS instead of ON CONFLICT so it is
+            # compatible with both SQLite fallback and the project's SQL translator.
+            execute(
+                f"UPDATE {table} SET setting_value=?, note=?, updated_at=? WHERE setting_key=?",
+                (str(value), str(note or ""), now, str(key)),
+            )
+            execute(
+                f"""
+                INSERT INTO {table}(setting_key, setting_value, note, updated_at)
+                SELECT ?, ?, ?, ?
+                WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE setting_key=? LIMIT 1)
+                """,
+                (str(key), str(value), str(note or ""), now, str(key)),
+            )
+        except Exception:
+            # Do not block page rendering; callers will still see a clear value in session.
+            pass
+
+
+def get_idle_timeout_minutes() -> int:  # type: ignore[override]
+    """Final V36 reader: Neon/PostgreSQL is the authority; local files cannot override it."""
+    try:
+        cache = st.session_state.get("_spt_idle_timeout_cache")
+        now_ts = time.time()
+        if isinstance(cache, dict) and now_ts - float(cache.get("ts", 0) or 0) < _V36_IDLE_CACHE_TTL_SECONDS:
+            minutes = _v36_parse_minutes(cache.get("minutes"))
+            if minutes is not None:
+                return minutes
+    except Exception:
+        pass
+
+    minutes = _v36_query_security_minutes()
+
+    # Fallback only: do not let local JSON override Neon when Neon has data.
+    if minutes is None:
+        try:
+            minutes = _read_idle_timeout_from_files()
+        except Exception:
+            minutes = None
+    if minutes is None:
+        minutes = DEFAULT_IDLE_MINUTES
+    minutes = max(1, int(minutes))
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+    except Exception:
+        pass
+    return minutes
+
+
+def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
+    """Final V36 writer: persist to Neon authority tables and refresh runtime cache."""
+    minutes = _v36_parse_minutes(minutes) or DEFAULT_IDLE_MINUTES
+    try:
+        # Preserve the checkbox setting from session if available.
+        settings = st.session_state.get("spt_security_settings", {})
+        ask = "1"
+        if isinstance(settings, dict) and settings.get("ask_continue_after_record") is not None:
+            ask = str(settings.get("ask_continue_after_record"))
+        ask = "0" if str(ask).strip().lower() in {"0", "false", "no", "n", "否"} else "1"
+    except Exception:
+        ask = "1"
+
+    _v36_upsert_security_setting("idle_timeout_minutes", str(minutes), "Neon authority idle auto logout minutes")
+    _v36_upsert_security_setting("idle_auto_logout_minutes", str(minutes), "Neon authority idle auto logout minutes alias")
+    _v36_upsert_security_setting("ask_continue_after_record", str(ask), "Ask continue after time record")
+
+    try:
+        st.session_state["_spt_idle_timeout_cache"] = {"minutes": minutes, "ts": time.time()}
+        settings = st.session_state.get("spt_security_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        settings["idle_timeout_minutes"] = str(minutes)
+        settings["idle_auto_logout_minutes"] = str(minutes)
+        settings["ask_continue_after_record"] = str(ask)
+        st.session_state["spt_security_settings"] = settings
+    except Exception:
+        pass
+
+# ================= END V36 NEON SECURITY SETTINGS FINAL AUTHORITY =================
