@@ -130,12 +130,19 @@ def _v144_safe_key_part(value) -> str:
 
 
 def _v144_clear_process_option_editor_state(reason: str = "category_changed") -> None:
-    """Clear all process-option editor drafts when the selected category changes."""
+    """Clear all process-option editor drafts when the selected category changes.
+
+    V49: Streamlit keeps st.data_editor state by widget key.  The 13. 系統設定
+    process editor must never reuse an old category draft after switching category
+    or toggling edit mode.  Clear every process-option editor/draft key and bump
+    a nonce so the next editor is created with a brand-new key.
+    """
     targets = [
-        "system_process_options_editor_v192",
-        "system_process_options_editor_v144",
-        "system_process_options_draft_v58",
-        "system_process_options_draft_v144",
+        "system_process_options_editor",
+        "system_process_options_draft",
+        "system_process_options_form",
+        "submit_save_processes",
+        "submit_delete_processes",
         "system_process_options",
         "_spt_v144_last_process_category",
     ]
@@ -144,10 +151,16 @@ def _v144_clear_process_option_editor_state(reason: str = "category_changed") ->
         if any(t in sk for t in targets):
             st.session_state.pop(k, None)
     try:
+        st.session_state["_spt_v49_process_editor_nonce"] = int(st.session_state.get("_spt_v49_process_editor_nonce", 0)) + 1
+        st.session_state["_spt_v49_process_editor_reset_reason"] = str(reason or "category_changed")
+    except Exception:
+        pass
+    try:
         from services.column_settings_service import clear_editor_draft
         clear_editor_draft("system_process_options")
         clear_editor_draft("system_process_options_editor_v192")
         clear_editor_draft("system_process_options_editor_v144")
+        clear_editor_draft("system_process_options_editor_v41")
     except Exception:
         pass
 
@@ -201,6 +214,55 @@ def _v144_prepare_process_save_df_for_category(df: pd.DataFrame, selected_catego
         if c in out.columns and c != "category_name":
             out = out.drop(columns=[c], errors="ignore")
     return out
+
+
+def _v49_force_process_table_category(df: pd.DataFrame, selected_category: str) -> pd.DataFrame:
+    """Return a display/editor dataframe whose category column strictly matches the loaded category.
+
+    This is a defensive UI guard.  Even if a stale data_editor payload or an
+    older service fallback tries to provide another category, the table shown in
+    13. 系統設定 must match the loaded category before it is rendered.
+    """
+    selected = _v144_normalize_category_text(selected_category)
+    base_cols = ["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"]
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame([{
+            "id": "",
+            "category_name": selected,
+            "process_name": "",
+            "is_active": True,
+            "sort_order": 1,
+            "note": "",
+            "created_at": "",
+            "updated_at": "",
+        }])
+    out = df.copy()
+    # Normalize category aliases first, then drop stale alias columns.
+    if "category_name" not in out.columns:
+        out.insert(1 if len(out.columns) else 0, "category_name", selected)
+    out["category_name"] = out["category_name"].map(_v144_normalize_category_text)
+    out = out[out["category_name"].eq(selected)].copy()
+    for c in ["category", "類別", "類別 / Category", "type_name", "機型"]:
+        if c in out.columns and c != "category_name":
+            out = out.drop(columns=[c], errors="ignore")
+    if out.empty:
+        out = pd.DataFrame([{
+            "id": "",
+            "category_name": selected,
+            "process_name": "",
+            "is_active": True,
+            "sort_order": 1,
+            "note": "",
+            "created_at": "",
+            "updated_at": "",
+        }])
+    else:
+        out["category_name"] = selected
+    for c in base_cols:
+        if c not in out.columns:
+            out[c] = "" if c not in {"is_active", "sort_order"} else (True if c == "is_active" else None)
+    return out
+
 # =================== END V144 Category Process Editor Category-Switch Guard ===================
 
 
@@ -847,7 +909,8 @@ if section == "類別與工段設定 / Category & Process":
         apply_filter_category = st.form_submit_button("▣ 載入此類別工段 / Load Category Processes", use_container_width=True)
     if apply_filter_category:
         st.session_state["system_process_category_filter_applied_v41"] = pending_filter_category
-        _v144_clear_process_option_editor_state("process_category_applied_v41")
+        st.session_state["_spt_13_process_edit_mode"] = False
+        _v144_clear_process_option_editor_state("process_category_applied_v49")
         st.rerun()
     filter_category = st.session_state.get("system_process_category_filter_applied_v41", _applied_process_category)
     # V48: if the dropdown value was changed but the Load button was not pressed,
@@ -869,56 +932,52 @@ if section == "類別與工段設定 / Category & Process":
     st.caption(f"目前已載入類別 / Loaded Category：{filter_category}")
 
     proc_df = load_process_options_df(active_only=False, category_name=filter_category)
-    # V44 final display guard: the visible process table must always match the
-    # selected/applied category.  This prevents stale editor/table state or a
-    # legacy service fallback from showing another category such as Sorter/EFEM
-    # while the selector says NTB.
+    # V49 final display/editor guard: both readonly and editable tables must
+    # strictly match the loaded category before rendering.
     _v44_selected_process_category = _v144_normalize_category_text(filter_category or "全部 / 通用")
-    if isinstance(proc_df, pd.DataFrame) and not proc_df.empty:
-        if "category_name" in proc_df.columns:
-            proc_df = proc_df[proc_df["category_name"].map(_v144_normalize_category_text).eq(_v44_selected_process_category)].copy()
-        else:
-            proc_df = pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
-    if proc_df.empty:
-        proc_df = pd.DataFrame([{"id": "", "category_name": _v44_selected_process_category, "process_name": "", "is_active": True, "sort_order": 1, "note": "", "created_at": "", "updated_at": ""}])
-    else:
-        # New rows and saves from this editor must remain in the applied category.
-        proc_df["category_name"] = _v44_selected_process_category
+    proc_df = _v49_force_process_table_category(proc_df, _v44_selected_process_category)
     proc_view = _normalize_delete_column(proc_df)
 
     proc_edit_key = "_spt_13_process_edit_mode"
     if can_manage:
         c1, c2, c3 = st.columns([1, 1, 4])
         if not st.session_state.get(proc_edit_key, False):
-            if c1.button("◇ 啟動編輯工段 / Enable Edit", key="enable_process_edit_v41", use_container_width=True):
+            if c1.button("◇ 啟動編輯工段 / Enable Edit", key="enable_process_edit_v49", use_container_width=True):
+                _v144_clear_process_option_editor_state("enable_process_edit_v49")
                 _set_edit_mode(proc_edit_key, True)
+                st.rerun()
         else:
-            if c1.button("◌ 停止編輯工段 / Lock Edit", key="disable_process_edit_v41", use_container_width=True):
+            if c1.button("◌ 停止編輯工段 / Lock Edit", key="disable_process_edit_v49", use_container_width=True):
+                _v144_clear_process_option_editor_state("disable_process_edit_v49")
                 _set_edit_mode(proc_edit_key, False)
+                st.rerun()
         c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
 
     if can_manage and st.session_state.get(proc_edit_key, False):
         st.info("編輯工段時不會立即寫入或重算；只有按下表單按鈕才寫入 Neon。")
-        proc_draft_key = f"system_process_options_draft_v41_{_v144_process_category_key}"
-        with st.form(f"system_process_options_form_v41_{_v144_process_category_key}", clear_on_submit=False):
+        _v49_process_editor_nonce = int(st.session_state.get("_spt_v49_process_editor_nonce", 0))
+        proc_draft_key = f"system_process_options_draft_v49_{_v144_process_category_key}_{_v49_process_editor_nonce}"
+        with st.form(f"system_process_options_form_v49_{_v144_process_category_key}_{_v49_process_editor_nonce}", clear_on_submit=False):
             edited_proc = render_table(
                 proc_view,
                 "system_process_options",
                 editable=True,
                 disabled=["id", "category_name", "created_at", "updated_at"],
-                key=f"system_process_options_editor_v41_form_{_v144_process_category_key}",
+                key=f"system_process_options_editor_v49_form_{_v144_process_category_key}_{_v49_process_editor_nonce}",
                 height=430,
                 num_rows="dynamic",
             )
             proc_apply_col, proc_delete_col = st.columns(2)
             with proc_apply_col:
-                proc_apply_clicked = st.form_submit_button("◈ 套用並永久儲存工段 / Save Processes", type="primary", use_container_width=True, key=f"submit_save_processes_v42_{_v144_process_category_key}")
+                proc_apply_clicked = st.form_submit_button("◈ 套用並永久儲存工段 / Save Processes", type="primary", use_container_width=True, key=f"submit_save_processes_v49_{_v144_process_category_key}_{_v49_process_editor_nonce}")
             with proc_delete_col:
-                proc_delete_clicked = st.form_submit_button("◉ 刪除勾選工段 / Delete Selected", type="primary", use_container_width=True, key=f"submit_delete_processes_v42_{_v144_process_category_key}")
+                proc_delete_clicked = st.form_submit_button("◉ 刪除勾選工段 / Delete Selected", type="primary", use_container_width=True, key=f"submit_delete_processes_v49_{_v144_process_category_key}_{_v49_process_editor_nonce}")
         if isinstance(edited_proc, pd.DataFrame):
-            st.session_state[proc_draft_key] = edited_proc.copy()
+            st.session_state[proc_draft_key] = _v49_force_process_table_category(edited_proc, filter_category or "全部 / 通用").copy()
         if proc_apply_clicked or proc_delete_clicked:
             edited_proc = st.session_state.get(proc_draft_key, edited_proc)
+            if isinstance(edited_proc, pd.DataFrame):
+                edited_proc = _v49_force_process_table_category(edited_proc, filter_category or "全部 / 通用")
             if edited_proc is None:
                 st.warning("找不到可套用的工段表格內容，請重新載入後再試。")
                 st.stop()
