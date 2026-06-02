@@ -1386,7 +1386,8 @@ html body div[data-testid="stForm"] label * {
     with st.form("login_form", clear_on_submit=False):
         username = st.text_input("帳號 / Username", placeholder="請輸入帳號")
         password = st.text_input("密碼 / Password", type="password", placeholder="請輸入密碼")
-        submitted = st.form_submit_button("⛨ 進入系統 / Secure Login", use_container_width=True)
+        with st:
+            submitted = st.form_submit_button("⛨ 進入系統 / Secure Login", use_container_width=True)
     st.markdown(
         """
         <div class="spt-login-note">
@@ -3310,7 +3311,8 @@ def _v106_render_force_password_change() -> None:
     with st.form("v106_force_password_change_form", clear_on_submit=False):
         new_pwd = st.text_input("新密碼 / New Password", type="password")
         confirm_pwd = st.text_input("確認新密碼 / Confirm New Password", type="password")
-        submitted = st.form_submit_button("儲存新密碼並繼續 / Save Password and Continue", type="primary", use_container_width=True)
+        with st:
+            submitted = st.form_submit_button("儲存新密碼並繼續 / Save Password and Continue", type="primary", use_container_width=True)
     if submitted:
         if not new_pwd or not confirm_pwd:
             st.error("請輸入新密碼並再次確認。")

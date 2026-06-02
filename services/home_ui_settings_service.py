@@ -282,8 +282,8 @@ def render_global_font_controls(username: str = "SYSTEM") -> None:
             )
         with c3:
             st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
-            submitted = st.form_submit_button("套用到所有模組並永久記錄")
-
+            with st:
+                submitted = st.form_submit_button("套用到所有模組並永久記錄")
     b1, b2, _ = st.columns([1.3, 1.3, 5])
     with b1:
         reset = st.button("恢復預設 100%", key="global_font_reset_100")

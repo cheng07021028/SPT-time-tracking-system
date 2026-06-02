@@ -139,8 +139,10 @@ with st.form("v39_login_log_search_form", clear_on_submit=False):
     with fc4:
         pending_limit = st.number_input("讀取筆數 / Limit", min_value=100, max_value=2000, value=int(_applied_login_filters.get("limit", 300)), step=100)
     q1, q2 = st.columns([1, 1])
-    apply_query = q1.form_submit_button("🔎 套用查詢 / Apply Search", type="primary", use_container_width=True)
-    reset_query = q2.form_submit_button("↺ 恢復預設 / Reset", use_container_width=True)
+    with q1:
+        apply_query = st.form_submit_button("🔎 套用查詢 / Apply Search", type="primary", use_container_width=True)
+    with q2:
+        reset_query = st.form_submit_button("↺ 恢復預設 / Reset", use_container_width=True)
 if reset_query:
     st.session_state["v39_login_log_filters_applied"] = _default_login_filters.copy()
     st.rerun()

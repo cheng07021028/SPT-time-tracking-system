@@ -1348,10 +1348,12 @@ if is_admin:
                         )
                         editor_key = f"{editor_key}_safe"
                     b1, b2, b3 = st.columns(3)
-                    do_save = b1.form_submit_button("💾 僅儲存修改 / Save", type="primary", use_container_width=True)
-                    do_recalc = b2.form_submit_button("🧮 重算勾選工時並同步 02 / Recalc", use_container_width=True)
-                    do_delete = b3.form_submit_button("🗑 刪除勾選整列 / Delete", use_container_width=True)
-
+                    with b1:
+                        do_save = st.form_submit_button("💾 僅儲存修改 / Save", type="primary", use_container_width=True)
+                    with b2:
+                        do_recalc = st.form_submit_button("🧮 重算勾選工時並同步 02 / Recalc", use_container_width=True)
+                    with b3:
+                        do_delete = st.form_submit_button("🗑 刪除勾選整列 / Delete", use_container_width=True)
                 edited_admin = _v92_editor_state_to_df(display_admin, edited_admin_return, editor_key)
 
                 manual_ids = _v92_checked_ids(edited_admin, delete_col, _id_col)

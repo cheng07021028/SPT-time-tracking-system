@@ -161,9 +161,10 @@ with st.form("log_query_filter_form", clear_on_submit=False):
     keyword = c7.text_input("關鍵字 / Keyword", value=str(f.get("keyword", "")))
 
     c8, c9 = st.columns([1, 1])
-    apply_filter = c8.form_submit_button("⌕ 套用查詢 / Apply Query", use_container_width=True)
-    clear_filter = c9.form_submit_button("↺ 清除條件 / Clear", use_container_width=True)
-
+    with c8:
+        apply_filter = st.form_submit_button("⌕ 套用查詢 / Apply Query", use_container_width=True)
+    with c9:
+        clear_filter = st.form_submit_button("↺ 清除條件 / Clear", use_container_width=True)
 if clear_filter:
     st.session_state["log_query_filters"] = _default_filters()
     st.rerun()

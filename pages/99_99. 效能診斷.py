@@ -81,7 +81,8 @@ with st.form("v39_perf_report_filter_form", clear_on_submit=False):
     with col3:
         st.write("")
         st.write("")
-        refresh_report = st.form_submit_button("重新整理測速報告", use_container_width=True, type="primary")
+        with st:
+            refresh_report = st.form_submit_button("重新整理測速報告", use_container_width=True, type="primary")
 if refresh_report:
     st.session_state["v39_perf_filters_applied"] = {"hours": int(pending_hours), "limit": int(pending_limit)}
     st.rerun()

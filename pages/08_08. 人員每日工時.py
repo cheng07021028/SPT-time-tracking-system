@@ -110,8 +110,8 @@ with st.expander("🔎 篩選條件 / Filters", expanded=True):
             "只看未紀錄 / No Record Only",
             value=bool(st.session_state.get("daily_hours_no_record_only", False)),
         )
-        submitted = c8.form_submit_button("🔎 套用篩選 / Apply", use_container_width=True)
-
+        with c8:
+            submitted = st.form_submit_button("🔎 套用篩選 / Apply", use_container_width=True)
         if submitted:
             st.session_state["daily_hours_date"] = selected
             st.session_state["daily_hours_employee_id"] = employee_id_keyword

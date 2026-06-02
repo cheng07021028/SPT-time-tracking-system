@@ -1264,9 +1264,10 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
 
             keyword = st.text_input("關鍵字搜尋：製令 / 料號 / 機型 / 工段 / 工號 / 姓名 / 備註", value=applied.get("keyword", ""))
             b1, b2, b3 = st.columns([1.3, 1, 2])
-            apply_clicked = b1.form_submit_button("⌕ 套用篩選並永久記錄", type="primary", use_container_width=True)
-            reset_clicked = b2.form_submit_button("↺ 恢復預設篩選", use_container_width=True)
-
+            with b1:
+                apply_clicked = st.form_submit_button("⌕ 套用篩選並永久記錄", type="primary", use_container_width=True)
+            with b2:
+                reset_clicked = st.form_submit_button("↺ 恢復預設篩選", use_container_width=True)
         if reset_clicked:
             new_filters = reset_history_filters()
             st.session_state["history_filters_applied_v216"] = new_filters
