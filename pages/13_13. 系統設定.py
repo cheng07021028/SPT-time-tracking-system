@@ -263,6 +263,151 @@ def _v49_force_process_table_category(df: pd.DataFrame, selected_category: str) 
             out[c] = "" if c not in {"is_active", "sort_order"} else (True if c == "is_active" else None)
     return out
 
+
+
+# =================== V53 data_editor dynamic-row recovery ===================
+def _v53_process_text(value: object) -> str:
+    try:
+        if value is None or pd.isna(value):
+            return ""
+    except Exception:
+        if value is None:
+            return ""
+    text = str(value).strip()
+    if text.lower() in {"none", "nan", "nat"}:
+        return ""
+    return text
+
+
+def _v53_row_has_process_value(row: object) -> bool:
+    for c in ["process_name", "工段名稱", "工段名稱 / Process", "process", "Process", "工段"]:
+        try:
+            val = row.get(c)  # pandas Series / dict
+        except Exception:
+            val = None
+        if _v53_process_text(val):
+            return True
+    return False
+
+
+def _v53_business_row_count(df: object) -> int:
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return 0
+    total = 0
+    for _, row in df.iterrows():
+        if _v53_row_has_process_value(row):
+            total += 1
+    return total
+
+
+def _v53_apply_editor_state_to_process_table(
+    returned_df: object,
+    source_df: pd.DataFrame,
+    editor_widget_key: str,
+    selected_category: str,
+) -> pd.DataFrame:
+    """Recover dynamic rows from st.data_editor widget state.
+
+    Streamlit data_editor inside a form may return only the original rows in some
+    versions unless the widget state is merged explicitly.  The dynamic rows are
+    stored under st.session_state[widget_key]["added_rows"].  This helper builds
+    the confirmed draft from:
+      1) original displayed rows,
+      2) edited_rows changes,
+      3) added_rows dynamic rows,
+      4) deleted_rows removal.
+
+    The final dataframe is then forced to the currently loaded category so saving
+    NTB cannot accidentally save another category and blank category cells in new
+    rows are still written as NTB.
+    """
+    selected = _v144_normalize_category_text(selected_category)
+    returned = returned_df.copy() if isinstance(returned_df, pd.DataFrame) else pd.DataFrame()
+    base = source_df.copy() if isinstance(source_df, pd.DataFrame) else returned.copy()
+
+    state = st.session_state.get(editor_widget_key)
+    state_df = None
+    if isinstance(state, dict) and any(k in state for k in ("edited_rows", "added_rows", "deleted_rows")):
+        work = base.copy()
+        # Ensure all rows/cols are mutable by position.
+        work = work.reset_index(drop=True)
+        edited_rows = state.get("edited_rows") or {}
+        if isinstance(edited_rows, dict):
+            for idx_raw, changes in edited_rows.items():
+                try:
+                    idx = int(idx_raw)
+                except Exception:
+                    continue
+                if idx < 0 or idx >= len(work) or not isinstance(changes, dict):
+                    continue
+                for col, val in changes.items():
+                    if col not in work.columns:
+                        work[col] = ""
+                    work.at[idx, col] = val
+
+        deleted_rows = state.get("deleted_rows") or []
+        delete_idx = set()
+        if isinstance(deleted_rows, (list, tuple, set)):
+            for idx_raw in deleted_rows:
+                try:
+                    delete_idx.add(int(idx_raw))
+                except Exception:
+                    pass
+        if delete_idx:
+            keep = [i for i in range(len(work)) if i not in delete_idx]
+            work = work.iloc[keep].reset_index(drop=True)
+
+        added_rows = state.get("added_rows") or []
+        if isinstance(added_rows, list) and added_rows:
+            rows_to_add = []
+            cols = list(work.columns) if len(work.columns) else ["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"]
+            for added in added_rows:
+                if not isinstance(added, dict):
+                    continue
+                row = {c: "" for c in cols}
+                for col, val in added.items():
+                    if col not in row:
+                        row[col] = val
+                    else:
+                        row[col] = val
+                # Some Streamlit versions store display-label keys in the widget state.
+                if "process_name" not in row or not _v53_process_text(row.get("process_name")):
+                    for alias in ["工段名稱 / Process", "工段名稱", "Process", "process", "工段"]:
+                        if _v53_process_text(row.get(alias)):
+                            row["process_name"] = row.get(alias)
+                            break
+                if "category_name" not in row or not _v53_process_text(row.get("category_name")):
+                    row["category_name"] = selected
+                if "is_active" not in row or str(row.get("is_active")).strip() == "":
+                    row["is_active"] = True
+                if _v53_row_has_process_value(row):
+                    rows_to_add.append(row)
+            if rows_to_add:
+                work = pd.concat([work, pd.DataFrame(rows_to_add)], ignore_index=True)
+        state_df = work
+
+    # Prefer the candidate that contains more non-empty process rows.  This keeps
+    # normal Streamlit versions working while fixing versions that omit added rows
+    # from the return value.
+    candidates = [df for df in [returned, state_df, base] if isinstance(df, pd.DataFrame)]
+    best = max(candidates, key=_v53_business_row_count) if candidates else pd.DataFrame()
+    if not isinstance(best, pd.DataFrame):
+        best = pd.DataFrame()
+    best = _v49_force_process_table_category(best, selected)
+    # Do not keep purely blank dynamic rows in the confirmed draft.
+    if isinstance(best, pd.DataFrame) and not best.empty:
+        keep_mask = []
+        for _, row in best.iterrows():
+            has_process = _v53_row_has_process_value(row)
+            has_id = _v53_process_text(row.get("id"))
+            keep_mask.append(bool(has_process or has_id))
+        best = best.loc[keep_mask].reset_index(drop=True) if keep_mask else best
+        if not best.empty:
+            best["category_name"] = selected
+    return best
+
+# ================= END V53 data_editor dynamic-row recovery =================
+
 # =================== END V144 Category Process Editor Category-Switch Guard ===================
 
 
@@ -958,12 +1103,13 @@ if section == "類別與工段設定 / Category & Process":
         _v49_process_editor_nonce = int(st.session_state.get("_spt_v49_process_editor_nonce", 0))
         proc_draft_key = f"system_process_options_draft_v49_{_v144_process_category_key}_{_v49_process_editor_nonce}"
         with st.form(f"system_process_options_form_v49_{_v144_process_category_key}_{_v49_process_editor_nonce}", clear_on_submit=False):
+            _v53_process_editor_widget_key = f"system_process_options_editor_v49_form_{_v144_process_category_key}_{_v49_process_editor_nonce}"
             edited_proc = render_table(
                 proc_view,
                 "system_process_options",
                 editable=True,
                 disabled=["id", "category_name", "created_at", "updated_at"],
-                key=f"system_process_options_editor_v49_form_{_v144_process_category_key}_{_v49_process_editor_nonce}",
+                key=_v53_process_editor_widget_key,
                 height=430,
                 num_rows="dynamic",
             )
@@ -972,10 +1118,16 @@ if section == "類別與工段設定 / Category & Process":
                 proc_apply_clicked = st.form_submit_button("◈ 套用並永久儲存工段 / Save Processes", type="primary", use_container_width=True, key=f"submit_save_processes_v49_{_v144_process_category_key}_{_v49_process_editor_nonce}")
             with proc_delete_col:
                 proc_delete_clicked = st.form_submit_button("◉ 刪除勾選工段 / Delete Selected", type="primary", use_container_width=True, key=f"submit_delete_processes_v49_{_v144_process_category_key}_{_v49_process_editor_nonce}")
-        if isinstance(edited_proc, pd.DataFrame):
-            st.session_state[proc_draft_key] = _v49_force_process_table_category(edited_proc, filter_category or "全部 / 通用").copy()
+        _v53_confirmed_proc = _v53_apply_editor_state_to_process_table(
+            edited_proc,
+            proc_view,
+            _v53_process_editor_widget_key,
+            filter_category or "全部 / 通用",
+        )
+        if isinstance(_v53_confirmed_proc, pd.DataFrame):
+            st.session_state[proc_draft_key] = _v53_confirmed_proc.copy()
         if proc_apply_clicked or proc_delete_clicked:
-            edited_proc = st.session_state.get(proc_draft_key, edited_proc)
+            edited_proc = st.session_state.get(proc_draft_key, _v53_confirmed_proc)
             if isinstance(edited_proc, pd.DataFrame):
                 edited_proc = _v49_force_process_table_category(edited_proc, filter_category or "全部 / 通用")
             if edited_proc is None:
