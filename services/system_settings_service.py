@@ -5798,3 +5798,156 @@ def audit_v41_system_settings_lazy_load() -> dict[str, Any]:
     }
 
 # ================= END V41 SYSTEM SETTINGS LAZY LOAD HELPERS =================
+
+# ================= V45 01/13 CATEGORY-PROCESS NEON BRIDGE FIX =================
+# Purpose:
+# - 01. 工時紀錄 must read the same Neon process_options table maintained by
+#   13. 系統設定.
+# - Older overrides still pointed get_process_options_by_category_exact() to the
+#   legacy process_category_options/local structures, which made 01 show
+#   "目前類別尚未設定任何啟用工段" even though 13 had active rows in Neon.
+# - This final override keeps Neon/PostgreSQL as the single source of truth and
+#   performs an exact category filter for 01.
+
+_V45_PROCESS_ALL_CATEGORY = "全部 / 通用"
+
+
+def _v45_category_text(value: Any) -> str:
+    try:
+        text = _v38_text(value, _V45_PROCESS_ALL_CATEGORY)
+    except Exception:
+        text = str(value or _V45_PROCESS_ALL_CATEGORY)
+    text = str(text or _V45_PROCESS_ALL_CATEGORY).strip()
+    return text or _V45_PROCESS_ALL_CATEGORY
+
+
+def _v45_bool_active(value: Any) -> bool:
+    text = str(value).strip().lower()
+    if text in {"0", "false", "no", "n", "off", "停用", "否", "none", "nan", ""}:
+        return False
+    return True
+
+
+def _v45_process_names_from_df(df: pd.DataFrame, category: str) -> list[str]:
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return []
+    work = df.copy()
+    if "category_name" not in work.columns and "type_name" in work.columns:
+        work = work.rename(columns={"type_name": "category_name"})
+    if "category_name" not in work.columns:
+        return []
+    if "process_name" not in work.columns:
+        return []
+    work["category_name"] = work["category_name"].map(_v45_category_text)
+    work = work[work["category_name"].eq(category)].copy()
+    if work.empty:
+        return []
+    if "is_active" in work.columns:
+        work = work[work["is_active"].map(_v45_bool_active)].copy()
+    elif "active" in work.columns:
+        work = work[work["active"].map(_v45_bool_active)].copy()
+    if work.empty:
+        return []
+    if "sort_order" not in work.columns:
+        work["sort_order"] = 999999
+    if "id" not in work.columns:
+        work["id"] = 999999
+    try:
+        work["_sort"] = pd.to_numeric(work["sort_order"], errors="coerce").fillna(999999)
+        work["_id"] = pd.to_numeric(work["id"], errors="coerce").fillna(999999)
+        work = work.sort_values(["_sort", "_id", "process_name"], kind="stable")
+    except Exception:
+        pass
+    names: list[str] = []
+    seen: set[str] = set()
+    for value in work["process_name"].tolist():
+        name = str(value or "").strip()
+        if name and name not in seen:
+            names.append(name)
+            seen.add(name)
+    return names
+
+
+def get_process_options_by_category_exact(category_name: str | None = None) -> list[str]:  # type: ignore[override]
+    """Return active process names for exactly one category from Neon process_options.
+
+    This is the source used by 01. 工時紀錄.  It intentionally does not read the
+    older process_category_options/local authority path.  If 13. 系統設定 shows
+    active process_options rows for Sorter/EFEM, 01 must return those same names.
+    """
+    category = _v45_category_text(category_name)
+    try:
+        df = load_process_options_df(active_only=True, category_name=category, limit=2000)
+    except TypeError:
+        df = load_process_options_df(active_only=True)
+    except Exception:
+        df = pd.DataFrame()
+    return _v45_process_names_from_df(df, category)
+
+
+def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
+    category = _v45_category_text(category_name)
+    names: list[str] = []
+    if include_common and category != _V45_PROCESS_ALL_CATEGORY:
+        names.extend(get_process_options_by_category_exact(_V45_PROCESS_ALL_CATEGORY))
+    names.extend(get_process_options_by_category_exact(category))
+    out: list[str] = []
+    seen: set[str] = set()
+    for name in names:
+        if name and name not in seen:
+            out.append(name)
+            seen.add(name)
+    return out
+
+
+def get_process_options() -> list[str]:  # type: ignore[override]
+    return get_process_options_by_category(get_default_process_category(), include_common=True)
+
+
+_v45_prev_load_process_category_choices = load_process_category_choices
+
+
+def load_process_category_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    """Load category choices from Neon category master plus process_options categories.
+
+    This prevents 01 from missing a category that exists in 13 process_options but
+    was not present in the category master due to older imports.
+    """
+    choices: list[str] = []
+    try:
+        df_cat = load_process_categories_df(active_only=True)
+        if isinstance(df_cat, pd.DataFrame) and not df_cat.empty and "category_name" in df_cat.columns:
+            choices.extend([_v45_category_text(x) for x in df_cat["category_name"].tolist() if _v45_category_text(x)])
+    except Exception:
+        try:
+            choices.extend(_v45_prev_load_process_category_choices(include_common=include_common))
+        except Exception:
+            pass
+    try:
+        df_proc = load_process_options_df(active_only=True, category_name=None, limit=5000)
+        if isinstance(df_proc, pd.DataFrame) and not df_proc.empty and "category_name" in df_proc.columns:
+            choices.extend([_v45_category_text(x) for x in df_proc["category_name"].tolist() if _v45_category_text(x)])
+    except Exception:
+        pass
+    if include_common:
+        choices.insert(0, _V45_PROCESS_ALL_CATEGORY)
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in choices:
+        item = _v45_category_text(item)
+        if item and item not in seen:
+            out.append(item)
+            seen.add(item)
+    return out or ([_V45_PROCESS_ALL_CATEGORY] if include_common else [])
+
+
+def audit_v45_process_bridge() -> dict[str, Any]:
+    return {
+        "version": "V45_01_13_PROCESS_BRIDGE_NEON_EXACT_CATEGORY",
+        "single_authority": "Neon process_options",
+        "page01_process_source": "get_process_options_by_category_exact -> load_process_options_df(category_name=...) ",
+        "exact_category_filter": True,
+        "no_local_process_category_options_authority": True,
+    }
+
+# ================= END V45 01/13 CATEGORY-PROCESS NEON BRIDGE FIX =================
