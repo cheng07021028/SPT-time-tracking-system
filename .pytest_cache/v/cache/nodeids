@@ -1,0 +1,9 @@
+[
+  "tests/test_core_flow.py::test_employee_and_work_order_unique",
+  "tests/test_core_flow.py::test_group_average_same_three_minute_bucket",
+  "tests/test_core_flow.py::test_log_written",
+  "tests/test_core_flow.py::test_start_finish_delete_flow",
+  "tests/test_permissions.py::test_operator_cannot_create_employee",
+  "tests/test_permissions.py::test_supervisor_can_create_work_order",
+  "tests/test_service_boundary.py::test_services_do_not_import_streamlit"
+]
