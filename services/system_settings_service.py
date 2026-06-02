@@ -5486,3 +5486,233 @@ def audit_v38_system_settings_neon_confirm_only() -> dict[str, Any]:
     }
 
 # ================= END V38 SYSTEM SETTINGS NEON AUTHORITY + CONFIRM-ONLY SAVE =================
+
+
+# ================= V40 SYSTEM SETTINGS DUPLICATE-SAFE UPSERT + PERFORMANCE FIX =================
+# Purpose:
+# - Fix PostgreSQL UniqueViolation when legacy Neon tables still have UNIQUE(process_name)
+#   or when a confirmed edit changes a row into another active row's natural key.
+# - Keep 13. 系統設定 as Neon/PostgreSQL single source of truth.
+# - Do not restore from local JSON/GitHub and do not change UI/CSS.
+
+_V40_SYS_SCHEMA_READY = False
+_v40_prev_ensure_system_settings_neon_schema = _v38_ensure_system_settings_neon_schema
+
+
+def _v40_is_unique_violation(exc: Exception) -> bool:
+    text = (exc.__class__.__name__ + " " + str(exc)).lower()
+    return "uniqueviolation" in text or "unique violation" in text or "duplicate key" in text or "unique constraint" in text
+
+
+def _v40_drop_legacy_process_unique_constraints() -> None:
+    """Drop legacy UNIQUE(process_name) constraints/indexes that block per-category processes.
+
+    Older patches sometimes created a uniqueness rule on process_options.process_name only.
+    The intended 13-module natural key is (category_name, process_name, active row).  Leaving the
+    legacy rule makes confirmed edits fail with psycopg.errors.UniqueViolation.  This migration is
+    intentionally narrow: it only removes unique objects whose indexed/constraint columns are exactly
+    process_name.
+    """
+    if not _v38_sys_pg_enabled():
+        return
+    ddl = r"""
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN
+        SELECT c.conname
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE t.relname = 'process_options'
+          AND c.contype = 'u'
+          AND (
+              SELECT string_agg(a.attname, ',' ORDER BY a.attnum)
+              FROM unnest(c.conkey) AS ck(attnum)
+              JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ck.attnum
+          ) = 'process_name'
+    LOOP
+        EXECUTE 'ALTER TABLE process_options DROP CONSTRAINT IF EXISTS ' || quote_ident(r.conname);
+    END LOOP;
+
+    FOR r IN
+        SELECT i.relname AS index_name
+        FROM pg_class t
+        JOIN pg_index ix ON ix.indrelid = t.oid
+        JOIN pg_class i ON i.oid = ix.indexrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE t.relname = 'process_options'
+          AND ix.indisunique = true
+          AND ix.indisprimary = false
+          AND NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conindid = i.oid)
+          AND (
+              SELECT string_agg(a.attname, ',' ORDER BY a.attnum)
+              FROM unnest(ix.indkey) AS k(attnum)
+              JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+          ) = 'process_name'
+    LOOP
+        EXECUTE 'DROP INDEX IF EXISTS ' || quote_ident(r.index_name);
+    END LOOP;
+END $$
+"""
+    try:
+        _v38_exec(ddl, ignore_error=True)
+    except Exception:
+        pass
+
+
+def _v38_ensure_system_settings_neon_schema() -> None:  # type: ignore[override]
+    global _V40_SYS_SCHEMA_READY
+    _v40_prev_ensure_system_settings_neon_schema()
+    if _V40_SYS_SCHEMA_READY:
+        return
+    try:
+        _v40_drop_legacy_process_unique_constraints()
+        # Helpful non-unique index for the intended natural key.  Unique enforcement is done by
+        # the save routine with soft-delete handling so legacy duplicates never crash the page.
+        _v38_exec(
+            "CREATE INDEX IF NOT EXISTS idx_v40_process_options_natural ON process_options(category_name, process_name, id) WHERE COALESCE(deleted_at,'')=''",
+            ignore_error=True,
+        )
+    finally:
+        _V40_SYS_SCHEMA_READY = True
+
+
+# Keep the public alias pointed at the latest schema guard.
+def ensure_system_settings_schema() -> None:  # type: ignore[override]
+    _v38_ensure_system_settings_neon_schema()
+
+
+def _v40_find_process_conflict_id(category: str, process: str, exclude_id: int = 0) -> int:
+    """Find an existing active process row that would conflict with the desired save.
+
+    First prefer the intended natural key (category_name + process_name).  Then fallback to
+    process_name-only so older DBs that still had UNIQUE(process_name) can merge cleanly.
+    """
+    category = _v38_text(category, "全部 / 通用") or "全部 / 通用"
+    process = _v38_text(process)
+    if not process:
+        return 0
+    try:
+        row = _v38_query_one(
+            """SELECT id FROM process_options
+               WHERE category_name=? AND process_name=? AND COALESCE(deleted_at,'')='' AND id<>?
+               ORDER BY id LIMIT 1""",
+            (category, process, int(exclude_id or 0)),
+        ) or {}
+        rid = _v38_int(row.get("id"), 0)
+        if rid > 0:
+            return rid
+    except Exception:
+        pass
+    try:
+        row = _v38_query_one(
+            """SELECT id FROM process_options
+               WHERE process_name=? AND COALESCE(deleted_at,'')='' AND id<>?
+               ORDER BY CASE WHEN category_name=? THEN 0 ELSE 1 END, id LIMIT 1""",
+            (process, int(exclude_id or 0), category),
+        ) or {}
+        return _v38_int(row.get("id"), 0)
+    except Exception:
+        return 0
+
+
+def _v40_update_process_option_id(rid: int, category: str, process: str, active: int, sort_order: int, note: str, now: str) -> None:
+    _v38_exec(
+        """UPDATE process_options
+           SET category_name=?, process_name=?, is_active=?, active=?, sort_order=?, note=?,
+               updated_at=?, updated_by='13_system_settings', deleted_at='', deleted_by='', delete_reason='',
+               version=COALESCE(version,1)+1
+           WHERE id=?""",
+        (category, process, active, active, sort_order, note, now, int(rid)),
+    )
+
+
+def _v40_soft_delete_process_option_id(rid: int, now: str, reason: str = "merged_duplicate_from_13") -> None:
+    if int(rid or 0) <= 0:
+        return
+    _v38_exec(
+        """UPDATE process_options
+           SET deleted_at=?, deleted_by='13_system_settings', delete_reason=?, active=0, is_active=0,
+               version=COALESCE(version,1)+1
+           WHERE id=?""",
+        (now, reason, int(rid)),
+        ignore_error=True,
+    )
+
+
+def save_process_options_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    """Confirmed save for 13. 系統設定 / process options.
+
+    This V40 override is duplicate-safe.  It prevents a confirmed edit from crashing when an old
+    Neon schema still contains unique rules or duplicate active rows.  If a draft row collides with
+    another active row, the older/current row is merged into the conflict target and the duplicate
+    source row is soft-deleted.  No local JSON/GitHub restore is used.
+    """
+    _v38_ensure_system_settings_neon_schema()
+    now = _v38_sys_now()
+    count = 0
+    working = df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    for _, row in working.iterrows():
+        process = _v38_text(row.get("process_name") or row.get("工段名稱") or row.get("工段名稱 / Process"))
+        if not process:
+            continue
+        category = _v38_text(row.get("category_name") or row.get("category") or row.get("類別") or row.get("類別 / Category"), "全部 / 通用") or "全部 / 通用"
+        active = _v38_bool_int(row.get("is_active") if "is_active" in row else row.get("active"), 1)
+        sort_order = _v38_int(row.get("sort_order"), 0)
+        note = _v38_text(row.get("note") or row.get("備註") or row.get("備註 / Note"))
+        rid = _v38_int(row.get("id"), 0)
+        if rid <= 0:
+            rid = _v38_find_id("process_options", "category_name=? AND process_name=? AND COALESCE(deleted_at,'')=''", (category, process))
+        if rid <= 0:
+            # If the database still behaves as process_name-unique, reuse that row instead of inserting.
+            rid = _v40_find_process_conflict_id(category, process, exclude_id=0)
+
+        if rid > 0:
+            conflict = _v40_find_process_conflict_id(category, process, exclude_id=rid)
+            target = conflict or rid
+            try:
+                _v40_update_process_option_id(target, category, process, active, sort_order, note, now)
+                if conflict and conflict != rid:
+                    _v40_soft_delete_process_option_id(rid, now)
+            except Exception as exc:
+                if not _v40_is_unique_violation(exc):
+                    raise
+                conflict2 = _v40_find_process_conflict_id(category, process, exclude_id=rid)
+                if conflict2 > 0:
+                    _v40_update_process_option_id(conflict2, category, process, active, sort_order, note, now)
+                    if conflict2 != rid:
+                        _v40_soft_delete_process_option_id(rid, now)
+                else:
+                    raise
+        else:
+            try:
+                _v38_exec(
+                    """INSERT INTO process_options(category_name, process_name, is_active, active, sort_order, note, created_at, updated_at, updated_by, deleted_at, deleted_by, delete_reason, version)
+                       VALUES (?,?,?,?,?,?,?,?,?, '', '', '', 1)""",
+                    (category, process, active, active, sort_order, note, now, now, "13_system_settings"),
+                )
+            except Exception as exc:
+                if not _v40_is_unique_violation(exc):
+                    raise
+                conflict = _v40_find_process_conflict_id(category, process, exclude_id=0)
+                if conflict > 0:
+                    _v40_update_process_option_id(conflict, category, process, active, sort_order, note, now)
+                else:
+                    raise
+        count += 1
+    _v38_clear_system_settings_cache()
+    return count
+
+
+def audit_v40_system_settings_duplicate_safe() -> dict[str, Any]:
+    return {
+        "version": "V40_SYSTEM_SETTINGS_DUPLICATE_SAFE_UPSERT",
+        "postgres_enabled": _v38_sys_pg_enabled(),
+        "schema_ready": bool(_V40_SYS_SCHEMA_READY),
+        "legacy_unique_process_name_drop": True,
+        "process_option_save": "merge_conflict_and_soft_delete_duplicate",
+        "neon_single_authority": True,
+    }
+
+# ================= END V40 SYSTEM SETTINGS DUPLICATE-SAFE UPSERT + PERFORMANCE FIX =================

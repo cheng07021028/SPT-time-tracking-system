@@ -342,3 +342,49 @@ def write_summary_json(path: str | Path, *, limit: int = 2000, last_hours: float
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     return summary
+
+
+# ================= V40 PAGE ENTRY / RERUN PERFORMANCE TRACKING =================
+# Lightweight page execution tracking for all Streamlit modules.  This only records timings;
+# it never changes UI, CSS, database authority, or business behavior.
+
+def start_page_event(module_code: str, module_name: str = "") -> dict[str, Any]:
+    token = {
+        "module_code": str(module_code or "unknown"),
+        "module_name": str(module_name or module_code or "unknown"),
+        "start": time.perf_counter(),
+    }
+    try:
+        import streamlit as st  # type: ignore
+        ss = getattr(st, "session_state", {})
+        ss["_spt_current_page"] = token["module_code"]
+        key = f"_spt_v40_rerun_count_{token['module_code']}"
+        ss[key] = int(ss.get(key, 0) or 0) + 1
+        token["rerun_count"] = int(ss[key])
+    except Exception:
+        token["rerun_count"] = 0
+    return token
+
+
+def finish_page_event(token: dict[str, Any] | None, *, ok: bool = True, error: str = "") -> None:
+    if not isinstance(token, dict):
+        return
+    try:
+        duration_ms = (time.perf_counter() - float(token.get("start") or time.perf_counter())) * 1000.0
+        record_event(
+            category="page",
+            name=f"page.{token.get('module_code','unknown')}",
+            duration_ms=duration_ms,
+            ok=ok,
+            threshold_ms=3000.0,
+            detail={
+                "module_code": token.get("module_code", ""),
+                "module_name": token.get("module_name", ""),
+                "rerun_count": token.get("rerun_count", 0),
+            },
+            error=error,
+        )
+    except Exception:
+        pass
+
+# ================= END V40 PAGE ENTRY / RERUN PERFORMANCE TRACKING =================
