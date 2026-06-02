@@ -30993,3 +30993,543 @@ def audit_v34_time_record_neon_hotpath() -> dict:
     return {"version": "V34_TIME_RECORD_NEON_HOTPATH", "postgres_enabled": _v34_tr_pg_enabled(), "today_limit": _V34_TODAY_LIMIT, "history_limit": _V34_HISTORY_LIMIT, "today_refresh_uses_direct_neon_sql": True, "local_json_tombstone_filter_disabled_on_hotpath": True, "soft_delete_only": True}
 
 # ================= END V34 NEON HOTPATH FOR 01 TIME RECORDS =================
+
+# ===================== V50 01 START WORK NEON TIMEOUT HOTPATH FIX =====================
+# 修正目的：
+# 1) 01「開始作業」不得因舊查詢 COALESCE / 全表掃描 / 取得整批 active records 而觸發 Neon statement_timeout。
+# 2) 開始前檢查改成短小索引查詢：同人員 active、同製令同工段 duplicate、不同工段 conflict。
+# 3) INSERT 使用 RETURNING id 取得真實 id，不再把 rowcount=1 誤當作 record id。
+# 4) auto_pause_old=True 時，只針對同人員不同工段 active 記錄做小批次暫停，不做全量同步、不跑 GitHub。
+# 5) 保留 Neon 單一真實來源與 soft-delete 原則；local JSON / GitHub 不進入開始作業熱路徑。
+
+try:
+    _v50_prev_get_active_records = get_active_records  # type: ignore[name-defined]
+    _v50_prev_get_active_record = get_active_record  # type: ignore[name-defined]
+    _v50_prev_get_active_same_work = get_active_same_work  # type: ignore[name-defined]
+    _v50_prev_get_conflicting_active_records = get_conflicting_active_records  # type: ignore[name-defined]
+    _v50_prev_start_work = start_work  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v50_prev_get_active_records = None
+    _v50_prev_get_active_record = None
+    _v50_prev_get_active_same_work = None
+    _v50_prev_get_conflicting_active_records = None
+    _v50_prev_start_work = None
+
+
+def _v50_pg_enabled() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled
+        return bool(is_postgres_enabled())
+    except Exception:
+        return False
+
+
+def _v50_text(v, default: str = "") -> str:
+    try:
+        if pd.isna(v):
+            return default
+    except Exception:
+        pass
+    return str(v if v is not None else default).strip()
+
+
+def _v50_now() -> str:
+    try:
+        from services.timezone_service import now_text
+        return str(now_text())
+    except Exception:
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v50_today() -> str:
+    try:
+        from services.timezone_service import today_text
+        return str(today_text())
+    except Exception:
+        return _v50_now()[:10]
+
+
+def _v50_base_select() -> str:
+    return (
+        "SELECT id, record_id, record_key, operation_id, status, work_order, work_order_no, "
+        "part_no, type_name, process_code, process_name, employee_id, employee_name, "
+        "start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, "
+        "end_date, end_time, work_hours, work_minutes, raw_minutes, average_minutes, assembly_location, "
+        "group_key, is_group_work, source, created_at, updated_at, updated_by, deleted_at, deleted_by, delete_reason, version "
+        "FROM time_records"
+    )
+
+
+def _v50_active_where() -> str:
+    # No COALESCE on indexed columns here.  This lets PostgreSQL use ordinary indexes.
+    return (
+        "(deleted_at IS NULL OR deleted_at='') "
+        "AND (end_timestamp IS NULL OR end_timestamp='') "
+        "AND (status IS NULL OR status='' OR status IN ('作業中','進行中','開始'))"
+    )
+
+
+def _v50_query_df(sql: str, params: tuple | list = ()) -> pd.DataFrame:
+    try:
+        from services.db_service import query_df
+        df = query_df(sql, tuple(params or ()))
+        if isinstance(df, pd.DataFrame):
+            return df.copy().where(pd.notna(df), "").reset_index(drop=True)
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v50_query_one(sql: str, params: tuple | list = ()) -> dict | None:
+    try:
+        from services.db_service import query_one
+        row = query_one(sql, tuple(params or ()))
+        return dict(row) if isinstance(row, dict) else None
+    except Exception:
+        return None
+
+
+def _v50_safe_id(value, default: int = 0) -> int:
+    try:
+        return int(float(str(value).strip()))
+    except Exception:
+        return default
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None, work_order: str | None = None, **kwargs) -> pd.DataFrame:  # type: ignore[override]
+    """V50 short indexed active-record query for 01 hot path."""
+    if not _v50_pg_enabled():
+        try:
+            return _v50_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name, work_order=work_order, **kwargs) if callable(_v50_prev_get_active_records) else pd.DataFrame()
+        except TypeError:
+            return _v50_prev_get_active_records(employee_id=employee_id, process_name=process_name, start_date=start_date, employee_name=employee_name) if callable(_v50_prev_get_active_records) else pd.DataFrame()
+    where = [_v50_active_where()]
+    params: list = []
+    if _v50_text(employee_id):
+        where.append("employee_id=?")
+        params.append(_v50_text(employee_id))
+    elif _v50_text(employee_name):
+        where.append("employee_name=?")
+        params.append(_v50_text(employee_name))
+    if _v50_text(process_name):
+        where.append("process_name=?")
+        params.append(_v50_text(process_name))
+    if _v50_text(start_date):
+        where.append("(start_date=? OR work_date=? OR start_timestamp LIKE ?)")
+        sd = _v50_text(start_date)[:10]
+        params.extend([sd, sd, sd + "%"])
+    if _v50_text(work_order):
+        where.append("(work_order=? OR work_order_no=?)")
+        wo = _v50_text(work_order)
+        params.extend([wo, wo])
+    sql = f"{_v50_base_select()} WHERE {' AND '.join(where)} ORDER BY id DESC LIMIT 80"
+    return _v50_query_df(sql, tuple(params))
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        try:
+            return dict(df.iloc[0].to_dict())
+        except Exception:
+            return None
+    return None
+
+
+def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    if not _v50_pg_enabled():
+        try:
+            return _v50_prev_get_active_same_work(employee_id, work_order, process_name, start_date=start_date, employee_name=employee_name) if callable(_v50_prev_get_active_same_work) else None
+        except TypeError:
+            return _v50_prev_get_active_same_work(employee_id, work_order, process_name) if callable(_v50_prev_get_active_same_work) else None
+    where = [_v50_active_where(), "employee_id=?", "process_name=?", "(work_order=? OR work_order_no=?)"]
+    params: list = [_v50_text(employee_id), _v50_text(process_name), _v50_text(work_order), _v50_text(work_order)]
+    if _v50_text(employee_name):
+        where.append("employee_name=?")
+        params.append(_v50_text(employee_name))
+    if _v50_text(start_date):
+        sd = _v50_text(start_date)[:10]
+        where.append("(start_date=? OR work_date=? OR start_timestamp LIKE ?)")
+        params.extend([sd, sd, sd + "%"])
+    sql = f"{_v50_base_select()} WHERE {' AND '.join(where)} ORDER BY id DESC LIMIT 1"
+    return _v50_query_one(sql, tuple(params))
+
+
+def get_conflicting_active_records(employee_id: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:  # type: ignore[override]
+    if not _v50_pg_enabled():
+        try:
+            return _v50_prev_get_conflicting_active_records(employee_id, process_name, start_date=start_date, employee_name=employee_name) if callable(_v50_prev_get_conflicting_active_records) else pd.DataFrame()
+        except TypeError:
+            return _v50_prev_get_conflicting_active_records(employee_id, process_name, employee_name=employee_name) if callable(_v50_prev_get_conflicting_active_records) else pd.DataFrame()
+    where = [_v50_active_where(), "employee_id=?", "process_name<>?"]
+    params: list = [_v50_text(employee_id), _v50_text(process_name)]
+    if _v50_text(employee_name):
+        where.append("employee_name=?")
+        params.append(_v50_text(employee_name))
+    if _v50_text(start_date):
+        sd = _v50_text(start_date)[:10]
+        where.append("(start_date=? OR work_date=? OR start_timestamp LIKE ?)")
+        params.extend([sd, sd, sd + "%"])
+    sql = f"{_v50_base_select()} WHERE {' AND '.join(where)} ORDER BY id DESC LIMIT 30"
+    return _v50_query_df(sql, tuple(params))
+
+
+def _v50_pause_conflicts(conflicts: pd.DataFrame, now: str, remark: str = "自動暫停：切換不同工段") -> int:
+    if conflicts is None or not isinstance(conflicts, pd.DataFrame) or conflicts.empty:
+        return 0
+    ids: list[int] = []
+    for x in conflicts.get("id", []).tolist():
+        rid = _v50_safe_id(x, 0)
+        if rid > 0 and rid not in ids:
+            ids.append(rid)
+    if not ids:
+        return 0
+    end_date, end_time = now[:10], now[11:19]
+    ph = ",".join(["?"] * len(ids))
+    try:
+        from services.db_service import execute
+        return int(execute(
+            f"""
+            UPDATE time_records
+            SET status='暫停', end_action='暫停', end_timestamp=?, end_date=?, end_time=?,
+                remark=CASE WHEN COALESCE(remark,'')='' THEN ? ELSE remark || '；' || ? END,
+                updated_at=?, updated_by='system', version=COALESCE(version,1)+1
+            WHERE id IN ({ph}) AND {_v50_active_where()}
+            """,
+            tuple([now, end_date, end_time, remark, remark, now] + ids),
+        ) or 0)
+    except Exception:
+        return 0
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V50 pure-Neon fast Start Work.
+
+    This avoids old authority/GitHub/local JSON synchronization and avoids broad
+    COALESCE-heavy scans.  It is intentionally small: validate, pause conflicts
+    when requested, INSERT ... RETURNING id, clear caches.
+    """
+    if not _v50_pg_enabled():
+        return int(_v50_prev_start_work(employee, work_order, process_name, remark, auto_pause_old) or 0) if callable(_v50_prev_start_work) else 0
+    employee = employee or {}
+    work_order = work_order or {}
+    emp_id = _v50_text(employee.get("employee_id"))
+    emp_name = _v50_text(employee.get("employee_name"))
+    wo_no = _v50_text(work_order.get("work_order") or work_order.get("work_order_no"))
+    proc = _v50_text(process_name)
+    if not emp_id or not wo_no or not proc:
+        raise ValueError("工號、製令、工段名稱不可空白。")
+    today = _v50_today()
+    duplicate = get_active_same_work(emp_id, wo_no, proc, start_date=today, employee_name=emp_name)
+    if duplicate:
+        raise ValueError(f"禁止重複紀錄：此人員已有相同製令與工段正在計時：{wo_no} / {proc}")
+    conflicts = get_conflicting_active_records(emp_id, proc, start_date=today, employee_name=emp_name)
+    if isinstance(conflicts, pd.DataFrame) and not conflicts.empty:
+        if not auto_pause_old:
+            raise ValueError("此人員已有不同工段正在計時，請先暫停、完工或下班前一筆作業。")
+        _v50_pause_conflicts(conflicts, _v50_now())
+    now = _v50_now()
+    import uuid
+    opid = uuid.uuid4().hex
+    record_key = f"{emp_id}|{wo_no}|{proc}|{opid}"
+    group_key = f"{emp_id}|{proc}|{today}"
+    part_no = _v50_text(work_order.get("part_no"))
+    type_name = _v50_text(work_order.get("type_name"))
+    assembly_location = _v50_text(work_order.get("assembly_location"))
+    from services.db_service import execute
+    rid = execute(
+        """
+        INSERT INTO time_records(
+            record_id, record_key, operation_id, status,
+            work_order, work_order_no, part_no, type_name, process_name,
+            employee_id, employee_name, start_action, start_timestamp,
+            remark, start_date, start_time, work_hours, work_minutes,
+            raw_minutes, average_minutes, assembly_location, group_key,
+            is_group_work, source, created_at, updated_at, deleted_at, version
+        ) VALUES (?, ?, ?, '作業中', ?, ?, ?, ?, ?, ?, ?, '開始', ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, 0, 'v50_neon_start_work', ?, ?, '', 1)
+        RETURNING id
+        """,
+        (
+            opid, record_key, opid,
+            wo_no, wo_no, part_no, type_name, proc,
+            emp_id, emp_name, now, _v50_text(remark), today, now[11:19],
+            assembly_location, group_key, now, now,
+        ),
+    )
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        clear_today_records_fast_cache()
+    except Exception:
+        pass
+    try:
+        write_log("START_WORK", f"{emp_name} 開始 {wo_no} / {proc}", "time_records", int(rid or 0))
+    except Exception:
+        pass
+    return int(rid or 0)
+
+
+def audit_v50_start_work_timeout_hotpath() -> dict:
+    return {
+        "version": "V50_01_START_WORK_NEON_TIMEOUT_HOTPATH_FIX",
+        "start_uses_insert_returning_id": True,
+        "active_checks_use_short_indexed_queries": True,
+        "local_json_github_removed_from_start_hotpath": True,
+        "auto_pause_conflicts_small_batch": True,
+        "changes_ui_css_theme": False,
+    }
+
+# =================== END V50 01 START WORK NEON TIMEOUT HOTPATH FIX =====================
+
+# ===================== V52 01 START BUTTON NON-BLOCKING HOT PATH =====================
+# 目的：
+# 1) 01「開始作業」不可再在按鈕前後重複查 active / duplicate / conflict，避免右上角小人一直運轉。
+# 2) start_work 只做必要 Neon 短查詢與單筆 INSERT；不走 GitHub、local JSON、舊權威檔、全量同步。
+# 3) LOG 使用最小化 best-effort insert，失敗不阻塞現場開始作業。
+# 4) 保留 Neon 單一真實來源與 soft delete；快取只在寫入後做最小清除。
+
+import uuid as _v52_uuid
+
+try:
+    _v52_prev_start_work = start_work  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v52_prev_start_work = None
+
+
+def _v52_pg_enabled() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled
+        return bool(is_postgres_enabled())
+    except Exception:
+        return False
+
+
+def _v52_text(value, default: str = "") -> str:
+    try:
+        if pd.isna(value):
+            return default
+    except Exception:
+        pass
+    return str(value if value is not None else default).strip()
+
+
+def _v52_now() -> str:
+    try:
+        from services.timezone_service import now_text
+        return str(now_text())
+    except Exception:
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v52_today() -> str:
+    try:
+        from services.timezone_service import today_text
+        return str(today_text())
+    except Exception:
+        return _v52_now()[:10]
+
+
+def _v52_active_predicate() -> str:
+    return "(deleted_at IS NULL OR deleted_at='') AND (end_timestamp IS NULL OR end_timestamp='')"
+
+
+def _v52_query_one(sql: str, params: tuple = ()) -> dict | None:
+    try:
+        from services.db_service import query_one
+        row = query_one(sql, params)
+        return dict(row) if isinstance(row, dict) else None
+    except Exception:
+        return None
+
+
+def _v52_query_df(sql: str, params: tuple = ()) -> pd.DataFrame:
+    try:
+        from services.db_service import query_df
+        df = query_df(sql, params)
+        if isinstance(df, pd.DataFrame):
+            return df.copy().where(pd.notna(df), "").reset_index(drop=True)
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _v52_execute(sql: str, params: tuple = ()) -> int:
+    from services.db_service import execute
+    return int(execute(sql, params) or 0)
+
+
+def _v52_find_duplicate(emp_id: str, wo_no: str, proc: str, today: str) -> dict | None:
+    # 短查詢：只取 id，不拉整列、不用 COALESCE、不查 local。
+    return _v52_query_one(
+        f"""
+        SELECT id
+        FROM time_records
+        WHERE {_v52_active_predicate()}
+          AND employee_id=?
+          AND process_name=?
+          AND (work_order=? OR work_order_no=?)
+          AND (start_date=? OR start_timestamp LIKE ?)
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (emp_id, proc, wo_no, wo_no, today, today + "%"),
+    )
+
+
+def _v52_conflict_ids(emp_id: str, proc: str, today: str) -> list[int]:
+    df = _v52_query_df(
+        f"""
+        SELECT id
+        FROM time_records
+        WHERE {_v52_active_predicate()}
+          AND employee_id=?
+          AND process_name<>?
+          AND (start_date=? OR start_timestamp LIKE ?)
+        ORDER BY id DESC
+        LIMIT 20
+        """,
+        (emp_id, proc, today, today + "%"),
+    )
+    ids: list[int] = []
+    if isinstance(df, pd.DataFrame) and not df.empty and "id" in df.columns:
+        for x in df["id"].tolist():
+            try:
+                i = int(float(str(x).strip()))
+                if i > 0 and i not in ids:
+                    ids.append(i)
+            except Exception:
+                pass
+    return ids
+
+
+def _v52_pause_ids(ids: list[int], now: str) -> int:
+    if not ids:
+        return 0
+    ids = [int(x) for x in ids if int(x) > 0][:20]
+    if not ids:
+        return 0
+    ph = ",".join(["?"] * len(ids))
+    remark = "系統自動暫停：同一人員切換不同工段作業"
+    return _v52_execute(
+        f"""
+        UPDATE time_records
+        SET status='暫停', end_action='暫停', end_timestamp=?, end_date=?, end_time=?,
+            remark=CASE WHEN remark IS NULL OR remark='' THEN ? ELSE remark || '；' || ? END,
+            updated_at=?, updated_by='system', version=COALESCE(version,1)+1
+        WHERE id IN ({ph}) AND {_v52_active_predicate()}
+        """,
+        tuple([now, now[:10], now[11:19], remark, remark, now] + ids),
+    )
+
+
+def _v52_insert_start_log(emp_name: str, wo_no: str, proc: str, rid: int, now: str) -> None:
+    # LOG 必須有，但不得阻塞現場按鈕；使用最小化 insert，失敗直接略過。
+    try:
+        _v52_execute(
+            """
+            INSERT INTO system_logs(log_time, user_name, action_type, target_table, target_id, message, detail, level)
+            VALUES (?, ?, 'START_WORK', 'time_records', ?, ?, '', 'INFO')
+            """,
+            (now, "SYSTEM", str(rid), f"{emp_name} 開始 {wo_no} / {proc}"),
+        )
+    except Exception:
+        pass
+
+
+def _v52_clear_start_caches() -> None:
+    # 不做全量備份、不做舊權威同步，只清與前台顯示相關的短快取。
+    for fn_name in ("clear_today_records_fast_cache", "clear_query_cache"):
+        try:
+            fn = globals().get(fn_name)
+            if callable(fn):
+                fn()
+                continue
+        except Exception:
+            pass
+        try:
+            if fn_name == "clear_query_cache":
+                from services.db_service import clear_query_cache as _clear
+                _clear()
+        except Exception:
+            pass
+
+
+def start_work(employee: dict, work_order: dict, process_name: str, remark: str = "", auto_pause_old: bool = True) -> int:  # type: ignore[override]
+    """V52 shortest start-work hot path.
+
+    This is the final override used by 01. It deliberately avoids page/service
+    duplicate queries, local authority writes, GitHub sync, old display merges,
+    and full-data scans.  It returns as soon as Neon INSERT succeeds.
+    """
+    if not _v52_pg_enabled():
+        if callable(_v52_prev_start_work):
+            return int(_v52_prev_start_work(employee, work_order, process_name, remark, auto_pause_old=auto_pause_old) or 0)
+        return 0
+
+    now = _v52_now()
+    today = now[:10] or _v52_today()
+    employee = employee or {}
+    work_order = work_order or {}
+    emp_id = _v52_text(employee.get("employee_id"))
+    emp_name = _v52_text(employee.get("employee_name"))
+    wo_no = _v52_text(work_order.get("work_order") or work_order.get("work_order_no"))
+    proc = _v52_text(process_name)
+    if not emp_id or not wo_no or not proc:
+        raise ValueError("工號、製令、工段名稱不可空白。")
+
+    dup = _v52_find_duplicate(emp_id, wo_no, proc, today)
+    if dup:
+        raise ValueError(f"禁止重複紀錄：此人員已有相同製令與工段正在計時：{wo_no} / {proc}")
+
+    conflicts = _v52_conflict_ids(emp_id, proc, today)
+    if conflicts and not auto_pause_old:
+        raise ValueError("此人員已有不同工段正在計時，請先暫停、完工或下班前一筆作業。")
+    if conflicts and auto_pause_old:
+        _v52_pause_ids(conflicts, now)
+
+    opid = _v52_uuid.uuid4().hex
+    record_key = f"{emp_id}|{wo_no}|{proc}|{opid}"
+    group_key = f"{emp_id}|{proc}|{today}"
+    part_no = _v52_text(work_order.get("part_no"))
+    type_name = _v52_text(work_order.get("type_name"))
+    assembly_location = _v52_text(work_order.get("assembly_location"))
+    rid = _v52_execute(
+        """
+        INSERT INTO time_records(
+            record_id, record_key, operation_id, status,
+            work_order, work_order_no, part_no, type_name, process_name,
+            employee_id, employee_name, start_action, start_timestamp,
+            remark, start_date, start_time, work_hours, work_minutes,
+            raw_minutes, average_minutes, assembly_location, group_key,
+            is_group_work, source, created_at, updated_at, deleted_at, version
+        ) VALUES (?, ?, ?, '作業中', ?, ?, ?, ?, ?, ?, ?, '開始', ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, 0, 'v52_neon_start_work', ?, ?, '', 1)
+        RETURNING id
+        """,
+        (
+            opid, record_key, opid,
+            wo_no, wo_no, part_no, type_name, proc,
+            emp_id, emp_name, now, _v52_text(remark), today, now[11:19],
+            assembly_location, group_key, now, now,
+        ),
+    )
+    _v52_clear_start_caches()
+    _v52_insert_start_log(emp_name, wo_no, proc, int(rid or 0), now)
+    return int(rid or 0)
+
+
+def audit_v52_start_work_nonblocking_hotpath() -> dict:
+    return {
+        "version": "V52_01_START_WORK_NONBLOCKING_HOTPATH",
+        "page_precheck_should_be_disabled": True,
+        "start_uses_direct_short_queries": True,
+        "local_json_github_removed_from_start": True,
+        "minimal_log_best_effort": True,
+        "neon_single_authority": True,
+        "changes_ui_css_theme": False,
+    }
+
+# =================== END V52 01 START BUTTON NON-BLOCKING HOT PATH =====================

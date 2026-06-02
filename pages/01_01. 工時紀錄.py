@@ -934,28 +934,17 @@ with left:
         else:
             try:
                 _spt_button_t = time.perf_counter()
-                _emp_name_for_check = str(employee.get("employee_name") or "").strip()
-                try:
-                    active = get_active_record(emp_id)
-                except Exception:
-                    active = None
-                duplicate = None if no_process_options else get_active_same_work(emp_id, wo_no, process, employee_name=_emp_name_for_check)
-                conflicts = pd.DataFrame() if no_process_options else get_conflicting_active_records(emp_id, process, employee_name=_emp_name_for_check)
-                if duplicate:
-                    st.error(f"禁止重複紀錄：此人員已有相同製令與工段正在計時：{wo_no} / {process}")
-                    st.stop()
-                if isinstance(conflicts, pd.DataFrame) and not conflicts.empty and not auto_pause:
-                    st.warning(f"此人員目前有 {len(conflicts)} 筆不同工段正在計時；請勾選自動暫停或先結束舊作業。")
-                    render_table(conflicts, "start_conflicting_active_records", editable=False, height=180)
-                    st.stop()
+                # V52：開始作業按鈕不得再在頁面層重複查 active / duplicate / conflict。
+                # 所有驗證與自動暫停改由 time_record_service.start_work 的短交易熱路徑一次完成。
                 rid = start_work(employee, work_order, process, remark, auto_pause_old=auto_pause)
                 _v259_clear_display_cache()
-                _spt_perf_tick("01_button_start_work_action", _spt_button_t, threshold_ms=200.0, detail={"record_id": rid, "employee_id": emp_id, "work_order": wo_no, "process": process})
+                _spt_perf_tick("01_button_start_work_action", _spt_button_t, threshold_ms=3000.0, detail={"record_id": rid, "employee_id": emp_id, "work_order": wo_no, "process": process})
+                st.success(f"已開始作業，紀錄編號：{rid}。請按右側/下方重新整理按鈕查看最新明細。")
                 trigger_post_record_continue_prompt(
-                    f"已開始作業，紀錄編號：{rid}。重表格已改為手動刷新，避免按鈕後整頁卡住。",
+                    f"已開始作業，紀錄編號：{rid}。今日明細採手動刷新，避免開始作業後整頁長時間運轉。",
                     title="已開始計時",
                 )
-                st.rerun()
+                st.stop()
             except Exception as exc:
                 st.error(str(exc))
 
