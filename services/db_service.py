@@ -3684,3 +3684,61 @@ def _v25_pg_init_schema() -> None:  # type: ignore[override]
     _V25_PG_SCHEMA_READY = True
 
 # ===== END V260602 OLD UI + NEON COMPATIBILITY MIGRATION =====
+
+# ===== V31 FULL NEON SINGLE SOURCE AUTHORITY HOOK =====
+# This wrapper makes PostgreSQL/Neon the formal authority for every module-level
+# state used by the old UI. It is additive only and does not change the visual UI.
+try:
+    _v31_prev_ensure_database = ensure_database  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v31_prev_ensure_database = None
+
+_V31_EXTRA_SCHEMA_READY = False
+
+
+def _v31_ensure_extra_neon_schema() -> None:
+    global _V31_EXTRA_SCHEMA_READY
+    if _V31_EXTRA_SCHEMA_READY:
+        return
+    try:
+        if not is_postgres_enabled():  # type: ignore[name-defined]
+            return
+        from services.neon_authority_service import ensure_neon_authority_schema
+        ensure_neon_authority_schema()
+        _V31_EXTRA_SCHEMA_READY = True
+    except Exception:
+        # Startup should not hard-crash because of the generic auxiliary store.
+        # Dedicated business-table errors will still surface normally.
+        pass
+
+
+def ensure_database() -> None:  # type: ignore[override]
+    if callable(_v31_prev_ensure_database):
+        _v31_prev_ensure_database()
+    _v31_ensure_extra_neon_schema()
+
+
+def assert_all_modules_use_neon_authority() -> dict[str, Any]:
+    """Diagnostic for 98/99 pages and manual verification."""
+    backend = get_database_backend() if "get_database_backend" in globals() else ("postgresql" if is_postgres_enabled() else "sqlite")
+    out = {
+        "ok": bool(is_postgres_enabled()),
+        "backend": backend,
+        "rule": "Neon/PostgreSQL is the single source of truth when DATABASE_URL is configured.",
+        "business_tables": [
+            "time_records", "work_orders", "employees", "system_logs", "auth_users",
+            "auth_account_permissions", "auth_security_settings", "auth_login_logs",
+            "security_login_logs", "process_options", "rest_periods", "system_settings",
+            "table_column_settings", "table_sort_settings",
+        ],
+        "generic_authority_tables": ["spt_module_authority", "spt_module_authority_audit", "spt_system_json_store"],
+        "local_json_role": "fallback only when DATABASE_URL is not configured; not authority on Streamlit Cloud.",
+    }
+    try:
+        from services.neon_authority_service import authority_status
+        out["generic_authority_status"] = authority_status()
+    except Exception as exc:
+        out["generic_authority_error"] = str(exc)[:300]
+    return out
+
+# ===== END V31 FULL NEON SINGLE SOURCE AUTHORITY HOOK =====

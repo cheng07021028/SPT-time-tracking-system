@@ -2965,3 +2965,216 @@ def audit_v300424_11_delete_range_sequence_visibility() -> Dict[str, Any]:
         "same_second_after_delete_rows_visible_by_sequence": True,
     }
 # ================= END V300.42.4 11 DELETE RANGE JSONL SEQUENCE VISIBILITY =================
+
+# ===== V31 FULL NEON SINGLE SOURCE LOGIN LOG OVERRIDES =====
+# Final overrides: 11｜登入紀錄 reads/writes Neon/PostgreSQL tables directly.
+# Local JSON/permanent files are no longer authoritative when DATABASE_URL is set.
+try:
+    from typing import Any as _V31Any, Optional as _V31Optional, Dict as _V31Dict
+except Exception:
+    pass
+
+
+def _v31_pg_enabled() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled
+        return bool(is_postgres_enabled())
+    except Exception:
+        return False
+
+
+def _v31_now() -> str:
+    try:
+        from services.timezone_service import now_text as _nt
+        return _nt()
+    except Exception:
+        from datetime import datetime as _dt
+        return _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v31_ensure_login_schema() -> None:
+    try:
+        from services.db_service import ensure_database
+        ensure_database()
+        from services import db_service as _db
+        if _v31_pg_enabled():
+            with _db._v25_pg_connect() as conn:  # type: ignore[attr-defined]
+                with conn.cursor() as cur:
+                    for table in ("auth_login_logs", "security_login_logs"):
+                        for col, ddl in (("deleted_at", "TEXT"), ("deleted_by", "TEXT"), ("delete_reason", "TEXT"), ("source", "TEXT")):
+                            try: cur.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {ddl}")
+                            except Exception: pass
+                conn.commit()
+        else:
+            for table in ("auth_login_logs", "security_login_logs"):
+                for col in ("deleted_at", "deleted_by", "delete_reason", "source"):
+                    try: _db.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT", ())
+                    except Exception: pass
+    except Exception:
+        pass
+
+
+def bootstrap_audit_log_service() -> dict:  # type: ignore[override]
+    _v31_ensure_login_schema()
+    return {"ok": True, "backend": "Neon/PostgreSQL" if _v31_pg_enabled() else "SQLite/local fallback", "removed_invalid_login_rows": 0}
+
+
+def auto_record_session_login(username: str = "", display_name: str = "", roles: str = "", **kwargs):  # type: ignore[override]
+    if not username:
+        return None
+    _v31_ensure_login_schema()
+    try:
+        from services.db_service import execute
+        now = _v31_now()
+        execute(
+            """
+            INSERT INTO auth_login_logs(username, display_name, event_time, event_type, result, module_code, module_name, message, ip_address, user_agent)
+            VALUES (?, ?, ?, 'SESSION_HEARTBEAT', 'OK', ?, '', ?, '', '')
+            """,
+            (username, display_name, now, str(kwargs.get("module_code", "")), f"roles={roles}"),
+        )
+    except Exception:
+        pass
+    return None
+
+
+def migrate_security_login_logs_to_login_logs() -> int:  # type: ignore[override]
+    _v31_ensure_login_schema()
+    try:
+        from services.db_service import query_df, execute
+        df = query_df("SELECT * FROM security_login_logs WHERE COALESCE(deleted_at,'')='' ORDER BY id")
+        if df is None or df.empty:
+            return 0
+        count = 0
+        for r in df.to_dict("records"):
+            username = str(r.get("username") or "")
+            login_time = str(r.get("login_time") or r.get("created_at") or "")
+            if not username or not login_time:
+                continue
+            execute(
+                """
+                INSERT INTO auth_login_logs(username, display_name, event_time, event_type, result, module_code, module_name, message, ip_address, user_agent, source)
+                VALUES (?, ?, ?, ?, ?, ?, '', ?, '', ?, 'security_login_logs')
+                """,
+                (username, str(r.get("display_name") or ""), login_time, str(r.get("event_type") or "LOGIN"), str(r.get("result") or "OK"), str(r.get("module_code") or ""), str(r.get("message") or ""), str(r.get("user_agent") or "")),
+            )
+            count += 1
+        return count
+    except Exception:
+        return 0
+
+
+def _v31_login_where(start_date=None, end_date=None, keyword: str = ""):
+    where = ["COALESCE(deleted_at,'')=''"]
+    params = []
+    if start_date:
+        where.append("substr(COALESCE(event_time, login_time, created_at, ''),1,10) >= ?")
+        params.append(str(start_date))
+    if end_date:
+        where.append("substr(COALESCE(event_time, login_time, created_at, ''),1,10) <= ?")
+        params.append(str(end_date))
+    if keyword:
+        where.append("(lower(COALESCE(username,'')) LIKE ? OR lower(COALESCE(display_name,'')) LIKE ? OR lower(COALESCE(event_type,'')) LIKE ? OR lower(COALESCE(result,'')) LIKE ? OR lower(COALESCE(message,'')) LIKE ?)")
+        k = f"%{str(keyword).lower()}%"
+        params.extend([k, k, k, k, k])
+    return " AND ".join(where), tuple(params)
+
+
+def load_login_logs(start_date=None, end_date=None, keyword: str = "", limit: int = 1000, event_types=None, results=None, include_legacy: bool = True, **kwargs):  # type: ignore[override]
+    _v31_ensure_login_schema()
+    import pandas as _pd
+    try:
+        from services.db_service import query_df
+        where, params = _v31_login_where(start_date, end_date, keyword)
+        sql = f"""
+        SELECT id, username, display_name, event_type, result,
+               COALESCE(event_time, login_time, created_at) AS login_time,
+               logout_time,
+               CASE WHEN idle_seconds IS NULL THEN NULL ELSE CAST(idle_seconds AS TEXT) END AS idle_minutes,
+               module_code, message, COALESCE(source, 'auth_login_logs') AS source,
+               ip_address, user_agent, COALESCE(created_at, event_time, login_time) AS created_at
+        FROM auth_login_logs
+        WHERE {where}
+        """
+        frames = [query_df(sql, params)]
+        if include_legacy:
+            where2, params2 = _v31_login_where(start_date, end_date, keyword)
+            sql2 = f"""
+            SELECT id, username, display_name, event_type, result,
+                   COALESCE(login_time, created_at) AS login_time,
+                   logout_time,
+                   CASE WHEN idle_seconds IS NULL THEN NULL ELSE CAST(idle_seconds AS TEXT) END AS idle_minutes,
+                   module_code, message, 'security_login_logs' AS source,
+                   '' AS ip_address, user_agent, COALESCE(created_at, login_time) AS created_at
+            FROM security_login_logs
+            WHERE {where2}
+            """
+            frames.append(query_df(sql2, params2))
+        frames = [f for f in frames if f is not None and not f.empty]
+        if not frames:
+            return _pd.DataFrame()
+        df = _pd.concat(frames, ignore_index=True)
+        if event_types:
+            df = df[df["event_type"].isin(event_types)]
+        if results:
+            df = df[df["result"].isin(results)]
+        if "login_time" in df.columns:
+            df = df.sort_values("login_time", ascending=False, na_position="last")
+        return df.head(int(limit or 1000)).reset_index(drop=True)
+    except Exception:
+        return _pd.DataFrame()
+
+
+def get_login_log_stats(start_date=None, end_date=None, keyword: str = "") -> dict:  # type: ignore[override]
+    df = load_login_logs(start_date=start_date, end_date=end_date, keyword=keyword, limit=100000, include_legacy=True)
+    if df is None or df.empty:
+        return {"records": 0, "success": 0, "failed": 0}
+    result_col = df.get("result")
+    success = int(result_col.astype(str).str.upper().isin(["OK", "SUCCESS", "成功"]).sum()) if result_col is not None else 0
+    failed = int(result_col.astype(str).str.upper().isin(["FAIL", "FAILED", "ERROR", "失敗"]).sum()) if result_col is not None else 0
+    return {"records": int(len(df)), "success": success, "failed": failed}
+
+
+def delete_login_logs_by_date_range(start_date: str, end_date: str) -> int:  # type: ignore[override]
+    _v31_ensure_login_schema()
+    try:
+        before = get_login_log_stats(start_date, end_date, "").get("records", 0)
+        from services.db_service import execute
+        now = _v31_now()
+        execute("UPDATE auth_login_logs SET deleted_at=?, deleted_by='admin', delete_reason='clear_login_logs' WHERE substr(COALESCE(event_time, login_time, created_at, ''),1,10) >= ? AND substr(COALESCE(event_time, login_time, created_at, ''),1,10) <= ? AND COALESCE(deleted_at,'')=''", (now, str(start_date), str(end_date)))
+        execute("UPDATE security_login_logs SET deleted_at=?, deleted_by='admin', delete_reason='clear_login_logs' WHERE substr(COALESCE(event_time, login_time, created_at, ''),1,10) >= ? AND substr(COALESCE(event_time, login_time, created_at, ''),1,10) <= ? AND COALESCE(deleted_at,'')=''", (now, str(start_date), str(end_date)))
+        return int(before)
+    except Exception:
+        return 0
+
+
+def export_audit_logs_to_permanent_file(create_history: bool = True, merge_existing: bool = True) -> dict:  # type: ignore[override]
+    _v31_ensure_login_schema()
+    return {"ok": True, "message": "登入紀錄已在 Neon/PostgreSQL 中，不再需要建立本機永久檔。", "backend": "Neon/PostgreSQL"}
+
+
+def restore_audit_logs_from_permanent_file(*args, **kwargs) -> dict:  # type: ignore[override]
+    return {"ok": True, "message": "Neon/PostgreSQL 為單一真實來源，不從本機永久檔還原。", "backend": "Neon/PostgreSQL"}
+
+
+def upload_audit_logs_to_github() -> dict:  # type: ignore[override]
+    return {"ok": True, "message": "GitHub 不再作為登入紀錄即時資料庫；正式資料已在 Neon/PostgreSQL。", "backend": "Neon/PostgreSQL"}
+
+
+def get_audit_permanent_status() -> dict:  # type: ignore[override]
+    _v31_ensure_login_schema()
+    total = 0
+    errors = []
+    try:
+        from services.db_service import query_one
+        for table, time_col in (("auth_login_logs", "event_time"), ("security_login_logs", "login_time")):
+            try:
+                row = query_one(f"SELECT COUNT(*) AS c FROM {table} WHERE COALESCE(deleted_at,'')='' ") or {}
+                total += int(row.get("c") or 0)
+            except Exception as exc:
+                errors.append(f"{table}: {str(exc)[:120]}")
+        return {"exists": True, "count": total, "db_count": total, "path": "neon://auth_login_logs + security_login_logs", "authority_schema": "Neon/PostgreSQL" if _v31_pg_enabled() else "SQLite/local fallback", "delete_state_path": "neon://deleted_at", "deleted_keys": 0, "errors": errors}
+    except Exception as exc:
+        return {"exists": False, "count": total, "db_count": total, "path": "neon://auth_login_logs", "authority_schema": "Neon/PostgreSQL", "error": str(exc)}
+
+# ===== END V31 FULL NEON SINGLE SOURCE LOGIN LOG OVERRIDES =====

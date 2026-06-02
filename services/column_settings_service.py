@@ -1648,3 +1648,51 @@ def save_settings(settings: Dict[str, Any], *, upload: bool = False) -> None:  #
             tmp.replace(SETTINGS_PATH)
         except Exception:
             pass
+
+# ===== V31 NEON SINGLE SOURCE COLUMN SETTINGS OVERRIDE =====
+# Keep the old UI wrappers, but persist table/column preferences in Neon when
+# DATABASE_URL is configured. Local JSON is fallback/cache only.
+try:
+    _v31_prev_column_load_settings = load_settings  # type: ignore[name-defined]
+    _v31_prev_column_save_settings = save_settings  # type: ignore[name-defined]
+except Exception:
+    _v31_prev_column_load_settings = None
+    _v31_prev_column_save_settings = None
+
+
+def _v31_column_neon_enabled() -> bool:
+    try:
+        from services.neon_authority_service import is_neon_enabled
+        return bool(is_neon_enabled())
+    except Exception:
+        return False
+
+
+def load_settings() -> Dict[str, Any]:  # type: ignore[override]
+    if _v31_column_neon_enabled():
+        try:
+            from services.neon_authority_service import load_system_payload
+            data = load_system_payload("spt_table_column_settings.json", {})
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            pass
+    if callable(_v31_prev_column_load_settings):
+        return _v31_prev_column_load_settings()
+    return {}
+
+
+def save_settings(settings: Dict[str, Any], *, upload: bool = False) -> None:  # type: ignore[override]
+    if _v31_column_neon_enabled():
+        try:
+            from services.neon_authority_service import save_system_payload
+            save_system_payload("spt_table_column_settings.json", settings if isinstance(settings, dict) else {})
+            return
+        except Exception:
+            pass
+    if callable(_v31_prev_column_save_settings):
+        try:
+            _v31_prev_column_save_settings(settings, upload=upload)
+        except TypeError:
+            _v31_prev_column_save_settings(settings)
+
+# ===== END V31 NEON SINGLE SOURCE COLUMN SETTINGS OVERRIDE =====
