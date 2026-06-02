@@ -4369,3 +4369,68 @@ def check_permission(module_code: str, action: str = "can_view") -> bool:  # typ
         return False
 
 # =================== END V256 LOGIN HOT PATH BYPASS ===================
+
+# =================== V33 PAGE ACCESS FASTPATH ===================
+# 2026-06-02 hotfix:
+# All page guards must be fast and must not read local permission JSON or rebuild
+# permission matrices during page entry. Neon/PostgreSQL stays the authority.
+try:
+    _v33_prev_require_login = require_login  # type: ignore[name-defined]
+except Exception:
+    _v33_prev_require_login = None
+
+
+def _v33_module_no(module_code: str) -> str:
+    s = str(module_code or "").strip()
+    if s[:2].isdigit():
+        return s[:2]
+    mapping = {
+        "01_time_record":"01", "01_time_records":"01", "02_history":"02", "03_work_orders":"03", "04_employees":"04",
+        "05_analysis":"05", "06_logs":"06", "07_missing":"07", "08_daily_hours":"08", "09_persistence":"09",
+        "10_permissions":"10", "11_login_logs":"11", "12_module_persistence":"12", "13_system_settings":"13",
+        "14_data_health":"14", "15_legacy_migration":"15", "98_authority_diagnostic":"98", "99_speed_diagnostic":"99",
+    }
+    return mapping.get(s, s)
+
+
+def _v33_is_admin_session() -> bool:
+    try:
+        username = str(st.session_state.get("auth_username", "") or "").strip().lower()
+        roles = [str(r).strip().lower() for r in (st.session_state.get("auth_roles", []) or [])]
+        return bool(username == "admin" or "admin" in roles)
+    except Exception:
+        return False
+
+
+def check_permission(module_code: str, action: str = "can_view") -> bool:  # type: ignore[override]
+    user = get_current_user()
+    if not user:
+        return False
+    if _v33_is_admin_session():
+        return True
+    username = str(user.get("username") or "").strip()
+    if not username:
+        return False
+    try:
+        from services.permission_service import has_permission
+        return bool(has_permission(username, _v33_module_no(module_code), action))
+    except Exception:
+        # fail closed for non-admin; never spin on page entry.
+        return False
+
+
+def require_module_access(module_code: str, action: str = "can_view") -> None:  # type: ignore[override]
+    require_login(module_code)
+    if check_permission(module_code, action):
+        return
+    try:
+        log_security_event(st.session_state.get("auth_username", ""), "PERMISSION_DENIED", "FAIL", f"{module_code}:{action}", module_code)
+    except Exception:
+        pass
+    st.error("權限不足：你的帳號未被授權使用此模組或功能。")
+    st.stop()
+
+
+require_permission = require_module_access
+
+# ================= END V33 PAGE ACCESS FASTPATH =================
