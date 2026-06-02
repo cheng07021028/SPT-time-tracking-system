@@ -359,46 +359,14 @@ def _v105_prepare_live_work_order_keyword_state(key: str = "start_work_order_man
 
 
 def _v105_inject_live_work_order_keyword_sync() -> None:
-    """讓製令關鍵字輸入後自動刷新下方製令下拉，不需 Enter。"""
-    components.html(
-        """
-<script>
-(function(){
-  const PARAM = 'spt_wo_kw';
-  const LABEL = '製令關鍵字';
-  const DEBOUNCE_MS = 420;
-  function bind(){
-    const doc = window.parent && window.parent.document ? window.parent.document : document;
-    const inputs = Array.from(doc.querySelectorAll('input')).filter(function(inp){
-      const aria = inp.getAttribute('aria-label') || '';
-      return aria.indexOf(LABEL) >= 0;
-    });
-    if(!inputs.length){ setTimeout(bind, 300); return; }
-    const input = inputs[0];
-    if(input.dataset.sptWoLiveBound === '1') return;
-    input.dataset.sptWoLiveBound = '1';
-    let timer = null;
-    function sync(){
-      const val = (input.value || '').trim();
-      const url = new URL(window.parent.location.href);
-      const cur = (url.searchParams.get(PARAM) || '').trim();
-      if(cur === val) return;
-      if(val){ url.searchParams.set(PARAM, val); }
-      else { url.searchParams.delete(PARAM); }
-      window.parent.location.replace(url.toString());
-    }
-    input.addEventListener('input', function(){
-      if(timer) clearTimeout(timer);
-      timer = setTimeout(sync, DEBOUNCE_MS);
-    }, true);
-  }
-  bind();
-})();
-</script>
-""",
-        height=0,
-        width=0,
-    )
+    """V57: Disabled live URL synchronization.
+
+    The old implementation updated URL query params while the operator typed the
+    work-order keyword, which forced full browser reloads and made 01 look like
+    it never stopped running.  Streamlit's text_input already submits on Enter or
+    normal rerun, so page rendering must not inject a reload script.
+    """
+    return
 # ===== END V105 WORK ORDER KEYWORD LIVE URL SYNC =====
 
 
