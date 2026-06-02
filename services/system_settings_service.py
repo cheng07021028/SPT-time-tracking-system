@@ -5716,3 +5716,71 @@ def audit_v40_system_settings_duplicate_safe() -> dict[str, Any]:
     }
 
 # ================= END V40 SYSTEM SETTINGS DUPLICATE-SAFE UPSERT + PERFORMANCE FIX =================
+
+# ================= V41 SYSTEM SETTINGS LAZY LOAD HELPERS =================
+# Purpose:
+# - Make 13. 系統設定 fast on page entry by allowing category-filtered process loading.
+# - Keep backwards compatibility: old callers can still use load_process_options_df(active_only=True/False).
+# - No local JSON / GitHub authority restore. Neon/PostgreSQL remains the formal source of truth.
+
+_v41_prev_load_process_options_df = load_process_options_df
+
+
+def load_process_options_df(active_only: bool = False, category_name: str | None = None, limit: int | None = None) -> pd.DataFrame:  # type: ignore[override]
+    """Load process options with optional category-level SQL filtering.
+
+    V41: 13. 系統設定 must not read every process row just to display one category.
+    Passing category_name makes the SQL filter run inside Neon/PostgreSQL and keeps the page hot path small.
+    """
+    if not _v38_sys_pg_enabled():
+        # Fallback keeps compatibility with old local mode, then filters in memory.
+        df = _v41_prev_load_process_options_df(active_only=active_only)
+        if category_name and isinstance(df, pd.DataFrame) and not df.empty:
+            if "category_name" not in df.columns and "type_name" in df.columns:
+                df = df.rename(columns={"type_name": "category_name"})
+            if "category_name" in df.columns:
+                df = df[df["category_name"].fillna("全部 / 通用").astype(str).eq(str(category_name))].copy()
+        return df
+
+    _v38_ensure_system_settings_neon_schema()
+    category = _v38_text(category_name) if category_name is not None else ""
+    safe_limit = _v38_int(limit, 0)
+
+    def _load() -> pd.DataFrame:
+        where = "WHERE COALESCE(deleted_at,'')=''"
+        params: list[Any] = []
+        if active_only:
+            where += " AND COALESCE(is_active,active,1)=1"
+        if category:
+            where += " AND COALESCE(category_name,'全部 / 通用')=?"
+            params.append(category)
+        limit_sql = ""
+        if safe_limit > 0:
+            limit_sql = f" LIMIT {int(safe_limit)}"
+        df = _v38_query_df(
+            f"""SELECT id, COALESCE(category_name,'全部 / 通用') AS category_name, process_name,
+                       COALESCE(is_active,active,1) AS is_active,
+                       COALESCE(sort_order,0) AS sort_order, note, created_at, updated_at
+                FROM process_options {where}
+                ORDER BY COALESCE(category_name,'全部 / 通用'), COALESCE(sort_order,0), id{limit_sql}""",
+            tuple(params),
+        )
+        if df is None or df.empty:
+            return pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+        return df
+
+    cache_key = f"v41_process:{active_only}:{category}:{safe_limit}"
+    return _v38_cached_df(cache_key, _load)
+
+
+def audit_v41_system_settings_lazy_load() -> dict[str, Any]:
+    return {
+        "version": "V41_SYSTEM_SETTINGS_LAZY_LOAD_FAST_ENTRY",
+        "neon_single_authority": True,
+        "page13_default_entry": "quick overview only",
+        "process_options_loading": "category-filtered SQL when category_name is provided",
+        "confirm_only_ui": True,
+        "no_mojibake_required": True,
+    }
+
+# ================= END V41 SYSTEM SETTINGS LAZY LOAD HELPERS =================

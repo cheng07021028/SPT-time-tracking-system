@@ -604,379 +604,375 @@ def _render_external_auto_backup_center() -> None:
     st.divider()
 
 
-# V3.23：先顯示系統設定永久保存健康檢查，再顯示自動備份設定。
-_render_system_settings_health_center()
 
-# V3.20：每日自動備份設定必須保留在 13｜系統設定，不可被系統設定修正覆蓋移除。
-_render_external_auto_backup_center()
+# ===================== V41 13 Lazy Load Fast Entry =====================
+# 原則：進入 13 頁面只顯示控制台與摘要；選擇區塊並按「載入」後才讀取該區資料。
+# 下拉、勾選、輸入、表格編輯都只暫存；只有按套用/儲存/刪除/查詢才寫入 Neon 或做重查。
 
-# -----------------------------------------------------------------------------
-# 0) Excel import/export for all system settings
-# -----------------------------------------------------------------------------
-st.subheader("零、系統設定 Excel 上傳 / 下載 / System Settings Excel")
-st.caption("V34 快速進頁：Excel 匯出資料只有按下按鈕時才產生，避免每次進入 13 頁面都讀取全部設定並建立 Excel。")
-exp1, exp2 = st.columns(2)
-with exp1:
-    if st.button("⟰ 產生並下載全部系統設定 Excel / Prepare Export", use_container_width=True, key="v34_prepare_system_settings_excel"):
-        current_process_export = load_process_options_df(active_only=False)
-        current_rest_export = load_rest_periods_df(active_only=False)
-        app_settings_export = pd.DataFrame([{"setting_key": "live_page_reset_time", "setting_value": get_live_page_reset_time(), "note": "01 工時紀錄每日重新整理時間 HH:MM"}])
-        st.session_state["v34_system_settings_excel_bytes"] = _excel_bytes({"process_options": current_process_export, "rest_periods": current_rest_export, "app_settings": app_settings_export})
-        st.session_state["v34_system_settings_excel_ready"] = True
-if st.session_state.get("v34_system_settings_excel_ready"):
-    st.download_button(
-        "⬇️ 下載全部系統設定 Excel / Download All System Settings",
-        data=st.session_state.get("v34_system_settings_excel_bytes", b""),
-        file_name="SPT_系統設定.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
+def _v41_finish_page() -> None:
+    try:
+        _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+    except Exception:
+        pass
+
+
+def _v41_finish_and_stop() -> None:
+    _v41_finish_page()
+    st.stop()
+
+
+_V41_SECTION_OPTIONS = [
+    "總覽 / Quick Overview",
+    "類別與工段設定 / Category & Process",
+    "休息時間設定 / Rest Periods",
+    "Excel 匯入匯出 / Excel Import Export",
+    "每日自動備份設定 / Daily Backup",
+    "永久保存健康檢查 / Persistence Health",
+]
+
+st.subheader("系統設定控制台 / System Settings Console")
+st.caption("V41 快速進頁：進入此模組不再一次載入所有工段、休息時間、備份、Excel 與診斷資料。請選擇區塊後按『載入設定區塊』，才讀取該區資料。")
+
+_current_section = st.session_state.get("spt_13_active_section_v41", _V41_SECTION_OPTIONS[0])
+if _current_section not in _V41_SECTION_OPTIONS:
+    _current_section = _V41_SECTION_OPTIONS[0]
+
+with st.form("spt_13_section_selector_form_v41", clear_on_submit=False):
+    _pending_section = st.selectbox(
+        "選擇要設定的區塊 / Choose settings area",
+        _V41_SECTION_OPTIONS,
+        index=_V41_SECTION_OPTIONS.index(_current_section),
+        key="spt_13_pending_section_v41",
+        help="選擇下拉選單只暫存；按『載入設定區塊』後才載入該區資料。",
     )
-if can_manage:
-    with st.expander("上傳系統設定 Excel / Upload System Settings", expanded=False):
-        setting_file = st.file_uploader("上傳系統設定 Excel / Upload System Settings", type=["xlsx", "xlsm", "xls"], key="system_settings_excel_upload_v243")
-        if setting_file is not None:
-            try:
-                sheets = pd.read_excel(setting_file, sheet_name=None)
-                st.success("已讀取系統設定 Excel，請確認後按下方按鈕套用。")
-                for nm, dfp in sheets.items():
-                    with st.expander(f"預覽：{nm}", expanded=False):
-                        st.dataframe(dfp, use_container_width=True, height=220)
-                if st.button("▣ 確認匯入並永久套用系統設定 / Import Settings", type="primary", use_container_width=True, key="import_system_settings_excel_v243"):
-                    p_count = r_count = 0
-                    if "process_options" in sheets:
-                        pdf = sheets["process_options"].copy()
-                        p_count = save_process_options_df(pdf)
-                    if "rest_periods" in sheets:
-                        rdf = sheets["rest_periods"].copy()
-                        r_count = save_rest_periods_df(rdf)
-                    if "app_settings" in sheets:
-                        adf = sheets["app_settings"]
-                        for _, row in adf.iterrows():
-                            if str(row.get("setting_key", "")).strip() == "live_page_reset_time":
-                                save_live_page_reset_time(str(row.get("setting_value", "02:00")).strip())
-                    _export_permanent_settings(f"已匯入系統設定：工段 {p_count} 筆、休息時間 {r_count} 筆")
-                    _refresh_after_apply("已匯入並永久套用系統設定，畫面已重新整理。")
-            except Exception as exc:
-                st.error(f"系統設定 Excel 讀取失敗：{exc}")
-st.divider()
-# -----------------------------------------------------------------------------
-# 1) Process options
-# -----------------------------------------------------------------------------
-st.subheader("一、類別與工段名稱設定 / Category & Process Options")
-st.caption("這裡會套用到 01｜工時紀錄的『類別 / Category』與『工段名稱』下拉選單。可依類別建立不同工段；「全部 / 通用」代表所有類別共用。")
-
-category_choices = load_process_category_choices(include_common=True)
-current_default_category = get_default_process_category()
-if current_default_category not in category_choices:
-    category_choices.append(current_default_category)
-
-cat1, cat3 = st.columns([2, 3])
-with cat1:
-    with st.form("system_default_process_category_form_v39", clear_on_submit=False):
-        selected_default_category = st.selectbox(
-            "預設類別 / Default Category",
-            category_choices,
-            index=category_choices.index(current_default_category) if current_default_category in category_choices else 0,
-            help="V39：選擇下拉選單只暫存；按『套用預設類別』才寫入 Neon 與觸發正式運算。",
-            key="system_default_process_category_v333_pending",
-        )
-        apply_default_clicked = st.form_submit_button("▣ 套用預設類別", use_container_width=True, disabled=not can_manage)
-    if can_manage and apply_default_clicked:
-        saved_category = save_default_process_category(selected_default_category)
-        _export_permanent_settings(f"已套用預設類別：{saved_category}")
-        _refresh_after_apply(f"已套用預設類別：{saved_category}，畫面已重新整理。")
-with cat3:
-    st.info("V39：此區下拉式選單採表單暫存模式；只有按下套用/確認按鈕才會寫入 Neon 或觸發正式運算。")
-
-
-st.markdown("#### 類別清單管理 / Category Master")
-st.caption("類別可新增、修改、刪除；刪除類別時會一併移除該類別對應工段。『全部 / 通用』為系統保留類別，不建議刪除。")
-cat_df = load_process_categories_df(active_only=False)
-if cat_df.empty:
-    cat_df = pd.DataFrame(columns=["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
-cat_view = _normalize_delete_column(cat_df)
-cat_edit_key = "_spt_13_category_edit_mode"
-if can_manage:
-    cc1, cc2, cc3 = st.columns([1, 1, 4])
-    if not st.session_state.get(cat_edit_key, False):
-        if cc1.button("◇ 啟動編輯類別 / Enable Edit", key="enable_category_edit", use_container_width=True):
-            _set_edit_mode(cat_edit_key, True)
-    else:
-        if cc1.button("◌ 停止編輯類別 / Lock Edit", key="disable_category_edit", use_container_width=True):
-            _set_edit_mode(cat_edit_key, False)
-    cc2.caption("新增：啟動編輯後，在表格最下方新增列。")
-
-if can_manage and st.session_state.get(cat_edit_key, False):
-    st.info("V38：編輯類別時不會立即寫入或重算；只有按下『套用/刪除』表單按鈕才送出並寫入 Neon。")
-    cat_draft_key = "system_process_categories_draft_v58"
-    with st.form("system_process_categories_form_v38", clear_on_submit=False):
-        edited_cat = render_table(
-            cat_view,
-            "system_process_categories",
-            editable=True,
-            disabled=["id", "created_at", "updated_at"],
-            key="system_process_categories_editor_v338_form",
-            height=300,
-            num_rows="dynamic",
-        )
-        st.markdown("**確認後執行動作 / Confirm Action**")
-        cat_apply_col, cat_delete_col = st.columns(2)
-        cat_apply_clicked = cat_apply_col.form_submit_button(
-            "◈ 套用並永久儲存類別 / Save Categories",
-            type="primary",
-            use_container_width=True,
-        )
-        cat_delete_clicked = cat_delete_col.form_submit_button(
-            "◉ 刪除勾選類別 / Delete Selected",
-            type="primary",
-            use_container_width=True,
-        )
-    if isinstance(edited_cat, pd.DataFrame):
-        st.session_state[cat_draft_key] = edited_cat.copy()
-    cat_submitted = bool(cat_apply_clicked or cat_delete_clicked)
-    cat_action = "套用並永久儲存類別設定" if cat_apply_clicked else ("刪除勾選類別" if cat_delete_clicked else "")
-    if cat_submitted:
-        edited_cat = st.session_state.get(cat_draft_key, edited_cat)
-        if edited_cat is None:
-            st.warning("找不到可套用的類別表格內容，請重新載入後再試。")
-            st.stop()
-        if cat_action == "套用並永久儲存類別設定":
-            save_df = edited_cat.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore")
-            count = save_process_categories_df(save_df)
-            _export_permanent_settings(f"已套用類別設定 {count} 筆")
-            _refresh_after_apply(f"已套用類別設定 {count} 筆，畫面已重新整理。", cat_edit_key)
-        else:
-            try:
-                ids = [int(float(x)) for x in edited_cat[_delete_mask(edited_cat)]["id"].dropna().tolist()]
-            except Exception:
-                ids = []
-            if not ids:
-                st.warning("請先勾選要刪除的既有類別，再按確認套用。")
-            else:
-                count = delete_process_categories(ids)
-                _export_permanent_settings(f"已刪除類別設定 {count} 筆")
-                _refresh_after_apply(f"已刪除類別設定 {count} 筆，畫面已重新整理。", cat_edit_key)
-else:
-    render_table(cat_view.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore"), "system_process_categories", editable=False, height=260)
-
-st.markdown("#### 類別對應工段設定 / Category-specific Process Options")
-all_category_choices = load_process_category_choices(include_common=True)
-if current_default_category not in all_category_choices:
-    all_category_choices.append(current_default_category)
-# V39：顯示類別下拉選單改為表單暫存。選擇時不立即載入/重算工段表，按「套用顯示類別」後才正式切換。
-_applied_process_category = st.session_state.get("system_process_category_filter_applied_v39", current_default_category)
-if _applied_process_category not in all_category_choices:
-    _applied_process_category = current_default_category if current_default_category in all_category_choices else (all_category_choices[0] if all_category_choices else "全部 / 通用")
-with st.form("system_process_category_filter_form_v39", clear_on_submit=False):
-    pending_filter_category = st.selectbox(
-        "顯示類別 / Show Category",
-        all_category_choices,
-        index=all_category_choices.index(_applied_process_category) if _applied_process_category in all_category_choices else 0,
-        key="system_process_category_filter_v333_pending",
-        help="V39：選擇下拉選單只暫存；按『套用顯示類別』後才載入該類別工段。",
+    _load_section = st.form_submit_button("▣ 載入設定區塊 / Load Settings Area", use_container_width=True)
+if _load_section:
+    st.session_state["spt_13_active_section_v41"] = _pending_section
+    # 切換區塊時清掉重表格草稿，避免舊 editor 狀態污染新區塊。
+    _clear_editor_state(
+        "system_process_categories",
+        "system_process_options",
+        "system_rest_periods",
+        "spt_v97_backup_center_loaded",
     )
-    apply_filter_category = st.form_submit_button("▣ 套用顯示類別 / Apply Category", use_container_width=True)
-if apply_filter_category:
-    st.session_state["system_process_category_filter_applied_v39"] = pending_filter_category
-    _v144_clear_process_option_editor_state("process_category_applied_v39")
     st.rerun()
-filter_category = st.session_state.get("system_process_category_filter_applied_v39", _applied_process_category)
 
-# V144/V39：選擇類別只有在套用後才改變；改變時清除 data_editor 舊草稿。
-_v144_current_process_category = _v144_normalize_category_text(filter_category)
-_v144_last_process_category = st.session_state.get("_spt_v144_last_process_category")
-if _v144_last_process_category is not None and _v144_last_process_category != _v144_current_process_category:
-    _v144_clear_process_option_editor_state("process_category_changed")
-st.session_state["_spt_v144_last_process_category"] = _v144_current_process_category
-_v144_process_category_key = _v144_safe_key_part(_v144_current_process_category)
+section = st.session_state.get("spt_13_active_section_v41", _V41_SECTION_OPTIONS[0])
+st.info(f"目前載入區塊：{section}。未按套用/儲存/查詢前，不會正式寫入 Neon 或執行大量運算。")
 
-proc_df = load_process_options_df(active_only=False)
-if proc_df.empty:
-    proc_df = pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
-if "category_name" not in proc_df.columns:
-    if "type_name" in proc_df.columns:
-        proc_df = proc_df.rename(columns={"type_name": "category_name"})
-    else:
-        proc_df.insert(1, "category_name", "全部 / 通用")
-proc_df["category_name"] = proc_df["category_name"].fillna("全部 / 通用").astype(str).replace({"": "全部 / 通用"})
-# V3.47：此表格只顯示目前選定類別自己的工段；不再混入「全部 / 通用」。
-# 即使該類別目前沒有任何工段，也保留一列空白新增列，讓使用者可直接新增並永久儲存。
-if filter_category:
-    proc_df = proc_df[proc_df["category_name"].eq(filter_category)].copy()
-if proc_df.empty:
-    proc_df = pd.DataFrame([
-        {
-            "id": "",
-            "category_name": filter_category or "全部 / 通用",
-            "process_name": "",
-            "is_active": True,
-            "sort_order": 1,
-            "note": "",
-            "created_at": "",
-            "updated_at": "",
-        }
-    ])
-proc_view = _normalize_delete_column(proc_df)
+if section == "總覽 / Quick Overview":
+    st.markdown("### 快速總覽 / Quick Overview")
+    s1, s2, s3, s4 = st.columns(4)
+    try:
+        s1.metric("預設類別", get_default_process_category())
+    except Exception:
+        s1.metric("預設類別", "讀取失敗")
+    try:
+        s2.metric("01 每日重整時間", get_live_page_reset_time())
+    except Exception:
+        s2.metric("01 每日重整時間", "讀取失敗")
+    s3.metric("資料權威", "Neon / PostgreSQL")
+    s4.metric("載入模式", "按需載入")
+    st.success("13 系統設定已切換為 V41 按需載入模式。選擇上方區塊並按『載入設定區塊』後才會載入詳細資料。")
+    st.warning("大量操作如 Excel 匯出、備份檢查、永久檔診斷不會在進頁時自動執行，避免右上角長時間運轉。")
+    _v41_finish_and_stop()
 
-proc_edit_key = "_spt_13_process_edit_mode"
-if can_manage:
-    c1, c2, c3 = st.columns([1, 1, 4])
-    if not st.session_state.get(proc_edit_key, False):
-        if c1.button("◇ 啟動編輯工段 / Enable Edit", key="enable_process_edit", use_container_width=True):
-            _set_edit_mode(proc_edit_key, True)
-    else:
-        if c1.button("◌ 停止編輯工段 / Lock Edit", key="disable_process_edit", use_container_width=True):
-            _set_edit_mode(proc_edit_key, False)
-    c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
+if section == "永久保存健康檢查 / Persistence Health":
+    _render_system_settings_health_center()
+    _v41_finish_and_stop()
 
-if can_manage and st.session_state.get(proc_edit_key, False):
-    st.info("V38：編輯工段時不會立即寫入或重算；只有按下『套用/刪除』表單按鈕才送出並寫入 Neon。")
-    proc_draft_key = f"system_process_options_draft_v144_{_v144_process_category_key}"
-    with st.form(f"system_process_options_form_v38_{_v144_process_category_key}", clear_on_submit=False):
-        edited_proc = render_table(
-            proc_view,
-            "system_process_options",
-            editable=True,
-            # V144：類別由上方 Show Category 決定，表格內不允許改 category_name，避免跨類別污染。
-            disabled=["id", "category_name", "created_at", "updated_at"],
-            # V144/V38：每個類別使用獨立 data_editor key，且置於 form 內，避免每次勾選都 rerun。
-            key=f"system_process_options_editor_v338_form_{_v144_process_category_key}",
-            height=430,
-            num_rows="dynamic",
-        )
-        st.markdown("**確認後執行動作 / Confirm Action**")
-        proc_apply_col, proc_delete_col = st.columns(2)
-        proc_apply_clicked = proc_apply_col.form_submit_button(
-            "◈ 套用並永久儲存工段 / Save Processes",
-            type="primary",
+if section == "每日自動備份設定 / Daily Backup":
+    _render_external_auto_backup_center()
+    _v41_finish_and_stop()
+
+if section == "Excel 匯入匯出 / Excel Import Export":
+    st.subheader("零、系統設定 Excel 上傳 / 下載 / System Settings Excel")
+    st.caption("V41：Excel 匯出與匯入只在按下按鈕後執行，不在進入 13 頁面時讀取全部資料。")
+    exp1, exp2 = st.columns(2)
+    with exp1:
+        if st.button("⟰ 產生並下載全部系統設定 Excel / Prepare Export", use_container_width=True, key="v41_prepare_system_settings_excel"):
+            current_process_export = load_process_options_df(active_only=False)
+            current_rest_export = load_rest_periods_df(active_only=False)
+            app_settings_export = pd.DataFrame([{"setting_key": "live_page_reset_time", "setting_value": get_live_page_reset_time(), "note": "01 工時紀錄每日重新整理時間 HH:MM"}])
+            st.session_state["v41_system_settings_excel_bytes"] = _excel_bytes({"process_options": current_process_export, "rest_periods": current_rest_export, "app_settings": app_settings_export})
+            st.session_state["v41_system_settings_excel_ready"] = True
+    if st.session_state.get("v41_system_settings_excel_ready"):
+        st.download_button(
+            "⬇️ 下載全部系統設定 Excel / Download All System Settings",
+            data=st.session_state.get("v41_system_settings_excel_bytes", b""),
+            file_name="SPT_系統設定.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
-        proc_delete_clicked = proc_delete_col.form_submit_button(
-            "◉ 刪除勾選工段 / Delete Selected",
-            type="primary",
-            use_container_width=True,
-        )
-    if isinstance(edited_proc, pd.DataFrame):
-        st.session_state[proc_draft_key] = edited_proc.copy()
-    submitted = bool(proc_apply_clicked or proc_delete_clicked)
-    action = "套用並永久儲存工段名稱設定" if proc_apply_clicked else ("刪除勾選工段" if proc_delete_clicked else "")
+    if can_manage:
+        with st.expander("上傳系統設定 Excel / Upload System Settings", expanded=False):
+            setting_file = st.file_uploader("上傳系統設定 Excel / Upload System Settings", type=["xlsx", "xlsm", "xls"], key="system_settings_excel_upload_v41")
+            if setting_file is not None:
+                try:
+                    sheets = pd.read_excel(setting_file, sheet_name=None)
+                    st.success("已讀取系統設定 Excel，請確認後按下方按鈕套用。")
+                    for nm, dfp in sheets.items():
+                        with st.expander(f"預覽：{nm}", expanded=False):
+                            st.dataframe(dfp, use_container_width=True, height=220)
+                    if st.button("▣ 確認匯入並永久套用系統設定 / Import Settings", type="primary", use_container_width=True, key="import_system_settings_excel_v41"):
+                        p_count = r_count = 0
+                        if "process_options" in sheets:
+                            p_count = save_process_options_df(sheets["process_options"].copy())
+                        if "rest_periods" in sheets:
+                            r_count = save_rest_periods_df(sheets["rest_periods"].copy())
+                        if "app_settings" in sheets:
+                            adf = sheets["app_settings"]
+                            for _, row in adf.iterrows():
+                                if str(row.get("setting_key", "")).strip() == "live_page_reset_time":
+                                    save_live_page_reset_time(str(row.get("setting_value", "02:00")).strip())
+                        _export_permanent_settings(f"已匯入系統設定：工段 {p_count} 筆、休息時間 {r_count} 筆")
+                        _refresh_after_apply("已匯入並永久套用系統設定，畫面已重新整理。")
+                except Exception as exc:
+                    st.error(f"系統設定 Excel 讀取失敗：{exc}")
+    _v41_finish_and_stop()
 
-    if submitted:
-        edited_proc = st.session_state.get(proc_draft_key, edited_proc)
-        if edited_proc is None:
-            st.warning("找不到可套用的工段表格內容，請重新載入後再試。")
-            st.stop()
-        if action == "套用並永久儲存工段名稱設定":
-            save_df = edited_proc.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore")
-            ok_category, mismatches = _v144_process_rows_match_selected_category(save_df, filter_category or "全部 / 通用")
-            if not ok_category:
-                _v144_clear_process_option_editor_state("process_category_mismatch_blocked")
-                st.error(
-                    "偵測到工段表格草稿不是目前選定類別，已阻止儲存，避免 GPTC/BWBS 互相覆蓋。"
-                    f"目前選定：{filter_category}；草稿含有：{', '.join(mismatches[:8])}。"
-                    "請重新整理或重新切換類別後再編輯。"
-                )
+if section == "類別與工段設定 / Category & Process":
+    st.subheader("一、類別與工段名稱設定 / Category & Process Options")
+    st.caption("類別與工段採按需載入。工段表只查目前套用的類別，不再進頁時讀取全部工段。")
+
+    category_choices = load_process_category_choices(include_common=True)
+    current_default_category = get_default_process_category()
+    if current_default_category not in category_choices:
+        category_choices.append(current_default_category)
+
+    cat1, cat3 = st.columns([2, 3])
+    with cat1:
+        with st.form("system_default_process_category_form_v41", clear_on_submit=False):
+            selected_default_category = st.selectbox(
+                "預設類別 / Default Category",
+                category_choices,
+                index=category_choices.index(current_default_category) if current_default_category in category_choices else 0,
+                help="選擇下拉選單只暫存；按『套用預設類別』才寫入 Neon。",
+                key="system_default_process_category_v41_pending",
+            )
+            apply_default_clicked = st.form_submit_button("▣ 套用預設類別", use_container_width=True, disabled=not can_manage)
+        if can_manage and apply_default_clicked:
+            saved_category = save_default_process_category(selected_default_category)
+            _export_permanent_settings(f"已套用預設類別：{saved_category}")
+            _refresh_after_apply(f"已套用預設類別：{saved_category}，畫面已重新整理。")
+    with cat3:
+        st.info("下拉、勾選與表格編輯只暫存；只有按套用/刪除才寫入 Neon。")
+
+    st.markdown("#### 類別清單管理 / Category Master")
+    cat_df = load_process_categories_df(active_only=False)
+    if cat_df.empty:
+        cat_df = pd.DataFrame(columns=["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+    cat_view = _normalize_delete_column(cat_df)
+    cat_edit_key = "_spt_13_category_edit_mode"
+    if can_manage:
+        cc1, cc2, cc3 = st.columns([1, 1, 4])
+        if not st.session_state.get(cat_edit_key, False):
+            if cc1.button("◇ 啟動編輯類別 / Enable Edit", key="enable_category_edit_v41", use_container_width=True):
+                _set_edit_mode(cat_edit_key, True)
+        else:
+            if cc1.button("◌ 停止編輯類別 / Lock Edit", key="disable_category_edit_v41", use_container_width=True):
+                _set_edit_mode(cat_edit_key, False)
+        cc2.caption("新增：啟動編輯後，在表格最下方新增列。")
+
+    if can_manage and st.session_state.get(cat_edit_key, False):
+        st.info("編輯類別時不會立即寫入或重算；只有按下表單按鈕才寫入 Neon。")
+        cat_draft_key = "system_process_categories_draft_v41"
+        with st.form("system_process_categories_form_v41", clear_on_submit=False):
+            edited_cat = render_table(
+                cat_view,
+                "system_process_categories",
+                editable=True,
+                disabled=["id", "created_at", "updated_at"],
+                key="system_process_categories_editor_v41_form",
+                height=300,
+                num_rows="dynamic",
+            )
+            cat_apply_col, cat_delete_col = st.columns(2)
+            cat_apply_clicked = cat_apply_col.form_submit_button("◈ 套用並永久儲存類別 / Save Categories", type="primary", use_container_width=True)
+            cat_delete_clicked = cat_delete_col.form_submit_button("◉ 刪除勾選類別 / Delete Selected", type="primary", use_container_width=True)
+        if isinstance(edited_cat, pd.DataFrame):
+            st.session_state[cat_draft_key] = edited_cat.copy()
+        if cat_apply_clicked or cat_delete_clicked:
+            edited_cat = st.session_state.get(cat_draft_key, edited_cat)
+            if edited_cat is None:
+                st.warning("找不到可套用的類別表格內容，請重新載入後再試。")
                 st.stop()
-            save_df = _v144_prepare_process_save_df_for_category(save_df, filter_category or "全部 / 通用")
-            count = save_process_options_df(save_df)
-            _export_permanent_settings(f"已套用 {filter_category} 類別工段設定 {count} 筆")
-            _refresh_after_apply(f"已套用 {filter_category} 類別工段設定 {count} 筆，畫面已重新整理。", proc_edit_key)
-        else:
-            try:
-                ids = [int(float(x)) for x in edited_proc[_delete_mask(edited_proc)]["id"].dropna().tolist()]
-            except Exception:
-                ids = []
-            if not ids:
-                st.warning("請先勾選要刪除的既有工段，再按確認套用。新增尚未儲存的空白列不需要刪除，直接清空即可。")
+            if cat_apply_clicked:
+                save_df = edited_cat.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore")
+                count = save_process_categories_df(save_df)
+                _export_permanent_settings(f"已套用類別設定 {count} 筆")
+                _refresh_after_apply(f"已套用類別設定 {count} 筆，畫面已重新整理。", cat_edit_key)
             else:
-                count = delete_process_options(ids)
-                _export_permanent_settings(f"已刪除工段名稱設定 {count} 筆")
-                _refresh_after_apply(f"已刪除工段名稱設定 {count} 筆，畫面已重新整理。", proc_edit_key)
-else:
-    render_table(proc_view.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore"), "system_process_options", editable=False, height=420)
-
-st.divider()
-
-# -----------------------------------------------------------------------------
-# 2) Rest periods
-# -----------------------------------------------------------------------------
-st.subheader("二、休息時間設定 / Rest Periods")
-st.caption("這裡會套用到工時計算。格式請使用 HH:MM，例如 10:30、12:00。只有『啟用』的休息時間會被扣除。")
-rest_df = load_rest_periods_df(active_only=False)
-if rest_df.empty:
-    rest_df = pd.DataFrame(columns=["id", "name", "start_time", "end_time", "is_active", "sort_order"])
-rest_view = _normalize_delete_column(rest_df)
-
-rest_edit_key = "_spt_13_rest_edit_mode"
-if can_manage:
-    c1, c2, c3 = st.columns([1, 1, 4])
-    if not st.session_state.get(rest_edit_key, False):
-        if c1.button("◇ 啟動編輯休息時間 / Enable Edit", key="enable_rest_edit", use_container_width=True):
-            _set_edit_mode(rest_edit_key, True)
+                try:
+                    ids = [int(float(x)) for x in edited_cat[_delete_mask(edited_cat)]["id"].dropna().tolist()]
+                except Exception:
+                    ids = []
+                if not ids:
+                    st.warning("請先勾選要刪除的既有類別，再按確認套用。")
+                else:
+                    count = delete_process_categories(ids)
+                    _export_permanent_settings(f"已刪除類別設定 {count} 筆")
+                    _refresh_after_apply(f"已刪除類別設定 {count} 筆，畫面已重新整理。", cat_edit_key)
     else:
-        if c1.button("◌ 停止編輯休息時間 / Lock Edit", key="disable_rest_edit", use_container_width=True):
-            _set_edit_mode(rest_edit_key, False)
-    c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
+        render_table(cat_view.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore"), "system_process_categories", editable=False, height=260)
 
-if can_manage and st.session_state.get(rest_edit_key, False):
-    st.info("V38：編輯休息時間時不會立即寫入或重算；只有按下『套用/刪除』表單按鈕才送出並寫入 Neon。")
-    rest_draft_key = "system_rest_periods_draft_v58"
-    with st.form("system_rest_periods_form_v38", clear_on_submit=False):
-        edited_rest = render_table(
-            rest_view,
-            "system_rest_periods",
-            editable=True,
-            disabled=["id"],
-            key="system_rest_periods_editor_v338_form",
-            height=360,
-            num_rows="dynamic",
+    st.markdown("#### 類別對應工段設定 / Category-specific Process Options")
+    all_category_choices = load_process_category_choices(include_common=True)
+    if current_default_category not in all_category_choices:
+        all_category_choices.append(current_default_category)
+    _applied_process_category = st.session_state.get("system_process_category_filter_applied_v41", current_default_category)
+    if _applied_process_category not in all_category_choices:
+        _applied_process_category = current_default_category if current_default_category in all_category_choices else (all_category_choices[0] if all_category_choices else "全部 / 通用")
+    with st.form("system_process_category_filter_form_v41", clear_on_submit=False):
+        pending_filter_category = st.selectbox(
+            "顯示類別 / Show Category",
+            all_category_choices,
+            index=all_category_choices.index(_applied_process_category) if _applied_process_category in all_category_choices else 0,
+            key="system_process_category_filter_v41_pending",
+            help="選擇下拉選單只暫存；按『載入此類別工段』後才查 Neon。",
         )
-        st.markdown("**確認後執行動作 / Confirm Action**")
-        rest_apply_col, rest_delete_col = st.columns(2)
-        rest_apply_clicked = rest_apply_col.form_submit_button(
-            "◈ 套用並永久儲存休息時間 / Save Rest Periods",
-            type="primary",
-            use_container_width=True,
-        )
-        rest_delete_clicked = rest_delete_col.form_submit_button(
-            "◉ 刪除勾選休息時間 / Delete Selected",
-            type="primary",
-            use_container_width=True,
-        )
-    if isinstance(edited_rest, pd.DataFrame):
-        st.session_state[rest_draft_key] = edited_rest.copy()
-    submitted = bool(rest_apply_clicked or rest_delete_clicked)
-    action = "套用並永久儲存休息時間設定" if rest_apply_clicked else ("刪除勾選休息時間" if rest_delete_clicked else "")
+        apply_filter_category = st.form_submit_button("▣ 載入此類別工段 / Load Category Processes", use_container_width=True)
+    if apply_filter_category:
+        st.session_state["system_process_category_filter_applied_v41"] = pending_filter_category
+        _v144_clear_process_option_editor_state("process_category_applied_v41")
+        st.rerun()
+    filter_category = st.session_state.get("system_process_category_filter_applied_v41", _applied_process_category)
 
-    if submitted:
-        edited_rest = st.session_state.get(rest_draft_key, edited_rest)
-        if edited_rest is None:
-            st.warning("找不到可套用的休息時間表格內容，請重新載入後再試。")
-            st.stop()
-        if action == "套用並永久儲存休息時間設定":
-            save_df = edited_rest.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore")
-            count = save_rest_periods_df(save_df)
-            _export_permanent_settings(f"已套用休息時間設定 {count} 筆")
-            _refresh_after_apply(f"已套用休息時間設定 {count} 筆，畫面已重新整理。", rest_edit_key)
+    _v144_current_process_category = _v144_normalize_category_text(filter_category)
+    _v144_last_process_category = st.session_state.get("_spt_v144_last_process_category")
+    if _v144_last_process_category is not None and _v144_last_process_category != _v144_current_process_category:
+        _v144_clear_process_option_editor_state("process_category_changed")
+    st.session_state["_spt_v144_last_process_category"] = _v144_current_process_category
+    _v144_process_category_key = _v144_safe_key_part(_v144_current_process_category)
+
+    proc_df = load_process_options_df(active_only=False, category_name=filter_category)
+    if proc_df.empty:
+        proc_df = pd.DataFrame([{"id": "", "category_name": filter_category or "全部 / 通用", "process_name": "", "is_active": True, "sort_order": 1, "note": "", "created_at": "", "updated_at": ""}])
+    proc_view = _normalize_delete_column(proc_df)
+
+    proc_edit_key = "_spt_13_process_edit_mode"
+    if can_manage:
+        c1, c2, c3 = st.columns([1, 1, 4])
+        if not st.session_state.get(proc_edit_key, False):
+            if c1.button("◇ 啟動編輯工段 / Enable Edit", key="enable_process_edit_v41", use_container_width=True):
+                _set_edit_mode(proc_edit_key, True)
         else:
-            try:
-                ids = [int(float(x)) for x in edited_rest[_delete_mask(edited_rest)]["id"].dropna().tolist()]
-            except Exception:
-                ids = []
-            if not ids:
-                st.warning("請先勾選要刪除的既有休息時間，再按確認套用。新增尚未儲存的空白列不需要刪除，直接清空即可。")
+            if c1.button("◌ 停止編輯工段 / Lock Edit", key="disable_process_edit_v41", use_container_width=True):
+                _set_edit_mode(proc_edit_key, False)
+        c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
+
+    if can_manage and st.session_state.get(proc_edit_key, False):
+        st.info("編輯工段時不會立即寫入或重算；只有按下表單按鈕才寫入 Neon。")
+        proc_draft_key = f"system_process_options_draft_v41_{_v144_process_category_key}"
+        with st.form(f"system_process_options_form_v41_{_v144_process_category_key}", clear_on_submit=False):
+            edited_proc = render_table(
+                proc_view,
+                "system_process_options",
+                editable=True,
+                disabled=["id", "category_name", "created_at", "updated_at"],
+                key=f"system_process_options_editor_v41_form_{_v144_process_category_key}",
+                height=430,
+                num_rows="dynamic",
+            )
+            proc_apply_col, proc_delete_col = st.columns(2)
+            proc_apply_clicked = proc_apply_col.form_submit_button("◈ 套用並永久儲存工段 / Save Processes", type="primary", use_container_width=True)
+            proc_delete_clicked = proc_delete_col.form_submit_button("◉ 刪除勾選工段 / Delete Selected", type="primary", use_container_width=True)
+        if isinstance(edited_proc, pd.DataFrame):
+            st.session_state[proc_draft_key] = edited_proc.copy()
+        if proc_apply_clicked or proc_delete_clicked:
+            edited_proc = st.session_state.get(proc_draft_key, edited_proc)
+            if edited_proc is None:
+                st.warning("找不到可套用的工段表格內容，請重新載入後再試。")
+                st.stop()
+            if proc_apply_clicked:
+                save_df = edited_proc.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore")
+                ok_category, mismatches = _v144_process_rows_match_selected_category(save_df, filter_category or "全部 / 通用")
+                if not ok_category:
+                    _v144_clear_process_option_editor_state("process_category_mismatch_blocked")
+                    st.error("偵測到工段表格草稿不是目前選定類別，已阻止儲存。" f"目前選定：{filter_category}；草稿含有：{', '.join(mismatches[:8])}。")
+                    st.stop()
+                save_df = _v144_prepare_process_save_df_for_category(save_df, filter_category or "全部 / 通用")
+                count = save_process_options_df(save_df)
+                _export_permanent_settings(f"已套用 {filter_category} 類別工段設定 {count} 筆")
+                _refresh_after_apply(f"已套用 {filter_category} 類別工段設定 {count} 筆，畫面已重新整理。", proc_edit_key)
             else:
-                count = delete_rest_periods(ids)
-                _export_permanent_settings(f"已刪除休息時間設定 {count} 筆")
-                _refresh_after_apply(f"已刪除休息時間設定 {count} 筆，畫面已重新整理。", rest_edit_key)
-else:
-    render_table(rest_view.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore"), "system_rest_periods", editable=False, height=360)
+                try:
+                    ids = [int(float(x)) for x in edited_proc[_delete_mask(edited_proc)]["id"].dropna().tolist()]
+                except Exception:
+                    ids = []
+                if not ids:
+                    st.warning("請先勾選要刪除的既有工段，再按確認套用。")
+                else:
+                    count = delete_process_options(ids)
+                    _export_permanent_settings(f"已刪除工段名稱設定 {count} 筆")
+                    _refresh_after_apply(f"已刪除工段名稱設定 {count} 筆，畫面已重新整理。", proc_edit_key)
+    else:
+        render_table(proc_view.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore"), "system_process_options", editable=False, height=420)
 
-st.divider()
-st.success("設定套用後的串接：01｜工時紀錄工段下拉選單立即讀取啟用工段；工時計算與 02｜歷史紀錄重新計算會使用啟用中的休息時間。")
+    _v41_finish_and_stop()
 
-try:
-    _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
-except Exception:
-    pass
+if section == "休息時間設定 / Rest Periods":
+    st.subheader("二、休息時間設定 / Rest Periods")
+    st.caption("這裡會套用到工時計算。格式請使用 HH:MM。只有『啟用』的休息時間會被扣除。")
+    rest_df = load_rest_periods_df(active_only=False)
+    if rest_df.empty:
+        rest_df = pd.DataFrame(columns=["id", "name", "start_time", "end_time", "is_active", "sort_order"])
+    rest_view = _normalize_delete_column(rest_df)
 
+    rest_edit_key = "_spt_13_rest_edit_mode"
+    if can_manage:
+        c1, c2, c3 = st.columns([1, 1, 4])
+        if not st.session_state.get(rest_edit_key, False):
+            if c1.button("◇ 啟動編輯休息時間 / Enable Edit", key="enable_rest_edit_v41", use_container_width=True):
+                _set_edit_mode(rest_edit_key, True)
+        else:
+            if c1.button("◌ 停止編輯休息時間 / Lock Edit", key="disable_rest_edit_v41", use_container_width=True):
+                _set_edit_mode(rest_edit_key, False)
+        c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
+
+    if can_manage and st.session_state.get(rest_edit_key, False):
+        st.info("編輯休息時間時不會立即寫入或重算；只有按下表單按鈕才寫入 Neon。")
+        rest_draft_key = "system_rest_periods_draft_v41"
+        with st.form("system_rest_periods_form_v41", clear_on_submit=False):
+            edited_rest = render_table(
+                rest_view,
+                "system_rest_periods",
+                editable=True,
+                disabled=["id"],
+                key="system_rest_periods_editor_v41_form",
+                height=360,
+                num_rows="dynamic",
+            )
+            rest_apply_col, rest_delete_col = st.columns(2)
+            rest_apply_clicked = rest_apply_col.form_submit_button("◈ 套用並永久儲存休息時間 / Save Rest Periods", type="primary", use_container_width=True)
+            rest_delete_clicked = rest_delete_col.form_submit_button("◉ 刪除勾選休息時間 / Delete Selected", type="primary", use_container_width=True)
+        if isinstance(edited_rest, pd.DataFrame):
+            st.session_state[rest_draft_key] = edited_rest.copy()
+        if rest_apply_clicked or rest_delete_clicked:
+            edited_rest = st.session_state.get(rest_draft_key, edited_rest)
+            if edited_rest is None:
+                st.warning("找不到可套用的休息時間表格內容，請重新載入後再試。")
+                st.stop()
+            if rest_apply_clicked:
+                save_df = edited_rest.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore")
+                count = save_rest_periods_df(save_df)
+                _export_permanent_settings(f"已套用休息時間設定 {count} 筆")
+                _refresh_after_apply(f"已套用休息時間設定 {count} 筆，畫面已重新整理。", rest_edit_key)
+            else:
+                try:
+                    ids = [int(float(x)) for x in edited_rest[_delete_mask(edited_rest)]["id"].dropna().tolist()]
+                except Exception:
+                    ids = []
+                if not ids:
+                    st.warning("請先勾選要刪除的既有休息時間，再按確認套用。")
+                else:
+                    count = delete_rest_periods(ids)
+                    _export_permanent_settings(f"已刪除休息時間設定 {count} 筆")
+                    _refresh_after_apply(f"已刪除休息時間設定 {count} 筆，畫面已重新整理。", rest_edit_key)
+    else:
+        render_table(rest_view.drop(columns=[SYSTEM_DELETE_COL, "刪除"], errors="ignore"), "system_rest_periods", editable=False, height=360)
+    st.success("設定套用後的串接：01｜工時紀錄工段下拉選單讀取啟用工段；工時計算與 02｜歷史紀錄重新計算會使用啟用中的休息時間。")
+    _v41_finish_and_stop()
+
+_v41_finish_page()
+# =================== END V41 13 Lazy Load Fast Entry ===================
