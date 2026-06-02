@@ -12,7 +12,10 @@ from typing import Any, Dict, List
 
 import streamlit as st
 
-st.set_page_config(page_title="98. 權威檔診斷", layout="wide")
+from services.theme_service import apply_theme, render_header, render_kpi_cards
+
+st.set_page_config(page_title="98. 權威檔診斷", page_icon="🧭", layout="wide")
+apply_theme()
 
 
 def _admin_guard() -> None:
@@ -51,16 +54,24 @@ TRACE_DIR = ROOT / "data" / "permanent_store" / "authority_trace"
 SNAPSHOT_PATH = TRACE_DIR / "v30015_latest_snapshot.json"
 REPORT_PATH = TRACE_DIR / "V300_15_AUTHORITY_TRACE_REPORT.md"
 
-st.title("98. 權威檔診斷 / Authority File Diagnostic")
-st.caption("V300.15.1｜盤點 01～99 共 15 個模組的權威檔與舊來源。只診斷，不修改正式資料。")
+render_header(
+    "98",
+    "權威檔診斷",
+    "Authority File Diagnostic｜盤點各模組權威檔、舊來源與資料保存狀態，只診斷不覆蓋正式資料",
+)
+
+module_count = len(MODULES_TO_TRACE)
+render_kpi_cards([
+    ("診斷版本 / Version", "V300.15.1"),
+    ("盤點模組 / Modules", str(module_count)),
+    ("執行模式 / Mode", "Read Only"),
+    ("資料保護 / Safety", "No overwrite"),
+])
 
 st.warning(
     "這個頁面只做盤點與報告產生：不改動 01/02、權限帳號、系統設定、登入紀錄或 LOG 內容。",
     icon="⚠️",
 )
-
-module_count = len(MODULES_TO_TRACE)
-st.info(f"本次盤點模組數：{module_count}。包含 01～14 與 99 效能診斷。", icon="📌")
 
 col_run, col_open = st.columns([1, 1])
 with col_run:
