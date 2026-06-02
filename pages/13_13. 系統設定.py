@@ -701,33 +701,32 @@ if can_manage:
     cc2.caption("新增：啟動編輯後，在表格最下方新增列。")
 
 if can_manage and st.session_state.get(cat_edit_key, False):
-    st.info("V63：類別表格與 10｜權限管理同模式；套用/刪除後會清除全域 data_editor 草稿，避免畫面殘留舊 checkbox 狀態。")
+    st.info("V38：編輯類別時不會立即寫入或重算；只有按下『套用/刪除』表單按鈕才送出並寫入 Neon。")
     cat_draft_key = "system_process_categories_draft_v58"
-    edited_cat = render_table(
-        cat_view,
-        "system_process_categories",
-        editable=True,
-        disabled=["id", "created_at", "updated_at"],
-        key="system_process_categories_editor_v334",
-        height=300,
-        num_rows="dynamic",
-    )
+    with st.form("system_process_categories_form_v38", clear_on_submit=False):
+        edited_cat = render_table(
+            cat_view,
+            "system_process_categories",
+            editable=True,
+            disabled=["id", "created_at", "updated_at"],
+            key="system_process_categories_editor_v338_form",
+            height=300,
+            num_rows="dynamic",
+        )
+        st.markdown("**確認後執行動作 / Confirm Action**")
+        cat_apply_col, cat_delete_col = st.columns(2)
+        cat_apply_clicked = cat_apply_col.form_submit_button(
+            "◈ 套用並永久儲存類別 / Save Categories",
+            type="primary",
+            use_container_width=True,
+        )
+        cat_delete_clicked = cat_delete_col.form_submit_button(
+            "◉ 刪除勾選類別 / Delete Selected",
+            type="primary",
+            use_container_width=True,
+        )
     if isinstance(edited_cat, pd.DataFrame):
         st.session_state[cat_draft_key] = edited_cat.copy()
-    st.markdown("**確認後執行動作 / Confirm Action**")
-    cat_apply_col, cat_delete_col = st.columns(2)
-    cat_apply_clicked = cat_apply_col.button(
-        "◈ 套用並永久儲存類別 / Save Categories",
-        type="primary",
-        use_container_width=True,
-        key="system_category_save_button_v73",
-    )
-    cat_delete_clicked = cat_delete_col.button(
-        "◉ 刪除勾選類別 / Delete Selected",
-        type="primary",
-        use_container_width=True,
-        key="system_category_delete_button_v73",
-    )
     cat_submitted = bool(cat_apply_clicked or cat_delete_clicked)
     cat_action = "套用並永久儲存類別設定" if cat_apply_clicked else ("刪除勾選類別" if cat_delete_clicked else "")
     if cat_submitted:
@@ -814,35 +813,34 @@ if can_manage:
     c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
 
 if can_manage and st.session_state.get(proc_edit_key, False):
-    st.info("V63：工段表格與 10｜權限管理同模式；套用/刪除後會清除全域 data_editor 草稿，避免畫面殘留舊 checkbox 狀態。")
+    st.info("V38：編輯工段時不會立即寫入或重算；只有按下『套用/刪除』表單按鈕才送出並寫入 Neon。")
     proc_draft_key = f"system_process_options_draft_v144_{_v144_process_category_key}"
-    edited_proc = render_table(
-        proc_view,
-        "system_process_options",
-        editable=True,
-        # V144：類別由上方 Show Category 決定，表格內不允許改 category_name，避免跨類別污染。
-        disabled=["id", "category_name", "created_at", "updated_at"],
-        # V144：每個類別使用獨立 data_editor key，避免 GPTC/BWBS 切換後沿用舊草稿。
-        key=f"system_process_options_editor_v144_{_v144_process_category_key}",
-        height=430,
-        num_rows="dynamic",
-    )
+    with st.form(f"system_process_options_form_v38_{_v144_process_category_key}", clear_on_submit=False):
+        edited_proc = render_table(
+            proc_view,
+            "system_process_options",
+            editable=True,
+            # V144：類別由上方 Show Category 決定，表格內不允許改 category_name，避免跨類別污染。
+            disabled=["id", "category_name", "created_at", "updated_at"],
+            # V144/V38：每個類別使用獨立 data_editor key，且置於 form 內，避免每次勾選都 rerun。
+            key=f"system_process_options_editor_v338_form_{_v144_process_category_key}",
+            height=430,
+            num_rows="dynamic",
+        )
+        st.markdown("**確認後執行動作 / Confirm Action**")
+        proc_apply_col, proc_delete_col = st.columns(2)
+        proc_apply_clicked = proc_apply_col.form_submit_button(
+            "◈ 套用並永久儲存工段 / Save Processes",
+            type="primary",
+            use_container_width=True,
+        )
+        proc_delete_clicked = proc_delete_col.form_submit_button(
+            "◉ 刪除勾選工段 / Delete Selected",
+            type="primary",
+            use_container_width=True,
+        )
     if isinstance(edited_proc, pd.DataFrame):
         st.session_state[proc_draft_key] = edited_proc.copy()
-    st.markdown("**確認後執行動作 / Confirm Action**")
-    proc_apply_col, proc_delete_col = st.columns(2)
-    proc_apply_clicked = proc_apply_col.button(
-        "◈ 套用並永久儲存工段 / Save Processes",
-        type="primary",
-        use_container_width=True,
-        key="system_process_save_button_v73",
-    )
-    proc_delete_clicked = proc_delete_col.button(
-        "◉ 刪除勾選工段 / Delete Selected",
-        type="primary",
-        use_container_width=True,
-        key="system_process_delete_button_v73",
-    )
     submitted = bool(proc_apply_clicked or proc_delete_clicked)
     action = "套用並永久儲存工段名稱設定" if proc_apply_clicked else ("刪除勾選工段" if proc_delete_clicked else "")
 
@@ -904,33 +902,32 @@ if can_manage:
     c2.caption("新增：啟動編輯後，在表格最下方新增列。刪除：勾選『刪除』後確認執行。")
 
 if can_manage and st.session_state.get(rest_edit_key, False):
-    st.info("V63：休息時間表格與 10｜權限管理同模式；套用/刪除後會清除全域 data_editor 草稿，避免畫面殘留舊 checkbox 狀態。")
+    st.info("V38：編輯休息時間時不會立即寫入或重算；只有按下『套用/刪除』表單按鈕才送出並寫入 Neon。")
     rest_draft_key = "system_rest_periods_draft_v58"
-    edited_rest = render_table(
-        rest_view,
-        "system_rest_periods",
-        editable=True,
-        disabled=["id"],
-        key="system_rest_periods_editor_v192",
-        height=360,
-        num_rows="dynamic",
-    )
+    with st.form("system_rest_periods_form_v38", clear_on_submit=False):
+        edited_rest = render_table(
+            rest_view,
+            "system_rest_periods",
+            editable=True,
+            disabled=["id"],
+            key="system_rest_periods_editor_v338_form",
+            height=360,
+            num_rows="dynamic",
+        )
+        st.markdown("**確認後執行動作 / Confirm Action**")
+        rest_apply_col, rest_delete_col = st.columns(2)
+        rest_apply_clicked = rest_apply_col.form_submit_button(
+            "◈ 套用並永久儲存休息時間 / Save Rest Periods",
+            type="primary",
+            use_container_width=True,
+        )
+        rest_delete_clicked = rest_delete_col.form_submit_button(
+            "◉ 刪除勾選休息時間 / Delete Selected",
+            type="primary",
+            use_container_width=True,
+        )
     if isinstance(edited_rest, pd.DataFrame):
         st.session_state[rest_draft_key] = edited_rest.copy()
-    st.markdown("**確認後執行動作 / Confirm Action**")
-    rest_apply_col, rest_delete_col = st.columns(2)
-    rest_apply_clicked = rest_apply_col.button(
-        "◈ 套用並永久儲存休息時間 / Save Rest Periods",
-        type="primary",
-        use_container_width=True,
-        key="system_rest_save_button_v73",
-    )
-    rest_delete_clicked = rest_delete_col.button(
-        "◉ 刪除勾選休息時間 / Delete Selected",
-        type="primary",
-        use_container_width=True,
-        key="system_rest_delete_button_v73",
-    )
     submitted = bool(rest_apply_clicked or rest_delete_clicked)
     action = "套用並永久儲存休息時間設定" if rest_apply_clicked else ("刪除勾選休息時間" if rest_delete_clicked else "")
 

@@ -4882,3 +4882,607 @@ def audit_v34_system_settings_neon_fastpath() -> dict[str, Any]:
     return {"version": "V34_SYSTEM_SETTINGS_NEON_FASTPATH", "postgres_enabled": _v34_sys_pg_enabled(), "schema_ready": bool(_V34_SYS_SCHEMA_READY), "local_json_authority": False, "github_foreground_sync": False, "cache_seconds": _V34_SYS_CACHE_SECONDS, "cached_tables": list(_V34_SYS_CACHE.keys())}
 
 # ================= END V34 NEON FAST SYSTEM SETTINGS AUTHORITY =================
+
+# ================= V38 SYSTEM SETTINGS NEON AUTHORITY + CONFIRM-ONLY SAVE｜2026-06-02 =================
+# Final override for 13｜系統設定.
+# Goals:
+# 1) Neon/PostgreSQL is the only formal authority when DATABASE_URL is configured.
+# 2) Reboot must read edited process categories/options/rest periods/system settings from Neon.
+# 3) Local JSON/GitHub permanent files are not allowed to restore/overwrite Neon.
+# 4) Save functions are idempotent and update existing natural keys to avoid duplicate/missing rows.
+# 5) Page-side V38 forms submit only on explicit Save/Delete buttons; typing/checking does not write data.
+
+try:
+    _v38_prev_load_process_categories_df = load_process_categories_df  # type: ignore[name-defined]
+    _v38_prev_load_process_options_df = load_process_options_df  # type: ignore[name-defined]
+    _v38_prev_load_rest_periods_df = load_rest_periods_df  # type: ignore[name-defined]
+except Exception:  # pragma: no cover
+    _v38_prev_load_process_categories_df = None
+    _v38_prev_load_process_options_df = None
+    _v38_prev_load_rest_periods_df = None
+
+_V38_SYS_SCHEMA_READY = False
+_V38_SYS_CACHE: dict[str, tuple[float, pd.DataFrame]] = {}
+_V38_SYS_CACHE_SECONDS = 8.0
+
+
+def _v38_sys_pg_enabled() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled
+        return bool(is_postgres_enabled())
+    except Exception:
+        return False
+
+
+def _v38_sys_now() -> str:
+    try:
+        from services.timezone_service import now_text as _nt
+        return str(_nt())
+    except Exception:
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _v38_text(value: Any, default: str = "") -> str:
+    try:
+        if pd.isna(value):
+            return default
+    except Exception:
+        pass
+    text = str(value if value is not None else default).strip()
+    return text if text else default
+
+
+def _v38_int(value: Any, default: int = 0) -> int:
+    try:
+        if pd.isna(value):
+            return int(default)
+    except Exception:
+        pass
+    try:
+        return int(float(str(value).strip()))
+    except Exception:
+        return int(default)
+
+
+def _v38_bool_int(value: Any, default: int = 1) -> int:
+    text = str(value).strip().lower() if value is not None else ""
+    if text in {"0", "false", "no", "n", "off", "停用", "否", "inactive"}:
+        return 0
+    if text in {"1", "true", "yes", "y", "on", "啟用", "是", "active"}:
+        return 1
+    try:
+        return 1 if bool(value) else 0
+    except Exception:
+        return int(default)
+
+
+def _v38_exec(sql: str, params: Iterable[Any] | None = None, *, ignore_error: bool = False) -> int:
+    from services.db_service import execute
+    try:
+        return int(execute(sql, tuple(params or ())) or 0)
+    except Exception:
+        if ignore_error:
+            return 0
+        raise
+
+
+def _v38_query_df(sql: str, params: Iterable[Any] | None = None) -> pd.DataFrame:
+    from services.db_service import query_df
+    return query_df(sql, tuple(params or ()))
+
+
+def _v38_query_one(sql: str, params: Iterable[Any] | None = None) -> dict | None:
+    from services.db_service import query_one
+    return query_one(sql, tuple(params or ()))
+
+
+def _v38_clear_system_settings_cache() -> None:
+    try:
+        _V38_SYS_CACHE.clear()
+    except Exception:
+        pass
+    try:
+        from services.db_service import clear_query_cache
+        clear_query_cache()
+    except Exception:
+        pass
+    try:
+        global _PROCESS_OPTIONS_CACHE, _LIVE_PAGE_RESET_TIME_CACHE
+        _PROCESS_OPTIONS_CACHE = None
+        _LIVE_PAGE_RESET_TIME_CACHE = None
+    except Exception:
+        pass
+    try:
+        from services.calculation_service import clear_rest_periods_cache
+        clear_rest_periods_cache()
+    except Exception:
+        pass
+
+
+def _v38_cached_df(key: str, loader) -> pd.DataFrame:
+    try:
+        import time as _time
+        now_s = _time.time()
+        cached = _V38_SYS_CACHE.get(key)
+        if cached and (now_s - cached[0]) <= _V38_SYS_CACHE_SECONDS:
+            return cached[1].copy()
+        df = loader()
+        if df is None:
+            df = pd.DataFrame()
+        _V38_SYS_CACHE[key] = (now_s, df.copy())
+        return df.copy()
+    except Exception:
+        try:
+            return loader()
+        except Exception:
+            return pd.DataFrame()
+
+
+def _v38_ensure_system_settings_neon_schema() -> None:
+    global _V38_SYS_SCHEMA_READY
+    if _V38_SYS_SCHEMA_READY:
+        return
+    if not _v38_sys_pg_enabled():
+        # Local/demo mode keeps older fallback behavior.
+        try:
+            if callable(globals().get("_v38_prev_load_process_categories_df")):
+                pass
+        except Exception:
+            pass
+        _V38_SYS_SCHEMA_READY = True
+        return
+
+    ddl = [
+        """CREATE TABLE IF NOT EXISTS process_categories (
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            category_name TEXT,
+            is_active INTEGER DEFAULT 1,
+            active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            updated_by TEXT,
+            deleted_at TEXT,
+            deleted_by TEXT,
+            delete_reason TEXT,
+            version INTEGER DEFAULT 1
+        )""",
+        """CREATE TABLE IF NOT EXISTS process_options (
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            category_name TEXT,
+            process_name TEXT,
+            is_active INTEGER DEFAULT 1,
+            active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            updated_by TEXT,
+            deleted_at TEXT,
+            deleted_by TEXT,
+            delete_reason TEXT,
+            version INTEGER DEFAULT 1
+        )""",
+        """CREATE TABLE IF NOT EXISTS rest_periods (
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            rest_period_id TEXT,
+            name TEXT,
+            start_time TEXT,
+            end_time TEXT,
+            is_active INTEGER DEFAULT 1,
+            active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            updated_by TEXT,
+            deleted_at TEXT,
+            deleted_by TEXT,
+            delete_reason TEXT,
+            version INTEGER DEFAULT 1
+        )""",
+        """CREATE TABLE IF NOT EXISTS system_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT,
+            note TEXT,
+            updated_at TEXT,
+            updated_by TEXT,
+            deleted_at TEXT,
+            deleted_by TEXT,
+            delete_reason TEXT,
+            version INTEGER DEFAULT 1
+        )""",
+    ]
+    alters = []
+    for table, cols in {
+        "process_categories": [
+            ("id", "BIGINT GENERATED BY DEFAULT AS IDENTITY"),
+            ("category_name", "TEXT"), ("is_active", "INTEGER DEFAULT 1"), ("active", "INTEGER DEFAULT 1"),
+            ("sort_order", "INTEGER DEFAULT 0"), ("note", "TEXT"), ("created_at", "TEXT"), ("updated_at", "TEXT"),
+            ("updated_by", "TEXT"), ("deleted_at", "TEXT"), ("deleted_by", "TEXT"), ("delete_reason", "TEXT"),
+            ("version", "INTEGER DEFAULT 1"),
+        ],
+        "process_options": [
+            ("id", "BIGINT GENERATED BY DEFAULT AS IDENTITY"),
+            ("category_name", "TEXT"), ("process_name", "TEXT"), ("is_active", "INTEGER DEFAULT 1"), ("active", "INTEGER DEFAULT 1"),
+            ("sort_order", "INTEGER DEFAULT 0"), ("note", "TEXT"), ("created_at", "TEXT"), ("updated_at", "TEXT"),
+            ("updated_by", "TEXT"), ("deleted_at", "TEXT"), ("deleted_by", "TEXT"), ("delete_reason", "TEXT"),
+            ("version", "INTEGER DEFAULT 1"),
+        ],
+        "rest_periods": [
+            ("id", "BIGINT GENERATED BY DEFAULT AS IDENTITY"), ("rest_period_id", "TEXT"),
+            ("name", "TEXT"), ("start_time", "TEXT"), ("end_time", "TEXT"), ("is_active", "INTEGER DEFAULT 1"),
+            ("active", "INTEGER DEFAULT 1"), ("sort_order", "INTEGER DEFAULT 0"), ("note", "TEXT"),
+            ("created_at", "TEXT"), ("updated_at", "TEXT"), ("updated_by", "TEXT"),
+            ("deleted_at", "TEXT"), ("deleted_by", "TEXT"), ("delete_reason", "TEXT"), ("version", "INTEGER DEFAULT 1"),
+        ],
+        "system_settings": [
+            ("setting_key", "TEXT"), ("setting_value", "TEXT"), ("note", "TEXT"),
+            ("updated_at", "TEXT"), ("updated_by", "TEXT"), ("deleted_at", "TEXT"),
+            ("deleted_by", "TEXT"), ("delete_reason", "TEXT"), ("version", "INTEGER DEFAULT 1"),
+        ],
+    }.items():
+        for col, typ in cols:
+            alters.append(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typ}")
+
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_v38_process_categories_active ON process_categories(is_active, sort_order, id) WHERE COALESCE(deleted_at,'')=''",
+        "CREATE INDEX IF NOT EXISTS idx_v38_process_categories_name ON process_categories(category_name) WHERE COALESCE(deleted_at,'')=''",
+        "CREATE INDEX IF NOT EXISTS idx_v38_process_options_category ON process_options(category_name, is_active, sort_order, id) WHERE COALESCE(deleted_at,'')=''",
+        "CREATE INDEX IF NOT EXISTS idx_v38_process_options_name ON process_options(process_name) WHERE COALESCE(deleted_at,'')=''",
+        "CREATE INDEX IF NOT EXISTS idx_v38_rest_periods_active ON rest_periods(is_active, sort_order, id) WHERE COALESCE(deleted_at,'')=''",
+        "CREATE INDEX IF NOT EXISTS idx_v38_system_settings_key ON system_settings(setting_key) WHERE COALESCE(deleted_at,'')=''",
+    ]
+    for stmt in ddl + alters + indexes:
+        _v38_exec(stmt, ignore_error=True)
+
+    try:
+        row = _v38_query_one("SELECT COUNT(*) AS c FROM process_categories WHERE COALESCE(deleted_at,'')=''", ()) or {}
+        if _v38_int(row.get("c"), 0) == 0:
+            now = _v38_sys_now()
+            _v38_exec(
+                "INSERT INTO process_categories(category_name, is_active, active, sort_order, note, created_at, updated_at, deleted_at) VALUES (?,?,?,?,?,?,?, '')",
+                ("全部 / 通用", 1, 1, 0, "system default", now, now),
+                ignore_error=True,
+            )
+    except Exception:
+        pass
+    _V38_SYS_SCHEMA_READY = True
+
+
+def ensure_system_settings_schema() -> None:  # type: ignore[override]
+    _v38_ensure_system_settings_neon_schema()
+
+
+def restore_system_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    if _v38_sys_pg_enabled():
+        _v38_ensure_system_settings_neon_schema()
+        return {"ok": True, "skipped": True, "authority": "Neon/PostgreSQL", "message": "Neon is authority; local restore disabled."}
+    return {"ok": True, "skipped": True, "authority": "local fallback"}
+
+
+def export_system_settings_permanent(reason: str = "system_settings_changed", write_history: bool = True) -> dict[str, Any]:  # type: ignore[override]
+    if _v38_sys_pg_enabled():
+        _v38_ensure_system_settings_neon_schema()
+        return {"ok": True, "skipped": True, "authority": "Neon/PostgreSQL", "reason": reason, "message": "Settings already saved in Neon; foreground JSON/GitHub export disabled."}
+    return {"ok": True, "skipped": True, "authority": "local fallback"}
+
+
+def load_process_categories_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    if not _v38_sys_pg_enabled():
+        if callable(_v38_prev_load_process_categories_df):
+            return _v38_prev_load_process_categories_df(active_only=active_only)
+        return pd.DataFrame()
+    _v38_ensure_system_settings_neon_schema()
+    def _load() -> pd.DataFrame:
+        where = "WHERE COALESCE(deleted_at,'')=''"
+        if active_only:
+            where += " AND COALESCE(is_active,1)=1"
+        df = _v38_query_df(
+            f"""SELECT id, category_name, COALESCE(is_active,1) AS is_active,
+                       COALESCE(sort_order,0) AS sort_order, note, created_at, updated_at
+                FROM process_categories {where}
+                ORDER BY COALESCE(sort_order,0), id""",
+            (),
+        )
+        if df is None or df.empty:
+            return pd.DataFrame(columns=["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+        return df
+    return _v38_cached_df(f"v38_categories:{active_only}", _load)
+
+
+def load_process_options_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    if not _v38_sys_pg_enabled():
+        if callable(_v38_prev_load_process_options_df):
+            return _v38_prev_load_process_options_df(active_only=active_only)
+        return pd.DataFrame()
+    _v38_ensure_system_settings_neon_schema()
+    def _load() -> pd.DataFrame:
+        where = "WHERE COALESCE(deleted_at,'')=''"
+        if active_only:
+            where += " AND COALESCE(is_active,active,1)=1"
+        df = _v38_query_df(
+            f"""SELECT id, COALESCE(category_name,'全部 / 通用') AS category_name, process_name,
+                       COALESCE(is_active,active,1) AS is_active,
+                       COALESCE(sort_order,0) AS sort_order, note, created_at, updated_at
+                FROM process_options {where}
+                ORDER BY COALESCE(category_name,'全部 / 通用'), COALESCE(sort_order,0), id""",
+            (),
+        )
+        if df is None or df.empty:
+            return pd.DataFrame(columns=["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"])
+        return df
+    return _v38_cached_df(f"v38_process:{active_only}", _load)
+
+
+def load_rest_periods_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
+    if not _v38_sys_pg_enabled():
+        if callable(_v38_prev_load_rest_periods_df):
+            return _v38_prev_load_rest_periods_df(active_only=active_only)
+        return pd.DataFrame()
+    _v38_ensure_system_settings_neon_schema()
+    def _load() -> pd.DataFrame:
+        where = "WHERE COALESCE(deleted_at,'')=''"
+        if active_only:
+            where += " AND COALESCE(is_active,active,1)=1"
+        df = _v38_query_df(
+            f"""SELECT id, name, start_time, end_time, COALESCE(is_active,active,1) AS is_active,
+                       COALESCE(sort_order,0) AS sort_order, note, created_at, updated_at
+                FROM rest_periods {where}
+                ORDER BY COALESCE(sort_order,0), id""",
+            (),
+        )
+        if df is None or df.empty:
+            return pd.DataFrame(columns=["id", "name", "start_time", "end_time", "is_active", "sort_order", "note", "created_at", "updated_at"])
+        return df
+    return _v38_cached_df(f"v38_rest:{active_only}", _load)
+
+
+def load_process_category_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    cats: list[str] = []
+    try:
+        df = load_process_categories_df(active_only=True)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            cats.extend([_v38_text(x) for x in df.get("category_name", []).tolist() if _v38_text(x)])
+    except Exception:
+        pass
+    if include_common:
+        cats.insert(0, "全部 / 通用")
+    out: list[str] = []
+    seen: set[str] = set()
+    for c in cats:
+        if c and c not in seen:
+            out.append(c)
+            seen.add(c)
+    return out or (["全部 / 通用"] if include_common else [])
+
+
+def _v38_find_id(table: str, where_sql: str, params: Iterable[Any]) -> int:
+    try:
+        row = _v38_query_one(f"SELECT id FROM {table} WHERE {where_sql} LIMIT 1", tuple(params)) or {}
+        return _v38_int(row.get("id"), 0)
+    except Exception:
+        return 0
+
+
+def save_process_categories_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    if not _v38_sys_pg_enabled():
+        # In local fallback, keep old behavior rather than forcing a new local authority.
+        if callable(globals().get("_v38_prev_load_process_categories_df")):
+            pass
+    _v38_ensure_system_settings_neon_schema()
+    now = _v38_sys_now()
+    count = 0
+    for _, row in (df if isinstance(df, pd.DataFrame) else pd.DataFrame()).iterrows():
+        name = _v38_text(row.get("category_name") or row.get("類別") or row.get("Category"))
+        if not name:
+            continue
+        active = _v38_bool_int(row.get("is_active") if "is_active" in row else row.get("active"), 1)
+        sort_order = _v38_int(row.get("sort_order"), 0)
+        note = _v38_text(row.get("note") or row.get("備註"))
+        rid = _v38_int(row.get("id"), 0)
+        if rid <= 0:
+            rid = _v38_find_id("process_categories", "category_name=? AND COALESCE(deleted_at,'')=''", (name,))
+        if rid > 0:
+            _v38_exec(
+                """UPDATE process_categories
+                   SET category_name=?, is_active=?, active=?, sort_order=?, note=?, updated_at=?, updated_by='13_system_settings', deleted_at='', version=COALESCE(version,1)+1
+                   WHERE id=?""",
+                (name, active, active, sort_order, note, now, rid),
+            )
+        else:
+            _v38_exec(
+                """INSERT INTO process_categories(category_name, is_active, active, sort_order, note, created_at, updated_at, updated_by, deleted_at, version)
+                   VALUES (?,?,?,?,?,?,?,?, '', 1)""",
+                (name, active, active, sort_order, note, now, now, "13_system_settings"),
+            )
+        count += 1
+    _v38_clear_system_settings_cache()
+    return count
+
+
+def delete_process_categories(ids: Iterable[int]) -> int:  # type: ignore[override]
+    _v38_ensure_system_settings_neon_schema()
+    clean = [_v38_int(x, 0) for x in (ids or []) if _v38_int(x, 0) > 0]
+    if not clean:
+        return 0
+    now = _v38_sys_now()
+    ph = ",".join(["?"] * len(clean))
+    names_df = _v38_query_df(f"SELECT category_name FROM process_categories WHERE id IN ({ph})", tuple(clean))
+    names = [_v38_text(x) for x in (names_df.get("category_name", []).tolist() if isinstance(names_df, pd.DataFrame) and not names_df.empty else []) if _v38_text(x)]
+    _v38_exec(f"UPDATE process_categories SET deleted_at=?, deleted_by='13_system_settings', delete_reason='delete_from_13', version=COALESCE(version,1)+1 WHERE id IN ({ph})", tuple([now] + clean))
+    if names:
+        ph2 = ",".join(["?"] * len(names))
+        _v38_exec(f"UPDATE process_options SET deleted_at=?, deleted_by='13_system_settings', delete_reason='category_deleted', version=COALESCE(version,1)+1 WHERE category_name IN ({ph2}) AND COALESCE(deleted_at,'')=''", tuple([now] + names))
+    _v38_clear_system_settings_cache()
+    return len(clean)
+
+
+def save_process_options_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    _v38_ensure_system_settings_neon_schema()
+    now = _v38_sys_now()
+    count = 0
+    for _, row in (df if isinstance(df, pd.DataFrame) else pd.DataFrame()).iterrows():
+        process = _v38_text(row.get("process_name") or row.get("工段名稱") or row.get("工段名稱 / Process"))
+        if not process:
+            continue
+        category = _v38_text(row.get("category_name") or row.get("category") or row.get("類別") or row.get("類別 / Category"), "全部 / 通用") or "全部 / 通用"
+        active = _v38_bool_int(row.get("is_active") if "is_active" in row else row.get("active"), 1)
+        sort_order = _v38_int(row.get("sort_order"), 0)
+        note = _v38_text(row.get("note") or row.get("備註") or row.get("備註 / Note"))
+        rid = _v38_int(row.get("id"), 0)
+        if rid <= 0:
+            rid = _v38_find_id("process_options", "category_name=? AND process_name=? AND COALESCE(deleted_at,'')=''", (category, process))
+        if rid > 0:
+            _v38_exec(
+                """UPDATE process_options
+                   SET category_name=?, process_name=?, is_active=?, active=?, sort_order=?, note=?, updated_at=?, updated_by='13_system_settings', deleted_at='', version=COALESCE(version,1)+1
+                   WHERE id=?""",
+                (category, process, active, active, sort_order, note, now, rid),
+            )
+        else:
+            try:
+                _v38_exec(
+                    """INSERT INTO process_options(category_name, process_name, is_active, active, sort_order, note, created_at, updated_at, updated_by, deleted_at, version)
+                       VALUES (?,?,?,?,?,?,?,?,?, '', 1)""",
+                    (category, process, active, active, sort_order, note, now, now, "13_system_settings"),
+                )
+            except Exception:
+                # Some older Neon tables still have a legacy UNIQUE(process_name).  Do not fail the page;
+                # update that existing process row so the user's confirmed edit is not lost.
+                existing = _v38_find_id("process_options", "process_name=? AND COALESCE(deleted_at,'')=''", (process,))
+                if existing > 0:
+                    _v38_exec(
+                        """UPDATE process_options
+                           SET category_name=?, process_name=?, is_active=?, active=?, sort_order=?, note=?, updated_at=?, updated_by='13_system_settings', deleted_at='', version=COALESCE(version,1)+1
+                           WHERE id=?""",
+                        (category, process, active, active, sort_order, note, now, existing),
+                    )
+                else:
+                    raise
+        count += 1
+    _v38_clear_system_settings_cache()
+    return count
+
+
+def delete_process_options(ids: Iterable[int]) -> int:  # type: ignore[override]
+    _v38_ensure_system_settings_neon_schema()
+    clean = [_v38_int(x, 0) for x in (ids or []) if _v38_int(x, 0) > 0]
+    if not clean:
+        return 0
+    ph = ",".join(["?"] * len(clean))
+    _v38_exec(f"UPDATE process_options SET deleted_at=?, deleted_by='13_system_settings', delete_reason='delete_from_13', version=COALESCE(version,1)+1 WHERE id IN ({ph})", tuple([_v38_sys_now()] + clean))
+    _v38_clear_system_settings_cache()
+    return len(clean)
+
+
+def save_rest_periods_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    _v38_ensure_system_settings_neon_schema()
+    now = _v38_sys_now()
+    count = 0
+    for _, row in (df if isinstance(df, pd.DataFrame) else pd.DataFrame()).iterrows():
+        name = _v38_text(row.get("name") or row.get("休息名稱"), "休息") or "休息"
+        start = _v38_text(row.get("start_time") or row.get("開始時間"))
+        end = _v38_text(row.get("end_time") or row.get("結束時間"))
+        if not start or not end:
+            continue
+        active = _v38_bool_int(row.get("is_active") if "is_active" in row else row.get("active"), 1)
+        sort_order = _v38_int(row.get("sort_order"), 0)
+        note = _v38_text(row.get("note") or row.get("備註"))
+        rid = _v38_int(row.get("id"), 0)
+        if rid <= 0:
+            rid = _v38_find_id("rest_periods", "name=? AND start_time=? AND end_time=? AND COALESCE(deleted_at,'')=''", (name, start, end))
+        if rid > 0:
+            _v38_exec(
+                """UPDATE rest_periods
+                   SET name=?, start_time=?, end_time=?, is_active=?, active=?, sort_order=?, note=?, updated_at=?, updated_by='13_system_settings', deleted_at='', version=COALESCE(version,1)+1
+                   WHERE id=?""",
+                (name, start, end, active, active, sort_order, note, now, rid),
+            )
+        else:
+            _v38_exec(
+                """INSERT INTO rest_periods(name, start_time, end_time, is_active, active, sort_order, note, created_at, updated_at, updated_by, deleted_at, version)
+                   VALUES (?,?,?,?,?,?,?,?,?,?, '', 1)""",
+                (name, start, end, active, active, sort_order, note, now, now, "13_system_settings"),
+            )
+        count += 1
+    _v38_clear_system_settings_cache()
+    return count
+
+
+def delete_rest_periods(ids: Iterable[int]) -> int:  # type: ignore[override]
+    _v38_ensure_system_settings_neon_schema()
+    clean = [_v38_int(x, 0) for x in (ids or []) if _v38_int(x, 0) > 0]
+    if not clean:
+        return 0
+    ph = ",".join(["?"] * len(clean))
+    _v38_exec(f"UPDATE rest_periods SET deleted_at=?, deleted_by='13_system_settings', delete_reason='delete_from_13', version=COALESCE(version,1)+1 WHERE id IN ({ph})", tuple([_v38_sys_now()] + clean))
+    _v38_clear_system_settings_cache()
+    return len(clean)
+
+
+def _v38_setting_get(key: str, default: str = "") -> str:
+    _v38_ensure_system_settings_neon_schema()
+    try:
+        row = _v38_query_one("SELECT setting_value FROM system_settings WHERE setting_key=? AND COALESCE(deleted_at,'')='' LIMIT 1", (key,)) or {}
+        val = _v38_text(row.get("setting_value"), default)
+        return val or default
+    except Exception:
+        return default
+
+
+def _v38_setting_set(key: str, value: str, note: str = "") -> None:
+    _v38_ensure_system_settings_neon_schema()
+    now = _v38_sys_now()
+    exists = _v38_query_one("SELECT setting_key FROM system_settings WHERE setting_key=? LIMIT 1", (key,))
+    if exists:
+        _v38_exec(
+            """UPDATE system_settings
+               SET setting_value=?, note=?, updated_at=?, updated_by='13_system_settings', deleted_at='', version=COALESCE(version,1)+1
+               WHERE setting_key=?""",
+            (str(value), str(note), now, key),
+        )
+    else:
+        _v38_exec(
+            """INSERT INTO system_settings(setting_key, setting_value, note, updated_at, updated_by, deleted_at, version)
+               VALUES (?,?,?,?,?, '', 1)""",
+            (key, str(value), str(note), now, "13_system_settings"),
+        )
+    _v38_clear_system_settings_cache()
+
+
+def get_default_process_category() -> str:  # type: ignore[override]
+    return _v38_setting_get("default_process_category", "全部 / 通用")
+
+
+def save_default_process_category(category_name: str) -> str:  # type: ignore[override]
+    val = _v38_text(category_name, "全部 / 通用") or "全部 / 通用"
+    _v38_setting_set("default_process_category", val, "13 system default category")
+    return val
+
+
+def get_live_page_reset_time() -> str:  # type: ignore[override]
+    return _v38_setting_get("live_page_reset_time", "02:00")
+
+
+def save_live_page_reset_time(value: str) -> str:  # type: ignore[override]
+    val = _v38_text(value, "02:00") or "02:00"
+    _v38_setting_set("live_page_reset_time", val, "01 page daily display reset time")
+    return val
+
+
+def audit_v38_system_settings_neon_confirm_only() -> dict[str, Any]:
+    return {
+        "version": "V38_SYSTEM_SETTINGS_NEON_CONFIRM_ONLY",
+        "postgres_enabled": _v38_sys_pg_enabled(),
+        "schema_ready": bool(_V38_SYS_SCHEMA_READY),
+        "neon_single_authority": True,
+        "local_json_restore_to_neon": False,
+        "github_foreground_sync": False,
+        "page_edit_mode": "st.form submit-only for category/process/rest editors",
+        "cache_seconds": _V38_SYS_CACHE_SECONDS,
+        "cached_tables": list(_V38_SYS_CACHE.keys()),
+    }
+
+# ================= END V38 SYSTEM SETTINGS NEON AUTHORITY + CONFIRM-ONLY SAVE =================
