@@ -84,13 +84,15 @@ with st.form("v39_perf_report_filter_form", clear_on_submit=False):
         refresh_report = st.form_submit_button("重新整理測速報告", use_container_width=True, type="primary")
 if refresh_report:
     st.session_state["v39_perf_filters_applied"] = {"hours": int(pending_hours), "limit": int(pending_limit)}
-    st.rerun()
-_applied_perf_filters = st.session_state.get("v39_perf_filters_applied", _default_perf_filters.copy())
-hours = int(_applied_perf_filters.get("hours", 24))
-limit = int(_applied_perf_filters.get("limit", 5000))
-
-summary = build_summary(last_hours=float(hours), limit=int(limit))
-report_path = write_report(last_hours=float(hours))
+    hours = int(pending_hours)
+    limit = int(pending_limit)
+    summary = build_summary(last_hours=float(hours), limit=int(limit))
+    report_path = write_report(last_hours=float(hours))
+    st.session_state["v59_perf_summary"] = summary
+    st.session_state["v59_perf_report_path"] = str(report_path)
+else:
+    summary = st.session_state.get("v59_perf_summary", {"event_count": 0, "slow_count": 0, "error_count": 0, "by_name": [], "by_category": [], "hot_tables_or_modules": [], "top_events": []})
+    report_path = st.session_state.get("v59_perf_report_path", "尚未重新整理")
 
 st.subheader("總覽")
 st.json({
@@ -141,13 +143,18 @@ st.subheader("V32 Neon 架構合規與效能快測")
 st.caption("目標：20 台電腦、50 人以上同時記錄；每個常用按鈕/查詢 2~3 秒完成；所有正式資料以 Neon/PostgreSQL 為單一真實來源。")
 try:
     from services.neon_performance_audit_service import module_architecture_audit, performance_probe, dataframe
-    audit = module_architecture_audit()
-    c1, c2, c3 = st.columns(3)
-    c1.metric("資料權威", audit.get("backend", "unknown"))
-    c2.metric("PostgreSQL", "ON" if audit.get("postgres_enabled") else "OFF")
-    c3.metric("模組數", len(audit.get("modules", [])))
-    st.markdown("##### 模組架構稽核 / Module architecture audit")
-    _safe_table(audit.get("modules") or [], max_rows=30)
+    if st.button("載入模組架構稽核 / Load module architecture audit", use_container_width=True):
+        st.session_state["v59_module_audit"] = module_architecture_audit()
+    audit = st.session_state.get("v59_module_audit")
+    if audit:
+        c1, c2, c3 = st.columns(3)
+        c1.metric("資料權威", audit.get("backend", "unknown"))
+        c2.metric("PostgreSQL", "ON" if audit.get("postgres_enabled") else "OFF")
+        c3.metric("模組數", len(audit.get("modules", [])))
+        st.markdown("##### 模組架構稽核 / Module architecture audit")
+        _safe_table(audit.get("modules") or [], max_rows=30)
+    else:
+        st.caption("為避免 99 頁面本身長時間運轉，模組架構稽核改為手動載入。")
     if st.button("執行 2~3 秒效能快測 / Run performance probe", use_container_width=True):
         st.session_state["v32_perf_probe"] = performance_probe()
     probe = st.session_state.get("v32_perf_probe")

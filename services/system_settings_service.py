@@ -6383,348 +6383,79 @@ def audit_v51_process_batch_save() -> dict[str, Any]:
 # ================= END V51 PROCESS OPTION BATCH SAVE PRESERVE ALL ROWS =================
 
 
-# ================= V57 01 PAGE HOTPATH NO-DDL SETTINGS READ =================
-# Purpose:
-# - 01. 工時紀錄 must be usable immediately after entering the page.
-# - Category/default/process reads must never run CREATE/ALTER/INDEX migrations on the page render path.
-# - Neon/PostgreSQL remains the single source of truth.  Schema migration belongs to deployment,
-#   init_db, or explicit save paths, not to dropdown reads.
-# - This directly fixes reports where 01_load_process_categories_default took ~35 seconds because
-#   it executed process_categories/process_options/rest_periods/system_settings DDL.
-
-_V57_SETTINGS_CACHE: dict[str, tuple[float, Any]] = {}
-try:
-    _V57_SETTINGS_TTL = float(os.environ.get("SPT_V57_SETTINGS_FAST_CACHE_SECONDS", "300") or 300)
-except Exception:
-    _V57_SETTINGS_TTL = 300.0
-
-
-def _v57_pg_enabled() -> bool:
+# ===================== V59 FAST CATEGORY READS WITHOUT DDL =====================
+def _v59_ss_text(v, default: str = "") -> str:
     try:
-        from services.db_service import is_postgres_enabled
-        return bool(is_postgres_enabled())
-    except Exception:
-        return False
-
-
-def _v57_text(value: Any, default: str = "") -> str:
-    try:
-        if pd.isna(value):
+        import pandas as _pd
+        if _pd.isna(v):
             return default
     except Exception:
         pass
-    text = str(value if value is not None else default).strip()
-    if text.lower() in {"none", "nan", "nat", "null", "<na>"}:
-        return default
-    return text or default
+    return str(v if v is not None else default).strip()
 
-
-def _v57_int(value: Any, default: int = 0) -> int:
-    try:
-        if pd.isna(value):
-            return int(default)
-    except Exception:
-        pass
-    try:
-        return int(float(str(value).strip()))
-    except Exception:
-        return int(default)
-
-
-def _v57_cache_get(key: str):
-    try:
-        import time as _time
-        got = _V57_SETTINGS_CACHE.get(key)
-        if got and (_time.time() - float(got[0])) <= _V57_SETTINGS_TTL:
-            value = got[1]
-            if isinstance(value, pd.DataFrame):
-                return value.copy()
-            if isinstance(value, list):
-                return list(value)
-            return value
-    except Exception:
-        pass
-    return None
-
-
-def _v57_cache_set(key: str, value):
-    try:
-        import time as _time
-        if isinstance(value, pd.DataFrame):
-            value = value.copy()
-        elif isinstance(value, list):
-            value = list(value)
-        _V57_SETTINGS_CACHE[key] = (_time.time(), value)
-    except Exception:
-        pass
-    return value.copy() if isinstance(value, pd.DataFrame) else (list(value) if isinstance(value, list) else value)
-
-
-def _v57_query_df_no_ddl(sql: str, params: tuple[Any, ...] = ()) -> pd.DataFrame:
+def _v59_ss_query_df(sql: str, params: tuple = ()):  # no schema checks here
     try:
         from services.db_service import query_df
-        df = query_df(sql, params)
-        if isinstance(df, pd.DataFrame):
-            return df
+        return query_df(sql, params)
     except Exception:
-        pass
-    return pd.DataFrame()
+        import pandas as _pd
+        return _pd.DataFrame()
 
-
-def _v57_query_one_no_ddl(sql: str, params: tuple[Any, ...] = ()) -> dict[str, Any]:
+def _v59_ss_query_one(sql: str, params: tuple = ()):  # no schema checks here
     try:
         from services.db_service import query_one
-        row = query_one(sql, params) or {}
-        return dict(row) if isinstance(row, dict) else {}
+        return query_one(sql, params)
     except Exception:
-        return {}
+        return None
 
-
-def _v57_standard_cols(kind: str) -> list[str]:
-    if kind == "categories":
-        return ["id", "category_name", "is_active", "sort_order", "note", "created_at", "updated_at"]
-    if kind == "process":
-        return ["id", "category_name", "process_name", "is_active", "sort_order", "note", "created_at", "updated_at"]
-    if kind == "rest":
-        return ["id", "name", "start_time", "end_time", "is_active", "sort_order", "note", "created_at", "updated_at"]
-    return []
-
-
-def ensure_system_settings_schema() -> None:  # type: ignore[override]
-    """V57 hot-path guard.
-
-    Do not run DDL from normal page rendering.  This function is intentionally
-    a no-op in PostgreSQL mode because previous versions called it from 01/13
-    dropdown reads and caused 30+ second page entry times.  Explicit save/import
-    functions still use their own INSERT/UPDATE logic and deployment scripts can
-    run schema setup outside the UI hot path.
-    """
-    if _v57_pg_enabled():
-        return
+def load_process_category_choices(include_common: bool = False) -> list[str]:  # type: ignore[override]
+    df = _v59_ss_query_df("""
+        SELECT category_name
+        FROM process_categories
+        WHERE (deleted_at IS NULL OR deleted_at='') AND COALESCE(is_active, active, 1)=1
+        ORDER BY COALESCE(sort_order,0), id
+        LIMIT 200
+    """)
+    out=[]
     try:
-        if callable(globals().get("_v38_prev_ensure_system_settings_schema")):
-            globals()["_v38_prev_ensure_system_settings_schema"]()
+        for x in df.get('category_name', []).tolist():
+            t=_v59_ss_text(x)
+            if t and t not in out and (include_common or t not in {'全部','通用','全部 / 通用'}):
+                out.append(t)
     except Exception:
-        return
-
-
-def load_process_categories_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
-    if not _v57_pg_enabled():
-        try:
-            if callable(globals().get("_v38_prev_load_process_categories_df")):
-                return globals()["_v38_prev_load_process_categories_df"](active_only=active_only)
-        except Exception:
-            pass
-        return pd.DataFrame(columns=_v57_standard_cols("categories"))
-    key = f"v57_categories:{bool(active_only)}"
-    cached = _v57_cache_get(key)
-    if isinstance(cached, pd.DataFrame):
-        return cached
-    where = "WHERE COALESCE(deleted_at,'')=''"
-    if active_only:
-        where += " AND COALESCE(is_active,1)=1"
-    sql = f"""SELECT id, category_name, COALESCE(is_active,1) AS is_active,
-                     COALESCE(sort_order,0) AS sort_order, note, created_at, updated_at
-              FROM process_categories {where}
-              ORDER BY COALESCE(sort_order,0), id"""
-    df = _v57_query_df_no_ddl(sql, ())
-    if df.empty:
-        # Fallback for older DBs where deleted_at/is_active columns are unavailable.
-        sql2 = "SELECT id, category_name, 1 AS is_active, COALESCE(sort_order,0) AS sort_order, note, created_at, updated_at FROM process_categories ORDER BY COALESCE(sort_order,0), id"
-        df = _v57_query_df_no_ddl(sql2, ())
-    if df.empty:
-        df = pd.DataFrame(columns=_v57_standard_cols("categories"))
-    return _v57_cache_set(key, df)
-
-
-def load_process_options_df(active_only: bool = False, category_name: str | None = None, limit: int | None = None) -> pd.DataFrame:  # type: ignore[override]
-    if not _v57_pg_enabled():
-        try:
-            if callable(globals().get("_v41_prev_load_process_options_df")):
-                df = globals()["_v41_prev_load_process_options_df"](active_only=active_only)
-            else:
-                df = pd.DataFrame(columns=_v57_standard_cols("process"))
-            cat = _v57_text(category_name)
-            if cat and isinstance(df, pd.DataFrame) and not df.empty and "category_name" in df.columns:
-                df = df[df["category_name"].map(_v57_text).eq(cat)].copy()
-            return df
-        except Exception:
-            return pd.DataFrame(columns=_v57_standard_cols("process"))
-    cat = _v57_text(category_name)
-    safe_limit = _v57_int(limit, 0)
-    key = f"v57_process:{bool(active_only)}:{cat}:{safe_limit}"
-    cached = _v57_cache_get(key)
-    if isinstance(cached, pd.DataFrame):
-        return cached
-    where = "WHERE COALESCE(deleted_at,'')=''"
-    params: list[Any] = []
-    if active_only:
-        where += " AND COALESCE(is_active,active,1)=1"
-    if cat:
-        where += " AND COALESCE(NULLIF(category_name,''),'全部 / 通用')=?"
-        params.append(cat)
-    limit_sql = f" LIMIT {safe_limit}" if safe_limit > 0 else ""
-    sql = f"""SELECT id, COALESCE(NULLIF(category_name,''),'全部 / 通用') AS category_name,
-                     process_name, COALESCE(is_active,active,1) AS is_active,
-                     COALESCE(sort_order,0) AS sort_order, note, created_at, updated_at
-              FROM process_options {where}
-              ORDER BY COALESCE(sort_order,0), id{limit_sql}"""
-    df = _v57_query_df_no_ddl(sql, tuple(params))
-    if df.empty:
-        # Minimal fallback, no schema creation.
-        where2 = "WHERE 1=1"
-        params2: list[Any] = []
-        if cat:
-            where2 += " AND COALESCE(NULLIF(category_name,''),'全部 / 通用')=?"
-            params2.append(cat)
-        if active_only:
-            where2 += " AND COALESCE(is_active,1)=1"
-        sql2 = f"""SELECT id, COALESCE(NULLIF(category_name,''),'全部 / 通用') AS category_name,
-                         process_name, COALESCE(is_active,1) AS is_active,
-                         COALESCE(sort_order,0) AS sort_order, note, created_at, updated_at
-                  FROM process_options {where2}
-                  ORDER BY COALESCE(sort_order,0), id{limit_sql}"""
-        df = _v57_query_df_no_ddl(sql2, tuple(params2))
-    if df.empty:
-        df = pd.DataFrame(columns=_v57_standard_cols("process"))
-    if cat and "category_name" in df.columns:
-        df = df[df["category_name"].map(lambda x: _v57_text(x, "全部 / 通用")).eq(cat)].copy()
-    return _v57_cache_set(key, df)
-
-
-def load_rest_periods_df(active_only: bool = False) -> pd.DataFrame:  # type: ignore[override]
-    if not _v57_pg_enabled():
-        try:
-            if callable(globals().get("_v38_prev_load_rest_periods_df")):
-                return globals()["_v38_prev_load_rest_periods_df"](active_only=active_only)
-        except Exception:
-            pass
-        return pd.DataFrame(columns=_v57_standard_cols("rest"))
-    key = f"v57_rest:{bool(active_only)}"
-    cached = _v57_cache_get(key)
-    if isinstance(cached, pd.DataFrame):
-        return cached
-    where = "WHERE COALESCE(deleted_at,'')=''"
-    if active_only:
-        where += " AND COALESCE(is_active,active,1)=1"
-    sql = f"""SELECT id, name, start_time, end_time, COALESCE(is_active,active,1) AS is_active,
-                     COALESCE(sort_order,0) AS sort_order, note, created_at, updated_at
-              FROM rest_periods {where}
-              ORDER BY COALESCE(sort_order,0), id"""
-    df = _v57_query_df_no_ddl(sql, ())
-    if df.empty:
-        df = pd.DataFrame(columns=_v57_standard_cols("rest"))
-    return _v57_cache_set(key, df)
-
-
-def load_process_category_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
-    # include_common is kept for compatibility but must not resurrect deleted 全部 / 通用.
-    key = "v57_category_choices"
-    cached = _v57_cache_get(key)
-    if isinstance(cached, list):
-        return cached
-    choices: list[str] = []
-    seen: set[str] = set()
-    df = load_process_categories_df(active_only=True)
-    if isinstance(df, pd.DataFrame) and not df.empty and "category_name" in df.columns:
-        for value in df["category_name"].tolist():
-            name = _v57_text(value)
-            if name and name not in seen:
-                choices.append(name)
-                seen.add(name)
-    if not choices:
-        dfp = load_process_options_df(active_only=True, category_name=None, limit=1000)
-        if isinstance(dfp, pd.DataFrame) and not dfp.empty and "category_name" in dfp.columns:
-            for value in dfp["category_name"].tolist():
-                name = _v57_text(value)
-                if name and name not in seen:
-                    choices.append(name)
-                    seen.add(name)
-    return _v57_cache_set(key, choices)
-
-
-def get_default_process_category() -> str:  # type: ignore[override]
-    key = "v57_default_process_category"
-    cached = _v57_cache_get(key)
-    if isinstance(cached, str):
-        return cached
-    active = load_process_category_choices(include_common=False)
-    stored = ""
-    if _v57_pg_enabled():
-        row = _v57_query_one_no_ddl("SELECT setting_value FROM system_settings WHERE setting_key=? AND COALESCE(deleted_at,'')='' LIMIT 1", ("default_process_category",))
-        stored = _v57_text(row.get("setting_value"))
-    if stored and stored in active:
-        return _v57_cache_set(key, stored)
-    return _v57_cache_set(key, active[0] if active else "")
-
-
-def get_process_options_by_category_exact(category_name: str | None = None) -> list[str]:  # type: ignore[override]
-    cat = _v57_text(category_name) or get_default_process_category()
-    if not cat:
-        return []
-    key = f"v57_exact_process_names:{cat}"
-    cached = _v57_cache_get(key)
-    if isinstance(cached, list):
-        return cached
-    df = load_process_options_df(active_only=True, category_name=cat, limit=2000)
-    names: list[str] = []
-    seen: set[str] = set()
-    if isinstance(df, pd.DataFrame) and not df.empty and "process_name" in df.columns:
-        work = df.copy()
-        if "sort_order" in work.columns:
-            try:
-                work["_sort"] = pd.to_numeric(work["sort_order"], errors="coerce").fillna(999999)
-                work = work.sort_values(["_sort", "id" if "id" in work.columns else "process_name"], kind="stable")
-            except Exception:
-                pass
-        for value in work["process_name"].tolist():
-            name = _v57_text(value)
-            if name and name not in seen:
-                names.append(name)
-                seen.add(name)
-    return _v57_cache_set(key, names)
-
-
-def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
-    cat = _v57_text(category_name) or get_default_process_category()
-    names = get_process_options_by_category_exact(cat)
-    # Include common only when common category still exists and caller explicitly asks.
-    active = load_process_category_choices(include_common=False)
-    if include_common and cat != "全部 / 通用" and "全部 / 通用" in active:
-        names = get_process_options_by_category_exact("全部 / 通用") + names
-    out: list[str] = []
-    seen: set[str] = set()
-    for name in names:
-        name = _v57_text(name)
-        if name and name not in seen:
-            out.append(name)
-            seen.add(name)
+        pass
     return out
 
+def get_default_process_category() -> str:  # type: ignore[override]
+    row = _v59_ss_query_one("SELECT setting_value FROM system_settings WHERE setting_key='default_process_category' AND (deleted_at IS NULL OR deleted_at='') LIMIT 1") or {}
+    val = _v59_ss_text((row or {}).get('setting_value')) if isinstance(row, dict) else ''
+    choices = load_process_category_choices(include_common=True)
+    return val if val in choices else (choices[0] if choices else '')
 
-def get_process_options() -> list[str]:  # type: ignore[override]
-    return get_process_options_by_category(get_default_process_category(), include_common=True)
-
-
-def _v38_clear_system_settings_cache() -> None:  # type: ignore[override]
+def get_process_options_by_category_exact(category_name: str) -> list[str]:  # type: ignore[override]
+    cat=_v59_ss_text(category_name)
+    if not cat:
+        return []
+    df=_v59_ss_query_df("""
+        SELECT process_name
+        FROM process_options
+        WHERE (deleted_at IS NULL OR deleted_at='')
+          AND COALESCE(active, is_active, 1)=1
+          AND TRIM(category_name)=TRIM(?)
+          AND COALESCE(process_name,'')<>''
+        ORDER BY COALESCE(sort_order,0), id
+        LIMIT 500
+    """, (cat,))
+    out=[]
     try:
-        _V57_SETTINGS_CACHE.clear()
+        for x in df.get('process_name', []).tolist():
+            t=_v59_ss_text(x)
+            if t and t not in out:
+                out.append(t)
     except Exception:
         pass
-    try:
-        _V38_SYS_CACHE.clear()
-    except Exception:
-        pass
+    return out
 
-
-def audit_v57_01_hotpath_no_ddl() -> dict[str, Any]:
-    return {
-        "version": "V57_01_HOTPATH_NO_DDL_SETTINGS_READ",
-        "page01_category_read_runs_schema_migration": False,
-        "page_read_uses_cache": True,
-        "neon_single_authority": True,
-        "migration_location": "deployment/init_db/manual save path, not page render",
-        "cache_ttl_seconds": _V57_SETTINGS_TTL,
-    }
-
-# ================= END V57 01 PAGE HOTPATH NO-DDL SETTINGS READ =================
+def audit_v59_system_settings_page_hotpath() -> dict:
+    return {"version":"V59_FAST_CATEGORY_READS_WITHOUT_DDL","load_process_category_choices_no_ddl":True,"get_process_options_by_category_exact_no_ddl":True}
+# =================== END V59 FAST CATEGORY READS WITHOUT DDL =====================

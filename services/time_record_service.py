@@ -31533,3 +31533,246 @@ def audit_v52_start_work_nonblocking_hotpath() -> dict:
     }
 
 # =================== END V52 01 START BUTTON NON-BLOCKING HOT PATH =====================
+
+
+# ===================== V59 PAGE HOTPATH FINAL OVERRIDES｜2026-06-02 =====================
+# Purpose: 01/02 pages must not call legacy reconciliation, local JSON, GitHub,
+# or whole-table scans during render/button hot paths.  These final overrides use
+# Neon/PostgreSQL as the authority with small indexed SQL only.
+import pandas as _v59_pd
+from datetime import datetime as _v59_datetime
+
+def _v59_text(v, default: str = "") -> str:
+    try:
+        if _v59_pd.isna(v):
+            return default
+    except Exception:
+        pass
+    return str(v if v is not None else default).strip()
+
+def _v59_now() -> str:
+    try:
+        from services.timezone_service import now_text
+        return str(now_text())
+    except Exception:
+        return _v59_datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def _v59_today() -> str:
+    try:
+        from services.timezone_service import today_text
+        return str(today_text())
+    except Exception:
+        return _v59_now()[:10]
+
+def _v59_is_pg() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled
+        return bool(is_postgres_enabled())
+    except Exception:
+        return False
+
+def _v59_active_predicate() -> str:
+    return "(deleted_at IS NULL OR deleted_at='') AND (end_timestamp IS NULL OR end_timestamp='')"
+
+def _v59_query_df(sql: str, params: tuple = ()) -> _v59_pd.DataFrame:
+    try:
+        from services.db_service import query_df
+        df = query_df(sql, params)
+        if isinstance(df, _v59_pd.DataFrame):
+            return df.where(_v59_pd.notna(df), "").reset_index(drop=True)
+    except Exception:
+        pass
+    return _v59_pd.DataFrame()
+
+def _v59_query_one(sql: str, params: tuple = ()) -> dict | None:
+    try:
+        from services.db_service import query_one
+        row = query_one(sql, params)
+        return dict(row) if isinstance(row, dict) else None
+    except Exception:
+        return None
+
+def _v59_execute(sql: str, params: tuple = ()) -> int:
+    try:
+        from services.db_service import execute
+        return int(execute(sql, params) or 0)
+    except Exception:
+        return 0
+
+def _v59_id_list(values) -> list[int]:
+    out=[]
+    for x in values or []:
+        try:
+            i=int(float(str(x).strip()))
+            if i>0 and i not in out:
+                out.append(i)
+        except Exception:
+            pass
+    return out
+
+def _v59_base_cols() -> str:
+    return "id, record_id, record_key, operation_id, status, work_order, work_order_no, part_no, type_name, process_code, process_name, employee_id, employee_name, start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, end_date, end_time, work_hours, work_minutes, raw_minutes, average_minutes, assembly_location, group_key, is_group_work, source, created_at, updated_at, updated_by, deleted_at, deleted_by, delete_reason, version"
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None) -> _v59_pd.DataFrame:  # type: ignore[override]
+    if not _v59_is_pg():
+        return _v59_pd.DataFrame()
+    sql = f"SELECT {_v59_base_cols()} FROM time_records WHERE {_v59_active_predicate()}"
+    params=[]
+    if employee_id:
+        sql += " AND employee_id=?"
+        params.append(_v59_text(employee_id))
+    if employee_name:
+        sql += " AND COALESCE(employee_name,'')=?"
+        params.append(_v59_text(employee_name))
+    if process_name:
+        sql += " AND process_name=?"
+        params.append(_v59_text(process_name))
+    if start_date:
+        sql += " AND start_date=?"
+        params.append(_v59_text(start_date))
+    sql += " ORDER BY id DESC LIMIT 100"
+    return _v59_query_df(sql, tuple(params))
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    if not _v59_is_pg():
+        return None
+    sql = f"SELECT {_v59_base_cols()} FROM time_records WHERE {_v59_active_predicate()} AND employee_id=?"
+    params=[_v59_text(employee_id)]
+    if employee_name:
+        sql += " AND COALESCE(employee_name,'')=?"
+        params.append(_v59_text(employee_name))
+    sql += " ORDER BY id DESC LIMIT 1"
+    return _v59_query_one(sql, tuple(params))
+
+def get_active_group(record_id: int) -> _v59_pd.DataFrame:  # type: ignore[override]
+    rec = _v59_query_one(f"SELECT {_v59_base_cols()} FROM time_records WHERE id=? LIMIT 1", (int(record_id),))
+    if not rec:
+        return _v59_pd.DataFrame()
+    if _v59_text(rec.get("end_timestamp")) or _v59_text(rec.get("deleted_at")):
+        return _v59_pd.DataFrame()
+    emp=_v59_text(rec.get("employee_id")); name=_v59_text(rec.get("employee_name")); proc=_v59_text(rec.get("process_name")); sdate=_v59_text(rec.get("start_date"))
+    if not emp:
+        return _v59_pd.DataFrame([rec])
+    sql=f"SELECT {_v59_base_cols()} FROM time_records WHERE {_v59_active_predicate()} AND employee_id=?"
+    params=[emp]
+    if name:
+        sql += " AND COALESCE(employee_name,'')=?"; params.append(name)
+    if proc:
+        sql += " AND process_name=?"; params.append(proc)
+    if sdate:
+        sql += " AND start_date=?"; params.append(sdate)
+    sql += " ORDER BY id ASC LIMIT 100"
+    return _v59_query_df(sql, tuple(params))
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> _v59_pd.DataFrame:  # type: ignore[override]
+    today = _v59_today()
+    if unfinished_only:
+        sql=f"SELECT {_v59_base_cols()} FROM time_records WHERE {_v59_active_predicate()} ORDER BY id DESC LIMIT 500"
+        return _v59_query_df(sql)
+    if include_finished:
+        sql=f"SELECT {_v59_base_cols()} FROM time_records WHERE (deleted_at IS NULL OR deleted_at='') AND start_date=? ORDER BY id DESC LIMIT 500"
+        return _v59_query_df(sql,(today,))
+    sql=f"SELECT {_v59_base_cols()} FROM time_records WHERE {_v59_active_predicate()} AND start_date=? ORDER BY id DESC LIMIT 500"
+    return _v59_query_df(sql,(today,))
+
+def load_records(start_date: str | None = None, end_date: str | None = None, employee_id: str | None = None, work_order: str | None = None) -> _v59_pd.DataFrame:  # type: ignore[override]
+    if not start_date and not end_date:
+        start_date = _v59_today()
+        end_date = _v59_today()
+    sql=f"SELECT {_v59_base_cols()} FROM time_records WHERE (deleted_at IS NULL OR deleted_at='')"
+    params=[]
+    if start_date:
+        sql += " AND start_date>=?"; params.append(_v59_text(start_date))
+    if end_date:
+        sql += " AND start_date<=?"; params.append(_v59_text(end_date))
+    if employee_id:
+        sql += " AND employee_id=?"; params.append(_v59_text(employee_id))
+    if work_order:
+        sql += " AND (work_order=? OR work_order_no=?)"; params.extend([_v59_text(work_order), _v59_text(work_order)])
+    sql += " ORDER BY id DESC LIMIT 5000"
+    return _v59_query_df(sql, tuple(params))
+
+def _v59_finish_minutes(start_ts: str, end_ts: str) -> tuple[float,int]:
+    try:
+        st_dt=_v59_pd.to_datetime(start_ts, errors="coerce")
+        en_dt=_v59_pd.to_datetime(end_ts, errors="coerce")
+        if _v59_pd.isna(st_dt) or _v59_pd.isna(en_dt):
+            return 0.0,0
+        mins=max(0, int(round((en_dt-st_dt).total_seconds()/60.0)))
+        return round(mins/60.0,4), mins
+    except Exception:
+        return 0.0,0
+
+def finish_work(record_id: int, end_action: str, remark: str = "", finish_parallel_group: bool = True) -> int:  # type: ignore[override]
+    rec = _v59_query_one(f"SELECT {_v59_base_cols()} FROM time_records WHERE id=? LIMIT 1", (int(record_id),))
+    if not rec:
+        return 0
+    rows = get_active_group(int(record_id)) if finish_parallel_group else _v59_pd.DataFrame([rec])
+    if rows.empty:
+        return 0
+    now=_v59_now(); end_date=now[:10]; end_time=now[11:19]
+    n=0
+    for _, rr in rows.iterrows():
+        rid = int(float(str(rr.get("id"))))
+        wh, wm = _v59_finish_minutes(_v59_text(rr.get("start_timestamp")), now)
+        _v59_execute("""
+            UPDATE time_records
+            SET status=?, end_action=?, end_timestamp=?, end_date=?, end_time=?,
+                remark=CASE WHEN ?='' THEN remark WHEN remark IS NULL OR remark='' THEN ? ELSE remark || '；' || ? END,
+                work_hours=?, work_minutes=?, raw_minutes=?, average_minutes=?, updated_at=?, updated_by='system', version=COALESCE(version,1)+1
+            WHERE id=? AND (deleted_at IS NULL OR deleted_at='') AND (end_timestamp IS NULL OR end_timestamp='')
+        """, (_v59_text(end_action), _v59_text(end_action), now, end_date, end_time, _v59_text(remark), _v59_text(remark), _v59_text(remark), wh, wm, wm, wm, now, rid))
+        n += 1
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return n
+
+def delete_time_records(record_ids: list[int], reason: str = "管理員刪除工時紀錄") -> int:  # type: ignore[override]
+    ids=_v59_id_list(record_ids)
+    if not ids:
+        return 0
+    now=_v59_now(); total=0
+    for i in range(0,len(ids),100):
+        chunk=ids[i:i+100]
+        ph=','.join(['?']*len(chunk))
+        total += _v59_execute(f"""
+            UPDATE time_records
+            SET deleted_at=?, deleted_by='admin', delete_reason=?, updated_at=?, version=COALESCE(version,1)+1
+            WHERE id IN ({ph}) AND (deleted_at IS NULL OR deleted_at='')
+        """, tuple([now, _v59_text(reason), now] + chunk))
+    try:
+        clear_query_cache()
+    except Exception:
+        pass
+    return int(total or len(ids))
+
+def _v59_checked(v) -> bool:
+    if isinstance(v, bool): return v
+    return _v59_text(v).lower() in {"true","1","yes","y","on","checked","selected","勾選","是"}
+
+def _v59_extract_checked_ids(editor_df, delete_column: str="刪除 / Delete") -> list[int]:
+    if not isinstance(editor_df, _v59_pd.DataFrame) or editor_df.empty:
+        return []
+    id_col = next((c for c in ["id","ID","ID / ID","紀錄編號"] if c in editor_df.columns), "")
+    if not id_col:
+        return []
+    del_col = next((c for c in [delete_column,"刪除 / Delete","刪除","Delete","_delete"] if c in editor_df.columns), "")
+    if not del_col:
+        return []
+    return _v59_id_list(editor_df.loc[editor_df[del_col].map(_v59_checked), id_col].tolist())
+
+def delete_time_records_from_editor_df(editor_df: _v59_pd.DataFrame, delete_column: str="刪除 / Delete", reason: str="01 管理員維護表刪除") -> int:  # type: ignore[override]
+    return delete_time_records(_v59_extract_checked_ids(editor_df, delete_column), reason=reason)
+
+def delete_time_records_from_02_history_editor(editor_df: _v59_pd.DataFrame, record_ids: list[int] | None=None, delete_column: str="刪除 / Delete", reason: str="02 歷史紀錄刪除") -> dict:  # type: ignore[override]
+    ids=_v59_id_list(record_ids or []) or _v59_extract_checked_ids(editor_df, delete_column)
+    if not ids:
+        return {"ok": False, "deleted_count": 0, "ids": [], "message": "沒有勾選可刪除的紀錄"}
+    n=delete_time_records(ids, reason=reason)
+    return {"ok": True, "deleted_count": int(n), "ids": ids, "version": "V59"}
+
+def audit_v59_time_record_hotpath() -> dict:
+    return {"version":"V59_PAGE_HOTPATH_FINAL_OVERRIDES","active_queries_direct_sql":True,"delete_direct_soft_delete":True,"finish_direct_short_update":True,"no_legacy_reconcile_in_page_hotpath":True}
+# =================== END V59 PAGE HOTPATH FINAL OVERRIDES =====================

@@ -2951,3 +2951,53 @@ def get_system_log_authority_status() -> dict[str, Any]:  # type: ignore[overrid
         return {"exists": False, "authority_type": "neon_system_logs_v32", "error": str(exc)[:300]}
 
 # ================= END V32 06 LOG NEON SINGLE AUTHORITY FINAL OVERRIDE =================
+
+
+# ===================== V59 NON-BLOCKING FRONTEND LOG BUFFER =====================
+# In Streamlit page/button hot paths, system_logs insert must never block the page.
+# Authority transactions remain in Neon; operational logs are buffered locally and
+# can be flushed/exported by 06/09 background tools later.
+def write_log(action_type: str, message: str, target_table: str = "", target_id: str = "", detail: str = "", level: str = "INFO", user_name: str | None = None) -> None:  # type: ignore[override]
+    try:
+        import json as _json
+        from pathlib import Path as _Path
+        from services.timezone_service import now_text as _now_text
+        row = {
+            "log_time": str(_now_text()),
+            "user_name": _clean_text(user_name) or _current_log_user(),
+            "action_type": _clean_text(action_type),
+            "target_table": _clean_text(target_table),
+            "target_id": _clean_text(target_id),
+            "message": _clean_text(message),
+            "detail": _clean_text(detail),
+            "level": _clean_text(level or "INFO"),
+            "source": "v59_nonblocking_frontend_buffer",
+        }
+        p = _Path("data/log_buffer/system_logs_buffer.jsonl")
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a", encoding="utf-8") as f:
+            f.write(_json.dumps(row, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+def write_log_many(rows: list[dict[str, Any]], *, default_target_table: str = "", default_level: str = "INFO", user_name: str | None = None) -> int:  # type: ignore[override]
+    n=0
+    for r in rows or []:
+        try:
+            write_log(
+                r.get("action_type") or r.get("action") or "BATCH_LOG",
+                r.get("message") or "",
+                r.get("target_table") or default_target_table,
+                r.get("target_id") or "",
+                r.get("detail") or "",
+                r.get("level") or default_level,
+                user_name=user_name or r.get("user_name"),
+            )
+            n += 1
+        except Exception:
+            pass
+    return n
+
+def audit_v59_nonblocking_log() -> dict:
+    return {"version":"V59_NONBLOCKING_FRONTEND_LOG_BUFFER","system_logs_insert_removed_from_page_hotpath":True}
+# =================== END V59 NON-BLOCKING FRONTEND LOG BUFFER =====================

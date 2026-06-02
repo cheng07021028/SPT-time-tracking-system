@@ -1612,6 +1612,17 @@ with tab1:
                             count = int((_v199_delete_result or {}).get("deleted_count") or 0)
                         except Exception:
                             count = delete_time_records(delete_ids, reason="02 歷史紀錄啟動編輯後整列刪除")
+                        # V59: immediately remove deleted rows from the cached result set so the
+                        # screen does not look like deletion failed.  The authority source is Neon;
+                        # this only updates the current display cache.
+                        try:
+                            _cached_df = st.session_state.get(V259_HISTORY_DF_KEY)
+                            if isinstance(_cached_df, pd.DataFrame) and not _cached_df.empty and "id" in _cached_df.columns:
+                                _del_set = {int(x) for x in delete_ids}
+                                st.session_state[V259_HISTORY_DF_KEY] = _cached_df.loc[~_cached_df["id"].map(lambda x: int(float(str(x))) if str(x).strip() else -1).isin(_del_set)].copy().reset_index(drop=True)
+                        except Exception:
+                            st.session_state.pop(V259_HISTORY_DF_KEY, None)
+                            st.session_state[V259_HISTORY_QUERY_REQUESTED_KEY] = False
                         st.session_state[delete_select_key] = []
                         st.session_state[recalc_select_key] = []
                         _add_history_result("success", f"已刪除 {count} 筆歷史紀錄。", append=False)

@@ -359,14 +359,46 @@ def _v105_prepare_live_work_order_keyword_state(key: str = "start_work_order_man
 
 
 def _v105_inject_live_work_order_keyword_sync() -> None:
-    """V57: Disabled live URL synchronization.
-
-    The old implementation updated URL query params while the operator typed the
-    work-order keyword, which forced full browser reloads and made 01 look like
-    it never stopped running.  Streamlit's text_input already submits on Enter or
-    normal rerun, so page rendering must not inject a reload script.
-    """
-    return
+    """讓製令關鍵字輸入後自動刷新下方製令下拉，不需 Enter。"""
+    components.html(
+        """
+<script>
+(function(){
+  const PARAM = 'spt_wo_kw';
+  const LABEL = '製令關鍵字';
+  const DEBOUNCE_MS = 420;
+  function bind(){
+    const doc = window.parent && window.parent.document ? window.parent.document : document;
+    const inputs = Array.from(doc.querySelectorAll('input')).filter(function(inp){
+      const aria = inp.getAttribute('aria-label') || '';
+      return aria.indexOf(LABEL) >= 0;
+    });
+    if(!inputs.length){ setTimeout(bind, 300); return; }
+    const input = inputs[0];
+    if(input.dataset.sptWoLiveBound === '1') return;
+    input.dataset.sptWoLiveBound = '1';
+    let timer = null;
+    function sync(){
+      const val = (input.value || '').trim();
+      const url = new URL(window.parent.location.href);
+      const cur = (url.searchParams.get(PARAM) || '').trim();
+      if(cur === val) return;
+      if(val){ url.searchParams.set(PARAM, val); }
+      else { url.searchParams.delete(PARAM); }
+      window.parent.location.replace(url.toString());
+    }
+    input.addEventListener('input', function(){
+      if(timer) clearTimeout(timer);
+      timer = setTimeout(sync, DEBOUNCE_MS);
+    }, true);
+  }
+  bind();
+})();
+</script>
+""",
+        height=0,
+        width=0,
+    )
 # ===== END V105 WORK ORDER KEYWORD LIVE URL SYNC =====
 
 
@@ -920,13 +952,31 @@ with right:
     st.subheader("結束目前作業 / Finish Work")
     emp_label2 = st.selectbox("選擇人員｜Employee", _employee_options_v126, index=_login_employee_index_v126, key=_v127_employee_select_key("end_emp_v127"))
     emp_id2, _emp2_name, _emp2_row = _v141_selected_employee(emp_label2, employees)
-    _spt_perf_t = time.perf_counter()
-    # V259: avoid heavy active-record refresh on every render; direct active lookup is enough for display.
-    try:
-        active2 = get_active_record(emp_id2, employee_name=_emp2_name)
-    except TypeError:
-        active2 = get_active_record(emp_id2)
-    _spt_perf_t = _spt_perf_tick("01_finish_panel_active_query", _spt_perf_t, threshold_ms=500.0, detail={"employee_id": emp_id2, "has_active": bool(active2)})
+
+    # V59: 01 page must be fully operable immediately.  Do not query active work
+    # automatically on every rerun/paint.  The operator explicitly presses a
+    # button before Neon is queried for active work.
+    _active_cache_key_v59 = f"v59_01_active_record_{emp_id2}_{_emp2_name}"
+    _active_loaded_key_v59 = f"v59_01_active_loaded_{emp_id2}_{_emp2_name}"
+    ac1, ac2 = st.columns([1.2, 1.8])
+    load_active_v59 = ac1.button("查詢目前作業", use_container_width=True, key=f"v59_query_active_{emp_id2}_{_emp2_name}")
+    clear_active_v59 = ac2.button("清除目前作業顯示", use_container_width=True, key=f"v59_clear_active_{emp_id2}_{_emp2_name}")
+    if clear_active_v59:
+        st.session_state.pop(_active_cache_key_v59, None)
+        st.session_state.pop(_active_loaded_key_v59, None)
+    if load_active_v59:
+        _spt_perf_t = time.perf_counter()
+        try:
+            active2 = get_active_record(emp_id2, employee_name=_emp2_name)
+        except TypeError:
+            active2 = get_active_record(emp_id2)
+        st.session_state[_active_cache_key_v59] = active2
+        st.session_state[_active_loaded_key_v59] = _v259_now_label()
+        _spt_perf_t = _spt_perf_tick("01_finish_panel_active_query", _spt_perf_t, threshold_ms=500.0, detail={"employee_id": emp_id2, "has_active": bool(active2)})
+    else:
+        active2 = st.session_state.get(_active_cache_key_v59)
+    if not st.session_state.get(_active_loaded_key_v59):
+        st.caption("為避免進入 01 頁面就一直運轉，右側目前作業已改為手動查詢；需要結束/暫停/完工時請按『查詢目前作業』。")
     _v207_admin_finish_bypass = _v207_current_user_is_admin()
     if (not _v207_admin_finish_bypass) and active2 and (not _v141_active_matches_employee(active2, emp_id2, _emp2_name) or not _v143_ui_row_matches_selected(active2, emp_id2, _emp2_name)):
         st.error(
@@ -981,6 +1031,7 @@ with right:
                 _spt_button_t = time.perf_counter()
                 n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=_v208_finish_parallel_group)
                 _v259_clear_display_cache()
+                st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
                 _spt_perf_tick("01_button_finish_pause_action", _spt_button_t, threshold_ms=200.0, detail={"active_id": active2.get("id"), "rows": n})
                 trigger_post_record_continue_prompt(f"已同步暫停 {n} 筆並平均計算工時。", title="工時已暫停")
                 st.rerun()
@@ -991,6 +1042,7 @@ with right:
                 _spt_button_t = time.perf_counter()
                 n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=_v208_finish_parallel_group)
                 _v259_clear_display_cache()
+                st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
                 _spt_perf_tick("01_button_finish_complete_action", _spt_button_t, threshold_ms=200.0, detail={"active_id": active2.get("id"), "rows": n})
                 trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。", title="工時已完工")
                 st.rerun()
@@ -1001,6 +1053,7 @@ with right:
                 _spt_button_t = time.perf_counter()
                 n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=_v208_finish_parallel_group)
                 _v259_clear_display_cache()
+                st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
                 _spt_perf_tick("01_button_finish_off_duty_action", _spt_button_t, threshold_ms=200.0, detail={"active_id": active2.get("id"), "rows": n})
                 trigger_post_record_continue_prompt(f"已同步下班 {n} 筆並平均計算工時。", title="工時已結束")
                 st.rerun()
