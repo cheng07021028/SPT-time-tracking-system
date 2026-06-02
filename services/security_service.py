@@ -4568,3 +4568,24 @@ def set_idle_timeout_minutes(minutes: int) -> None:  # type: ignore[override]
         pass
 
 # ================= END V36 NEON SECURITY SETTINGS FINAL AUTHORITY =================
+
+
+# ================= V46 NEON FREE SAVER MODE - SECURITY SETTINGS CACHE =================
+# Right-top login bar is rendered on every page.  Do not query Neon on every rerun.
+# Neon remains the authority; cache only reduces repeated reads.  set_idle_timeout_minutes()
+# already refreshes session cache after explicit save from 10. 權限管理.
+try:
+    _V36_IDLE_CACHE_TTL_SECONDS = max(float(globals().get("_V36_IDLE_CACHE_TTL_SECONDS", 30.0)), float(os.environ.get("SPT_SECURITY_CACHE_TTL_SECONDS", "300") or 300))
+except Exception:
+    _V36_IDLE_CACHE_TTL_SECONDS = 300.0
+
+
+def audit_v46_security_saver() -> dict[str, Any]:
+    return {
+        "version": "V46_SECURITY_NEON_FREE_SAVER",
+        "idle_timeout_cache_ttl_seconds": _V36_IDLE_CACHE_TTL_SECONDS,
+        "neon_authority": True,
+        "page_header_repeated_db_read_reduced": True,
+    }
+
+# ================= END V46 NEON FREE SAVER MODE - SECURITY SETTINGS CACHE =================

@@ -4353,3 +4353,28 @@ def audit_v33_page_entry_fastpath() -> dict[str, Any]:
     }
 
 # ===== END V33 PAGE ENTRY FASTPATH FOR NEON =====
+
+
+# ================= V46 NEON FREE SAVER MODE - DB CACHE POLICY =================
+# Keep Neon as single source of truth, but reduce repeated SELECTs during Streamlit reruns.
+# Writes still invalidate matching-table cache via V30 targeted invalidation.
+try:
+    _QUERY_CACHE_TTL_SEC = max(float(globals().get("_QUERY_CACHE_TTL_SEC", 45.0)), float(os.environ.get("SPT_DB_SELECT_CACHE_TTL_SECONDS", "120") or 120))
+    _QUERY_CACHE_MAX_ITEMS = max(int(globals().get("_QUERY_CACHE_MAX_ITEMS", 300)), int(os.environ.get("SPT_DB_SELECT_CACHE_MAX_ITEMS", "800") or 800))
+except Exception:
+    _QUERY_CACHE_TTL_SEC = 120.0
+    _QUERY_CACHE_MAX_ITEMS = 800
+
+
+def audit_v46_neon_free_saver() -> dict[str, Any]:
+    return {
+        "version": "V46_NEON_FREE_SAVER_MODE",
+        "postgres_enabled": is_postgres_enabled() if "is_postgres_enabled" in globals() else False,
+        "select_cache_ttl_seconds": _QUERY_CACHE_TTL_SEC,
+        "select_cache_max_items": _QUERY_CACHE_MAX_ITEMS,
+        "targeted_cache_invalidation": True,
+        "neon_role": "authority transactions + indexed reads only",
+        "ui_edits_role": "session/form pending state until explicit apply/save/query",
+    }
+
+# ================= END V46 NEON FREE SAVER MODE - DB CACHE POLICY =================

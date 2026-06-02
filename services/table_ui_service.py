@@ -2004,3 +2004,248 @@ def export_table_ui_settings_permanent(reason: str = "table_ui_settings_changed"
     return {"ok": True, "files": [], "count": 0, "message": "V43: Neon table_ui_settings is authoritative; local export skipped"}
 
 # ===================== END V43 NEON FAST TABLE UI OVERRIDE =====================
+
+
+# ================= V46 NEON FREE SAVER MODE - TABLE UI SETTINGS =================
+# 2026-06-02
+# Purpose:
+# - table_ui_settings is UI preference data, not high-frequency business data.
+# - Do not repeatedly run SQLite-only DDL on Neon/PostgreSQL during page render.
+# - Prefer session/in-process cache. Read Neon only on cache miss. Write Neon only when
+#   the user explicitly clicks Save Column Settings.
+# - Disable local JSON/GitHub permanent restore/export in normal Neon hot paths to save
+#   Neon CU-hours and prevent page-entry delays.
+
+_V46_TABLE_UI_CACHE_TTL_SECONDS = 1800.0
+_V46_TABLE_UI_SCHEMA_READY = False
+_V46_TABLE_UI_MEM_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def _v46_table_ui_pg_enabled() -> bool:
+    try:
+        from services.db_service import is_postgres_enabled
+        return bool(is_postgres_enabled())
+    except Exception:
+        return False
+
+
+def _v46_table_ui_now_sql() -> str:
+    return "CURRENT_TIMESTAMP" if _v46_table_ui_pg_enabled() else "datetime('now','localtime')"
+
+
+def ensure_table_ui_schema() -> None:  # type: ignore[override]
+    """Fast, PostgreSQL-compatible schema check.
+
+    Called by render helpers, so it must be cheap and one-time per Python process.
+    """
+    global _V46_TABLE_UI_SCHEMA_READY, _TABLE_UI_SCHEMA_READY
+    if _V46_TABLE_UI_SCHEMA_READY:
+        return
+    if _v46_table_ui_pg_enabled():
+        execute(
+            """
+            CREATE TABLE IF NOT EXISTS table_ui_settings (
+                table_key TEXT PRIMARY KEY,
+                widths_json TEXT,
+                order_json TEXT,
+                updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        for ddl in (
+            "ALTER TABLE table_ui_settings ADD COLUMN IF NOT EXISTS widths_json TEXT",
+            "ALTER TABLE table_ui_settings ADD COLUMN IF NOT EXISTS order_json TEXT",
+            "ALTER TABLE table_ui_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP",
+        ):
+            try:
+                execute(ddl)
+            except Exception:
+                pass
+    else:
+        execute(
+            """
+            CREATE TABLE IF NOT EXISTS table_ui_settings (
+                table_key TEXT PRIMARY KEY,
+                widths_json TEXT,
+                order_json TEXT,
+                updated_at TEXT DEFAULT (datetime('now','localtime'))
+            )
+            """
+        )
+        try:
+            execute("ALTER TABLE table_ui_settings ADD COLUMN order_json TEXT")
+        except Exception:
+            pass
+    _V46_TABLE_UI_SCHEMA_READY = True
+    _TABLE_UI_SCHEMA_READY = True
+
+
+def _v46_cache_get(table_key: str) -> dict[str, Any] | None:
+    now_ts = time.time()
+    try:
+        cached = st.session_state.get(f"_spt_v46_table_ui_{table_key}")
+        if isinstance(cached, dict) and now_ts - float(cached.get("ts", 0) or 0) <= _V46_TABLE_UI_CACHE_TTL_SECONDS:
+            payload = cached.get("data")
+            return dict(payload) if isinstance(payload, dict) else None
+    except Exception:
+        pass
+    try:
+        cached = _V46_TABLE_UI_MEM_CACHE.get(str(table_key))
+        if cached and now_ts - float(cached[0]) <= _V46_TABLE_UI_CACHE_TTL_SECONDS:
+            return dict(cached[1])
+    except Exception:
+        pass
+    return None
+
+
+def _v46_cache_put(table_key: str, payload: dict[str, Any]) -> None:
+    item = {"widths": dict(payload.get("widths") or {}), "order": list(payload.get("order") or [])}
+    now_ts = time.time()
+    try:
+        _V46_TABLE_UI_MEM_CACHE[str(table_key)] = (now_ts, item)
+        if len(_V46_TABLE_UI_MEM_CACHE) > 500:
+            oldest = min(_V46_TABLE_UI_MEM_CACHE.items(), key=lambda kv: kv[1][0])[0]
+            _V46_TABLE_UI_MEM_CACHE.pop(oldest, None)
+    except Exception:
+        pass
+    try:
+        st.session_state[f"_spt_v46_table_ui_{table_key}"] = {"ts": now_ts, "data": item}
+    except Exception:
+        pass
+
+
+def _v46_load_table_ui_payload(table_key: str) -> dict[str, Any]:
+    cached = _v46_cache_get(table_key)
+    if cached is not None:
+        return cached
+    ensure_table_ui_schema()
+    row = None
+    try:
+        row = query_one("SELECT widths_json, order_json FROM table_ui_settings WHERE table_key=?", (str(table_key),))
+    except Exception:
+        row = None
+    widths: dict[str, int] = {}
+    order: list[str] = []
+    if row:
+        try:
+            data = json.loads(row.get("widths_json") or "{}")
+            if isinstance(data, dict):
+                widths = {str(k): int(v) for k, v in data.items() if str(k)}
+        except Exception:
+            widths = {}
+        try:
+            data = json.loads(row.get("order_json") or "[]")
+            if isinstance(data, list):
+                order = [str(x) for x in data if str(x)]
+        except Exception:
+            order = []
+    payload = {"widths": widths, "order": order}
+    _v46_cache_put(table_key, payload)
+    return payload
+
+
+def load_widths(table_key: str) -> dict[str, int]:  # type: ignore[override]
+    payload = _v46_load_table_ui_payload(str(table_key))
+    return dict(payload.get("widths") or {})
+
+
+def load_column_order(table_key: str) -> list[str]:  # type: ignore[override]
+    payload = _v46_load_table_ui_payload(str(table_key))
+    return list(payload.get("order") or [])
+
+
+def save_widths(table_key: str, widths: dict[str, int]) -> None:  # type: ignore[override]
+    ensure_table_ui_schema()
+    table_key = str(table_key)
+    existing = _v46_load_table_ui_payload(table_key)
+    order = list(existing.get("order") or [])
+    widths_clean = {str(k): int(v) for k, v in (widths or {}).items() if str(k)}
+    if _v46_table_ui_pg_enabled():
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(table_key) DO UPDATE SET
+                widths_json=excluded.widths_json,
+                order_json=COALESCE(table_ui_settings.order_json, excluded.order_json),
+                updated_at=CURRENT_TIMESTAMP
+            """,
+            (table_key, json.dumps(widths_clean, ensure_ascii=False), json.dumps(order, ensure_ascii=False)),
+        )
+    else:
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, datetime('now','localtime'))
+            ON CONFLICT(table_key) DO UPDATE SET
+                widths_json=excluded.widths_json,
+                updated_at=excluded.updated_at
+            """,
+            (table_key, json.dumps(widths_clean, ensure_ascii=False), json.dumps(order, ensure_ascii=False)),
+        )
+    _v46_cache_put(table_key, {"widths": widths_clean, "order": order})
+    if str(os.environ.get("SPT_TABLE_UI_EXPORT_AFTER_SAVE", "0")).strip().lower() in {"1", "true", "yes", "on"}:
+        try:
+            export_table_ui_settings_permanent("save_widths", write_history=False)
+        except Exception:
+            pass
+
+
+def save_column_order(table_key: str, order: Iterable[str]) -> None:  # type: ignore[override]
+    ensure_table_ui_schema()
+    table_key = str(table_key)
+    existing = _v46_load_table_ui_payload(table_key)
+    widths = dict(existing.get("widths") or {})
+    cols = [str(c) for c in order if str(c)]
+    if _v46_table_ui_pg_enabled():
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(table_key) DO UPDATE SET
+                order_json=excluded.order_json,
+                widths_json=COALESCE(table_ui_settings.widths_json, excluded.widths_json),
+                updated_at=CURRENT_TIMESTAMP
+            """,
+            (table_key, json.dumps(widths, ensure_ascii=False), json.dumps(cols, ensure_ascii=False)),
+        )
+    else:
+        execute(
+            """
+            INSERT INTO table_ui_settings(table_key, widths_json, order_json, updated_at)
+            VALUES (?, ?, ?, datetime('now','localtime'))
+            ON CONFLICT(table_key) DO UPDATE SET
+                order_json=excluded.order_json,
+                updated_at=excluded.updated_at
+            """,
+            (table_key, json.dumps(widths, ensure_ascii=False), json.dumps(cols, ensure_ascii=False)),
+        )
+    _v46_cache_put(table_key, {"widths": widths, "order": cols})
+    if str(os.environ.get("SPT_TABLE_UI_EXPORT_AFTER_SAVE", "0")).strip().lower() in {"1", "true", "yes", "on"}:
+        try:
+            export_table_ui_settings_permanent("save_column_order", write_history=False)
+        except Exception:
+            pass
+
+
+def restore_table_ui_settings_from_permanent(force: bool = False) -> dict[str, Any]:  # type: ignore[override]
+    """Disabled in Neon hot path. UI settings are cached and saved only on explicit button."""
+    if _v46_table_ui_pg_enabled() and str(os.environ.get("SPT_ALLOW_TABLE_UI_LOCAL_RESTORE", "0")).strip().lower() not in {"1", "true", "yes", "on"}:
+        return {"ok": True, "restored": 0, "skipped": True, "reason": "V46 Neon Saver Mode: local/GitHub restore disabled on hot path"}
+    # Local fallback can still use the older implementation if needed, but avoid recursion by doing no-op here.
+    return {"ok": True, "restored": 0, "skipped": True, "reason": "V46 local restore disabled by default"}
+
+
+def audit_v46_table_ui_saver() -> dict[str, Any]:
+    return {
+        "version": "V46_TABLE_UI_NEON_FREE_SAVER",
+        "postgres_enabled": _v46_table_ui_pg_enabled(),
+        "cache_ttl_seconds": _V46_TABLE_UI_CACHE_TTL_SECONDS,
+        "cache_items": len(_V46_TABLE_UI_MEM_CACHE),
+        "hot_path_local_restore": False,
+        "hot_path_github_upload": False,
+        "write_only_on_explicit_save": True,
+        "postgres_schema_uses_current_timestamp": True,
+    }
+
+# ================= END V46 NEON FREE SAVER MODE - TABLE UI SETTINGS =================

@@ -5951,3 +5951,25 @@ def audit_v45_process_bridge() -> dict[str, Any]:
     }
 
 # ================= END V45 01/13 CATEGORY-PROCESS NEON BRIDGE FIX =================
+
+
+# ================= V46 NEON FREE SAVER MODE - SYSTEM SETTINGS CACHE =================
+# 13. 系統設定 and 01. 工時紀錄 repeatedly read category/process/rest settings.
+# Keep Neon as authority, but cache read-only settings longer.  All save_* functions already
+# clear this cache after explicit Save/Apply, so Reboot persistence and data correctness remain.
+try:
+    _V38_SYS_CACHE_SECONDS = max(float(globals().get("_V38_SYS_CACHE_SECONDS", 8.0)), float(os.environ.get("SPT_SYSTEM_SETTINGS_CACHE_TTL_SECONDS", "300") or 300))
+except Exception:
+    _V38_SYS_CACHE_SECONDS = 300.0
+
+
+def audit_v46_system_settings_saver() -> dict[str, Any]:
+    return {
+        "version": "V46_SYSTEM_SETTINGS_NEON_FREE_SAVER",
+        "cache_ttl_seconds": _V38_SYS_CACHE_SECONDS,
+        "neon_authority": True,
+        "confirm_only_write": True,
+        "page01_page13_shared_process_cache": True,
+    }
+
+# ================= END V46 NEON FREE SAVER MODE - SYSTEM SETTINGS CACHE =================
