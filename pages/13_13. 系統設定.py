@@ -989,6 +989,10 @@ if section == "類別與工段設定 / Category & Process":
                     st.error("偵測到工段表格草稿不是目前選定類別，已阻止儲存。" f"目前選定：{filter_category}；草稿含有：{', '.join(mismatches[:8])}。")
                     st.stop()
                 save_df = _v144_prepare_process_save_df_for_category(save_df, filter_category or "全部 / 通用")
+                try:
+                    save_df.attrs["selected_category"] = filter_category or "全部 / 通用"
+                except Exception:
+                    pass
                 count = save_process_options_df(save_df)
                 _export_permanent_settings(f"已套用 {filter_category} 類別工段設定 {count} 筆")
                 _refresh_after_apply(f"已套用 {filter_category} 類別工段設定 {count} 筆，畫面已重新整理。", proc_edit_key)

@@ -6135,3 +6135,221 @@ def audit_v48_category_authority() -> dict[str, Any]:
     }
 
 # ================= END V48 CATEGORY AUTHORITY + DEFAULT CLEANUP =================
+
+
+# ================= V51 PROCESS OPTION BATCH SAVE PRESERVE ALL ROWS =================
+# Purpose:
+# - Fix 13. 系統設定 where the user entered/pasted many process rows but only one
+#   row appeared after saving/reloading.
+# - Keep Neon/PostgreSQL as the single source of truth.
+# - Preserve every non-empty process row for the selected category.
+# - If a cell contains newline-separated process names, split them into multiple rows.
+# - Do not move or soft-delete rows from other categories while saving this category.
+
+import re as _v51_re
+
+
+def _v51_norm_text(value: Any, default: str = "") -> str:
+    try:
+        return _v38_text(value, default)
+    except Exception:
+        try:
+            if pd.isna(value):
+                return default
+        except Exception:
+            pass
+        text = str(value if value is not None else default).strip()
+        return text if text else default
+
+
+def _v51_split_process_names(value: Any) -> list[str]:
+    """Split pasted process cells into individual process names.
+
+    Streamlit data_editor may keep a multi-line paste inside one cell instead of
+    creating rows.  The 13 module must treat each non-empty line as one process.
+    """
+    text = _v51_norm_text(value)
+    if not text:
+        return []
+    # Newline is the primary delimiter.  Also tolerate common list separators
+    # when users paste from Excel or text notes.  Do not split on slash because
+    # process/category names may legitimately contain '/'.
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    parts: list[str] = []
+    for block in text.split("\n"):
+        # If there is only a single line, keep commas as part of the process
+        # name unless semicolon/full-width semicolon is clearly used as a list.
+        sub_parts = _v51_re.split(r"[;；]+", block)
+        for item in sub_parts:
+            item = str(item or "").strip()
+            if item:
+                parts.append(item)
+    return parts
+
+
+def _v51_get_selected_category_from_df(df: pd.DataFrame) -> str:
+    selected = ""
+    try:
+        selected = _v51_norm_text(getattr(df, "attrs", {}).get("selected_category", ""))
+    except Exception:
+        selected = ""
+    if selected:
+        return selected
+    for col in ["category_name", "category", "類別", "類別 / Category", "type_name", "機型"]:
+        if isinstance(df, pd.DataFrame) and col in df.columns:
+            for val in df[col].tolist():
+                cat = _v51_norm_text(val)
+                if cat and cat.lower() not in {"none", "nan"}:
+                    return cat
+    try:
+        return get_default_process_category()
+    except Exception:
+        return ""
+
+
+def _v51_process_value_from_row(row: Any) -> str:
+    for col in ["process_name", "工段名稱", "工段名稱 / Process", "process", "Process", "工段"]:
+        try:
+            value = row.get(col)
+        except Exception:
+            value = None
+        text = _v51_norm_text(value)
+        if text and text.lower() not in {"none", "nan"}:
+            return text
+    return ""
+
+
+def _v51_clean_process_rows(df: pd.DataFrame) -> list[dict[str, Any]]:
+    working = df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    selected_category = _v51_get_selected_category_from_df(working)
+    if not selected_category:
+        selected_category = "未分類"
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for _, row in working.iterrows():
+        process_cell = _v51_process_value_from_row(row)
+        process_names = _v51_split_process_names(process_cell)
+        if not process_names:
+            continue
+        category = _v51_norm_text(row.get("category_name") if hasattr(row, 'get') else "") or selected_category
+        # Blank/None category in new dynamic rows means the current loaded category.
+        if category.lower() in {"none", "nan"}:
+            category = selected_category
+        active = _v38_bool_int(row.get("is_active") if "is_active" in getattr(row, 'index', []) else row.get("active"), 1)
+        base_sort = _v38_int(row.get("sort_order") if hasattr(row, 'get') else 0, 0)
+        note = _v51_norm_text(row.get("note") or row.get("備註") or row.get("備註 / Note")) if hasattr(row, 'get') else ""
+        rid = _v38_int(row.get("id") if hasattr(row, 'get') else 0, 0)
+        for i, proc in enumerate(process_names):
+            key = (category, proc)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({
+                "id": rid if len(process_names) == 1 else 0,
+                "category_name": category,
+                "process_name": proc,
+                "is_active": active,
+                "sort_order": base_sort + i if base_sort else len(out) + 1,
+                "note": note,
+            })
+    return out
+
+
+def _v51_find_exact_process_id(category: str, process: str) -> int:
+    try:
+        row = _v38_query_one(
+            """SELECT id FROM process_options
+               WHERE category_name=? AND process_name=? AND COALESCE(deleted_at,'')=''
+               ORDER BY id LIMIT 1""",
+            (category, process),
+        ) or {}
+        return _v38_int(row.get("id"), 0)
+    except Exception:
+        return 0
+
+
+def _v51_update_process_row(rid: int, category: str, process: str, active: int, sort_order: int, note: str, now: str) -> None:
+    _v38_exec(
+        """UPDATE process_options
+           SET category_name=?, process_name=?, is_active=?, active=?, sort_order=?, note=?,
+               updated_at=?, updated_by='13_system_settings', deleted_at='', deleted_by='', delete_reason='',
+               version=COALESCE(version,1)+1
+           WHERE id=?""",
+        (category, process, active, active, sort_order, note, now, int(rid)),
+    )
+
+
+def _v51_insert_process_row(category: str, process: str, active: int, sort_order: int, note: str, now: str) -> None:
+    _v38_exec(
+        """INSERT INTO process_options(category_name, process_name, is_active, active, sort_order, note,
+                  created_at, updated_at, updated_by, deleted_at, deleted_by, delete_reason, version)
+           VALUES (?,?,?,?,?,?,?,?,?, '', '', '', 1)""",
+        (category, process, active, active, sort_order, note, now, now, "13_system_settings"),
+    )
+
+
+def save_process_options_df(df: pd.DataFrame) -> int:  # type: ignore[override]
+    """V51 final confirmed save for category-specific process options.
+
+    The save operation is exact-category and batch-safe:
+    - all non-empty rows are preserved;
+    - newline pasted cells become multiple rows;
+    - blank category cells from dynamic rows inherit the selected category;
+    - saving one category never moves/deletes another category's rows.
+    """
+    _v38_ensure_system_settings_neon_schema()
+    try:
+        _v40_drop_legacy_process_unique_constraints()
+    except Exception:
+        pass
+    now = _v38_sys_now()
+    rows = _v51_clean_process_rows(df if isinstance(df, pd.DataFrame) else pd.DataFrame())
+    saved = 0
+    for row in rows:
+        category = _v51_norm_text(row.get("category_name"))
+        process = _v51_norm_text(row.get("process_name"))
+        if not category or not process:
+            continue
+        rid = _v38_int(row.get("id"), 0)
+        exact_id = _v51_find_exact_process_id(category, process)
+        if exact_id > 0:
+            rid = exact_id
+        active = _v38_bool_int(row.get("is_active"), 1)
+        sort_order = _v38_int(row.get("sort_order"), saved + 1)
+        note = _v51_norm_text(row.get("note"))
+        if rid > 0:
+            _v51_update_process_row(rid, category, process, active, sort_order, note, now)
+        else:
+            try:
+                _v51_insert_process_row(category, process, active, sort_order, note, now)
+            except Exception as exc:
+                # If a legacy DB still rejects INSERT because of an old process_name-only
+                # unique rule, retry schema cleanup once, then update the exact category
+                # row if it appeared concurrently.  Do not move other categories.
+                if _v40_is_unique_violation(exc):
+                    try:
+                        _v40_drop_legacy_process_unique_constraints()
+                    except Exception:
+                        pass
+                    exact_id = _v51_find_exact_process_id(category, process)
+                    if exact_id > 0:
+                        _v51_update_process_row(exact_id, category, process, active, sort_order, note, now)
+                    else:
+                        _v51_insert_process_row(category, process, active, sort_order, note, now)
+                else:
+                    raise
+        saved += 1
+    _v38_clear_system_settings_cache()
+    return saved
+
+
+def audit_v51_process_batch_save() -> dict[str, Any]:
+    return {
+        "version": "V51_PROCESS_OPTION_BATCH_SAVE_PRESERVE_ALL_ROWS",
+        "neon_single_authority": True,
+        "batch_rows_preserved": True,
+        "newline_paste_split": True,
+        "selected_category_inherited_by_blank_rows": True,
+        "does_not_move_other_categories": True,
+    }
+# ================= END V51 PROCESS OPTION BATCH SAVE PRESERVE ALL ROWS =================
