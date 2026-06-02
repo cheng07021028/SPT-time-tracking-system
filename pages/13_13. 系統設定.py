@@ -738,18 +738,24 @@ if section == "類別與工段設定 / Category & Process":
     category_choices = load_process_category_choices(include_common=True)
     current_default_category = get_default_process_category()
     if current_default_category not in category_choices:
-        category_choices.append(current_default_category)
+        current_default_category = category_choices[0] if category_choices else ""
+    if not category_choices:
+        st.warning("目前沒有任何啟用類別，請先在類別清單管理新增並套用類別。")
 
     cat1, cat3 = st.columns([2, 3])
     with cat1:
         with st.form("system_default_process_category_form_v41", clear_on_submit=False):
-            selected_default_category = st.selectbox(
-                "預設類別 / Default Category",
-                category_choices,
-                index=category_choices.index(current_default_category) if current_default_category in category_choices else 0,
-                help="選擇下拉選單只暫存；按『套用預設類別』才寫入 Neon。",
-                key="system_default_process_category_v41_pending",
-            )
+            if category_choices:
+                selected_default_category = st.selectbox(
+                    "預設類別 / Default Category",
+                    category_choices,
+                    index=category_choices.index(current_default_category) if current_default_category in category_choices else 0,
+                    help="選擇下拉選單只暫存；按『套用預設類別』才寫入 Neon。",
+                    key="system_default_process_category_v48_pending",
+                )
+            else:
+                selected_default_category = ""
+                st.info("請先建立啟用類別。")
             apply_default_clicked = st.form_submit_button("▣ 套用預設類別", use_container_width=True, disabled=not can_manage)
         if can_manage and apply_default_clicked:
             saved_category = save_default_process_category(selected_default_category)
@@ -821,24 +827,38 @@ if section == "類別與工段設定 / Category & Process":
     st.markdown("#### 類別對應工段設定 / Category-specific Process Options")
     all_category_choices = load_process_category_choices(include_common=True)
     if current_default_category not in all_category_choices:
-        all_category_choices.append(current_default_category)
+        current_default_category = all_category_choices[0] if all_category_choices else ""
     _applied_process_category = st.session_state.get("system_process_category_filter_applied_v41", current_default_category)
     if _applied_process_category not in all_category_choices:
-        _applied_process_category = current_default_category if current_default_category in all_category_choices else (all_category_choices[0] if all_category_choices else "全部 / 通用")
+        _applied_process_category = current_default_category if current_default_category in all_category_choices else (all_category_choices[0] if all_category_choices else "")
+        st.session_state["system_process_category_filter_applied_v41"] = _applied_process_category
     with st.form("system_process_category_filter_form_v41", clear_on_submit=False):
-        pending_filter_category = st.selectbox(
-            "顯示類別 / Show Category",
-            all_category_choices,
-            index=all_category_choices.index(_applied_process_category) if _applied_process_category in all_category_choices else 0,
-            key="system_process_category_filter_v41_pending",
-            help="選擇下拉選單只暫存；按『載入此類別工段』後才查 Neon。",
-        )
+        if all_category_choices:
+            pending_filter_category = st.selectbox(
+                "顯示類別 / Show Category",
+                all_category_choices,
+                index=all_category_choices.index(_applied_process_category) if _applied_process_category in all_category_choices else 0,
+                key="system_process_category_filter_v48_pending",
+                help="選擇下拉選單只暫存；按『載入此類別工段』後才查 Neon。",
+            )
+        else:
+            pending_filter_category = ""
+            st.info("目前沒有可顯示的啟用類別。")
         apply_filter_category = st.form_submit_button("▣ 載入此類別工段 / Load Category Processes", use_container_width=True)
     if apply_filter_category:
         st.session_state["system_process_category_filter_applied_v41"] = pending_filter_category
         _v144_clear_process_option_editor_state("process_category_applied_v41")
         st.rerun()
     filter_category = st.session_state.get("system_process_category_filter_applied_v41", _applied_process_category)
+    # V48: if the dropdown value was changed but the Load button was not pressed,
+    # do not show the previously loaded category table under the new dropdown label.
+    # This keeps "顯示類別 / Show Category" and the visible table from looking mismatched.
+    if pending_filter_category and pending_filter_category != filter_category and not apply_filter_category:
+        st.info(f"已選擇『{pending_filter_category}』但尚未載入。請按『載入此類別工段』後再顯示表格。")
+        _v41_finish_and_stop()
+    if not filter_category:
+        st.warning("目前沒有已套用的類別，請先建立並啟用類別。")
+        _v41_finish_and_stop()
 
     _v144_current_process_category = _v144_normalize_category_text(filter_category)
     _v144_last_process_category = st.session_state.get("_spt_v144_last_process_category")
@@ -846,6 +866,7 @@ if section == "類別與工段設定 / Category & Process":
         _v144_clear_process_option_editor_state("process_category_changed")
     st.session_state["_spt_v144_last_process_category"] = _v144_current_process_category
     _v144_process_category_key = _v144_safe_key_part(_v144_current_process_category)
+    st.caption(f"目前已載入類別 / Loaded Category：{filter_category}")
 
     proc_df = load_process_options_df(active_only=False, category_name=filter_category)
     # V44 final display guard: the visible process table must always match the

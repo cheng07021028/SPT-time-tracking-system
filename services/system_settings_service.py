@@ -5973,3 +5973,165 @@ def audit_v46_system_settings_saver() -> dict[str, Any]:
     }
 
 # ================= END V46 NEON FREE SAVER MODE - SYSTEM SETTINGS CACHE =================
+
+
+# ================= V48 CATEGORY AUTHORITY + DEFAULT CLEANUP =================
+# Purpose:
+# - 13. 系統設定 category dropdowns and 01. 工時紀錄 category dropdown must use
+#   the same active category master from Neon process_categories.
+# - Do not resurrect deleted "全部 / 通用" in dropdowns.
+# - If the stored default category was deleted, resolve to the first active category
+#   without showing a stale value in 01/13.
+# - Common process rows are only used when the common category actually exists.
+
+_V48_COMMON_CATEGORY = "全部 / 通用"
+
+
+def _v48_text(value: Any, default: str = "") -> str:
+    try:
+        text = _v38_text(value, default)
+    except Exception:
+        text = str(value if value is not None else default)
+    text = str(text or default).strip()
+    return text
+
+
+def _v48_active_category_master() -> list[str]:
+    """Return active categories from Neon process_categories only.
+
+    This is the authority for category dropdowns.  Deleted categories, including
+    全部 / 通用, must not be reinserted by code.
+    """
+    cats: list[str] = []
+    seen: set[str] = set()
+    try:
+        df = load_process_categories_df(active_only=True)
+        if isinstance(df, pd.DataFrame) and not df.empty and "category_name" in df.columns:
+            # Preserve the admin-defined sort order from load_process_categories_df.
+            for value in df["category_name"].tolist():
+                name = _v48_text(value)
+                if name and name not in seen:
+                    cats.append(name)
+                    seen.add(name)
+    except Exception:
+        pass
+    return cats
+
+
+def _v48_category_exists(category_name: str | None) -> bool:
+    name = _v48_text(category_name)
+    if not name:
+        return False
+    return name in _v48_active_category_master()
+
+
+def _v48_first_active_category() -> str:
+    cats = _v48_active_category_master()
+    return cats[0] if cats else ""
+
+
+def load_process_category_choices(include_common: bool = True) -> list[str]:  # type: ignore[override]
+    """V48: dropdown choices are exactly active category master values.
+
+    The include_common argument is kept for compatibility, but no longer forces
+    全部 / 通用 back into the list after the user deleted it.  If the category
+    master is empty, we fall back to distinct process_options categories only so
+    legacy data remains recoverable.
+    """
+    cats = _v48_active_category_master()
+    if cats:
+        return cats
+
+    # Legacy recovery only when the category master has no active rows at all.
+    recovered: list[str] = []
+    seen: set[str] = set()
+    try:
+        df = load_process_options_df(active_only=True, category_name=None, limit=5000)
+        if isinstance(df, pd.DataFrame) and not df.empty and "category_name" in df.columns:
+            for value in df["category_name"].tolist():
+                name = _v48_text(value)
+                if name and name not in seen:
+                    recovered.append(name)
+                    seen.add(name)
+    except Exception:
+        pass
+    return recovered
+
+
+_v48_prev_get_default_process_category = globals().get("get_default_process_category")
+
+
+def get_default_process_category() -> str:  # type: ignore[override]
+    """V48: return only an active category; never return deleted defaults."""
+    stored = ""
+    try:
+        if callable(_v48_prev_get_default_process_category):
+            stored = _v48_text(_v48_prev_get_default_process_category())
+    except Exception:
+        stored = ""
+    if stored and _v48_category_exists(stored):
+        return stored
+    return _v48_first_active_category()
+
+
+_v48_prev_save_default_process_category = globals().get("save_default_process_category")
+
+
+def save_default_process_category(category_name: str | None) -> str:  # type: ignore[override]
+    """V48: save a default category only if it exists in active category master."""
+    requested = _v48_text(category_name)
+    choices = _v48_active_category_master()
+    if requested not in choices:
+        requested = choices[0] if choices else ""
+    if not requested:
+        # Keep the DB setting blank rather than resurrecting 全部 / 通用.
+        try:
+            _v38_setting_set("default_process_category", "")
+            _v38_clear_cache()
+        except Exception:
+            pass
+        return ""
+    try:
+        return _v38_setting_set("default_process_category", requested)
+    except Exception:
+        if callable(_v48_prev_save_default_process_category):
+            return _v48_text(_v48_prev_save_default_process_category(requested))
+        return requested
+
+
+def get_process_options_by_category(category_name: str | None = None, include_common: bool = True) -> list[str]:  # type: ignore[override]
+    """V48: process options for exactly the selected active category.
+
+    Common category rows are included only if 全部 / 通用 still exists in the
+    active category master.  This prevents deleted common category from showing
+    again in 01. 工時紀錄.
+    """
+    category = _v48_text(category_name) or get_default_process_category()
+    names: list[str] = []
+    if include_common and category != _V48_COMMON_CATEGORY and _v48_category_exists(_V48_COMMON_CATEGORY):
+        names.extend(get_process_options_by_category_exact(_V48_COMMON_CATEGORY))
+    names.extend(get_process_options_by_category_exact(category))
+    out: list[str] = []
+    seen: set[str] = set()
+    for name in names:
+        name = _v48_text(name)
+        if name and name not in seen:
+            out.append(name)
+            seen.add(name)
+    return out
+
+
+def get_process_options() -> list[str]:  # type: ignore[override]
+    return get_process_options_by_category(get_default_process_category(), include_common=True)
+
+
+def audit_v48_category_authority() -> dict[str, Any]:
+    return {
+        "version": "V48_CATEGORY_AUTHORITY_NEON_MASTER",
+        "category_dropdown_source": "active Neon process_categories only",
+        "common_category_auto_resurrected": False,
+        "deleted_default_resolved_to_first_active": True,
+        "page01_page13_same_category_source": True,
+    }
+
+# ================= END V48 CATEGORY AUTHORITY + DEFAULT CLEANUP =================

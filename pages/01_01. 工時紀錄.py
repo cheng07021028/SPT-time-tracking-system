@@ -882,13 +882,25 @@ with left:
         detail={"category_count": len(category_choices)},
     )
     if default_category not in category_choices:
-        category_choices.append(default_category)
-    selected_category = st.selectbox(
-        "類別｜Category",
-        category_choices,
-        index=category_choices.index(default_category) if default_category in category_choices else 0,
-        key="time_record_process_category_v333",
-    )
+        default_category = category_choices[0] if category_choices else ""
+    # V48: use a new widget key so stale deleted values such as 全部 / 通用 from
+    # older sessions cannot remain selected after 13. 系統設定 removed them.
+    try:
+        if st.session_state.get("time_record_process_category_v48") not in category_choices:
+            st.session_state.pop("time_record_process_category_v48", None)
+        st.session_state.pop("time_record_process_category_v333", None)
+    except Exception:
+        pass
+    if category_choices:
+        selected_category = st.selectbox(
+            "類別｜Category",
+            category_choices,
+            index=category_choices.index(default_category) if default_category in category_choices else 0,
+            key="time_record_process_category_v48",
+        )
+    else:
+        selected_category = ""
+        st.error("13｜系統設定目前沒有任何啟用類別，請先建立類別並永久儲存。")
     _spt_perf_t = time.perf_counter()
     PROCESS_OPTIONS = get_process_options_by_category_exact(selected_category)
     _spt_perf_t = _spt_perf_tick(
@@ -897,7 +909,7 @@ with left:
         threshold_ms=500.0,
         detail={"category": selected_category, "process_count": len(PROCESS_OPTIONS)},
     )
-    st.caption(f"目前工段類別 / Current Category：{selected_category or '全部 / 通用'}")
+    st.caption(f"目前工段類別 / Current Category：{selected_category or '未設定'}")
     if PROCESS_OPTIONS:
         process = st.selectbox("工段名稱｜Process", PROCESS_OPTIONS)
         no_process_options = False
