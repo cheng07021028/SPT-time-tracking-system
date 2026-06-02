@@ -47,6 +47,27 @@ def record(category: str, name: str, duration_ms: float, *, ok: bool = True, thr
             pass
 
 
+
+
+def _v47_effective_threshold_ms(category: str, name: str, threshold_ms: float) -> float:
+    """Raise noisy diagnostic thresholds in Neon Free Saver mode.
+
+    The profiler is useful, but recording every 250ms database round trip creates too much
+    file churn and makes 99 harder to read. In saver mode, record DB events only when they
+    are truly slow or failed. Errors are still always recorded by record_event().
+    """
+    try:
+        cat = str(category or "").lower()
+        label = str(name or "").lower()
+        if cat == "db" or label.startswith("db."):
+            return max(float(threshold_ms), float(os.environ.get("SPT_DB_DIAG_THRESHOLD_MS", "1200") or 1200))
+        if cat == "page" or label.startswith("page."):
+            return max(float(threshold_ms), float(os.environ.get("SPT_PAGE_DIAG_THRESHOLD_MS", "3000") or 3000))
+    except Exception:
+        pass
+    return float(threshold_ms)
+
+
 def _safe_detail(args: tuple[Any, ...], kwargs: dict[str, Any], *, max_args: int = 3) -> dict[str, Any]:
     out: dict[str, Any] = {}
     try:
@@ -79,11 +100,11 @@ def wrap(func: Callable[..., Any], *, category: str, name: str | None = None, th
         try:
             result = func(*args, **kwargs)
             duration_ms = (time.perf_counter() - start) * 1000.0
-            record(category, label, duration_ms, ok=True, threshold_ms=threshold_ms, detail=detail)
+            record(category, label, duration_ms, ok=True, threshold_ms=_v47_effective_threshold_ms(category, label, threshold_ms), detail=detail)
             return result
         except Exception as exc:
             duration_ms = (time.perf_counter() - start) * 1000.0
-            record(category, label, duration_ms, ok=False, threshold_ms=threshold_ms, detail=detail, error=str(exc)[:500])
+            record(category, label, duration_ms, ok=False, threshold_ms=_v47_effective_threshold_ms(category, label, threshold_ms), detail=detail, error=str(exc)[:500])
             raise
 
     try:
