@@ -113,17 +113,45 @@ with b4:
 
 st.divider()
 st.markdown("### 登入紀錄查詢 / Login Log Search")
-fc1, fc2, fc3 = st.columns([1, 1, 2])
-with fc1:
-    start = st.date_input("開始日期 / Start Date", value=today_date() - timedelta(days=30))
-with fc2:
-    end = st.date_input("結束日期 / End Date", value=today_date())
-with fc3:
-    keyword = st.text_input("關鍵字 / Keyword", value="", placeholder="帳號、姓名、事件、訊息...")
+st.info("V39：日期、關鍵字、讀取筆數只會先暫存；按『套用查詢』後才查 Neon，避免每次選單/輸入變更就長時間運轉。")
+_default_login_filters = {
+    "start": today_date() - timedelta(days=30),
+    "end": today_date(),
+    "keyword": "",
+    "limit": 300,
+}
+_applied_login_filters = st.session_state.get("v39_login_log_filters_applied", _default_login_filters.copy())
+with st.form("v39_login_log_search_form", clear_on_submit=False):
+    fc1, fc2, fc3, fc4 = st.columns([1, 1, 2, 1])
+    with fc1:
+        pending_start = st.date_input("開始日期 / Start Date", value=_applied_login_filters.get("start", _default_login_filters["start"]))
+    with fc2:
+        pending_end = st.date_input("結束日期 / End Date", value=_applied_login_filters.get("end", _default_login_filters["end"]))
+    with fc3:
+        pending_keyword = st.text_input("關鍵字 / Keyword", value=str(_applied_login_filters.get("keyword", "")), placeholder="帳號、姓名、事件、訊息...")
+    with fc4:
+        pending_limit = st.number_input("讀取筆數 / Limit", min_value=100, max_value=2000, value=int(_applied_login_filters.get("limit", 300)), step=100)
+    q1, q2 = st.columns([1, 1])
+    apply_query = q1.form_submit_button("🔎 套用查詢 / Apply Search", type="primary", use_container_width=True)
+    reset_query = q2.form_submit_button("↺ 恢復預設 / Reset", use_container_width=True)
+if reset_query:
+    st.session_state["v39_login_log_filters_applied"] = _default_login_filters.copy()
+    st.rerun()
+if apply_query:
+    st.session_state["v39_login_log_filters_applied"] = {
+        "start": pending_start,
+        "end": pending_end,
+        "keyword": pending_keyword,
+        "limit": int(pending_limit),
+    }
+    st.rerun()
+_applied_login_filters = st.session_state.get("v39_login_log_filters_applied", _default_login_filters.copy())
+start = _applied_login_filters.get("start", _default_login_filters["start"])
+end = _applied_login_filters.get("end", _default_login_filters["end"])
+keyword = str(_applied_login_filters.get("keyword", ""))
+limit = int(_applied_login_filters.get("limit", 300))
 
-limit = st.slider("讀取筆數 / Limit", min_value=100, max_value=2000, value=300, step=100)
-
-stats = get_login_log_stats(str(start), str(end), keyword)  # V34: SQL COUNT only, no full-table load
+stats = get_login_log_stats(str(start), str(end), keyword)  # SQL COUNT only after Apply.
 s1, s2, s3 = st.columns(3)
 s1.metric("筆數 / Records", stats.get("records", 0))
 s2.metric("成功 / Success", stats.get("success", 0))

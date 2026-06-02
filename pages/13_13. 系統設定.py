@@ -663,24 +663,23 @@ current_default_category = get_default_process_category()
 if current_default_category not in category_choices:
     category_choices.append(current_default_category)
 
-cat1, cat2, cat3 = st.columns([2, 1, 3])
+cat1, cat3 = st.columns([2, 3])
 with cat1:
-    selected_default_category = st.selectbox(
-        "預設類別 / Default Category",
-        category_choices,
-        index=category_choices.index(current_default_category) if current_default_category in category_choices else 0,
-        help="當 01 工時紀錄沒有選擇特定類別、或該類別沒有專屬工段時，會使用此預設類別與通用工段。",
-        key="system_default_process_category_v333",
-    )
-with cat2:
-    st.write("")
-    st.write("")
-    if can_manage and st.button("▣ 套用預設類別", use_container_width=True, key="apply_default_process_category_v333"):
+    with st.form("system_default_process_category_form_v39", clear_on_submit=False):
+        selected_default_category = st.selectbox(
+            "預設類別 / Default Category",
+            category_choices,
+            index=category_choices.index(current_default_category) if current_default_category in category_choices else 0,
+            help="V39：選擇下拉選單只暫存；按『套用預設類別』才寫入 Neon 與觸發正式運算。",
+            key="system_default_process_category_v333_pending",
+        )
+        apply_default_clicked = st.form_submit_button("▣ 套用預設類別", use_container_width=True, disabled=not can_manage)
+    if can_manage and apply_default_clicked:
         saved_category = save_default_process_category(selected_default_category)
         _export_permanent_settings(f"已套用預設類別：{saved_category}")
         _refresh_after_apply(f"已套用預設類別：{saved_category}，畫面已重新整理。")
 with cat3:
-    st.info("01｜工時紀錄會依這裡的『類別 / Category』載入對應工段；『全部 / 通用』代表所有類別共用工段。")
+    st.info("V39：此區下拉式選單採表單暫存模式；只有按下套用/確認按鈕才會寫入 Neon 或觸發正式運算。")
 
 
 st.markdown("#### 類別清單管理 / Category Master")
@@ -757,15 +756,26 @@ st.markdown("#### 類別對應工段設定 / Category-specific Process Options")
 all_category_choices = load_process_category_choices(include_common=True)
 if current_default_category not in all_category_choices:
     all_category_choices.append(current_default_category)
-filter_category = st.selectbox(
-    "顯示類別 / Show Category",
-    all_category_choices,
-    index=all_category_choices.index(current_default_category) if current_default_category in all_category_choices else 0,
-    key="system_process_category_filter_v333",
-    help="選擇類別後，下方表格只顯示該類別自己的工段；切換類別會清除上一類別的編輯草稿。",
-)
+# V39：顯示類別下拉選單改為表單暫存。選擇時不立即載入/重算工段表，按「套用顯示類別」後才正式切換。
+_applied_process_category = st.session_state.get("system_process_category_filter_applied_v39", current_default_category)
+if _applied_process_category not in all_category_choices:
+    _applied_process_category = current_default_category if current_default_category in all_category_choices else (all_category_choices[0] if all_category_choices else "全部 / 通用")
+with st.form("system_process_category_filter_form_v39", clear_on_submit=False):
+    pending_filter_category = st.selectbox(
+        "顯示類別 / Show Category",
+        all_category_choices,
+        index=all_category_choices.index(_applied_process_category) if _applied_process_category in all_category_choices else 0,
+        key="system_process_category_filter_v333_pending",
+        help="V39：選擇下拉選單只暫存；按『套用顯示類別』後才載入該類別工段。",
+    )
+    apply_filter_category = st.form_submit_button("▣ 套用顯示類別 / Apply Category", use_container_width=True)
+if apply_filter_category:
+    st.session_state["system_process_category_filter_applied_v39"] = pending_filter_category
+    _v144_clear_process_option_editor_state("process_category_applied_v39")
+    st.rerun()
+filter_category = st.session_state.get("system_process_category_filter_applied_v39", _applied_process_category)
 
-# V144：選擇類別改變時，必須清除 data_editor 舊草稿；否則上方 GPTC、下方仍可能顯示 BWBS。
+# V144/V39：選擇類別只有在套用後才改變；改變時清除 data_editor 舊草稿。
 _v144_current_process_category = _v144_normalize_category_text(filter_category)
 _v144_last_process_category = st.session_state.get("_spt_v144_last_process_category")
 if _v144_last_process_category is not None and _v144_last_process_category != _v144_current_process_category:

@@ -62,14 +62,25 @@ render_header("99｜效能診斷", "V258 自動測速紀錄：登入、首頁、
 
 st.info("請先正常操作一次：登入 → 進入 01 → 按開始/暫停/完工。再回到本頁按重新整理，即可下載測速報告。")
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    hours = st.number_input("統計最近幾小時", min_value=1, max_value=72, value=24, step=1)
-with col2:
-    limit = st.number_input("最多讀取事件數", min_value=100, max_value=20000, value=5000, step=100)
-with col3:
-    if st.button("重新整理測速報告", use_container_width=True):
-        st.rerun()
+st.info("V39：診斷條件只會先暫存；按『重新整理測速報告』後才讀取/彙總效能事件，避免每次調整數字就重新運算。")
+_default_perf_filters = {"hours": 24, "limit": 5000}
+_applied_perf_filters = st.session_state.get("v39_perf_filters_applied", _default_perf_filters.copy())
+with st.form("v39_perf_report_filter_form", clear_on_submit=False):
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        pending_hours = st.number_input("統計最近幾小時", min_value=1, max_value=72, value=int(_applied_perf_filters.get("hours", 24)), step=1)
+    with col2:
+        pending_limit = st.number_input("最多讀取事件數", min_value=100, max_value=20000, value=int(_applied_perf_filters.get("limit", 5000)), step=100)
+    with col3:
+        st.write("")
+        st.write("")
+        refresh_report = st.form_submit_button("重新整理測速報告", use_container_width=True, type="primary")
+if refresh_report:
+    st.session_state["v39_perf_filters_applied"] = {"hours": int(pending_hours), "limit": int(pending_limit)}
+    st.rerun()
+_applied_perf_filters = st.session_state.get("v39_perf_filters_applied", _default_perf_filters.copy())
+hours = int(_applied_perf_filters.get("hours", 24))
+limit = int(_applied_perf_filters.get("limit", 5000))
 
 summary = build_summary(last_hours=float(hours), limit=int(limit))
 report_path = write_report(last_hours=float(hours))
