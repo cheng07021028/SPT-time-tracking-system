@@ -939,56 +939,145 @@ def _v72_render_start_confirmation() -> bool:
         pass
     return False
 
-def _v74_render_start_status(active_df: pd.DataFrame) -> bool:
-    """Render one compact status block for Start Work; active table is shown only on the right panel."""
-    has_active = isinstance(active_df, pd.DataFrame) and not active_df.empty
-    if has_active:
-        st.warning("此人員已有開始中的作業，請先到右側開始中作業表格選取該筆，按『暫停 / 完工 / 下班』結束後，才可開始新作業。")
+def _v75_norm_text(value) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    return str(value or "").strip()
+
+
+def _v75_row_value(row, *cols) -> str:
+    for col in cols:
+        try:
+            if col in row and _v75_norm_text(row.get(col)):
+                return _v75_norm_text(row.get(col))
+        except Exception:
+            pass
+    return ""
+
+
+def _v75_active_start_policy(active_df: pd.DataFrame, selected_process: str, selected_work_order: str) -> dict:
+    """Decide whether Start should be enabled.
+
+    Site rule V75:
+    - Same employee + same process + different work order is synchronous work and must be allowed.
+    - Same employee + same process + same work order is duplicate and must be blocked.
+    - Same employee + different process still blocks start until the active work is ended.
+    """
+    policy = {"has_active": False, "blocked": False, "reason": "", "mode": "new"}
+    if not isinstance(active_df, pd.DataFrame) or active_df.empty:
+        policy["reason"] = "此人員目前沒有開始中的作業，可以開始新作業。"
+        return policy
+    proc = _v75_norm_text(selected_process)
+    wo = _v75_norm_text(selected_work_order)
+    policy["has_active"] = True
+    rows = []
+    try:
+        rows = [r for _, r in active_df.iterrows()]
+    except Exception:
+        rows = []
+    same_process = []
+    other_process = []
+    duplicate = []
+    for row in rows:
+        row_proc = _v75_row_value(row, "process_name", "工段", "工段名稱", "Process")
+        row_wo = _v75_row_value(row, "work_order", "work_order_no", "製令", "製令號碼", "Work Order")
+        if proc and row_proc == proc:
+            same_process.append(row)
+            if wo and row_wo == wo:
+                duplicate.append(row)
+        else:
+            other_process.append(row)
+    if duplicate:
+        policy.update({
+            "blocked": True,
+            "mode": "duplicate",
+            "reason": f"此人員已有相同製令與工段正在計時：{wo} / {proc}，不可重複開始。",
+        })
+    elif other_process:
+        policy.update({
+            "blocked": True,
+            "mode": "other_process",
+            "reason": "此人員已有不同工段的開始中作業，請先在右側暫停 / 完工 / 下班後，才能開始新工段。",
+        })
+    elif same_process:
+        policy.update({
+            "blocked": False,
+            "mode": "sync_same_process",
+            "reason": "此人員已有同工段開始中作業；不同製令、同工段可繼續開始同步作業。結束任一筆時會同步結束同工段所有開始中紀錄並平均工時。",
+        })
     else:
-        st.success("此人員目前沒有開始中的作業，可以開始新作業。")
-    return has_active
+        policy.update({
+            "blocked": True,
+            "mode": "unknown",
+            "reason": "此人員已有開始中作業，但系統無法判斷同步工段，請先在右側結束目前作業後再開始。",
+        })
+    return policy
+
+
+def _v74_render_start_status(active_df: pd.DataFrame, selected_process: str = "", selected_work_order: str = "") -> dict:
+    """Render one compact status block and return V75 start policy."""
+    policy = _v75_active_start_policy(active_df, selected_process, selected_work_order)
+    mode = policy.get("mode")
+    msg = str(policy.get("reason") or "")
+    if mode == "new":
+        st.success(msg)
+    elif mode == "sync_same_process":
+        st.info(msg)
+    elif policy.get("blocked"):
+        st.warning(msg)
+    else:
+        st.info(msg)
+    return policy
 
 
 def _v74_select_active_record(active_df: pd.DataFrame, employee_id: str, employee_name: str) -> dict | None:
-    """Render active-work table and return the row selected by the operator.
+    """Render a stable active-work table and return the selected record.
 
-    New Streamlit supports row selection; older runtimes fall back to first row while still
-    preserving the unified active-work table and synchronous finish rules.
+    V75 keeps the table visible on every Streamlit version.  Row-click selection is
+    unreliable on some Streamlit Cloud builds, so the operator gets a deterministic
+    selectbox below the table.  This prevents the finish buttons from disappearing.
     """
     if active_df is None or not isinstance(active_df, pd.DataFrame) or active_df.empty:
         return None
-    display_df = _v72_active_display_df(active_df)
-    selected_idx = 0
-    selection_key = f"v74_active_work_select_{_v72_safe_key(employee_id, employee_name, len(active_df))}"
+    raw_df = active_df.reset_index(drop=True).copy()
+    display_df = _v72_active_display_df(raw_df)
+    if not isinstance(display_df, pd.DataFrame) or display_df.empty:
+        display_df = raw_df.copy()
     try:
-        event = st.dataframe(
-            display_df,
-            use_container_width=True,
-            hide_index=True,
-            height=250,
-            key=selection_key,
-            on_select="rerun",
-            selection_mode="single-row",
-        )
-        rows = []
-        try:
-            rows = list(getattr(getattr(event, "selection", None), "rows", []) or [])
-        except Exception:
-            try:
-                rows = list((event or {}).get("selection", {}).get("rows", []) or [])
-            except Exception:
-                rows = []
-        if rows:
-            selected_idx = int(rows[0])
+        st.dataframe(display_df, use_container_width=True, hide_index=True, height=280)
     except TypeError:
-        render_table(display_df, "v74_active_work_table_fallback", editable=False, height=250)
-        st.caption("目前 Streamlit 版本不支援點選列時，系統預設操作第一筆開始中作業；同步群組仍會一起處理。")
-    except Exception as exc:
-        render_table(display_df, "v74_active_work_table_fallback_error", editable=False, height=250)
-        st.caption(f"表格點選模式暫時無法使用，已改用第一筆作業：{exc}")
-    selected_idx = max(0, min(selected_idx, len(active_df) - 1))
+        st.dataframe(display_df, use_container_width=True, height=280)
+    except Exception:
+        render_table(display_df, "v75_active_work_table_fallback", editable=False, height=280)
+
+    options: list[tuple[str, int]] = []
+    for idx, row in raw_df.iterrows():
+        rid = _v75_row_value(row, "id", "ID", "紀錄編號", "record_id") or str(idx + 1)
+        wo = _v75_row_value(row, "work_order", "work_order_no", "製令", "製令號碼")
+        proc = _v75_row_value(row, "process_name", "工段", "工段名稱")
+        sd = _v75_row_value(row, "start_date", "開始日期")
+        stime = _v75_row_value(row, "start_time", "開始時間")
+        label = f"{rid}｜{wo or '未填製令'}｜{proc or '未填工段'}｜{sd} {stime}".strip()
+        options.append((label, int(idx)))
+    if not options:
+        return None
+    if len(options) == 1:
+        st.caption(f"已自動選取開始中作業：{options[0][0]}")
+        selected_idx = options[0][1]
+    else:
+        labels = [x[0] for x in options]
+        selected_label = st.selectbox(
+            "選擇要結束的開始中作業｜Select active work",
+            labels,
+            index=0,
+            key=f"v75_active_work_selectbox_{_v72_safe_key(employee_id, employee_name, len(raw_df))}",
+        )
+        selected_idx = dict(options).get(selected_label, 0)
     try:
-        return active_df.iloc[selected_idx].fillna("").to_dict()
+        return raw_df.iloc[int(selected_idx)].fillna("").to_dict()
     except Exception:
         return None
 
@@ -1114,21 +1203,21 @@ with left:
     auto_pause = st.checkbox("防呆模式：前一項作業未停止時禁止開始新作業｜Start disabled until previous work is finished", value=False, disabled=True)
 
     active_before_start_df = _v72_load_active_df(emp_id, emp_name)
-    has_active_before_start = _v74_render_start_status(active_before_start_df)
-    start_disabled = bool(no_process_options or has_active_before_start)
+    start_policy = _v74_render_start_status(active_before_start_df, process, wo_no)
+    start_disabled = bool(no_process_options or start_policy.get("blocked"))
 
     if st.button("⏱ 開始作業 / Start", use_container_width=True, disabled=start_disabled):
         if not check_permission("01_time_record", "can_create"):
             st.error("權限不足：你沒有新增工時紀錄權限。")
-        elif has_active_before_start:
-            st.warning("此人員已有開始中的作業，請先在右側結束上一筆。")
+        elif start_policy.get("blocked"):
+            st.warning(str(start_policy.get("reason") or "此人員已有未完成作業，請先處理右側開始中作業。"))
         else:
             try:
                 _spt_button_t = time.perf_counter()
                 rid = start_work(employee, work_order, process, remark, auto_pause_old=False)
                 _v72_clear_active_cache(emp_id, emp_name)
                 _v259_clear_display_cache()
-                _spt_perf_tick("01_button_start_work_action", _spt_button_t, threshold_ms=3000.0, detail={"record_id": rid})
+                _spt_perf_tick("01_button_start_work_action", _spt_button_t, threshold_ms=3000.0, detail={"record_id": rid, "sync_mode": start_policy.get("mode")})
                 _v74_trigger_after_start_prompt(rid)
                 st.rerun()
             except Exception as exc:
@@ -1144,7 +1233,7 @@ with right:
         st.success("此人員目前沒有開始中的作業。")
         active2 = None
     else:
-        st.warning("此人員已有開始中的作業。請直接選取下表作業，按『暫停 / 完工 / 下班』結束後，才能開始新作業。")
+        st.warning("此人員已有開始中的作業。請直接選取下表作業，按『暫停 / 完工 / 下班』結束；若同工段不同製令，左側仍可開始同步作業。")
         active2 = _v74_select_active_record(active_right_df, emp_id2, _emp2_name)
 
     _v207_admin_finish_bypass = _v207_current_user_is_admin()

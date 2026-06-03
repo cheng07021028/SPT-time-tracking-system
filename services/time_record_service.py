@@ -484,30 +484,38 @@ def _ids_from_df(df: pd.DataFrame) -> list[int]:
 
 
 def get_active_group(record_id: int) -> pd.DataFrame:
+    """Return the active synchronous work group for finishing one selected record.
+
+    V75 site rule:
+    Different work orders in the same process for the same employee are synchronous
+    work.  Ending any one selected record must end every active same-employee,
+    same-start-date, same-process record and average the Python-calculated work
+    minutes across those records.  Neon only persists the final transaction.
+    """
     rec = _safe_one(f"SELECT {_base_cols()} FROM time_records WHERE id=? LIMIT 1", (int(record_id),))
     if not rec:
         return pd.DataFrame(columns=TIME_RECORD_COLUMNS)
     if _text(rec.get("end_timestamp")) or _text(rec.get("deleted_at")):
         return pd.DataFrame([rec])
-    emp = _text(rec.get("employee_id")); name = _text(rec.get("employee_name")); proc = _text(rec.get("process_name")); sdate = _text(rec.get("start_date")); wo = _text(rec.get("work_order") or rec.get("work_order_no"))
-    group_key = _text(rec.get("group_key"))
-    start_dt = _parse_dt(rec.get("start_timestamp"))
-    df = get_active_records(employee_id=emp, employee_name=name or None, process_name=proc or None, start_date=sdate or None)
-    if df.empty:
+    emp = _text(rec.get("employee_id"))
+    name = _text(rec.get("employee_name"))
+    proc = _text(rec.get("process_name"))
+    sdate = _text(rec.get("start_date"))
+    if not emp or not proc:
         return pd.DataFrame([rec])
-    if group_key:
-        same = df[df.get("group_key", "").astype(str) == group_key].copy()
-        if len(same) > 1:
-            return same.reset_index(drop=True)
-    if start_dt is not None and "start_timestamp" in df.columns:
-        def close_enough(v):
-            d = _parse_dt(v)
-            return bool(d and abs((d - start_dt).total_seconds()) <= 180)
-        same = df[df["start_timestamp"].map(close_enough)].copy()
-        if len(same) > 1:
-            return same.reset_index(drop=True)
-    # Same person/process but different work_order means parallel work; include only if start time close.
-    return pd.DataFrame([rec])
+    df = get_active_records(employee_id=emp, employee_name=name or None, process_name=proc, start_date=sdate or None)
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame([rec])
+    # Keep only same-process active records.  This intentionally includes
+    # different work_order / work_order_no values because they are同步作業.
+    try:
+        if "process_name" in df.columns:
+            df = df[df["process_name"].astype(str).str.strip() == proc].copy()
+    except Exception:
+        pass
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame([rec])
+    return df.reset_index(drop=True)
 
 
 def get_active_same_work(employee_id: str, work_order: str, process_name: str, start_date: str | None = None, employee_name: str | None = None) -> pd.DataFrame:

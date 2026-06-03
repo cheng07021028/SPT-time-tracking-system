@@ -2521,6 +2521,78 @@ def render_post_record_continue_prompt() -> None:  # type: ignore[override]
     st.stop()
 # ===================== END V86 01 FAST PROMPT STOP =====================
 
+
+# ======================= V75 POST-RECORD PROMPT STATE FIX =======================
+# Fixes a Streamlit dialog loop where Continue / Logout was clicked but the
+# post_record_prompt state remained true.  The final override is intentionally
+# self-contained and does not call older prompt renderers, so there are no
+# duplicate button keys or stale dialog fragments.
+def _v75_clear_post_record_prompt_state() -> None:
+    for key in ["post_record_prompt", "post_record_message", "post_record_title"]:
+        try:
+            st.session_state.pop(key, None)
+        except Exception:
+            pass
+
+
+def _v75_continue_after_record() -> None:
+    _v75_clear_post_record_prompt_state()
+    try:
+        mark_activity()
+    except Exception:
+        pass
+
+
+def _v75_logout_after_record() -> None:
+    # Clear dialog state before logout.  logout() also clears post_record_* keys,
+    # but clearing first prevents the next rerun from reopening the dialog if the
+    # logout path needs to flush work-record authority data.
+    _v75_clear_post_record_prompt_state()
+    try:
+        logout("完成工時後選擇不繼續記錄，自動登出")
+    except Exception:
+        for k in list(st.session_state.keys()):
+            if str(k).startswith("auth_"):
+                st.session_state.pop(k, None)
+
+
+def render_post_record_continue_prompt() -> None:  # type: ignore[override]
+    if not st.session_state.get("post_record_prompt"):
+        return
+    title = str(st.session_state.get("post_record_title") or "工時紀錄完成")
+    message = str(st.session_state.get("post_record_message") or "工時紀錄已完成")
+
+    def _content() -> None:
+        st.success(message)
+        st.markdown("### 是否繼續操作下一筆工時紀錄？")
+        st.caption("若沒有要繼續下一筆同步作業或其他查詢，請按『否，登出帳號』，避免其他人員誤用此帳號。")
+        c1, c2 = st.columns(2)
+        c1.button(
+            "是，繼續記錄 / Continue",
+            use_container_width=True,
+            key="post_continue_yes_v75_fixed",
+            on_click=_v75_continue_after_record,
+        )
+        c2.button(
+            "否，登出帳號 / Logout",
+            use_container_width=True,
+            key="post_continue_no_v75_fixed",
+            on_click=_v75_logout_after_record,
+        )
+
+    if hasattr(st, "dialog"):
+        @st.dialog(f"{title} / Record Notice")
+        def _dialog() -> None:
+            _content()
+        _dialog()
+    else:
+        st.warning("工時紀錄已處理，請選擇是否繼續操作下一筆紀錄。")
+        _content()
+    # Stop background page rendering while the modal is open.  Once a button is
+    # clicked, the callback clears post_record_prompt and the next rerun continues.
+    st.stop()
+# ===================== END V75 POST-RECORD PROMPT STATE FIX =====================
+
 # ========================= V98 IDLE TIMEOUT SINGLE AUTHORITY FIX =========================
 # 修正目的：
 # - 10｜權限管理安全設定已寫入 data/permanent_store/modules/10_permissions/records.json，
