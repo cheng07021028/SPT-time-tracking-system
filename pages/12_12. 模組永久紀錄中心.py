@@ -32,18 +32,30 @@ except Exception:
 
 username = st.session_state.get("auth_username", st.session_state.get("username", "SYSTEM"))
 
-try:
-    protect_gitignore_rules()
-    rebuild_global_index()
-except Exception as exc:
-    st.warning(f"模組永久索引重建時發生警告，但不影響查詢：{exc}")
-
 st.markdown("### 模組永久資料健康檢查 / Module Persistent Data Health")
-st.info("本頁定位為各模組資料源健康檢查中心。每日備份排程請到 13｜系統設定；備份紀錄與 GitHub 備份狀態請到 09｜資料永久保存與備份。")
+st.info("V69：本頁不再於開啟時自動重建索引或掃描所有模組；請按下方按鈕後才載入狀態。每日備份排程請到 13｜系統設定；備份紀錄與 GitHub 備份狀態請到 09｜資料永久保存與備份。")
 
-status_df = pd.DataFrame(get_module_status())
+mc1, mc2, mc3 = st.columns([1, 1, 2])
+if mc1.button("載入模組狀態 / Load Module Status", use_container_width=True, key="v69_12_load_module_status"):
+    try:
+        st.session_state["v69_12_status_df"] = pd.DataFrame(get_module_status())
+    except Exception as exc:
+        st.session_state["v69_12_status_df"] = pd.DataFrame()
+        st.warning(f"讀取模組狀態失敗：{exc}")
+if mc2.button("重建索引 / Rebuild Index", use_container_width=True, key="v69_12_rebuild_index"):
+    try:
+        protect_gitignore_rules()
+        rebuild_global_index()
+        st.session_state["v69_12_status_df"] = pd.DataFrame(get_module_status())
+        st.success("已重建模組索引。")
+    except Exception as exc:
+        st.warning(f"模組永久索引重建時發生警告，但不影響查詢：{exc}")
+
+status_df = st.session_state.get("v69_12_status_df")
+if not isinstance(status_df, pd.DataFrame):
+    status_df = pd.DataFrame()
 if status_df.empty:
-    st.warning("目前尚未建立模組永久紀錄索引，請先執行進階維護中的 Bootstrap。")
+    st.warning("尚未載入模組永久紀錄狀態。請按『載入模組狀態』；若索引不存在再按『重建索引』。")
 else:
     records_ok = int(status_df.get("紀錄檔 / Records Exists", pd.Series(dtype=bool)).fillna(False).sum())
     settings_ok = int(status_df.get("設定檔 / Settings Exists", pd.Series(dtype=bool)).fillna(False).sum())

@@ -229,16 +229,21 @@ with c7:
 st.divider()
 
 st.subheader("目前永久檔狀態 / Permanent File Status")
-try:
-    main_count = database_business_row_count()
-except Exception:
-    main_count = 0
-status_rows = [
-    {"項目 / Item": "SQLite DB", "路徑 / Path": str(DB_PATH), "存在 / Exists": DB_PATH.exists(), "大小 / Size": DB_PATH.stat().st_size if DB_PATH.exists() else 0, "主資料筆數 / Business Rows": main_count},
-    {"項目 / Item": "永久資料 latest", "路徑 / Path": str(LATEST_STATE), "存在 / Exists": LATEST_STATE.exists(), "大小 / Size": LATEST_STATE.stat().st_size if LATEST_STATE.exists() else 0, "主資料筆數 / Business Rows": ""},
-    {"項目 / Item": "模組設定 latest", "路徑 / Path": str(LATEST_SETTINGS), "存在 / Exists": LATEST_SETTINGS.exists(), "大小 / Size": LATEST_SETTINGS.stat().st_size if LATEST_SETTINGS.exists() else 0, "主資料筆數 / Business Rows": ""},
-]
-st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
+if st.button("載入永久檔狀態 / Load Permanent File Status", use_container_width=True, key="v69_load_permanent_file_status"):
+    try:
+        main_count = database_business_row_count()
+    except Exception:
+        main_count = 0
+    st.session_state["v69_permanent_status_rows"] = [
+        {"項目 / Item": "SQLite DB", "路徑 / Path": str(DB_PATH), "存在 / Exists": DB_PATH.exists(), "大小 / Size": DB_PATH.stat().st_size if DB_PATH.exists() else 0, "主資料筆數 / Business Rows": main_count},
+        {"項目 / Item": "永久資料 latest", "路徑 / Path": str(LATEST_STATE), "存在 / Exists": LATEST_STATE.exists(), "大小 / Size": LATEST_STATE.stat().st_size if LATEST_STATE.exists() else 0, "主資料筆數 / Business Rows": ""},
+        {"項目 / Item": "模組設定 latest", "路徑 / Path": str(LATEST_SETTINGS), "存在 / Exists": LATEST_SETTINGS.exists(), "大小 / Size": LATEST_SETTINGS.stat().st_size if LATEST_SETTINGS.exists() else 0, "主資料筆數 / Business Rows": ""},
+    ]
+status_rows = st.session_state.get("v69_permanent_status_rows", [])
+if status_rows:
+    st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
+else:
+    st.info("V69：永久檔狀態不再於開頁自動查詢資料庫，請按上方按鈕。")
 
 if LATEST_STATE.exists():
     with st.expander("預覽永久資料 latest / Preview Permanent State", expanded=True):

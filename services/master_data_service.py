@@ -26,6 +26,7 @@ from services.crud_table_service import (
     load_employees as _load_employees,
     save_work_orders as _save_work_orders,
     save_employees as _save_employees,
+    clear_master_data_cache as _clear_crud_master_data_cache,
 )
 
 _EMP_CACHE: dict[tuple[Any, ...], tuple[float, pd.DataFrame]] = {}
@@ -67,18 +68,24 @@ def _apply_bool_filter(df: pd.DataFrame, column: str, enabled: bool | None, defa
 def clear_time_record_master_fast_cache() -> None:
     _EMP_CACHE.clear()
     _WO_CACHE.clear()
+    try:
+        _clear_crud_master_data_cache()
+    except Exception:
+        pass
 
 
 def load_work_orders(active_only: bool | None = None, **_: Any) -> pd.DataFrame:
-    """Load work-order master data.
-
-    Parameters are intentionally backward-compatible with older pages. By
-    default, this returns all non-deleted rows. Set active_only=True to filter
-    to active work orders.
-    """
+    """Load work-order master data with short filter-aware cache."""
+    key = ("work_orders", active_only)
+    now = _now_ts()
+    cached = _WO_CACHE.get(key)
+    if cached is not None and now - cached[0] <= _CACHE_TTL:
+        return _copy(cached[1])
     df = _load_work_orders().drop(columns=["_delete"], errors="ignore")
     df = _apply_bool_filter(df, "is_active", active_only, default=True)
-    return df.reset_index(drop=True)
+    df = df.reset_index(drop=True)
+    _WO_CACHE[key] = (now, _copy(df))
+    return df
 
 
 def load_employees(
@@ -87,17 +94,19 @@ def load_employees(
     today_attendance_only: bool | None = None,
     **_: Any,
 ) -> pd.DataFrame:
-    """Load employee master data.
-
-    Parameters are intentionally backward-compatible with older pages. By
-    default, this returns all non-deleted rows. Set filters to True only when a
-    page explicitly needs a reduced list.
-    """
+    """Load employee master data with short filter-aware cache."""
+    key = ("employees", active_only, in_factory_only, today_attendance_only)
+    now = _now_ts()
+    cached = _EMP_CACHE.get(key)
+    if cached is not None and now - cached[0] <= _CACHE_TTL:
+        return _copy(cached[1])
     df = _load_employees().drop(columns=["_delete"], errors="ignore")
     df = _apply_bool_filter(df, "is_active", active_only, default=True)
     df = _apply_bool_filter(df, "is_in_factory", in_factory_only, default=True)
     df = _apply_bool_filter(df, "is_today_attendance", today_attendance_only, default=True)
-    return df.reset_index(drop=True)
+    df = df.reset_index(drop=True)
+    _EMP_CACHE[key] = (now, _copy(df))
+    return df
 
 
 def load_work_orders_for_time_record_fast(active_only: bool | None = True, **_: Any) -> pd.DataFrame:
@@ -200,7 +209,7 @@ def upsert_employee(row: dict[str, Any]) -> dict[str, Any]:
 
 def audit_v64_master_data_runtime_consolidated() -> dict[str, Any]:
     return {
-        "version": "V65_MASTER_DATA_SIGNATURE_COMPAT",
+        "version": "V69_MASTER_DATA_FILTER_CACHE",
         "local_json_hot_path": False,
         "github_hot_path": False,
         "cache_ttl_seconds": _CACHE_TTL,

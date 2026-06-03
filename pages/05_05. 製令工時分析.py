@@ -30,6 +30,9 @@ except Exception:
 
 
 FILTER_KEY = "_spt_05_analysis_filters"
+V69_QUERY_KEY = "_spt_v69_05_query_applied"
+V69_DF_KEY = "_spt_v69_05_base_df"
+V69_FILTER_SIG_KEY = "_spt_v69_05_filter_signature"
 if FILTER_KEY not in st.session_state:
     st.session_state[FILTER_KEY] = load_analysis_filters()
 filters = dict(st.session_state[FILTER_KEY])
@@ -368,7 +371,11 @@ def _localize_work_order_process_table(df: pd.DataFrame) -> pd.DataFrame:
 
 start_saved = _parse_date(filters.get("start_date"), today_date() - timedelta(days=30))
 end_saved = _parse_date(filters.get("end_date"), today_date())
-base_df = _enrich_records(load_records(str(start_saved), str(end_saved)))
+# V69: do not query time_records just to open the analysis page or render filter widgets.
+# Reuse the last queried dataframe for option lists; otherwise keep options empty except saved selections.
+base_df = st.session_state.get(V69_DF_KEY, pd.DataFrame())
+if not isinstance(base_df, pd.DataFrame):
+    base_df = pd.DataFrame()
 
 with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=True):
     st.caption("所有條件按「套用篩選」後才重新運算，避免每點一下就卡頓；條件會永久記錄。")
@@ -439,19 +446,31 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
             }
         st.session_state[FILTER_KEY] = new_filters
         save_analysis_filters(new_filters)
-        st.success("已套用並永久記錄 05 分析篩選條件。")
+        st.session_state[V69_QUERY_KEY] = True
+        st.session_state.pop(V69_DF_KEY, None)
+        st.session_state.pop(V69_FILTER_SIG_KEY, None)
+        st.success("已套用並永久記錄 05 分析篩選條件，正在查詢分析資料。")
         st.rerun()
 
 # 依已套用條件重新查詢與分析。
 filters = dict(st.session_state[FILTER_KEY])
 start = _parse_date(filters.get("start_date"), today_date() - timedelta(days=30))
 end = _parse_date(filters.get("end_date"), today_date())
-# V67：同一個已套用日期區間不要在同一次 rerun 查詢/合併兩次。
-# base_df 已經為篩選選項載入過同日期區間資料；直接複用可避免 05 進頁重打 Neon。
-if str(start) == str(start_saved) and str(end) == str(end_saved):
-    df = base_df.copy()
+if not st.session_state.get(V69_QUERY_KEY, False):
+    st.info("請設定條件後按『套用篩選並永久記錄』查詢。V69：本頁不再於開啟時自動掃描工時紀錄。")
+    try:
+        _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+    except Exception:
+        pass
+    st.stop()
+
+_filter_signature = repr(sorted(filters.items()))
+if st.session_state.get(V69_FILTER_SIG_KEY) == _filter_signature and isinstance(st.session_state.get(V69_DF_KEY), pd.DataFrame):
+    df = st.session_state[V69_DF_KEY].copy()
 else:
     df = _enrich_records(load_records(str(start), str(end)))
+    st.session_state[V69_DF_KEY] = df.copy()
+    st.session_state[V69_FILTER_SIG_KEY] = _filter_signature
 
 if df.empty:
     st.info("查無工時資料 / No records")

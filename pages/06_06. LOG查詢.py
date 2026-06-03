@@ -30,16 +30,23 @@ except Exception:
     _SPT_V40_PAGE_TOKEN = None
 
 
-try:
-    _log_auth_status = log_service.get_system_log_authority_status() if hasattr(log_service, "get_system_log_authority_status") else {}
-except Exception:
-    _log_auth_status = {}
+if st.button("載入 LOG 權威狀態 / Load LOG Authority Status", use_container_width=True, key="v69_load_log_authority_status"):
+    try:
+        st.session_state["v69_log_auth_status"] = log_service.get_system_log_authority_status() if hasattr(log_service, "get_system_log_authority_status") else {}
+    except Exception as exc:
+        st.session_state["v69_log_auth_status"] = {"error": str(exc)}
+_log_auth_status = st.session_state.get("v69_log_auth_status", {})
 if _log_auth_status:
-    st.caption(
-        f"LOG 權威檔：{'Exists' if _log_auth_status.get('exists') else 'Not Found'}｜"
-        f"權威筆數：{_log_auth_status.get('count', 0)}｜SQLite快取：{_log_auth_status.get('db_count', 0)}｜"
-        f"DeletedKeys：{_log_auth_status.get('deleted_keys', 0)}｜Path：{_log_auth_status.get('path', '-')}"
-    )
+    if _log_auth_status.get("error"):
+        st.warning(f"LOG 權威狀態讀取失敗：{_log_auth_status.get('error')}")
+    else:
+        st.caption(
+            f"LOG 權威檔：{'Exists' if _log_auth_status.get('exists') else 'Not Found'}｜"
+            f"權威筆數：{_log_auth_status.get('count', 0)}｜SQLite快取：{_log_auth_status.get('db_count', 0)}｜"
+            f"DeletedKeys：{_log_auth_status.get('deleted_keys', 0)}｜Path：{_log_auth_status.get('path', '-')}"
+        )
+else:
+    st.caption("V69：LOG 權威狀態不再於開頁自動掃描，需按上方按鈕載入。")
 
 
 def _make_logs_excel_bytes(raw_df, display_df, filters: dict) -> bytes:

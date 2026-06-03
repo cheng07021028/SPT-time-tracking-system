@@ -390,10 +390,17 @@ if isinstance(v163_report, dict):
             st.warning(f"產生 V163 Excel 報告失敗：{exc}")
 
 with st.expander("最近 14 日結帳狀態 / Recent Daily Close Status", expanded=False):
-    try:
-        st.dataframe(list_daily_close_status(end_date=str(v163_work_date), days=14), use_container_width=True, hide_index=True, height=320)
-    except Exception as exc:
-        st.error(f"讀取每日結帳狀態失敗：{exc}")
+    if st.button("載入最近 14 日結帳狀態 / Load Recent Status", use_container_width=True, key="v69_load_recent_daily_close_status"):
+        try:
+            st.session_state["v69_daily_close_status_df"] = list_daily_close_status(end_date=str(v163_work_date), days=14)
+        except Exception as exc:
+            st.session_state["v69_daily_close_status_error"] = str(exc)
+    if "v69_daily_close_status_error" in st.session_state:
+        st.error(f"讀取每日結帳狀態失敗：{st.session_state.pop('v69_daily_close_status_error')}")
+    if "v69_daily_close_status_df" in st.session_state:
+        st.dataframe(st.session_state["v69_daily_close_status_df"], use_container_width=True, hide_index=True, height=320)
+    else:
+        st.caption("V69：此清單不再於開頁自動查詢，按上方按鈕後載入。")
 
 if not CAN_REPAIR:
     st.info("你的帳號沒有 14 模組 can_manage 權限，因此只能查看結帳狀態，不能執行結帳或重新開啟。")
@@ -407,10 +414,7 @@ st.caption(
     "Streamlit 會多掃描舊頁面，還可能載入舊邏輯，造成頁面變慢或修正看似未生效。"
 )
 if "v159_page_hygiene_status" not in st.session_state:
-    try:
-        st.session_state["v159_page_hygiene_status"] = collect_page_hygiene_status()
-    except Exception as exc:
-        st.session_state["v159_page_hygiene_status"] = {"status": "ERROR", "items": [], "error": str(exc)}
+    st.session_state["v159_page_hygiene_status"] = {"status": "IDLE", "items": [], "message": "尚未檢查；請按『重新檢查頁面路由』。"}
 
 v159_c1, v159_c2, v159_c3 = st.columns([1, 1, 2])
 if v159_c1.button("🔄 重新檢查頁面路由", use_container_width=True, key="v159_refresh_page_hygiene"):
@@ -591,10 +595,7 @@ st.caption(
     "此區只顯示與補送備份佇列，不修改工時內容、不刪除、不重算、不覆蓋 01/02 歷史。"
 )
 if "v155_backup_status" not in st.session_state:
-    try:
-        st.session_state["v155_backup_status"] = collect_backup_queue_status()
-    except Exception as exc:
-        st.session_state["v155_backup_status"] = {"level": "ERROR", "summary": {}, "errors": [{"source": "status", "error": str(exc)}]}
+    st.session_state["v155_backup_status"] = {"level": "IDLE", "summary": {}, "warnings": ["尚未讀取備份佇列；請按『重新讀取備份狀態』。"]}
 
 bs1, bs2, bs3 = st.columns([1, 1, 2])
 if bs1.button("🔄 重新讀取備份狀態", use_container_width=True, key="v155_refresh_backup_status"):

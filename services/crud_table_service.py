@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Iterable
+import time
 
 import pandas as pd
 
@@ -36,6 +37,33 @@ EMP_DISPLAY_TO_INTERNAL = {
 # open a remote connection. 03/04 pages call load_* on many reruns, so keep this
 # migration guard process-local and run it only once per worker.
 _RUNTIME_COLUMNS_READY = False
+
+# V69: page switches and every Streamlit widget rerun used to re-query 03/04
+# master data from Neon.  Master tables are small and only change through this
+# service, so keep a short process-local cache and clear it immediately on save.
+_LOAD_CACHE_TTL_SECONDS = 180.0
+_LOAD_CACHE: dict[str, tuple[float, pd.DataFrame]] = {}
+
+
+def _cached_df(key: str) -> pd.DataFrame | None:
+    item = _LOAD_CACHE.get(key)
+    if not item:
+        return None
+    ts, df = item
+    if time.time() - ts > _LOAD_CACHE_TTL_SECONDS:
+        _LOAD_CACHE.pop(key, None)
+        return None
+    return df.copy().reset_index(drop=True)
+
+
+def _store_cached_df(key: str, df: pd.DataFrame) -> pd.DataFrame:
+    cached = df.copy().reset_index(drop=True) if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    _LOAD_CACHE[key] = (time.time(), cached)
+    return cached.copy().reset_index(drop=True)
+
+
+def clear_master_data_cache() -> None:
+    _LOAD_CACHE.clear()
 
 
 def _text(v: Any) -> str:
@@ -131,6 +159,9 @@ def _normalize(df: pd.DataFrame | None, cols: list[str], mapping: dict[str, str]
 
 
 def load_work_orders() -> pd.DataFrame:
+    cached = _cached_df("work_orders")
+    if cached is not None:
+        return cached
     _ensure_runtime_columns()
     df = query_df(
         """
@@ -149,10 +180,13 @@ def load_work_orders() -> pd.DataFrame:
             df[c] = False if c == "_delete" else ""
     df["_delete"] = False
     df["is_active"] = df["is_active"].map(lambda x: _bool(x, True))
-    return df[WORK_ORDER_COLS].reset_index(drop=True)
+    return _store_cached_df("work_orders", df[WORK_ORDER_COLS].reset_index(drop=True))
 
 
 def load_employees() -> pd.DataFrame:
+    cached = _cached_df("employees")
+    if cached is not None:
+        return cached
     _ensure_runtime_columns()
     df = query_df(
         """
@@ -175,7 +209,7 @@ def load_employees() -> pd.DataFrame:
     df["_delete"] = False
     for c in ["is_active", "is_in_factory", "is_today_attendance"]:
         df[c] = df[c].map(lambda x: _bool(x, True))
-    return df[EMPLOYEE_COLS].reset_index(drop=True)
+    return _store_cached_df("employees", df[EMPLOYEE_COLS].reset_index(drop=True))
 
 
 def _save_log(action_type: str, table: str, msg: str) -> None:
@@ -240,6 +274,7 @@ def save_work_orders(df: pd.DataFrame) -> dict[str, Any]:
             result["inserted"] += 1
     _save_log("SAVE_WORK_ORDERS", "work_orders", f"製令儲存 inserted={result['inserted']} updated={result['updated']} deleted={result['deleted']}")
     clear_query_cache()
+    clear_master_data_cache()
     return result
 
 
@@ -298,6 +333,7 @@ def save_employees(df: pd.DataFrame) -> dict[str, Any]:
             result["inserted"] += 1
     _save_log("SAVE_EMPLOYEES", "employees", f"人員儲存 inserted={result['inserted']} updated={result['updated']} deleted={result['deleted']}")
     clear_query_cache()
+    clear_master_data_cache()
     return result
 
 
@@ -330,4 +366,5 @@ def audit_v63_crud_runtime_consolidated() -> dict[str, Any]:
         "employees_authority": "db_service/neon",
         "local_json_write_on_save": False,
         "github_write_on_save": False,
+        "load_cache_ttl_seconds": _LOAD_CACHE_TTL_SECONDS,
     }

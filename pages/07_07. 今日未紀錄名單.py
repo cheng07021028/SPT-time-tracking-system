@@ -82,6 +82,10 @@ DAILY_DATE_KEY = "v234_07_daily_attendance_selected_date"
 DAILY_REV_KEY = "v234_07_daily_attendance_editor_rev"
 DAILY_LAST_DATE_KEY = "v234_07_daily_attendance_last_loaded_date"
 DAILY_MESSAGE_KEY = "v234_07_daily_attendance_message"
+DAILY_LOADED_KEY = "v69_07_daily_attendance_loaded"
+MISSING_TODAY_DF_KEY = "v69_07_missing_today_df"
+MISSING_TODAY_LOADED_KEY = "v69_07_missing_today_loaded"
+MISSING_TODAY_TS_KEY = "v69_07_missing_today_ts"
 
 DAILY_COLS = [
     "record_id",
@@ -824,18 +828,24 @@ selected_date = _date_to_text(selected_date_obj)
 st.session_state[DAILY_DATE_KEY] = selected_date_obj
 
 current_employee_df = _current_internal_df() if STATE_KEY in st.session_state else ensure_cols(load_employees())
-if st.session_state.get(DAILY_LAST_DATE_KEY) != selected_date or DAILY_STATE_KEY not in st.session_state:
-    st.session_state[DAILY_STATE_KEY] = _load_daily_rows_for_date(selected_date, current_employee_df)
+# V69: do not load the independent daily attendance authority automatically on every page open/date change.
+# It may read Neon/module payloads; load only after explicit user action, then keep it in session.
+if st.session_state.get(DAILY_LAST_DATE_KEY) != selected_date:
+    st.session_state[DAILY_LOADED_KEY] = False
+    st.session_state[DAILY_STATE_KEY] = pd.DataFrame(columns=DAILY_COLS)
     st.session_state[DAILY_LAST_DATE_KEY] = selected_date
     st.session_state[DAILY_REV_KEY] = int(st.session_state.get(DAILY_REV_KEY, 0)) + 1
+if DAILY_STATE_KEY not in st.session_state:
+    st.session_state[DAILY_STATE_KEY] = pd.DataFrame(columns=DAILY_COLS)
 
 msg = st.session_state.pop(DAILY_MESSAGE_KEY, "")
 if msg:
     st.success(msg)
 
 btn1, btn2, btn3, btn4 = st.columns(4)
-if btn1.button("⟳ 重新載入出勤紀錄 / Reload", use_container_width=True, key="v234_daily_reload"):
+if btn1.button("⟳ 載入/重新載入出勤紀錄 / Load / Reload", use_container_width=True, key="v234_daily_reload"):
     st.session_state[DAILY_STATE_KEY] = _load_daily_rows_for_date(selected_date, current_employee_df)
+    st.session_state[DAILY_LOADED_KEY] = True
     st.session_state[DAILY_REV_KEY] = int(st.session_state.get(DAILY_REV_KEY, 0)) + 1
     rerun()
 if btn2.button("＋ 依人員名單補齊 / Fill From Employees", use_container_width=True, key="v234_daily_fill_from_employees"):
@@ -930,7 +940,9 @@ else:
         rerun()
 
 current_daily_df = pd.DataFrame(st.session_state.get(DAILY_STATE_KEY, pd.DataFrame()), columns=DAILY_COLS)
-selected_missing_df = _build_missing_from_daily_attendance(current_daily_df, selected_date)
+selected_missing_df = _build_missing_from_daily_attendance(current_daily_df, selected_date) if st.session_state.get(DAILY_LOADED_KEY, False) else pd.DataFrame()
+if not st.session_state.get(DAILY_LOADED_KEY, False):
+    st.info("V69：每日出勤紀錄不再於開頁自動載入；請按『載入/重新載入出勤紀錄』。")
 summary_df = _attendance_summary(current_daily_df)
 met1, met2, met3, met4 = st.columns(4)
 met1.metric("所選日期出勤表筆數 / Records", f"{len(current_daily_df):,}")
@@ -938,15 +950,21 @@ met2.metric("出勤 / Attendance", f"{int(current_daily_df.get('is_today_attenda
 met3.metric("在廠 / In Factory", f"{int(current_daily_df.get('is_in_factory', pd.Series(dtype=bool)).map(_to_bool_value).sum()) if not current_daily_df.empty else 0:,}")
 met4.metric("該日未紀錄 / Missing", f"{len(selected_missing_df):,}")
 
-excel_bytes = _make_daily_attendance_excel(current_daily_df, selected_missing_df, selected_date)
-st.download_button(
-    "⬇ 下載每日出勤紀錄 Excel / Download Daily Attendance Excel",
-    data=excel_bytes,
-    file_name=f"SPT_每日出勤紀錄_{selected_date}.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    use_container_width=True,
-    key="v234_download_daily_attendance_excel",
-)
+ex1, ex2 = st.columns([1, 3])
+if ex1.button("準備每日出勤 Excel / Prepare Excel", use_container_width=True, key="v69_prepare_daily_attendance_excel"):
+    st.session_state["v69_daily_attendance_excel_bytes"] = _make_daily_attendance_excel(current_daily_df, selected_missing_df, selected_date)
+    st.session_state["v69_daily_attendance_excel_date"] = selected_date
+if "v69_daily_attendance_excel_bytes" in st.session_state:
+    st.download_button(
+        "⬇ 下載每日出勤紀錄 Excel / Download Daily Attendance Excel",
+        data=st.session_state["v69_daily_attendance_excel_bytes"],
+        file_name=f"SPT_每日出勤紀錄_{st.session_state.get('v69_daily_attendance_excel_date', selected_date)}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        key="v234_download_daily_attendance_excel",
+    )
+else:
+    ex2.caption("V69：Excel 不再於每次 rerun 自動產生，按左側按鈕後才準備下載檔。")
 
 with st.expander("所選日期未紀錄名單 / Missing Records By Selected Attendance Date", expanded=False):
     render_table(selected_missing_df, "v234_selected_date_missing_records", editable=False, height=360)
@@ -955,12 +973,20 @@ with st.expander("所選日期未紀錄名單 / Missing Records By Selected Atte
 st.divider()
 st.subheader("今日未紀錄名單 / Missing Today")
 today = today_date().strftime("%Y-%m-%d")
-current_attendance_df = _current_internal_df() if STATE_KEY in st.session_state else ensure_cols(load_employees())
-df = _build_missing_today_df(current_attendance_df, today)
+mt1, mt2 = st.columns([1, 3])
+if mt1.button("重新計算今日未紀錄 / Refresh Missing Today", use_container_width=True, key="v69_refresh_missing_today"):
+    current_attendance_df = _current_internal_df() if STATE_KEY in st.session_state else ensure_cols(load_employees())
+    st.session_state[MISSING_TODAY_DF_KEY] = _build_missing_today_df(current_attendance_df, today)
+    st.session_state[MISSING_TODAY_LOADED_KEY] = True
+    st.session_state[MISSING_TODAY_TS_KEY] = today
 
+df = st.session_state.get(MISSING_TODAY_DF_KEY, pd.DataFrame()) if st.session_state.get(MISSING_TODAY_LOADED_KEY, False) else pd.DataFrame()
 st.metric("今日未紀錄人數 / Missing Records", f"{len(df):,}")
-st.caption("V66：此區依目前畫面暫存的『啟用 / 在廠 / 今日出勤』狀態，加上今日工時權威檔即時計算；ID 為空不影響判斷，實際主鍵使用工號。")
-render_table(df, "missing_today_v202", editable=False, height=460)
+st.caption("V69：今日未紀錄名單不再於開頁自動查詢工時紀錄；按『重新計算今日未紀錄』才查詢。")
+if st.session_state.get(MISSING_TODAY_LOADED_KEY, False):
+    render_table(df, "missing_today_v202", editable=False, height=460)
+else:
+    st.info("尚未載入今日未紀錄名單。")
 
 try:
     _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
