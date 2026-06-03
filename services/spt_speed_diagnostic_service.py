@@ -9,6 +9,7 @@ Events are written to data/performance/performance_events.jsonl and can be revie
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any, Callable

@@ -82,7 +82,7 @@ with fc_b:
         for k in [
             "daily_hours_date", "daily_hours_employee_id", "daily_hours_employee_name",
             "daily_hours_departments", "daily_hours_title", "daily_hours_status",
-            "daily_hours_no_record_only",
+            "daily_hours_no_record_only", "_spt_v67_daily_hours_query_applied",
         ]:
             st.session_state.pop(k, None)
         st.rerun()
@@ -120,6 +120,17 @@ with st.expander("🔎 篩選條件 / Filters", expanded=True):
             st.session_state["daily_hours_title"] = title_keyword
             st.session_state["daily_hours_status"] = selected_status
             st.session_state["daily_hours_no_record_only"] = show_only_no_record
+            st.session_state["_spt_v67_daily_hours_query_applied"] = True
+
+# V67：首次進入 08 頁只顯示篩選表單，不立即查每日工時。
+# 避免切頁或重新整理時自動掃描 Neon；按「套用篩選」後才載入資料。
+if not st.session_state.get("_spt_v67_daily_hours_query_applied", False):
+    st.info("請按『套用篩選』後查詢人員每日工時，避免進入頁面就掃描 Neon。")
+    try:
+        _spt_v40_finish_page_event(_SPT_V40_PAGE_TOKEN)
+    except Exception:
+        pass
+    st.stop()
 
 # 以 session_state 的條件為準；避免使用者輸入到一半就立即改查詢。
 selected = st.session_state.get("daily_hours_date", today_date())

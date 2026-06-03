@@ -37,12 +37,16 @@ try:
 except Exception:
     _SPT_V40_PAGE_TOKEN = None
 
-init_permission_tables()
-try:
-    # V57：補回原始六個預設帳號（只新增缺少帳號，不覆蓋已存在帳號資料）
-    restore_default_accounts_once_v57()
-except Exception:
-    pass
+# V67：權限表初始化/預設帳號補齊只需每個 Streamlit session 執行一次。
+# 避免 10 頁每次 widget rerun 都觸發 Neon schema/default account 檢查。
+if not st.session_state.get("_spt_v67_permission_bootstrap_ready", False):
+    init_permission_tables()
+    try:
+        # V57：補回原始六個預設帳號（只新增缺少帳號，不覆蓋已存在帳號資料）
+        restore_default_accounts_once_v57()
+    except Exception:
+        pass
+    st.session_state["_spt_v67_permission_bootstrap_ready"] = True
 
 st.caption("V1.78 loaded｜權限管理頁已受 can_manage 管制；帳號、權限、安全設定會永久保存到 GitHub 設定檔。")
 

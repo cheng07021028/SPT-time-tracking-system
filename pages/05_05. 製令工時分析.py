@@ -446,7 +446,12 @@ with st.expander("🔎 專業 BI 篩選 / Professional BI Filters", expanded=Tru
 filters = dict(st.session_state[FILTER_KEY])
 start = _parse_date(filters.get("start_date"), today_date() - timedelta(days=30))
 end = _parse_date(filters.get("end_date"), today_date())
-df = _enrich_records(load_records(str(start), str(end)))
+# V67：同一個已套用日期區間不要在同一次 rerun 查詢/合併兩次。
+# base_df 已經為篩選選項載入過同日期區間資料；直接複用可避免 05 進頁重打 Neon。
+if str(start) == str(start_saved) and str(end) == str(end_saved):
+    df = base_df.copy()
+else:
+    df = _enrich_records(load_records(str(start), str(end)))
 
 if df.empty:
     st.info("查無工時資料 / No records")

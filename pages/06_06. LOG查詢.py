@@ -167,6 +167,9 @@ with st.form("log_query_filter_form", clear_on_submit=False):
         clear_filter = st.form_submit_button("↺ 清除條件 / Clear", use_container_width=True)
 if clear_filter:
     st.session_state["log_query_filters"] = _default_filters()
+    st.session_state.pop("_spt_v67_log_query_result", None)
+    st.session_state.pop("_spt_v67_log_query_signature", None)
+    st.session_state["_spt_v67_log_query_loaded"] = False
     st.rerun()
 
 if apply_filter:
@@ -182,10 +185,31 @@ if apply_filter:
         "level": level,
         "keyword": keyword.strip(),
     }
+    st.session_state["_spt_v67_log_query_force_run"] = True
     st.rerun()
 
 filters = st.session_state["log_query_filters"]
-result = _load_logs_safely(filters)
+_log_query_signature = (
+    str(filters.get("start_date")),
+    str(filters.get("end_date")),
+    int(filters.get("page_size", 500) or 500),
+    int(filters.get("page", 1) or 1),
+    str(filters.get("action_type", "")),
+    str(filters.get("level", "ALL")),
+    str(filters.get("keyword", "")),
+)
+_log_query_force = bool(st.session_state.pop("_spt_v67_log_query_force_run", False))
+_log_query_loaded = bool(st.session_state.get("_spt_v67_log_query_loaded", False))
+if _log_query_force or (_log_query_loaded and st.session_state.get("_spt_v67_log_query_signature") != _log_query_signature):
+    result = _load_logs_safely(filters)
+    st.session_state["_spt_v67_log_query_result"] = result
+    st.session_state["_spt_v67_log_query_signature"] = _log_query_signature
+    st.session_state["_spt_v67_log_query_loaded"] = True
+elif _log_query_loaded:
+    result = st.session_state.get("_spt_v67_log_query_result") or {}
+else:
+    result = {"ok": True, "df": pd.DataFrame(), "total_rows": 0, "page": int(filters.get("page", 1) or 1), "page_size": int(filters.get("page_size", 500) or 500), "total_pages": 1, "elapsed_seconds": 0}
+    st.info("請按『套用查詢』後再讀取 LOG，避免進入 06 頁就掃描 Neon。")
 df = result.get("df") if isinstance(result, dict) else pd.DataFrame()
 if df is None:
     df = pd.DataFrame()
@@ -204,12 +228,15 @@ st.caption(
 pg1, pg2, pg3, pg4 = st.columns([1, 1, 1, 3])
 if pg1.button("◀ 上一頁", use_container_width=True, disabled=int(filters.get("page", 1)) <= 1):
     st.session_state["log_query_filters"]["page"] = max(1, int(filters.get("page", 1)) - 1)
+    st.session_state["_spt_v67_log_query_force_run"] = True
     st.rerun()
 if pg2.button("下一頁 ▶", use_container_width=True, disabled=int(filters.get("page", 1)) >= total_pages):
     st.session_state["log_query_filters"]["page"] = int(filters.get("page", 1)) + 1
+    st.session_state["_spt_v67_log_query_force_run"] = True
     st.rerun()
 if pg3.button("回第 1 頁", use_container_width=True, disabled=int(filters.get("page", 1)) == 1):
     st.session_state["log_query_filters"]["page"] = 1
+    st.session_state["_spt_v67_log_query_force_run"] = True
     st.rerun()
 pg4.info("換頁只查目前頁；不會觸發刪除、不會重建權威檔。")
 
@@ -258,6 +285,9 @@ if check_permission("06_logs", "can_delete") or check_permission("06_logs", "can
             username = st.session_state.get("auth_username", st.session_state.get("username", "SYSTEM"))
             deleted = _delete_logs_safely(delete_start, delete_end, username=username)
             st.session_state["log_delete_confirm_token"] = delete_token + 1
+            st.session_state.pop("_spt_v67_log_query_result", None)
+            st.session_state.pop("_spt_v67_log_query_signature", None)
+            st.session_state["_spt_v67_log_query_loaded"] = False
             st.success(f"已刪除 {deleted} 筆 LOG，並保留一筆刪除稽核紀錄。")
             st.rerun()
 else:

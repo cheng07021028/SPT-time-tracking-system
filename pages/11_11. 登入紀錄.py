@@ -34,18 +34,26 @@ except Exception:
     _SPT_V40_PAGE_TOKEN = None
 
 
-# Make sure the current logged-in session is represented at least once.
-try:
-    auto_record_session_login(
-        username=st.session_state.get("auth_username", st.session_state.get("username", "")),
-        display_name=st.session_state.get("auth_display_name", st.session_state.get("display_name", "")),
-        roles=",".join(st.session_state.get("auth_roles", [])) if isinstance(st.session_state.get("auth_roles"), list) else str(st.session_state.get("auth_roles", "")),
-        module_code="11_login_logs",
-    )
-except Exception:
-    pass
+# V67：目前 session 的登入紀錄與 audit bootstrap 只需執行一次。
+# 避免進入 11 頁或操作篩選時重複寫入/掃描 Neon。
+if not st.session_state.get("_spt_v67_11_session_login_recorded", False):
+    try:
+        auto_record_session_login(
+            username=st.session_state.get("auth_username", st.session_state.get("username", "")),
+            display_name=st.session_state.get("auth_display_name", st.session_state.get("display_name", "")),
+            roles=",".join(st.session_state.get("auth_roles", [])) if isinstance(st.session_state.get("auth_roles"), list) else str(st.session_state.get("auth_roles", "")),
+            module_code="11_login_logs",
+        )
+    except Exception:
+        pass
+    st.session_state["_spt_v67_11_session_login_recorded"] = True
 
-bootstrap_info = bootstrap_audit_log_service()
+if not st.session_state.get("_spt_v67_11_bootstrap_ready", False):
+    bootstrap_info = bootstrap_audit_log_service()
+    st.session_state["_spt_v67_11_bootstrap_info"] = bootstrap_info
+    st.session_state["_spt_v67_11_bootstrap_ready"] = True
+else:
+    bootstrap_info = st.session_state.get("_spt_v67_11_bootstrap_info", {})
 try:
     removed_bad = int(bootstrap_info.get("removed_invalid_login_rows", 0) or 0)
     if removed_bad:
@@ -145,6 +153,9 @@ with st.form("v39_login_log_search_form", clear_on_submit=False):
         reset_query = st.form_submit_button("↺ 恢復預設 / Reset", use_container_width=True)
 if reset_query:
     st.session_state["v39_login_log_filters_applied"] = _default_login_filters.copy()
+    st.session_state.pop("_spt_v67_login_logs_cached", None)
+    st.session_state.pop("_spt_v67_login_logs_signature", None)
+    st.session_state["_spt_v67_login_logs_loaded"] = False
     st.rerun()
 if apply_query:
     st.session_state["v39_login_log_filters_applied"] = {
@@ -153,6 +164,7 @@ if apply_query:
         "keyword": pending_keyword,
         "limit": int(pending_limit),
     }
+    st.session_state["_spt_v67_login_logs_force_query"] = True
     st.rerun()
 _applied_login_filters = st.session_state.get("v39_login_log_filters_applied", _default_login_filters.copy())
 start = _applied_login_filters.get("start", _default_login_filters["start"])
@@ -160,15 +172,30 @@ end = _applied_login_filters.get("end", _default_login_filters["end"])
 keyword = str(_applied_login_filters.get("keyword", ""))
 limit = int(_applied_login_filters.get("limit", 300))
 
-stats = get_login_log_stats(str(start), str(end), keyword)  # SQL COUNT only after Apply.
+_login_query_signature = (str(start), str(end), keyword, int(limit))
+_login_force = bool(st.session_state.pop("_spt_v67_login_logs_force_query", False))
+_login_loaded = bool(st.session_state.get("_spt_v67_login_logs_loaded", False))
+if _login_force or (_login_loaded and st.session_state.get("_spt_v67_login_logs_signature") != _login_query_signature):
+    stats = get_login_log_stats(str(start), str(end), keyword)  # SQL COUNT only after Apply.
+    logs = load_login_logs(start_date=str(start), end_date=str(end), keyword=keyword, limit=limit, include_legacy=True)
+    if isinstance(logs, list):
+        logs = pd.DataFrame(logs)
+    st.session_state["_spt_v67_login_logs_cached"] = {"stats": stats, "logs": logs}
+    st.session_state["_spt_v67_login_logs_signature"] = _login_query_signature
+    st.session_state["_spt_v67_login_logs_loaded"] = True
+elif _login_loaded:
+    _login_cached = st.session_state.get("_spt_v67_login_logs_cached") or {}
+    stats = _login_cached.get("stats", {})
+    logs = _login_cached.get("logs", pd.DataFrame())
+else:
+    stats = {"records": 0, "success": 0, "failed": 0}
+    logs = pd.DataFrame()
+    st.info("請按『套用查詢』後再讀取登入紀錄，避免進入 11 頁就掃描 Neon。")
+
 s1, s2, s3 = st.columns(3)
 s1.metric("筆數 / Records", stats.get("records", 0))
 s2.metric("成功 / Success", stats.get("success", 0))
 s3.metric("失敗 / Failed", stats.get("failed", 0))
-
-logs = load_login_logs(start_date=str(start), end_date=str(end), keyword=keyword, limit=limit, include_legacy=True)
-if isinstance(logs, list):
-    logs = pd.DataFrame(logs)
 
 if logs.empty:
     st.info("查無登入紀錄 / No login logs")
@@ -233,6 +260,9 @@ if st.button("⊖ 確認清除日期區間內登入紀錄 / Delete Logs in Date 
         st.error("請先勾選確認刪除，系統不會使用文字輸入 DELETE。")
     else:
         count = delete_login_logs_by_date_range(str(start), str(end))
+        st.session_state.pop("_spt_v67_login_logs_cached", None)
+        st.session_state.pop("_spt_v67_login_logs_signature", None)
+        st.session_state["_spt_v67_login_logs_loaded"] = False
         status_after = get_audit_permanent_status()
         st.success(f"已清除 {count} 筆登入紀錄，權威檔目前 {status_after.get('count', 0)} 筆 / Deleted {count} logs; authority now has {status_after.get('count', 0)} rows")
         st.caption(f"權威檔已更新：{status_after.get('path', '-')}｜DeleteState：{status_after.get('delete_state_path', '-')}｜DeletedKeys：{status_after.get('deleted_keys', 0)}｜LastDeleted：{status_after.get('last_deleted_count', 0)}")
