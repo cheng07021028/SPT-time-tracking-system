@@ -349,6 +349,11 @@ def parse_pasted_employees(raw: str) -> tuple[pd.DataFrame, bool, list[str]]:
 
 def reload_data():
     df = load_employees()
+    df = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame(df)
+    # V66: load_employees() may already include the editor helper column.
+    # Do not insert _delete twice; reset it and keep it as the first column.
+    if "_delete" in df.columns:
+        df = df.drop(columns=["_delete"])
     df.insert(0, "_delete", False)
     st.session_state[STATE_KEY] = ensure_cols(df)
 
