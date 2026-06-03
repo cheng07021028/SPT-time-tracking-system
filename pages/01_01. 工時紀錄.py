@@ -125,6 +125,7 @@ from services.security_service import (
     require_module_access,
     render_post_record_continue_prompt,
     trigger_post_record_continue_prompt,
+    logout,
 )
 from services.master_data_service import (
     load_employees_for_time_record_fast,
@@ -810,6 +811,156 @@ def _v148_load_today_finished_records_for_employee(employee_id: str, employee_na
     return _v148_sort_finished_records(pd.DataFrame(keep))
 # ===== END V148 TODAY FINISHED RECORDS READ-ONLY PANEL =====
 
+
+# ===== V72 ACTIVE-WORK FRONTEND GUARD =====
+# Restore the previous 01 behavior without putting heavy calculation on Neon:
+# - selected employee's active work is loaded into session cache and rendered as a table;
+# - if any active work exists, Start is disabled in the foreground;
+# - Start is a two-step confirmation; choosing No logs out immediately;
+# - work-hour calculations remain Python-side in time_record_service, Neon only persists transactions.
+V72_ACTIVE_CACHE_PREFIX = "v72_01_active_df_"
+V72_ACTIVE_LOADED_PREFIX = "v72_01_active_loaded_"
+V72_START_CONFIRM_KEY = "v72_01_pending_start_confirm"
+V72_ACTIVE_TTL_SECONDS = 45
+
+
+def _v72_safe_key(*parts) -> str:
+    text = "_".join(str(x or "") for x in parts)
+    return re.sub(r"[^0-9A-Za-z_\-]+", "_", text)[:120]
+
+
+def _v72_active_cache_keys(employee_id: str, employee_name: str) -> tuple[str, str]:
+    suffix = _v72_safe_key(employee_id, employee_name)
+    return V72_ACTIVE_CACHE_PREFIX + suffix, V72_ACTIVE_LOADED_PREFIX + suffix
+
+
+def _v72_load_active_df(employee_id: str, employee_name: str = "", *, force: bool = False) -> pd.DataFrame:
+    df_key, ts_key = _v72_active_cache_keys(employee_id, employee_name)
+    now_perf = time.perf_counter()
+    cached = st.session_state.get(df_key)
+    loaded_perf = float(st.session_state.get(ts_key + "_perf", 0.0) or 0.0)
+    if (not force) and isinstance(cached, pd.DataFrame) and loaded_perf and (now_perf - loaded_perf) < V72_ACTIVE_TTL_SECONDS:
+        return cached.copy()
+    try:
+        df = refresh_active_records_for_employee(employee_id, employee_name=employee_name)
+    except TypeError:
+        df = refresh_active_records_for_employee(employee_id)
+    except Exception:
+        df = pd.DataFrame()
+    if not isinstance(df, pd.DataFrame):
+        df = pd.DataFrame()
+    st.session_state[df_key] = df.reset_index(drop=True)
+    st.session_state[ts_key] = _v259_now_label()
+    st.session_state[ts_key + "_perf"] = now_perf
+    return st.session_state[df_key].copy()
+
+
+def _v72_clear_active_cache(employee_id: str = "", employee_name: str = "") -> None:
+    if employee_id or employee_name:
+        df_key, ts_key = _v72_active_cache_keys(employee_id, employee_name)
+        for k in [df_key, ts_key, ts_key + "_perf"]:
+            st.session_state.pop(k, None)
+        return
+    for k in list(st.session_state.keys()):
+        if str(k).startswith(V72_ACTIVE_CACHE_PREFIX) or str(k).startswith(V72_ACTIVE_LOADED_PREFIX):
+            st.session_state.pop(k, None)
+
+
+def _v72_active_display_df(active_df: pd.DataFrame) -> pd.DataFrame:
+    if not isinstance(active_df, pd.DataFrame) or active_df.empty:
+        return pd.DataFrame()
+    df = active_df.copy()
+    now_dt = pd.Timestamp.now()
+    if "start_timestamp" in df.columns:
+        st_dt = pd.to_datetime(df["start_timestamp"], errors="coerce")
+        df["已進行分鐘 / Elapsed Min"] = ((now_dt - st_dt).dt.total_seconds() / 60.0).round(1)
+    columns = [
+        "id", "employee_id", "employee_name", "work_order", "work_order_no", "part_no", "type_name",
+        "process_name", "start_date", "start_time", "start_timestamp", "已進行分鐘 / Elapsed Min", "remark",
+    ]
+    keep = [c for c in columns if c in df.columns]
+    if not keep:
+        return df.head(20)
+    out = df[keep].head(20).copy()
+    rename = {
+        "id": "ID",
+        "employee_id": "工號",
+        "employee_name": "姓名",
+        "work_order": "製令",
+        "work_order_no": "製令號碼",
+        "part_no": "P/N",
+        "type_name": "機型",
+        "process_name": "工段",
+        "start_date": "開始日期",
+        "start_time": "開始時間",
+        "start_timestamp": "開始時間戳",
+        "remark": "備註",
+    }
+    return out.rename(columns=rename)
+
+
+def _v72_render_active_guard(employee_id: str, employee_name: str) -> tuple[pd.DataFrame, bool]:
+    c1, c2 = st.columns([1.25, 2.75])
+    force = c1.button("重新檢查開始中作業", use_container_width=True, key=f"v72_refresh_active_before_start_{employee_id}_{employee_name}")
+    active_df = _v72_load_active_df(employee_id, employee_name, force=force)
+    _, ts_key = _v72_active_cache_keys(employee_id, employee_name)
+    ts = st.session_state.get(ts_key, "")
+    if ts:
+        c2.caption(f"開始防呆狀態：{ts} 已檢查。為避免每次下拉都慢，45 秒內使用前台快取；按左側可重新檢查。")
+    has_active = isinstance(active_df, pd.DataFrame) and not active_df.empty
+    if has_active:
+        st.warning("此人員已有開始中的作業。請先在右側按『暫停 / 完工 / 下班』結束後，才可開始新作業。")
+        render_table(_v72_active_display_df(active_df), "v72_start_guard_active_work_table", editable=False, height=210)
+    else:
+        st.success("此人員目前沒有開始中的作業，可以開始新作業。")
+    return active_df, has_active
+
+
+def _v72_store_start_confirmation(employee: dict, work_order: dict, process: str, remark: str) -> None:
+    st.session_state[V72_START_CONFIRM_KEY] = {
+        "employee": dict(employee or {}),
+        "work_order": dict(work_order or {}),
+        "process": str(process or ""),
+        "remark": str(remark or ""),
+        "created_at": _v259_now_label(),
+    }
+
+
+def _v72_render_start_confirmation() -> bool:
+    pending = st.session_state.get(V72_START_CONFIRM_KEY)
+    if not isinstance(pending, dict):
+        return False
+    emp = pending.get("employee") or {}
+    wo = pending.get("work_order") or {}
+    emp_text = f"{emp.get('employee_id','')} {emp.get('employee_name','')}".strip()
+    wo_text = str(wo.get("work_order") or wo.get("work_order_no") or "").strip()
+    st.info(f"請確認是否繼續記錄這筆作業：{emp_text}｜製令 {wo_text}｜工段 {pending.get('process','')}。")
+    c_yes, c_no, c_cancel = st.columns(3)
+    if c_yes.button("是，開始記錄", use_container_width=True, key="v72_confirm_start_yes"):
+        try:
+            _spt_button_t = time.perf_counter()
+            rid = start_work(pending.get("employee") or {}, pending.get("work_order") or {}, pending.get("process") or "", pending.get("remark") or "", auto_pause_old=False)
+            st.session_state.pop(V72_START_CONFIRM_KEY, None)
+            _v72_clear_active_cache()
+            _v259_clear_display_cache()
+            _spt_perf_tick("01_button_start_work_confirmed_action", _spt_button_t, threshold_ms=3000.0, detail={"record_id": rid})
+            st.success(f"已開始作業，紀錄編號：{rid}。")
+            st.rerun()
+        except Exception as exc:
+            st.error(str(exc))
+        return True
+    if c_no.button("否，登出帳號", use_container_width=True, key="v72_confirm_start_no_logout"):
+        st.session_state.pop(V72_START_CONFIRM_KEY, None)
+        logout("開始作業前選擇不繼續記錄，自動登出")
+        st.rerun()
+        return True
+    if c_cancel.button("取消，留在本頁", use_container_width=True, key="v72_confirm_start_cancel"):
+        st.session_state.pop(V72_START_CONFIRM_KEY, None)
+        st.rerun()
+        return True
+    return True
+# ===== V72 ACTIVE-WORK FRONTEND GUARD END =====
+
 # V13: 01 opens from latest memory files/SQLite without doing heavy master restore inline.
 _spt_perf_t = time.perf_counter()
 employees = load_employees_for_time_record_fast(active_only=True, in_factory_only=False)
@@ -920,33 +1071,24 @@ with left:
             f"目前類別『{selected_category}』尚未在 13｜系統設定 → 一、類別與工段名稱設定 / Category & Process Options 設定任何啟用的工段名稱。請先完成設定並永久儲存。"
         )
     remark = st.text_area("備註｜Remark", height=90)
-    auto_pause = st.checkbox("切換不同工段時，自動暫停同人員其他未結束作業｜Auto pause different process", value=True)
+    auto_pause = st.checkbox("防呆模式：前一項作業未停止時禁止開始新作業｜Start disabled until previous work is finished", value=False, disabled=True)
 
-    # V259: do not run active/duplicate/conflict SQL on every page paint.
-    # Those checks are executed only after the operator presses Start, so page
-    # display stays fast while the write path still validates correctness.
-    st.caption("V259：開始前檢查會在按下『開始作業』後執行，避免每次輸入/選單變更都重查資料庫。")
-    confirm_pause = True
+    st.caption("V72：開始前防呆改回前台快取檢查；若此人員已有開始中作業，開始按鈕會灰色停用。工時計算在 Python 前台/service 完成，Neon 只負責最後交易保存。")
+    active_before_start_df, has_active_before_start = _v72_render_active_guard(emp_id, emp_name)
+    start_disabled = bool(no_process_options or has_active_before_start)
+    if has_active_before_start:
+        st.caption("開始作業已停用：請先結束上一項作業。右側結束區仍可使用『暫停 / 完工 / 下班』同步結束作業並平均工時。")
 
-    if st.button("⏱ 開始作業 / Start", use_container_width=True, disabled=no_process_options):
+    _v72_render_start_confirmation()
+
+    if st.button("⏱ 開始作業 / Start", use_container_width=True, disabled=start_disabled):
         if not check_permission("01_time_record", "can_create"):
             st.error("權限不足：你沒有新增工時紀錄權限。")
+        elif has_active_before_start:
+            st.warning("此人員已有開始中的作業，請先結束上一筆。")
         else:
-            try:
-                _spt_button_t = time.perf_counter()
-                # V52：開始作業按鈕不得再在頁面層重複查 active / duplicate / conflict。
-                # 所有驗證與自動暫停改由 time_record_service.start_work 的短交易熱路徑一次完成。
-                rid = start_work(employee, work_order, process, remark, auto_pause_old=auto_pause)
-                _v259_clear_display_cache()
-                _spt_perf_tick("01_button_start_work_action", _spt_button_t, threshold_ms=3000.0, detail={"record_id": rid, "employee_id": emp_id, "work_order": wo_no, "process": process})
-                st.success(f"已開始作業，紀錄編號：{rid}。請按右側/下方重新整理按鈕查看最新明細。")
-                trigger_post_record_continue_prompt(
-                    f"已開始作業，紀錄編號：{rid}。今日明細採手動刷新，避免開始作業後整頁長時間運轉。",
-                    title="已開始計時",
-                )
-                st.stop()
-            except Exception as exc:
-                st.error(str(exc))
+            _v72_store_start_confirmation(employee, work_order, process, remark)
+            st.rerun()
 
 with right:
     st.subheader("結束目前作業 / Finish Work")
@@ -994,18 +1136,8 @@ with right:
         # group finishing/averaging when finish_parallel_group=True.
         group_df = pd.DataFrame([active2]).reset_index(drop=True)
         _v208_finish_parallel_group = True
-        st.markdown(
-            f"""
-<div class="spt-card spt-glow">
-<b>目前作業中 / Active Work</b><br>
-選擇人員：{emp_id2} {_emp2_name}<br>
-工段：{active2.get('process_name', '')}<br>
-同步計時：已找到目前作業<br>
-說明：按下暫停、下班或完工時，會由系統在 service 層同步結束同一人員、同一天、同一工段的未結束計時，並平均分配工時。<br>
-</div>
-""",
-            unsafe_allow_html=True,
-        )
+        st.caption("目前作業中 / Active Work：下表由前台快取顯示；按下暫停、下班或完工時，service 會同步結束同一人員、同日、同工段的未結束計時並平均分配工時。")
+        render_table(_v72_active_display_df(group_df), "active_record_single_v72", editable=False, height=190)
 
         end_remark = st.text_input("結束備註｜Finish Remark", key="end_remark", disabled=False)
         c1, c2, c3 = st.columns(3)
@@ -1017,6 +1149,7 @@ with right:
                     _spt_button_t = time.perf_counter()
                     n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=_v208_finish_parallel_group)
                     _v259_clear_display_cache()
+                    _v72_clear_active_cache(emp_id2, _emp2_name)
                     st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
                     _spt_perf_tick("01_button_finish_pause_action", _spt_button_t, threshold_ms=3000.0, detail={"active_id": active2.get("id"), "rows": n})
                     trigger_post_record_continue_prompt(f"已同步暫停 {n} 筆並平均計算工時。", title="工時已暫停")
@@ -1032,6 +1165,7 @@ with right:
                     _spt_button_t = time.perf_counter()
                     n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=_v208_finish_parallel_group)
                     _v259_clear_display_cache()
+                    _v72_clear_active_cache(emp_id2, _emp2_name)
                     st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
                     _spt_perf_tick("01_button_finish_complete_action", _spt_button_t, threshold_ms=3000.0, detail={"active_id": active2.get("id"), "rows": n})
                     trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。", title="工時已完工")
@@ -1047,6 +1181,7 @@ with right:
                     _spt_button_t = time.perf_counter()
                     n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=_v208_finish_parallel_group)
                     _v259_clear_display_cache()
+                    _v72_clear_active_cache(emp_id2, _emp2_name)
                     st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
                     _spt_perf_tick("01_button_finish_off_duty_action", _spt_button_t, threshold_ms=3000.0, detail={"active_id": active2.get("id"), "rows": n})
                     trigger_post_record_continue_prompt(f"已同步下班 {n} 筆並平均計算工時。", title="工時已結束")

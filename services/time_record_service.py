@@ -194,6 +194,9 @@ def _add_col(table: str, ddl: str) -> None:
 
 
 _TIME_RUNTIME_READY = False
+_REST_PERIODS_CACHE: list[tuple[dt_time, dt_time]] | None = None
+_REST_PERIODS_CACHE_AT = 0.0
+_REST_PERIODS_TTL_SECONDS = 300.0
 
 def _ensure_time_runtime_columns() -> None:
     global _TIME_RUNTIME_READY
@@ -254,6 +257,10 @@ def _split_ts(ts: str) -> tuple[str, str]:
 
 
 def _load_rest_periods() -> list[tuple[dt_time, dt_time]]:
+    global _REST_PERIODS_CACHE, _REST_PERIODS_CACHE_AT
+    now_perf = datetime.now().timestamp()
+    if _REST_PERIODS_CACHE is not None and (now_perf - _REST_PERIODS_CACHE_AT) < _REST_PERIODS_TTL_SECONDS:
+        return list(_REST_PERIODS_CACHE)
     try:
         df = query_df(
             """
@@ -283,6 +290,8 @@ def _load_rest_periods() -> list[tuple[dt_time, dt_time]]:
                     periods.append((s, e))
             except Exception:
                 pass
+    _REST_PERIODS_CACHE = list(periods)
+    _REST_PERIODS_CACHE_AT = now_perf
     return periods
 
 
@@ -381,10 +390,14 @@ def _row_to_payload(row: dict[str, Any], recalc: bool = False) -> dict[str, Any]
 
 
 def _cache_clear() -> None:
+    global _REST_PERIODS_CACHE, _REST_PERIODS_CACHE_AT
     try:
         clear_query_cache()
     except Exception:
         pass
+    # Runtime write paths may change settings/imported rows. Keep calculation settings fresh without querying Neon for every row.
+    _REST_PERIODS_CACHE = None
+    _REST_PERIODS_CACHE_AT = 0.0
 
 
 def clear_today_records_fast_cache() -> None:
@@ -525,6 +538,21 @@ def _lookup_work_order(wo: str) -> dict:
     return row or {}
 
 
+def _records_by_ids(ids: list[int]) -> dict[int, dict[str, Any]]:
+    clean = [int(x) for x in ids if _int_or_none(x) is not None]
+    if not clean:
+        return {}
+    ph = ",".join(["?"] * len(clean))
+    df = _safe_df(f"SELECT {_base_cols()} FROM time_records WHERE id IN ({ph}) AND (deleted_at IS NULL OR deleted_at='')", tuple(clean))
+    out: dict[int, dict[str, Any]] = {}
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        for _, row in df.iterrows():
+            rid = _int_or_none(row.get("id"))
+            if rid is not None:
+                out[int(rid)] = row.to_dict()
+    return out
+
+
 def _soft_pause_conflicts(ids: list[int], now: str) -> int:
     if not ids:
         return 0
@@ -613,9 +641,11 @@ def finish_work(record_id: int, end_action: str = "完工", remark: str = "", fi
     ids = _ids_from_df(group_df) if isinstance(group_df, pd.DataFrame) and not group_df.empty else [rid]
     action = _text(end_action) or "完工"
     status = END_ACTION_STATUS.get(action, action)
+    # Fetch all active records in one lightweight read; all duration/rest/average calculations stay in Python.
+    records = _records_by_ids(ids)
     raw_net: dict[int, tuple[float, float]] = {}
     for i in ids:
-        rec = _safe_one(f"SELECT {_base_cols()} FROM time_records WHERE id=? LIMIT 1", (i,)) or {}
+        rec = records.get(int(i), {})
         raw_net[i] = calculate_work_minutes(rec.get("start_timestamp"), now)
     if len(ids) > 1:
         total_net = sum(v[1] for v in raw_net.values())
