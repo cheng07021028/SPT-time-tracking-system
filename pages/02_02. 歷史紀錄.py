@@ -1626,8 +1626,8 @@ with tab1:
 
                 if history_action == "儲存編輯":
                     save_df = _strip_history_cross_day_display_cols(edited).drop(columns=[delete_col_label, recalc_col_label, "刪除", "重算"], errors="ignore")
-                    count = save_time_records(save_df)
-                    _add_history_result("success", f"已儲存 {count} 筆歷史紀錄。", append=False)
+                    count = save_time_records(save_df, recalc_edited_timestamps=True)
+                    _add_history_result("success", f"已儲存 {count} 筆歷史紀錄，並已依最新開始/結束時間重算工時、寫入修改紀錄與同步作業平均。", append=False)
                     _history_refresh_editor()
                     rerun()
                 elif history_action == "重新計算勾選紀錄工時":

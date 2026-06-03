@@ -10,6 +10,7 @@ V63 design goals:
 """
 from __future__ import annotations
 
+import json
 import math
 import uuid
 from datetime import datetime, timedelta, time as dt_time
@@ -750,20 +751,182 @@ def _insert_or_update_payload(payload: dict[str, Any], record_id: int | None = N
     return "inserted", int(new_id or 0)
 
 
+_V73_AUDIT_FIELDS = [
+    "status", "work_order", "work_order_no", "part_no", "type_name", "process_code", "process_name",
+    "employee_id", "employee_name", "start_action", "start_timestamp", "end_action", "end_timestamp",
+    "remark", "start_date", "start_time", "end_date", "end_time", "work_hours", "work_minutes",
+    "raw_minutes", "average_minutes", "assembly_location", "group_key", "is_group_work", "source",
+]
+_V73_TIMING_FIELDS = {"start_timestamp", "end_timestamp", "start_date", "start_time", "end_date", "end_time"}
+_V73_GROUP_FIELDS = {"employee_id", "employee_name", "process_name", "start_date", "start_timestamp", "end_timestamp", "group_key"}
+
+
+def _same_value_for_audit(a: Any, b: Any) -> bool:
+    ta = _text(a)
+    tb = _text(b)
+    if ta == tb:
+        return True
+    try:
+        return abs(float(ta or 0) - float(tb or 0)) < 0.0001
+    except Exception:
+        return False
+
+
+def _diff_payload(before: dict[str, Any] | None, after: dict[str, Any]) -> dict[str, dict[str, str]]:
+    if not before:
+        return {c: {"old": "", "new": _text(after.get(c))} for c in _V73_AUDIT_FIELDS if _text(after.get(c))}
+    diff: dict[str, dict[str, str]] = {}
+    for c in _V73_AUDIT_FIELDS:
+        if not _same_value_for_audit((before or {}).get(c), after.get(c)):
+            diff[c] = {"old": _text((before or {}).get(c)), "new": _text(after.get(c))}
+    return diff
+
+
+def _load_existing_records_map(ids: list[int]) -> dict[int, dict[str, Any]]:
+    clean = [int(x) for x in ids if _int_or_none(x) is not None]
+    if not clean:
+        return {}
+    out: dict[int, dict[str, Any]] = {}
+    for i in range(0, len(clean), 200):
+        chunk = clean[i:i + 200]
+        ph = ",".join(["?"] * len(chunk))
+        df = _safe_df(f"SELECT {_base_cols()} FROM time_records WHERE id IN ({ph}) AND (deleted_at IS NULL OR deleted_at='')", tuple(chunk))
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            for _, row in df.iterrows():
+                rid = _int_or_none(row.get("id"))
+                if rid is not None:
+                    out[int(rid)] = row.to_dict()
+    return out
+
+
+def _audit_time_record_change(record_id: int | None, action_type: str, changed: dict[str, dict[str, str]], source: str) -> None:
+    if not changed:
+        return
+    now = now_text()
+    try:
+        detail = json.dumps({"source": source, "changed_fields": changed}, ensure_ascii=False, default=str)[:6000]
+    except Exception:
+        detail = str({"source": source, "changed_fields": changed})[:6000]
+    try:
+        execute(
+            "INSERT INTO system_logs(log_time, user_name, action_type, target_table, target_id, message, detail, level) VALUES (?, ?, ?, 'time_records', ?, ?, ?, 'INFO')",
+            (now, "SYSTEM", action_type, str(record_id or ""), f"工時紀錄已修改：{record_id or ''}", detail),
+        )
+    except Exception:
+        pass
+
+
+def _related_group_ids_from_record(record: dict[str, Any]) -> list[int]:
+    rid = _int_or_none(record.get("id"))
+    ids: list[int] = []
+    group_key = _text(record.get("group_key"))
+    if group_key:
+        df = _safe_df(f"SELECT id FROM time_records WHERE group_key=? AND {_not_deleted_predicate()}", (group_key,))
+        if isinstance(df, pd.DataFrame) and not df.empty and "id" in df.columns:
+            ids = [i for i in (_int_or_none(x) for x in df["id"].tolist()) if i is not None]
+    if len(ids) <= 1:
+        emp = _text(record.get("employee_id")); proc = _text(record.get("process_name")); sdate = _text(record.get("start_date"))
+        start_dt = _parse_dt(record.get("start_timestamp"))
+        if emp and proc and sdate and start_dt is not None:
+            cand = _safe_df(
+                f"SELECT id, start_timestamp FROM time_records WHERE employee_id=? AND process_name=? AND start_date=? AND {_not_deleted_predicate()} LIMIT 100",
+                (emp, proc, sdate),
+            )
+            ids = []
+            if isinstance(cand, pd.DataFrame) and not cand.empty:
+                for _, row in cand.iterrows():
+                    d = _parse_dt(row.get("start_timestamp"))
+                    i = _int_or_none(row.get("id"))
+                    if d is not None and i is not None and abs((d - start_dt).total_seconds()) <= 180:
+                        ids.append(i)
+    if rid is not None and rid not in ids:
+        ids.append(rid)
+    return sorted({int(x) for x in ids if _int_or_none(x) is not None})
+
+
+def _sync_parallel_group_after_edit(seed_ids: list[int]) -> int:
+    if not seed_ids:
+        return 0
+    existing = _load_existing_records_map(seed_ids)
+    group_ids: set[int] = set()
+    for rec in existing.values():
+        group_ids.update(_related_group_ids_from_record(rec))
+    if len(group_ids) <= 1:
+        return 0
+    records = _load_existing_records_map(sorted(group_ids))
+    ended_ids = [i for i, rec in records.items() if _text(rec.get("start_timestamp")) and _text(rec.get("end_timestamp"))]
+    if len(ended_ids) <= 1:
+        return 0
+    nets: dict[int, tuple[float, float]] = {}
+    for i in ended_ids:
+        rec = records.get(i, {})
+        nets[i] = calculate_work_minutes(rec.get("start_timestamp"), rec.get("end_timestamp"))
+    total_net = sum(v[1] for v in nets.values())
+    avg_net = round(total_net / max(len(ended_ids), 1), 2)
+    now = now_text()
+    ops: list[tuple[str, tuple[Any, ...]]] = []
+    for i in ended_ids:
+        raw, _net = nets.get(i, (0.0, 0.0))
+        ops.append((
+            """
+            UPDATE time_records
+            SET raw_minutes=?, work_minutes=?, average_minutes=?, work_hours=?, is_group_work=1,
+                updated_at=?, updated_by='system', version=COALESCE(version,1)+1
+            WHERE id=? AND (deleted_at IS NULL OR deleted_at='')
+            """,
+            (round(raw, 2), avg_net, avg_net, round(avg_net / 60.0, 4), now, i),
+        ))
+    counts = execute_transaction(ops, mark_changed=True, reason="sync_parallel_group_after_edit", source_sql="sync_parallel_group_after_edit")
+    try:
+        execute(
+            "INSERT INTO system_logs(log_time, user_name, action_type, target_table, target_id, message, detail, level) VALUES (?, ?, 'SYNC_PARALLEL_GROUP', 'time_records', ?, ?, ?, 'INFO')",
+            (now, "SYSTEM", ",".join(map(str, ended_ids[:50])), f"同步作業平均重算 {len(ended_ids)} 筆", f"ids={ended_ids}; average_minutes={avg_net}"),
+        )
+    except Exception:
+        pass
+    return int(sum(int(x or 0) for x in counts) or len(ended_ids))
+
+
 def save_time_records(df: pd.DataFrame, recalc_edited_timestamps: bool = False) -> int:
     _ensure_time_runtime_columns()
     work = _normalize_df(df)
     if work.empty:
         return 0
+    ids = []
+    for _, row in work.iterrows():
+        rid = _int_or_none(row.get("id"))
+        if rid is not None and rid > 0:
+            ids.append(rid)
+    existing_map = _load_existing_records_map(sorted(set(ids)))
     count = 0
+    changed_or_group_seed_ids: list[int] = []
     for _, row in work.iterrows():
         rd = dict(row)
         if not _text(rd.get("employee_id")) or not _text(rd.get("work_order") or rd.get("work_order_no")) or not _text(rd.get("process_name")):
             continue
         rid = _int_or_none(rd.get("id"))
-        payload = _row_to_payload(rd, recalc=bool(recalc_edited_timestamps))
-        _kind, n = _insert_or_update_payload(payload, rid)
-        count += 1 if n else 0
+        before = existing_map.get(int(rid)) if rid is not None else None
+        # 02/01 編輯儲存要遵守重算原則：只要開始/結束日期時間被改，就在前台 Python service 重算，Neon 只做交易寫入。
+        preliminary = _row_to_payload(rd, recalc=False)
+        diff0 = _diff_payload(before, preliminary)
+        timing_changed = bool(_V73_TIMING_FIELDS.intersection(diff0.keys()))
+        group_changed = bool(_V73_GROUP_FIELDS.intersection(diff0.keys()))
+        should_recalc = bool(recalc_edited_timestamps or timing_changed)
+        payload = _row_to_payload(rd, recalc=should_recalc)
+        diff = _diff_payload(before, payload)
+        if before and not diff:
+            continue
+        kind, n = _insert_or_update_payload(payload, rid)
+        saved_id = int(rid or n or 0)
+        if n or (kind == "updated" and before is not None):
+            # db_service.execute may return 0 for SQLite UPDATE rowcount even when the row was updated.
+            # Count a detected changed existing row as saved so 01/02 does not show a false "0 筆" result.
+            count += 1
+            _audit_time_record_change(saved_id, "UPDATE_TIME_RECORD" if kind == "updated" else "INSERT_TIME_RECORD", diff, "01/02_edit_save")
+            if saved_id and (should_recalc or group_changed or _text(payload.get("group_key"))):
+                changed_or_group_seed_ids.append(saved_id)
+    if changed_or_group_seed_ids:
+        _sync_parallel_group_after_edit(changed_or_group_seed_ids)
     _cache_clear()
     return int(count)
 
