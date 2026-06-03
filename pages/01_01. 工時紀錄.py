@@ -988,75 +988,91 @@ with right:
     if not active2:
         st.success("此人員目前沒有未結束作業。")
     else:
-        _spt_perf_t = time.perf_counter()
-        raw_group_df = get_active_group(int(active2["id"]))
-        group_df = raw_group_df.copy().reset_index(drop=True) if _v207_admin_finish_bypass and isinstance(raw_group_df, pd.DataFrame) else _v143_ui_filter_group_for_selected(raw_group_df, emp_id2, _emp2_name)
-        _spt_perf_t = _spt_perf_tick(
-            "01_finish_panel_group_query_and_filter",
-            _spt_perf_t,
-            threshold_ms=500.0,
-            detail={"active_id": active2.get("id"), "group_rows": len(group_df) if isinstance(group_df, pd.DataFrame) else 0},
-        )
-        _v208_force_single_finish = False
-        if group_df.empty and active2 and _v143_ui_row_matches_selected(active2, emp_id2, _emp2_name):
-            # Same selected employee, but group rows contain stale identity fields.
-            # Show the active row instead of blocking the same account.
-            group_df = pd.DataFrame([active2])
-            _v208_force_single_finish = True
-        if group_df.empty:
-            st.error(
-                "目前作業中資料已被擋下：系統讀到的群組資料不屬於目前選擇人員，為避免誤結束他人工時，已停止顯示。請重新整理；若仍出現，請由管理員檢查 01/02 權威檔身份欄位。"
-            )
-        else:
-            st.markdown(
-                f"""
+        # V60: restore Finish/Pause/Off Duty buttons immediately after active work is found.
+        # Do NOT auto-query/render the whole active group here; that query was a page hot path
+        # and also made the action buttons appear to disappear.  The service layer still handles
+        # group finishing/averaging when finish_parallel_group=True.
+        group_df = pd.DataFrame([active2]).reset_index(drop=True)
+        _v208_finish_parallel_group = True
+        st.markdown(
+            f"""
 <div class="spt-card spt-glow">
 <b>目前作業中 / Active Work</b><br>
 選擇人員：{emp_id2} {_emp2_name}<br>
-工段：{active2['process_name']}<br>
-同步計時：{len(group_df)} 筆<br>
-說明：按下暫停、下班或完工時，會同步結束同一人員、同一天、同一工段的所有未結束計時，並平均分配工時。<br>
+工段：{active2.get('process_name', '')}<br>
+同步計時：已找到目前作業<br>
+說明：按下暫停、下班或完工時，會由系統在 service 層同步結束同一人員、同一天、同一工段的未結束計時，並平均分配工時。<br>
 </div>
 """,
-                unsafe_allow_html=True,
-            )
-            render_table(group_df, "active_parallel_group", editable=False, height=230)
-        _v208_finish_parallel_group = (not _v208_force_single_finish)
-        end_remark = st.text_input("結束備註｜Finish Remark", key="end_remark", disabled=group_df.empty)
+            unsafe_allow_html=True,
+        )
+
+        end_remark = st.text_input("結束備註｜Finish Remark", key="end_remark", disabled=False)
         c1, c2, c3 = st.columns(3)
-        if c1.button("⏸ 暫停 / Pause", use_container_width=True, disabled=group_df.empty):
+        if c1.button("⏸ 暫停 / Pause", use_container_width=True, key=f"v60_finish_pause_{active2.get('id')}"):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
-                _spt_button_t = time.perf_counter()
-                n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=_v208_finish_parallel_group)
-                _v259_clear_display_cache()
-                st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
-                _spt_perf_tick("01_button_finish_pause_action", _spt_button_t, threshold_ms=200.0, detail={"active_id": active2.get("id"), "rows": n})
-                trigger_post_record_continue_prompt(f"已同步暫停 {n} 筆並平均計算工時。", title="工時已暫停")
-                st.rerun()
-        if c2.button("⟡ 完工 / Complete", use_container_width=True):
+                try:
+                    _spt_button_t = time.perf_counter()
+                    n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=_v208_finish_parallel_group)
+                    _v259_clear_display_cache()
+                    st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
+                    _spt_perf_tick("01_button_finish_pause_action", _spt_button_t, threshold_ms=3000.0, detail={"active_id": active2.get("id"), "rows": n})
+                    trigger_post_record_continue_prompt(f"已同步暫停 {n} 筆並平均計算工時。", title="工時已暫停")
+                    st.success(f"已同步暫停 {n} 筆。請重新查詢目前作業或重新整理今日明細。")
+                    st.stop()
+                except Exception as exc:
+                    st.error(str(exc))
+        if c2.button("⟡ 完工 / Complete", use_container_width=True, key=f"v60_finish_complete_{active2.get('id')}"):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
-                _spt_button_t = time.perf_counter()
-                n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=_v208_finish_parallel_group)
-                _v259_clear_display_cache()
-                st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
-                _spt_perf_tick("01_button_finish_complete_action", _spt_button_t, threshold_ms=200.0, detail={"active_id": active2.get("id"), "rows": n})
-                trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。", title="工時已完工")
-                st.rerun()
-        if c3.button("◐ 下班 / Off Duty", use_container_width=True, disabled=group_df.empty):
+                try:
+                    _spt_button_t = time.perf_counter()
+                    n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=_v208_finish_parallel_group)
+                    _v259_clear_display_cache()
+                    st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
+                    _spt_perf_tick("01_button_finish_complete_action", _spt_button_t, threshold_ms=3000.0, detail={"active_id": active2.get("id"), "rows": n})
+                    trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。", title="工時已完工")
+                    st.success(f"已同步完工 {n} 筆。請重新查詢目前作業或重新整理今日明細。")
+                    st.stop()
+                except Exception as exc:
+                    st.error(str(exc))
+        if c3.button("◐ 下班 / Off Duty", use_container_width=True, key=f"v60_finish_off_duty_{active2.get('id')}"):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
-                _spt_button_t = time.perf_counter()
-                n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=_v208_finish_parallel_group)
-                _v259_clear_display_cache()
-                st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
-                _spt_perf_tick("01_button_finish_off_duty_action", _spt_button_t, threshold_ms=200.0, detail={"active_id": active2.get("id"), "rows": n})
-                trigger_post_record_continue_prompt(f"已同步下班 {n} 筆並平均計算工時。", title="工時已結束")
-                st.rerun()
+                try:
+                    _spt_button_t = time.perf_counter()
+                    n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=_v208_finish_parallel_group)
+                    _v259_clear_display_cache()
+                    st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
+                    _spt_perf_tick("01_button_finish_off_duty_action", _spt_button_t, threshold_ms=3000.0, detail={"active_id": active2.get("id"), "rows": n})
+                    trigger_post_record_continue_prompt(f"已同步下班 {n} 筆並平均計算工時。", title="工時已結束")
+                    st.success(f"已同步下班 {n} 筆。請重新查詢目前作業或重新整理今日明細。")
+                    st.stop()
+                except Exception as exc:
+                    st.error(str(exc))
+
+        with st.expander("同步群組預覽 / Group Preview（手動載入，不影響結束按鈕）", expanded=False):
+            if st.button("載入同步群組預覽", use_container_width=True, key=f"v60_load_group_preview_{active2.get('id')}"):
+                try:
+                    _spt_perf_t = time.perf_counter()
+                    raw_group_df = get_active_group(int(active2["id"]))
+                    group_preview_df = raw_group_df.copy().reset_index(drop=True) if isinstance(raw_group_df, pd.DataFrame) else pd.DataFrame()
+                    _spt_perf_tick(
+                        "01_finish_panel_group_preview_query",
+                        _spt_perf_t,
+                        threshold_ms=3000.0,
+                        detail={"active_id": active2.get("id"), "group_rows": len(group_preview_df)},
+                    )
+                    if group_preview_df.empty:
+                        st.info("目前沒有可顯示的同步群組明細；結束按鈕仍會以目前作業為主進行處理。")
+                    else:
+                        render_table(group_preview_df, "active_parallel_group_preview_v60", editable=False, height=230)
+                except Exception as exc:
+                    st.warning(f"同步群組預覽載入失敗，仍可直接按暫停 / 完工 / 下班：{exc}")
 
     st.markdown("#### 今日已結束紀錄 / Today Finished Records")
     _finished_key, _finished_ts_key = _v259_finish_key(emp_id2, _emp2_name)

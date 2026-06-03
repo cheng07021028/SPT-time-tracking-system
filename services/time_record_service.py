@@ -31776,3 +31776,183 @@ def delete_time_records_from_02_history_editor(editor_df: _v59_pd.DataFrame, rec
 def audit_v59_time_record_hotpath() -> dict:
     return {"version":"V59_PAGE_HOTPATH_FINAL_OVERRIDES","active_queries_direct_sql":True,"delete_direct_soft_delete":True,"finish_direct_short_update":True,"no_legacy_reconcile_in_page_hotpath":True}
 # =================== END V59 PAGE HOTPATH FINAL OVERRIDES =====================
+
+# =================== V61 01 TODAY DETAIL FAST WINDOW OVERRIDE =====================
+# Purpose:
+# - 01 page "Refresh today details" must not scan the full time_records table.
+# - Avoid statement timeout on Neon Free by reading only the recent id window first.
+# - Keep Neon/PostgreSQL as source of truth, but make page refresh non-blocking.
+try:
+    import pandas as _v61_pd
+except Exception:  # pragma: no cover
+    _v61_pd = pd
+
+
+def _v61_text(value) -> str:
+    if value is None:
+        return ""
+    try:
+        if _v61_pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    return str(value).strip()
+
+
+def _v61_today() -> str:
+    try:
+        return str(today_text())
+    except Exception:
+        try:
+            return datetime.now().strftime("%Y-%m-%d")
+        except Exception:
+            return ""
+
+
+def _v61_safe_df(sql: str, params: tuple = ()) -> _v61_pd.DataFrame:
+    try:
+        df = query_df(sql, params)
+        if isinstance(df, _v61_pd.DataFrame):
+            return df.where(_v61_pd.notna(df), "").reset_index(drop=True)
+    except Exception:
+        return _v61_pd.DataFrame()
+    return _v61_pd.DataFrame()
+
+
+def _v61_safe_one(sql: str, params: tuple = ()) -> dict | None:
+    try:
+        row = query_one(sql, params)
+        return dict(row) if isinstance(row, dict) else None
+    except Exception:
+        return None
+
+
+def _v61_max_id() -> int:
+    row = _v61_safe_one("SELECT MAX(id) AS max_id FROM time_records", ())
+    try:
+        return int(float(str((row or {}).get("max_id") or 0)))
+    except Exception:
+        return 0
+
+
+def _v61_recent_floor(window: int = 8000) -> int:
+    mx = _v61_max_id()
+    if mx <= 0:
+        return 0
+    return max(0, mx - int(window))
+
+
+def _v61_cols() -> str:
+    return (
+        "id, record_id, record_key, operation_id, status, work_order, work_order_no, "
+        "part_no, type_name, process_code, process_name, employee_id, employee_name, "
+        "start_action, start_timestamp, end_action, end_timestamp, remark, start_date, start_time, "
+        "end_date, end_time, work_hours, work_minutes, raw_minutes, average_minutes, "
+        "assembly_location, group_key, is_group_work, source, created_at, updated_at, updated_by, "
+        "deleted_at, deleted_by, delete_reason, version"
+    )
+
+
+def _v61_not_deleted() -> str:
+    return "(deleted_at IS NULL OR deleted_at='')"
+
+
+def _v61_active_predicate() -> str:
+    ended = "('下班','暫停','完工','已結束','結束','Off Duty','Pause','Complete','Finished')"
+    return f"{_v61_not_deleted()} AND (end_timestamp IS NULL OR end_timestamp='') AND COALESCE(status,'') NOT IN {ended}"
+
+
+def get_active_records(employee_id: str | None = None, process_name: str | None = None, start_date: str | None = None, employee_name: str | None = None, work_order: str | None = None, **kwargs) -> _v61_pd.DataFrame:  # type: ignore[override]
+    """V61: fast active records query scoped to recent ids to prevent page spinner timeout."""
+    floor = _v61_recent_floor(20000)
+    sql = f"SELECT {_v61_cols()} FROM time_records WHERE id>? AND {_v61_active_predicate()}"
+    params: list = [floor]
+    if employee_id:
+        sql += " AND employee_id=?"
+        params.append(_v61_text(employee_id))
+    if employee_name:
+        sql += " AND COALESCE(employee_name,'')=?"
+        params.append(_v61_text(employee_name))
+    if process_name:
+        sql += " AND process_name=?"
+        params.append(_v61_text(process_name))
+    if start_date:
+        sql += " AND start_date=?"
+        params.append(_v61_text(start_date))
+    if work_order:
+        sql += " AND (work_order=? OR work_order_no=?)"
+        params.extend([_v61_text(work_order), _v61_text(work_order)])
+    sql += " ORDER BY id DESC LIMIT 50"
+    return _v61_safe_df(sql, tuple(params))
+
+
+def get_active_record(employee_id: str, employee_name: str | None = None) -> dict | None:  # type: ignore[override]
+    df = get_active_records(employee_id=employee_id, employee_name=employee_name)
+    if df is None or getattr(df, "empty", True):
+        return None
+    try:
+        return dict(df.iloc[0])
+    except Exception:
+        return None
+
+
+def today_records(include_finished: bool = True, unfinished_only: bool = False) -> _v61_pd.DataFrame:  # type: ignore[override]
+    """V61: 01 Today Records fast refresh.
+
+    Instead of scanning all time_records by date, query a recent id window first.
+    This protects the UI from Neon statement_timeout while keeping the page usable.
+    """
+    today = _v61_today()
+    floor = _v61_recent_floor(30000)
+    if unfinished_only:
+        sql = f"SELECT {_v61_cols()} FROM time_records WHERE id>? AND {_v61_active_predicate()} ORDER BY id DESC LIMIT 300"
+        return _v61_safe_df(sql, (floor,))
+    if include_finished:
+        sql = (
+            f"SELECT {_v61_cols()} FROM time_records "
+            f"WHERE id>? AND {_v61_not_deleted()} "
+            "AND (start_date=? OR substr(COALESCE(start_timestamp,''),1,10)=?) "
+            "ORDER BY id DESC LIMIT 300"
+        )
+        return _v61_safe_df(sql, (floor, today, today))
+    sql = (
+        f"SELECT {_v61_cols()} FROM time_records "
+        f"WHERE id>? AND {_v61_active_predicate()} "
+        "AND (start_date=? OR substr(COALESCE(start_timestamp,''),1,10)=?) "
+        "ORDER BY id DESC LIMIT 300"
+    )
+    return _v61_safe_df(sql, (floor, today, today))
+
+
+def get_active_group(record_id: int) -> _v61_pd.DataFrame:  # type: ignore[override]
+    rec = _v61_safe_one(f"SELECT {_v61_cols()} FROM time_records WHERE id=? LIMIT 1", (int(record_id),))
+    if not rec:
+        return _v61_pd.DataFrame()
+    emp = _v61_text(rec.get("employee_id")); name = _v61_text(rec.get("employee_name")); proc = _v61_text(rec.get("process_name")); sdate = _v61_text(rec.get("start_date"))
+    floor = _v61_recent_floor(30000)
+    sql = f"SELECT {_v61_cols()} FROM time_records WHERE id>? AND {_v61_active_predicate()}"
+    params: list = [floor]
+    if emp:
+        sql += " AND employee_id=?"; params.append(emp)
+    if name:
+        sql += " AND COALESCE(employee_name,'')=?"; params.append(name)
+    if proc:
+        sql += " AND process_name=?"; params.append(proc)
+    if sdate:
+        sql += " AND start_date=?"; params.append(sdate)
+    sql += " ORDER BY id ASC LIMIT 50"
+    df = _v61_safe_df(sql, tuple(params))
+    if df.empty:
+        return _v61_pd.DataFrame([rec])
+    return df
+
+
+def audit_v61_01_fast_refresh() -> dict:
+    return {
+        "version": "V61_01_FAST_REFRESH_RECENT_ID_WINDOW",
+        "today_records_recent_id_window": True,
+        "active_query_recent_id_window": True,
+        "query_failure_returns_empty_df": True,
+        "neon_source_of_truth": True,
+    }
+# ================= END V61 01 TODAY DETAIL FAST WINDOW OVERRIDE ===================
