@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""V64 consolidated master data service.
+"""V65 consolidated master data service.
 
 Runtime master data reads/writes use crud_table_service/db_service. Local JSON
 or GitHub authority is not touched on page hot paths.
@@ -11,6 +11,10 @@ V64 fix:
   TypeError.
 - Cache is keyed by filter options so one page cannot receive another page's
   filtered result by accident.
+
+V65 fix:
+- `has_master_data_for_time_record_fast(employees, work_orders)` now supports
+  the page 01 tuple-unpack call without raising TypeError.
 """
 from __future__ import annotations
 
@@ -132,8 +136,40 @@ def load_employees_for_time_record_fast(
     return df.reset_index(drop=True)
 
 
-def has_master_data_for_time_record_fast() -> bool:
-    return not load_employees_for_time_record_fast().empty and not load_work_orders_for_time_record_fast().empty
+def _has_rows(value: Any) -> bool:
+    """Return whether a provided master-data object has at least one row."""
+    if isinstance(value, pd.DataFrame):
+        return not value.empty
+    if value is None:
+        return False
+    try:
+        return len(value) > 0  # type: ignore[arg-type]
+    except Exception:
+        return False
+
+
+def has_master_data_for_time_record_fast(
+    employees: Any | None = None,
+    work_orders: Any | None = None,
+    **_: Any,
+) -> bool | tuple[bool, bool]:
+    """Check whether time-record master data exists.
+
+    Backward compatibility:
+    - Older code called this with no arguments and expected one boolean.
+    - Page 01 calls `has_master_data_for_time_record_fast(employees, work_orders)`
+      and unpacks `(has_employees_master, has_work_orders_master)`.
+
+    When dataframes are supplied, use them directly to avoid an extra Neon query
+    during page render. When no dataframes are supplied, load the fast cached
+    data and return the historical single boolean.
+    """
+    if employees is not None or work_orders is not None:
+        return (_has_rows(employees), _has_rows(work_orders))
+
+    has_employees = _has_rows(load_employees_for_time_record_fast())
+    has_work_orders = _has_rows(load_work_orders_for_time_record_fast())
+    return has_employees and has_work_orders
 
 
 def save_work_orders_df(df: pd.DataFrame) -> dict[str, Any]:
@@ -164,11 +200,12 @@ def upsert_employee(row: dict[str, Any]) -> dict[str, Any]:
 
 def audit_v64_master_data_runtime_consolidated() -> dict[str, Any]:
     return {
-        "version": "V64_MASTER_DATA_SIGNATURE_COMPAT",
+        "version": "V65_MASTER_DATA_SIGNATURE_COMPAT",
         "local_json_hot_path": False,
         "github_hot_path": False,
         "cache_ttl_seconds": _CACHE_TTL,
         "backward_compatible_filters": True,
+        "backward_compatible_master_check_args": True,
     }
 
 
