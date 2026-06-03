@@ -15,21 +15,14 @@ from services.performance_profiler_service import read_events
 
 
 def _is_system_admin() -> bool:
-    """Allow diagnostics only for authoritative system admins.
+    """Hot-path safe admin check.
 
-    This page contains performance traces and SQL error summaries, so it must be
-    stricter than normal module permissions. It intentionally mirrors the hard
-    admin concept used by 10. 權限管理.
+    Do not call authority-role helpers that query Neon while merely rendering 99.
+    The user is already authenticated; session role is enough for this page gate.
     """
-    try:
-        from services.security_service import _v142_is_permission_management_admin  # type: ignore
-        if bool(_v142_is_permission_management_admin()):
-            return True
-    except Exception:
-        pass
     user = get_current_user() or {}
-    username = str(user.get("username") or user.get("帳號") or "").strip().lower()
-    roles = [str(x).strip().lower() for x in (user.get("roles", []) or [])]
+    username = str(user.get("username") or user.get("帳號") or st.session_state.get("auth_username", "") or "").strip().lower()
+    roles = [str(x).strip().lower() for x in (user.get("roles", []) or st.session_state.get("auth_roles", []) or [])]
     role = str(user.get("role") or user.get("role_code") or "").strip().lower()
     return bool(username == "admin" or role == "admin" or "admin" in roles)
 

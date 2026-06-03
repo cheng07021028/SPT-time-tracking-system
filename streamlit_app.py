@@ -25,20 +25,10 @@ st.set_page_config(
 
 apply_theme()
 
-# V260602: keep original UI, but bootstrap the Neon/PostgreSQL legacy-compatible
-# schema before login so default/admin and migrated accounts can be used. This is
-# additive only; it does not drop or rewrite data.
-try:
-    from services.db_service import ensure_database
-    ensure_database()
-except Exception as exc:
-    st.warning(f"資料庫初始化尚未完成：{exc}")
-try:
-    from services.security_service import ensure_security_schema
-    ensure_security_schema()
-except Exception:
-    # Login still renders; detailed errors remain in Streamlit logs.
-    pass
+# V62: Do not run schema/bootstrap migrations from the Streamlit hot path.
+# Existing Neon/PostgreSQL tables are the authority.  Full schema maintenance must be
+# executed from an explicit maintenance action, not every page/home/login render.
+# This prevents 01/02/99 from spending tens of seconds on CREATE/ALTER/seed SQL.
 
 require_login("home")
 # V256: keep home/login hot path clean. PostgreSQL authority bootstrap is not
