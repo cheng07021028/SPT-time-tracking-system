@@ -580,171 +580,60 @@ WORK_ORDER_CANONICAL_COLS = ["id", "work_order", "part_no", "type_name", "assemb
 
 
 def _v136_load_work_orders_from_sqlite_direct() -> pd.DataFrame:
-    """Read current SQLite work_orders table directly for immediate 03 display repair.
+    """V63: Neon/runtime-authority compatibility wrapper.
 
-    03｜製令管理的頁面讀取是 canonical-first；但 OneDrive mapped sync 舊流程
-    曾經只寫 SQLite，造成畫面顯示「實際新增 567」但製令清單編輯仍空白。
-    此函式只讀取剛寫入的 SQLite 現況，用於同步 canonical 與刷新畫面暫存。
+    The previous implementation read local SQLite directly. In the Neon
+    consolidated runtime this must read the official DB service instead.
     """
-    ensure_tables()
-    conn = get_conn()
-    try:
-        df = pd.read_sql_query(
-            """
-            SELECT id, work_order, part_no, type_name, assembly_location, customer, note,
-                   is_active, created_at, updated_at
-            FROM work_orders
-            ORDER BY work_order
-            """,
-            conn,
-        )
-    finally:
-        conn.close()
-    for c in WORK_ORDER_CANONICAL_COLS:
-        if c not in df.columns:
-            df[c] = ""
-    if "is_active" in df.columns:
-        df["is_active"] = df["is_active"].map(_is_truthy)
-    return df[WORK_ORDER_CANONICAL_COLS].reset_index(drop=True)
+    return ensure_cols(load_work_orders()).drop(columns=["_delete"], errors="ignore")
 
 
 def _v136_sync_work_order_authority_from_sqlite(reason: str = "v136_work_order_sync") -> dict:
-    """Persist SQLite work_orders into the official 03 canonical authority file.
+    """V63: no local/GitHub authority sync on page hot path.
 
-    This is the missing bridge that caused OneDrive sync results to disappear from
-    「製令清單編輯」: the apply button inserted rows into SQLite, while the editor
-    reloaded from data/permanent_store/modules/03_work_orders/records.json.
+    Neon/PostgreSQL is already the runtime authority; page 09/14 can create
+    backup snapshots manually.
     """
-    df = _v136_load_work_orders_from_sqlite_direct()
-    rows = []
-    try:
-        from services.permanent_authority_service import save_authority, table_from_df
-        rows = table_from_df(df)
-        save_authority("03_work_orders", records={"work_orders": rows}, reason=reason, github=True)
-        return {"ok": True, "rows": len(rows), "error": ""}
-    except Exception as exc:
-        # Local SQLite has already been updated; return the error so the page can warn
-        # the user instead of silently showing an empty canonical table again.
-        try:
-            from services.log_service import write_log
-            write_log("V136_WORK_ORDER_AUTH_SYNC_ERROR", f"03 製令權威檔同步失敗：{exc}", "work_orders", level="ERROR")
-        except Exception:
-            pass
-        return {"ok": False, "rows": len(rows) if rows else len(df), "error": str(exc)[:500]}
+    df = load_work_orders()
+    return {"ok": True, "rows": len(df), "error": "", "backend": "neon_runtime"}
 
 
 def _apply_work_order_sync_direct(add_df: pd.DataFrame, upd_df: pd.DataFrame, del_df: pd.DataFrame, do_delete: bool) -> dict:
-    """Apply OneDrive mapped sync and then write the official 03 authority file.
+    """V63: apply mapped sync through save_work_orders, not local SQLite.
 
-    V136 fix:
-    - Keep the proven direct SQLite insert/update/delete path for concrete counts.
-    - Immediately mirror the final SQLite table into 03_work_orders canonical records.
-    - Refresh the editor from that same final table, so 「實際新增 567」 will appear
-      in 「製令清單編輯」 after rerun instead of showing an empty table.
+    This preserves the page UI and result counters while preventing SQLite/local
+    authority from becoming a second source of truth.
     """
-    ensure_tables()
-    conn = get_conn()
-    cur = conn.cursor()
-    now = now_text()
-    inserted = updated = deleted = skipped = 0
-    inserted_keys: list[str] = []
-    updated_keys: list[str] = []
-    deleted_keys: list[str] = []
-
-    def _row_payload(r) -> tuple[str, str, str, str, str, str, int]:
-        wo = _normalize_text(r.get("work_order"))
-        return (
-            wo,
-            _normalize_text(r.get("part_no")),
-            _normalize_text(r.get("type_name")),
-            _normalize_text(r.get("assembly_location")),
-            _normalize_text(r.get("customer")),
-            _normalize_text(r.get("note")),
-            1 if _is_truthy(r.get("is_active", True)) else 0,
-        )
-
-    try:
-        if add_df is not None and not add_df.empty:
-            for _, r in add_df.drop_duplicates(subset=["work_order"], keep="last").iterrows():
-                wo, part_no, type_name, assembly_location, customer, note, is_active = _row_payload(r)
-                if not wo:
-                    skipped += 1
-                    continue
-                cur.execute(
-                    """
-                    INSERT INTO work_orders
-                    (work_order, part_no, type_name, assembly_location, customer, note, is_active, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(work_order) DO UPDATE SET
-                        part_no=excluded.part_no,
-                        type_name=excluded.type_name,
-                        assembly_location=excluded.assembly_location,
-                        customer=excluded.customer,
-                        note=excluded.note,
-                        is_active=excluded.is_active,
-                        updated_at=excluded.updated_at
-                    """,
-                    (wo, part_no, type_name, assembly_location, customer, note, is_active, now, now),
-                )
-                inserted += 1
-                inserted_keys.append(wo)
-
-        if upd_df is not None and not upd_df.empty:
-            for _, r in upd_df.drop_duplicates(subset=["work_order"], keep="last").iterrows():
-                wo, part_no, type_name, assembly_location, customer, note, is_active = _row_payload(r)
-                if not wo:
-                    skipped += 1
-                    continue
-                cur.execute(
-                    """
-                    UPDATE work_orders
-                    SET part_no=?, type_name=?, assembly_location=?, customer=?, note=?, is_active=?, updated_at=?
-                    WHERE work_order=?
-                    """,
-                    (part_no, type_name, assembly_location, customer, note, is_active, now, wo),
-                )
-                if cur.rowcount:
-                    updated += cur.rowcount
-                    updated_keys.append(wo)
-                else:
-                    cur.execute(
-                        """
-                        INSERT INTO work_orders
-                        (work_order, part_no, type_name, assembly_location, customer, note, is_active, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (wo, part_no, type_name, assembly_location, customer, note, is_active, now, now),
-                    )
-                    inserted += 1
-                    inserted_keys.append(wo)
-
-        if do_delete and del_df is not None and not del_df.empty:
-            for wo in del_df.get("work_order", pd.Series(dtype=str)).map(_normalize_text).drop_duplicates().tolist():
-                if not wo:
-                    skipped += 1
-                    continue
-                cur.execute("DELETE FROM work_orders WHERE work_order=?", (wo,))
-                if cur.rowcount:
-                    deleted += cur.rowcount
-                    deleted_keys.append(wo)
-
-        conn.commit()
-    finally:
-        conn.close()
-
-    authority = _v136_sync_work_order_authority_from_sqlite("onedrive_mapped_sync_v136")
+    parts = []
+    if add_df is not None and not add_df.empty:
+        a = ensure_cols(add_df.copy())
+        a["_delete"] = False
+        parts.append(a)
+    if upd_df is not None and not upd_df.empty:
+        u = ensure_cols(upd_df.copy())
+        u["_delete"] = False
+        parts.append(u)
+    if do_delete and del_df is not None and not del_df.empty:
+        d = ensure_cols(del_df.copy())
+        d["_delete"] = True
+        parts.append(d)
+    if not parts:
+        return {"inserted": 0, "updated": 0, "deleted": 0, "skipped": 0, "inserted_keys": [], "updated_keys": [], "deleted_keys": [], "authority_ok": True, "authority_rows": len(load_work_orders()), "authority_error": ""}
+    merged = pd.concat(parts, ignore_index=True)
+    result = save_work_orders(merged)
     return {
-        "inserted": inserted,
-        "updated": updated,
-        "deleted": deleted,
-        "skipped": skipped,
-        "inserted_keys": inserted_keys,
-        "updated_keys": updated_keys,
-        "deleted_keys": deleted_keys,
-        "authority_ok": authority.get("ok", False),
-        "authority_rows": authority.get("rows", 0),
-        "authority_error": authority.get("error", ""),
+        "inserted": int(result.get("inserted", 0)),
+        "updated": int(result.get("updated", 0)),
+        "deleted": int(result.get("deleted", 0)),
+        "skipped": int(result.get("skipped", 0)),
+        "inserted_keys": add_df.get("work_order", pd.Series(dtype=str)).dropna().astype(str).head(30).tolist() if add_df is not None and not add_df.empty else [],
+        "updated_keys": upd_df.get("work_order", pd.Series(dtype=str)).dropna().astype(str).head(30).tolist() if upd_df is not None and not upd_df.empty else [],
+        "deleted_keys": del_df.get("work_order", pd.Series(dtype=str)).dropna().astype(str).head(30).tolist() if do_delete and del_df is not None and not del_df.empty else [],
+        "authority_ok": True,
+        "authority_rows": len(load_work_orders()),
+        "authority_error": "",
     }
+
 
 if STATE_KEY not in st.session_state:
     reload_data()
@@ -847,7 +736,7 @@ with tab1:
         delete_mask = current_df["_delete"].map(_to_bool_value).fillna(False).astype(bool)
         deleted_count = int(delete_mask.sum())
         save_df = current_df.loc[~delete_mask].drop(columns=["_delete"], errors="ignore").copy()
-        result = save_work_orders(save_df)
+        result = save_work_orders(current_df)
         reload_data()
         _refresh_editor_widget()
         st.session_state["v253_work_order_edit_enabled"] = False

@@ -463,7 +463,7 @@ with tab1:
         delete_mask = current_df["_delete"].map(_to_bool_value).fillna(False).astype(bool)
         deleted_count = int(delete_mask.sum())
         save_df = current_df.loc[~delete_mask].drop(columns=["_delete"], errors="ignore").copy()
-        result = save_employees(save_df)
+        result = save_employees(current_df)
         reload_data()
         _refresh_editor_widget()
         st.session_state["v253_employee_edit_enabled"] = False
