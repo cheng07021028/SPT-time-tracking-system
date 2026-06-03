@@ -927,38 +927,78 @@ def _v72_store_start_confirmation(employee: dict, work_order: dict, process: str
 
 
 def _v72_render_start_confirmation() -> bool:
-    pending = st.session_state.get(V72_START_CONFIRM_KEY)
-    if not isinstance(pending, dict):
-        return False
-    emp = pending.get("employee") or {}
-    wo = pending.get("work_order") or {}
-    emp_text = f"{emp.get('employee_id','')} {emp.get('employee_name','')}".strip()
-    wo_text = str(wo.get("work_order") or wo.get("work_order_no") or "").strip()
-    st.info(f"請確認是否繼續記錄這筆作業：{emp_text}｜製令 {wo_text}｜工段 {pending.get('process','')}。")
-    c_yes, c_no, c_cancel = st.columns(3)
-    if c_yes.button("是，開始記錄", use_container_width=True, key="v72_confirm_start_yes"):
+    """Deprecated by V74.
+
+    Start Work now writes the record immediately, then shows the existing modal via
+    trigger_post_record_continue_prompt().  Clear any stale V72 pre-start pending state
+    so the old duplicated confirmation block cannot return after deploy.
+    """
+    try:
+        st.session_state.pop(V72_START_CONFIRM_KEY, None)
+    except Exception:
+        pass
+    return False
+
+def _v74_render_start_status(active_df: pd.DataFrame) -> bool:
+    """Render one compact status block for Start Work; active table is shown only on the right panel."""
+    has_active = isinstance(active_df, pd.DataFrame) and not active_df.empty
+    if has_active:
+        st.warning("此人員已有開始中的作業，請先到右側開始中作業表格選取該筆，按『暫停 / 完工 / 下班』結束後，才可開始新作業。")
+    else:
+        st.success("此人員目前沒有開始中的作業，可以開始新作業。")
+    return has_active
+
+
+def _v74_select_active_record(active_df: pd.DataFrame, employee_id: str, employee_name: str) -> dict | None:
+    """Render active-work table and return the row selected by the operator.
+
+    New Streamlit supports row selection; older runtimes fall back to first row while still
+    preserving the unified active-work table and synchronous finish rules.
+    """
+    if active_df is None or not isinstance(active_df, pd.DataFrame) or active_df.empty:
+        return None
+    display_df = _v72_active_display_df(active_df)
+    selected_idx = 0
+    selection_key = f"v74_active_work_select_{_v72_safe_key(employee_id, employee_name, len(active_df))}"
+    try:
+        event = st.dataframe(
+            display_df,
+            use_container_width=True,
+            hide_index=True,
+            height=250,
+            key=selection_key,
+            on_select="rerun",
+            selection_mode="single-row",
+        )
+        rows = []
         try:
-            _spt_button_t = time.perf_counter()
-            rid = start_work(pending.get("employee") or {}, pending.get("work_order") or {}, pending.get("process") or "", pending.get("remark") or "", auto_pause_old=False)
-            st.session_state.pop(V72_START_CONFIRM_KEY, None)
-            _v72_clear_active_cache()
-            _v259_clear_display_cache()
-            _spt_perf_tick("01_button_start_work_confirmed_action", _spt_button_t, threshold_ms=3000.0, detail={"record_id": rid})
-            st.success(f"已開始作業，紀錄編號：{rid}。")
-            st.rerun()
-        except Exception as exc:
-            st.error(str(exc))
-        return True
-    if c_no.button("否，登出帳號", use_container_width=True, key="v72_confirm_start_no_logout"):
-        st.session_state.pop(V72_START_CONFIRM_KEY, None)
-        logout("開始作業前選擇不繼續記錄，自動登出")
-        st.rerun()
-        return True
-    if c_cancel.button("取消，留在本頁", use_container_width=True, key="v72_confirm_start_cancel"):
-        st.session_state.pop(V72_START_CONFIRM_KEY, None)
-        st.rerun()
-        return True
-    return True
+            rows = list(getattr(getattr(event, "selection", None), "rows", []) or [])
+        except Exception:
+            try:
+                rows = list((event or {}).get("selection", {}).get("rows", []) or [])
+            except Exception:
+                rows = []
+        if rows:
+            selected_idx = int(rows[0])
+    except TypeError:
+        render_table(display_df, "v74_active_work_table_fallback", editable=False, height=250)
+        st.caption("目前 Streamlit 版本不支援點選列時，系統預設操作第一筆開始中作業；同步群組仍會一起處理。")
+    except Exception as exc:
+        render_table(display_df, "v74_active_work_table_fallback_error", editable=False, height=250)
+        st.caption(f"表格點選模式暫時無法使用，已改用第一筆作業：{exc}")
+    selected_idx = max(0, min(selected_idx, len(active_df) - 1))
+    try:
+        return active_df.iloc[selected_idx].fillna("").to_dict()
+    except Exception:
+        return None
+
+
+def _v74_trigger_after_start_prompt(record_id) -> None:
+    trigger_post_record_continue_prompt(
+        f"已開始記錄這筆作業，紀錄編號：{record_id}。若要繼續下一筆同步作業或其他查詢，請按『是，繼續記錄』；若沒有要繼續，請按『否，登出帳號』避免其他人員誤用此帳號。",
+        title="開始作業完成",
+    )
+
 # ===== V72 ACTIVE-WORK FRONTEND GUARD END =====
 
 # V13: 01 opens from latest memory files/SQLite without doing heavy master restore inline.
@@ -1073,75 +1113,58 @@ with left:
     remark = st.text_area("備註｜Remark", height=90)
     auto_pause = st.checkbox("防呆模式：前一項作業未停止時禁止開始新作業｜Start disabled until previous work is finished", value=False, disabled=True)
 
-    st.caption("V72：開始前防呆改回前台快取檢查；若此人員已有開始中作業，開始按鈕會灰色停用。工時計算在 Python 前台/service 完成，Neon 只負責最後交易保存。")
-    active_before_start_df, has_active_before_start = _v72_render_active_guard(emp_id, emp_name)
+    active_before_start_df = _v72_load_active_df(emp_id, emp_name)
+    has_active_before_start = _v74_render_start_status(active_before_start_df)
     start_disabled = bool(no_process_options or has_active_before_start)
-    if has_active_before_start:
-        st.caption("開始作業已停用：請先結束上一項作業。右側結束區仍可使用『暫停 / 完工 / 下班』同步結束作業並平均工時。")
-
-    _v72_render_start_confirmation()
 
     if st.button("⏱ 開始作業 / Start", use_container_width=True, disabled=start_disabled):
         if not check_permission("01_time_record", "can_create"):
             st.error("權限不足：你沒有新增工時紀錄權限。")
         elif has_active_before_start:
-            st.warning("此人員已有開始中的作業，請先結束上一筆。")
+            st.warning("此人員已有開始中的作業，請先在右側結束上一筆。")
         else:
-            _v72_store_start_confirmation(employee, work_order, process, remark)
-            st.rerun()
+            try:
+                _spt_button_t = time.perf_counter()
+                rid = start_work(employee, work_order, process, remark, auto_pause_old=False)
+                _v72_clear_active_cache(emp_id, emp_name)
+                _v259_clear_display_cache()
+                _spt_perf_tick("01_button_start_work_action", _spt_button_t, threshold_ms=3000.0, detail={"record_id": rid})
+                _v74_trigger_after_start_prompt(rid)
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
 
 with right:
-    st.subheader("結束目前作業 / Finish Work")
-    emp_label2 = st.selectbox("選擇人員｜Employee", _employee_options_v126, index=_login_employee_index_v126, key=_v127_employee_select_key("end_emp_v127"))
-    emp_id2, _emp2_name, _emp2_row = _v141_selected_employee(emp_label2, employees)
+    st.subheader("開始中的作業 / Active Work")
+    emp_id2, _emp2_name = emp_id, emp_name
+    st.caption(f"目前人員：{emp_id2}｜{_emp2_name}。右側自動顯示開始中作業，不再需要另外按『查詢目前作業』。")
 
-    # V59: 01 page must be fully operable immediately.  Do not query active work
-    # automatically on every rerun/paint.  The operator explicitly presses a
-    # button before Neon is queried for active work.
-    _active_cache_key_v59 = f"v59_01_active_record_{emp_id2}_{_emp2_name}"
-    _active_loaded_key_v59 = f"v59_01_active_loaded_{emp_id2}_{_emp2_name}"
-    ac1, ac2 = st.columns([1.2, 1.8])
-    load_active_v59 = ac1.button("查詢目前作業", use_container_width=True, key=f"v59_query_active_{emp_id2}_{_emp2_name}")
-    clear_active_v59 = ac2.button("清除目前作業顯示", use_container_width=True, key=f"v59_clear_active_{emp_id2}_{_emp2_name}")
-    if clear_active_v59:
-        st.session_state.pop(_active_cache_key_v59, None)
-        st.session_state.pop(_active_loaded_key_v59, None)
-    if load_active_v59:
-        _spt_perf_t = time.perf_counter()
-        try:
-            active2 = get_active_record(emp_id2, employee_name=_emp2_name)
-        except TypeError:
-            active2 = get_active_record(emp_id2)
-        st.session_state[_active_cache_key_v59] = active2
-        st.session_state[_active_loaded_key_v59] = _v259_now_label()
-        _spt_perf_t = _spt_perf_tick("01_finish_panel_active_query", _spt_perf_t, threshold_ms=500.0, detail={"employee_id": emp_id2, "has_active": bool(active2)})
+    active_right_df = active_before_start_df if isinstance(active_before_start_df, pd.DataFrame) else pd.DataFrame()
+    if active_right_df.empty:
+        st.success("此人員目前沒有開始中的作業。")
+        active2 = None
     else:
-        active2 = st.session_state.get(_active_cache_key_v59)
-    if not st.session_state.get(_active_loaded_key_v59):
-        st.caption("為避免進入 01 頁面就一直運轉，右側目前作業已改為手動查詢；需要結束/暫停/完工時請按『查詢目前作業』。")
+        st.warning("此人員已有開始中的作業。請直接選取下表作業，按『暫停 / 完工 / 下班』結束後，才能開始新作業。")
+        active2 = _v74_select_active_record(active_right_df, emp_id2, _emp2_name)
+
     _v207_admin_finish_bypass = _v207_current_user_is_admin()
     if (not _v207_admin_finish_bypass) and active2 and (not _v141_active_matches_employee(active2, emp_id2, _emp2_name) or not _v143_ui_row_matches_selected(active2, emp_id2, _emp2_name)):
         st.error(
             "Active Work 人員不一致，已停止顯示其他人員資料。"
             f"目前選擇：{emp_id2} {_emp2_name}；讀到資料：{_v143_ui_identity_debug_text(active2)}。"
-            "請按重新整理；若仍出現，代表 01/02 權威檔有舊版身份欄位污染，需由管理員執行資料修復。"
+            "請重新整理；若仍出現，代表 01/02 權威資料有舊版身份欄位污染，需由管理員執行資料修復。"
         )
         active2 = None
-    if not active2:
-        st.success("此人員目前沒有未結束作業。")
-    else:
-        # V60: restore Finish/Pause/Off Duty buttons immediately after active work is found.
-        # Do NOT auto-query/render the whole active group here; that query was a page hot path
-        # and also made the action buttons appear to disappear.  The service layer still handles
-        # group finishing/averaging when finish_parallel_group=True.
-        group_df = pd.DataFrame([active2]).reset_index(drop=True)
-        _v208_finish_parallel_group = True
-        st.caption("目前作業中 / Active Work：下表由前台快取顯示；按下暫停、下班或完工時，service 會同步結束同一人員、同日、同工段的未結束計時並平均分配工時。")
-        render_table(_v72_active_display_df(group_df), "active_record_single_v72", editable=False, height=190)
 
+    if active2:
+        try:
+            st.caption(f"已選取紀錄 ID：{active2.get('id', '')}。操作按鈕會同步結束同一人員、同日、同工段的未結束作業並平均工時。")
+        except Exception:
+            pass
         end_remark = st.text_input("結束備註｜Finish Remark", key="end_remark", disabled=False)
+        _v208_finish_parallel_group = True
         c1, c2, c3 = st.columns(3)
-        if c1.button("⏸ 暫停 / Pause", use_container_width=True, key=f"v60_finish_pause_{active2.get('id')}"):
+        if c1.button("⏸ 暫停 / Pause", use_container_width=True, key=f"v74_finish_pause_{active2.get('id')}"):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
@@ -1150,14 +1173,12 @@ with right:
                     n = finish_work(active2["id"], "暫停", end_remark, finish_parallel_group=_v208_finish_parallel_group)
                     _v259_clear_display_cache()
                     _v72_clear_active_cache(emp_id2, _emp2_name)
-                    st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
                     _spt_perf_tick("01_button_finish_pause_action", _spt_button_t, threshold_ms=3000.0, detail={"active_id": active2.get("id"), "rows": n})
                     trigger_post_record_continue_prompt(f"已同步暫停 {n} 筆並平均計算工時。", title="工時已暫停")
-                    st.success(f"已同步暫停 {n} 筆。請重新查詢目前作業或重新整理今日明細。")
-                    st.stop()
+                    st.rerun()
                 except Exception as exc:
                     st.error(str(exc))
-        if c2.button("⟡ 完工 / Complete", use_container_width=True, key=f"v60_finish_complete_{active2.get('id')}"):
+        if c2.button("⟡ 完工 / Complete", use_container_width=True, key=f"v74_finish_complete_{active2.get('id')}"):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
@@ -1166,14 +1187,12 @@ with right:
                     n = finish_work(active2["id"], "完工", end_remark, finish_parallel_group=_v208_finish_parallel_group)
                     _v259_clear_display_cache()
                     _v72_clear_active_cache(emp_id2, _emp2_name)
-                    st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
                     _spt_perf_tick("01_button_finish_complete_action", _spt_button_t, threshold_ms=3000.0, detail={"active_id": active2.get("id"), "rows": n})
                     trigger_post_record_continue_prompt(f"已同步完工 {n} 筆並平均計算工時。", title="工時已完工")
-                    st.success(f"已同步完工 {n} 筆。請重新查詢目前作業或重新整理今日明細。")
-                    st.stop()
+                    st.rerun()
                 except Exception as exc:
                     st.error(str(exc))
-        if c3.button("◐ 下班 / Off Duty", use_container_width=True, key=f"v60_finish_off_duty_{active2.get('id')}"):
+        if c3.button("◐ 下班 / Off Duty", use_container_width=True, key=f"v74_finish_off_duty_{active2.get('id')}"):
             if not check_permission("01_time_record", "can_edit"):
                 st.error("權限不足：你沒有結束 / 編輯工時權限。")
             else:
@@ -1182,16 +1201,14 @@ with right:
                     n = finish_work(active2["id"], "下班", end_remark, finish_parallel_group=_v208_finish_parallel_group)
                     _v259_clear_display_cache()
                     _v72_clear_active_cache(emp_id2, _emp2_name)
-                    st.session_state.pop(_active_cache_key_v59, None); st.session_state.pop(_active_loaded_key_v59, None)
                     _spt_perf_tick("01_button_finish_off_duty_action", _spt_button_t, threshold_ms=3000.0, detail={"active_id": active2.get("id"), "rows": n})
                     trigger_post_record_continue_prompt(f"已同步下班 {n} 筆並平均計算工時。", title="工時已結束")
-                    st.success(f"已同步下班 {n} 筆。請重新查詢目前作業或重新整理今日明細。")
-                    st.stop()
+                    st.rerun()
                 except Exception as exc:
                     st.error(str(exc))
 
-        with st.expander("同步群組預覽 / Group Preview（手動載入，不影響結束按鈕）", expanded=False):
-            if st.button("載入同步群組預覽", use_container_width=True, key=f"v60_load_group_preview_{active2.get('id')}"):
+        with st.expander("同步群組預覽 / Group Preview（手動載入）", expanded=False):
+            if st.button("載入同步群組預覽", use_container_width=True, key=f"v74_load_group_preview_{active2.get('id')}"):
                 try:
                     _spt_perf_t = time.perf_counter()
                     raw_group_df = get_active_group(int(active2["id"]))
@@ -1205,7 +1222,7 @@ with right:
                     if group_preview_df.empty:
                         st.info("目前沒有可顯示的同步群組明細；結束按鈕仍會以目前作業為主進行處理。")
                     else:
-                        render_table(group_preview_df, "active_parallel_group_preview_v60", editable=False, height=230)
+                        render_table(group_preview_df, "active_parallel_group_preview_v74", editable=False, height=230)
                 except Exception as exc:
                     st.warning(f"同步群組預覽載入失敗，仍可直接按暫停 / 完工 / 下班：{exc}")
 
