@@ -423,45 +423,57 @@ with tab1:
 
     st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。工號 / Employee ID、姓名 / Name 為必填。")
     e1, e2 = st.columns(2)
-    e1.download_button("⟰ 下載目前人員名單 / Export Employees", data=_excel_bytes({"employees": load_employees()}), file_name="SPT_人員名單.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+    if e1.button("⟰ 準備目前人員名單下載 / Prepare Export", use_container_width=True, key="v68_prepare_employee_export"):
+        export_df = _current_internal_df().drop(columns=["_delete"], errors="ignore")
+        st.session_state["v68_employee_export_bytes"] = _excel_bytes({"employees": export_df})
+        st.session_state["v68_employee_export_rows"] = len(export_df)
+    if "v68_employee_export_bytes" in st.session_state:
+        e1.download_button("下載目前人員名單 / Download Employees", data=st.session_state["v68_employee_export_bytes"], file_name="SPT_人員名單.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="v68_download_employee_export")
+        e1.caption(f"已準備 {st.session_state.get('v68_employee_export_rows', 0)} 筆。")
     tpl = pd.DataFrame(columns=["工號", "姓名", "單位", "職稱", "啟用", "在廠", "今日出勤", "備註"])
     e2.download_button("⟰ 下載人員匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_人員匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-    st.info("V64：批次按鈕已改為重新指定整份暫存表；刪除 / 啟用 / 在廠 / 今日出勤全選與取消會立即刷新 checkbox，不再被舊 data_editor 草稿蓋回。")
-    _commit_current_editor_widget_state()
-    st.session_state[STATE_KEY] = _current_internal_df()
+    st.info("V68：唯讀模式改用輕量表格顯示；按『啟動編輯』後才載入可編輯 data_editor，避免每次選擇都重繪大型編輯器。")
+    if employee_edit_enabled:
+        _commit_current_editor_widget_state()
+        st.session_state[STATE_KEY] = _current_internal_df()
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
-    # V120：穩定編輯模式。把 data_editor 與儲存按鈕放在同一個 form，
-    # 避免每修改一格就 rerun 跳回頁面上方；批次按鈕與原儲存邏輯不變。
-    with st.form("v120_employee_stable_editor_form", clear_on_submit=False):
-        edited = st.data_editor(
-            editor_df,
-            hide_index=True,
-            use_container_width=True,
-            num_rows="dynamic",
-            height=560,
-            column_order=EDITOR_COLS,
-            column_config={
-                DISPLAY_COLUMNS["_delete"]: st.column_config.CheckboxColumn("刪除 / Delete", width="medium"),
-                DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
-                DISPLAY_COLUMNS["employee_id"]: st.column_config.TextColumn("工號 / Employee ID", required=True, width="medium"),
-                DISPLAY_COLUMNS["employee_name"]: st.column_config.TextColumn("姓名 / Name", required=True, width="medium"),
-                DISPLAY_COLUMNS["department"]: st.column_config.TextColumn("單位 / Department", width="medium"),
-                DISPLAY_COLUMNS["title"]: st.column_config.TextColumn("職稱 / Title", width="medium"),
-                DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
-                DISPLAY_COLUMNS["is_in_factory"]: st.column_config.CheckboxColumn("在廠 / In Factory", width="medium"),
-                DISPLAY_COLUMNS["is_today_attendance"]: st.column_config.CheckboxColumn("今日出勤 / Today Attendance", width="medium"),
-                DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
-                DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
-                DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
-            },
-            key=_editor_key(),
-            disabled=not employee_edit_enabled,
-        )
-        submitted_employees = st.form_submit_button("▣ 確認儲存人員清單 / Save Employees", type="primary", use_container_width=True, disabled=not employee_edit_enabled)
-    ignore_editor_return = bool(st.session_state.pop(EDITOR_IGNORE_RETURN_KEY, False))
-    if employee_edit_enabled and isinstance(edited, pd.DataFrame) and not ignore_editor_return:
-        st.session_state[STATE_KEY] = _from_editor_df(edited.copy())
+    submitted_employees = False
+    edited = None
+    if not employee_edit_enabled:
+        st.dataframe(editor_df, hide_index=True, use_container_width=True, height=560, column_order=EDITOR_COLS)
+    else:
+        # V120：穩定編輯模式。把 data_editor 與儲存按鈕放在同一個 form，
+        # 避免每修改一格就 rerun 跳回頁面上方；批次按鈕與原儲存邏輯不變。
+        with st.form("v120_employee_stable_editor_form", clear_on_submit=False):
+            edited = st.data_editor(
+                editor_df,
+                hide_index=True,
+                use_container_width=True,
+                num_rows="dynamic",
+                height=560,
+                column_order=EDITOR_COLS,
+                column_config={
+                    DISPLAY_COLUMNS["_delete"]: st.column_config.CheckboxColumn("刪除 / Delete", width="medium"),
+                    DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
+                    DISPLAY_COLUMNS["employee_id"]: st.column_config.TextColumn("工號 / Employee ID", required=True, width="medium"),
+                    DISPLAY_COLUMNS["employee_name"]: st.column_config.TextColumn("姓名 / Name", required=True, width="medium"),
+                    DISPLAY_COLUMNS["department"]: st.column_config.TextColumn("單位 / Department", width="medium"),
+                    DISPLAY_COLUMNS["title"]: st.column_config.TextColumn("職稱 / Title", width="medium"),
+                    DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
+                    DISPLAY_COLUMNS["is_in_factory"]: st.column_config.CheckboxColumn("在廠 / In Factory", width="medium"),
+                    DISPLAY_COLUMNS["is_today_attendance"]: st.column_config.CheckboxColumn("今日出勤 / Today Attendance", width="medium"),
+                    DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
+                    DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
+                    DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
+                },
+                key=_editor_key(),
+                disabled=False,
+            )
+            submitted_employees = st.form_submit_button("▣ 確認儲存人員清單 / Save Employees", type="primary", use_container_width=True)
+        ignore_editor_return = bool(st.session_state.pop(EDITOR_IGNORE_RETURN_KEY, False))
+        if isinstance(edited, pd.DataFrame) and not ignore_editor_return:
+            st.session_state[STATE_KEY] = _from_editor_df(edited.copy())
 
     if submitted_employees:
         current_df = _current_internal_df()

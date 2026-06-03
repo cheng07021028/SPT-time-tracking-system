@@ -695,46 +695,57 @@ with tab1:
         rerun()
 
     st.warning("勾選「刪除 / Delete」後按下儲存，才會真正刪除資料。製令 / Work Order 為必填。")
-    cur_export_df = load_work_orders()
     dl1, dl2 = st.columns(2)
-    dl1.download_button("⟰ 下載目前製令清單 / Export Work Orders", data=_excel_bytes({"work_orders": cur_export_df}), file_name="SPT_製令清單.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+    if dl1.button("⟰ 準備目前製令清單下載 / Prepare Export", use_container_width=True, key="v68_prepare_work_order_export"):
+        export_df = _current_internal_df().drop(columns=["_delete"], errors="ignore")
+        st.session_state["v68_work_order_export_bytes"] = _excel_bytes({"work_orders": export_df})
+        st.session_state["v68_work_order_export_rows"] = len(export_df)
+    if "v68_work_order_export_bytes" in st.session_state:
+        dl1.download_button("下載目前製令清單 / Download Work Orders", data=st.session_state["v68_work_order_export_bytes"], file_name="SPT_製令清單.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="v68_download_work_order_export")
+        dl1.caption(f"已準備 {st.session_state.get('v68_work_order_export_rows', 0)} 筆。")
     tpl = pd.DataFrame(columns=["製令", "P/N", "機型", "組立地點", "客戶", "備註", "啟用"])
     dl2.download_button("⟰ 下載製令匯入範本 / Download Template", data=_excel_bytes({"template": tpl}), file_name="SPT_製令匯入範本.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
 
-    st.info("V64：批次按鈕已改為重新指定整份暫存表；啟用全選 / 啟用取消 / 刪除全選 / 刪除取消會立即刷新 checkbox 與 KPI，不再被舊 data_editor 草稿蓋回。")
-    _commit_current_editor_widget_state()
-    st.session_state[STATE_KEY] = _current_internal_df()
+    st.info("V68：唯讀模式改用輕量表格顯示；按『啟動編輯』後才載入可編輯 data_editor，避免每次選擇都重繪大型編輯器。")
+    if work_order_edit_enabled:
+        _commit_current_editor_widget_state()
+        st.session_state[STATE_KEY] = _current_internal_df()
     editor_df = _to_editor_df(st.session_state[STATE_KEY])
-    # V120：穩定編輯模式。把 data_editor 與儲存按鈕放在同一個 form，
-    # 避免每修改一格就 rerun 跳回頁面上方；批次按鈕與原儲存邏輯不變。
-    with st.form("v120_work_order_stable_editor_form", clear_on_submit=False):
-        edited = st.data_editor(
-            editor_df,
-            hide_index=True,
-            use_container_width=True,
-            num_rows="dynamic",
-            height=560,
-            column_order=EDITOR_COLS,
-            column_config={
-                DISPLAY_COLUMNS["_delete"]: st.column_config.CheckboxColumn("刪除 / Delete", width="medium"),
-                DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
-                DISPLAY_COLUMNS["work_order"]: st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
-                DISPLAY_COLUMNS["part_no"]: st.column_config.TextColumn("P/N / Part No.", width="medium"),
-                DISPLAY_COLUMNS["type_name"]: st.column_config.TextColumn("機型 / Type", width="large"),
-                DISPLAY_COLUMNS["assembly_location"]: st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
-                DISPLAY_COLUMNS["customer"]: st.column_config.TextColumn("客戶 / Customer", width="medium"),
-                DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
-                DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
-                DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
-                DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
-            },
-            key=_editor_key(),
-            disabled=not work_order_edit_enabled,
-        )
-        submitted_work_orders = st.form_submit_button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True, disabled=not work_order_edit_enabled)
-    ignore_editor_return = bool(st.session_state.pop(EDITOR_IGNORE_RETURN_KEY, False))
-    if work_order_edit_enabled and isinstance(edited, pd.DataFrame) and not ignore_editor_return:
-        st.session_state[STATE_KEY] = _from_editor_df(edited.copy())
+    submitted_work_orders = False
+    edited = None
+    if not work_order_edit_enabled:
+        st.dataframe(editor_df, hide_index=True, use_container_width=True, height=560, column_order=EDITOR_COLS)
+    else:
+        # V120：穩定編輯模式。把 data_editor 與儲存按鈕放在同一個 form，
+        # 避免每修改一格就 rerun 跳回頁面上方；批次按鈕與原儲存邏輯不變。
+        with st.form("v120_work_order_stable_editor_form", clear_on_submit=False):
+            edited = st.data_editor(
+                editor_df,
+                hide_index=True,
+                use_container_width=True,
+                num_rows="dynamic",
+                height=560,
+                column_order=EDITOR_COLS,
+                column_config={
+                    DISPLAY_COLUMNS["_delete"]: st.column_config.CheckboxColumn("刪除 / Delete", width="medium"),
+                    DISPLAY_COLUMNS["id"]: st.column_config.NumberColumn("ID / ID", disabled=True, width="small"),
+                    DISPLAY_COLUMNS["work_order"]: st.column_config.TextColumn("製令 / Work Order", required=True, width="medium"),
+                    DISPLAY_COLUMNS["part_no"]: st.column_config.TextColumn("P/N / Part No.", width="medium"),
+                    DISPLAY_COLUMNS["type_name"]: st.column_config.TextColumn("機型 / Type", width="large"),
+                    DISPLAY_COLUMNS["assembly_location"]: st.column_config.TextColumn("組立地點 / Assembly Location", width="medium"),
+                    DISPLAY_COLUMNS["customer"]: st.column_config.TextColumn("客戶 / Customer", width="medium"),
+                    DISPLAY_COLUMNS["note"]: st.column_config.TextColumn("備註 / Note", width="large"),
+                    DISPLAY_COLUMNS["is_active"]: st.column_config.CheckboxColumn("啟用 / Active", width="medium"),
+                    DISPLAY_COLUMNS["created_at"]: st.column_config.TextColumn("建立時間 / Created At", disabled=True, width="medium"),
+                    DISPLAY_COLUMNS["updated_at"]: st.column_config.TextColumn("更新時間 / Updated At", disabled=True, width="medium"),
+                },
+                key=_editor_key(),
+                disabled=False,
+            )
+            submitted_work_orders = st.form_submit_button("▣ 確認儲存製令清單 / Save Work Orders", type="primary", use_container_width=True)
+        ignore_editor_return = bool(st.session_state.pop(EDITOR_IGNORE_RETURN_KEY, False))
+        if isinstance(edited, pd.DataFrame) and not ignore_editor_return:
+            st.session_state[STATE_KEY] = _from_editor_df(edited.copy())
 
     if submitted_work_orders:
         current_df = _current_internal_df()

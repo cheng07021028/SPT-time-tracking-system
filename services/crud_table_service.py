@@ -32,6 +32,11 @@ EMP_DISPLAY_TO_INTERNAL = {
     "今日出勤 / Today Attendance": "is_today_attendance", "備註 / Note": "note", "建立時間 / Created At": "created_at", "更新時間 / Updated At": "updated_at",
 }
 
+# V68: schema checks are expensive on Neon/PostgreSQL because every check can
+# open a remote connection. 03/04 pages call load_* on many reruns, so keep this
+# migration guard process-local and run it only once per worker.
+_RUNTIME_COLUMNS_READY = False
+
 
 def _text(v: Any) -> str:
     try:
@@ -93,16 +98,20 @@ def _add_col(table: str, ddl: str) -> None:
             pass
 
 
-def _ensure_runtime_columns() -> None:
+def _ensure_runtime_columns(force: bool = False) -> None:
+    global _RUNTIME_COLUMNS_READY
+    if _RUNTIME_COLUMNS_READY and not force:
+        return
     ensure_database()
     for ddl in ["work_order_no TEXT", "customer TEXT", "active INTEGER DEFAULT 1", "deleted_at TEXT", "deleted_by TEXT", "delete_reason TEXT"]:
         _add_col("work_orders", ddl)
     for ddl in ["active INTEGER DEFAULT 1", "is_in_factory INTEGER DEFAULT 1", "is_today_attendance INTEGER DEFAULT 1", "deleted_at TEXT", "deleted_by TEXT", "delete_reason TEXT"]:
         _add_col("employees", ddl)
+    _RUNTIME_COLUMNS_READY = True
 
 
 def ensure_tables() -> None:
-    _ensure_runtime_columns()
+    _ensure_runtime_columns(force=True)
 
 
 def _normalize(df: pd.DataFrame | None, cols: list[str], mapping: dict[str, str]) -> pd.DataFrame:

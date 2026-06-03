@@ -4387,3 +4387,80 @@ def audit_v46_neon_free_saver() -> dict[str, Any]:
     }
 
 # ================= END V46 NEON FREE SAVER MODE - DB CACHE POLICY =================
+
+
+# ================= V68 POSTGRES CONNECTION POOL FASTPATH =================
+# Neon/PostgreSQL is remote. Opening a new TLS connection for every SELECT/PRAGMA
+# makes page switches and every Streamlit rerun very slow. Keep the old public
+# db_service API, but route _v25_pg_connect() through psycopg_pool when available.
+_SPT_V68_PG_POOL = None
+_SPT_V68_PG_POOL_DSN = ""
+_SPT_V68_ORIGINAL_PG_CONNECT = _v25_pg_connect if "_v25_pg_connect" in globals() else None
+
+
+class _SptV68PooledConnectionContext:
+    def __init__(self, pool):
+        self._pool = pool
+        self._ctx = None
+
+    def __enter__(self):
+        self._ctx = self._pool.connection()
+        return self._ctx.__enter__()
+
+    def __exit__(self, exc_type, exc, tb):
+        if self._ctx is not None:
+            return self._ctx.__exit__(exc_type, exc, tb)
+        return False
+
+
+def _spt_v68_get_pg_pool():
+    global _SPT_V68_PG_POOL, _SPT_V68_PG_POOL_DSN
+    from psycopg.rows import dict_row
+    from psycopg_pool import ConnectionPool
+
+    dsn = _v25_postgres_dsn()
+    if _SPT_V68_PG_POOL is not None and _SPT_V68_PG_POOL_DSN == dsn:
+        return _SPT_V68_PG_POOL
+
+    if _SPT_V68_PG_POOL is not None:
+        try:
+            _SPT_V68_PG_POOL.close()
+        except Exception:
+            pass
+
+    max_size = int(os.environ.get("SPT_PG_POOL_MAX_SIZE", "6") or "6")
+    timeout = float(os.environ.get("SPT_PG_POOL_TIMEOUT", "20") or "20")
+    _SPT_V68_PG_POOL = ConnectionPool(
+        conninfo=dsn,
+        kwargs={"row_factory": dict_row, "connect_timeout": int(timeout)},
+        min_size=0,
+        max_size=max(1, max_size),
+        timeout=timeout,
+        open=True,
+    )
+    _SPT_V68_PG_POOL_DSN = dsn
+    return _SPT_V68_PG_POOL
+
+
+def _v25_pg_connect():  # type: ignore[override]
+    if str(os.environ.get("SPT_DISABLE_PG_POOL", "0") or "0").strip().lower() in {"1", "true", "yes", "on"}:
+        if callable(_SPT_V68_ORIGINAL_PG_CONNECT):
+            return _SPT_V68_ORIGINAL_PG_CONNECT()
+    try:
+        return _SptV68PooledConnectionContext(_spt_v68_get_pg_pool())
+    except Exception:
+        if callable(_SPT_V68_ORIGINAL_PG_CONNECT):
+            return _SPT_V68_ORIGINAL_PG_CONNECT()
+        raise
+
+
+def audit_v68_postgres_pool_fastpath() -> dict[str, Any]:
+    return {
+        "version": "V68_POSTGRES_CONNECTION_POOL_FASTPATH",
+        "postgres_enabled": is_postgres_enabled() if "is_postgres_enabled" in globals() else False,
+        "pool_enabled": str(os.environ.get("SPT_DISABLE_PG_POOL", "0") or "0").strip().lower() not in {"1", "true", "yes", "on"},
+        "pool_max_size": int(os.environ.get("SPT_PG_POOL_MAX_SIZE", "6") or "6"),
+        "purpose": "reduce Neon connection overhead during Streamlit reruns",
+    }
+
+# ================= END V68 POSTGRES CONNECTION POOL FASTPATH =================
