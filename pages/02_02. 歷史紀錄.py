@@ -2,6 +2,7 @@
 from __future__ import annotations
 from datetime import date, timedelta
 from io import BytesIO
+import os
 import re
 import pandas as pd
 from services.timezone_service import today_date
@@ -121,6 +122,51 @@ HISTORY_RESULT_MESSAGES_KEY = "v238_history_result_messages"
 V259_HISTORY_QUERY_REQUESTED_KEY = "v259_02_history_query_requested"
 V259_HISTORY_DF_KEY = "v259_02_history_df"
 V259_HISTORY_TS_KEY = "v259_02_history_loaded_at"
+
+# V71: 02 歷史明細是互動頁面，不適合一次把數萬筆拉進 Streamlit。
+# 大量匯出/稽核應走 09/15/背景報表；互動查詢先保持 2~3 秒目標。
+def _v71_env_int(name: str, default: int, min_value: int = 50, max_value: int = 5000) -> int:
+    try:
+        value = int(float(str(os.environ.get(name, default)).strip()))
+    except Exception:
+        value = default
+    return max(min_value, min(max_value, value))
+
+V71_HISTORY_INTERACTIVE_MAX_ROWS = _v71_env_int("SPT_HISTORY_INTERACTIVE_MAX_ROWS", 1000, 100, 5000)
+V71_HISTORY_PYTHON_SCAN_MAX_ROWS = _v71_env_int("SPT_HISTORY_PYTHON_SCAN_MAX_ROWS", 2000, 200, 5000)
+
+
+def _v71_top_n_limit(filters: dict | None) -> int | None:
+    try:
+        text = str((filters or {}).get("top_n") or "全部").strip()
+        if text.startswith("Top"):
+            return int(text.replace("Top", "").strip())
+    except Exception:
+        pass
+    return None
+
+
+def _v71_requested_detail_limit(filters: dict | None, default: int = 300) -> int:
+    try:
+        raw = int(float(str((filters or {}).get("detail_limit") or default).strip()))
+    except Exception:
+        raw = default
+    top_limit = _v71_top_n_limit(filters)
+    if top_limit:
+        raw = min(raw, top_limit)
+    return max(50, min(V71_HISTORY_INTERACTIVE_MAX_ROWS, raw))
+
+
+def _v71_needs_python_post_filter(filters: dict | None) -> bool:
+    f = filters or {}
+    anomaly = str(f.get("anomaly_filter") or "全部").strip()
+    sort_by = str(f.get("sort_by") or "").strip()
+    return bool(
+        f.get("departments")
+        or f.get("titles")
+        or anomaly != "全部"
+        or sort_by in {"工時由大到小", "工時由小到大"}
+    )
 
 
 def _v259_now_label() -> str:
@@ -676,7 +722,7 @@ def _focus_filter_to_import_rows(import_df: pd.DataFrame, label: str = "匯入�
         "keyword": "",
         "top_n": "全部",
         "sort_by": "開始時間由新到舊",
-        "detail_limit": max(int(new_filters.get("detail_limit") or 1000), min(max(len(import_df) + 50, 1000), 50000)),
+        "detail_limit": min(V71_HISTORY_INTERACTIVE_MAX_ROWS, max(300, min(max(len(import_df) + 50, 300), V71_HISTORY_INTERACTIVE_MAX_ROWS))),
     })
     saved = save_history_filters(new_filters)
     st.session_state["history_filters_applied_v216"] = saved
@@ -1131,15 +1177,18 @@ def _apply_history_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
                 mask = mask | out[c].fillna("").astype(str).str.contains(keyword, case=False, na=False)
             out = out[mask]
 
-    # Join employee master fields for department/title filtering when available.
-    try:
-        emp_df = load_employees(active_only=False)
-        if not emp_df.empty and "employee_id" in out.columns and "employee_id" in emp_df.columns:
-            add_cols = [c for c in ["employee_id", "department", "title"] if c in emp_df.columns]
-            if len(add_cols) > 1:
-                out = out.merge(emp_df[add_cols].drop_duplicates("employee_id"), on="employee_id", how="left", suffixes=("", "_emp"))
-    except Exception:
-        pass
+    # Join employee master fields only when department/title filters are actually used.
+    # V71: loading and merging the employee master on every 02 query made the refresh path slow
+    # even when the user did not filter by department/title.
+    if filters.get("departments") or filters.get("titles"):
+        try:
+            emp_df = load_employees(active_only=False)
+            if not emp_df.empty and "employee_id" in out.columns and "employee_id" in emp_df.columns:
+                add_cols = [c for c in ["employee_id", "department", "title"] if c in emp_df.columns]
+                if len(add_cols) > 1:
+                    out = out.merge(emp_df[add_cols].drop_duplicates("employee_id"), on="employee_id", how="left", suffixes=("", "_emp"))
+        except Exception:
+            pass
     in_list("department", filters.get("departments", []))
     in_list("title", filters.get("titles", []))
 
@@ -1225,7 +1274,8 @@ def _render_history_filter_panel(base_df: pd.DataFrame, employees: pd.DataFrame,
             )
             start_input = r1c2.date_input("開始日期", value=start_default)
             end_input = r1c3.date_input("結束日期", value=end_default)
-            detail_limit = r1c4.number_input("明細讀取上限", min_value=50, max_value=50000, value=int(applied.get("detail_limit") or 1000), step=50)
+            detail_default = min(V71_HISTORY_INTERACTIVE_MAX_ROWS, max(50, int(applied.get("detail_limit") or 300)))
+            detail_limit = r1c4.number_input("明細讀取上限", min_value=50, max_value=V71_HISTORY_INTERACTIVE_MAX_ROWS, value=detail_default, step=50)
 
             # V253: build options from SQL DISTINCT values when available, not full history rows.
             _opt = option_values or {}
@@ -1356,28 +1406,26 @@ df = st.session_state.get(V259_HISTORY_DF_KEY, pd.DataFrame())
 _query_requested = bool(st.session_state.get(V259_HISTORY_QUERY_REQUESTED_KEY))
 _query_not_loaded = (not isinstance(df, pd.DataFrame)) or (isinstance(df, pd.DataFrame) and df.empty and not st.session_state.get(V259_HISTORY_TS_KEY))
 if _query_requested and _query_not_loaded:
-    if callable(load_history_records_sql_filtered):
-        try:
-            _detail_limit = int(history_filters.get("detail_limit") or 1000)
-        except Exception:
-            _detail_limit = 1000
-        _needs_python_post_filter = bool(
-            history_filters.get("departments")
-            or history_filters.get("titles")
-            or str(history_filters.get("anomaly_filter") or "?券") != "?券"
-            or str(history_filters.get("sort_by") or "") in {"撌交??勗之?啣?", "撌交??勗??啣之"}
-        )
-        _sql_limit = min(50000, max(_detail_limit, 5000)) if _needs_python_post_filter else _detail_limit
-        _sql_df = load_history_records_sql_filtered(history_filters, limit=_sql_limit)
-        if isinstance(_sql_df, pd.DataFrame):
-            df = _apply_history_filters(_sql_df, history_filters)
+    with st.spinner("正在查詢歷史明細，已套用 V71 快速路徑與互動上限..."):
+        if callable(load_history_records_sql_filtered):
+            _detail_limit = _v71_requested_detail_limit(history_filters, default=300)
+            _needs_python_post_filter = _v71_needs_python_post_filter(history_filters)
+            # Python-only filters need a little more candidate rows, but still cannot load tens
+            # of thousands into Streamlit. Keep the page interactive and let exports use a batch path.
+            _sql_limit = min(V71_HISTORY_PYTHON_SCAN_MAX_ROWS, max(_detail_limit, min(V71_HISTORY_PYTHON_SCAN_MAX_ROWS, _detail_limit * 2))) if _needs_python_post_filter else _detail_limit
+            _sql_df = load_history_records_sql_filtered(history_filters, limit=_sql_limit)
+            if isinstance(_sql_df, pd.DataFrame):
+                df = _apply_history_filters(_sql_df, history_filters) if _needs_python_post_filter else _sql_df
+                if len(df) > _detail_limit:
+                    df = df.head(_detail_limit).copy()
+            else:
+                df = pd.DataFrame()
         else:
-            df = pd.DataFrame()
-    else:
-        df = load_records(str(history_filters.get("start_date", _seed_start)), str(history_filters.get("end_date", _seed_end)), None, None)
-        df = _apply_history_filters(df, history_filters)
-    st.session_state[V259_HISTORY_DF_KEY] = df
-    st.session_state[V259_HISTORY_TS_KEY] = _v259_now_label()
+            _fallback_limit = _v71_requested_detail_limit(history_filters, default=300)
+            df = load_records(str(history_filters.get("start_date", _seed_start)), str(history_filters.get("end_date", _seed_end)), None, None)
+            df = _apply_history_filters(df, history_filters).head(_fallback_limit)
+        st.session_state[V259_HISTORY_DF_KEY] = df
+        st.session_state[V259_HISTORY_TS_KEY] = _v259_now_label()
 if not isinstance(df, pd.DataFrame):
     df = pd.DataFrame()
 
@@ -1408,7 +1456,7 @@ with tab1:
     # V131：02 歷史明細編輯欄寬設定。
     # 只新增欄寬/欄位順序設定入口，沿用 table_ui_service 的權威檔永久讀寫；
     # 不改 02 儲存、重算、刪除、匯入、01/02 同步等既有功能。
-    _history_width_df = _prepare_history_display_df(df, include_action_cols=False) if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    _history_width_df = _prepare_history_display_df(df.head(1), include_action_cols=False) if isinstance(df, pd.DataFrame) else pd.DataFrame()
     if not _history_width_df.empty:
         try:
             render_width_settings(

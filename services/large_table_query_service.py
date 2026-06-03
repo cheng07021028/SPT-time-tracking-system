@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Any, Iterable
+import os
 
 import pandas as pd
 
@@ -117,14 +118,18 @@ def _history_order_sql(sort_by: Any) -> str:
     text = _clean_text(sort_by)
     if text == "ID由舊到新":
         return "id ASC"
+    # V71: avoid ORDER BY COALESCE(start_timestamp,start_date).  That expression
+    # prevents PostgreSQL/Neon from using the start_date indexes and made 02 refresh
+    # take minutes on larger tables.  start_date/start_time are maintained by 01/02
+    # and are the index-friendly history ordering columns.
     if text == "開始時間由舊到新":
-        return "COALESCE(start_timestamp,start_date,'') ASC, id ASC"
+        return "start_date ASC, start_time ASC, id ASC"
     if text == "開始時間由新到舊":
-        return "COALESCE(start_timestamp,start_date,'') DESC, id DESC"
+        return "start_date DESC, start_time DESC, id DESC"
     if text == "製令排序":
-        return "COALESCE(work_order,'') ASC, COALESCE(process_name,'') ASC, COALESCE(employee_id,'') ASC, id DESC"
+        return "work_order ASC, process_name ASC, employee_id ASC, id DESC"
     if text == "人員排序":
-        return "COALESCE(employee_id,'') ASC, COALESCE(start_timestamp,start_date,'') DESC, id DESC"
+        return "employee_id ASC, start_date DESC, start_time DESC, id DESC"
     # 工時排序牽涉 HH:MM:SS 與 decimal 混合，保留頁面既有 pandas 精準排序。
     return "id DESC"
 
@@ -191,7 +196,12 @@ def load_history_records_sql_filtered(filters: dict[str, Any] | None = None, *, 
     # V58: interactive history queries must remain short.  Exports/background jobs
     # should use a dedicated batch/export path rather than loading huge history data
     # through the Streamlit page.
-    effective_limit = _safe_int(effective_limit, 1000, 1, 5000)
+    try:
+        max_interactive = int(float(str(os.environ.get("SPT_HISTORY_INTERACTIVE_MAX_ROWS", "1000")).strip()))
+    except Exception:
+        max_interactive = 1000
+    max_interactive = max(100, min(5000, max_interactive))
+    effective_limit = _safe_int(effective_limit, 1000, 1, max_interactive)
     effective_offset = max(0, _safe_int(offset, 0, 0, 999999999))
     sql += " LIMIT ? OFFSET ?"
     params.extend([effective_limit, effective_offset])

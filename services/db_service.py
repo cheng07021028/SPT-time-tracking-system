@@ -4293,6 +4293,10 @@ def _v33_ensure_minimal_neon_schema() -> None:
                 "CREATE INDEX IF NOT EXISTS idx_v33_sec_roles_user ON security_user_roles(lower(username), role_code)",
                 "CREATE INDEX IF NOT EXISTS idx_v33_time_today ON time_records(work_date, id DESC) WHERE deleted_at IS NULL OR deleted_at=''",
                 "CREATE INDEX IF NOT EXISTS idx_v33_time_start_date ON time_records(start_date, id DESC) WHERE deleted_at IS NULL OR deleted_at=''",
+                # V71: 02 history fast refresh indexes.  These match the interactive
+                # start_date/start_time ORDER BY path and common filter combinations.
+                "CREATE INDEX IF NOT EXISTS idx_v71_time_history_start_sort ON time_records(start_date DESC, start_time DESC, id DESC) WHERE deleted_at IS NULL OR deleted_at=''",
+                "CREATE INDEX IF NOT EXISTS idx_v71_time_history_filter_order ON time_records(start_date, work_order, employee_id, process_name, id DESC) WHERE deleted_at IS NULL OR deleted_at=''",
                 "CREATE INDEX IF NOT EXISTS idx_v33_time_employee_status ON time_records(employee_id, status, work_date) WHERE deleted_at IS NULL OR deleted_at=''",
                 "CREATE INDEX IF NOT EXISTS idx_v33_time_group ON time_records(group_key) WHERE deleted_at IS NULL OR deleted_at=''",
                 "CREATE INDEX IF NOT EXISTS idx_v33_work_orders_active ON work_orders(is_active, work_order, work_order_no) WHERE deleted_at IS NULL OR deleted_at=''",
