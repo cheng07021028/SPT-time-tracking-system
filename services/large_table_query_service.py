@@ -101,6 +101,18 @@ def _time_record_date_where(start_date: Any, end_date: Any) -> tuple[str, list[A
     return " AND ".join(where), params
 
 
+
+
+def _time_records_not_deleted_where() -> str:
+    """SQL predicate for rows that are visible in 01/02/05/08 runtime views.
+
+    02 history delete is implemented as a DB soft delete.  Any SQL-first read
+    path must apply the same predicate as services.time_record_service.load_records;
+    otherwise deleted rows can reappear after a Reboot when the page reloads from
+    Neon instead of the current session cache.
+    """
+    return "(deleted_at IS NULL OR deleted_at='')"
+
 def _history_order_sql(sort_by: Any) -> str:
     text = _clean_text(sort_by)
     if text == "ID由舊到新":
@@ -126,7 +138,7 @@ def load_history_records_sql_filtered(filters: dict[str, Any] | None = None, *, 
     f = dict(filters or {})
     s = start_date if start_date is not None else f.get("start_date")
     e = end_date if end_date is not None else f.get("end_date")
-    where: list[str] = []
+    where: list[str] = [_time_records_not_deleted_where()]
     params: list[Any] = []
 
     date_clause, date_params = _time_record_date_where(s, e)
@@ -197,7 +209,7 @@ def count_history_records_sql_filtered(filters: dict[str, Any] | None = None, *,
     f = dict(filters or {})
     s = start_date if start_date is not None else f.get("start_date")
     e = end_date if end_date is not None else f.get("end_date")
-    where: list[str] = []
+    where: list[str] = [_time_records_not_deleted_where()]
     params: list[Any] = []
     date_clause, date_params = _time_record_date_where(s, e)
     if date_clause:
@@ -238,8 +250,10 @@ def load_daily_record_summary_sql(work_date: Any) -> pd.DataFrame:
     sql = """
         SELECT employee_id, work_hours, end_timestamp, status
         FROM time_records
-        WHERE COALESCE(start_date,'') = ? OR substr(COALESCE(start_timestamp,''),1,10) = ?
+        WHERE (_time_records_not_deleted_where_PLACEHOLDER_)
+          AND (COALESCE(start_date,'') = ? OR substr(COALESCE(start_timestamp,''),1,10) = ?)
     """
+    sql = sql.replace("_time_records_not_deleted_where_PLACEHOLDER_", _time_records_not_deleted_where())
     df = query_df(sql, (d, d))
     if df is None or df.empty:
         return pd.DataFrame(columns=["employee_id", "work_hours", "end_timestamp", "status"])
@@ -262,14 +276,16 @@ def load_history_filter_options_sql(start_date: Any = None, end_date: Any = None
     ]
     out: dict[str, list[str]] = {c: [] for c in cols}
     date_clause, date_params = _time_record_date_where(start_date, end_date)
-    where_sql = f" WHERE ({date_clause})" if date_clause else ""
+    base_where = [_time_records_not_deleted_where()]
+    if date_clause:
+        base_where.append(f"({date_clause})")
+    where_sql = " WHERE " + " AND ".join(base_where)
     lim = _safe_int(limit_per_column, 5000, 50, 50000)
     for col in cols:
         try:
             sql = (
                 f"SELECT DISTINCT COALESCE({col}, '') AS v FROM time_records"
-                f"{where_sql} AND COALESCE({col}, '') <> ''" if where_sql
-                else f"SELECT DISTINCT COALESCE({col}, '') AS v FROM time_records WHERE COALESCE({col}, '') <> ''"
+                f"{where_sql} AND COALESCE({col}, '') <> ''"
             )
             sql += " ORDER BY v LIMIT ?"
             params = list(date_params) + [lim]
